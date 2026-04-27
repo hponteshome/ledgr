@@ -1,0 +1,4 @@
+id;name;permissions;isActive;createdAt;updatedAt;deletedAt
+ad8e026c-4164-4fc7-8668-42cc7f3cc67e;Administrador Master;{"all":true};1;2026-03-18T15:06:28.292Z;2026-03-18T15:40:03.936Z;
+b1234567-c123-d123-e123-f12345678901;Operador;{"read":true,"write":true,"delete":false};1;2026-03-18T15:06:28.317Z;2026-03-18T15:40:03.936Z;
+c2345678-d234-e234-f234-a23456789012;Visualizador;{"read":true,"write":false,"delete":false};1;2026-03-18T15:06:29.189Z;2026-03-18T15:40:03.936Z;

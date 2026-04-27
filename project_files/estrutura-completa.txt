@@ -1,0 +1,66 @@
+[PASTA] components/
+  [PASTA] auth/
+  [PASTA] common/
+  [PASTA] financeiro/
+    [ARQUIVO] SugestaoConta.tsx (0 KB - 02/03/2026 08:28)
+  [ARQUIVO] Alert.tsx (1.35 KB - 02/03/2026 08:28)
+  [ARQUIVO] Header.tsx (11.11 KB - 06/03/2026 10:47)
+  [ARQUIVO] HomeRoute.tsx (0.77 KB - 02/03/2026 08:28)
+  [ARQUIVO] KPICard.tsx (1.16 KB - 02/03/2026 08:28)
+  [ARQUIVO] Layout.tsx (5.53 KB - 06/03/2026 10:45)
+  [ARQUIVO] LoadingSpinner.tsx (0.55 KB - 02/03/2026 08:28)
+  [ARQUIVO] PrivateRoute.tsx (0.39 KB - 02/03/2026 08:28)
+  [ARQUIVO] ProtectedRoute.tsx (0.9 KB - 03/03/2026 15:40)
+  [ARQUIVO] PublicLayout.tsx (4.14 KB - 02/03/2026 08:28)
+  [ARQUIVO] SearchRFBButton.tsx (3.69 KB - 06/03/2026 10:42)
+  [ARQUIVO] UserCard.tsx (1.45 KB - 06/03/2026 10:43)
+[PASTA] contexts/
+  [ARQUIVO] AuthContext.tsx (4.06 KB - 06/03/2026 10:49)
+  [ARQUIVO] CompanyContext.tsx (4.98 KB - 06/03/2026 10:50)
+[PASTA] pages/
+  [PASTA] companies/
+    [ARQUIVO] CompanyEditar.tsx (16.81 KB - 06/03/2026 10:34)
+    [ARQUIVO] CompanyForm.tsx (9.09 KB - 06/03/2026 10:40)
+    [ARQUIVO] CompanyList.tsx (8.73 KB - 06/03/2026 10:36)
+    [ARQUIVO] index.tsx (0.09 KB - 06/03/2026 10:38)
+    [ARQUIVO] KPICard.tsx (0.94 KB - 02/03/2026 20:17)
+  [PASTA] financial/
+    [ARQUIVO] LivroCaixa.tsx (0 KB - 02/03/2026 08:28)
+  [PASTA] forgot-password/
+    [ARQUIVO] ForgotPassword.tsx (6 KB - 02/03/2026 18:02)
+  [PASTA] login/
+    [ARQUIVO] Login.tsx (8.31 KB - 06/03/2026 10:58)
+  [PASTA] register/
+    [ARQUIVO] Register.tsx (7.4 KB - 06/03/2026 10:56)
+  [PASTA] reset-password/
+    [ARQUIVO] ResetPassword.tsx (10.14 KB - 02/03/2026 18:02)
+  [PASTA] usuarios/
+    [ARQUIVO] index.tsx (0.04 KB - 06/03/2026 11:00)
+    [ARQUIVO] User.tsx (0.26 KB - 06/03/2026 11:00)
+    [ARQUIVO] UserCard.tsx (1.46 KB - 04/03/2026 23:32)
+    [ARQUIVO] UserForm.tsx (13.62 KB - 06/03/2026 11:02)
+    [ARQUIVO] UserList old.tsx (13.44 KB - 04/03/2026 23:14)
+    [ARQUIVO] UserList.tsx (5.26 KB - 06/03/2026 11:03)
+  [ARQUIVO] AuditLogs.tsx (1.9 KB - 02/03/2026 08:28)
+  [ARQUIVO] Auditoria.tsx (2.74 KB - 02/03/2026 17:44)
+  [ARQUIVO] Dashboard Mock.tsx (14.96 KB - 03/03/2026 14:13)
+  [ARQUIVO] Dashboard.tsx (5.17 KB - 06/03/2026 10:25)
+  [ARQUIVO] HomeDashboard.backup.tsx (5.3 KB - 02/03/2026 17:42)
+  [ARQUIVO] LedgrHome.tsx (6.92 KB - 04/03/2026 09:14)
+  [ARQUIVO] Registro.tsx (9.02 KB - 06/03/2026 10:26)
+  [ARQUIVO] xDashboard.tsx (21.08 KB - 02/03/2026 20:25)
+  [ARQUIVO] xHomeDashboard.tsx (15.16 KB - 02/03/2026 19:24)
+[PASTA] routes/
+  [ARQUIVO] index com rotas completas.tsx (3.28 KB - 03/03/2026 10:26)
+  [ARQUIVO] index.tsx (2.2 KB - 06/03/2026 11:05)
+[PASTA] services/
+  [ARQUIVO] api.ts (2.09 KB - 06/03/2026 11:06)
+[PASTA] styles/
+  [ARQUIVO] globals.css (0 KB - 17/02/2026 16:32)
+[PASTA] types/
+[ARQUIVO] App - Copia.tsx (0.54 KB - 02/03/2026 08:28)
+[ARQUIVO] App.tsx (0.51 KB - 06/03/2026 11:07)
+[ARQUIVO] index.css (0.66 KB - 03/03/2026 11:41)
+[ARQUIVO] main.tsx (0.24 KB - 03/03/2026 12:38)
+[ARQUIVO] vite-env.d.ts (0 KB - 02/03/2026 08:28)
+

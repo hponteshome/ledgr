@@ -1,0 +1,55 @@
+@import "tailwindcss";
+
+/* 1. RESET E CONFIGURAÇÕES BASE */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background-color: #F8FAFC; /* Fundo suave conforme Design System */
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color: #0F172A;
+  overflow-x: hidden; /* Evita scroll horizontal indesejado */
+}
+
+/* 2. SIDEBAR LIMPA (LEDGR 1.0) */
+/* Remove a barra visual mas mantém a funcionalidade de scroll na Sidebar */
+.custom-scrollbar::-webkit-scrollbar { 
+  width: 0px; 
+  height: 0px; 
+}
+
+.custom-scrollbar {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+  overflow-y: auto;
+  overflow-x: visible !important; /* CRÍTICO: Permite que o menu flutuante apareça para fora */
+}
+
+/* 3. ANIMAÇÕES DE INTERFACE */
+.animate-fadeIn { 
+  animation: fadeIn 0.3s ease-in-out; 
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* 4. CLASSES AUXILIARES DE DESIGN (Opcional, mas recomendado) */
+.glass-effect {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* Garante que modais e tooltips fiquem sempre acima de tudo */
+.z-max {
+  z-index: 9999;
+}

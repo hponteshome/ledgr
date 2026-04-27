@@ -1,0 +1,33 @@
+D:\Projetos\Ledgr\
+├── apps\
+│   ├── api\                    <-- ESTE É O SEU BACKEND (O MONÓLITO)
+│   │   ├── src\
+│   │   │   ├── main.ts         <-- Ponto de entrada (Porta 3000)
+│   │   │   ├── app.module.ts   <-- Importa Auth, Core e Integrations
+│   │   │   ├── auth\           <-- Login, JWT (Ex-service-iam)
+│   │   │   ├── core\           <-- Negócio (Ex-service-cadastro)
+│   │   │   │   ├── tenants\    (Empresas)
+│   │   │   │   ├── users\      (Usuários)
+│   │   │   │   └── addresses\  (Endereços)
+│   │   │   ├── integrations\   <-- Serviços externos (Ex-service-rfb)
+│   │   │   └── prisma\         <-- Service e Client do Prisma
+│   │   ├── prisma\             <-- schema.prisma e migrations
+│   │   ├── package.json        <-- Scripts do Backend
+│   │   └── .env                <-- DATABASE_URL
+│   │
+│   └── frontend\               <-- ESTE É O SEU FRONTEND (VITE/REACT)
+│       ├── src\
+│       │   ├── components\     (Layout, Header, Button)
+│       │   ├── contexts\       (AuthContext, ThemeContext)
+│       │   ├── pages\          (Dashboard, Login, Settings)
+│       │   └── services\       (api.ts - aponta para a porta 3000)
+│       ├── public\
+│       ├── package.json        <-- Scripts do Frontend
+│       └── .env                <-- VITE_API_URL=http://localhost:3000
+│
+├── infra\
+│   └── docker\
+│       └── docker-compose.yml  <-- Apenas Postgres e Redis
+│
+├── .gitignore
+└── package.json                <-- (Opcional) Script root para subir ambos

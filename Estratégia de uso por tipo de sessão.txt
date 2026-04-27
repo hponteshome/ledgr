@@ -1,0 +1,21 @@
+Estratégia de uso por tipo de sessão:
+Sessão de bug fix — cole só isto no início:
+
+Stack: NestJS+Prisma+PG / React+Vite
+Auth: @ledgr:token / @ledgr:activeCompany
+Upload: fetch direto (não axios — corrompe multipart)
+AuditLog: actorId, action, targetId, before, after, ip
+JournalEntry: campo date (não entryDate), sourceModule
+
+São ~5 linhas e cobrem 80% dos erros recorrentes.
+
+Sessão de novo módulo — cole o arquivo completo + o trecho do schema dos models envolvidos. 
+Por exemplo, para trabalhar no Contas a Receber bastaria colar as seções de Stack + Convenções + o model ApEntry do schema.
+
+Sobre o schema.prisma: nunca cole o arquivo inteiro. A estratégia é: quando precisar de um model específico, rode:
+ Select-String -Path "prisma/schema.prisma" -Pattern "model NomeDoModel" -Context 0,40
+ e cole só aquele trecho — exatamente como fizemos hoje com o DocumentStatus e o ApEntryStatus.
+
+Manutenção do arquivo: a seção "Estado dos módulos" é a mais importante de manter atualizada 
+— quando um módulo for para produção ou uma pendência for resolvida, atualize aquela linha.
+ O resto raramente muda.

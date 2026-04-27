@@ -1,0 +1,32 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",          // Essencial para "type": "module"
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2022", "DOM"],
+    "skipLibCheck": true,
+    "sourceMap": true,
+    "outDir": "./dist",
+    "declaration": true,
+    "isolatedModules": true,
+    "strict": true,
+    "noImplicitAny": false,        // Facilita a migração do monólito
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["apps/*/src"],
+      "@auth/*": ["apps/api/src/auth/*"],
+      "@prisma/*": ["apps/api/src/prisma/*"],
+      "@accounting/*": ["apps/api/src/modules/accounting/*"],
+      "@multi-company/*": ["apps/api/src/multi-company/*"],
+      "@core/*": ["apps/api/src/core/*"],
+      "@shared/*": ["apps/shared/*"]
+    }
+  },
+  "include": [
+    "infra/prisma/**/*.ts", 
+    "apps/**/*.ts"
+  ],
+  "exclude": ["node_modules", "dist"]
+}

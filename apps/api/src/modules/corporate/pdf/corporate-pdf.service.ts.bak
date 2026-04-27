@@ -1,0 +1,341 @@
+// apps/api/src/modules/corporate/pdf/corporate-pdf.service.ts
+import { Injectable } from '@nestjs/common';
+import * as puppeteer from 'puppeteer';
+import * as crypto from 'crypto';
+import { ShareholdersService } from '../shareholders/shareholders.service';
+import { TransfersService } from '../transfers/transfers.service';
+
+@Injectable()
+export class CorporatePdfService {
+  constructor(
+    private shareholdersService: ShareholdersService,
+    private transfersService: TransfersService,
+  ) {}
+
+  async generateShareRegisterPdf(companyId: string, company: any): Promise<{ buffer: Buffer; hash: string }> {
+    const [records, summary] = await Promise.all([
+      this.shareholdersService.findAll(companyId, { active: true }),
+      this.shareholdersService.getCapitalSummary(companyId),
+    ]);
+
+    const html = this.buildShareRegisterHtml(company, records, summary);
+    return this.renderPdf(html);
+  }
+
+  async generateTransferRegisterPdf(companyId: string, company: any, year?: number): Promise<{ buffer: Buffer; hash: string }> {
+    const transfers = await this.transfersService.findAll(companyId, { year });
+    const html = this.buildTransferRegisterHtml(company, transfers, year);
+    return this.renderPdf(html);
+  }
+
+  private async renderPdf(html: string): Promise<{ buffer: Buffer; hash: string }> {
+    const browser = await puppeteer.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+    const page = await browser.newPage();
+    await page.setContent(html, { waitUntil: 'networkidle0' });
+    const pdfBuffer = await page.pdf({
+      format: 'A4',
+      printBackground: true,
+      margin: { top: '20mm', right: '15mm', bottom: '20mm', left: '15mm' },
+    });
+    await browser.close();
+    const buffer = Buffer.from(pdfBuffer);
+    const hash = crypto.createHash('sha256').update(buffer).digest('hex');
+    return { buffer, hash };
+  }
+
+  private fmt(value: number | string | null | undefined): string {
+    if (value === null || value === undefined) return '—';
+    const n = typeof value === 'string' ? parseFloat(value) : value;
+    return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  private fmtDate(d: Date | string | null | undefined): string {
+    if (!d) return '—';
+    return new Date(d).toLocaleDateString('pt-BR');
+  }
+
+  private buildShareRegisterHtml(company: any, records: any[], summary: any): string {
+    const rows = records.map((r, i) => `
+      <tr class="${i % 2 === 0 ? 'even' : 'odd'}">
+        <td class="center">${i + 1}</td>
+        <td><strong>${r.holderName}</strong><br><span class="taxid">${r.holderTaxId}</span></td>
+        <td class="center">${r.shareType === 'QUOTA' ? 'Quota' : r.shareType === 'ORDINARIA' ? 'ON' : 'PN'}${r.series ? ' – ' + r.series : ''}</td>
+        <td class="right">${this.fmt(r.quantity)}</td>
+        <td class="right">R$ ${this.fmt(r.nominalValue)}</td>
+        <td class="right">R$ ${this.fmt(r.totalValue)}</td>
+        <td class="center">${this.fmt(r.percentOwned)}%</td>
+        <td class="center">${r.isFullyPaid ? '✓' : '—'}</td>
+        <td class="center">${this.fmtDate(r.integralizationDate)}</td>
+        <td class="center">${r.hasEncumbrance ? '⚠ Sim' : 'Não'}</td>
+      </tr>
+    `).join('');
+
+    return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Livro de Registro de Ações</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Times New Roman', serif; font-size: 10pt; color: #111; background: #fff; }
+
+  .cover { text-align: center; padding: 60px 0 40px; border-bottom: 2pt solid #000; margin-bottom: 30px; }
+  .cover .logo-area { font-size: 8pt; letter-spacing: 2px; text-transform: uppercase; color: #555; margin-bottom: 12px; }
+  .cover h1 { font-size: 18pt; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
+  .cover h2 { font-size: 12pt; font-weight: normal; margin-top: 8px; }
+  .cover .company { margin-top: 20px; font-size: 11pt; }
+  .cover .meta { margin-top: 10px; font-size: 9pt; color: #444; }
+
+  .summary-box { display: flex; gap: 0; border: 1pt solid #000; margin-bottom: 20px; }
+  .summary-item { flex: 1; padding: 10px 14px; border-right: 0.5pt solid #ccc; }
+  .summary-item:last-child { border-right: none; }
+  .summary-label { font-size: 7pt; text-transform: uppercase; letter-spacing: 0.5px; color: #555; }
+  .summary-value { font-size: 13pt; font-weight: bold; margin-top: 2px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 8.5pt; }
+  th { background: #000; color: #fff; padding: 6px 5px; text-align: left; font-size: 7.5pt; text-transform: uppercase; letter-spacing: 0.3px; }
+  th.center, td.center { text-align: center; }
+  th.right, td.right { text-align: right; }
+  td { padding: 5px 5px; border-bottom: 0.5pt solid #e0e0e0; vertical-align: top; }
+  tr.even td { background: #fafafa; }
+  .taxid { font-size: 7.5pt; color: #666; font-family: 'Courier New', monospace; }
+
+  .totals-row td { background: #f0f0f0; font-weight: bold; border-top: 1pt solid #000; }
+
+  .legal-note { margin-top: 24px; font-size: 8pt; color: #444; border-top: 0.5pt solid #ccc; padding-top: 12px; }
+  .signatures { margin-top: 50px; display: flex; gap: 60px; }
+  .sig-line { flex: 1; border-top: 0.5pt solid #000; padding-top: 6px; text-align: center; font-size: 8pt; }
+  .footer { margin-top: 20px; font-size: 7pt; color: #888; text-align: center; border-top: 0.5pt solid #ddd; padding-top: 8px; }
+
+  @page { size: A4 landscape; margin: 15mm; }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <div class="logo-area">◆ LEDGR — Sistema de Gestão Contábil e Societária</div>
+  <h1>Livro de Registro de ${records[0]?.entryType === 'LTDA' ? 'Quotistas' : 'Ações Nominativas'}</h1>
+  <h2>${records[0]?.entryType === 'SA' ? 'Lei 6.404/76, Art. 31' : 'Código Civil, Art. 1.053'}</h2>
+  <div class="company">
+    <strong>${company.legalName}</strong><br>
+    CNPJ: ${company.taxId}
+  </div>
+  <div class="meta">
+    Data de Emissão: ${new Date().toLocaleDateString('pt-BR')} &nbsp;|&nbsp;
+    Hora: ${new Date().toLocaleTimeString('pt-BR')}
+  </div>
+</div>
+
+<div class="summary-box">
+  <div class="summary-item">
+    <div class="summary-label">Total de Titulares</div>
+    <div class="summary-value">${summary.holdersCount}</div>
+  </div>
+  <div class="summary-item">
+    <div class="summary-label">Total de ${records[0]?.entryType === 'LTDA' ? 'Quotas' : 'Ações'}</div>
+    <div class="summary-value">${this.fmt(summary.totalShares)}</div>
+  </div>
+  <div class="summary-item">
+    <div class="summary-label">Capital Social Total</div>
+    <div class="summary-value">R$ ${this.fmt(summary.totalCapital)}</div>
+  </div>
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th style="width:30px">#</th>
+      <th>Titular / CPF-CNPJ</th>
+      <th class="center" style="width:60px">Tipo</th>
+      <th class="right" style="width:80px">Quantidade</th>
+      <th class="right" style="width:70px">Vl. Nominal</th>
+      <th class="right" style="width:90px">Total (R$)</th>
+      <th class="center" style="width:50px">%</th>
+      <th class="center" style="width:50px">Integraliz.</th>
+      <th class="center" style="width:70px">Dt. Integr.</th>
+      <th class="center" style="width:50px">Gravame</th>
+    </tr>
+  </thead>
+  <tbody>
+    ${rows}
+  </tbody>
+  <tfoot>
+    <tr class="totals-row">
+      <td colspan="3"><strong>TOTAL GERAL</strong></td>
+      <td class="right"><strong>${this.fmt(summary.totalShares)}</strong></td>
+      <td></td>
+      <td class="right"><strong>R$ ${this.fmt(summary.totalCapital)}</strong></td>
+      <td class="center"><strong>100%</strong></td>
+      <td colspan="3"></td>
+    </tr>
+  </tfoot>
+</table>
+
+<div class="legal-note">
+  <strong>Nota Legal:</strong> Este livro é mantido em conformidade com ${records[0]?.entryType === 'SA'
+    ? 'a Lei 6.404/76 (Lei das S.A.), artigos 31 e 100, e autenticado perante a JUCESP conforme IN DREI nº 79/2022'
+    : 'o Código Civil Brasileiro, artigos 1.053 e 1.057'}.
+  A autenticidade deste documento pode ser verificada pelo hash SHA-256 registrado no sistema LEDGR.
+</div>
+
+<div class="signatures">
+  <div class="sig-line">
+    ________________________________<br>
+    Diretor / Sócio Administrador<br>
+    CPF: ___________________
+  </div>
+  <div class="sig-line">
+    ________________________________<br>
+    Contador Responsável<br>
+    CRC: ___________________
+  </div>
+  <div class="sig-line">
+    ________________________________<br>
+    Testemunha<br>
+    CPF: ___________________
+  </div>
+</div>
+
+<div class="footer">
+  Gerado automaticamente pelo LEDGR em ${new Date().toISOString()} &nbsp;·&nbsp; Documento sujeito a assinatura digital ICP-Brasil
+</div>
+
+</body>
+</html>`;
+  }
+
+  private buildTransferRegisterHtml(company: any, transfers: any[], year?: number): string {
+    let seq = 0;
+    const rows = transfers.map(t => {
+      seq++;
+      return `
+      <tr class="${seq % 2 === 0 ? 'even' : 'odd'}">
+        <td class="center">${seq}</td>
+        <td class="center">${this.fmtDate(t.transferDate)}</td>
+        <td>
+          <strong>${t.fromRecord.holderName}</strong><br>
+          <span class="taxid">${t.fromRecord.holderTaxId}</span>
+        </td>
+        <td>
+          <strong>${t.toRecord.holderName}</strong><br>
+          <span class="taxid">${t.toRecord.holderTaxId}</span>
+        </td>
+        <td class="center">${t.shareType === 'QUOTA' ? 'Quota' : t.shareType === 'ORDINARIA' ? 'ON' : 'PN'}${t.series ? '–' + t.series : ''}</td>
+        <td class="right">${this.fmt(t.quantity)}</td>
+        <td class="right">R$ ${this.fmt(t.nominalValue)}</td>
+        <td class="right">R$ ${this.fmt(t.transferValue)}</td>
+        <td class="center">${this.reasonLabel(t.reason)}</td>
+        <td class="center">${t.instrumentType ?? '—'}</td>
+        <td class="center ${t.averbacaoDate ? 'averbado' : 'pendente'}">${t.averbacaoDate ? '✓ ' + this.fmtDate(t.averbacaoDate) : 'Pendente'}</td>
+      </tr>`;
+    }).join('');
+
+    return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Livro de Transferência</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Times New Roman', serif; font-size: 10pt; color: #111; background: #fff; }
+  .cover { text-align: center; padding: 50px 0 30px; border-bottom: 2pt solid #000; margin-bottom: 24px; }
+  .cover .logo-area { font-size: 8pt; letter-spacing: 2px; text-transform: uppercase; color: #555; margin-bottom: 10px; }
+  .cover h1 { font-size: 17pt; font-weight: bold; text-transform: uppercase; }
+  .cover h2 { font-size: 11pt; font-weight: normal; margin-top: 6px; }
+  .cover .company { margin-top: 16px; font-size: 11pt; }
+  .cover .meta { font-size: 8.5pt; color: #555; margin-top: 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: 8pt; }
+  th { background: #111; color: #fff; padding: 5px 5px; font-size: 7.5pt; text-transform: uppercase; }
+  th.center, td.center { text-align: center; }
+  th.right, td.right { text-align: right; }
+  td { padding: 5px 5px; border-bottom: 0.5pt solid #e0e0e0; vertical-align: top; }
+  tr.even td { background: #fafafa; }
+  .taxid { font-size: 7.5pt; color: #666; font-family: 'Courier New', monospace; }
+  .averbado { color: #166534; font-weight: bold; }
+  .pendente { color: #92400e; }
+  .totals-row td { background: #f0f0f0; font-weight: bold; border-top: 1pt solid #000; }
+  .legal-note { margin-top: 20px; font-size: 8pt; color: #444; border-top: 0.5pt solid #ccc; padding-top: 10px; }
+  .signatures { margin-top: 40px; display: flex; gap: 50px; }
+  .sig-line { flex: 1; border-top: 0.5pt solid #000; padding-top: 5px; text-align: center; font-size: 8pt; }
+  .footer { margin-top: 16px; font-size: 7pt; color: #888; text-align: center; border-top: 0.5pt solid #ddd; padding-top: 6px; }
+  @page { size: A4 landscape; margin: 12mm 15mm; }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <div class="logo-area">◆ LEDGR — Sistema de Gestão Contábil e Societária</div>
+  <h1>Livro de Transferência de ${transfers[0]?.entryType === 'LTDA' ? 'Quotas' : 'Ações'}</h1>
+  <h2>${transfers[0]?.entryType === 'SA' ? 'Lei 6.404/76, Art. 36' : 'Código Civil, Art. 1.057'} ${year ? '· Exercício ' + year : ''}</h2>
+  <div class="company">
+    <strong>${company.legalName}</strong><br>
+    CNPJ: ${company.taxId}
+  </div>
+  <div class="meta">
+    Total de transferências registradas: ${transfers.length} &nbsp;|&nbsp;
+    Emitido em: ${new Date().toLocaleDateString('pt-BR')}
+  </div>
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th class="center" style="width:28px">Nº</th>
+      <th class="center" style="width:65px">Data</th>
+      <th style="width:18%">Cedente / CPF-CNPJ</th>
+      <th style="width:18%">Cessionário / CPF-CNPJ</th>
+      <th class="center" style="width:50px">Tipo</th>
+      <th class="right" style="width:70px">Quantidade</th>
+      <th class="right" style="width:70px">Vl. Nominal</th>
+      <th class="right" style="width:80px">Vl. Cessão</th>
+      <th class="center" style="width:80px">Motivo</th>
+      <th class="center" style="width:90px">Instrumento</th>
+      <th class="center" style="width:75px">Averbação</th>
+    </tr>
+  </thead>
+  <tbody>${rows}</tbody>
+  <tfoot>
+    <tr class="totals-row">
+      <td colspan="5"><strong>TOTAL (${transfers.length} transferências)</strong></td>
+      <td class="right"><strong>${this.fmt(transfers.reduce((s, t) => s + Number(t.quantity), 0))}</strong></td>
+      <td></td>
+      <td class="right"><strong>R$ ${this.fmt(transfers.reduce((s, t) => s + Number(t.transferValue), 0))}</strong></td>
+      <td colspan="3"></td>
+    </tr>
+  </tfoot>
+</table>
+
+<div class="legal-note">
+  <strong>Nota Legal:</strong> Livro mantido conforme ${transfers[0]?.entryType === 'SA'
+    ? 'Lei 6.404/76, art. 36 e IN DREI nº 82/2021'
+    : 'Código Civil, art. 1.057'}. Cada transferência é averbada pelo administrador responsável.
+</div>
+
+<div class="signatures">
+  <div class="sig-line">________________________________<br>Diretor / Sócio Administrador<br>CPF: ___________________</div>
+  <div class="sig-line">________________________________<br>Contador Responsável<br>CRC: ___________________</div>
+</div>
+
+<div class="footer">
+  Gerado pelo LEDGR em ${new Date().toISOString()} &nbsp;·&nbsp; Sujeito a assinatura digital ICP-Brasil
+</div>
+
+</body>
+</html>`;
+  }
+
+  private reasonLabel(r: string): string {
+    const map: Record<string, string> = {
+      COMPRA_VENDA: 'Compra e Venda',
+      DOACAO: 'Doação',
+      HERANCA: 'Herança',
+      INTEGRALIZACAO: 'Integralização',
+      REDUCAO_CAPITAL: 'Red. Capital',
+      BONIFICACAO: 'Bonificação',
+      CISAO: 'Cisão',
+      INCORPORACAO: 'Incorporação',
+      OUTRO: 'Outro',
+    };
+    return map[r] ?? r;
+  }
+}

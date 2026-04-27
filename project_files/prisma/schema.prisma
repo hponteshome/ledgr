@@ -1,0 +1,187 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+//  url        = env("DATABASE_URL")   /// coeentado pra rodar no Prisma7
+  extensions = [uuid_ossp(map: "uuid-ossp")]
+}
+
+// =============================================
+// IAM & AUTHENTICATION
+// =============================================
+
+model User {
+  id                   String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  document             String          @unique @map("document") @db.VarChar
+  documentType         String          @map("document_type") @db.VarChar
+  email                String          @unique @map("email") @db.VarChar
+  passwordHash         String          @map("password_hash") @db.VarChar(255)
+  fullName             String          @map("full_name") @db.VarChar
+  nickname             String?         @map("nickname") @db.VarChar
+  birthDate            DateTime?       @map("birth_date") @db.Timestamp(6)
+  phone                String?         @map("phone") @db.VarChar
+  isActive             Boolean         @default(true) @map("is_active")
+  isEmailConfirmed     Boolean         @default(false) @map("is_email_confirmed")
+  isDocumentConfirmed  Boolean         @default(false) @map("is_document_confirmed")
+  twoFactorSecret      String?         @map("two_factor_secret") @db.VarChar
+  isTwoFactorActive    Boolean         @default(false) @map("two_factor_active")
+  lastAccess           DateTime?       @map("last_access") @db.Timestamp(6)
+  failedAttempts       Int             @default(0) @map("failed_attempts")
+  blockedUntil         DateTime?       @map("blocked_until") @db.Timestamp(6)
+  refreshToken         String?         @map("refresh_token") @db.VarChar
+  profileId            String?         @map("profile_id") @db.Uuid
+  status               String          @default("active") @map("status") @db.VarChar
+  createdAt            DateTime        @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt            DateTime        @default(now()) @map("updated_at") @db.Timestamp(6)
+  deletedAt            DateTime?       @map("deleted_at") @db.Timestamp(6)
+
+  // Relations
+  companies            UserCompany[]
+  profile              Profile?        @relation(fields: [profileId], references: [id])
+
+  @@map("users")
+}
+
+model Profile {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String?  @map("name") @db.VarChar
+  permissions Json     @map("permissions")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  
+  users       User[]
+
+  @@map("profiles")
+}
+
+// =============================================
+// CORE BUSINESS (COMPANIES)
+// =============================================
+
+model Company {
+  id                String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  taxId             String          @unique @map("tax_id") @db.VarChar(18)
+  legalName         String          @map("legal_name") @db.VarChar
+  tradeName         String?         @map("trade_name") @db.VarChar
+  isHeadquarter     Boolean         @default(false) @map("is_headquarter")
+  openingDate       DateTime        @map("opening_date") @db.Date
+  street            String          @map("street") @db.VarChar
+  number            String          @map("number") @db.VarChar
+  complement        String?         @map("complement") @db.VarChar
+  neighborhood      String          @map("neighborhood") @db.VarChar
+  zipCode           String          @map("zip_code") @db.VarChar(8)
+  state             String          @map("state") @db.VarChar(2)
+  city              String          @map("city") @db.VarChar
+  email             String?         @map("email") @db.VarChar
+  phone1            String?         @map("phone_1") @db.VarChar
+  phone2            String?         @map("phone_2") @db.VarChar
+  equity            Decimal         @map("equity") @db.Decimal(15, 2)
+  legalNature       String          @map("legal_nature") @db.VarChar
+  size              String          @map("size") @db.VarChar
+  taxRegime         String          @map("tax_regime") @db.VarChar
+  status            String          @map("status") @db.VarChar
+  statusDate        DateTime        @map("status_date") @db.Date
+  simplesData       Json?           @map("simples_data") @db.Json
+  meiData           Json?           @map("mei_data") @db.Json
+  lastRfbSync       DateTime?       @map("last_rfb_sync") @db.Timestamp(6)
+  partners          Json?           @map("partners")
+  type              String?         @default("CLIENT") @map("type") @db.VarChar
+  createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt         DateTime        @default(now()) @map("updated_at") @db.Timestamp(6)
+
+  // Relations
+  users             UserCompany[]
+  properties        Property[]
+  employees         Employee[]
+  corporateBooks    CorporateBook[]
+
+  @@map("companies")
+}
+
+model UserCompany {
+  id        String  @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userId    String  @map("user_id") @db.Uuid
+  companyId String  @map("company_id") @db.Uuid
+  role      String? @default("ADMIN") @map("role") @db.VarChar
+
+  company   Company @relation(fields: [companyId], references: [id])
+  user      User    @relation(fields: [userId], references: [id])
+
+  @@unique([userId, companyId])
+  @@map("user_companies")
+}
+
+// =============================================
+// NEW MODULES (REAL ESTATE, HR, CORPORATE)
+// =============================================
+
+model Property {
+  id                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId             String   @map("company_id") @db.Uuid
+  incra                 String?  @map("incra") @db.VarChar
+  car                   String?  @map("car") @db.VarChar 
+  registryOfficeId      String?  @map("registry_office_id") @db.VarChar 
+  iptu                  String?  @map("iptu") @db.VarChar
+  fiscalId              String?  @map("fiscal_id") @db.VarChar 
+  propertyTaxId         String?  @map("property_tax_id") @db.VarChar 
+  municipalRegistry     String?  @map("municipal_registry") @db.VarChar 
+  registryStatusHistory String?  @map("registry_status_history") @db.Text 
+  address               String?  @map("address") @db.VarChar
+  
+  company               Company  @relation(fields: [companyId], references: [id])
+
+  @@map("properties")
+}
+
+model Employee {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId       String    @map("company_id") @db.Uuid
+  fullName        String    @map("full_name") @db.VarChar
+  taxId           String    @map("tax_id") @db.VarChar(11)
+  socialId        String?   @map("social_id") @db.VarChar 
+  birthDate       DateTime  @map("birth_date") @db.Date
+  hireDate        DateTime  @map("hire_date") @db.Date
+  terminationDate DateTime? @map("termination_date") @db.Date
+  role            String    @map("role") @db.VarChar
+  salary          Decimal   @map("salary") @db.Decimal(15, 2)
+  department      String?   @map("department") @db.VarChar
+  status          String    @default("active") @map("status") @db.VarChar 
+  
+  company         Company   @relation(fields: [companyId], references: [id])
+
+  @@map("employees")
+}
+
+model CorporateBook {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId           String    @map("company_id") @db.Uuid
+  type                String    @map("type") @db.VarChar 
+  bookNumber          Int       @map("book_number")
+  isDigitalSigned     Boolean   @default(false) @map("is_digital_signed")
+  digitalSignature    String?   @map("digital_signature") @db.Text
+  jucespCertification String?   @map("jucesp_certification") @db.VarChar
+  certificationDate   DateTime? @map("certification_date") @db.Date
+  contentUrl          String?   @map("content_url") @db.VarChar
+  status              String    @default("draft") @map("status") @db.VarChar
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+
+  company             Company   @relation(fields: [companyId], references: [id])
+
+  @@map("corporate_books")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  actorId   String?  @map("actor_id") @db.Uuid
+  action    String   @map("acao")
+  targetId  String?  @map("target_id")
+  before    Json?    @map("antes")
+  after     Json?    @map("depois")
+  ip        String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("audit_logs")
+}

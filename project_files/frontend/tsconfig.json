@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "useDefineForClassFields": true,
+    "lib": ["DOM", "DOM.Iterable", "ESNext"],
+    "allowJs": false,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "module": "ESNext",
+    "moduleResolution": "Node",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx", // <-- ISSO resolve o erro "React is not defined"
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"] // <-- Ajustado para a nova posição da pasta src
+    }
+  },
+  "include": ["src"],
+"references": [{ "path": "./tsconfig.node.json" }] // <-- Verifique se esta linha existe
+}
