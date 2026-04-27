@@ -1,0 +1,7 @@
+id;userId;companyId;role;user;company
+f5828e9f-12e0-49d8-98f3-f65d475af1ae;177e026c-4164-4fc7-8668-42cc7f3cc67e;06a88dfa-d4cf-4c5c-8dc1-83538d6b8b7c;ADMIN;{"email":"hpontes@ledgr.com","fullName":"Hpontes","document":"56524021991"};{"tradeName":"HALLO","taxId":"07432458000169"}
+60526a50-4f54-460a-a939-d2fcdf2e5c49;177e026c-4164-4fc7-8668-42cc7f3cc67e;11111111-1111-1111-1111-111111111111;ADMIN;{"email":"hpontes@ledgr.com","fullName":"Hpontes","document":"56524021991"};{"tradeName":"🌐 Visão Global","taxId":"00000000000000"}
+208240a6-f715-4517-a46f-0a7d3aa9ef57;8d1febc7-9d53-44a3-9427-c80e61983145;06a88dfa-d4cf-4c5c-8dc1-83538d6b8b7c;ADMIN;{"email":"joao.silva@ledgr.com","fullName":"João Silva Santos","document":"98765432100"};{"tradeName":"HALLO","taxId":"07432458000169"}
+2a936244-c717-4dbe-81cb-7124a2f31885;3a5e8712-096c-4aac-ab91-df0602846fac;06a88dfa-d4cf-4c5c-8dc1-83538d6b8b7c;ADMIN;{"email":"maria.oliveira@ledgr.com","fullName":"Maria Oliveira Costa","document":"12345678900"};{"tradeName":"HALLO","taxId":"07432458000169"}
+e397052d-e74e-4026-9b10-e62c9c7f33e8;8d1febc7-9d53-44a3-9427-c80e61983145;11111111-1111-1111-1111-111111111111;ADMIN;{"email":"joao.silva@ledgr.com","fullName":"João Silva Santos","document":"98765432100"};{"tradeName":"🌐 Visão Global","taxId":"00000000000000"}
+d675fee3-fc77-4439-beba-89ef96310efe;3a5e8712-096c-4aac-ab91-df0602846fac;11111111-1111-1111-1111-111111111111;ADMIN;{"email":"maria.oliveira@ledgr.com","fullName":"Maria Oliveira Costa","document":"12345678900"};{"tradeName":"🌐 Visão Global","taxId":"00000000000000"}

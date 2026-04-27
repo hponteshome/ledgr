@@ -1,0 +1,1897 @@
+// =============================================================================
+// LEDGR — Prisma Schema
+// Revisão completa: 24/03/2026
+// Convenções:
+//   • PK: gen_random_uuid() @db.Uuid
+//   • snake_case no banco via @map()
+//   • Timestamps: @db.Timestamp(6)
+//   • Soft delete: deletedAt DateTime? @db.Timestamp(6)
+//   • Valores monetários: Decimal (nunca Float)
+//   • companyId sempre via request.companyId (CompanyInterceptor)
+// =============================================================================
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  //  url        = env("DATABASE_URL")
+  extensions = [uuid_ossp(map: "uuid-ossp")]
+}
+
+// =============================================================================
+// 01 · IAM & AUTENTICAÇÃO
+// =============================================================================
+
+/// Usuários do sistema LEDGR. Cada usuário pode estar vinculado a múltiplas
+/// empresas via UserCompany. Suporta 2FA, bloqueio por tentativas e soft delete.
+model User {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  document            String    @unique @map("document") @db.VarChar(20)
+  documentType        String    @map("document_type") @db.VarChar
+  email               String    @unique @map("email") @db.VarChar
+  passwordHash        String    @map("password_hash") @db.VarChar(255)
+  fullName            String    @map("full_name") @db.VarChar
+  nickname            String?   @map("nickname") @db.VarChar
+  birthDate           DateTime? @map("birth_date") @db.Timestamp(6)
+  phone1              String?   @map("phone_1") @db.VarChar
+  phone2              String?   @map("phone_2") @db.VarChar
+  isActive            Boolean   @default(true) @map("is_active")
+  isEmailConfirmed    Boolean   @default(false) @map("is_email_confirmed")
+  isDocumentConfirmed Boolean   @default(false) @map("is_document_confirmed")
+  twoFactorSecret     String?   @map("two_factor_secret") @db.VarChar
+  isTwoFactorActive   Boolean   @default(false) @map("two_factor_active")
+  lastAccess          DateTime? @map("last_access") @db.Timestamp(6)
+  failedAttempts      Int       @default(0) @map("failed_attempts")
+  blockedUntil        DateTime? @map("blocked_until") @db.Timestamp(6)
+  refreshToken        String?   @map("refresh_token") @db.VarChar
+  profileId           String?   @map("profile_id") @db.Uuid
+  level               Int       @default(0) @map("level")
+  status              String    @default("active") @map("status") @db.VarChar
+  personId            String?   @unique @map("person_id") @db.Uuid
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  deletedAt           DateTime? @map("deleted_at") @db.Timestamp(6)
+
+  // ── Relations ─────────────────────────────────────────────
+  person            Person?                   @relation(fields: [personId], references: [id])
+  profile           Profile?                  @relation(fields: [profileId], references: [id])
+  companies         UserCompany[]
+  documents         Document[]
+  documentVersions  DocumentVersion[]
+  documentSigners   DocumentSigner[]
+  documentTemplates DocumentTemplate[]
+  auditLogs         AuditLog[]                @relation("UserAuditLogs")
+  createdAccounts   ChartOfAccounts[]         @relation("CreatedAccounts")
+  updatedAccounts   ChartOfAccounts[]         @relation("UpdatedAccounts")
+  createdApEntries  ApEntry[]                 @relation("CreatedApEntries")
+  updatedApEntries  ApEntry[]                 @relation("UpdatedApEntries")
+  accountingConfigs CompanyAccountingConfig[] @relation("AccountingConfigCreator")
+
+  @@map("users")
+}
+
+/// Perfis de acesso com permissões em formato JSON.
+/// Vinculado a User via profileId.
+model Profile {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String?   @map("name") @db.VarChar
+  permissions Json      @map("permissions")
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamp(6)
+
+  users User[]
+
+  @@map("profiles")
+}
+
+// =============================================================================
+// 02 · EMPRESAS
+// =============================================================================
+
+/// Empresas gerenciadas pelo LEDGR. Cada empresa é uma entidade independente
+/// com seu próprio plano de contas, lançamentos e documentos.
+model Company {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  taxId         String   @unique @map("tax_id") @db.VarChar(18)
+  legalName     String   @map("legal_name") @db.VarChar
+  tradeName     String?  @map("trade_name") @db.VarChar
+  isHeadquarter Boolean  @default(false) @map("is_headquarter")
+  openingDate   DateTime @map("opening_date") @db.Date
+
+  // ── Registro institucional ────────────────────────────────
+  registerOrg    String?   @map("register_org") @db.VarChar(50)
+  registerNumber String?   @map("register_number") @db.VarChar(50)
+  registerDate   DateTime? @map("register_date") @db.Date
+  registerBook   String?   @map("register_book") @db.VarChar(30)
+  registerSheet  String?   @map("register_sheet") @db.VarChar(10)
+
+  // ── Atividades econômicas (CNAE) ──────────────────────────
+  mainActivity        String? @map("main_activity") @db.VarChar
+  secondaryActivities Json?   @map("secondary_activities") @db.Json
+
+  // ── Endereço ──────────────────────────────────────────────
+  street       String  @map("street") @db.VarChar
+  number       String  @map("number") @db.VarChar
+  complement   String? @map("complement") @db.VarChar
+  neighborhood String  @map("neighborhood") @db.VarChar
+  zipCode      String  @map("zip_code") @db.VarChar(8)
+  state        String  @map("state") @db.VarChar(2)
+  city         String  @map("city") @db.VarChar
+  country      String? @default("Brasil") @map("country") @db.VarChar
+
+  // ── Contato ───────────────────────────────────────────────
+  email  String? @map("email") @db.VarChar
+  phone1 String? @map("phone_1") @db.VarChar
+  phone2 String? @map("phone_2") @db.VarChar
+
+  // ── Dados financeiros e jurídicos ─────────────────────────
+  equity      Decimal @map("equity") @db.Decimal(15, 2)
+  legalNature String  @map("legal_nature") @db.VarChar
+  size        String  @map("size") @db.VarChar
+  taxRegime   String  @map("tax_regime") @db.VarChar
+
+  // ── Status ────────────────────────────────────────────────
+  status       String   @map("status") @db.VarChar
+  statusDate   DateTime @map("status_date") @db.Date
+  statusReason String?  @map("status_reason") @db.VarChar
+
+  // ── Dados RFB ─────────────────────────────────────────────
+  simplesData Json?     @map("simples_data") @db.Json
+  meiData     Json?     @map("mei_data") @db.Json
+  lastRfbSync DateTime? @map("last_rfb_sync") @db.Timestamp(6)
+  partners    Json?     @map("partners")
+
+  type      String?   @default("CLIENT") @map("type") @db.VarChar
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamp(6)
+
+  // Livros de Ações
+  shareholderRecords ShareholderRecord[]
+  shareTransfers     ShareTransfer[]
+
+
+  // ── Relations ─────────────────────────────────────────────
+  users             UserCompany[]
+  properties        Property[]
+  employees         Employee[]
+  corporateBooks    CorporateBook[]
+  documents         Document[]
+  documentTemplates DocumentTemplate[]
+  personLinks       PersonCompany[]
+  certificates      Certificate[]
+  accountBalances   AccountBalance[]
+  chartOfAccounts   ChartOfAccounts[]
+  journalEntries    JournalEntry[]
+  accountingRules   AccountingRule[]
+  ecdImports        EcdImport[]
+  loteImports       LoteImport[]
+  fixedAssets       FixedAsset[]
+  apEntries         ApEntry[]
+  ecfPartAs         EcfPartA[]
+  ecfPartBs         EcfPartB[]
+  accountingConfigs CompanyAccountingConfig[]
+
+  @@map("companies")
+}
+
+/// Vínculo N:N entre usuários e empresas.
+model UserCompany {
+  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String  @map("user_id") @db.Uuid
+  companyId String  @map("company_id") @db.Uuid
+  role      String? @default("ADMIN") @map("role") @db.VarChar
+
+  company Company @relation(fields: [companyId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@unique([userId, companyId])
+  @@map("user_companies")
+}
+
+// =============================================================================
+// 03 · PESSOAS FÍSICAS
+// =============================================================================
+
+enum MaritalStatus {
+  SOLTEIRO
+  CASADO
+  UNIAO_ESTAVEL
+  SEPARADO
+  DIVORCIADO
+  VIUVO
+
+  @@map("marital_status")
+}
+
+enum MatrimonialRegime {
+  COMUNHAO_PARCIAL
+  COMUNHAO_UNIVERSAL
+  SEPARACAO_TOTAL
+  SEPARACAO_OBRIGATORIA
+  PARTICIPACAO_FINAL_AQUESTOS
+
+  @@map("matrimonial_regime")
+}
+
+/// Cadastro de pessoas físicas. Pode ser vinculada a um User (login) e/ou
+/// a empresas via PersonCompany (sócios, procuradores, representantes).
+model Person {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  // ── Identificação civil ───────────────────────────────────
+  cpf      String  @unique @map("cpf") @db.VarChar(14)
+  fullName String  @map("full_name") @db.VarChar
+  nickname String? @map("nickname") @db.VarChar
+
+  // ── Filiação ──────────────────────────────────────────────
+  motherName String? @map("mother_name") @db.VarChar
+  fatherName String? @map("father_name") @db.VarChar
+
+  // ── Dados pessoais ────────────────────────────────────────
+  birthDate         DateTime?          @map("birth_date") @db.Date
+  birthCity         String?            @map("birth_city") @db.VarChar
+  birthState        String?            @map("birth_state") @db.VarChar(2)
+  birthCountry      String?            @default("Brasil") @map("birth_country") @db.VarChar
+  nationality       String?            @default("Brasileira") @map("nationality") @db.VarChar
+  gender            String?            @map("gender") @db.VarChar(20)
+  dependents        Json?              @map("dependents") @db.Json
+  maritalStatus     MaritalStatus?     @map("marital_status")
+  matrimonialRegime MatrimonialRegime? @map("matrimonial_regime")
+  spouseName        String?            @map("spouse_name") @db.VarChar
+  spouseCpf         String?            @map("spouse_cpf") @db.VarChar(14)
+
+  // ── Documentos ────────────────────────────────────────────
+  rgNumber      String?   @map("rg_number") @db.VarChar
+  rgIssuer      String?   @map("rg_issuer") @db.VarChar
+  rgIssueDate   DateTime? @map("rg_issue_date") @db.Date
+  cnh           String?   @map("cnh") @db.VarChar
+  passport      String?   @map("passport") @db.VarChar
+  tituloEleitor String?   @map("titulo_eleitor") @db.VarChar
+
+  // ── Contato ───────────────────────────────────────────────
+  email  String? @map("email") @db.VarChar
+  phone1 String? @map("phone_1") @db.VarChar
+  phone2 String? @map("phone_2") @db.VarChar
+
+  // ── Endereço ──────────────────────────────────────────────
+  street       String? @map("street") @db.VarChar
+  number       String? @map("number") @db.VarChar
+  complement   String? @map("complement") @db.VarChar
+  neighborhood String? @map("neighborhood") @db.VarChar
+  zipCode      String? @map("zip_code") @db.VarChar(8)
+  city         String? @map("city") @db.VarChar
+  state        String? @map("state") @db.VarChar(2)
+  country      String? @default("Brasil") @map("country") @db.VarChar
+
+  // ── Registros profissionais ───────────────────────────────
+  oabNumber          String? @map("oab_number") @db.VarChar
+  oabState           String? @map("oab_state") @db.VarChar(2)
+  crcNumber          String? @map("crc_number") @db.VarChar
+  crcState           String? @map("crc_state") @db.VarChar(2)
+  crcType            String? @map("crc_type") @db.VarChar
+  creaNumber         String? @map("crea_number") @db.VarChar
+  creaState          String? @map("crea_state") @db.VarChar(2)
+  coreconNumber      String? @map("corecon_number") @db.VarChar
+  coreconState       String? @map("corecon_state") @db.VarChar(2)
+  otherRegistrations Json?   @map("other_registrations") @db.Json
+
+  // ── Dados bancários ───────────────────────────────────────
+  bankName    String? @map("bank_name") @db.VarChar
+  bankAgency  String? @map("bank_agency") @db.VarChar
+  bankAccount String? @map("bank_account") @db.VarChar
+
+  notes     String?   @map("notes") @db.Text
+  isActive  Boolean   @default(true) @map("is_active")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamp(6)
+
+  shareholderRecords ShareholderRecord[]
+
+  // ── Relations ─────────────────────────────────────────────
+  companyLinks PersonCompany[]
+  user         User?
+  apEntries    ApEntry[]
+
+  @@index([cpf])
+  @@index([fullName])
+  @@index([deletedAt])
+  @@map("persons")
+}
+
+/// Vínculo de pessoas físicas a empresas (sócios, procuradores, representantes).
+model PersonCompany {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  personId  String    @map("person_id") @db.Uuid
+  companyId String    @map("company_id") @db.Uuid
+  role      String    @map("role") @db.VarChar
+  startDate DateTime? @map("start_date") @db.Date
+  endDate   DateTime? @map("end_date") @db.Date
+  notes     String?   @map("notes") @db.VarChar
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  person  Person  @relation(fields: [personId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([personId, companyId, role, startDate])
+  @@index([companyId])
+  @@index([personId])
+  @@map("person_companies")
+}
+
+// =============================================================================
+// 04 · IMÓVEIS, RH E SOCIETÁRIO
+// =============================================================================
+
+/// Critério de segregação de valor terreno/edificação.
+/// Base legal: IN RFB 1.700/2017 + Parecer Normativo CST 14/1975.
+/// Exigido no ECF Ficha 24 e para unidades autônomas.
+enum LandValueSource {
+  REGISTRY_FRACTION /// Fração ideal da matrícula — critério preferencial
+  APPRAISAL_REPORT /// Laudo de avaliação ABNT NBR 14653
+  MARKET_ESTIMATE /// Percentual de mercado local — fallback auditável
+
+  @@map("land_value_source")
+}
+
+/// Imóveis vinculados a empresas. Suporta imóveis rurais (INCRA/CAR),
+/// urbanos (IPTU) e integração com o módulo de Ativo Imobilizado.
+model Property {
+  id        String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId String @map("company_id") @db.Uuid
+
+  incra String? @map("incra") @db.VarChar
+  car   String? @map("car") @db.VarChar
+
+  registryOfficeId      String? @map("registry_office_id") @db.VarChar
+  registryNumber        String? @map("registry_number") @db.VarChar(60)
+  registryStatusHistory String? @map("registry_status_history") @db.Text
+
+  iptu              String? @map("iptu") @db.VarChar
+  fiscalId          String? @map("fiscal_id") @db.VarChar
+  propertyTaxId     String? @map("property_tax_id") @db.VarChar
+  municipalRegistry String? @map("municipal_registry") @db.VarChar
+
+  street       String? @map("street") @db.VarChar
+  number       String? @map("number") @db.VarChar
+  complement   String? @map("complement") @db.VarChar
+  neighborhood String? @map("neighborhood") @db.VarChar
+  zipCode      String? @map("zip_code") @db.VarChar(9)
+  city         String? @map("city") @db.VarChar
+  state        String? @map("state") @db.VarChar(2)
+  country      String? @default("Brasil") @map("country") @db.VarChar
+
+  totalArea Decimal? @map("total_area") @db.Decimal(10, 2)
+  builtArea Decimal? @map("built_area") @db.Decimal(10, 2)
+
+  assessedValue    Decimal?         @map("assessed_value") @db.Decimal(15, 2)
+  landValuePercent Decimal?         @map("land_value_percent") @db.Decimal(5, 2)
+  landValueAmount  Decimal?         @map("land_value_amount") @db.Decimal(15, 2)
+  landValueSource  LandValueSource? @map("land_value_source")
+
+  notes     String?   @map("notes") @db.Text
+  isActive  Boolean   @default(true) @map("is_active")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamp(6)
+
+  company     Company      @relation(fields: [companyId], references: [id])
+  fixedAssets FixedAsset[]
+
+  @@index([companyId, deletedAt])
+  @@index([iptu])
+  @@index([registryNumber])
+  @@map("properties")
+}
+
+/// Funcionários vinculados a empresas. Módulo de RH em preparação.
+model Employee {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId       String    @map("company_id") @db.Uuid
+  fullName        String    @map("full_name") @db.VarChar
+  taxId           String    @map("tax_id") @db.VarChar(11)
+  socialId        String?   @map("social_id") @db.VarChar
+  birthDate       DateTime  @map("birth_date") @db.Date
+  hireDate        DateTime  @map("hire_date") @db.Date
+  terminationDate DateTime? @map("termination_date") @db.Date
+  role            String    @map("role") @db.VarChar
+  salary          Decimal   @map("salary") @db.Decimal(15, 2)
+  department      String?   @map("department") @db.VarChar
+  status          String    @default("active") @map("status") @db.VarChar
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  deletedAt       DateTime? @map("deleted_at") @db.Timestamp(6)
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@map("employees")
+}
+
+/// Livros societários digitais. Suporta assinatura digital e certificação JUCESP.
+model CorporateBook {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId           String    @map("company_id") @db.Uuid
+  type                String    @map("type") @db.VarChar
+  bookNumber          Int       @map("book_number")
+  isDigitalSigned     Boolean   @default(false) @map("is_digital_signed")
+  digitalSignature    String?   @map("digital_signature") @db.Text
+  jucespCertification String?   @map("jucesp_certification") @db.VarChar
+  certificationDate   DateTime? @map("certification_date") @db.Date
+  contentUrl          String?   @map("content_url") @db.VarChar
+  status              String    @default("draft") @map("status") @db.VarChar
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  deletedAt           DateTime? @map("deleted_at") @db.Timestamp(6)
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@map("corporate_books")
+}
+
+/// Log de auditoria imutável. Registra todas as ações relevantes do sistema.
+model AuditLog {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  actorId   String?  @map("actor_id") @db.Uuid
+  action    String   @map("acao") @db.VarChar
+  targetId  String?  @map("target_id") @db.VarChar
+  before    Json?    @map("antes")
+  after     Json?    @map("depois")
+  ip        String?  @map("ip") @db.VarChar
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+
+  actor User? @relation("UserAuditLogs", fields: [actorId], references: [id])
+
+  @@index([actorId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// =============================================================================
+// 05 · DOCUMENTOS
+// =============================================================================
+
+enum DocumentType {
+  ESTATUTO_SOCIAL
+  ATA_AGO
+  ATA_AGE
+  ATA_DIRETORIA
+  ACORDO_ACIONISTAS
+  CERTIFICADO_ACOES
+  LIVRO_REGISTRO_ACOES
+  LIVRO_TRANSFERENCIA_ACOES
+  LIVRO_ATAS_AGO
+  LIVRO_ATAS_AGE
+  CONTRATO_SOCIAL
+  ADITIVO_CONTRATUAL
+  PROCURACAO
+  FISCAL
+  TRABALHISTA
+  CONTABIL
+  OUTRO
+}
+
+enum DocumentStatus {
+  RASCUNHO
+  EM_REVISAO
+  AGUARDANDO_ASSINATURA
+  ASSINADO
+  REGISTRADO
+  ARQUIVADO
+  CANCELADO
+}
+
+enum SignatureMethod {
+  GOVBR
+  CERT_A1
+  CERT_A3
+}
+
+enum SignatureStatus {
+  PENDENTE
+  ASSINADO
+  RECUSADO
+  EXPIRADO
+}
+
+enum DocumentVisibility {
+  PUBLICO
+  RESERVADO
+  RESTRITO
+  CONTROLADO
+}
+
+/// Documentos societários, fiscais e trabalhistas.
+/// Suporta versionamento, múltiplos signatários e dois fluxos de assinatura
+/// (gov.br via Lei 14.063/2020 e ICP-Brasil A1/A3 via MP 2.200-2/2001).
+model Document {
+  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId String? @map("company_id") @db.Uuid
+
+  type        DocumentType       @map("type")
+  status      DocumentStatus     @default(RASCUNHO) @map("status")
+  visibility  DocumentVisibility @default(RESERVADO) @map("visibility")
+  isTemplate  Boolean            @default(false) @map("is_template")
+  title       String             @map("title") @db.VarChar
+  description String?            @map("description") @db.Text
+  bookNumber  Int?               @map("book_number")
+  date        DateTime           @map("date") @db.Date
+
+  content        String? @map("content") @db.Text
+  contentHash    String? @map("content_hash") @db.VarChar(64)
+  currentVersion Int     @default(1) @map("current_version")
+
+  fileUrl          String? @map("file_url") @db.VarChar
+  fileSize         Int?    @map("file_size")
+  originalFileName String? @map("original_file_name") @db.VarChar
+  pdfUrl           String? @map("pdf_url") @db.VarChar
+  digitalSignature String? @map("digital_signature") @db.Text
+
+  registrationNumber String?   @map("registration_number") @db.VarChar
+  registrationDate   DateTime? @map("registration_date") @db.Date
+  requiresJucesp     Boolean   @default(false) @map("requires_jucesp")
+
+  notes       String?   @map("notes") @db.Text
+  createdById String    @map("created_by_id") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamp(6)
+
+  company    Company?            @relation(fields: [companyId], references: [id])
+  createdBy  User                @relation(fields: [createdById], references: [id])
+  versions   DocumentVersion[]
+  signatures DocumentSignature[]
+  signers    DocumentSigner[]
+
+  @@index([companyId, type, deletedAt])
+  @@index([companyId, visibility, deletedAt])
+  @@index([isTemplate, type])
+  @@map("documents")
+}
+
+/// Versões imutáveis de documentos. Cada edição gera uma nova versão.
+model DocumentVersion {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  documentId  String   @map("document_id") @db.Uuid
+  version     Int      @map("version")
+  content     String   @map("content") @db.Text
+  contentHash String?  @map("content_hash") @db.VarChar(64)
+  changeNote  String?  @map("change_note") @db.VarChar
+  createdById String   @map("created_by_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+
+  document  Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  createdBy User     @relation(fields: [createdById], references: [id])
+
+  @@unique([documentId, version])
+  @@map("document_versions")
+}
+
+/// Signatários definidos para um documento. Controla a ordem de assinatura.
+model DocumentSigner {
+  id         String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  documentId String          @map("document_id") @db.Uuid
+  userId     String?         @map("user_id") @db.Uuid
+  name       String          @map("name") @db.VarChar
+  cpf        String?         @map("cpf") @db.VarChar(14)
+  email      String?         @map("email") @db.VarChar
+  role       String?         @map("role") @db.VarChar
+  order      Int             @default(0) @map("order")
+  status     SignatureStatus @default(PENDENTE) @map("status")
+  notifiedAt DateTime?       @map("notified_at") @db.Timestamp(6)
+  createdAt  DateTime        @default(now()) @map("created_at") @db.Timestamp(6)
+
+  document   Document            @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  user       User?               @relation(fields: [userId], references: [id])
+  signatures DocumentSignature[]
+
+  @@map("document_signers")
+}
+
+/// Assinaturas realizadas. Armazena snapshot imutável dos dados do signatário
+/// e hash criptográfico no momento da assinatura.
+model DocumentSignature {
+  id         String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  documentId String          @map("document_id") @db.Uuid
+  signerId   String?         @map("signer_id") @db.Uuid
+  method     SignatureMethod @map("method")
+  status     SignatureStatus @default(PENDENTE) @map("status")
+
+  signerName  String  @map("signer_name") @db.VarChar
+  signerCpf   String? @map("signer_cpf") @db.VarChar(14)
+  signerEmail String? @map("signer_email") @db.VarChar
+  signerRole  String? @map("signer_role") @db.VarChar
+
+  documentHash    String? @map("document_hash") @db.VarChar(64)
+  signatureHash   String? @map("signature_hash") @db.Text
+  signatureFormat String? @map("signature_format") @db.VarChar
+  certificateData Json?   @map("certificate_data") @db.Json
+
+  govbrTransactionId String? @map("govbr_transaction_id") @db.VarChar
+  govbrAccountLevel  String? @map("govbr_account_level") @db.VarChar
+
+  ipAddress String?   @map("ip_address") @db.VarChar
+  userAgent String?   @map("user_agent") @db.VarChar
+  signedAt  DateTime? @map("signed_at") @db.Timestamp(6)
+  expiresAt DateTime? @map("expires_at") @db.Timestamp(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+
+  document Document        @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  signer   DocumentSigner? @relation(fields: [signerId], references: [id])
+
+  @@map("document_signatures")
+}
+
+/// Templates de documentos reutilizáveis com variáveis substituíveis.
+model DocumentTemplate {
+  id          String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId   String?      @map("company_id") @db.Uuid
+  type        DocumentType @map("type")
+  name        String       @map("name") @db.VarChar
+  description String?      @map("description") @db.Text
+  content     String       @map("content") @db.Text
+  variables   Json?        @map("variables") @db.Json
+  isActive    Boolean      @default(true) @map("is_active")
+  createdById String       @map("created_by_id") @db.Uuid
+  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt   DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  company   Company? @relation(fields: [companyId], references: [id])
+  createdBy User     @relation(fields: [createdById], references: [id])
+
+  @@map("document_templates")
+}
+
+/// Certificados digitais A1/A3 armazenados com chave criptografada (AES-256-GCM).
+model Certificate {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId    String   @map("company_id") @db.Uuid
+  alias        String   @map("alias") @db.VarChar
+  type         String   @map("type") @db.VarChar
+  usage        String[] @map("usage")
+  encryptedKey String   @map("encrypted_key") @db.Text
+  certificate  String   @map("certificate") @db.Text
+  subject      String   @map("subject") @db.VarChar
+  issuer       String   @map("issuer") @db.VarChar
+  serialNumber String   @map("serial_number") @db.VarChar
+  validFrom    DateTime @map("valid_from") @db.Timestamp(6)
+  validTo      DateTime @map("valid_to") @db.Timestamp(6)
+  fingerprint  String   @map("fingerprint") @db.VarChar(64)
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@index([companyId, isActive])
+  @@index([validTo])
+  @@map("certificates")
+}
+
+// =============================================================================
+// 06 · CONTABILIDADE
+// =============================================================================
+
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  REVENUE
+  EXPENSE
+
+  @@map("account_type")
+}
+
+enum AccountNature {
+  DEBIT
+  CREDIT
+
+  @@map("account_nature")
+}
+
+enum SourceModule {
+  ACCOUNTING
+  FINANCE
+  FISCAL
+  HR
+  BANK_IMPORT
+  ECD_IMPORT
+
+  @@map("source_module")
+}
+
+/// Plano de contas hierárquico. Suporta até 8 níveis conforme configuração
+/// da máscara em CompanyAccountingConfig. Hierarquia via parentId (não por código).
+model ChartOfAccounts {
+  id         String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId  String?       @map("company_id") @db.Uuid
+  code       String        @map("code") @db.VarChar
+  name       String        @map("name") @db.VarChar
+  level      Int           @map("level")
+  type       AccountType   @map("type")
+  nature     AccountNature @map("nature")
+  isAnalytic Boolean       @default(false) @map("is_analytic")
+
+  // ── Hierarquia ────────────────────────────────────────────
+  parentId String?           @map("parent_id") @db.Uuid
+  parent   ChartOfAccounts?  @relation("AccountHierarchy", fields: [parentId], references: [id])
+  children ChartOfAccounts[] @relation("AccountHierarchy")
+
+  // ── Mapeamentos de compliance ─────────────────────────────
+  spedCode    String? @map("sped_code") @db.VarChar
+  reducedCode String? @map("reduced_code") @db.VarChar(10)
+  ifrsCode    String? @map("ifrs_code") @db.VarChar
+  usgaapCode  String? @map("usgaap_code") @db.VarChar
+  eSocialCode String? @map("esocial_code") @db.VarChar
+
+  isActive    Boolean   @default(true) @map("is_active")
+  createdById String?   @map("created_by_id") @db.Uuid
+  updatedById String?   @map("updated_by_id") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamp(6)
+
+  // ── Relations ─────────────────────────────────────────────
+  company      Company?           @relation(fields: [companyId], references: [id])
+  createdBy    User?              @relation("CreatedAccounts", fields: [createdById], references: [id])
+  updatedBy    User?              @relation("UpdatedAccounts", fields: [updatedById], references: [id])
+  journalItems JournalEntryItem[]
+  rules        AccountingRule[]
+  balances     AccountBalance[]
+
+  @@unique([companyId, code])
+  @@index([companyId, type])
+  @@map("chart_of_accounts")
+}
+
+/// Configuração de máscara do plano de contas por empresa.
+/// A máscara "1.1.1.2.3" define a quantidade de dígitos por nível.
+/// Suporta histórico com períodos de vigência para mudanças ao longo do tempo.
+model CompanyAccountingConfig {
+  id        String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId String @map("company_id") @db.Uuid
+
+  /// Máscara no formato "1.1.1.2.3" — cada número indica dígitos do nível.
+  /// Padrão SPED: "1.1.1.2.3" → X.X.X.XX.XXX (5 níveis)
+  mask String @map("mask") @db.VarChar(50)
+
+  validFrom DateTime  @map("valid_from") @db.Timestamp(6)
+  validTo   DateTime? @map("valid_to") @db.Timestamp(6) /// null = configuração vigente
+
+  createdById String?  @map("created_by_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  company   Company @relation(fields: [companyId], references: [id])
+  createdBy User?   @relation("AccountingConfigCreator", fields: [createdById], references: [id])
+
+  @@index([companyId, validFrom])
+  @@map("company_accounting_configs")
+}
+
+/// Lançamentos contábeis com partidas dobradas.
+/// Cada lançamento tem N itens (débitos e créditos) que devem se equilibrar.
+model JournalEntry {
+  id           String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId    String       @map("company_id") @db.Uuid
+  date         DateTime     @map("date") @db.Date
+  description  String       @map("description") @db.Text
+  reference    String?      @map("reference") @db.VarChar
+  sourceModule SourceModule @default(ACCOUNTING) @map("source_module")
+  createdById  String       @map("created_by_id") @db.Uuid
+  createdAt    DateTime     @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt    DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  deletedAt    DateTime?    @map("deleted_at") @db.Timestamp(6)
+
+  company   Company            @relation(fields: [companyId], references: [id])
+  items     JournalEntryItem[]
+  apEntries ApEntry[]
+
+  @@index([companyId, date])
+  @@map("journal_entries")
+}
+
+/// Itens de lançamento contábil (partidas individuais débito/crédito).
+model JournalEntryItem {
+  id             String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  journalEntryId String        @map("journal_entry_id") @db.Uuid
+  accountId      String        @map("account_id") @db.Uuid
+  value          Decimal       @map("value") @db.Decimal(18, 2)
+  type           AccountNature @map("type")
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamp(6)
+
+  journalEntry JournalEntry    @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+  account      ChartOfAccounts @relation(fields: [accountId], references: [id])
+
+  @@index([accountId])
+  @@map("journal_entry_items")
+}
+
+/// Regras de classificação automática para importação bancária.
+/// Motor de sugestão de conta contábil baseado em padrões de texto.
+model AccountingRule {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId          String   @map("company_id") @db.Uuid
+  pattern            String   @map("pattern") @db.VarChar
+  suggestedAccountId String   @map("suggested_account_id") @db.Uuid
+  priority           Int      @default(1) @map("priority")
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt          DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  company          Company         @relation(fields: [companyId], references: [id])
+  suggestedAccount ChartOfAccounts @relation(fields: [suggestedAccountId], references: [id])
+
+  @@index([companyId, pattern])
+  @@map("accounting_rules")
+}
+
+/// Saldos de contas contábeis por data de referência.
+/// Fotografia dos saldos ECD (registro I155 do SPED).
+model AccountBalance {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  accountId     String   @map("account_id") @db.Uuid
+  companyId     String   @map("company_id") @db.Uuid
+  balance       Decimal  @map("balance") @db.Decimal(18, 2)
+  referenceDate DateTime @map("reference_date") @db.Timestamp(6)
+  createdBy     String   @map("created_by") @db.Uuid
+  updatedBy     String   @map("updated_by") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  account ChartOfAccounts @relation(fields: [accountId], references: [id])
+  company Company         @relation(fields: [companyId], references: [id])
+
+  @@unique([accountId, referenceDate])
+  @@index([companyId])
+  @@index([referenceDate])
+  @@map("account_balances")
+}
+
+/// Importações de ECD (Escrituração Contábil Digital) do SPED.
+model EcdImport {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId     String    @map("company_id") @db.Uuid
+  fileName      String    @map("file_name") @db.VarChar
+  fileSize      Int?      @map("file_size")
+  layoutVersion String    @map("layout_version") @db.VarChar
+  periodStart   DateTime  @map("period_start") @db.Date
+  periodEnd     DateTime  @map("period_end") @db.Date
+  bookType      String    @map("book_type") @db.VarChar
+  bookNumber    String    @map("book_number") @db.VarChar
+  bookNature    String    @map("book_nature") @db.VarChar
+  status        String    @default("processing") @map("status") @db.VarChar
+  stats         Json?     @map("stats") @db.Json
+  errors        Json?     @map("errors") @db.Json
+  importedBy    String    @map("imported_by") @db.Uuid
+  importedAt    DateTime  @default(now()) @map("imported_at") @db.Timestamp(6)
+  deletedAt     DateTime? @map("deleted_at") @db.Timestamp(6)
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@index([companyId, status])
+  @@index([companyId, periodStart, periodEnd])
+  @@map("ecd_imports")
+}
+
+/// Importações de lotes de lançamentos contábeis (IOB, Domínio, etc).
+model LoteImport {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId   String    @map("company_id") @db.Uuid
+  fileName    String    @map("file_name") @db.VarChar
+  fileSize    Int?      @map("file_size")
+  source      String    @map("source") @db.VarChar
+  batchType   String    @map("batch_type") @db.VarChar
+  batchDate   DateTime  @map("batch_date") @db.Date
+  description String?   @map("description") @db.VarChar
+  status      String    @default("done") @map("status") @db.VarChar
+  stats       Json?     @map("stats") @db.Json
+  errors      Json?     @map("errors") @db.Json
+  importedBy  String    @map("imported_by") @db.Uuid
+  importedAt  DateTime  @default(now()) @map("imported_at") @db.Timestamp(6)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamp(6)
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@index([companyId, status])
+  @@index([companyId, batchDate])
+  @@map("lote_imports")
+}
+
+// =============================================================================
+// 07 · ATIVO IMOBILIZADO
+// =============================================================================
+
+enum AssetGroup {
+  REAL_ESTATE
+  MACHINERY_EQUIPMENT
+  VEHICLE
+  FURNITURE_FIXTURE
+  IT_EQUIPMENT
+  INTANGIBLE
+  OTHER
+
+  @@map("asset_group")
+}
+
+enum AssetStatus {
+  PENDING_ACTIVATION
+  ACTIVE
+  UNDER_MAINTENANCE
+  INACTIVE
+  DISPOSED
+  WRITTEN_OFF
+
+  @@map("asset_status")
+}
+
+enum DepreciationMethod {
+  STRAIGHT_LINE
+  SUM_OF_DIGITS
+  UNITS_OF_PRODUCTION
+  ACCELERATED_2X
+
+  @@map("depreciation_method")
+}
+
+enum MaintenanceType {
+  PREVENTIVE
+  CORRECTIVE
+  PREDICTIVE
+  OVERHAUL
+  EMERGENCY
+
+  @@map("maintenance_type")
+}
+
+enum MaintenanceStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+
+  @@map("maintenance_status")
+}
+
+enum ImprovementType {
+  ACCESSORY
+  CAPITALIZABLE_RENOVATION
+  EXPANSION
+  RETROFIT
+  RESTORATION
+
+  @@map("improvement_type")
+}
+
+enum AppraisalType {
+  ASSET_VALUATION
+  TECHNICAL_INSPECTION
+  PHYSICAL_DEPRECIATION
+  TAX_CLASSIFICATION
+  ENGINEERING_REPORT
+
+  @@map("appraisal_type")
+}
+
+enum RetrofitStatus {
+  PLANNING
+  IN_PROGRESS
+  COMPLETED
+  SUSPENDED
+  CANCELLED
+
+  @@map("retrofit_status")
+}
+
+enum AssetEventType {
+  ACQUISITION
+  ACTIVATION
+  MAINTENANCE_OPENED
+  MAINTENANCE_COMPLETED
+  IMPROVEMENT_REGISTERED
+  IMPROVEMENT_CAPITALIZED
+  RETROFIT_STARTED
+  RETROFIT_COMPLETED
+  APPRAISAL_REGISTERED
+  REVALUATION
+  TRANSFER
+  WRITE_OFF
+  DISPOSAL
+
+  @@map("asset_event_type")
+}
+
+/// Bens do ativo imobilizado. Suporta imóveis, equipamentos, veículos e intangíveis.
+/// Integrado com Property para imóveis e com módulo contábil para depreciação.
+model FixedAsset {
+  id        String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId String @map("company_id") @db.Uuid
+
+  internalCode  String      @map("internal_code") @db.VarChar(30)
+  description   String      @map("description") @db.VarChar(255)
+  group         AssetGroup  @map("group")
+  subgroup      String?     @map("subgroup") @db.VarChar(100)
+  brand         String?     @map("brand") @db.VarChar(100)
+  model         String?     @map("model") @db.VarChar(100)
+  serialNumber  String?     @map("serial_number") @db.VarChar(100)
+  location      String?     @map("location") @db.VarChar(255)
+  responsibleId String?     @map("responsible_id") @db.Uuid
+  status        AssetStatus @default(PENDING_ACTIVATION) @map("status")
+  notes         String?     @map("notes") @db.Text
+
+  acquisitionCost   Decimal   @map("acquisition_cost") @db.Decimal(15, 2)
+  acquisitionDate   DateTime  @map("acquisition_date") @db.Date
+  residualValue     Decimal   @default(0) @map("residual_value") @db.Decimal(15, 2)
+  bookValue         Decimal   @map("book_value") @db.Decimal(15, 2)
+  marketValue       Decimal?  @map("market_value") @db.Decimal(15, 2)
+  lastAppraisalDate DateTime? @map("last_appraisal_date") @db.Date
+
+  depreciationMethod  DepreciationMethod @default(STRAIGHT_LINE) @map("depreciation_method")
+  usefulLifeMonths    Int                @map("useful_life_months")
+  remainingLifeMonths Int                @map("remaining_life_months")
+  annualRatePercent   Decimal            @map("annual_rate_percent") @db.Decimal(5, 2)
+  accumulatedDeprec   Decimal            @default(0) @map("accumulated_depreciation") @db.Decimal(15, 2)
+  depreciationStart   DateTime           @map("depreciation_start") @db.Date
+  nonDepreciable      Boolean            @default(false) @map("non_depreciable")
+
+  // ── Campos específicos de imóveis ─────────────────────────
+  propertyId       String?          @map("property_id") @db.Uuid
+  iptuRegistration String?          @map("iptu_registration") @db.VarChar(50)
+  registryNumber   String?          @map("registry_number") @db.VarChar(60)
+  totalArea        Decimal?         @map("total_area") @db.Decimal(10, 2)
+  builtArea        Decimal?         @map("built_area") @db.Decimal(10, 2)
+  assessedValue    Decimal?         @map("assessed_value") @db.Decimal(15, 2)
+  landValuePercent Decimal?         @map("land_value_percent") @db.Decimal(5, 2)
+  landValueAmount  Decimal?         @map("land_value_amount") @db.Decimal(15, 2)
+  landValueSource  LandValueSource? @map("land_value_source")
+  street           String?          @map("street") @db.VarChar(255)
+  zipCode          String?          @map("zip_code") @db.VarChar(9)
+  state            String?          @map("state") @db.VarChar(2)
+  city             String?          @map("city") @db.VarChar(100)
+
+  // ── Vínculos contábeis ────────────────────────────────────
+  assetAccountId    String? @map("asset_account_id") @db.Uuid
+  depreciationAccId String? @map("depreciation_acc_id") @db.Uuid
+  accumDeprecAccId  String? @map("accum_deprec_acc_id") @db.Uuid
+  writeOffAccountId String? @map("write_off_account_id") @db.Uuid
+
+  isActive  Boolean   @default(true) @map("is_active")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamp(6)
+
+  company          Company                @relation(fields: [companyId], references: [id])
+  property         Property?              @relation(fields: [propertyId], references: [id])
+  maintenances     AssetMaintenance[]
+  improvements     AssetImprovement[]
+  retrofitProjects AssetRetrofitProject[]
+  depreciationLogs AssetDepreciationLog[]
+  appraisals       AssetAppraisal[]
+  history          AssetHistory[]
+
+  @@unique([companyId, internalCode])
+  @@index([companyId, status])
+  @@index([companyId, group])
+  @@index([deletedAt])
+  @@map("fixed_assets")
+}
+
+/// Manutenções de ativos imobilizados (preventiva, corretiva, preditiva).
+model AssetMaintenance {
+  id        String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId String @map("company_id") @db.Uuid
+  assetId   String @map("asset_id") @db.Uuid
+
+  type           MaintenanceType   @map("type")
+  status         MaintenanceStatus @default(SCHEDULED) @map("status")
+  title          String            @map("title") @db.VarChar(200)
+  description    String            @map("description") @db.Text
+  serviceOrderNo String?           @map("service_order_no") @db.VarChar(50)
+
+  providerName String? @map("provider_name") @db.VarChar(255)
+  providerCnpj String? @map("provider_cnpj") @db.VarChar(18)
+  contactInfo  String? @map("contact_info") @db.VarChar(100)
+
+  scheduledDate DateTime  @map("scheduled_date") @db.Date
+  startedAt     DateTime? @map("started_at") @db.Timestamp(6)
+  completedAt   DateTime? @map("completed_at") @db.Timestamp(6)
+
+  estimatedCost Decimal? @map("estimated_cost") @db.Decimal(12, 2)
+  actualCost    Decimal? @map("actual_cost") @db.Decimal(12, 2)
+  capitalizable Boolean  @default(false) @map("capitalizable")
+
+  notes     String?   @map("notes") @db.Text
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamp(6)
+
+  asset FixedAsset @relation(fields: [assetId], references: [id])
+
+  @@index([assetId, status])
+  @@index([companyId, scheduledDate])
+  @@map("asset_maintenances")
+}
+
+/// Melhorias e benfeitorias em ativos. Controla capitalização e extensão de vida útil.
+model AssetImprovement {
+  id        String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId String @map("company_id") @db.Uuid
+  assetId   String @map("asset_id") @db.Uuid
+
+  type            ImprovementType @map("type")
+  description     String          @map("description") @db.VarChar(255)
+  justification   String?         @map("justification") @db.Text
+  technicalReport String?         @map("technical_report") @db.Text
+
+  startDate          DateTime  @map("start_date") @db.Date
+  completionDate     DateTime? @map("completion_date") @db.Date
+  capitalizationDate DateTime? @map("capitalization_date") @db.Date
+
+  totalCost           Decimal @map("total_cost") @db.Decimal(15, 2)
+  usefulLifeExtension Int     @default(0) @map("useful_life_extension")
+  newUsefulLifeMonths Int?    @map("new_useful_life_months")
+  capitalized         Boolean @default(false) @map("capitalized")
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamp(6)
+
+  asset FixedAsset @relation(fields: [assetId], references: [id])
+
+  @@index([assetId, capitalized])
+  @@map("asset_improvements")
+}
+
+/// Projetos de retrofit de ativos imobilizados com controle de fases.
+model AssetRetrofitProject {
+  id        String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId String @map("company_id") @db.Uuid
+  assetId   String @map("asset_id") @db.Uuid
+
+  name        String         @map("name") @db.VarChar(255)
+  objective   String         @map("objective") @db.Text
+  responsible String?        @map("responsible") @db.VarChar(255)
+  status      RetrofitStatus @default(PLANNING) @map("status")
+
+  startDate      DateTime  @map("start_date") @db.Date
+  plannedEndDate DateTime? @map("planned_end_date") @db.Date
+  actualEndDate  DateTime? @map("actual_end_date") @db.Date
+
+  totalBudget      Decimal @map("total_budget") @db.Decimal(15, 2)
+  executedAmount   Decimal @default(0) @map("executed_amount") @db.Decimal(15, 2)
+  physicalProgress Decimal @default(0) @map("physical_progress") @db.Decimal(5, 2)
+  usefulLifeImpact Int     @default(0) @map("useful_life_impact")
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamp(6)
+
+  asset  FixedAsset           @relation(fields: [assetId], references: [id])
+  phases AssetRetrofitPhase[]
+
+  @@index([assetId, status])
+  @@map("asset_retrofit_projects")
+}
+
+/// Fases de um projeto de retrofit.
+model AssetRetrofitPhase {
+  id        String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  projectId String @map("project_id") @db.Uuid
+
+  name        String  @map("name") @db.VarChar(255)
+  sequence    Int     @map("sequence")
+  description String? @map("description") @db.Text
+
+  phaseBudget    Decimal   @map("phase_budget") @db.Decimal(15, 2)
+  executedAmount Decimal   @default(0) @map("executed_amount") @db.Decimal(15, 2)
+  plannedDate    DateTime  @map("planned_date") @db.Date
+  completionDate DateTime? @map("completion_date") @db.Date
+  completed      Boolean   @default(false) @map("completed")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  project AssetRetrofitProject @relation(fields: [projectId], references: [id])
+
+  @@index([projectId, sequence])
+  @@map("asset_retrofit_phases")
+}
+
+/// Laudos de avaliação de ativos (ABNT NBR 14653).
+model AssetAppraisal {
+  id        String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId String @map("company_id") @db.Uuid
+  assetId   String @map("asset_id") @db.Uuid
+
+  type             AppraisalType @map("type")
+  appraisalDate    DateTime      @map("appraisal_date") @db.Date
+  appraisalFirm    String        @map("appraisal_firm") @db.VarChar(255)
+  responsibleName  String        @map("responsible_name") @db.VarChar(255)
+  creaRegistration String?       @map("crea_registration") @db.VarChar(50)
+
+  appraisedValue Decimal @map("appraised_value") @db.Decimal(15, 2)
+  previousValue  Decimal @map("previous_value") @db.Decimal(15, 2)
+
+  methodology              String? @map("methodology") @db.Text
+  conclusions              String? @map("conclusions") @db.Text
+  estimatedRemainingMonths Int?    @map("estimated_remaining_months")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  asset FixedAsset @relation(fields: [assetId], references: [id])
+
+  @@index([assetId, appraisalDate])
+  @@map("asset_appraisals")
+}
+
+/// Log mensal de depreciação por ativo. Registro imutável de cada cálculo.
+model AssetDepreciationLog {
+  id        String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId String @map("company_id") @db.Uuid
+  assetId   String @map("asset_id") @db.Uuid
+
+  period DateTime           @map("period") @db.Date
+  method DepreciationMethod @map("method")
+
+  monthlyCharge     Decimal @map("monthly_charge") @db.Decimal(15, 2)
+  accumDeprecBefore Decimal @map("accum_deprec_before") @db.Decimal(15, 2)
+  accumDeprecAfter  Decimal @map("accum_deprec_after") @db.Decimal(15, 2)
+  bookValueAfter    Decimal @map("book_value_after") @db.Decimal(15, 2)
+
+  journalEntryId String?  @map("journal_entry_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+
+  asset FixedAsset @relation(fields: [assetId], references: [id])
+
+  @@unique([assetId, method])
+  @@index([companyId, method])
+  @@map("asset_depreciation_logs")
+}
+
+/// Histórico de eventos de ativos imobilizados para trilha de auditoria.
+model AssetHistory {
+  id        String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId String @map("company_id") @db.Uuid
+  assetId   String @map("asset_id") @db.Uuid
+
+  eventType     AssetEventType @map("event_type")
+  description   String         @map("description") @db.Text
+  previousValue Decimal?       @map("previous_value") @db.Decimal(15, 2)
+  newValue      Decimal?       @map("new_value") @db.Decimal(15, 2)
+  performedById String?        @map("performed_by_id") @db.Uuid
+  metadata      Json?          @map("metadata") @db.Json
+  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamp(6)
+
+  asset FixedAsset @relation(fields: [assetId], references: [id])
+
+  @@index([assetId, createdAt])
+  @@index([companyId, eventType])
+  @@map("asset_history")
+}
+
+// =============================================================================
+// 08 · FINANCEIRO
+// =============================================================================
+
+enum FiscalDocumentType {
+  NFE /// Nota Fiscal Eletrônica (produtos)
+  NFSE /// Nota Fiscal de Serviços Eletrônica
+  FATURA
+  DUPLICATA
+  BOLETO
+  CONSUMO /// Luz, água, gás, condomínio, telefonia
+  OUTROS
+}
+
+enum IntegrationStatus {
+  PENDING /// Aguardando integração
+  INTEGRATED /// AP + Contábil + Agenda gerados com sucesso
+  ERROR /// Falha em alguma etapa da integração
+  MANUAL /// Integrado manualmente após erro
+}
+
+enum AgendaEventType {
+  PAYMENT /// Pagamento de documento fiscal / AP
+  TAX /// Obrigação fiscal (DARF, GPS, FGTS, DAS)
+  CLOSING /// Fechamento de período contábil/fiscal
+  MEETING
+  REMINDER
+  OTHER
+}
+
+enum AgendaColor {
+  YELLOW /// NF-e / NFS-e
+  BLUE /// Pagamentos fixos (folha, aluguel)
+  GREEN /// Obrigações fiscais (DARF, GPS)
+  RED /// Urgente / vencido
+  ORANGE /// Contas de consumo
+  PURPLE /// Reuniões / avisos
+}
+
+/// Documentos fiscais de entrada (NF-e, NFS-e, faturas, boletos).
+/// Ponto de entrada do fluxo de integração AP × Contábil × Agenda.
+model FiscalDocument {
+  id             String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId      String             @map("company_id") @db.Uuid
+  documentType   FiscalDocumentType @map("document_type")
+  documentNumber String?            @map("document_number") @db.VarChar
+  accessKey      String?            @map("access_key") @db.Char(44)
+
+  issuerCnpj     String  @map("issuer_cnpj") @db.VarChar(18)
+  issuerName     String  @map("issuer_name") @db.VarChar
+  issuerStateReg String? @map("issuer_state_reg") @db.VarChar
+
+  issueDate       DateTime @map("issue_date") @db.Timestamp(6)
+  dueDate         DateTime @map("due_date") @db.Timestamp(6)
+  competenceMonth String   @map("competence_month") @db.Char(7)
+
+  grossAmount    Decimal @map("gross_amount") @db.Decimal(15, 2)
+  discountAmount Decimal @default(0) @map("discount_amount") @db.Decimal(15, 2)
+  netAmount      Decimal @map("net_amount") @db.Decimal(15, 2)
+
+  irAmount     Decimal @default(0) @map("ir_amount") @db.Decimal(15, 2)
+  pisAmount    Decimal @default(0) @map("pis_amount") @db.Decimal(15, 2)
+  cofinsAmount Decimal @default(0) @map("cofins_amount") @db.Decimal(15, 2)
+  csllAmount   Decimal @default(0) @map("csll_amount") @db.Decimal(15, 2)
+  issAmount    Decimal @default(0) @map("iss_amount") @db.Decimal(15, 2)
+  inssAmount   Decimal @default(0) @map("inss_amount") @db.Decimal(15, 2)
+
+  expenseAccountId String? @map("expense_account_id") @db.Uuid
+  costCenter       String? @map("cost_center") @db.VarChar
+
+  integrationStatus IntegrationStatus @default(PENDING) @map("integration_status")
+  apEntryId         String?           @map("ap_entry_id") @db.Uuid
+  journalEntryId    String?           @map("journal_entry_id") @db.Uuid
+  agendaEventId     String?           @map("agenda_event_id") @db.Uuid
+
+  notes         String?        @map("notes") @db.Text
+  attachmentUrl String?        @map("attachment_url") @db.VarChar
+  status        DocumentStatus @default(RASCUNHO) @map("status")
+
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamp(6)
+  createdById String    @map("created_by_id") @db.Uuid
+  updatedById String?   @map("updated_by_id") @db.Uuid
+
+  apEntry ApEntry?
+
+  @@index([companyId, dueDate])
+  @@index([companyId, competenceMonth])
+  @@index([accessKey])
+  @@index([issuerCnpj, companyId])
+  @@map("fiscal_documents")
+}
+
+/// Eventos da agenda financeira. Integrado com documentos fiscais e AP.
+/// Suporta recorrência e séries de eventos.
+model AgendaEvent {
+  id          String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId   String          @map("company_id") @db.Uuid
+  eventType   AgendaEventType @map("event_type")
+  title       String          @map("title") @db.VarChar
+  description String?         @map("description") @db.Text
+  color       AgendaColor     @map("color")
+  dueDate     DateTime        @map("due_date") @db.Timestamp(6)
+  amount      Decimal?        @map("amount") @db.Decimal(15, 2)
+  isPaid      Boolean         @default(false) @map("is_paid")
+  paidAt      DateTime?       @map("paid_at") @db.Timestamp(6)
+
+  isRecurring    Boolean @default(false) @map("is_recurring")
+  recurrenceRule String? @map("recurrence_rule") @db.VarChar
+  parentEventId  String? @map("parent_event_id") @db.Uuid
+
+  fiscalDocumentId String? @map("fiscal_document_id") @db.Uuid
+  apEntryId        String? @map("ap_entry_id") @db.Uuid
+
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamp(6)
+  createdById String    @map("created_by_id") @db.Uuid
+  updatedById String?   @map("updated_by_id") @db.Uuid
+
+  apEntry ApEntry?
+
+  @@index([companyId, dueDate])
+  @@index([companyId, isPaid])
+  @@map("agenda_events")
+}
+
+// =============================================================================
+// 09 · CONTAS A PAGAR
+// =============================================================================
+
+enum ApEntryStatus {
+  OPEN
+  PAID
+  OVERDUE
+  PARTIALLY_PAID
+  CANCELLED
+  SCHEDULED
+}
+
+enum APStatus {
+  OPEN
+  PARTIAL
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+enum APOrigin {
+  FISCAL_DOCUMENT
+  MANUAL
+  PAYROLL
+  BOLETO_IMPORT
+}
+
+enum PaymentMethod {
+  BOLETO
+  TED
+  DOC
+  PIX
+  CHEQUE
+  DINHEIRO
+  CARTAO_CREDITO
+  CARTAO_DEBITO
+  TRANSFERENCIA
+  OUTROS
+}
+
+/// Contas a pagar (modelo principal do financeiro).
+/// Gerado automaticamente pelo IntegrationService ou lançado manualmente.
+model ApEntry {
+  id        String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId String @map("company_id") @db.Uuid
+
+  title          String  @map("title") @db.VarChar(200)
+  description    String? @map("description") @db.Text
+  documentNumber String? @map("document_number") @db.VarChar(50)
+
+  issueDate     DateTime? @map("issue_date") @db.Timestamp(6)
+  dueDate       DateTime  @map("due_date") @db.Timestamp(6)
+  paidAt        DateTime? @map("paid_at") @db.Timestamp(6)
+  scheduledDate DateTime? @map("scheduled_date") @db.Timestamp(6)
+
+  amount         Decimal @map("amount") @db.Decimal(15, 2)
+  paidAmount     Decimal @default(0) @map("paid_amount") @db.Decimal(15, 2)
+  discountAmount Decimal @default(0) @map("discount_amount") @db.Decimal(15, 2)
+  fineAmount     Decimal @default(0) @map("fine_amount") @db.Decimal(15, 2)
+  interestAmount Decimal @default(0) @map("interest_amount") @db.Decimal(15, 2)
+
+  status          ApEntryStatus  @default(OPEN) @map("status")
+  paymentMethod   PaymentMethod? @map("payment_method")
+  bankAccount     String?        @map("bank_account") @db.VarChar(100)
+  transactionCode String?        @map("transaction_code") @db.VarChar(100)
+
+  supplierId      String? @map("supplier_id") @db.Uuid
+  supplierName    String? @map("supplier_name") @db.VarChar(200)
+  supplierCnpjCpf String? @map("supplier_cnpj_cpf") @db.VarChar(18)
+
+  fiscalDocumentId String? @unique @map("fiscal_document_id") @db.Uuid
+  contractId       String? @map("contract_id") @db.Uuid
+  purchaseOrderId  String? @map("purchase_order_id") @db.Uuid
+  journalEntryId   String? @map("journal_entry_id") @db.Uuid
+  agendaEventId    String? @unique @map("agenda_event_id") @db.Uuid
+
+  notes         String? @map("notes") @db.Text
+  attachmentUrl String? @map("attachment_url") @db.VarChar(500)
+
+  createdById String    @map("created_by_id") @db.Uuid
+  updatedById String?   @map("updated_by_id") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamp(6)
+
+  company        Company         @relation(fields: [companyId], references: [id])
+  createdBy      User            @relation("CreatedApEntries", fields: [createdById], references: [id])
+  updatedBy      User?           @relation("UpdatedApEntries", fields: [updatedById], references: [id])
+  supplier       Person?         @relation(fields: [supplierId], references: [id])
+  fiscalDocument FiscalDocument? @relation(fields: [fiscalDocumentId], references: [id])
+  journalEntry   JournalEntry?   @relation(fields: [journalEntryId], references: [id])
+  agendaEvent    AgendaEvent?    @relation(fields: [agendaEventId], references: [id])
+
+  @@index([companyId])
+  @@index([companyId, dueDate])
+  @@index([companyId, status])
+  @@index([supplierId])
+  @@index([fiscalDocumentId])
+  @@index([dueDate])
+  @@index([status])
+  @@map("ap_entries")
+}
+
+/// AccountsPayable é o modelo expandido de AP com suporte a parcelamento
+/// e histórico de pagamentos parciais via APPayment.
+model AccountsPayable {
+  id        String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId String @map("company_id") @db.Uuid
+
+  title          String   @map("title") @db.VarChar
+  description    String?  @map("description") @db.Text
+  origin         APOrigin @default(MANUAL) @map("origin")
+  documentNumber String?  @map("document_number") @db.VarChar
+  barCode        String?  @map("bar_code") @db.VarChar
+
+  supplierCnpj String? @map("supplier_cnpj") @db.VarChar(18)
+  supplierName String? @map("supplier_name") @db.VarChar
+
+  grossAmount    Decimal @map("gross_amount") @db.Decimal(15, 2)
+  discountAmount Decimal @default(0) @map("discount_amount") @db.Decimal(15, 2)
+  interestAmount Decimal @default(0) @map("interest_amount") @db.Decimal(15, 2)
+  fineAmount     Decimal @default(0) @map("fine_amount") @db.Decimal(15, 2)
+  netAmount      Decimal @map("net_amount") @db.Decimal(15, 2)
+  paidAmount     Decimal @default(0) @map("paid_amount") @db.Decimal(15, 2)
+
+  issueDate       DateTime @map("issue_date") @db.Timestamp(6)
+  dueDate         DateTime @map("due_date") @db.Timestamp(6)
+  competenceMonth String   @map("competence_month") @db.Char(7)
+
+  status            APStatus @default(OPEN) @map("status")
+  installmentNumber Int      @default(1) @map("installment_number")
+  totalInstallments Int      @default(1) @map("total_installments")
+  parentId          String?  @map("parent_id") @db.Uuid
+
+  expenseAccountId String? @map("expense_account_id") @db.Uuid
+  costCenter       String? @map("cost_center") @db.VarChar
+  categoryTag      String? @map("category_tag") @db.VarChar
+
+  fiscalDocumentId String? @map("fiscal_document_id") @db.Uuid
+  agendaEventId    String? @map("agenda_event_id") @db.Uuid
+
+  notes           String?   @map("notes") @db.Text
+  createdById     String?   @map("created_by_id") @db.Uuid
+  updatedById     String?   @map("updated_by_id") @db.Uuid
+  statusUpdatedAt DateTime? @map("status_updated_at") @db.Timestamp(6)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  deletedAt       DateTime? @map("deleted_at") @db.Timestamp(6)
+
+  payments APPayment[]
+
+  @@index([companyId, dueDate])
+  @@index([companyId, status])
+  @@index([companyId, competenceMonth])
+  @@index([fiscalDocumentId])
+  @@map("accounts_payable")
+}
+
+/// Histórico de baixas parciais de AccountsPayable.
+model APPayment {
+  id                String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  accountsPayableId String @map("accounts_payable_id") @db.Uuid
+
+  paidAt          DateTime      @map("paid_at") @db.Timestamp(6)
+  amount          Decimal       @map("amount") @db.Decimal(15, 2)
+  discountApplied Decimal       @default(0) @map("discount_applied") @db.Decimal(15, 2)
+  interestApplied Decimal       @default(0) @map("interest_applied") @db.Decimal(15, 2)
+  fineApplied     Decimal       @default(0) @map("fine_applied") @db.Decimal(15, 2)
+  paymentMethod   PaymentMethod @default(PIX) @map("payment_method")
+  bankAccount     String?       @map("bank_account") @db.VarChar
+  receiptRef      String?       @map("receipt_ref") @db.VarChar
+  notes           String?       @map("notes") @db.Text
+
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamp(6)
+  createdById String    @map("created_by_id") @db.Uuid
+  updatedById String?   @map("updated_by_id") @db.Uuid
+
+  accountsPayable AccountsPayable @relation(fields: [accountsPayableId], references: [id])
+
+  @@index([accountsPayableId])
+  @@map("ap_payments")
+}
+
+// =============================================================================
+// 10 · ECF (ESCRITURAÇÃO CONTÁBIL FISCAL)
+// =============================================================================
+
+/// LALUR Parte A — Demonstração do Lucro Real e base de cálculo da CSLL.
+model EcfPartA {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId   String   @map("company_id") @db.Uuid
+  code        String   @map("code") @db.VarChar
+  description String   @map("description") @db.VarChar
+  value       Decimal  @map("value") @db.Decimal(18, 2)
+  type        String   @map("type") @db.VarChar
+  period      String   @map("period") @db.VarChar
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@index([companyId, period])
+  @@map("ecf_part_a")
+}
+
+/// LALUR Parte B — Controle de adições e exclusões temporárias do lucro real.
+model EcfPartB {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId   String   @map("company_id") @db.Uuid
+  accountCode String   @map("account_code") @db.VarChar
+  description String   @map("description") @db.VarChar
+  balance     Decimal  @map("balance") @db.Decimal(18, 2)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@unique([companyId, accountCode])
+  @@index([companyId])
+  @@map("ecf_part_b")
+}
+
+// =============================================================================
+// 11 · IMPORTAÇÃO BANCÁRIA
+// =============================================================================
+
+enum BankImportStatus {
+  PENDING
+  CLASSIFIED
+  POSTED
+  IGNORED
+  RECONCILED
+}
+
+enum BankCode {
+  ITAU
+  BRADESCO
+  BB
+  SANTANDER
+  CAIXA
+  SICREDI
+  SICOOB
+  NUBANK
+  INTER
+  GENERIC
+}
+
+enum TransactionType {
+  DEBIT
+  CREDIT
+}
+
+/// Extratos bancários importados. Agrupa transações de um período.
+model BankStatement {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId      String    @map("company_id") @db.Uuid
+  bankCode       BankCode  @map("bank_code")
+  bankName       String    @map("bank_name") @db.VarChar
+  agency         String?   @map("agency") @db.VarChar
+  account        String?   @map("account") @db.VarChar
+  periodFrom     DateTime  @map("period_from") @db.Timestamp(6)
+  periodTo       DateTime  @map("period_to") @db.Timestamp(6)
+  fileName       String    @map("file_name") @db.VarChar
+  fileFormat     String    @map("file_format") @db.VarChar
+  totalLines     Int       @map("total_lines")
+  totalDebits    Decimal   @map("total_debits") @db.Decimal(15, 2)
+  totalCredits   Decimal   @map("total_credits") @db.Decimal(15, 2)
+  openingBalance Decimal?  @map("opening_balance") @db.Decimal(15, 2)
+  closingBalance Decimal?  @map("closing_balance") @db.Decimal(15, 2)
+  createdById    String    @map("created_by_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamp(6)
+
+  transactions BankTransaction[]
+
+  @@index([companyId, periodFrom])
+  @@index([companyId, bankCode])
+  @@map("bank_statements")
+}
+
+/// Transações individuais de extratos bancários.
+/// Motor de sugestão de conta contábil em 3 camadas: regras, ML e histórico.
+model BankTransaction {
+  id                   String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId            String           @map("company_id") @db.Uuid
+  statementId          String           @map("statement_id") @db.Uuid
+  transactionDate      DateTime         @map("transaction_date") @db.Timestamp(6)
+  description          String           @map("description") @db.VarChar
+  descriptionNorm      String           @map("description_norm") @db.VarChar
+  amount               Decimal          @map("amount") @db.Decimal(15, 2)
+  type                 TransactionType  @map("type")
+  balance              Decimal?         @map("balance") @db.Decimal(15, 2)
+  bankRef              String?          @map("bank_ref") @db.VarChar
+  agency               String?          @map("agency") @db.VarChar
+  groupKey             String?          @map("group_key") @db.VarChar
+  status               BankImportStatus @default(PENDING) @map("status")
+  accountId            String?          @map("account_id") @db.Uuid
+  counterAccountId     String?          @map("counter_account_id") @db.Uuid
+  memo                 String?          @map("memo") @db.VarChar
+  costCenter           String?          @map("cost_center") @db.VarChar
+  suggestedAccountId   String?          @map("suggested_account_id") @db.Uuid
+  suggestionSource     String?          @map("suggestion_source") @db.VarChar
+  suggestionConfidence Int?             @map("suggestion_confidence")
+  apEntryId            String?          @map("ap_entry_id") @db.Uuid
+  arEntryId            String?          @map("ar_entry_id") @db.Uuid
+  payrollId            String?          @map("payroll_id") @db.Uuid
+  journalEntryId       String?          @map("journal_entry_id") @db.Uuid
+  createdAt            DateTime         @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt            DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  statement BankStatement @relation(fields: [statementId], references: [id])
+
+  @@index([companyId, transactionDate])
+  @@index([statementId])
+  @@index([status])
+  @@index([descriptionNorm])
+  @@index([groupKey])
+  @@map("bank_transactions")
+}
+
+/// Regras de classificação automática para importação bancária.
+/// Motor de aprendizado: usageCount aumenta a cada aplicação.
+model BankImportRule {
+  id           String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId    String           @map("company_id") @db.Uuid
+  textPattern  String           @map("text_pattern") @db.VarChar
+  bankCode     BankCode?        @map("bank_code")
+  type         TransactionType? @map("type")
+  accountId    String           @map("account_id") @db.Uuid
+  memoTemplate String?          @map("memo_template") @db.VarChar
+  isFixed      Boolean          @default(false) @map("is_fixed")
+  usageCount   Int              @default(0) @map("usage_count")
+  lastUsedAt   DateTime?        @map("last_used_at") @db.Timestamp(6)
+  createdById  String           @map("created_by_id") @db.Uuid
+  createdAt    DateTime         @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt    DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  deletedAt    DateTime?        @map("deleted_at") @db.Timestamp(6)
+
+  @@unique([companyId, textPattern, bankCode, type])
+  @@index([companyId, usageCount])
+  @@map("bank_import_rules")
+}
+
+// =============================================================================
+// 12 · LIVROS SOCIETÁRIOS — REGISTRO E TRANSFERÊNCIA
+// =============================================================================
+
+enum ShareType {
+  ORDINARIA    /// ON — direito a voto
+  PREFERENCIAL /// PN — sem voto, preferência em dividendos
+  QUOTA        /// Ltda — quota social
+
+  @@map("share_type")
+}
+
+enum ShareEntryType {
+  SA    /// Sociedade Anônima — usa ações
+  LTDA  /// Limitada — usa quotas
+
+  @@map("share_entry_type")
+}
+
+enum TransferReason {
+  COMPRA_VENDA     /// Cessão onerosa entre partes
+  DOACAO           /// Transmissão gratuita
+  HERANCA          /// Sucessão causa mortis
+  INTEGRALIZACAO   /// Integralização de capital
+  REDUCAO_CAPITAL  /// Redução de capital com devolução
+  BONIFICACAO      /// Emissão por incorporação de reservas
+  CISAO            /// Cisão total ou parcial
+  INCORPORACAO     /// Absorção por outra sociedade
+  OUTRO
+
+  @@map("transfer_reason")
+}
+
+/// Registro de acionistas/quotistas (Livro de Registro de Ações/Quotas).
+/// Mantém o saldo atual de cada titular por série/tipo de ação.
+/// Base legal: Lei 6.404/76 art. 31 (S/A) e CC art. 1.053 (Ltda).
+model ShareholderRecord {
+  id           String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId    String         @map("company_id") @db.Uuid
+  bookId       String?        @map("book_id") @db.Uuid          /// vínculo com CorporateBook
+  entryType    ShareEntryType @map("entry_type")                /// SA ou LTDA
+
+  // ── Titular ───────────────────────────────────────────────
+  holderName   String         @map("holder_name") @db.VarChar
+  holderTaxId  String         @map("holder_tax_id") @db.VarChar(18)  /// CPF ou CNPJ
+  holderType   String         @default("PF") @map("holder_type") @db.VarChar(2) /// PF | PJ
+  personId     String?        @map("person_id") @db.Uuid        /// vínculo opcional com Person
+  address      String?        @map("address") @db.VarChar
+
+  // ── Participação ──────────────────────────────────────────
+  shareType    ShareType      @map("share_type")
+  series       String?        @map("series") @db.VarChar(10)    /// série (ex: "A", "B")
+  quantity     Decimal        @map("quantity") @db.Decimal(18, 6)
+  nominalValue Decimal        @map("nominal_value") @db.Decimal(15, 2)  /// valor nominal por ação/quota
+  totalValue   Decimal        @map("total_value") @db.Decimal(18, 2)    /// qty × nominalValue
+  percentOwned Decimal        @map("percent_owned") @db.Decimal(8, 4)   /// % do capital
+
+  // ── Integralização ────────────────────────────────────────
+  subscriptionDate   DateTime? @map("subscription_date") @db.Date
+  integralizationDate DateTime? @map("integralization_date") @db.Date
+  paidInAmount       Decimal   @default(0) @map("paid_in_amount") @db.Decimal(18, 2)
+  isFullyPaid        Boolean   @default(false) @map("is_fully_paid")
+
+  // ── Restrições / Gravames ─────────────────────────────────
+  hasEncumbrance  Boolean   @default(false) @map("has_encumbrance")
+  encumbranceDesc String?   @map("encumbrance_desc") @db.Text
+  isPledged       Boolean   @default(false) @map("is_pledged")
+
+  // ── Numeração ─────────────────────────────────────────────
+  shareNumberFrom  Int?     @map("share_number_from")     /// nº inicial do certificado
+  shareNumberTo    Int?     @map("share_number_to")       /// nº final do certificado
+  certificateNumber String? @map("certificate_number") @db.VarChar(30)
+
+  // ── Controle ──────────────────────────────────────────────
+  isActive    Boolean   @default(true) @map("is_active")
+  notes       String?   @map("notes") @db.Text
+  createdById String    @map("created_by_id") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamp(6)
+
+  // ── Relations ─────────────────────────────────────────────
+  company          Company          @relation(fields: [companyId], references: [id])
+  person           Person?          @relation(fields: [personId], references: [id])
+  transfersAsFrom  ShareTransfer[]  @relation("TransferFrom")
+  transfersAsTo    ShareTransfer[]  @relation("TransferTo")
+
+  @@index([companyId, isActive])
+  @@index([companyId, holderTaxId])
+  @@index([companyId, shareType])
+  @@map("shareholder_records")
+}
+
+/// Transferências de ações/quotas (Livro de Transferência).
+/// Cada transferência é imutável após registrada (append-only).
+/// Base legal: Lei 6.404/76 art. 36 (S/A) e CC art. 1.057 (Ltda).
+model ShareTransfer {
+  id          String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId   String         @map("company_id") @db.Uuid
+  bookId      String?        @map("book_id") @db.Uuid
+  entryType   ShareEntryType @map("entry_type")
+
+  // ── Partes ────────────────────────────────────────────────
+  fromRecordId String  @map("from_record_id") @db.Uuid   /// ShareholderRecord do cedente
+  toRecordId   String  @map("to_record_id") @db.Uuid     /// ShareholderRecord do cessionário
+
+  // ── Objeto da transferência ───────────────────────────────
+  shareType      ShareType      @map("share_type")
+  series         String?        @map("series") @db.VarChar(10)
+  quantity       Decimal        @map("quantity") @db.Decimal(18, 6)
+  nominalValue   Decimal        @map("nominal_value") @db.Decimal(15, 2)
+  transferValue  Decimal        @map("transfer_value") @db.Decimal(18, 2)  /// preço efetivo da cessão
+  shareNumberFrom Int?          @map("share_number_from")
+  shareNumberTo   Int?          @map("share_number_to")
+
+  // ── Dados do ato ──────────────────────────────────────────
+  transferDate   DateTime       @map("transfer_date") @db.Date
+  reason         TransferReason @map("reason")
+  instrumentType String?        @map("instrument_type") @db.VarChar(100) /// "Contrato de Cessão", "Escritura", etc.
+  instrumentDate DateTime?      @map("instrument_date") @db.Date
+  notaryOffice   String?        @map("notary_office") @db.VarChar(255)   /// Cartório (se escriturado)
+  bookNumber     String?        @map("book_number_notary") @db.VarChar(30)
+  pageNumber     String?        @map("page_number") @db.VarChar(10)
+
+  // ── Averbação no livro ────────────────────────────────────
+  averbacaoDate    DateTime?   @map("averbacao_date") @db.Date
+  averbacaoUserId  String?     @map("averbacao_user_id") @db.Uuid
+
+  // ── Documento gerado ──────────────────────────────────────
+  documentId  String?   @map("document_id") @db.Uuid
+
+  notes       String?   @map("notes") @db.Text
+  createdById String    @map("created_by_id") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  // ── Relations ─────────────────────────────────────────────
+  company     Company            @relation(fields: [companyId], references: [id])
+  fromRecord  ShareholderRecord  @relation("TransferFrom", fields: [fromRecordId], references: [id])
+  toRecord    ShareholderRecord  @relation("TransferTo", fields: [toRecordId], references: [id])
+
+  @@index([companyId, transferDate])
+  @@index([fromRecordId])
+  @@index([toRecordId])
+  @@map("share_transfers")
+}

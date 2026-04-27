@@ -1,0 +1,813 @@
+﻿[PASTA] apps/
+  [PASTA] api/
+    [PASTA] src/
+      [PASTA] auth/
+        [PASTA] decorators/
+          [ARQUIVO] current-user.decorator.ts (0.32 KB - 24/03/2026 09:10)
+          [ARQUIVO] permission.decorator.ts (0.21 KB - 20/03/2026 13:44)
+        [PASTA] dto/
+          [ARQUIVO] login.dto.ts (0.21 KB - 20/03/2026 13:44)
+          [ARQUIVO] register.dto.ts (1.04 KB - 27/03/2026 13:20)
+          [ARQUIVO] user.dto.ts (1.2 KB - 27/03/2026 13:19)
+        [PASTA] guards/
+          [ARQUIVO] jwt.guard.ts (0.22 KB - 20/03/2026 13:44)
+          [ARQUIVO] local.guard.ts (0.33 KB - 20/03/2026 13:44)
+          [ARQUIVO] profile.guard.ts (1.43 KB - 20/03/2026 13:44)
+        [PASTA] strategies/
+          [ARQUIVO] jwt.strategy.ts (1.36 KB - 20/03/2026 13:44)
+          [ARQUIVO] local.strategy.ts (0.87 KB - 20/03/2026 13:44)
+        [ARQUIVO] auth.controller.ts (2.22 KB - 20/03/2026 13:44)
+        [ARQUIVO] auth.module.ts (1.25 KB - 20/03/2026 13:44)
+        [ARQUIVO] auth.service funcionando.ts (2.46 KB - 20/03/2026 13:44)
+        [ARQUIVO] auth.service.ts (3.04 KB - 20/03/2026 13:44)
+        [ARQUIVO] xxxxjwt-auth.guard.XXXXXts (0.83 KB - 06/03/2026 21:50)
+      [PASTA] contexts/
+        [ARQUIVO] AuthContext.tsx (3.35 KB - 21/03/2026 20:12)
+      [PASTA] core/
+        [PASTA] audit/
+          [ARQUIVO] audit.controller.ts (0.81 KB - 20/03/2026 13:44)
+          [ARQUIVO] audit.module.ts (0.38 KB - 20/03/2026 13:44)
+          [ARQUIVO] audit.service.ts (1.01 KB - 20/03/2026 13:44)
+          [ARQUIVO] audit_log.entity.ts (0.88 KB - 20/03/2026 13:44)
+        [PASTA] cache/
+        [PASTA] certificates/
+          [ARQUIVO] certificates.controller.ts (3.9 KB - 20/03/2026 13:44)
+          [ARQUIVO] certificates.dto.ts (1.86 KB - 20/03/2026 13:44)
+          [ARQUIVO] certificates.module.ts (1.82 KB - 20/03/2026 13:44)
+          [ARQUIVO] certificates.service.ts (10.07 KB - 20/03/2026 13:44)
+          [ARQUIVO] crypto.service.ts (3.04 KB - 20/03/2026 13:44)
+          [ARQUIVO] INSTALACAO.md (5.49 KB - 11/03/2026 18:59)
+          [ARQUIVO] migration_add_certificates.sql (3.29 KB - 11/03/2026 19:03)
+          [ARQUIVO] PATCH_documents.service.md (4.71 KB - 11/03/2026 19:03)
+          [ARQUIVO] signing.service.ts (11.86 KB - 20/03/2026 13:44)
+        [PASTA] companies/
+          [ARQUIVO] company.controller.ts (5.06 KB - 24/03/2026 09:10)
+          [ARQUIVO] company.module.ts (0.52 KB - 20/03/2026 13:44)
+          [ARQUIVO] company.service.ts (6.52 KB - 20/03/2026 13:44)
+        [PASTA] contratos/
+          [ARQUIVO] contratos.controller.ts (2.51 KB - 20/03/2026 13:44)
+          [ARQUIVO] contratos.dto.ts (3.13 KB - 20/03/2026 13:44)
+          [ARQUIVO] contratos.module.ts (0.49 KB - 20/03/2026 13:44)
+          [ARQUIVO] contratos.service.ts (9.21 KB - 20/03/2026 13:44)
+          [ARQUIVO] index.ts (0.21 KB - 20/03/2026 13:44)
+        [PASTA] decorators/
+          [ARQUIVO] current-user.decorator.ts (0.32 KB - 24/03/2026 09:10)
+        [PASTA] documents/
+          [ARQUIVO] create-documents.dto.ts (5.6 KB - 20/03/2026 13:44)
+          [ARQUIVO] documents.controller.ts (7.28 KB - 20/03/2026 13:44)
+          [ARQUIVO] documents.dto.ts (1.2 KB - 20/03/2026 13:44)
+          [ARQUIVO] documents.module.ts (0.58 KB - 20/03/2026 13:44)
+          [ARQUIVO] documents.service.ts (18.52 KB - 20/03/2026 13:44)
+        [PASTA] dto/
+          [ARQUIVO] company.dto.ts (1.81 KB - 20/03/2026 13:44)
+          [ARQUIVO] create-user.dto.ts (1.79 KB - 27/03/2026 13:24)
+          [ARQUIVO] register.dto.ts (1.44 KB - 27/03/2026 13:14)
+          [ARQUIVO] update-user.dto.ts (1.56 KB - 20/03/2026 13:44)
+          [ARQUIVO] user.dto.ts (2.3 KB - 27/03/2026 13:10)
+        [PASTA] logging/
+        [PASTA] persons/
+          [ARQUIVO] persons.controller.ts (2.85 KB - 20/03/2026 13:44)
+          [ARQUIVO] persons.dto.ts (6.38 KB - 20/03/2026 13:44)
+          [ARQUIVO] persons.module.ts (0.48 KB - 20/03/2026 13:44)
+          [ARQUIVO] persons.service.ts (12.27 KB - 20/03/2026 13:44)
+          [ARQUIVO] update-persons.dto.ts (1.03 KB - 20/03/2026 13:44)
+        [PASTA] system/
+          [ARQUIVO] backup.controller.ts (1.6 KB - 23/03/2026 09:31)
+          [ARQUIVO] backup.module.ts (0.4 KB - 23/03/2026 09:26)
+          [ARQUIVO] backup.service.ts (1.57 KB - 23/03/2026 12:42)
+          [ARQUIVO] export-data.service.ts (16.4 KB - 20/03/2026 13:44)
+          [ARQUIVO] system.controller.ts (1.68 KB - 20/03/2026 13:44)
+          [ARQUIVO] system.module.ts (0.59 KB - 20/03/2026 13:44)
+        [PASTA] users/
+          [ARQUIVO] profiles.controller.ts (2.29 KB - 20/03/2026 13:44)
+          [ARQUIVO] profiles.module.ts (0.44 KB - 20/03/2026 13:44)
+          [ARQUIVO] profiles.service.ts (0.93 KB - 20/03/2026 13:44)
+          [ARQUIVO] users.controller.ts (4.25 KB - 24/03/2026 09:10)
+          [ARQUIVO] users.module.ts (0.63 KB - 20/03/2026 13:44)
+          [ARQUIVO] users.service.ts (5.42 KB - 27/03/2026 12:43)
+        [ARQUIVO] audit_log.entity.ts (0.86 KB - 20/03/2026 13:44)
+      [PASTA] database/
+      [PASTA] events/
+      [PASTA] file-storage/
+      [PASTA] jobs/
+      [PASTA] modules/
+        [PASTA] accounting/
+          [PASTA] controllers/
+            [ARQUIVO] accounting.controller.ts (0.63 KB - 20/03/2026 13:44)
+            [ARQUIVO] accounting-import.controller.ts (11.34 KB - 25/03/2026 20:01)
+            [ARQUIVO] accounting-mask.controller.ts (2.34 KB - 24/03/2026 09:41)
+            [ARQUIVO] balance-comparison.controller.ts (0.54 KB - 25/03/2026 22:38)
+            [ARQUIVO] balance-import.controller.ts (1.63 KB - 20/03/2026 13:44)
+            [ARQUIVO] balances.controller.ts (2.41 KB - 20/03/2026 13:44)
+            [ARQUIVO] chart-of-accounts.controller.ts (5.5 KB - 20/03/2026 13:44)
+            [ARQUIVO] journal-entry.controller.ts (4.39 KB - 20/03/2026 13:44)
+            [ARQUIVO] trial-balance.controller.ts (3.1 KB - 20/03/2026 13:44)
+          [PASTA] dto/
+            [ARQUIVO] chart-of-accounts.dto.ts (4.11 KB - 20/03/2026 13:44)
+            [ARQUIVO] import-balance.dto.ts (4.23 KB - 20/03/2026 13:44)
+            [ARQUIVO] verification-balance.dto.ts (0.46 KB - 20/03/2026 13:44)
+          [PASTA] services/
+            [ARQUIVO] accounting.service.ts (4.25 KB - 20/03/2026 13:44)
+            [ARQUIVO] accounting-mask.service.ts (9.99 KB - 24/03/2026 14:17)
+            [ARQUIVO] balance-import.service.ts (4.41 KB - 20/03/2026 13:44)
+            [ARQUIVO] balances.service.ts (2.51 KB - 26/03/2026 08:13)
+            [ARQUIVO] bank-import.service.ts (1.17 KB - 20/03/2026 13:44)
+            [ARQUIVO] chart-of-accounts.service.ts (23.08 KB - 24/03/2026 10:04)
+            [ARQUIVO] journal-entry.service.ts (19.21 KB - 27/03/2026 00:26)
+            [ARQUIVO] trial-balance.service.ts (9.29 KB - 26/03/2026 22:01)
+          [ARQUIVO] accounting.module.ts (2.54 KB - 26/03/2026 08:04)
+        [PASTA] assets/
+          [PASTA] controllers/
+            [ARQUIVO] assets.controller.ts (7.36 KB - 20/03/2026 13:44)
+          [PASTA] dto/
+            [ARQUIVO] create-asset.dto.ts (10.59 KB - 20/03/2026 13:44)
+          [PASTA] services/
+            [ARQUIVO] appraisal.service.ts (1.88 KB - 20/03/2026 13:44)
+            [ARQUIVO] assets.service.ts (10.83 KB - 20/03/2026 13:44)
+            [ARQUIVO] depreciation.service.ts (5.06 KB - 24/03/2026 14:10)
+            [ARQUIVO] history.service.ts (1.02 KB - 20/03/2026 13:44)
+            [ARQUIVO] improvement.service.ts (3.21 KB - 20/03/2026 13:44)
+            [ARQUIVO] maintenance.service.ts (3.62 KB - 20/03/2026 13:44)
+            [ARQUIVO] retrofit.service.ts (3.77 KB - 20/03/2026 13:44)
+          [ARQUIVO] assets.module.ts (1.15 KB - 20/03/2026 13:44)
+        [PASTA] corporate/
+          [PASTA] pdf/
+            [PASTA] templates/
+              [ARQUIVO] share-register.html (0 KB - 15/04/2026 19:07)
+              [ARQUIVO] transfer-register.html (0 KB - 15/04/2026 19:07)
+            [ARQUIVO] corporate-pdf.service.ts (14.78 KB - 15/04/2026 19:18)
+          [PASTA] shareholders/
+            [PASTA] dto/
+              [ARQUIVO] create-shareholder.dto.ts (1.81 KB - 15/04/2026 19:16)
+              [ARQUIVO] filter-shareholder.dto.ts (0 KB - 15/04/2026 19:07)
+              [ARQUIVO] update-shareholder.dto.ts (0 KB - 15/04/2026 19:07)
+            [ARQUIVO] shareholders.controller.ts (1.47 KB - 15/04/2026 19:24)
+            [ARQUIVO] shareholders.service.ts (6.06 KB - 15/04/2026 19:17)
+          [PASTA] transfers/
+            [PASTA] dto/
+              [ARQUIVO] create-transfer.dto.ts (1.71 KB - 15/04/2026 19:17)
+              [ARQUIVO] filter-transfers.dto.ts (0 KB - 15/04/2026 19:07)
+            [ARQUIVO] transfers.controller.ts (1.13 KB - 15/04/2026 19:25)
+            [ARQUIVO] transfers.service.ts (4.71 KB - 15/04/2026 19:17)
+          [ARQUIVO] corporate.module.ts (0.76 KB - 15/04/2026 19:16)
+        [PASTA] finance/
+          [PASTA] dto/
+            [ARQUIVO] batch-pay-ap.dto.ts (0.65 KB - 20/03/2026 13:44)
+            [ARQUIVO] create.agenda.dto.ts (1.12 KB - 20/03/2026 13:44)
+            [ARQUIVO] create-ap.dto.ts (1.33 KB - 20/03/2026 13:44)
+            [ARQUIVO] create-fiscal-document.dto.ts (2.02 KB - 20/03/2026 13:44)
+            [ARQUIVO] filter-ap.dto.ts (0.98 KB - 20/03/2026 15:57)
+            [ARQUIVO] filter-fiscal-document.dto.ts (0.9 KB - 20/03/2026 13:44)
+            [ARQUIVO] pay-ap.dto.ts (0.63 KB - 20/03/2026 13:44)
+            [ARQUIVO] update.agenda.dto.ts (0.55 KB - 20/03/2026 13:44)
+            [ARQUIVO] update-ap.dto.ts (0.63 KB - 24/03/2026 14:13)
+            [ARQUIVO] update-fiscal-document.dto.ts (0.65 KB - 20/03/2026 13:44)
+          [PASTA] parsers/
+            [ARQUIVO] bank-parser.service.ts (23.28 KB - 21/03/2026 14:27)
+          [ARQUIVO] accounts-payable.controller.ts (2.44 KB - 20/03/2026 13:44)
+          [ARQUIVO] accounts-payable.service.ts (16.12 KB - 24/03/2026 14:14)
+          [ARQUIVO] agenda.service.ts (5.73 KB - 20/03/2026 16:01)
+          [ARQUIVO] bank-import.controller.ts (2.37 KB - 22/03/2026 11:38)
+          [ARQUIVO] bank-import.module.ts (0.82 KB - 22/03/2026 11:37)
+          [ARQUIVO] bank-import.service.ts (11.13 KB - 21/03/2026 14:27)
+          [ARQUIVO] finance.controller.ts (3.49 KB - 20/03/2026 13:44)
+          [ARQUIVO] finance.module.ts (1.07 KB - 20/03/2026 13:44)
+          [ARQUIVO] finance.service.ts (7.59 KB - 20/03/2026 13:44)
+          [ARQUIVO] integration.service.ts (9.46 KB - 20/03/2026 16:03)
+          [ARQUIVO] suggestion.service.ts (9.62 KB - 21/03/2026 14:27)
+        [PASTA] fiscal/
+          [PASTA] services/
+            [ARQUIVO] fiscal.service.ts (0 KB - 12/03/2026 18:32)
+          [ARQUIVO] fiscal.controller.ts (0 KB - 12/03/2026 18:32)
+          [ARQUIVO] fiscal.module.ts (0 KB - 12/03/2026 18:32)
+        [PASTA] hr/
+          [PASTA] services/
+            [ARQUIVO] hr.service.ts (0 KB - 12/03/2026 18:32)
+          [ARQUIVO] hr.controller.ts (0 KB - 12/03/2026 18:32)
+          [ARQUIVO] hr.module.ts (0 KB - 12/03/2026 18:32)
+        [PASTA] rfb/
+          [ARQUIVO] rfb.module.ts (0.46 KB - 20/03/2026 13:44)
+          [ARQUIVO] rfb-client.controller.ts (1.09 KB - 20/03/2026 13:44)
+          [ARQUIVO] rfb-client.service.ts (2.27 KB - 20/03/2026 13:44)
+        [PASTA] sped/
+          [PASTA] ecd/
+            [PASTA] controllers/
+              [ARQUIVO] ecd.controller.ts (7.96 KB - 27/03/2026 23:25)
+              [ARQUIVO] ecd-viewer.controller.ts (0.59 KB - 27/03/2026 22:25)
+            [PASTA] dto/
+              [ARQUIVO] ecd-viewer-response.dto.ts (0.83 KB - 27/03/2026 21:52)
+              [ARQUIVO] import-balance.dto.ts (0.24 KB - 20/03/2026 13:44)
+              [ARQUIVO] verification-balance.dto.ts (0.46 KB - 20/03/2026 13:44)
+            [PASTA] hooks/
+            [PASTA] services/
+              [ARQUIVO] ecd-exporter.service.ts (7.79 KB - 24/03/2026 14:01)
+              [ARQUIVO] ecd-importer.service.ts (18.86 KB - 25/03/2026 13:30)
+              [ARQUIVO] ecd-parser.service.ts (17.47 KB - 25/03/2026 13:31)
+              [ARQUIVO] ecd-validator.service.ts (6.64 KB - 20/03/2026 13:44)
+              [ARQUIVO] ecd-viewer.service.ts (2.3 KB - 27/03/2026 22:27)
+          [PASTA] ecf/
+            [PASTA] controllers/
+              [ARQUIVO] ecf.controller.ts (7 KB - 22/03/2026 13:44)
+            [PASTA] dto/
+            [PASTA] services/
+              [ARQUIVO] ecf.module.ts (0 KB - 16/03/2026 14:29)
+              [ARQUIVO] ecf-importer.service.ts (3.18 KB - 20/03/2026 16:45)
+              [ARQUIVO] ecf-parser.service.ts (7.58 KB - 22/03/2026 13:57)
+              [ARQUIVO] ecf-validator.service.ts (0.94 KB - 20/03/2026 13:44)
+          [PASTA] efd/
+            [PASTA] controllers/
+            [PASTA] dto/
+            [PASTA] services/
+            [ARQUIVO] efd.module.ts (0 KB - 16/03/2026 14:29)
+          [ARQUIVO] sped.module.ts (1.96 KB - 27/03/2026 22:39)
+      [PASTA] multi-company/
+        [ARQUIVO] company.decorator.ts (0.31 KB - 20/03/2026 13:44)
+        [ARQUIVO] company.interceptor.ts (2.21 KB - 20/03/2026 13:44)
+        [ARQUIVO] company.service.ts (0.38 KB - 20/03/2026 13:44)
+        [ARQUIVO] multi-company.guard.ts (0.9 KB - 20/03/2026 13:44)
+        [ARQUIVO] multi-company.module.ts (0.09 KB - 20/03/2026 13:44)
+        [ARQUIVO] multi-company.service.ts (0.33 KB - 20/03/2026 13:44)
+      [PASTA] notifications/
+      [PASTA] prisma/
+        [ARQUIVO] prisma.module.ts (0.21 KB - 20/03/2026 13:44)
+        [ARQUIVO] prisma.service.ts (1.17 KB - 20/03/2026 13:44)
+      [PASTA] shared/
+        [PASTA] constants/
+        [PASTA] decorators/
+          [ARQUIVO] current-user.decorator.ts (0.26 KB - 20/03/2026 13:44)
+        [PASTA] domain/
+          [PASTA] base/
+          [PASTA] interfaces/
+          [PASTA] value-objects/
+        [PASTA] dto/
+        [PASTA] exceptions/
+        [PASTA] filters/
+        [PASTA] interceptors/
+        [PASTA] pipes/
+        [PASTA] utils/
+          [PASTA] formatters/
+          [PASTA] helpers/
+          [PASTA] validators/
+        [ARQUIVO] api.ts (1.32 KB - 30/03/2026 08:52)
+      [PASTA] types/
+        [ARQUIVO] pg.d.ts (0.05 KB - 20/03/2026 13:44)
+      [PASTA] utils/
+        [ARQUIVO] normalize-account-code.ts (2.2 KB - 20/03/2026 13:44)
+      [PASTA] workflow/
+      [ARQUIVO] app.module.ts (1.91 KB - 25/03/2026 23:53)
+      [ARQUIVO] main.ts (0.75 KB - 21/03/2026 13:19)
+    [PASTA] uploads/
+      [PASTA] documents/
+    [ARQUIVO] .env (0.14 KB - 13/03/2026 19:33)
+    [ARQUIVO] BP Import txt.csv (5.99 KB - 13/03/2026 16:11)
+    [ARQUIVO] nest-cli.json (0.2 KB - 01/03/2026 22:44)
+    [ARQUIVO] package.json (1.55 KB - 22/03/2026 11:10)
+    [ARQUIVO] tsconfig.app.json (0.29 KB - 01/03/2026 22:44)
+    [ARQUIVO] tsconfig.json (0.99 KB - 14/03/2026 13:18)
+[PASTA] backups/
+  [ARQUIVO] companies.csv (1.75 KB - 19/03/2026 14:17)
+  [ARQUIVO] person_companies.csv (0 KB - 19/03/2026 14:18)
+  [ARQUIVO] persons.csv (1.19 KB - 19/03/2026 14:17)
+  [ARQUIVO] profiles.csv (0.46 KB - 19/03/2026 14:17)
+  [ARQUIVO] user_companies.csv (1.55 KB - 19/03/2026 14:17)
+  [ARQUIVO] users.csv (1.46 KB - 19/03/2026 14:17)
+[PASTA] docs/
+[PASTA] env_files/
+  [PASTA] frontend/
+    [ARQUIVO] .env (0.11 KB - 01/03/2026 13:59)
+  [ARQUIVO] .env (0.1 KB - 28/02/2026 17:11)
+[PASTA] frontend/
+  [PASTA] src/
+    [PASTA] components/
+      [PASTA] accounting/
+        [ARQUIVO] AccountTree.tsx (6.49 KB - 18/03/2026 16:54)
+        [ARQUIVO] BalanceView.tsx (4.26 KB - 14/03/2026 11:38)
+        [ARQUIVO] EcdOpeningModal.tsx (26.28 KB - 25/03/2026 20:02)
+        [ARQUIVO] ImportBalancesModal.tsx (11.39 KB - 14/03/2026 22:47)
+        [ARQUIVO] ImportChartModal.tsx (7.78 KB - 18/03/2026 16:30)
+        [ARQUIVO] ReportToolbar.tsx (12.11 KB - 27/03/2026 10:19)
+      [PASTA] common/
+      [PASTA] finance/
+        [ARQUIVO] AgendaCalendar.tsx (15.68 KB - 20/03/2026 09:56)
+        [ARQUIVO] AgendaEventModal.tsx (13.74 KB - 20/03/2026 10:06)
+        [ARQUIVO] AgendaSidebar.tsx (7.75 KB - 20/03/2026 10:07)
+        [ARQUIVO] APPayModal.tsx (11.74 KB - 20/03/2026 12:58)
+        [ARQUIVO] APPositionReport.tsx (9.74 KB - 20/03/2026 12:57)
+        [ARQUIVO] APTable.tsx (14.57 KB - 20/03/2026 12:56)
+        [ARQUIVO] FiscalDocumentModal.tsx (15.6 KB - 19/03/2026 18:08)
+        [ARQUIVO] FiscalDocumentTable.tsx (11.33 KB - 19/03/2026 18:06)
+      [PASTA] hooks/
+        [ARQUIVO] useConfirm.ts (1.08 KB - 20/03/2026 13:50)
+        [ARQUIVO] use-ecd-list.ts (0.7 KB - 27/03/2026 22:48)
+        [ARQUIVO] use-ecd-viewer.ts (0.73 KB - 30/03/2026 08:55)
+        [ARQUIVO] useNotification.ts (1.1 KB - 20/03/2026 13:50)
+      [PASTA] sped/
+        [ARQUIVO] EcdAccountTree.tsx (3.56 KB - 27/03/2026 21:43)
+      [ARQUIVO] Alert.tsx (1.35 KB - 02/03/2026 08:28)
+      [ARQUIVO] CertificateImportModal.tsx (12.67 KB - 11/03/2026 19:03)
+      [ARQUIVO] ConfirmDialog.tsx (2.67 KB - 14/03/2026 01:10)
+      [ARQUIVO] DocumentStylePicker - COLORIDO descartado.tsx (21.54 KB - 10/03/2026 11:47)
+      [ARQUIVO] DocumentStylePicker.tsx (29.4 KB - 11/03/2026 16:04)
+      [ARQUIVO] Header.tsx (22.27 KB - 21/03/2026 20:42)
+      [ARQUIVO] HomeRoute.tsx (0.77 KB - 02/03/2026 08:28)
+      [ARQUIVO] KPICard.tsx (2.19 KB - 13/03/2026 09:15)
+      [ARQUIVO] Layout - com Sidebar.tsx (5.21 KB - 09/03/2026 01:36)
+      [ARQUIVO] Layout.tsx (1.92 KB - 27/03/2026 10:01)
+      [ARQUIVO] LoadingSpinner.tsx (0.42 KB - 13/03/2026 09:38)
+      [ARQUIVO] PrivateRoute.tsx (0.39 KB - 02/03/2026 08:28)
+      [ARQUIVO] ProtectedRoute.tsx (0.9 KB - 03/03/2026 15:40)
+      [ARQUIVO] PublicLayout.tsx (4.14 KB - 02/03/2026 08:28)
+      [ARQUIVO] SearchRFBButton.tsx (6 KB - 09/03/2026 00:50)
+      [ARQUIVO] SideBar.tsx (11.41 KB - 27/03/2026 23:07)
+      [ARQUIVO] SignaturePanel.tsx (8.07 KB - 11/03/2026 19:03)
+      [ARQUIVO] UserCard.tsx (1.45 KB - 06/03/2026 10:43)
+    [PASTA] contexts/
+      [ARQUIVO] AuthContext.tsx (3.28 KB - 07/03/2026 14:27)
+      [ARQUIVO] CompanyContext.tsx (5.43 KB - 13/03/2026 12:42)
+    [PASTA] pages/
+      [PASTA] accounting/
+        [ARQUIVO] AccountMaintenanceModal.tsx (39.8 KB - 26/03/2026 11:54)
+        [ARQUIVO] AccountsPage.tsx (9.47 KB - 27/03/2026 15:57)
+        [ARQUIVO] BalancesPage.tsx (10.31 KB - 15/03/2026 17:03)
+        [ARQUIVO] ChartOfAccountsPage.tsx (25.65 KB - 25/03/2026 08:41)
+        [ARQUIVO] DiarioGeralPage.tsx (31.54 KB - 27/03/2026 11:23)
+        [ARQUIVO] EcdValidationPage.tsx (10.83 KB - 18/03/2026 17:02)
+        [ARQUIVO] JournalPage.tsx (72.75 KB - 26/03/2026 11:32)
+        [ARQUIVO] RazaoAnaliticoPage.tsx (33.11 KB - 27/03/2026 18:05)
+        [ARQUIVO] TrialBalanceView.tsx (68.7 KB - 25/03/2026 10:08)
+      [PASTA] assets/
+        [PASTA] components/
+          [ARQUIVO] AppraisalTab.tsx (3.38 KB - 17/03/2026 11:39)
+          [ARQUIVO] DepreciationTab.tsx (6.23 KB - 17/03/2026 11:38)
+          [ARQUIVO] HistoryTab.tsx (3.08 KB - 17/03/2026 11:39)
+          [ARQUIVO] ImprovementTab.tsx (3.88 KB - 17/03/2026 11:41)
+          [ARQUIVO] MaintenanceTab.tsx (5.75 KB - 17/03/2026 11:42)
+          [ARQUIVO] RetrofitTab.tsx (4.71 KB - 17/03/2026 11:40)
+        [PASTA] hooks/
+          [ARQUIVO] useAssets.ts (7.9 KB - 20/03/2026 13:50)
+        [PASTA] modals/
+          [ARQUIVO] AppraisalModal.tsx (4.22 KB - 17/03/2026 12:12)
+          [ARQUIVO] AssetFormModal.tsx (11.61 KB - 17/03/2026 13:28)
+          [ARQUIVO] ImprovementModal.tsx (4.06 KB - 17/03/2026 12:11)
+          [ARQUIVO] MaintenanceModal.tsx (6.19 KB - 17/03/2026 12:12)
+          [ARQUIVO] ModalComponents.tsx (2.15 KB - 17/03/2026 12:10)
+          [ARQUIVO] RetrofitModal.tsx (3.34 KB - 17/03/2026 12:10)
+          [ARQUIVO] WriteOffModal.tsx (5.96 KB - 17/03/2026 12:16)
+        [PASTA] types/
+          [ARQUIVO] asset.types.ts (11.11 KB - 20/03/2026 13:50)
+        [ARQUIVO] AssetsList.tsx (15.87 KB - 17/03/2026 11:26)
+        [ARQUIVO] AssetsView.tsx (16.27 KB - 17/03/2026 13:33)
+      [PASTA] audit/
+        [ARQUIVO] Audit.tsx (2.79 KB - 06/03/2026 11:11)
+        [ARQUIVO] AuditLogs.tsx (1.9 KB - 02/03/2026 08:28)
+      [PASTA] certificates/
+        [ARQUIVO] Certificateimportmodal.tsx (12.56 KB - 12/03/2026 11:27)
+        [ARQUIVO] CertificatesPage.tsx (13.87 KB - 12/03/2026 11:25)
+      [PASTA] companies/
+        [PASTA] corporate/
+          [PASTA] atas/
+            [PASTA] age/
+              [ARQUIVO] AgeEdit.tsx (41.98 KB - 11/03/2026 16:06)
+              [ARQUIVO] AgeList.tsx (12.03 KB - 10/03/2026 11:03)
+              [ARQUIVO] AgeView.tsx (11.95 KB - 12/03/2026 11:18)
+              [ARQUIVO] index.tsx (0.23 KB - 10/03/2026 10:41)
+          [PASTA] contratos/
+            [ARQUIVO] ContratoEdit.tsx (36.2 KB - 11/03/2026 16:09)
+            [ARQUIVO] ContratoList.tsx (10.41 KB - 11/03/2026 13:04)
+            [ARQUIVO] ContratoView.tsx (4.27 KB - 11/03/2026 16:09)
+            [ARQUIVO] index.tsx (0.19 KB - 11/03/2026 08:49)
+          [PASTA] meetings/
+            [ARQUIVO] index.tsx (0.09 KB - 09/03/2026 02:48)
+            [ARQUIVO] MeetingForm.tsx (11.46 KB - 09/03/2026 03:49)
+            [ARQUIVO] MeetingList.tsx (1.25 KB - 09/03/2026 03:39)
+            [ARQUIVO] MeetingView.tsx (1.11 KB - 09/03/2026 03:40)
+          [PASTA] shareholders/
+            [ARQUIVO] ShareholderForm.tsx (2.36 KB - 09/03/2026 03:39)
+            [ARQUIVO] ShareholderList.tsx (1.28 KB - 09/03/2026 03:39)
+          [PASTA] statute/
+            [ARQUIVO] index.tsx (0.35 KB - 09/03/2026 20:16)
+            [ARQUIVO] StatuteArticle.tsx (2.7 KB - 09/03/2026 03:19)
+            [ARQUIVO] StatuteEdit.tsx (15.88 KB - 09/03/2026 21:49)
+            [ARQUIVO] StatuteHistory.tsx (7.18 KB - 09/03/2026 22:45)
+            [ARQUIVO] StatuteList.tsx (13.08 KB - 09/03/2026 22:34)
+            [ARQUIVO] StatuteView.tsx (15.03 KB - 09/03/2026 22:42)
+            [ARQUIVO] types.ts (1.54 KB - 20/03/2026 13:50)
+          [ARQUIVO] index.tsx (0.62 KB - 11/03/2026 09:23)
+        [ARQUIVO] CompanyEdit.tsx (16.1 KB - 11/03/2026 16:41)
+        [ARQUIVO] CompanyForm.tsx (17.6 KB - 18/03/2026 15:32)
+        [ARQUIVO] CompanyList.tsx (13.51 KB - 14/03/2026 01:24)
+        [ARQUIVO] CompanyShow.tsx (12.4 KB - 11/03/2026 16:35)
+        [ARQUIVO] index.tsx (0.09 KB - 06/03/2026 10:38)
+      [PASTA] documents/
+        [PASTA] signatures/
+          [PASTA] components/
+            [ARQUIVO] GovBrSign.tsx (5.71 KB - 09/03/2026 10:52)
+            [ARQUIVO] SignatureStatusBadge.tsx (5.36 KB - 09/03/2026 10:44)
+          [ARQUIVO] CertificateManager.tsx (13.2 KB - 09/03/2026 03:12)
+          [ARQUIVO] GovBrSign.tsx (5.71 KB - 09/03/2026 03:08)
+          [ARQUIVO] index.tsx (0.25 KB - 09/03/2026 03:09)
+          [ARQUIVO] SignatureList.tsx (7.77 KB - 09/03/2026 03:08)
+          [ARQUIVO] SignatureRequest.tsx (6.85 KB - 09/03/2026 03:09)
+        [ARQUIVO] CorporateBooks.tsx (15.12 KB - 09/03/2026 01:41)
+        [ARQUIVO] DocumentsList.tsx (12.08 KB - 09/03/2026 03:14)
+        [ARQUIVO] DocumentUpload.tsx (19.45 KB - 09/03/2026 18:25)
+        [ARQUIVO] DocumentView.tsx (16.82 KB - 12/03/2026 11:24)
+        [ARQUIVO] index.tsx (0.5 KB - 11/03/2026 19:24)
+      [PASTA] finance/
+        [PASTA] hooks/
+          [ARQUIVO] useAccountsPayable.ts (4.14 KB - 20/03/2026 13:50)
+          [ARQUIVO] useAgenda.ts (4.72 KB - 20/03/2026 13:50)
+          [ARQUIVO] useBankImport.ts (2.76 KB - 22/03/2026 11:49)
+          [ARQUIVO] useFinance.ts (5.09 KB - 20/03/2026 13:50)
+        [PASTA] types/
+          [ARQUIVO] accounts-payable.ts (4.98 KB - 20/03/2026 13:50)
+          [ARQUIVO] bank-import.ts (3.02 KB - 21/03/2026 14:29)
+          [ARQUIVO] finance.ts (3.59 KB - 20/03/2026 13:50)
+        [ARQUIVO] AgendaPage.tsx (3.01 KB - 20/03/2026 10:02)
+        [ARQUIVO] BankImportPage.tsx (30.52 KB - 22/03/2026 17:02)
+        [ARQUIVO] ContasAPagarPage.tsx (2.81 KB - 20/03/2026 13:08)
+        [ARQUIVO] FinancePage.tsx (12.96 KB - 22/03/2026 17:01)
+        [ARQUIVO] Financial.tsx (18.4 KB - 08/03/2026 14:50)
+        [ARQUIVO] LivroCaixa.tsx (0 KB - 02/03/2026 08:28)
+      [PASTA] forgot-password/
+        [ARQUIVO] ForgotPassword.tsx (6 KB - 02/03/2026 18:02)
+      [PASTA] login/
+        [ARQUIVO] Login.tsx (8.31 KB - 06/03/2026 10:58)
+      [PASTA] persons/
+        [ARQUIVO] index.tsx (0.09 KB - 06/03/2026 10:38)
+        [ARQUIVO] PersonForm.tsx (54.94 KB - 12/03/2026 17:17)
+        [ARQUIVO] PersonList.tsx (10.04 KB - 10/03/2026 18:36)
+        [ARQUIVO] PersonView.tsx (15.35 KB - 11/03/2026 12:14)
+      [PASTA] register/
+        [ARQUIVO] Register.tsx (7.4 KB - 06/03/2026 10:56)
+      [PASTA] reports/
+        [ARQUIVO] BalanceComparisonPage.tsx (10.41 KB - 26/03/2026 08:18)
+      [PASTA] reset-password/
+        [ARQUIVO] ResetPassword.tsx (10.14 KB - 02/03/2026 18:02)
+      [PASTA] sped/
+        [PASTA] components/
+          [ARQUIVO] CnpjMismatchCard.tsx (4.68 KB - 22/03/2026 12:19)
+        [ARQUIVO] EcdHistoryPage.tsx (1.22 KB - 30/03/2026 09:00)
+        [ARQUIVO] EcdPage.tsx (46.13 KB - 27/03/2026 22:52)
+        [ARQUIVO] EcdViewerPage.tsx (3.18 KB - 27/03/2026 22:09)
+        [ARQUIVO] EcfPage.tsx (53.49 KB - 22/03/2026 14:04)
+      [PASTA] system/
+        [ARQUIVO] BackupRestore.tsx (6.78 KB - 23/03/2026 09:55)
+        [ARQUIVO] TableManager.tsx (14.18 KB - 19/03/2026 14:08)
+      [PASTA] users/
+        [ARQUIVO] index.tsx (0.04 KB - 06/03/2026 11:00)
+        [ARQUIVO] ProfileForm.tsx (4.67 KB - 21/03/2026 14:12)
+        [ARQUIVO] ProfileList.tsx (5.61 KB - 27/03/2026 15:44)
+        [ARQUIVO] User.tsx (0.72 KB - 27/03/2026 12:43)
+        [ARQUIVO] UserCard.tsx (1.46 KB - 04/03/2026 23:32)
+        [ARQUIVO] UserForm.tsx (15.9 KB - 27/03/2026 23:42)
+        [ARQUIVO] UserList.tsx (6.97 KB - 27/03/2026 15:34)
+      [ARQUIVO] Dashboard Mock.tsx (14.96 KB - 03/03/2026 14:13)
+      [ARQUIVO] Dashboard.tsx (24.87 KB - 09/03/2026 01:16)
+      [ARQUIVO] HomeDashboard.backup.tsx (5.3 KB - 02/03/2026 17:42)
+      [ARQUIVO] LedgrHome.tsx (7.28 KB - 08/03/2026 13:44)
+    [PASTA] routes/
+      [ARQUIVO] index.tsx (9.85 KB - 30/03/2026 09:02)
+    [PASTA] services/
+      [ARQUIVO] api.ts (1.94 KB - 20/03/2026 13:50)
+    [PASTA] styles/
+      [ARQUIVO] globals.css (0 KB - 17/02/2026 16:32)
+    [PASTA] types/
+    [PASTA] utils/
+      [ARQUIVO] chartMapper.ts (1.35 KB - 20/03/2026 13:50)
+      [ARQUIVO] errorHandler.ts (2.37 KB - 20/03/2026 13:50)
+      [ARQUIVO] formatters.ts (0.74 KB - 20/03/2026 13:50)
+      [ARQUIVO] logger.css (0.39 KB - 08/03/2026 13:04)
+      [ARQUIVO] rfbMapper.ts (3.83 KB - 20/03/2026 13:50)
+    [ARQUIVO] App.tsx (0.83 KB - 25/03/2026 10:23)
+    [ARQUIVO] index.css (1.41 KB - 22/03/2026 17:32)
+    [ARQUIVO] main.tsx (0.24 KB - 03/03/2026 12:38)
+    [ARQUIVO] vite-env.d.ts (0 KB - 20/03/2026 13:50)
+  [ARQUIVO] .env (0.11 KB - 01/03/2026 13:59)
+  [ARQUIVO] index.html (0.39 KB - 19/02/2026 15:59)
+  [ARQUIVO] package.json (1.43 KB - 22/03/2026 17:25)
+  [ARQUIVO] postcss.config.js (0.09 KB - 08/03/2026 13:57)
+  [ARQUIVO] tailwind.config.js (0.18 KB - 08/03/2026 13:53)
+  [ARQUIVO] tsconfig.json (0.77 KB - 01/03/2026 22:44)
+  [ARQUIVO] tsconfig.node.json (0.22 KB - 01/03/2026 22:44)
+  [ARQUIVO] tsconfig.paths.json (0.1 KB - 10/03/2026 13:46)
+  [ARQUIVO] vite.config.ts (0.34 KB - 20/03/2026 13:44)
+[PASTA] infra/
+  [PASTA] docker/
+    [PASTA] report/
+      [ARQUIVO] postgres_diagnostico_20260218_211843.csv (0.31 KB - 18/02/2026 21:18)
+      [ARQUIVO] postgres_diagnostico_20260218_211843.json (902.89 KB - 01/03/2026 22:44)
+    [ARQUIVO] diagnostico-postgres-completo.ps1 (3.65 KB - 18/02/2026 21:05)
+    [ARQUIVO] diagnostico-postgres-completo_export.ps1 (5.07 KB - 18/02/2026 21:18)
+    [ARQUIVO] diagnostico-postgres-containers.ps1 (1.25 KB - 18/02/2026 19:49)
+    [ARQUIVO] docker-compose.yml (3.88 KB - 19/03/2026 10:25)
+    [ARQUIVO] docker-compose.yml.bak (0.55 KB - 18/02/2026 17:34)
+    [ARQUIVO] init.sql (0.9 KB - 27/02/2026 12:07)
+    [ARQUIVO] ledgrmasterkey 4e96818fb4236edc6c064bea1e56d7029f0c73efad34ac12175b7ccb4b0f5e7f.txt (0 KB - 11/03/2026 18:58)
+    [ARQUIVO] reset-ledgr-postgres.ps1 (2.12 KB - 18/02/2026 20:37)
+  [PASTA] prisma/
+    [ARQUIVO] executa-plano.ts (0.41 KB - 20/03/2026 13:50)
+    [ARQUIVO] fix-auth.ts (1.13 KB - 20/03/2026 13:50)
+    [ARQUIVO] gerar.ts (1.03 KB - 20/03/2026 13:50)
+    [ARQUIVO] seed.ts (2.32 KB - 20/03/2026 13:50)
+    [ARQUIVO] seed-Levels.ts (2.28 KB - 20/03/2026 13:50)
+    [ARQUIVO] seed-Plano.ts (10.84 KB - 20/03/2026 13:50)
+    [ARQUIVO] seed-simples.ts (3.71 KB - 20/03/2026 13:50)
+[PASTA] libs/
+  [PASTA] domain/
+  [PASTA] infrastructure/
+  [PASTA] shared/
+[PASTA] prisma/
+  [PASTA] migrations/
+    [PASTA] 20260324164948_0_init/
+      [ARQUIVO] migration.sql (54.7 KB - 24/03/2026 13:49)
+    [PASTA] 20260327153659_add_level_to_users/
+      [ARQUIVO] migration.sql (0.08 KB - 27/03/2026 12:36)
+    [ARQUIVO] migration_lock.toml (0.12 KB - 27/03/2026 12:36)
+  [ARQUIVO] schema.prisma (79.65 KB - 15/04/2026 19:04)
+[PASTA] project_files/
+  [PASTA] apps/
+    [PASTA] api/
+      [PASTA] src/
+        [PASTA] auth/
+          [PASTA] decorators/
+            [ARQUIVO] current-user.decorator.ts (0.26 KB - 20/03/2026 13:54)
+            [ARQUIVO] permission.decorator.ts (0.21 KB - 20/03/2026 13:54)
+          [PASTA] dto/
+            [ARQUIVO] login.dto.ts (0.26 KB - 20/03/2026 13:54)
+            [ARQUIVO] register.dto.ts (0.95 KB - 20/03/2026 13:54)
+            [ARQUIVO] user.dto.ts (0.94 KB - 20/03/2026 13:54)
+          [PASTA] guards/
+            [ARQUIVO] jwt.guard.ts (0.16 KB - 20/03/2026 13:54)
+            [ARQUIVO] local.guard.ts (0.33 KB - 20/03/2026 13:54)
+            [ARQUIVO] profile.guard.ts (1.16 KB - 20/03/2026 13:54)
+          [PASTA] strategies/
+            [ARQUIVO] jwt.strategy.ts (0.82 KB - 20/03/2026 13:54)
+            [ARQUIVO] local.strategy.ts (1.34 KB - 20/03/2026 13:54)
+          [ARQUIVO] auth.controller.ts (1.94 KB - 20/03/2026 13:54)
+          [ARQUIVO] auth.module.ts (1.26 KB - 20/03/2026 13:54)
+          [ARQUIVO] auth.service funcionando.ts (2.46 KB - 20/03/2026 13:54)
+          [ARQUIVO] auth.service.ts (4.28 KB - 20/03/2026 13:54)
+          [ARQUIVO] xxxxjwt-auth.guard.XXXXXts (0.83 KB - 06/03/2026 21:50)
+        [PASTA] contexts/
+          [ARQUIVO] AuthContext.tsx (3.71 KB - 06/03/2026 09:47)
+          [ARQUIVO] CompanyContext.tsx (4.47 KB - 06/03/2026 09:46)
+        [PASTA] core/
+          [PASTA] audit/
+            [ARQUIVO] audit.controller.ts (0.99 KB - 20/03/2026 13:54)
+            [ARQUIVO] audit.module.ts (0.38 KB - 20/03/2026 13:54)
+            [ARQUIVO] audit.service.ts (0.68 KB - 20/03/2026 13:54)
+            [ARQUIVO] audit_log.entity.ts (0.88 KB - 20/03/2026 13:54)
+          [PASTA] cache/
+          [PASTA] companies/
+            [ARQUIVO] company.controller.ts (2.84 KB - 20/03/2026 13:54)
+            [ARQUIVO] company.module.ts (0.52 KB - 20/03/2026 13:54)
+            [ARQUIVO] company.service.ts (3.68 KB - 20/03/2026 13:54)
+          [PASTA] decorators/
+            [ARQUIVO] current-user.decorator.ts (0.26 KB - 20/03/2026 13:54)
+          [PASTA] dto/
+            [ARQUIVO] company.dto.ts (1.24 KB - 20/03/2026 13:54)
+            [ARQUIVO] register.dto.ts (0.95 KB - 20/03/2026 13:54)
+            [ARQUIVO] user.dto.ts (2.12 KB - 20/03/2026 13:54)
+          [PASTA] logging/
+          [PASTA] users/
+            [ARQUIVO] profiles.controller.ts (0.87 KB - 20/03/2026 13:54)
+            [ARQUIVO] users.controller.ts (2.79 KB - 20/03/2026 13:54)
+            [ARQUIVO] users.module.ts (0.5 KB - 20/03/2026 13:54)
+            [ARQUIVO] users.service.ts (4.64 KB - 20/03/2026 13:54)
+          [ARQUIVO] audit_log.entity.ts (0.86 KB - 20/03/2026 13:54)
+        [PASTA] database/
+        [PASTA] events/
+        [PASTA] file-storage/
+        [PASTA] jobs/
+        [PASTA] modules/
+        [PASTA] multi-company/
+          [ARQUIVO] company.interceptor.ts (1.33 KB - 20/03/2026 13:54)
+          [ARQUIVO] company.service.ts (0.38 KB - 20/03/2026 13:54)
+          [ARQUIVO] multi-company.module.ts (0.09 KB - 20/03/2026 13:54)
+          [ARQUIVO] multi-company.service.ts (0.33 KB - 20/03/2026 13:54)
+        [PASTA] notifications/
+        [PASTA] prisma/
+          [ARQUIVO] prisma.module.ts (0.21 KB - 20/03/2026 13:54)
+          [ARQUIVO] prisma.service.ts (1.17 KB - 20/03/2026 13:54)
+        [PASTA] services/
+          [ARQUIVO] api.ts (0.73 KB - 20/03/2026 13:54)
+          [ARQUIVO] rfb-client.service.ts (2.11 KB - 20/03/2026 13:54)
+          [ARQUIVO] rfb-mock.service.ts (1.25 KB - 20/03/2026 13:54)
+        [PASTA] shared/
+          [PASTA] constants/
+          [PASTA] decorators/
+          [PASTA] domain/
+            [PASTA] base/
+            [PASTA] interfaces/
+            [PASTA] value-objects/
+          [PASTA] dto/
+          [PASTA] exceptions/
+          [PASTA] filters/
+          [PASTA] interceptors/
+          [PASTA] pipes/
+          [PASTA] utils/
+            [PASTA] formatters/
+            [PASTA] helpers/
+            [PASTA] validators/
+        [PASTA] types/
+          [ARQUIVO] pg.d.ts (0.05 KB - 20/03/2026 13:54)
+        [PASTA] workflow/
+        [ARQUIVO] app.module.ts (1.05 KB - 20/03/2026 13:54)
+        [ARQUIVO] main.ts (0.54 KB - 20/03/2026 13:54)
+      [ARQUIVO] nest-cli.json (0.2 KB - 01/03/2026 22:44)
+      [ARQUIVO] package.json (1.08 KB - 07/03/2026 12:16)
+      [ARQUIVO] tsconfig.app.json (0.29 KB - 01/03/2026 22:44)
+      [ARQUIVO] tsconfig.json (0.63 KB - 01/03/2026 22:44)
+  [PASTA] docs/
+  [PASTA] frontend/
+    [PASTA] src/
+      [PASTA] components/
+        [PASTA] common/
+        [PASTA] financeiro/
+          [ARQUIVO] SugestaoConta.tsx (0 KB - 02/03/2026 08:28)
+        [ARQUIVO] Alert.tsx (1.35 KB - 02/03/2026 08:28)
+        [ARQUIVO] Header.tsx (11.28 KB - 07/03/2026 15:17)
+        [ARQUIVO] HomeRoute.tsx (0.77 KB - 02/03/2026 08:28)
+        [ARQUIVO] KPICard.tsx (1.16 KB - 02/03/2026 08:28)
+        [ARQUIVO] Layout.tsx (5.53 KB - 06/03/2026 10:45)
+        [ARQUIVO] LoadingSpinner.tsx (0.55 KB - 02/03/2026 08:28)
+        [ARQUIVO] PrivateRoute.tsx (0.39 KB - 02/03/2026 08:28)
+        [ARQUIVO] ProtectedRoute.tsx (0.9 KB - 03/03/2026 15:40)
+        [ARQUIVO] PublicLayout.tsx (4.14 KB - 02/03/2026 08:28)
+        [ARQUIVO] SearchRFBButton.tsx (3.69 KB - 06/03/2026 10:42)
+        [ARQUIVO] UserCard.tsx (1.45 KB - 06/03/2026 10:43)
+      [PASTA] contexts/
+        [ARQUIVO] AuthContext.tsx (3.28 KB - 07/03/2026 14:27)
+        [ARQUIVO] CompanyContext.tsx (4.87 KB - 07/03/2026 15:45)
+      [PASTA] pages/
+        [PASTA] companies/
+          [ARQUIVO] CompanyEditar.tsx (16.81 KB - 06/03/2026 10:34)
+          [ARQUIVO] CompanyForm.tsx (9.09 KB - 06/03/2026 10:40)
+          [ARQUIVO] CompanyList.tsx (8.93 KB - 07/03/2026 15:49)
+          [ARQUIVO] index.tsx (0.09 KB - 06/03/2026 10:38)
+          [ARQUIVO] KPICard.tsx (0.94 KB - 02/03/2026 20:17)
+        [PASTA] financial/
+          [ARQUIVO] LivroCaixa.tsx (0 KB - 02/03/2026 08:28)
+        [PASTA] forgot-password/
+          [ARQUIVO] ForgotPassword.tsx (6 KB - 02/03/2026 18:02)
+        [PASTA] login/
+          [ARQUIVO] Login.tsx (8.31 KB - 06/03/2026 10:58)
+        [PASTA] register/
+          [ARQUIVO] Register.tsx (7.4 KB - 06/03/2026 10:56)
+        [PASTA] reset-password/
+          [ARQUIVO] ResetPassword.tsx (10.14 KB - 02/03/2026 18:02)
+        [PASTA] users/
+          [ARQUIVO] index.tsx (0.04 KB - 06/03/2026 11:00)
+          [ARQUIVO] User.tsx (0.26 KB - 06/03/2026 11:00)
+          [ARQUIVO] UserCard.tsx (1.46 KB - 04/03/2026 23:32)
+          [ARQUIVO] UserForm.tsx (13.62 KB - 06/03/2026 11:02)
+          [ARQUIVO] UserList old.tsx (13.44 KB - 04/03/2026 23:14)
+          [ARQUIVO] UserList.tsx (5.26 KB - 06/03/2026 14:29)
+        [ARQUIVO] Audit.tsx (2.79 KB - 06/03/2026 11:11)
+        [ARQUIVO] AuditLogs.tsx (1.9 KB - 02/03/2026 08:28)
+        [ARQUIVO] Dashboard Mock.tsx (14.96 KB - 03/03/2026 14:13)
+        [ARQUIVO] Dashboard.tsx (5.48 KB - 06/03/2026 14:23)
+        [ARQUIVO] HomeDashboard.backup.tsx (5.3 KB - 02/03/2026 17:42)
+        [ARQUIVO] LedgrHome.tsx (6.92 KB - 04/03/2026 09:14)
+        [ARQUIVO] xDashboard.tsx (21.08 KB - 02/03/2026 20:25)
+        [ARQUIVO] xHomeDashboard.tsx (15.16 KB - 02/03/2026 19:24)
+      [PASTA] routes/
+        [ARQUIVO] index com rotas completas.tsx (3.28 KB - 03/03/2026 10:26)
+        [ARQUIVO] index.tsx (2.2 KB - 06/03/2026 14:29)
+      [PASTA] services/
+        [ARQUIVO] api.ts (2.09 KB - 20/03/2026 13:54)
+      [PASTA] styles/
+        [ARQUIVO] globals.css (0 KB - 17/02/2026 16:32)
+      [PASTA] types/
+      [ARQUIVO] App - Copia.tsx (0.54 KB - 02/03/2026 08:28)
+      [ARQUIVO] App.tsx (0.51 KB - 06/03/2026 11:07)
+      [ARQUIVO] index.css (0.66 KB - 03/03/2026 11:41)
+      [ARQUIVO] main.tsx (0.24 KB - 03/03/2026 12:38)
+      [ARQUIVO] vite-env.d.ts (0 KB - 20/03/2026 13:54)
+    [ARQUIVO] .env (0.11 KB - 01/03/2026 13:59)
+    [ARQUIVO] index.html (0.39 KB - 19/02/2026 15:59)
+    [ARQUIVO] package.json (0.67 KB - 07/03/2026 12:07)
+    [ARQUIVO] tsconfig.json (0.77 KB - 01/03/2026 22:44)
+    [ARQUIVO] tsconfig.node.json (0.22 KB - 01/03/2026 22:44)
+    [ARQUIVO] vite.config.ts (0.21 KB - 20/03/2026 13:54)
+  [PASTA] infra/
+    [PASTA] docker/
+      [PASTA] report/
+        [ARQUIVO] postgres_diagnostico_20260218_211843.csv (0.31 KB - 18/02/2026 21:18)
+        [ARQUIVO] postgres_diagnostico_20260218_211843.json (902.89 KB - 01/03/2026 22:44)
+      [ARQUIVO] diagnostico-postgres-completo.ps1 (3.65 KB - 18/02/2026 21:05)
+      [ARQUIVO] diagnostico-postgres-completo_export.ps1 (5.07 KB - 18/02/2026 21:18)
+      [ARQUIVO] diagnostico-postgres-containers.ps1 (1.25 KB - 18/02/2026 19:49)
+      [ARQUIVO] docker-compose.yml (0.39 KB - 18/02/2026 18:11)
+      [ARQUIVO] docker-compose.yml.bak (0.55 KB - 18/02/2026 17:34)
+      [ARQUIVO] init.sql (0.9 KB - 27/02/2026 12:07)
+      [ARQUIVO] reset-ledgr-postgres.ps1 (2.12 KB - 18/02/2026 20:37)
+    [PASTA] prisma/
+      [ARQUIVO] seed.ts (7.64 KB - 20/03/2026 13:54)
+  [PASTA] libs/
+    [PASTA] domain/
+    [PASTA] infrastructure/
+    [PASTA] shared/
+  [PASTA] prisma/
+    [PASTA] migrations/
+      [PASTA] 20260304225514/
+        [ARQUIVO] migration.sql (3.63 KB - 04/03/2026 19:55)
+      [PASTA] 20260306115826_rename_to_english_and_add_modules/
+        [ARQUIVO] migration.sql (6.4 KB - 06/03/2026 08:58)
+      [PASTA] 20260307153450_add_audit_log/
+        [ARQUIVO] migration.sql (0.3 KB - 07/03/2026 12:34)
+      [ARQUIVO] migration_lock.toml (0.12 KB - 07/03/2026 12:34)
+    [ARQUIVO] schema.prisma (8.4 KB - 07/03/2026 15:13)
+  [PASTA] scripts/
+  [PASTA] tools/
+  [ARQUIVO] .env (0.1 KB - 28/02/2026 17:11)
+  [ARQUIVO] Dashboard.tsx (9.66 KB - 02/03/2026 20:12)
+  [ARQUIVO] Dashboard-com-Layout.tsx (14.83 KB - 03/03/2026 10:25)
+  [ARQUIVO] Dashboard-FINAL-FUNCIONANDO.tsx (14.69 KB - 03/03/2026 10:58)
+  [ARQUIVO] Dashboard-melhorado.tsx (14.06 KB - 02/03/2026 19:56)
+  [ARQUIVO] Dashboard-TSX-COMPLETO.tsx (32.21 KB - 03/03/2026 10:08)
+  [ARQUIVO] diagnostico.ps1 (0.53 KB - 28/02/2026 12:29)
+  [ARQUIVO] EmpresaLista.tsx (12.34 KB - 02/03/2026 19:56)
+  [ARQUIVO] EmpresaLista-melhorado.tsx (12.27 KB - 02/03/2026 19:56)
+  [ARQUIVO] Estrutura Monolito.rm (1.77 KB - 01/03/2026 13:25)
+  [ARQUIVO] estrutura_completa.txt (704.48 KB - 28/02/2026 19:18)
+  [ARQUIVO] estrutura_ledgr.txt (17.91 KB - 01/03/2026 22:42)
+  [ARQUIVO] estrutura_projeto.txt (17.83 KB - 01/03/2026 22:36)
+  [ARQUIVO] estrutura-completa.txt (2.94 KB - 06/03/2026 11:08)
+  [ARQUIVO] estruturaLedgrMono.ps1 (2.02 KB - 28/02/2026 09:42)
+  [ARQUIVO] gerar-hash.js (0.11 KB - 02/03/2026 11:15)
+  [ARQUIVO] Header-corrigido (1).tsx (8.27 KB - 02/03/2026 20:34)
+  [ARQUIVO] Header-corrigido.tsx (8.27 KB - 02/03/2026 20:22)
+  [ARQUIVO] index-rotas-mock.tsx (3.26 KB - 03/03/2026 10:19)
+  [ARQUIVO] Ledgr verão 1.0.docx (40.36 KB - 07/03/2026 14:53)
+  [ARQUIVO] ledgr-dashboard-completo.html (40.2 KB - 02/03/2026 21:34)
+  [ARQUIVO] Log Fase1.md (3.16 KB - 01/03/2026 22:32)
+  [ARQUIVO] Login-FINAL.tsx (6.57 KB - 02/03/2026 20:33)
+  [ARQUIVO] mapageral.ps1 (5.87 KB - 02/03/2026 17:52)
+  [ARQUIVO] mapsimples.ps1 (1.73 KB - 02/03/2026 17:54)
+  [ARQUIVO] migrate_to_ledgr.sql (2.92 KB - 28/02/2026 09:54)
+  [ARQUIVO] package.json (1.53 KB - 07/03/2026 11:35)
+  [ARQUIVO] prisma.config.ts (0.28 KB - 20/03/2026 13:54)
+  [ARQUIVO] Refatoração Prisma_ PT-BR para EN - Refatoração Prisma_ PT-BR para EN.pdf (31.4 KB - 06/03/2026 08:31)
+  [ARQUIVO] revisao_completa.txt (144146.75 KB - 28/02/2026 19:19)
+  [ARQUIVO] revisao_completa2.txt (142945.22 KB - 28/02/2026 20:40)
+  [ARQUIVO] revisaocompleta1.txt (437.76 KB - 28/02/2026 21:03)
+  [ARQUIVO] revisaocompleta3.txt (52117.73 KB - 28/02/2026 21:11)
+  [ARQUIVO] routes-simple.tsx (0.41 KB - 03/03/2026 10:26)
+  [ARQUIVO] teste.js (0.73 KB - 04/03/2026 15:06)
+  [ARQUIVO] tsconfig.json (0.71 KB - 01/03/2026 22:44)
+  [ARQUIVO] UsuarioForm.tsx (13.39 KB - 05/03/2026 18:20)
+  [ARQUIVO] UsuarioLista.tsx (13.29 KB - 02/03/2026 19:56)
+  [ARQUIVO] UsuarioLista-melhorado.tsx (13.22 KB - 02/03/2026 19:56)
+[PASTA] scripts/
+  [ARQUIVO] fix-existing-accounts.ts (3.88 KB - 20/03/2026 13:54)
+[PASTA] src/
+  [PASTA] modules/
+    [PASTA] finance/
+      [PASTA] dto/
+      [ARQUIVO] accounts-payable.service.ts (0 KB - 20/03/2026 14:02)
+[PASTA] tools/
+[ARQUIVO] .env (0.21 KB - 22/03/2026 18:20)
+[ARQUIVO] 05736256000185-26201865159-20250101-20251231-G-CB096D84D87CD1B9B8BFDC60C6FC1616BDC498A3-1-SPED-ECD.txt (153.99 KB - 16/03/2026 10:31)
+[ARQUIVO] 2ª Alteração TESTE.docx (31.76 KB - 11/03/2026 13:11)
+[ARQUIVO] backup_pre_reset.sql (825.73 KB - 19/03/2026 18:26)
+[ARQUIVO] coa.json (0 KB - 23/03/2026 14:40)
+[ARQUIVO] contratos-index.ts (0.19 KB - 20/03/2026 13:44)
+[ARQUIVO] database_dump.backup (70.56 KB - 13/03/2026 09:04)
+[ARQUIVO] Detalhes da Solicitação.pdf (84.38 KB - 11/03/2026 12:27)
+[ARQUIVO] diagnostico.ps1 (0.53 KB - 28/02/2026 12:29)
+[ARQUIVO] Estratégia de uso por tipo de sessão.txt (1.14 KB - 22/03/2026 12:04)
+[ARQUIVO] estrutura-completa.txt (2.87 KB - 08/03/2026 09:23)
+[ARQUIVO] estruturaLedgrMono.ps1 (2.02 KB - 28/02/2026 09:42)
+[ARQUIVO] ExtratoImport.pdf (189.57 KB - 30/03/2026 09:08)
+[ARQUIVO] fix-auth.ts (1.17 KB - 20/03/2026 13:44)
+[ARQUIVO] initial_migration.sql (0 KB - 21/03/2026 14:44)
+[ARQUIVO] LançamentosAbertura2015.txt (5.42 KB - 25/03/2026 20:40)
+[ARQUIVO] Ledgr verão 1.0.docx (63.49 KB - 10/03/2026 17:33)
+[ARQUIVO] ledgr-ativo-imobilizado-roteiro.md (24.61 KB - 17/03/2026 08:25)
+[ARQUIVO] LEDGR-contexto.md (13.93 KB - 25/03/2026 08:41)
+[ARQUIVO] LEDGR-Diario-Lancamentos.md (11.8 KB - 19/03/2026 09:18)
+[ARQUIVO] ledgr-Gestão de Documentos.docx (23.23 KB - 09/03/2026 16:22)
+[ARQUIVO] LedgrHome.tsx (6.86 KB - 08/03/2026 13:43)
+[ARQUIVO] mapageral.ps1 (11.01 KB - 18/03/2026 10:14)
+[ARQUIVO] MapaGeral.txt (37.82 KB - 19/03/2026 10:33)
+[ARQUIVO] migrate_to_ledgr.sql (2.92 KB - 28/02/2026 09:54)
+[ARQUIVO] Módulo de Gestão Documental — LEDGR.agent.md (7.3 KB - 24/03/2026 17:00)
+[ARQUIVO] package.json (1.83 KB - 21/03/2026 14:40)
+[ARQUIVO] prisma.config.ts (0.28 KB - 20/03/2026 13:44)
+[ARQUIVO] Protocolo 20260309154867595 9 RCTDPJ Hallo Adm.pdf (164.8 KB - 09/03/2026 15:22)
+[ARQUIVO] README.md (2.9 KB - 20/03/2026 09:35)
+[ARQUIVO] README.txt (2.72 KB - 13/03/2026 09:04)
+[ARQUIVO] Refatoração Prisma_ PT-BR para EN - Refatoração Prisma_ PT-BR para EN.pdf (31.4 KB - 06/03/2026 08:31)
+[ARQUIVO] restore-Ledgr.ps1 (4.87 KB - 08/03/2026 12:10)
+[ARQUIVO] routes-simple.tsx (0.41 KB - 03/03/2026 10:26)
+[ARQUIVO] Template SA - Transformação e Estatuto.docx (20.1 KB - 10/03/2026 18:58)
+[ARQUIVO] Termo-analise.pdf (142.78 KB - 11/03/2026 12:02)
+[ARQUIVO] trial-balance.service.ts (8.23 KB - 20/03/2026 13:44)
+[ARQUIVO] TrialBalanceView (1).tsx (41.72 KB - 15/03/2026 23:22)
+[ARQUIVO] TrialBalanceView sem niveis.tsx (35.63 KB - 15/03/2026 23:26)
+[ARQUIVO] TrialBalanceView.tsx (39.73 KB - 15/03/2026 22:40)
+[ARQUIVO] tsconfig.json (0.96 KB - 14/03/2026 13:17)
+[ARQUIVO] UsuarioForm.tsx (13.39 KB - 05/03/2026 18:20)
+
