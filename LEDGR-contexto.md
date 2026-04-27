@@ -605,3 +605,17 @@ Pendente: deduplicacao por fileName, historico no modal testar
 - LoteImport model + tabela lote_imports (source, batchType, batchDate, stats)
 - reducedCode em ChartOfAccounts
 - loteImports LoteImport[] em Company
+
+---
+
+## Git / GitHub
+
+- Repositorio: https://github.com/hponteshome/ledgr (privado)
+- Usuario: hponteshome@gmail.com
+- Branch principal: main
+- Backup ao final de cada sessao:
+
+cd "D:\Projetos\Ledgr"
+git add .
+git commit -m "descricao das mudancas"
+git push
