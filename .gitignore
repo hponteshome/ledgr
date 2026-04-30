@@ -6,3 +6,5 @@ uploads/
 *.log
 .DS_Store
 prisma/migrations/
+
+project_files/revisao_completa*.txt
