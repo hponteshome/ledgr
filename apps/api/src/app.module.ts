@@ -16,6 +16,7 @@ import { ContratosModule } from './core/contratos/contratos.module';
 import { BackupModule } from './core/system/backup.module';
 import { SystemModule } from './core/system/system.module';
 import { AccountingModule } from './modules/accounting/accounting.module';
+import { CalendarModule } from './modules/calendar/calendar.module';
 import { SpedModule } from './modules/sped/sped.module';
 import { AssetsModule } from './modules/assets/assets.module';
 import { Reflector } from '@nestjs/core';
@@ -43,6 +44,7 @@ import { SignaturesModule } from './modules/signatures/signatures.module';
     BackupModule,
     SystemModule,
     AccountingModule,
+    CalendarModule,
     SpedModule,
     AssetsModule,
     FinanceModule,

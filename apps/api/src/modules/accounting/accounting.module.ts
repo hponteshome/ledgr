@@ -29,11 +29,15 @@ import { AccountingMaskService }    from './services/accounting-mask.service';
 import { IobImportService }         from './services/iob-import.service';
 import { IobPlanoParserService }    from './services/iob-plano-parser.service';
 import { IobLotdParserService }     from './services/iob-lotd-parser.service';
+import { FixedIncomeModule } from './fixed-income/fixed-income.module';
+import { CdiModule } from './cdi/cdi.module';
 import { IobLotdImportService }     from './services/iob-lotd-import.service';
 
 @Module({
   imports: [
     PrismaModule,
+    FixedIncomeModule,
+    CdiModule,
     MulterModule.register({ limits: { fileSize: 50 * 1024 * 1024 } }),
   ],
   controllers: [

@@ -5,7 +5,7 @@ import {
   FiChevronLeft, FiChevronDown, FiChevronRight, FiActivity, FiSettings,
   FiFolder, FiBook, FiPenTool, FiClipboard, FiShield, FiLayers,
   FiUserCheck, FiUpload, FiDatabase, FiPieChart, FiCalendar,
-  FiServer, FiEdit2, FiEdit3, FiPackage, FiTool, FiTruck,
+  FiServer, FiEdit2, FiEdit3, FiPackage, FiTool, FiTruck, FiTrendingUp,
   FiAlertCircle, FiTrendingDown, FiLogOut, FiBarChart2, FiArchive, FiBookOpen, FiCpu,
 } from 'react-icons/fi';
 import { useCompany } from '../contexts/CompanyContext';
@@ -64,7 +64,21 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
         { path: '/app/accounting/accounts', label: 'Plano de Contas', icon: FiLayers },
         { path: '/app/accounting/journal', label: 'Lançamentos', icon: FiEdit3 },
         { path: '/app/accounting/trial-balance', label: 'Balancete', icon: FiPieChart },
+        { path: '/app/accounting/investimentos/renda-fixa', label: 'Renda Fixa', icon: FiTrendingUp },
+        { path: '/app/accounting/investimentos/simulador', label: 'Simulador CDB', icon: FiActivity },
         { path: '/app/accounting/balance-comparison', label: 'Comparativo de Saldos', icon: FiActivity },
+      ],
+    },
+    {
+      path: '/app/sistema',
+      icon: FiSettings,
+      label: 'Sistema',
+      accent: '#374151',
+      surface: '#F9FAFB',
+      children: [
+        { path: '/app/sistema/calendario', label: 'Calendario de Feriados', icon: FiCalendar },
+        { path: '/app/sistema/indicadores', label: 'Indicadores Economicos', icon: FiBarChart2 },
+        { path: '/app/sistema/tabelas', label: 'Tabelas Legais', icon: FiBook },
       ],
     },
     {

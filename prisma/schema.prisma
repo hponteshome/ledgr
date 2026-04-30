@@ -170,6 +170,7 @@ model Company {
   journalEntries    JournalEntry[]
   accountingRules   AccountingRule[]
   ecdImports        EcdImport[]
+  fixedIncomeInvestments FixedIncomeInvestment[]
   loteImports       LoteImport[]
   fixedAssets       FixedAsset[]
   apEntries         ApEntry[]
@@ -1894,4 +1895,217 @@ model ShareTransfer {
   @@index([fromRecordId])
   @@index([toRecordId])
   @@map("share_transfers")
+}
+// =============================================================================
+// LEDGR — Adição ao schema.prisma
+// Módulo: Renda Fixa (CDB / LCI / LCA / CRI / CRA / Debêntures)
+// Adicionar após o bloco 10 · ECF
+// =============================================================================
+
+enum FixedIncomeType {
+  CDB
+  LCI
+  LCA
+  CRI
+  CRA
+  DEBENTURE
+  TESOURO_PREFIXADO
+  TESOURO_SELIC
+  TESOURO_IPCA
+  OUTRO
+
+  @@map("fixed_income_type")
+}
+
+enum FixedIncomeIndexer {
+  CDI
+  SELIC
+  IPCA
+  IGPM
+  PREFIXADO
+
+  @@map("fixed_income_indexer")
+}
+
+enum FixedIncomeStatus {
+  ATIVO
+  RESGATADO
+  VENCIDO
+  CANCELADO
+
+  @@map("fixed_income_status")
+}
+
+enum FixedIncomeEventType {
+  APLICACAO
+  RESGATE_ANTECIPADO
+  RESGATE_VENCIMENTO
+  ATUALIZACAO_SALDO    // registro mensal de competência (Lucro Real)
+  LANCAMENTO_CONTABIL  // vínculo com JournalEntry
+
+  @@map("fixed_income_event_type")
+}
+
+/// Investimentos em renda fixa da empresa (CDB, LCI, LCA, Tesouro...).
+/// Suporta múltiplos resgates parciais e antecipados.
+/// Para Lucro Real: receita financeira reconhecida mensalmente via eventos ATUALIZACAO_SALDO.
+model FixedIncomeInvestment {
+  id        String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId String @map("company_id") @db.Uuid
+
+  // ── Identificação ─────────────────────────────────────────
+  description   String            @map("description") @db.VarChar(200)
+  type          FixedIncomeType   @default(CDB) @map("type")
+  issuerName    String            @map("issuer_name") @db.VarChar(100)  // Banco emissor
+  issuerCnpj    String?           @map("issuer_cnpj") @db.VarChar(18)
+  externalCode  String?           @map("external_code") @db.VarChar(50) // Código na corretora
+
+  // ── Condições financeiras ──────────────────────────────────
+  indexer         FixedIncomeIndexer @default(CDI) @map("indexer")
+  indexerRate     Decimal            @map("indexer_rate") @db.Decimal(8, 4)   // 96.00 = 96% do CDI
+  fixedRate       Decimal?           @map("fixed_rate") @db.Decimal(8, 4)     // Para prefixados
+  capitalInitial  Decimal            @map("capital_initial") @db.Decimal(15, 2)
+  capitalBalance  Decimal            @map("capital_balance") @db.Decimal(15, 2) // Saldo do principal apos resgates
+  capitalCurrent  Decimal            @map("capital_current") @db.Decimal(15, 2) // Saldo bruto total (principal + rendimentos)
+  accumulatedYield Decimal           @default(0) @map("accumulated_yield") @db.Decimal(15, 2) // Rendimento bruto acumulado
+  totalRedeemed        Decimal       @default(0) @map("total_redeemed") @db.Decimal(15, 2)         // Total liquido resgatado
+  totalRedeemedPrincipal Decimal     @default(0) @map("total_redeemed_principal") @db.Decimal(15, 2) // Total principal resgatado
+
+  // ── Datas ─────────────────────────────────────────────────
+  applicationDate DateTime  @map("application_date") @db.Date
+  maturityDate    DateTime  @map("maturity_date") @db.Date
+  lastUpdateDate  DateTime? @map("last_update_date") @db.Date // Última atualização de saldo
+
+  // ── IRRF ──────────────────────────────────────────────────
+  irrfExempt      Boolean  @default(false) @map("irrf_exempt")  // LCI/LCA/CRI/CRA são isentos
+  accountingAccountId String? @map("accounting_account_id") @db.Uuid  // Conta contabil do investimento
+  irrfAccumulated Decimal  @default(0) @map("irrf_accumulated") @db.Decimal(15, 2)
+
+  // ── Contas contábeis ──────────────────────────────────────
+  assetAccountId   String? @map("asset_account_id") @db.Uuid   // Ativo: CDB a receber
+  revenueAccountId String? @map("revenue_account_id") @db.Uuid  // Receita financeira
+  irrfAccountId    String? @map("irrf_account_id") @db.Uuid     // IRRF a recuperar (antecipação)
+
+  status    FixedIncomeStatus @default(ATIVO) @map("status")
+  notes     String?           @map("notes") @db.Text
+  createdAt DateTime          @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  deletedAt DateTime?         @map("deleted_at") @db.Timestamp(6)
+
+  company  Company                @relation(fields: [companyId], references: [id])
+  events   FixedIncomeEvent[]
+  rates    FixedIncomeMonthlyRate[]
+
+  @@index([companyId, status])
+  @@index([companyId, maturityDate])
+  @@map("fixed_income_investments")
+}
+
+/// Taxas CDI/índice mensais reais — histórico para cálculo exato.
+model FixedIncomeMonthlyRate {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  investmentId String   @map("investment_id") @db.Uuid
+  companyId    String   @map("company_id") @db.Uuid
+  competence   String   @map("competence") @db.Char(7)   // "2024-01"
+  indexerRate  Decimal  @map("indexer_rate") @db.Decimal(12, 10) // Taxa mensal acumulada (ex: 0.0096669)
+  businessDays Int?     @map("business_days")
+  calendarDays Int?     @map("calendar_days")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+
+  investment FixedIncomeInvestment @relation(fields: [investmentId], references: [id], onDelete: Cascade)
+
+  @@unique([investmentId, competence])
+  @@index([companyId, competence])
+  @@map("fixed_income_monthly_rates")
+}
+
+/// Eventos do ciclo de vida do investimento.
+/// Cada RESGATE_ANTECIPADO reduz capitalCurrent e registra IRRF retido.
+model FixedIncomeEvent {
+  id           String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  investmentId String               @map("investment_id") @db.Uuid
+  companyId    String               @map("company_id") @db.Uuid
+  eventType    FixedIncomeEventType @map("event_type")
+  eventDate    DateTime             @map("event_date") @db.Date
+  competence   String?              @map("competence") @db.Char(7)  // "2024-01" para atualizações
+
+  // ── Valores do evento ─────────────────────────────────────
+  grossAmount   Decimal  @default(0) @map("gross_amount") @db.Decimal(15, 2)   // Rendimento bruto do período
+  netAmount     Decimal  @default(0) @map("net_amount") @db.Decimal(15, 2)     // Líquido após IRRF
+  irrfAmount    Decimal  @default(0) @map("irrf_amount") @db.Decimal(15, 2)    // IRRF retido
+  irrfRate      Decimal? @map("irrf_rate") @db.Decimal(5, 4)                   // Alíquota aplicada
+  balanceAfter  Decimal  @map("balance_after") @db.Decimal(15, 2)              // Saldo bruto após evento
+
+  // ── Para resgates ─────────────────────────────────────────
+  redemptionPrincipal Decimal? @map("redemption_principal") @db.Decimal(15, 2) // Parcela do principal resgatado
+  redemptionYield     Decimal? @map("redemption_yield") @db.Decimal(15, 2)     // Parcela de rendimento resgatado
+  redemptionTotal     Decimal? @map("redemption_total") @db.Decimal(15, 2)     // Total líquido recebido
+
+  // ── Vínculo contábil ──────────────────────────────────────
+  journalEntryId String? @map("journal_entry_id") @db.Uuid
+  notes          String? @map("notes") @db.VarChar(500)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+
+  investment FixedIncomeInvestment @relation(fields: [investmentId], references: [id], onDelete: Cascade)
+
+  @@index([investmentId, eventDate])
+  @@index([companyId, eventType])
+  @@map("fixed_income_events")
+}
+
+// =============================================================================
+// 13 · TABELA CDI DIÁRIO (BCB — Série 12)
+// =============================================================================
+
+model CdiDailyRate {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  date         DateTime @map("date") @db.Date
+  dailyRate    Decimal  @map("daily_rate") @db.Decimal(10, 6)
+  monthlyAccum Decimal  @map("monthly_accum") @db.Decimal(10, 4)
+  yearAccum    Decimal  @map("year_accum") @db.Decimal(10, 4)
+  accum30d     Decimal  @map("accum_30d") @db.Decimal(10, 4)
+  accum12m     Decimal  @map("accum_12m") @db.Decimal(10, 4)
+  accumIndex   Decimal  @map("accum_index") @db.Decimal(18, 7)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  @@unique([date])
+  @@index([date])
+  @@map("cdi_daily_rates")
+}
+
+// =============================================================================
+// 12 · CALENDÁRIO DE FERIADOS
+// =============================================================================
+
+enum HolidayType {
+  NACIONAL
+  ESTADUAL
+  MUNICIPAL
+  JUDAICO
+  FACULTATIVO
+
+  @@map("holiday_type")
+}
+
+model Holiday {
+  id        String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  date      DateTime    @map("date") @db.Date
+  name      String      @map("name") @db.VarChar(100)
+  type      HolidayType @map("type")
+  state     String?     @map("state") @db.VarChar(2)
+  city      String?     @map("city") @db.VarChar(100)
+  recurring Boolean     @default(false) @map("recurring")
+  // Feriados judaicos
+  hebrewName    String? @map("hebrew_name") @db.VarChar(100)
+  hebrewDate    String? @map("hebrew_date") @db.VarChar(20)  // ex: "15 Nissan"
+  erevStart     Boolean @default(false) @map("erev_start")   // inicia na vespera ao por do sol
+  createdAt DateTime    @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  @@unique([date, type, state, city])
+  @@index([date])
+  @@index([type])
+  @@map("holidays")
 }

@@ -47,6 +47,12 @@ import MaintenancesPage from '../pages/assets/MaintenancesPage';
 import { BalanceComparisonPage } from '../pages/reports/BalanceComparisonPage';
 import DiarioGeralPage from '../pages/accounting/DiarioGeralPage';
 import RazaoAnaliticoPage from '../pages/accounting/RazaoAnaliticoPage';
+import CdbProjecaoPage from '../pages/accounting/investments/CdbProjecaoPage';
+import RendaFixaPage from '../pages/accounting/investments/RendaFixaPage';
+import CdiTabelaPage from '../pages/accounting/investments/CdiTabelaPage';
+import { IndicadoresPage } from '../pages/sistema/IndicadoresPage';
+import { CalendarioPage } from '../pages/sistema/CalendarioPage';
+import { TabelasLegaisPage } from '../pages/sistema/TabelasLegaisPage';
 import ShareholdersPage from '../pages/corporate/shareholders/ShareholdersPage';
 import { RepositorioPage } from '../pages/documentos/RepositorioPage';
 
@@ -80,6 +86,12 @@ export const AppRoutes = () => {
                 <Route path="app/reports/balance-comparison" element={<ProtectedRoute><BalanceComparisonPage /></ProtectedRoute>} />
                 <Route path="app/accounting/validate-ecd" element={<ProtectedRoute><EcdValidationPage /></ProtectedRoute>} />
                 <Route path="app/accounting/diario" element={<ProtectedRoute><DiarioGeralPage /></ProtectedRoute>} />
+                <Route path="app/accounting/investimentos/cdi" element={<ProtectedRoute><CdiTabelaPage /></ProtectedRoute>} />
+                <Route path="app/sistema/indicadores" element={<ProtectedRoute><IndicadoresPage /></ProtectedRoute>} />
+                <Route path="app/sistema/calendario" element={<ProtectedRoute><CalendarioPage /></ProtectedRoute>} />
+                <Route path="app/sistema/tabelas" element={<ProtectedRoute><TabelasLegaisPage /></ProtectedRoute>} />
+                <Route path="app/accounting/investimentos/renda-fixa" element={<ProtectedRoute><RendaFixaPage /></ProtectedRoute>} />
+                <Route path="app/accounting/investimentos/simulador" element={<ProtectedRoute><CdbProjecaoPage /></ProtectedRoute>} />
                 <Route path="app/accounting/razao" element={<ProtectedRoute><RazaoAnaliticoPage /></ProtectedRoute>} />
 
                 {/* SPED */}
