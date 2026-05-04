@@ -24,7 +24,7 @@ export function DepreciationTab({ asset }: { asset: FixedAsset }) {
 
     const chartData = [
         ...history.map(d => ({
-            month: d.period.slice(0, 7),
+            month: String(d.period).slice(0, 7),
             bookValue: Number(d.bookValueAfter),
             accumDeprec: Number(d.accumDeprecAfter),
             type: 'real',
@@ -96,7 +96,7 @@ export function DepreciationTab({ asset }: { asset: FixedAsset }) {
                             <tbody className="divide-y divide-gray-100">
                                 {history.slice(0, 24).map(d => (
                                     <tr key={d.id} className="hover:bg-gray-50">
-                                        <td className="px-4 py-2 font-mono text-xs">{d.period.slice(0, 7)}</td>
+                                        <td className="px-4 py-2 font-mono text-xs">{String(d.period).slice(0, 7)}</td>
                                         <td className="px-4 py-2 text-right text-red-600 text-xs">{formatCurrency(d.monthlyCharge)}</td>
                                         <td className="px-4 py-2 text-right text-xs">{formatCurrency(d.accumDeprecAfter)}</td>
                                         <td className="px-4 py-2 text-right font-medium text-xs">{formatCurrency(d.bookValueAfter)}</td>

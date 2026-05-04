@@ -164,8 +164,8 @@ const JournalPage: React.FC = () => {
         setLoading(true);
         try {
             const params = showRecent
-                ? { dateTo: fDate, search: search || undefined, page, limit: 100 }
-                : { dateFrom: `${currentMonth.from.split('-')[0]}-01-01`, dateTo: `${currentMonth.from.split('-')[0]}-12-31`, search: search || undefined, page, limit: 100 };
+                ? { dateTo: fDate, search: search || undefined, page, limit: 50, orderBy: 'date', orderDir: 'desc' }
+                : { dateFrom: currentMonth.from, dateTo: currentMonth.to, search: search || undefined, page, limit: 100 };
             const r = await api.get('/accounting/journal', { params });
             setData(r.data);
         } catch (e) { console.error(e); }
@@ -580,8 +580,8 @@ const JournalPage: React.FC = () => {
                                     return (
                                         <tr key={entry.id} className="hover:bg-blue-50/30 group transition-colors border-b border-gray-50">
                                             <td className="px-3 py-2 font-mono text-gray-600 whitespace-nowrap">{fmtDate(entry.date)}</td>
-                                            <td className="px-3 py-2 text-gray-500 text-[11px] max-w-[180px] overflow-hidden text-ellipsis whitespace-nowrap" title={entry.description}>{entry.description}</td>
                                             <td className="px-3 py-2 font-mono text-gray-400 whitespace-nowrap text-[10px]">{nrLanc}</td>
+                                            <td className="px-3 py-2 text-gray-500 text-[11px] max-w-[180px] overflow-hidden text-ellipsis whitespace-nowrap" title={entry.description}>{entry.description}</td>
                                             <td className="px-3 py-2 font-mono text-blue-700 whitespace-nowrap"
                                                 title={debitTitle}>{debitCode}</td>
                                             <td className="px-3 py-2 font-mono text-green-700 whitespace-nowrap"

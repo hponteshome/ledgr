@@ -1246,11 +1246,11 @@ model AssetDepreciationLog {
   bookValueAfter    Decimal @map("book_value_after") @db.Decimal(15, 2)
 
   journalEntryId String?  @map("journal_entry_id") @db.Uuid
-  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamp(6)
-
+  @@unique([assetId, method, period])
+  @@index([companyId, period])
   asset FixedAsset @relation(fields: [assetId], references: [id])
 
-  @@unique([assetId, method])
+
   @@index([companyId, method])
   @@map("asset_depreciation_logs")
 }

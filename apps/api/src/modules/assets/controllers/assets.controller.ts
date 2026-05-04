@@ -62,16 +62,16 @@ export class AssetsController {
   findOverdueMaintenance(@Req() req: any) {
     return this.maintenanceService.findOverdue(req.companyId);
   }
-
   @Post('depreciation/reprocess')
   @HttpCode(HttpStatus.OK)
   reprocessDepreciation(@Req() req: any, @Body('period') period: string) {
     return this.depreciationService.reprocessPeriod(req.companyId, period);
   }
 
-  @Post('maintenances')
-  createMaintenance(@Req() req: any, @Body() dto: CreateMaintenanceDto) {
-    return this.maintenanceService.create(req.companyId, dto, req.user?.id);
+  @Post('depreciation/run')
+  @HttpCode(HttpStatus.OK)
+  runDepreciation(@Req() req: any, @Body('period') period: string) {
+    return this.depreciationService.processCompany(req.companyId, period);
   }
 
   @Post('improvements')
@@ -135,6 +135,23 @@ export class AssetsController {
     @Body() dto: UpdateMaintenanceDto,
   ) {
     return this.maintenanceService.update(req.companyId, id, dto, req.user?.id);
+  }
+
+  @Post(':id/deactivate')
+  @HttpCode(HttpStatus.OK)
+  deactivate(@Req() req: any, @Param('id') id: string) {
+    return this.assetsService.deactivate(req.companyId, id, req.user?.id);
+  }
+
+  @Post(':id/reactivate')
+  @HttpCode(HttpStatus.OK)
+  reactivate(@Req() req: any, @Param('id') id: string) {
+    return this.assetsService.reactivate(req.companyId, id, req.user?.id);
+  }
+
+  @Delete(':id')
+  remove(@Req() req: any, @Param('id') id: string) {
+    return this.assetsService.softDelete(req.companyId, id, req.user?.id);
   }
 
   @Delete('maintenances/:id')

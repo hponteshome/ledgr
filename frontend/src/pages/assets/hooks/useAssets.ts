@@ -172,6 +172,18 @@ export function useAssetMutations() {
       setLoading(false);
     }
   }, [headers]);
+  const deactivate = useCallback(async (id: string) => {
+    return request(`${API}/assets/${id}/deactivate`, { method: 'POST', headers, body: '{}' });
+  }, [request, headers]);
+
+  const reactivate = useCallback(async (id: string) => {
+    return request(`${API}/assets/${id}/reactivate`, { method: 'POST', headers, body: '{}' });
+  }, [request, headers]);
+
+  const removeAsset = useCallback(async (id: string) => {
+    return request(`${API}/assets/${id}`, { method: 'DELETE', headers });
+  }, [request, headers]);
+
 
   const removeMaintenance = useCallback(async (id: string) => {
     return request(`${API}/assets/maintenances/${id}`, {
@@ -269,6 +281,9 @@ export function useAssetMutations() {
     writeOff,
     createMaintenance,
     updateMaintenance,
+    deactivate,
+    reactivate,
+    removeAsset,
     removeMaintenance,
     createImprovement,
     capitalizeImprovement,

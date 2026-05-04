@@ -27,9 +27,9 @@ export class DepreciationService {
     this.logger.log(`Monthly depreciation completed. ${total} assets processed.`);
   }
 
-  async processCompany(companyId: string): Promise<number> {
-    const now = new Date();
-    const period = new Date(now.getFullYear(), now.getMonth(), 1);
+  async processCompany(companyId: string, periodStr?: string): Promise<number> {
+    const now = periodStr ? new Date(periodStr) : new Date();
+    const period = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1));
 
     const assets = await this.prisma.fixedAsset.findMany({
       where: {
@@ -45,16 +45,16 @@ export class DepreciationService {
       try {
         // CORREÇÃO 1: Ajustado para usar a nova chave única do model [assetId, method]
         const alreadyProcessed = await this.prisma.assetDepreciationLog.findUnique({
-          where: { 
-            assetId_method: { 
-              assetId: asset.id, 
-              method: asset.depreciationMethod 
-            } 
+          where: {
+            assetId_method_period: {
+              assetId: asset.id,
+              method: asset.depreciationMethod,
+              period,
+            },
           },
         });
-        
-        // Mantida a sua lógica de trava por período
-        if (alreadyProcessed && alreadyProcessed.period.getTime() === period.getTime()) continue;
+
+        if (alreadyProcessed) continue;
 
         const monthlyCharge = this.calculateCharge(asset);
         const accumDeprecBefore = Number(asset.accumulatedDeprec);
@@ -126,7 +126,7 @@ export class DepreciationService {
     await this.prisma.assetDepreciationLog.deleteMany({
       where: { companyId, period: new Date(period) },
     });
-    return this.processCompany(companyId);
+    return this.processCompany(companyId, period);
   }
 
   async getAssetHistory(companyId: string, assetId: string) {

@@ -8,7 +8,7 @@ import {
     History, TrendingDown, Edit, CheckCircle, XCircle, AlertTriangle,
     MapPin, Hash, Calendar, DollarSign,
 } from 'lucide-react';
-import { useAssetDetail } from './hooks/useAssets';
+import { useAssetDetail, useAssetMutations } from './hooks/useAssets';
 import {
     ASSET_GROUP_LABELS,
     ASSET_STATUS_LABELS,
@@ -42,6 +42,20 @@ export default function AssetShow() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const { asset, loading, error, fetch } = useAssetDetail();
+    const { activate, deactivate, reactivate, removeAsset } = useAssetMutations();
+    const handleDeactivate = async () => { if (!id) return; await deactivate(id); fetch(id); };
+    const handleReactivate = async () => { if (!id) return; await reactivate(id); fetch(id); };
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const handleDelete = async () => {
+        if (!id) return;
+        await removeAsset(id);
+        navigate('/app/assets');
+    };
+    const handleActivate = async () => {
+        if (!id) return;
+        await activate(id);
+        fetch(id);
+    };
     const [tab, setTab] = useState<Tab>('resumo');
     const [showEdit, setShowEdit] = useState(false);
     const [showWriteOff, setShowWriteOff] = useState(false);
@@ -90,7 +104,7 @@ export default function AssetShow() {
                     </button>
                     {asset.status === 'PENDING_ACTIVATION' && (
                         <button
-                            onClick={() => {/* ativar */ }}
+                            onClick={handleActivate}
                             className="flex items-center gap-1.5 px-3 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700"
                         >
                             <CheckCircle className="w-4 h-4" /> Ativar
@@ -104,6 +118,25 @@ export default function AssetShow() {
                             <XCircle className="w-4 h-4" /> Baixa
                         </button>
                     )}
+                    {asset.status === 'ACTIVE' && (
+                        <button onClick={handleDeactivate}
+                            className="flex items-center gap-1.5 px-3 py-2 border border-amber-300 text-amber-700 rounded-lg text-sm hover:bg-amber-50">
+                            <AlertTriangle className="w-4 h-4" /> Desativar
+                        </button>
+                    )}
+                    {asset.status === 'INACTIVE' && (
+                        <button onClick={handleReactivate}
+                            className="flex items-center gap-1.5 px-3 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700">
+                            <CheckCircle className="w-4 h-4" /> Reativar
+                        </button>
+                    )}
+                    <button
+                        onClick={() => setShowDeleteConfirm(true)}
+                        className="flex items-center gap-1.5 px-3 py-2 border border-red-300 text-red-600 rounded-lg text-sm hover:bg-red-50"
+                    >
+                        <XCircle className="w-4 h-4" /> Excluir
+                    </button>
+
                 </div>
             </div>
 
@@ -173,6 +206,21 @@ export default function AssetShow() {
                     onClose={() => setShowEdit(false)}
                     onSuccess={() => { setShowEdit(false); fetch(id!); }}
                 />
+            )}
+            {showDeleteConfirm && (
+                <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-xl shadow-xl p-5 w-full max-w-sm">
+                        <h3 className="font-medium text-gray-800 mb-1 flex items-center gap-2">
+                            <AlertTriangle className="text-red-500 w-4 h-4" /> Excluir ativo?
+                        </h3>
+                        <p className="text-sm text-gray-500 mb-1">Esta ação realizará um soft delete e ficará registrada no log de auditoria.</p>
+                        <p className="text-sm font-medium text-gray-700 mb-4">{asset.description}</p>
+                        <div className="flex gap-2 justify-end">
+                            <button onClick={() => setShowDeleteConfirm(false)} className="px-4 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg border border-gray-200">Cancelar</button>
+                            <button onClick={handleDelete} className="px-4 py-1.5 text-sm text-white bg-red-600 rounded-lg hover:bg-red-700">Excluir</button>
+                        </div>
+                    </div>
+                </div>
             )}
             {showWriteOff && (
                 <WriteOffModal
