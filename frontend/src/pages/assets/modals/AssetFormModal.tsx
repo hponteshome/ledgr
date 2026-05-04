@@ -98,6 +98,7 @@ export function AssetFormModal({ asset, onClose, onSuccess }: Props) {
                 landValuePercent: form.landValuePercent ? Number(form.landValuePercent) : undefined,
                 totalArea: form.totalArea ? Number(form.totalArea) : undefined,
                 builtArea: form.builtArea ? Number(form.builtArea) : undefined,
+                assessedValue: form.assessedValue ? Number(form.assessedValue) : undefined,
             };
 
             const result = isEdit

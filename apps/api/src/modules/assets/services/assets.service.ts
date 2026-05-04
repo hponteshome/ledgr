@@ -109,18 +109,22 @@ export class AssetsService {
     const annualRatePercent = dto.annualRatePercent
       ?? Number(((1 / (dto.usefulLifeMonths / 12)) * 100).toFixed(2));
 
+    // Sanitizar campos Decimal opcionais — string vazia vira null
+    const assessedValue = dto.assessedValue ?? null;
+    const totalArea     = dto.totalArea     ?? null;
+    const builtArea     = dto.builtArea     ?? null;
     const asset = await this.prisma.fixedAsset.create({
       data: {
         companyId,
         internalCode:        dto.internalCode,
         description:         dto.description,
+        notes:               dto.notes ?? null,
         group:               dto.group as any,
-        subgroup:            dto.subgroup,
-        brand:               dto.brand,
-        model:               dto.model,
-        serialNumber:        dto.serialNumber,
-        location:            dto.location,
-        notes:               dto.notes,
+        subgroup:            dto.subgroup   ?? null,
+        brand:               dto.brand      ?? null,
+        model:               dto.model      ?? null,
+        serialNumber:        dto.serialNumber ?? null,
+        location:            dto.location   ?? null,
         acquisitionCost,
         acquisitionDate:     new Date(dto.acquisitionDate),
         residualValue:       dto.residualValue ?? 0,
@@ -135,9 +139,9 @@ export class AssetsService {
         landValueAmount:     landValueAmount || null,
         iptuRegistration:    dto.iptuRegistration,
         registryNumber:      dto.registryNumber,
-        totalArea:           dto.totalArea,
-        builtArea:           dto.builtArea,
-        assessedValue:       dto.assessedValue,
+        totalArea:           totalArea,
+        builtArea:           builtArea,
+        assessedValue:       assessedValue,
         street:              dto.street,
         zipCode:             dto.zipCode,
         state:               dto.state,
@@ -188,6 +192,25 @@ export class AssetsService {
     return { ok: true };
   }
 
+  // ── Deactivate / Reactivate ─────────────────────────────
+  async deactivate(companyId: string, id: string, performedById?: string) {
+    const asset = await this.findOne(companyId, id);
+    if (asset.status !== 'ACTIVE') throw new BadRequestException('Asset is not active');
+    await this.prisma.fixedAsset.update({ where: { id }, data: { status: 'INACTIVE' } });
+    await this.history.record(id, companyId, 'TRANSFER',
+      'Ativo desativado temporariamente', Number(asset.bookValue), Number(asset.bookValue), performedById);
+    return { ok: true };
+  }
+
+  async reactivate(companyId: string, id: string, performedById?: string) {
+    const asset = await this.findOne(companyId, id);
+    if (asset.status !== 'INACTIVE') throw new BadRequestException('Asset is not inactive');
+    await this.prisma.fixedAsset.update({ where: { id }, data: { status: 'ACTIVE' } });
+    await this.history.record(id, companyId, 'ACTIVATION',
+      'Ativo reativado', Number(asset.bookValue), Number(asset.bookValue), performedById);
+    return { ok: true };
+  }
+
   // ── Write-Off ────────────────────────────────────────────
   async writeOff(companyId: string, id: string, dto: WriteOffAssetDto, performedById?: string) {
     const asset = await this.findOne(companyId, id);
@@ -213,6 +236,21 @@ export class AssetsService {
     );
 
     return { gainLoss, bookValueAtWriteOff: Number(asset.bookValue) };
+  }
+
+  // ── Soft Delete ──────────────────────────────────────────
+  async softDelete(companyId: string, id: string, performedById?: string) {
+    const asset = await this.findOne(companyId, id);
+    await this.prisma.fixedAsset.update({
+      where: { id },
+      data: { deletedAt: new Date(), isActive: false },
+    });
+    await this.history.record(
+      id, companyId, 'DISPOSAL',
+      `Ativo excluído: ${asset.description}`,
+      Number(asset.bookValue), 0, performedById,
+    );
+    return { ok: true };
   }
 
   // ── Depreciation Projection ───────────────────────────────
