@@ -3,7 +3,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '@/prisma/prisma.service';
 import { AssetHistoryService } from './history.service';
-import { Prisma } from '@prisma/client'; // Importado para lidar com tipos Decimal
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class DepreciationService {
@@ -18,7 +18,6 @@ export class DepreciationService {
   async runMonthlyDepreciation() {
     this.logger.log('Starting monthly depreciation job...');
     const companies = await this.prisma.company.findMany({ where: { deletedAt: null } });
-
     let total = 0;
     for (const company of companies) {
       const count = await this.processCompany(company.id);
@@ -43,7 +42,6 @@ export class DepreciationService {
 
     for (const asset of assets) {
       try {
-        // CORREÇÃO 1: Ajustado para usar a nova chave única do model [assetId, method]
         const alreadyProcessed = await this.prisma.assetDepreciationLog.findUnique({
           where: {
             assetId_method_period: {
@@ -68,19 +66,17 @@ export class DepreciationService {
               companyId,
               period,
               method: asset.depreciationMethod,
-              // CORREÇÃO 2: Garantindo que valores numéricos sejam aceitos pelo campo Decimal do Prisma
-              monthlyCharge: new Prisma.Decimal(monthlyCharge),
+              monthlyCharge:     new Prisma.Decimal(monthlyCharge),
               accumDeprecBefore: new Prisma.Decimal(accumDeprecBefore),
-              accumDeprecAfter: new Prisma.Decimal(accumDeprecAfter),
-              bookValueAfter: new Prisma.Decimal(bookValueAfter),
+              accumDeprecAfter:  new Prisma.Decimal(accumDeprecAfter),
+              bookValueAfter:    new Prisma.Decimal(bookValueAfter),
             },
           }),
           this.prisma.fixedAsset.update({
             where: { id: asset.id },
             data: {
-              // CORREÇÃO 3: Update também exige Decimal ou string para colunas @db.Decimal
-              accumulatedDeprec: new Prisma.Decimal(accumDeprecAfter),
-              bookValue: new Prisma.Decimal(bookValueAfter),
+              accumulatedDeprec:   new Prisma.Decimal(accumDeprecAfter),
+              bookValue:           new Prisma.Decimal(bookValueAfter),
               remainingLifeMonths: asset.remainingLifeMonths - 1,
               ...(asset.remainingLifeMonths <= 1 && { status: 'INACTIVE' }),
             },
@@ -122,28 +118,86 @@ export class DepreciationService {
     return Number(Math.min(charge, allowedBalance).toFixed(2));
   }
 
-  async backfillAsset(companyId: string, assetId: string): Promise<number> {
-    const asset = await this.prisma.fixedAsset.findFirst({
-      where: { id: assetId, companyId, deletedAt: null },
-    });
-    if (!asset) throw new Error('Asset not found');
-    const start = new Date(asset.depreciationStart);
-    const now = new Date();
-    let processed = 0;
-    let cursor = new Date(Date.UTC(start.getFullYear(), start.getMonth(), 1));
-    while (cursor <= now) {
-      const periodStr = cursor.toISOString().slice(0, 7) + '-01';
-      const count = await this.processCompany(companyId, periodStr);
-      if (count > 0) processed++;
-      cursor = new Date(Date.UTC(cursor.getFullYear(), cursor.getMonth() + 1, 1));
-    }
-    return processed;
+  // ── Backfill via SQL raw — confiável e performático ─────────────────────────
+  async backfillAsset(companyId: string, assetId: string, dateFrom?: string, dateTo?: string): Promise<number> {
+    // 1 — Deletar logs existentes
+    await this.prisma.assetDepreciationLog.deleteMany({ where: { assetId, companyId } });
+
+    // 2 — Inserir logs via SQL com generate_series
+    const fromClause = dateFrom
+      ? `DATE_TRUNC('month', '${dateFrom}'::date)`
+      : `DATE_TRUNC('month', (SELECT depreciation_start FROM fixed_assets WHERE id = '${assetId}'))`;
+
+    const toClause = dateTo
+      ? `DATE_TRUNC('month', '${dateTo}'::date)`
+      : `DATE_TRUNC('month', CURRENT_DATE)`;
+
+    const result = await this.prisma.$executeRawUnsafe(`
+      WITH params AS (
+        SELECT
+          id,
+          company_id,
+          depreciation_method,
+          acquisition_cost,
+          COALESCE(land_value_amount, 0) AS land_amount,
+          residual_value,
+          useful_life_months,
+          ROUND((acquisition_cost - COALESCE(land_value_amount,0) - residual_value) / useful_life_months, 2) AS monthly_charge
+        FROM fixed_assets
+        WHERE id = '${assetId}' AND company_id = '${companyId}'
+      ),
+      months AS (
+        SELECT
+          gs::date AS period,
+          (ROW_NUMBER() OVER () - 1) AS idx
+        FROM generate_series(${fromClause}, ${toClause}, '1 month'::interval) AS gs
+      )
+      INSERT INTO asset_depreciation_logs
+        (id, company_id, asset_id, period, method, monthly_charge, accum_deprec_before, accum_deprec_after, book_value_after)
+      SELECT
+        gen_random_uuid(),
+        p.company_id,
+        p.id,
+        m.period,
+        p.depreciation_method,
+        p.monthly_charge,
+        ROUND(p.monthly_charge * m.idx, 2),
+        ROUND(p.monthly_charge * (m.idx + 1), 2),
+        ROUND(p.acquisition_cost - ROUND(p.monthly_charge * (m.idx + 1), 2), 2)
+      FROM months m, params p
+      ON CONFLICT (asset_id, method, period) DO UPDATE SET
+        monthly_charge      = EXCLUDED.monthly_charge,
+        accum_deprec_before = EXCLUDED.accum_deprec_before,
+        accum_deprec_after  = EXCLUDED.accum_deprec_after,
+        book_value_after    = EXCLUDED.book_value_after
+    `);
+
+    // 3 — Atualizar o ativo com os valores finais
+    await this.prisma.$executeRawUnsafe(`
+      WITH params AS (
+        SELECT
+          ROUND((acquisition_cost - COALESCE(land_value_amount,0) - residual_value) / useful_life_months, 2) AS monthly_charge,
+          useful_life_months
+        FROM fixed_assets WHERE id = '${assetId}'
+      ),
+      log_count AS (
+        SELECT COUNT(*) AS cnt FROM asset_depreciation_logs WHERE asset_id = '${assetId}' AND company_id = '${companyId}'
+      )
+      UPDATE fixed_assets SET
+        accumulated_depreciation = (SELECT ROUND(monthly_charge * cnt, 2) FROM params, log_count),
+        book_value               = acquisition_cost - (SELECT ROUND(monthly_charge * cnt, 2) FROM params, log_count),
+        remaining_life_months    = (SELECT useful_life_months - cnt::int FROM params, log_count),
+        status                   = CASE WHEN (SELECT useful_life_months - cnt::int FROM params, log_count) <= 0 THEN 'INACTIVE'::asset_status ELSE 'ACTIVE'::asset_status END
+      WHERE id = '${assetId}' AND company_id = '${companyId}'
+    `);
+
+    return result;
   }
 
   async backfillAll(companyId: string): Promise<{ assets: number; periods: number }> {
     const assets = await this.prisma.fixedAsset.findMany({
       where: { companyId, status: 'ACTIVE', nonDepreciable: false, deletedAt: null },
-      select: { id: true, depreciationStart: true },
+      select: { id: true },
     });
     let totalPeriods = 0;
     for (const asset of assets) {

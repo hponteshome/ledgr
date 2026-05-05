@@ -272,10 +272,11 @@ export class FilterAssetDto {
   page?: number = 1;
 
   @IsOptional()
-  @Type(() => Number)
   @IsNumber()
+  @Max(1000)
   limit?: number = 20;
 }
+ 
 
 // ── Write-Off ─────────────────────────────────────────────────
 

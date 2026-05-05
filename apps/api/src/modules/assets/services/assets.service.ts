@@ -83,6 +83,9 @@ export class AssetsService {
         depreciationLogs: { orderBy: { period: 'desc' }, take: 36 },
         appraisals:       { orderBy: { appraisalDate: 'desc' } },
         history:          { orderBy: { createdAt: 'desc' }, take: 50 },
+        assetAccount:     { select: { id: true, code: true, name: true } },
+        depreciationAcc:  { select: { id: true, code: true, name: true } },
+        accumDeprecAcc:   { select: { id: true, code: true, name: true } },
       },
     });
 

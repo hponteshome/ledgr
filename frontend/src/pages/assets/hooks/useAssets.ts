@@ -180,6 +180,10 @@ export function useAssetMutations() {
     return request(`${API}/assets/${id}/reactivate`, { method: 'POST', headers, body: '{}' });
   }, [request, headers]);
 
+  const backfillAsset = useCallback(async (id: string, dateFrom?: string, dateTo?: string) => {
+    return request(`${API}/assets/${id}/depreciation/backfill`, { method: 'POST', headers, body: JSON.stringify({ dateFrom, dateTo }) });
+  }, [request, headers]);
+
   const removeAsset = useCallback(async (id: string) => {
     return request(`${API}/assets/${id}`, { method: 'DELETE', headers });
   }, [request, headers]);
@@ -283,6 +287,7 @@ export function useAssetMutations() {
     updateMaintenance,
     deactivate,
     reactivate,
+    backfillAsset,
     removeAsset,
     removeMaintenance,
     createImprovement,

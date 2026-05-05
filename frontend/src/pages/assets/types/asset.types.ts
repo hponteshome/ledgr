@@ -155,6 +155,7 @@ export interface FixedAsset {
   // Real Estate
   iptuRegistration?: string;
   registryNumber?:   string;
+  registryOffice?:   string;
   totalArea?:        number;
   builtArea?:        number;
   assessedValue?:    number;
