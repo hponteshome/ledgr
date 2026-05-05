@@ -22,17 +22,18 @@ export function DepreciationTab({ asset }: { asset: FixedAsset }) {
     const history = asset.depreciationLogs ?? [];
     const projection = data?.projection ?? [];
 
+    console.log('PERIOD SAMPLE', history[0]?.period, typeof history[0]?.period);
     const chartData = [
         ...history.map(d => ({
-            month: String(d.period).slice(0, 7),
+            month: new Date(d.period).toISOString().slice(0, 7),
             bookValue: Number(d.bookValueAfter),
             accumDeprec: Number(d.accumDeprecAfter),
             type: 'real',
         })),
         ...projection.map((d: any) => ({
-            month: d.month,
-            bookValueProjected: d.balance,
-            accumDeprecProjected: d.accumulatedDepreciation,
+            month: d.period ?? d.month,
+            bookValueProjected: d.bookValue ?? d.balance,
+            accumDeprecProjected: d.accumDeprec ?? d.accumulatedDepreciation,
             type: 'projection',
         })),
     ];
@@ -96,7 +97,7 @@ export function DepreciationTab({ asset }: { asset: FixedAsset }) {
                             <tbody className="divide-y divide-gray-100">
                                 {history.slice(0, 24).map(d => (
                                     <tr key={d.id} className="hover:bg-gray-50">
-                                        <td className="px-4 py-2 font-mono text-xs">{String(d.period).slice(0, 7)}</td>
+                                        <td className="px-4 py-2 font-mono text-xs">{new Date(d.period).toISOString().slice(0, 7)}</td>
                                         <td className="px-4 py-2 text-right text-red-600 text-xs">{formatCurrency(d.monthlyCharge)}</td>
                                         <td className="px-4 py-2 text-right text-xs">{formatCurrency(d.accumDeprecAfter)}</td>
                                         <td className="px-4 py-2 text-right font-medium text-xs">{formatCurrency(d.bookValueAfter)}</td>
