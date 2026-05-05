@@ -134,9 +134,9 @@ export function AssetFormModal({ asset, onClose, onSuccess }: Props) {
     const [error, setError] = useState('');
     const [step, setStep] = useState(1);
 
-    const [acctAsset,  setAcctAsset]  = useState<AccountResult>({ id: asset?.assetAccountId  ?? '', code: '', name: '' });
-    const [acctDeprec, setAcctDeprec] = useState<AccountResult>({ id: asset?.depreciationAccId ?? '', code: '', name: '' });
-    const [acctAccum,  setAcctAccum]  = useState<AccountResult>({ id: asset?.accumDeprecAccId  ?? '', code: '', name: '' });
+    const [acctAsset,  setAcctAsset]  = useState<AccountResult>({ id: (asset as any)?.assetAccount?.id ?? asset?.assetAccountId ?? '', code: (asset as any)?.assetAccount?.code ?? '', name: (asset as any)?.assetAccount?.name ?? '' });
+    const [acctDeprec, setAcctDeprec] = useState<AccountResult>({ id: (asset as any)?.depreciationAcc?.id ?? asset?.depreciationAccId ?? '', code: (asset as any)?.depreciationAcc?.code ?? '', name: (asset as any)?.depreciationAcc?.name ?? '' });
+    const [acctAccum,  setAcctAccum]  = useState<AccountResult>({ id: (asset as any)?.accumDeprecAcc?.id ?? asset?.accumDeprecAccId ?? '', code: (asset as any)?.accumDeprecAcc?.code ?? '', name: (asset as any)?.accumDeprecAcc?.name ?? '' });
 
     const [form, setForm] = useState<any>({
         internalCode:      asset?.internalCode ?? '',
@@ -158,7 +158,7 @@ export function AssetFormModal({ asset, onClose, onSuccess }: Props) {
         nonDepreciable:    asset?.nonDepreciable ?? false,
         iptuRegistration:  asset?.iptuRegistration ?? '',
         registryNumber:    asset?.registryNumber ?? '',
-        registryOffice:    '',
+        registryOffice:    (asset as any)?.registryOffice ?? '',
         totalArea:         asset?.totalArea  ? fmtNum(asset.totalArea)  : '',
         builtArea:         asset?.builtArea  ? fmtNum(asset.builtArea)  : '',
         assessedValueItbi: asset?.assessedValue ? fmtNum(asset.assessedValue) : '',

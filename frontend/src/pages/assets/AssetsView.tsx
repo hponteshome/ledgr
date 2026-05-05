@@ -272,7 +272,7 @@ function ResumoTab({ asset }: { asset: FixedAsset }) {
                     <h3 className="font-semibold text-gray-800 text-sm uppercase tracking-wide">Dados do Imóvel</h3>
                     <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
                         {asset.iptuRegistration && <InfoRow label="Inscrição IPTU" value={asset.iptuRegistration} />}
-                        {asset.registryNumber && <InfoRow label="Matrícula Cartório" value={asset.registryNumber} />}
+                        {asset.registryNumber && <InfoRow label="Matrícula / Cartório" value={[asset.registryNumber, (asset as any).registryOffice].filter(Boolean).join(" - ")} />}
                         {asset.totalArea && <InfoRow label="Área Total" value={`${asset.totalArea} m²`} />}
                         {asset.builtArea && <InfoRow label="Área Construída" value={`${asset.builtArea} m²`} />}
                         {asset.assessedValue && <InfoRow label="Valor Venal" value={formatCurrency(asset.assessedValue)} />}

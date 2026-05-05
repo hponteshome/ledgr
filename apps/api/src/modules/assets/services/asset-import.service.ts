@@ -83,7 +83,7 @@ export class AssetImportService {
         const lines = content.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
         if (lines.length < 2) throw new BadRequestException('Arquivo vazio ou sem dados após o cabeçalho.');
 
-        const header = lines[0].split('|').map(h => h.trim().toLowerCase());
+        const header = lines[0].split('|').map(h => h.replace(/\t/g, '').trim().toLowerCase());
         const expectedHeader = [
             'codigo', 'grupo', 'descricao', 'data_aquisicao', 'valor_aquisicao',
             'land_pct', 'matricula', 'municipio', 'uf', 'conta_ativo', 'conta_deprec',
@@ -103,7 +103,7 @@ export class AssetImportService {
 
         for (let i = 1; i < lines.length; i++) {
             const lineNum = i + 1;
-            const cols = lines[i].split('|').map(c => c.trim());
+            const cols = lines[i].split('|').map(c => c.replace(/\t/g, '').trim());
 
             const internalCode = cols[0];
             const group = cols[1];

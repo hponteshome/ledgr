@@ -78,8 +78,8 @@ export class AssetsController {
 
   @Post(':id/depreciation/backfill')
   @HttpCode(HttpStatus.OK)
-  backfillAsset(@Req() req: any, @Param('id') id: string) {
-    return this.depreciationService.backfillAsset(req.companyId, id);
+  backfillAsset(@Req() req: any, @Param('id') id: string, @Body() body: { dateFrom?: string; dateTo?: string }) {
+    return this.depreciationService.backfillAsset(req.companyId, id, body?.dateFrom, body?.dateTo);
   }
 
   @Post('depreciation/run')
@@ -212,8 +212,10 @@ export class AssetsController {
 
   @Post('import/preview')
   @HttpCode(HttpStatus.OK)
-  previewImport(@Req() req: any, @Body('content') content: string) {
-    return this.importService.parseFile(content);
+  async previewImport(@Req() req: any, @Body('content') content: string) {
+    const preview = this.importService.parseFile(content);
+    const duplicates = await this.importService.checkDuplicates(req.companyId, preview.rows);
+    return { ...preview, duplicates };
   }
 
   @Post('import')
