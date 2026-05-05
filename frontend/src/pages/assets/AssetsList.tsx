@@ -277,16 +277,16 @@ export default function AssetsList() {
                     </div>
                 )}
             </div>
-
             {showForm && (
                 <AssetFormModal onClose={() => setShowForm(false)} onSuccess={onCreated} />
+            )}
             {showImport && (
                 <AssetImportModal
                     onClose={() => setShowImport(false)}
                     onSuccess={() => { setShowImport(false); fetch(); }}
                 />
             )}
-            )}
+
         </div>
     );
 }
