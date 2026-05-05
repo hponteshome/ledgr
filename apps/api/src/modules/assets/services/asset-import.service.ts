@@ -24,6 +24,7 @@ export interface ImportRow {
     assessedValue?: number;
     landFraction?: number;
     iptuRegistration?: string;
+    depreciationStart?: string;
 }
 
 export interface ImportPreview {
@@ -143,6 +144,7 @@ export class AssetImportService {
                 assessedValue: parseDecimal(cols[15]),
                 landFraction: parseDecimal(cols[16]),
                 iptuRegistration: cols[17] || undefined,
+                depreciationStart: parseDate(cols[18]) || undefined,
             });
         }
 
@@ -219,9 +221,8 @@ export class AssetImportService {
                     usefulLifeMonths: 480,
                     remainingLifeMonths: 480,
                     annualRatePercent: '2.50',
-                    depreciationStart: new Date(),
                     nonDepreciable: false,
-                    status: 'PENDING_ACTIVATION',
+                    depreciationStart: row.depreciationStart ? new Date(row.depreciationStart) : new Date(row.acquisitionDate),
                     landValuePercent: row.landValuePercent ?? null,
                     landValueAmount: landValueAmount ?? null,
           // landFraction e auxiliar — nao persiste no banco
