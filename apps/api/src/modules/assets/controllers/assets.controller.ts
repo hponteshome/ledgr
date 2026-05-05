@@ -70,6 +70,18 @@ export class AssetsController {
     return this.depreciationService.reprocessPeriod(req.companyId, period);
   }
 
+  @Post('depreciation/backfill')
+  @HttpCode(HttpStatus.OK)
+  backfillAll(@Req() req: any) {
+    return this.depreciationService.backfillAll(req.companyId);
+  }
+
+  @Post(':id/depreciation/backfill')
+  @HttpCode(HttpStatus.OK)
+  backfillAsset(@Req() req: any, @Param('id') id: string) {
+    return this.depreciationService.backfillAsset(req.companyId, id);
+  }
+
   @Post('depreciation/run')
   @HttpCode(HttpStatus.OK)
   runDepreciation(@Req() req: any, @Body('period') period: string) {

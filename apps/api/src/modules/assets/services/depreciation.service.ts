@@ -122,6 +122,37 @@ export class DepreciationService {
     return Number(Math.min(charge, allowedBalance).toFixed(2));
   }
 
+  async backfillAsset(companyId: string, assetId: string): Promise<number> {
+    const asset = await this.prisma.fixedAsset.findFirst({
+      where: { id: assetId, companyId, deletedAt: null },
+    });
+    if (!asset) throw new Error('Asset not found');
+    const start = new Date(asset.depreciationStart);
+    const now = new Date();
+    let processed = 0;
+    let cursor = new Date(Date.UTC(start.getFullYear(), start.getMonth(), 1));
+    while (cursor <= now) {
+      const periodStr = cursor.toISOString().slice(0, 7) + '-01';
+      const count = await this.processCompany(companyId, periodStr);
+      if (count > 0) processed++;
+      cursor = new Date(Date.UTC(cursor.getFullYear(), cursor.getMonth() + 1, 1));
+    }
+    return processed;
+  }
+
+  async backfillAll(companyId: string): Promise<{ assets: number; periods: number }> {
+    const assets = await this.prisma.fixedAsset.findMany({
+      where: { companyId, status: 'ACTIVE', nonDepreciable: false, deletedAt: null },
+      select: { id: true, depreciationStart: true },
+    });
+    let totalPeriods = 0;
+    for (const asset of assets) {
+      const periods = await this.backfillAsset(companyId, asset.id);
+      totalPeriods += periods;
+    }
+    return { assets: assets.length, periods: totalPeriods };
+  }
+
   async reprocessPeriod(companyId: string, period: string) {
     await this.prisma.assetDepreciationLog.deleteMany({
       where: { companyId, period: new Date(period) },
