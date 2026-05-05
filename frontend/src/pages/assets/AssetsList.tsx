@@ -1,11 +1,11 @@
 // ============================================================
-// LEDGR — frontend/src/pages/assets/AssetList.tsx
+// LEDGR — frontend/src/pages/assets/AssetsList.tsx
 // ============================================================
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     Building2, Wrench, Plus, Search, Filter, AlertTriangle, Upload,
-    TrendingDown, BarChart3, DollarSign, Package,
+    TrendingDown, BarChart3, DollarSign, Package, ChevronUp, ChevronDown, ChevronsUpDown,
 } from 'lucide-react';
 import { useAssetsList } from './hooks/useAssets';
 import {
@@ -15,9 +15,9 @@ import {
     AssetGroup
 } from './types/asset.types';
 import type { FixedAsset } from './types/asset.types';
-import { AssetFormModal }   from './modals/AssetFormModal';
+import { AssetFormModal } from './modals/AssetFormModal';
 import { AssetImportModal } from './modals/AssetImportModal';
-import { formatCurrency, formatDate } from '../../utils/formatters';
+import { formatCurrency } from '../../utils/formatters';
 
 const GRUPO_ICONS: Record<string, any> = {
     REAL_ESTATE: Building2,
@@ -29,6 +29,16 @@ const GRUPO_ICONS: Record<string, any> = {
     OTHER: Package,
 };
 
+type SortKey = 'internalCode' | 'description' | 'assetAccount' | 'city' | 'bookValue' | 'accumDeprec' | 'status';
+type SortDir = 'asc' | 'desc';
+
+function SortIcon({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey; sortDir: SortDir }) {
+    if (col !== sortKey) return <ChevronsUpDown className="w-3 h-3 opacity-40 inline ml-1" />;
+    return sortDir === 'asc'
+        ? <ChevronUp className="w-3 h-3 inline ml-1" />
+        : <ChevronDown className="w-3 h-3 inline ml-1" />;
+}
+
 export default function AssetsList() {
     const navigate = useNavigate();
     const { data, loading, error, fetch } = useAssetsList();
@@ -37,11 +47,13 @@ export default function AssetsList() {
     const [status, setStatus] = useState('');
     const [showForm, setShowForm] = useState(false);
     const [showImport, setShowImport] = useState(false);
+    const [sortKey, setSortKey] = useState<SortKey>('internalCode');
+    const [sortDir, setSortDir] = useState<SortDir>('asc');
 
-    useEffect(() => { fetch({ search, grupo, status }); }, []);
+    useEffect(() => { fetch({ search, grupo, status, limit: 1000 }); }, []);
 
     function handleFilter() {
-        fetch({ search: search || undefined, grupo: grupo || undefined, status: status || undefined });
+        fetch({ search: search || undefined, grupo: grupo || undefined, status: status || undefined, limit: 1000 });
     }
 
     function handleKeyDown(e: React.KeyboardEvent) {
@@ -50,18 +62,41 @@ export default function AssetsList() {
 
     function onCreated() {
         setShowForm(false);
-        fetch({ search, grupo, status });
+        fetch({ search, grupo, status, limit: 1000 });
     }
 
-    const pctDeprec = (a: FixedAsset) => {
-        if (!a.acquisitionCost) return 0;
-        return Math.round((a.accumulatedDeprec / a.acquisitionCost) * 100);
-    };
+    function handleSort(key: SortKey) {
+        if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+        else { setSortKey(key); setSortDir('asc'); }
+    }
+
+    const sorted = useMemo(() => {
+        const rows = [...(data?.data ?? [])];
+        rows.sort((a, b) => {
+            let va: any, vb: any;
+            switch (sortKey) {
+                case 'internalCode':  va = a.internalCode; vb = b.internalCode; break;
+                case 'description':   va = a.description;  vb = b.description;  break;
+                case 'assetAccount':  va = (a as any).assetAccount?.code ?? ''; vb = (b as any).assetAccount?.code ?? ''; break;
+                case 'city':          va = a.city ?? a.location ?? ''; vb = b.city ?? b.location ?? ''; break;
+                case 'bookValue':     va = Number(a.bookValue); vb = Number(b.bookValue); break;
+                case 'accumDeprec':   va = Number(a.accumulatedDeprec ?? 0); vb = Number(b.accumulatedDeprec ?? 0); break;
+                case 'status':        va = a.status; vb = b.status; break;
+                default:              va = ''; vb = '';
+            }
+            if (va < vb) return sortDir === 'asc' ? -1 : 1;
+            if (va > vb) return sortDir === 'asc' ? 1 : -1;
+            return 0;
+        });
+        return rows;
+    }, [data?.data, sortKey, sortDir]);
+
+    const thCls = "px-3 py-3 font-medium cursor-pointer select-none hover:bg-[#16325a] whitespace-nowrap";
 
     return (
-        <div className="p-6 space-y-6">
-            {/* ── Header ──────────────────────────────────────────── */}
-            <div className="flex items-center justify-between">
+        <div className="p-6 space-y-4">
+            {/* Header */}
+            <div className="flex items-center justify-between gap-3 flex-wrap">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
                         <Building2 className="w-7 h-7 text-blue-700" />
@@ -69,129 +104,133 @@ export default function AssetsList() {
                     </h1>
                     <p className="text-sm text-gray-500 mt-1">Controle patrimonial completo — imóveis, máquinas, veículos e mais</p>
                 </div>
-                <button
-                    onClick={() => setShowImport(true)}
-                    className="flex items-center gap-2 border border-orange-300 text-orange-600 px-4 py-2 rounded-lg hover:bg-orange-50 transition-colors text-sm font-medium"
-                >
-                    <Upload className="w-4 h-4" />
-                    Importar
-                </button>
-                <button
-                    onClick={() => setShowForm(true)}
-                    className="flex items-center gap-2 bg-blue-700 text-white px-4 py-2 rounded-lg hover:bg-blue-800 transition-colors text-sm font-medium"
-                >
-                    <Plus className="w-4 h-4" />
-                    Novo Ativo
-                </button>
+                <div className="flex gap-2">
+                    <button onClick={() => setShowImport(true)}
+                        className="flex items-center gap-2 border border-orange-300 text-orange-600 px-4 py-2 rounded-lg hover:bg-orange-50 transition-colors text-sm font-medium">
+                        <Upload className="w-4 h-4" /> Importar
+                    </button>
+                    <button onClick={() => setShowForm(true)}
+                        className="flex items-center gap-2 bg-blue-700 text-white px-4 py-2 rounded-lg hover:bg-blue-800 transition-colors text-sm font-medium">
+                        <Plus className="w-4 h-4" /> Novo Ativo
+                    </button>
+                </div>
             </div>
 
-            {/* ── KPIs ────────────────────────────────────────────── */}
+            {/* KPIs */}
             {data?.kpis && (
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                    <KpiCard
-                        icon={<Package className="w-5 h-5 text-blue-600" />}
-                        label="Total de Ativos"
-                        value={data.kpis.totalAssets.toString()}
-                        bg="bg-blue-50"
-                    />
-                    <KpiCard
-                        icon={<DollarSign className="w-5 h-5 text-green-600" />}
-                        label="Valor Bruto Total"
-                        value={formatCurrency(data.kpis.totalAcquisitionCost)}
-                        bg="bg-green-50"
-                    />
-                    <KpiCard
-                        icon={<BarChart3 className="w-5 h-5 text-indigo-600" />}
-                        label="Valor Contábil"
-                        value={formatCurrency(data.kpis.totalBookValue)}
-                        bg="bg-indigo-50"
-                    />
-                    <KpiCard
-                        icon={<TrendingDown className="w-5 h-5 text-orange-600" />}
-                        label="Depreciação Acum."
-                        value={formatCurrency(data.kpis.totalAccumDeprec)}
-                        bg="bg-orange-50"
-                    />
+                    <KpiCard icon={<Package className="w-5 h-5 text-blue-600" />}
+                        label="Total de Ativos" value={data.kpis.totalAssets.toString()} bg="bg-blue-50" />
+                    <KpiCard icon={<DollarSign className="w-5 h-5 text-green-600" />}
+                        label="Valor Bruto Total" value={formatCurrency(data.kpis.totalAcquisitionCost)} bg="bg-green-50" />
+                    <KpiCard icon={<BarChart3 className="w-5 h-5 text-indigo-600" />}
+                        label="Valor Contábil" value={formatCurrency(data.kpis.totalBookValue)} bg="bg-indigo-50" />
+                    <KpiCard icon={<TrendingDown className="w-5 h-5 text-orange-600" />}
+                        label="Depreciação Acum." value={formatCurrency(data.kpis.totalAccumDeprec)} bg="bg-orange-50" />
                 </div>
             )}
 
-            {/* ── Filtros ──────────────────────────────────────────── */}
+            {/* Filtros */}
             <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-wrap gap-3 items-end">
                 <div className="flex-1 min-w-48">
                     <label className="block text-xs font-medium text-gray-600 mb-1">Buscar</label>
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                        <input
-                            className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        <input className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                             placeholder="Código, descrição, marca..."
-                            value={search}
-                            onChange={e => setSearch(e.target.value)}
-                            onKeyDown={handleKeyDown}
-                        />
+                            value={search} onChange={e => setSearch(e.target.value)} onKeyDown={handleKeyDown} />
                     </div>
                 </div>
                 <div className="min-w-40">
                     <label className="block text-xs font-medium text-gray-600 mb-1">Grupo</label>
-                    <select
-                        className="w-full border border-gray-300 rounded-lg text-sm py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        value={grupo}
-                        onChange={e => setGrupo(e.target.value as AssetGroup)}
-                    >
+                    <select className="w-full border border-gray-300 rounded-lg text-sm py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        value={grupo} onChange={e => setGrupo(e.target.value as AssetGroup)}>
                         <option value="">Todos</option>
-                        {Object.entries(ASSET_GROUP_LABELS).map(([k, v]) => (
-                            <option key={k} value={k}>{v}</option>
-                        ))}
+                        {Object.entries(ASSET_GROUP_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                     </select>
                 </div>
                 <div className="min-w-36">
                     <label className="block text-xs font-medium text-gray-600 mb-1">Status</label>
-                    <select
-                        className="w-full border border-gray-300 rounded-lg text-sm py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        value={status}
-                        onChange={e => setStatus(e.target.value)}
-                    >
+                    <select className="w-full border border-gray-300 rounded-lg text-sm py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        value={status} onChange={e => setStatus(e.target.value)}>
                         <option value="">Todos</option>
-                        {Object.entries(ASSET_STATUS_LABELS).map(([k, v]) => (
-                            <option key={k} value={k}>{v}</option>
-                        ))}
+                        {Object.entries(ASSET_STATUS_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                     </select>
                 </div>
-                <button
-                    onClick={handleFilter}
-                    className="flex items-center gap-2 bg-gray-800 text-white px-4 py-2 rounded-lg hover:bg-gray-700 text-sm"
-                >
-                    <Filter className="w-4 h-4" />
-                    Filtrar
+                <button onClick={handleFilter}
+                    className="flex items-center gap-2 bg-gray-800 text-white px-4 py-2 rounded-lg hover:bg-gray-700 text-sm">
+                    <Filter className="w-4 h-4" /> Filtrar
                 </button>
             </div>
 
-            {/* ── Tabela ──────────────────────────────────────────── */}
             {error && (
                 <div className="flex items-center gap-2 bg-red-50 text-red-700 px-4 py-3 rounded-lg text-sm">
                     <AlertTriangle className="w-4 h-4" /> {error}
                 </div>
             )}
 
-            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-                <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                        <thead className="bg-[#1A3A5C] text-white">
-                            <tr>
-                                <th className="text-left px-4 py-3 font-medium">Código</th>
-                                <th className="text-left px-4 py-3 font-medium">Descrição</th>
-                                <th className="text-left px-4 py-3 font-medium">Grupo</th>
-                                <th className="text-left px-4 py-3 font-medium">Localização</th>
-                                <th className="text-right px-4 py-3 font-medium">Valor Contábil</th>
-                                <th className="text-center px-4 py-3 font-medium">% Deprec.</th>
-                                <th className="text-center px-4 py-3 font-medium">Status</th>
-                                <th className="text-center px-4 py-3 font-medium">OS</th>
-                            </tr>
-                        </thead>
+            {/* Tabela com scroll */}
+            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden flex flex-col"
+                style={{ maxHeight: 'calc(100vh - 340px)' }}>
+
+                {/* Header fixo */}
+                <table className="w-full text-sm table-fixed flex-shrink-0">
+                    <colgroup>
+                        <col style={{ width: '130px' }} />
+                        <col style={{ width: '160px' }} />
+                        <col />
+                        <col style={{ width: '120px' }} />
+                        <col style={{ width: '140px' }} />
+                        <col style={{ width: '140px' }} />
+                        <col style={{ width: '140px' }} />
+                        <col style={{ width: '48px' }} />
+                    </colgroup>
+                    <thead className="bg-[#1A3A5C] text-white">
+                        <tr>
+                            <th className={`${thCls} text-left`} onClick={() => handleSort('internalCode')}>
+                                Código <SortIcon col="internalCode" sortKey={sortKey} sortDir={sortDir} />
+                            </th>
+                            <th className={`${thCls} text-left`} onClick={() => handleSort('assetAccount')}>
+                                Conta <SortIcon col="assetAccount" sortKey={sortKey} sortDir={sortDir} />
+                            </th>
+                            <th className={`${thCls} text-left`} onClick={() => handleSort('description')}>
+                                Descrição <SortIcon col="description" sortKey={sortKey} sortDir={sortDir} />
+                            </th>
+                            <th className={`${thCls} text-left`} onClick={() => handleSort('city')}>
+                                Localização <SortIcon col="city" sortKey={sortKey} sortDir={sortDir} />
+                            </th>
+                            <th className={`${thCls} text-right`} onClick={() => handleSort('bookValue')}>
+                                Valor Contábil <SortIcon col="bookValue" sortKey={sortKey} sortDir={sortDir} />
+                            </th>
+                            <th className={`${thCls} text-right`} onClick={() => handleSort('accumDeprec')}>
+                                Deprec. Acum. <SortIcon col="accumDeprec" sortKey={sortKey} sortDir={sortDir} />
+                            </th>
+                            <th className={`${thCls} text-center`} onClick={() => handleSort('status')}>
+                                Status <SortIcon col="status" sortKey={sortKey} sortDir={sortDir} />
+                            </th>
+                            <th className="px-3 py-3 text-center font-medium">OS</th>
+                        </tr>
+                    </thead>
+                </table>
+
+                {/* Corpo scrollável */}
+                <div className="overflow-auto flex-1">
+                    <table className="w-full text-sm table-fixed">
+                        <colgroup>
+                            <col style={{ width: '130px' }} />
+                            <col style={{ width: '160px' }} />
+                            <col />
+                            <col style={{ width: '120px' }} />
+                            <col style={{ width: '140px' }} />
+                            <col style={{ width: '140px' }} />
+                            <col style={{ width: '140px' }} />
+                            <col style={{ width: '48px' }} />
+                        </colgroup>
                         <tbody className="divide-y divide-gray-100">
                             {loading && (
                                 <tr><td colSpan={8} className="py-12 text-center text-gray-400">Carregando...</td></tr>
                             )}
-                            {!loading && !data?.data?.length && (
+                            {!loading && !sorted.length && (
                                 <tr>
                                     <td colSpan={8} className="py-12 text-center">
                                         <Building2 className="w-10 h-10 text-gray-200 mx-auto mb-2" />
@@ -202,55 +241,50 @@ export default function AssetsList() {
                                     </td>
                                 </tr>
                             )}
-                            {data?.data?.map(ativo => {
+                            {sorted.map(ativo => {
                                 const Icon = GRUPO_ICONS[ativo.group] ?? Package;
-                                const pct = pctDeprec(ativo);
-                                const osAbertas = ativo.maintenances?.filter(m => m.status !== 'COMPLETED' && m.status !== 'CANCELLED').length ?? 0;
+                                const deprec = Number(ativo.accumulatedDeprec ?? 0);
+                                const osAbertas = ativo.maintenances?.filter((m: any) => m.status !== 'COMPLETED' && m.status !== 'CANCELLED').length ?? 0;
                                 return (
-                                    <tr
-                                        key={ativo.id}
+                                    <tr key={ativo.id}
                                         className="hover:bg-blue-50 cursor-pointer transition-colors"
-                                        onClick={() => navigate(`/app/assets/${ativo.id}`)}
-                                    >
-                                        <td className="px-4 py-3">
-                                            <div className="flex items-center gap-2">
-                                                <Icon className="w-4 h-4 text-blue-500 shrink-0" />
-                                                <span className="font-mono font-medium text-gray-800">{ativo.internalCode}</span>
+                                        onClick={() => navigate(`/app/assets/${ativo.id}`)}>
+                                        <td className="px-3 py-2.5">
+                                            <div className="flex items-center gap-1.5">
+                                                <Icon className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                                                <span className="font-mono font-medium text-gray-800 text-xs truncate">{ativo.internalCode}</span>
                                             </div>
                                         </td>
-                                        <td className="px-4 py-3">
-                                            <div className="font-medium text-gray-900">{ativo.description}</div>
-                                            {ativo.brand && <div className="text-xs text-gray-400">{ativo.brand}{ativo.model ? ` · ${ativo.model}` : ''}</div>}
+                                        <td className="px-3 py-2.5">
+                                            {(ativo as any).assetAccount ? (
+                                                <div>
+                                                    <span className="font-mono text-xs text-blue-700">{(ativo as any).assetAccount.code}</span>
+                                                    <div className="text-[10px] text-gray-400 truncate">{(ativo as any).assetAccount.name}</div>
+                                                </div>
+                                            ) : <span className="text-gray-300 text-xs">—</span>}
                                         </td>
-                                        <td className="px-4 py-3 text-gray-600">{ASSET_GROUP_LABELS[ativo.group]}</td>
-                                        <td className="px-4 py-3 text-gray-600">{ativo.location ?? '—'}</td>
-                                        <td className="px-4 py-3 text-right font-medium text-gray-900">
+                                        <td className="px-3 py-2.5">
+                                            <div className="font-medium text-gray-900 text-xs truncate">{ativo.description}</div>
+                                            {ativo.brand && <div className="text-[10px] text-gray-400">{ativo.brand}{ativo.model ? ` · ${ativo.model}` : ''}</div>}
+                                        </td>
+                                        <td className="px-3 py-2.5 text-xs text-gray-600 truncate">{ativo.city ?? ativo.location ?? '—'}</td>
+                                        <td className="px-3 py-2.5 text-right font-mono text-xs font-medium text-gray-900">
                                             {formatCurrency(ativo.bookValue)}
                                         </td>
-                                        <td className="px-4 py-3">
-                                            <div className="flex flex-col items-center gap-1">
-                                                <span className="text-xs font-medium text-gray-700">{pct}%</span>
-                                                <div className="w-16 h-1.5 bg-gray-200 rounded-full">
-                                                    <div
-                                                        className={`h-1.5 rounded-full ${pct >= 80 ? 'bg-red-500' : pct >= 50 ? 'bg-orange-400' : 'bg-green-500'}`}
-                                                        style={{ width: `${pct}%` }}
-                                                    />
-                                                </div>
-                                            </div>
+                                        <td className="px-3 py-2.5 text-right font-mono text-xs text-orange-600">
+                                            {deprec > 0 ? formatCurrency(deprec) : <span className="text-gray-300">—</span>}
                                         </td>
-                                        <td className="px-4 py-3 text-center">
+                                        <td className="px-3 py-2.5 text-center">
                                             <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${ASSET_STATUS_COLORS[ativo.status]}`}>
                                                 {ASSET_STATUS_LABELS[ativo.status]}
                                             </span>
                                         </td>
-                                        <td className="px-4 py-3 text-center">
+                                        <td className="px-3 py-2.5 text-center">
                                             {osAbertas > 0 ? (
                                                 <span className="flex items-center justify-center gap-1 text-orange-600 text-xs font-medium">
                                                     <Wrench className="w-3 h-3" /> {osAbertas}
                                                 </span>
-                                            ) : (
-                                                <span className="text-gray-300 text-xs">—</span>
-                                            )}
+                                            ) : <span className="text-gray-300 text-xs">—</span>}
                                         </td>
                                     </tr>
                                 );
@@ -259,39 +293,35 @@ export default function AssetsList() {
                     </table>
                 </div>
 
-                {/* Paginação */}
-                {data?.meta && data.meta.totalPages > 1 && (
-                    <div className="border-t border-gray-100 px-4 py-3 flex items-center justify-between text-sm text-gray-500">
-                        <span>{data.meta.total} ativos encontrados</span>
-                        <div className="flex gap-1">
-                            {Array.from({ length: data.meta.totalPages }, (_, i) => i + 1).map(p => (
-                                <button
-                                    key={p}
-                                    onClick={() => fetch({ search, grupo, status, page: p })}
-                                    className={`px-3 py-1 rounded ${p === data.meta.page ? 'bg-blue-700 text-white' : 'hover:bg-gray-100'}`}
-                                >
-                                    {p}
-                                </button>
-                            ))}
+                {/* Rodapé */}
+                {sorted.length > 0 && (
+                    <div className="border-t border-gray-200 px-4 py-2 bg-gray-50 flex items-center justify-between text-xs text-gray-500 flex-shrink-0">
+                        <span><strong className="text-gray-700">{sorted.length}</strong> ativos encontrados</span>
+                        <div className="flex gap-6">
+                            <span>Deprec. acum.: <strong className="text-orange-600 font-mono">
+                                {formatCurrency(sorted.reduce((s, a) => s + Number(a.accumulatedDeprec ?? 0), 0))}
+                            </strong></span>
+                            <span>Valor contábil: <strong className="text-gray-700 font-mono">
+                                {formatCurrency(sorted.reduce((s, a) => s + Number(a.bookValue), 0))}
+                            </strong></span>
                         </div>
                     </div>
                 )}
             </div>
+
             {showForm && (
                 <AssetFormModal onClose={() => setShowForm(false)} onSuccess={onCreated} />
             )}
             {showImport && (
                 <AssetImportModal
                     onClose={() => setShowImport(false)}
-                    onSuccess={() => { setShowImport(false); fetch(); }}
+                    onSuccess={() => { setShowImport(false); fetch({ limit: 1000 }); }}
                 />
             )}
-
         </div>
     );
 }
 
-// ── Componente auxiliar ────────────────────────────────────────
 function KpiCard({ icon, label, value, bg }: { icon: any; label: string; value: string; bg: string }) {
     return (
         <div className={`${bg} rounded-xl p-4 flex items-center gap-3`}>

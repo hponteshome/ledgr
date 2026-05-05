@@ -49,20 +49,25 @@ const VALID_METHODS = [
 ];
 
 function parseDate(s: string): string | null {
-    // Aceita dd/mm/yyyy ou yyyy-mm-dd
     if (!s) return null;
     if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
     const m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
     if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+    const serial = parseInt(s, 10);
+    if (!isNaN(serial) && serial > 40000 && serial < 60000) {
+        const d = new Date(Date.UTC(1899, 11, 30) + serial * 86400000);
+        const dd = String(d.getUTCDate()).padStart(2, String.fromCharCode(39) + String.fromCharCode(48) + String.fromCharCode(39));
+        const mm = String(d.getUTCMonth() + 1).padStart(2, String.fromCharCode(39) + String.fromCharCode(48) + String.fromCharCode(39));
+        const yyyy = d.getUTCFullYear();
+        return `${yyyy}-${mm}-${dd}`;
+    }
     return null;
 }
-
 function parseDecimal(s: string): number | undefined {
     if (!s || s.trim() === '') return undefined;
     const n = parseFloat(s.trim().replace(/\./g, '').replace(',', '.'));
     return isNaN(n) ? undefined : n;
 }
-
 @Injectable()
 export class AssetImportService {
     constructor(
@@ -219,7 +224,7 @@ export class AssetImportService {
                     status: 'PENDING_ACTIVATION',
                     landValuePercent: row.landValuePercent ?? null,
                     landValueAmount: landValueAmount ?? null,
-                    landFraction: row.landFraction ?? null,
+          // landFraction e auxiliar — nao persiste no banco
                     registryNumber: row.registryNumber ?? null,
                     registryOffice: row.registryOffice ?? null,
                     city: row.city ?? null,
