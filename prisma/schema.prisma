@@ -745,6 +745,9 @@ model ChartOfAccounts {
   journalItems JournalEntryItem[]
   rules        AccountingRule[]
   balances     AccountBalance[]
+  fixedAssetsAsset    FixedAsset[] @relation("AssetAccount")
+  fixedAssetsDeprec   FixedAsset[] @relation("DepreciationAcc")
+  fixedAssetsAccum    FixedAsset[] @relation("AccumDeprecAcc")
 
   @@unique([companyId, code])
   @@index([companyId, type])
@@ -1014,7 +1017,7 @@ model FixedAsset {
   companyId String @map("company_id") @db.Uuid
 
   internalCode  String      @map("internal_code") @db.VarChar(30)
-  description   String      @map("description") @db.VarChar(255)
+  description   String      @map("description") @db.Text
   group         AssetGroup  @map("group")
   subgroup      String?     @map("subgroup") @db.VarChar(100)
   brand         String?     @map("brand") @db.VarChar(100)
@@ -1060,6 +1063,9 @@ model FixedAsset {
   // ── Vínculos contábeis ────────────────────────────────────
   assetAccountId    String? @map("asset_account_id") @db.Uuid
   depreciationAccId String? @map("depreciation_acc_id") @db.Uuid
+  assetAccount      ChartOfAccounts? @relation("AssetAccount",      fields: [assetAccountId],    references: [id])
+  depreciationAcc   ChartOfAccounts? @relation("DepreciationAcc",   fields: [depreciationAccId], references: [id])
+  accumDeprecAcc    ChartOfAccounts? @relation("AccumDeprecAcc",     fields: [accumDeprecAccId],  references: [id])
   accumDeprecAccId  String? @map("accum_deprec_acc_id") @db.Uuid
   writeOffAccountId String? @map("write_off_account_id") @db.Uuid
 

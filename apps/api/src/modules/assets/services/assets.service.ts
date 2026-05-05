@@ -18,8 +18,8 @@ export class AssetsService {
   // ── List ─────────────────────────────────────────────────
   async findAll(companyId: string, filters: FilterAssetDto) {
     const { group, status, location, search, page = 1, limit = 20 } = filters;
-    const skip = (page - 1) * limit;
-
+    const take = Math.min(Number(limit), 1000);
+    const skip = (page - 1) * take;
     const where: any = {
       companyId,
       deletedAt: null,
@@ -40,7 +40,7 @@ export class AssetsService {
       this.prisma.fixedAsset.findMany({
         where,
         skip,
-        take: limit,
+        take,
         orderBy: { internalCode: 'asc' },
         include: {
           maintenances: {
@@ -48,6 +48,7 @@ export class AssetsService {
             select: { id: true, status: true, scheduledDate: true },
           },
           _count: { select: { improvements: true, retrofitProjects: true } },
+          assetAccount: { select: { id: true, code: true, name: true } },
         },
       }),
       this.prisma.fixedAsset.count({ where }),
@@ -61,7 +62,7 @@ export class AssetsService {
 
     return {
       data,
-      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+      meta: { total, page, limit: take, totalPages: Math.ceil(total / take) },
       kpis: {
         totalAssets:          kpis._count.id,
         totalAcquisitionCost: Number(kpis._sum.acquisitionCost ?? 0),
