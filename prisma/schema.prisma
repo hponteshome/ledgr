@@ -1044,6 +1044,8 @@ model FixedAsset {
   propertyId       String?          @map("property_id") @db.Uuid
   iptuRegistration String?          @map("iptu_registration") @db.VarChar(50)
   registryNumber   String?          @map("registry_number") @db.VarChar(60)
+  registryOffice   String?          @map("registry_office") @db.VarChar(120)
+  realEstateNotes  String?          @map("real_estate_notes") @db.Text
   totalArea        Decimal?         @map("total_area") @db.Decimal(10, 2)
   builtArea        Decimal?         @map("built_area") @db.Decimal(10, 2)
   assessedValue    Decimal?         @map("assessed_value") @db.Decimal(15, 2)

@@ -11,7 +11,8 @@ import { MaintenanceService }  from '../services/maintenance.service';
 import { ImprovementService }  from '../services/improvement.service';
 import { RetrofitService }     from '../services/retrofit.service';
 import { AppraisalService }    from '../services/appraisal.service';
-import { AssetHistoryService } from '../services/history.service';
+import { AssetHistoryService }  from '../services/history.service';
+import { AssetImportService }   from '../services/asset-import.service';
 import {
   CreateAssetDto,
   UpdateAssetDto,
@@ -37,6 +38,7 @@ export class AssetsController {
     private readonly retrofitService:     RetrofitService,
     private readonly appraisalService:    AppraisalService,
     private readonly historyService:      AssetHistoryService,
+    private readonly importService:       AssetImportService,
   ) {}
 
   // ── Fixed Assets ─────────────────────────────────────────
@@ -194,6 +196,20 @@ export class AssetsController {
   @Get(':assetId/appraisals')
   findAppraisalsByAsset(@Req() req: any, @Param('assetId') assetId: string) {
     return this.appraisalService.findAll(req.companyId, assetId);
+  }
+
+  @Post('import/preview')
+  @HttpCode(HttpStatus.OK)
+  previewImport(@Req() req: any, @Body('content') content: string) {
+    return this.importService.parseFile(content);
+  }
+
+  @Post('import')
+  @HttpCode(HttpStatus.OK)
+  async bulkImport(@Req() req: any, @Body() body: { content: string; duplicateAction: 'overwrite' | 'ignore' }) {
+    const preview = this.importService.parseFile(body.content);
+    const duplicates = await this.importService.checkDuplicates(req.companyId, preview.rows);
+    return this.importService.importRows(req.companyId, preview.rows, duplicates, body.duplicateAction, req.user?.id);
   }
 
   @Get(':assetId/history')

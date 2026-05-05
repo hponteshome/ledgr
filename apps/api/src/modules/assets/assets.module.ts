@@ -10,6 +10,7 @@ import { ImprovementService }  from './services/improvement.service';
 import { RetrofitService }     from './services/retrofit.service';
 import { AppraisalService }    from './services/appraisal.service';
 import { AssetHistoryService } from './services/history.service';
+import { AssetImportService }  from './services/asset-import.service';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { AssetHistoryService } from './services/history.service';
     RetrofitService,
     AppraisalService,
     AssetHistoryService,
+    AssetImportService,
   ],
   exports: [AssetsService, DepreciationService],
 })

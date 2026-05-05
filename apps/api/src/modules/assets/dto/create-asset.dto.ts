@@ -180,6 +180,13 @@ export class CreateAssetDto {
   registryNumber?: string;
 
   @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  registryOffice?: string;
+  @IsOptional()
+  @IsString()
+  realEstateNotes?: string;
+  @IsOptional()
   @IsNumber()
   @Min(0)
   @Type(() => Number)

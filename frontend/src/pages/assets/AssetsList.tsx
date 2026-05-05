@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-    Building2, Wrench, Plus, Search, Filter, AlertTriangle,
+    Building2, Wrench, Plus, Search, Filter, AlertTriangle, Upload,
     TrendingDown, BarChart3, DollarSign, Package,
 } from 'lucide-react';
 import { useAssetsList } from './hooks/useAssets';
@@ -15,7 +15,8 @@ import {
     AssetGroup
 } from './types/asset.types';
 import type { FixedAsset } from './types/asset.types';
-import { AssetFormModal } from './modals/AssetFormModal';
+import { AssetFormModal }   from './modals/AssetFormModal';
+import { AssetImportModal } from './modals/AssetImportModal';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 
 const GRUPO_ICONS: Record<string, any> = {
@@ -35,6 +36,7 @@ export default function AssetsList() {
     const [grupo, setGrupo] = useState<AssetGroup | ''>('');
     const [status, setStatus] = useState('');
     const [showForm, setShowForm] = useState(false);
+    const [showImport, setShowImport] = useState(false);
 
     useEffect(() => { fetch({ search, grupo, status }); }, []);
 
@@ -67,6 +69,13 @@ export default function AssetsList() {
                     </h1>
                     <p className="text-sm text-gray-500 mt-1">Controle patrimonial completo — imóveis, máquinas, veículos e mais</p>
                 </div>
+                <button
+                    onClick={() => setShowImport(true)}
+                    className="flex items-center gap-2 border border-orange-300 text-orange-600 px-4 py-2 rounded-lg hover:bg-orange-50 transition-colors text-sm font-medium"
+                >
+                    <Upload className="w-4 h-4" />
+                    Importar
+                </button>
                 <button
                     onClick={() => setShowForm(true)}
                     className="flex items-center gap-2 bg-blue-700 text-white px-4 py-2 rounded-lg hover:bg-blue-800 transition-colors text-sm font-medium"
@@ -271,6 +280,12 @@ export default function AssetsList() {
 
             {showForm && (
                 <AssetFormModal onClose={() => setShowForm(false)} onSuccess={onCreated} />
+            {showImport && (
+                <AssetImportModal
+                    onClose={() => setShowImport(false)}
+                    onSuccess={() => { setShowImport(false); fetch(); }}
+                />
+            )}
             )}
         </div>
     );
