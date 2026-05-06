@@ -10,7 +10,7 @@ import { formatCurrency } from '../../../utils/formatters';
 export function DepreciationTab({ asset }: { asset: FixedAsset }) {
     const { getDepreciationProjection } = useAssetMutations();
     const [data, setData] = useState<any>(null);
-
+    const [projectionMonths, setProjectionMonths] = useState(60);
     useEffect(() => {
         getDepreciationProjection(asset.id).then(setData);
     }, [asset.id]);
@@ -23,15 +23,17 @@ export function DepreciationTab({ asset }: { asset: FixedAsset }) {
     const projection = data?.projection ?? [];
 
     console.log('PERIOD SAMPLE', history[0]?.period, typeof history[0]?.period);
-    const chartData = [
-        ...history.map(d => ({
-                month: (() => { const dt = new Date(d.period); return dt.toLocaleString('pt-BR', { month: 'short', year: 'numeric' }).replace('. ', '/'); })(),
+        const fmtMonth = (iso: string) => { const d = new Date(iso.length === 7 ? iso + '-01' : iso); return d.toLocaleString('pt-BR', { month: 'short', year: 'numeric' }).replace('. ', '/'); };
+        const acquisitionPoint = { month: fmtMonth(asset.depreciationStart), bookValue: Number(asset.acquisitionCost), accumDeprec: 0, type: 'real' };
+        const chartData = [acquisitionPoint,
+            ...[...history].reverse().map(d => ({
+                month: fmtMonth(d.period),
             bookValue: Number(d.bookValueAfter),
             accumDeprec: Number(d.accumDeprecAfter),
             type: 'real',
         })),
-        ...projection.map((d: any) => ({
-                month: (() => { const raw = d.period ?? d.month; const dt2 = new Date(raw); return dt2.toLocaleString('pt-BR', { month: 'short', year: 'numeric' }).replace('. ', '/'); })(),
+            ...projection.slice(0, projectionMonths).map((d: any) => ({
+                month: fmtMonth(d.period ?? d.month ?? ''),
             bookValueProjected: d.bookValue ?? d.balance,
             accumDeprecProjected: d.accumDeprec ?? d.accumulatedDepreciation,
             type: 'projection',
@@ -64,19 +66,29 @@ export function DepreciationTab({ asset }: { asset: FixedAsset }) {
             {/* Gráfico */}
             {chartData.length > 0 && (
                 <div className="bg-white border border-gray-200 rounded-xl p-5">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-4">Curva de Depreciação</h3>
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-sm font-semibold text-gray-700">Curva de Depreciação</h3>
+                            <div className="flex items-center gap-2">
+                                <label className="text-xs text-gray-500">Projeção:</label>
+                                <input type="number" min={12} max={600} step={12} value={projectionMonths}
+                                    onChange={e => setProjectionMonths(Number(e.target.value))}
+                                    className="border border-gray-200 rounded-lg px-2 py-1 text-xs w-20 text-center" />
+                                <span className="text-xs text-gray-400">meses</span>
+                            </div>
+                        </div>
                     <ResponsiveContainer width="100%" height={260}>
                         <LineChart data={chartData}>
                             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                            <XAxis dataKey="month" tick={{ fontSize: 11 }} tickLine={false} />
+                            <XAxis dataKey="month" tick={{ fontSize: 11 }} tickLine={false} interval={0} ticks={chartData.filter(d => d.month?.startsWith('dez')).map(d => d.month)} />
                             <YAxis tick={{ fontSize: 11 }} tickFormatter={v => `${(v / 1000).toFixed(0)}k`} />
                             <Tooltip formatter={(v: any) => formatCurrency(v)} />
                             <Legend />
                             <ReferenceLine y={Number(asset.residualValue)} stroke="#999" strokeDasharray="4 4" label={{ value: 'Residual', fontSize: 10 }} />
                             <Line type="monotone" dataKey="bookValue" stroke="#1d4ed8" strokeWidth={2} dot={false} name="Valor Contábil (real)" />
                             <Line type="monotone" dataKey="bookValueProjected" stroke="#1d4ed8" strokeWidth={2} dot={false} strokeDasharray="5 5" name="Valor Contábil (projeção)" />
-                            <Line type="monotone" dataKey="accumDeprec" stroke="#f97316" strokeWidth={2} dot={false} name="Deprec. Acum. (real)" />
-                        </LineChart>
+                                <Line type="monotone" dataKey="accumDeprec" stroke="#f97316" strokeWidth={2} dot={false} name="Deprec. Acum. (real)" />
+                                <Line type="monotone" dataKey="accumDeprecProjected" stroke="#f97316" strokeWidth={2} dot={false} strokeDasharray="5 5" name="Deprec. Acum. (projeção)" />
+                            </LineChart>
                     </ResponsiveContainer>
                 </div>
             )}
