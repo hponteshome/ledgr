@@ -298,4 +298,70 @@ export class AssetsService {
 
     return { projection, asset };
   }
+
+  async getDepreciationReport(
+    companyId: string,
+    yearFrom?: number,
+    yearTo?: number,
+  ): Promise<any[]> {
+    const now = new Date();
+    const yFrom = yearFrom ?? now.getFullYear() - 4;
+    const yTo   = yearTo   ?? now.getFullYear();
+
+    const assets = await this.prisma.fixedAsset.findMany({
+      where: { companyId, deletedAt: null },
+      include: { assetAccount: { select: { code: true, name: true } } },
+      orderBy: [{ group: 'asc' }, { internalCode: 'asc' }],
+    });
+
+    if (assets.length === 0) return [];
+
+    const rows: Array<{ asset_id: string; year: number; total: string }> =
+      await this.prisma.$queryRawUnsafe(
+        `SELECT asset_id,
+               DATE_PART('year', period)::int AS year,
+               SUM(monthly_charge)::numeric(18,2) AS total
+          FROM asset_depreciation_logs
+         WHERE asset_id = ANY($1::uuid[])
+           AND DATE_PART('year', period) BETWEEN $2 AND $3
+         GROUP BY asset_id, DATE_PART('year', period)
+         ORDER BY asset_id, year`,
+        assets.map(a => a.id), yFrom, yTo,
+      );
+
+    const map = new Map<string, Record<number, number>>();
+    for (const r of rows) {
+      if (!map.has(r.asset_id)) map.set(r.asset_id, {});
+      map.get(r.asset_id)![r.year] = parseFloat(r.total);
+    }
+
+    const years: number[] = [];
+    for (let y = yFrom; y <= yTo; y++) years.push(y);
+
+    return assets.map(a => {
+      const byYear = map.get(a.id) ?? {};
+      const yearTotals: Record<string, number> = {};
+      let totalDeprec = 0;
+      for (const y of years) {
+        yearTotals[y] = byYear[y] ?? 0;
+        totalDeprec += yearTotals[y];
+      }
+      return {
+        id:                a.id,
+        internalCode:      a.internalCode,
+        description:       a.description,
+        group:             a.group,
+        accountCode:       a.assetAccount?.code ?? '—',
+        accountName:       a.assetAccount?.name ?? '—',
+        depreciationStart: a.depreciationStart,
+        nonDepreciable:    a.nonDepreciable,
+        acquisitionCost:   Number(a.acquisitionCost),
+        accumulatedDeprec: Number(a.accumulatedDeprec),
+        bookValue:         Number(a.bookValue),
+        years,
+        yearTotals,
+        totalDeprec,
+      };
+    });
+  }
 }

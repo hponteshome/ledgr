@@ -4,7 +4,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-    Building2, Wrench, Plus, Search, Filter, AlertTriangle, Upload,
+    Building2, Wrench, Plus, Search, Filter, AlertTriangle, Upload, FileSpreadsheet, TableProperties,
     TrendingDown, BarChart3, DollarSign, Package, ChevronUp, ChevronDown, ChevronsUpDown,
     CheckSquare, Square, Zap, Power, PowerOff, Trash2, RefreshCw, X,
 } from 'lucide-react';
@@ -44,6 +44,7 @@ export default function AssetsList() {
     const { token } = useAuth();
     const { activeCompany } = useCompany();
 
+        const [viewMode, setViewMode] = useState<'lista' | 'relatorio'>('lista');
     const [search, setSearch] = useState('');
     const [grupo, setGrupo] = useState<AssetGroup | ''>('');
     const [status, setStatus] = useState('');
@@ -185,6 +186,19 @@ export default function AssetsList() {
                 </div>
             </div>
 
+                {/* Toggle Lista / Relatório */}
+                <div className="flex gap-1 border border-gray-200 rounded-lg p-1 w-fit bg-gray-50">
+                    <button onClick={() => setViewMode('lista')}
+                        className={['flex items-center gap-1.5 px-4 py-1.5 rounded-md text-sm font-medium transition-all', viewMode === 'lista' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'].join(' ')}>
+                        <TableProperties className="w-4 h-4" /> Lista de Ativos
+                    </button>
+                    <button onClick={() => setViewMode('relatorio')}
+                        className={['flex items-center gap-1.5 px-4 py-1.5 rounded-md text-sm font-medium transition-all', viewMode === 'relatorio' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'].join(' ')}>
+                        <FileSpreadsheet className="w-4 h-4" /> Relatório Anual
+                    </button>
+                </div>
+
+                {viewMode === 'lista' && (<>
             {/* KPIs */}
             {data?.kpis && (
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -435,6 +449,143 @@ export default function AssetsList() {
                     onSuccess={() => { setShowImport(false); fetch({ limit: 1000 }); }}
                 />
             )}
+                </> )}
+                {viewMode === 'relatorio' && <DepreciationReportTab token={token!} companyId={activeCompany?.id ?? ''} />}
+        </div>
+    );
+}
+
+// ── Relatório Anual de Depreciação ──────────────────────────────────────────
+function DepreciationReportTab({ token, companyId }: { token: string; companyId: string }) {
+    const [yearFrom, setYearFrom] = useState(new Date().getFullYear() - 3);
+    const [yearTo, setYearTo]     = useState(new Date().getFullYear());
+    const [data, setData]         = useState<any[]>([]);
+    const [loading, setLoading]   = useState(false);
+        const [sortKey, setSortKey] = useState<string>('internalCode');
+        const [sortDir, setSortDir] = useState<'asc'|'desc'>('asc');
+
+        function handleSort(key: string) {
+            if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+            else { setSortKey(key); setSortDir('asc'); }
+        }
+
+        const sorted = useMemo(() => {
+            return [...data].sort((a, b) => {
+                let va: any, vb: any;
+                if (sortKey === 'totalDeprec' || sortKey === 'bookValue') {
+                    va = a[sortKey]; vb = b[sortKey];
+                } else if (!isNaN(Number(sortKey))) {
+                    va = a.yearTotals[sortKey] ?? 0; vb = b.yearTotals[sortKey] ?? 0;
+                } else {
+                    va = (a[sortKey] ?? '').toString().toLowerCase();
+                    vb = (b[sortKey] ?? '').toString().toLowerCase();
+                }
+                if (va < vb) return sortDir === 'asc' ? -1 : 1;
+                if (va > vb) return sortDir === 'asc' ? 1 : -1;
+                return 0;
+            });
+        }, [data, sortKey, sortDir]);
+
+    const load = async () => {
+        setLoading(true);
+        try {
+            const r = await fetch(
+                `http://localhost:3000/assets/depreciation-report?yearFrom=${yearFrom}&yearTo=${yearTo}`,
+                { headers: { Authorization: `Bearer ${token}`, 'x-company-id': companyId } }
+            );
+            setData(await r.json());
+        } finally { setLoading(false); }
+    };
+
+    useEffect(() => { if (companyId) load(); }, [companyId]);
+
+    const years: number[] = data[0]?.years ?? [];
+
+    const exportXlsx = async () => {
+        const XLSX = await import('xlsx');
+        const header = ['Código', 'Descrição', 'Grupo', 'Conta', 'Início Deprec.', ...years.map(String), 'Total Deprec.', 'Valor Contábil'];
+        const rows = data.map(a => [
+            a.internalCode, a.description, a.group, a.accountCode,
+            a.depreciationStart ? new Date(a.depreciationStart).toLocaleDateString('pt-BR') : '—',
+            ...years.map(y => a.yearTotals[y] ?? 0),
+            a.totalDeprec, a.bookValue
+        ]);
+        const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Depreciação Anual');
+        XLSX.writeFile(wb, `depreciacao-anual-${yearFrom}-${yearTo}.xlsx`);
+    };
+
+    const fmt = (v: number) => v ? formatCurrency(v) : '—';
+
+    return (
+        <div className="space-y-4">
+            {/* Filtros */}
+            <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-wrap gap-3 items-end">
+                <div>
+                    <label className="block text-xs text-gray-500 mb-1">Ano inicial</label>
+                    <input type="number" value={yearFrom} onChange={e => setYearFrom(Number(e.target.value))}
+                        className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm w-24" />
+                </div>
+                <div>
+                    <label className="block text-xs text-gray-500 mb-1">Ano final</label>
+                    <input type="number" value={yearTo} onChange={e => setYearTo(Number(e.target.value))}
+                        className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm w-24" />
+                </div>
+                <button onClick={load} className="flex items-center gap-2 bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-800">
+                    <RefreshCw className="w-4 h-4" /> Atualizar
+                </button>
+                <button onClick={exportXlsx} className="flex items-center gap-2 border border-green-300 text-green-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-50">
+                    <FileSpreadsheet className="w-4 h-4" /> Exportar XLSX
+                </button>
+            </div>
+            {/* Tabela */}
+            <div className="bg-white border border-gray-200 rounded-xl overflow-auto">
+                {loading ? (
+                    <div className="p-8 text-center text-gray-400 text-sm">Carregando...</div>
+                ) : (
+                    <table className="w-full text-sm">
+                        <thead>
+                            <tr className="bg-gray-50 border-b border-gray-200">
+                                <th onClick={() => handleSort('internalCode')} className="text-left cursor-pointer select-none px-3 py-2 text-xs text-gray-500 uppercase font-medium hover:text-gray-700">Código <SortIcon col="internalCode" sortKey={sortKey} sortDir={sortDir} /></th>
+                                <th onClick={() => handleSort('description')} className="text-left cursor-pointer select-none px-3 py-2 text-xs text-gray-500 uppercase font-medium hover:text-gray-700">Descrição <SortIcon col="description" sortKey={sortKey} sortDir={sortDir} /></th>
+                                <th onClick={() => handleSort('accountCode')} className="text-left cursor-pointer select-none px-3 py-2 text-xs text-gray-500 uppercase font-medium hover:text-gray-700">Conta <SortIcon col="accountCode" sortKey={sortKey} sortDir={sortDir} /></th>
+                                <th onClick={() => handleSort('depreciationStart')} className="text-left cursor-pointer select-none px-3 py-2 text-xs text-gray-500 uppercase font-medium hover:text-gray-700">Início <SortIcon col="depreciationStart" sortKey={sortKey} sortDir={sortDir} /></th>
+                                {years.map(y => (
+                                    <th key={y} onClick={() => handleSort(String(y))} className="text-right cursor-pointer select-none px-3 py-2 text-xs text-gray-500 uppercase font-medium hover:text-gray-700">{y} <SortIcon col={String(y)} sortKey={sortKey} sortDir={sortDir} /></th>
+                                ))}
+                                <th onClick={() => handleSort('totalDeprec')} className="text-right cursor-pointer select-none px-3 py-2 text-xs text-gray-500 uppercase font-medium hover:text-gray-700">Total Deprec. <SortIcon col="totalDeprec" sortKey={sortKey} sortDir={sortDir} /></th>
+                                <th onClick={() => handleSort('bookValue')} className="text-right cursor-pointer select-none px-3 py-2 text-xs text-gray-500 uppercase font-medium hover:text-gray-700">Vlr. Contábil <SortIcon col="bookValue" sortKey={sortKey} sortDir={sortDir} /></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {sorted.map(a => (
+                                <tr key={a.id} className="border-b border-gray-100 hover:bg-gray-50">
+                                    <td className="px-3 py-2 font-mono text-xs text-gray-600">{a.internalCode}</td>
+                                    <td className="px-3 py-2 text-gray-800 max-w-xs truncate" title={a.description}>{a.description}</td>
+                                    <td className="px-3 py-2 text-xs text-gray-500">{a.accountCode}</td>
+                                    <td className="px-3 py-2 text-xs text-gray-500">{a.depreciationStart ? new Date(a.depreciationStart).toLocaleDateString('pt-BR') : '—'}</td>
+                                    {years.map(y => (
+                                        <td key={y} className="px-3 py-2 text-right text-gray-700">{fmt(a.yearTotals[y])}</td>
+                                    ))}
+                                    <td className="px-3 py-2 text-right font-medium text-orange-700">{fmt(a.totalDeprec)}</td>
+                                    <td className="px-3 py-2 text-right font-medium text-blue-700">{fmt(a.bookValue)}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                        <tfoot>
+                            <tr className="bg-gray-50 border-t border-gray-200 font-medium">
+                                <td colSpan={4} className="px-3 py-2 text-xs text-gray-500 uppercase">Totais</td>
+                                {years.map(y => (
+                                    <td key={y} className="px-3 py-2 text-right text-gray-800">{fmt(data.reduce((s,a) => s + (a.yearTotals[y]??0), 0))}</td>
+                                ))}
+                                <td className="px-3 py-2 text-right text-orange-700">{fmt(data.reduce((s,a) => s + a.totalDeprec, 0))}</td>
+                                <td className="px-3 py-2 text-right text-blue-700">{fmt(data.reduce((s,a) => s + a.bookValue, 0))}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                )}
+            </div>
         </div>
     );
 }
