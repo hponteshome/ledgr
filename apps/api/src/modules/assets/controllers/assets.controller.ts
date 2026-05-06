@@ -105,6 +105,19 @@ export class AssetsController {
 
   // ── Dynamic :id routes ───────────────────────────────────
 
+  @Get('depreciation-report')
+  getDepreciationReport(
+    @Req() req: any,
+    @Query('yearFrom') yearFrom?: string,
+    @Query('yearTo') yearTo?: string,
+  ) {
+    return this.assetsService.getDepreciationReport(
+      req.companyId,
+      yearFrom ? parseInt(yearFrom) : undefined,
+      yearTo ? parseInt(yearTo) : undefined,
+    );
+  }
+
   @Get(':id')
   findOne(@Req() req: any, @Param('id') id: string) {
     return this.assetsService.findOne(req.companyId, id);
@@ -230,6 +243,6 @@ export class AssetsController {
   findHistory(@Req() req: any, @Param('assetId') assetId: string) {
     return this.historyService.findByAsset(req.companyId, assetId);
   }
+
+
 }
-
-
