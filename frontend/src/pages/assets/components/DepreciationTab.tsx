@@ -25,13 +25,13 @@ export function DepreciationTab({ asset }: { asset: FixedAsset }) {
     console.log('PERIOD SAMPLE', history[0]?.period, typeof history[0]?.period);
     const chartData = [
         ...history.map(d => ({
-                month: (() => { const d = new Date(d.period); return d.toLocaleString('pt-BR', { month: 'short', year: 'numeric' }).replace('. ', '/'); })(),
+                month: (() => { const dt = new Date(d.period); return dt.toLocaleString('pt-BR', { month: 'short', year: 'numeric' }).replace('. ', '/'); })(),
             bookValue: Number(d.bookValueAfter),
             accumDeprec: Number(d.accumDeprecAfter),
             type: 'real',
         })),
         ...projection.map((d: any) => ({
-                month: (() => { const raw = d.period ?? d.month; const dt = new Date(raw); return dt.toLocaleString('pt-BR', { month: 'short', year: 'numeric' }).replace('. ', '/'); })(),
+                month: (() => { const raw = d.period ?? d.month; const dt2 = new Date(raw); return dt2.toLocaleString('pt-BR', { month: 'short', year: 'numeric' }).replace('. ', '/'); })(),
             bookValueProjected: d.bookValue ?? d.balance,
             accumDeprecProjected: d.accumDeprec ?? d.accumulatedDepreciation,
             type: 'projection',
