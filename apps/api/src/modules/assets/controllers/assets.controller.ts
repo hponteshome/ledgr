@@ -105,6 +105,16 @@ export class AssetsController {
 
   // ── Dynamic :id routes ───────────────────────────────────
 
+  @Post('depreciation-journal')
+  generateDepreciationJournal(@Req() req: any, @Body() body: { yearMonth: string }) {
+    return this.depreciationService.generateDepreciationJournalEntries(
+      req.companyId,
+      body.yearMonth,
+      req.user?.id,
+    );
+  }
+
+
   @Get('depreciation-report')
   getDepreciationReport(
     @Req() req: any,
