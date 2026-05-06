@@ -1,7 +1,7 @@
 // ============================================================
 // LEDGR — frontend/src/pages/assets/AssetsList.tsx
 // ============================================================
-import { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     Building2, Wrench, Plus, Search, Filter, AlertTriangle, Upload, FileSpreadsheet, TableProperties,
@@ -461,6 +461,10 @@ function DepreciationReportTab({ token, companyId }: { token: string; companyId:
     const [yearTo, setYearTo]     = useState(new Date().getFullYear());
     const [data, setData]         = useState<any[]>([]);
     const [loading, setLoading]   = useState(false);
+    const [showMonthly, setShowMonthly]       = useState(false);
+    const [monthlyData, setMonthlyData]       = useState<Record<number, any[]>>({});
+    const [monthlyLoading, setMonthlyLoading] = useState(false);
+    const [journalLoading, setJournalLoading] = useState<string | null>(null);
         const [sortKey, setSortKey] = useState<string>('internalCode');
         const [sortDir, setSortDir] = useState<'asc'|'desc'>('asc');
 
@@ -470,7 +474,7 @@ function DepreciationReportTab({ token, companyId }: { token: string; companyId:
         }
 
         const sorted = useMemo(() => {
-            return [...data].sort((a, b) => {
+            return [...(Array.isArray(data) ? data : [])].sort((a, b) => {
                 let va: any, vb: any;
                 if (sortKey === 'totalDeprec' || sortKey === 'bookValue') {
                     va = a[sortKey]; vb = b[sortKey];
@@ -517,6 +521,40 @@ function DepreciationReportTab({ token, companyId }: { token: string; companyId:
     };
 
     const fmt = (v: number) => v ? formatCurrency(v) : '—';
+
+    const loadMonthly = async () => {
+        if (showMonthly) { setShowMonthly(false); return; }
+        setMonthlyLoading(true);
+        try {
+            const results: Record<number, any[]> = {};
+            await Promise.all(years.map(async y => {
+                const r = await fetch(`http://localhost:3000/assets/depreciation-monthly-totals?year=${y}`,
+                    { headers: { Authorization: `Bearer ${token}`, "x-company-id": companyId } });
+                results[y] = await r.json();
+            }));
+            setMonthlyData(results);
+            setShowMonthly(true);
+        } finally { setMonthlyLoading(false); }
+    };
+
+    const generateJournal = async (yearMonth: string) => {
+        setJournalLoading(yearMonth);
+        try {
+            const r = await fetch("http://localhost:3000/assets/depreciation-journal", {
+                method: "POST",
+                headers: { Authorization: `Bearer ${token}`, "x-company-id": companyId, "Content-Type": "application/json" },
+                body: JSON.stringify({ yearMonth }),
+            });
+            const d = await r.json();
+            if (d.created || d.journalEntryId) {
+                const y = parseInt(yearMonth.slice(0, 4));
+                const updated = [...(monthlyData[y] ?? [])].map(m =>
+                    m.yearMonth === yearMonth ? { ...m, hasJournal: true, journalEntryId: d.journalEntryId } : m
+                );
+                setMonthlyData(prev => ({ ...prev, [y]: updated }));
+            }
+        } finally { setJournalLoading(null); }
+    };
 
     return (
         <div className="space-y-4">
@@ -573,18 +611,70 @@ function DepreciationReportTab({ token, companyId }: { token: string; companyId:
                                 </tr>
                             ))}
                         </tbody>
-                        <tfoot>
-                            <tr className="bg-gray-50 border-t border-gray-200 font-medium">
-                                <td colSpan={4} className="px-3 py-2 text-xs text-gray-500 uppercase">Totais</td>
-                                {years.map(y => (
-                                    <td key={y} className="px-3 py-2 text-right text-gray-800">{fmt(data.reduce((s,a) => s + (a.yearTotals[y]??0), 0))}</td>
-                                ))}
-                                <td className="px-3 py-2 text-right text-orange-700">{fmt(data.reduce((s,a) => s + a.totalDeprec, 0))}</td>
-                                <td className="px-3 py-2 text-right text-blue-700">{fmt(data.reduce((s,a) => s + a.bookValue, 0))}</td>
-                            </tr>
-                        </tfoot>
-                    </table>
-                )}
+                            <tfoot>
+                                <tr className="bg-gray-50 border-t border-gray-200 font-medium cursor-pointer hover:bg-blue-50 transition-colors"
+                                    onClick={loadMonthly} title="Clique para ver detalhes mensais">
+                                    <td colSpan={4} className="px-3 py-2 text-xs text-gray-500 uppercase">
+                                        {monthlyLoading ? "Carregando..." : showMonthly ? "▲ Totais (ocultar meses)" : "▼ Totais (ver meses)"}
+                                    </td>
+                                    {years.map(y => (
+                                        <td key={y} className="px-3 py-2 text-right text-gray-800">{fmt(data.reduce((s,a) => s + (a.yearTotals[y]??0), 0))}</td>
+                                    ))}
+                                    <td className="px-3 py-2 text-right text-orange-700">{fmt(data.reduce((s,a) => s + a.totalDeprec, 0))}</td>
+                                    <td className="px-3 py-2 text-right text-blue-700">{fmt(data.reduce((s,a) => s + a.bookValue, 0))}</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    )}
+                    {showMonthly && (
+                        <div className="mt-4 bg-white border border-blue-200 rounded-xl overflow-auto">
+                            <div className="px-4 py-3 bg-blue-50 border-b border-blue-200 flex items-center justify-between">
+                                <span className="text-sm font-medium text-blue-800">Detalhes Mensais — Lançamentos Contábeis</span>
+                                <span className="text-xs text-blue-500">Clique em ⚡ para gerar o lançamento do mês</span>
+                            </div>
+                            <table className="w-full text-sm">
+                                <thead>
+                                    <tr className="bg-gray-50 border-b border-gray-200">
+                                        <th className="text-left px-3 py-2 text-xs text-gray-500 uppercase">Mês</th>
+                                        {years.map(y => (
+                                            <th key={y} colSpan={2} className="text-center px-3 py-2 text-xs text-gray-500 uppercase border-l border-gray-200">{y}</th>
+                                        ))}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {Array.from({ length: 12 }, (_, i) => {
+                                        const monthNames = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+                                        return (
+                                            <tr key={i} className="border-b border-gray-100 hover:bg-gray-50">
+                                                <td className="px-3 py-2 text-xs font-medium text-gray-600">{monthNames[i]}</td>
+                                                {years.map(y => {
+                                                    const m = monthlyData[y]?.[i];
+                                                    return (
+                                                        <React.Fragment key={y}>
+                                                            <td className="px-3 py-2 text-right text-xs text-gray-700 border-l border-gray-100">
+                                                                {m?.total ? fmt(m.total) : "—"}
+                                                            </td>
+                                                            <td className="px-2 py-2 text-center border-r border-gray-100">
+                                                                {m?.total > 0 && (
+                                                                    m?.hasJournal
+                                                                        ? <span className="text-xs text-green-600 font-medium">✓</span>
+                                                                        : <button onClick={() => generateJournal(m.yearMonth)}
+                                                                            disabled={journalLoading === m.yearMonth}
+                                                                            className="text-xs text-blue-600 hover:text-blue-800 font-medium disabled:opacity-50">
+                                                                            {journalLoading === m.yearMonth ? "..." : "⚡"}
+                                                                          </button>
+                                                                )}
+                                                            </td>
+                                                        </React.Fragment>
+                                                    );
+                                                })}
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
             </div>
         </div>
     );

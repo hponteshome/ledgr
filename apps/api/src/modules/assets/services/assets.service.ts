@@ -335,12 +335,12 @@ export class AssetsService {
                DATE_PART('year', period)::int AS year,
                SUM(monthly_charge)::numeric(18,2) AS total
           FROM asset_depreciation_logs
-         WHERE asset_id = ANY($1::uuid[])
-           AND DATE_PART('year', period) BETWEEN $2 AND $3
-         ORDER BY asset_id, year`,
-        assets.map(a => a.id), yFrom, yTo,
-      );
-
+             WHERE asset_id = ANY($1::uuid[])
+               AND DATE_PART('year', period) BETWEEN $2 AND $3
+             GROUP BY asset_id, DATE_PART('year', period)
+                 ORDER BY asset_id, year`,
+            assets.map(a => a.id), yFrom, yTo,
+          );
     const map = new Map<string, Record<number, number>>();
     for (const r of rows) {
       if (!map.has(r.asset_id)) map.set(r.asset_id, {});
