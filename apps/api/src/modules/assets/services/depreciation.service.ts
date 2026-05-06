@@ -198,19 +198,68 @@ export class DepreciationService {
     const assets = await this.prisma.fixedAsset.findMany({
       where: { companyId, status: 'ACTIVE', nonDepreciable: false, deletedAt: null },
       select: { id: true },
+      });
+      let periods = 0;
+      for (const asset of assets) {
+        const count = await this.backfillAsset(companyId, asset.id);
+        periods += count;
+      }
+      return { assets: assets.length, periods };
+  }
+
+  // ── Lançamentos contábeis consolidados por mês ─────────────────────────────
+  async generateDepreciationJournalEntries(
+    companyId: string,
+    yearMonth: string,  // formato YYYY-MM
+    userId: string,
+  ): Promise<{ created: boolean; journalEntryId?: string; totalAssets: number; totalAmount: number }> {
+
+    // 1. Busca todos os logs do mês informado
+    const periodDate = new Date(`${yearMonth}-01T00:00:00.000Z`);
+    const logs = await this.prisma.assetDepreciationLog.findMany({
+      where: { companyId, period: periodDate },
+      include: { asset: { select: { id: true, description: true, depreciationAccId: true, accumDeprecAccId: true } } },
     });
-    let totalPeriods = 0;
-    for (const asset of assets) {
-      const periods = await this.backfillAsset(companyId, asset.id);
-      totalPeriods += periods;
-    }
-    return { assets: assets.length, periods: totalPeriods };
+
+    const logsWithAccounts = logs.filter(l => l.asset.depreciationAccId && l.asset.accumDeprecAccId);
+    if (logsWithAccounts.length === 0) return { created: false, totalAssets: 0, totalAmount: 0 };
+
+    const totalAmount = logsWithAccounts.reduce((s, l) => s + Number(l.monthlyCharge), 0);
+
+    // 2. Data do lançamento = último dia do mês
+    const lastDay = new Date(Date.UTC(periodDate.getUTCFullYear(), periodDate.getUTCMonth() + 1, 0));
+
+    // 3. Verifica se já existe lançamento para este mês (evita duplicata)
+    const existing = await this.prisma.journalEntry.findFirst({
+      where: { companyId, reference: `DEPR-${yearMonth}`, deletedAt: null },
+    });
+    if (existing) return { created: false, journalEntryId: existing.id, totalAssets: logsWithAccounts.length, totalAmount };
+
+    // 4. Cria o lançamento em $transaction
+    const result = await this.prisma.$transaction(async (tx) => {
+      const entry = await tx.journalEntry.create({
+        data: {
+          companyId,
+          date:        lastDay,
+          description: `Depreciação do Ativo Imobilizado — ${yearMonth.slice(5, 7)}/${yearMonth.slice(0, 4)}`,
+          reference:   `DEPR-${yearMonth}`,
+          sourceModule: 'ECD_IMPORT',
+          createdById: userId,
+          items: {
+            create: logsWithAccounts.flatMap(l => [
+              { accountId: l.asset.depreciationAccId!, value: Number(l.monthlyCharge), type: 'DEBIT' },
+              { accountId: l.asset.accumDeprecAccId!, value: Number(l.monthlyCharge), type: 'CREDIT' },
+            ]),
+          },
+        },
+      });
+      return entry;
+    });
+
+    return { created: true, journalEntryId: result.id, totalAssets: logsWithAccounts.length, totalAmount };
   }
 
   async reprocessPeriod(companyId: string, period: string) {
-    await this.prisma.assetDepreciationLog.deleteMany({
-      where: { companyId, period: new Date(period) },
-    });
     return this.processCompany(companyId, period);
   }
 
