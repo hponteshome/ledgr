@@ -80,7 +80,7 @@ export class AssetsService {
         maintenances:     { where: { deletedAt: null }, orderBy: { scheduledDate: 'desc' } },
         improvements:     { orderBy: { startDate: 'desc' } },
         retrofitProjects: { include: { phases: { orderBy: { sequence: 'asc' } } }, orderBy: { startDate: 'desc' } },
-        depreciationLogs: { orderBy: { period: 'desc' }, take: 36 },
+        depreciationLogs: { orderBy: { period: 'desc' } },
         appraisals:       { orderBy: { appraisalDate: 'desc' } },
         history:          { orderBy: { createdAt: 'desc' }, take: 50 },
         assetAccount:     { select: { id: true, code: true, name: true } },
@@ -265,36 +265,49 @@ export class AssetsService {
     if (asset.nonDepreciable) return { projection: [], asset };
 
     const projection: any[] = [];
-    let balance = Number(asset.bookValue);
-    const residual        = Number(asset.residualValue);
-    const landAmount      = Number(asset.landValueAmount ?? 0);
-    const depreciableBase = Number(asset.acquisitionCost) - landAmount - residual;
-    const months          = asset.remainingLifeMonths;
-    const elapsed         = asset.usefulLifeMonths - asset.remainingLifeMonths;
+        let balance = Number(asset.bookValue);
+        const residual        = Number(asset.residualValue);
+        const landAmount      = Number(asset.landValueAmount ?? 0);
+        const depreciableBase = Number(asset.acquisitionCost) - landAmount - residual;
+        const months          = asset.remainingLifeMonths;
+        const elapsed         = asset.usefulLifeMonths - asset.remainingLifeMonths;
 
-    for (let i = 1; i <= months && balance > residual; i++) {
-      let charge = 0;
-      if (asset.depreciationMethod === 'STRAIGHT_LINE') {
-        charge = depreciableBase / asset.usefulLifeMonths;
-      } else if (asset.depreciationMethod === 'SUM_OF_DIGITS') {
-        const n        = asset.usefulLifeMonths;
-        const sumDigits    = (n * (n + 1)) / 2;
-        const currentMonth = elapsed + i;
-        charge = depreciableBase * ((n - currentMonth + 1) / sumDigits);
-      }
-      charge  = Math.min(charge, balance - residual);
-      balance -= charge;
+        // Ponto de partida: último log do histórico ou depreciationStart + elapsed
+        const lastLog = asset.depreciationLogs?.[0]; // ordenado desc
+        let startDate: Date;
+        if (lastLog) {
+          const lp = lastLog.period instanceof Date ? lastLog.period : new Date(lastLog.period);
+          const nextMonth = lp.getUTCMonth() + 1 === 12 ? 0 : lp.getUTCMonth() + 1;
+          const nextYear  = lp.getUTCMonth() + 1 === 12 ? lp.getUTCFullYear() + 1 : lp.getUTCFullYear();
+          startDate = new Date(Date.UTC(nextYear, nextMonth, 1));
+        } else {
+          const ds = new Date(asset.depreciationStart);
+          startDate = new Date(Date.UTC(ds.getUTCFullYear(), ds.getUTCMonth() + elapsed + 1, 1));
+        }
+            let projAccumDeprec = Number(asset.accumulatedDeprec);
+            for (let i = 0; i < months && balance > residual; i++) {
+              let charge = 0;
+              if (asset.depreciationMethod === 'STRAIGHT_LINE') {
+                charge = depreciableBase / asset.usefulLifeMonths;
+              } else if (asset.depreciationMethod === 'SUM_OF_DIGITS') {
+                const n = asset.usefulLifeMonths;
+                const sumDigits = (n * (n + 1)) / 2;
+                const currentMonth = elapsed + i + 1;
+                charge = depreciableBase * ((n - currentMonth + 1) / sumDigits);
+              }
+              charge = Math.min(charge, balance - residual);
+              balance -= charge;
+              projAccumDeprec += charge;
 
-      const date = new Date(asset.depreciationStart);
-      date.setMonth(date.getMonth() + elapsed + i);
+              const date = new Date(Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth() + i, 1));
 
-      projection.push({
-        period:        `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`,
-        monthlyCharge: Number(charge.toFixed(2)),
-        bookValue:     Number(balance.toFixed(2)),
-        accumDeprec:   Number((Number(asset.accumulatedDeprec) + (depreciableBase - balance + residual)).toFixed(2)),
-      });
-    }
+              projection.push({
+                period:        `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`,
+                monthlyCharge: Number(charge.toFixed(2)),
+                bookValue:     Number(balance.toFixed(2)),
+                accumDeprec:   Number(projAccumDeprec.toFixed(2)),
+              });
+            }
 
     return { projection, asset };
   }
