@@ -25,13 +25,13 @@ export function DepreciationTab({ asset }: { asset: FixedAsset }) {
     console.log('PERIOD SAMPLE', history[0]?.period, typeof history[0]?.period);
     const chartData = [
         ...history.map(d => ({
-            month: new Date(d.period).toISOString().slice(0, 7),
+                month: (() => { const d = new Date(d.period); return d.toLocaleString('pt-BR', { month: 'short', year: 'numeric' }).replace('. ', '/'); })(),
             bookValue: Number(d.bookValueAfter),
             accumDeprec: Number(d.accumDeprecAfter),
             type: 'real',
         })),
         ...projection.map((d: any) => ({
-            month: d.period ?? d.month,
+                month: (() => { const raw = d.period ?? d.month; const dt = new Date(raw); return dt.toLocaleString('pt-BR', { month: 'short', year: 'numeric' }).replace('. ', '/'); })(),
             bookValueProjected: d.bookValue ?? d.balance,
             accumDeprecProjected: d.accumDeprec ?? d.accumulatedDepreciation,
             type: 'projection',
@@ -97,7 +97,7 @@ export function DepreciationTab({ asset }: { asset: FixedAsset }) {
                             <tbody className="divide-y divide-gray-100">
                                 {history.slice(0, 24).map(d => (
                                     <tr key={d.id} className="hover:bg-gray-50">
-                                        <td className="px-4 py-2 font-mono text-xs">{new Date(d.period).toISOString().slice(0, 7)}</td>
+                                        <td className="px-4 py-2 font-mono text-xs">{new Date(d.period).toLocaleString('pt-BR', { month: 'short', year: 'numeric' }).replace('. ', '/')}</td>
                                         <td className="px-4 py-2 text-right text-red-600 text-xs">{formatCurrency(d.monthlyCharge)}</td>
                                         <td className="px-4 py-2 text-right text-xs">{formatCurrency(d.accumDeprecAfter)}</td>
                                         <td className="px-4 py-2 text-right font-medium text-xs">{formatCurrency(d.bookValueAfter)}</td>
