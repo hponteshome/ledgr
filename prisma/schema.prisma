@@ -703,7 +703,7 @@ enum SourceModule {
   HR
   BANK_IMPORT
   ECD_IMPORT
-
+  ASSET
   @@map("source_module")
 }
 
