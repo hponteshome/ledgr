@@ -236,25 +236,25 @@ export class DepreciationService {
     if (existing) return { created: false, journalEntryId: existing.id, totalAssets: logsWithAccounts.length, totalAmount };
 
     // 4. Cria o lançamento em $transaction
-    const result = await this.prisma.$transaction(async (tx) => {
-      const entry = await tx.journalEntry.create({
-        data: {
-          companyId,
-          date:        lastDay,
-          description: `Depreciação do Ativo Imobilizado — ${yearMonth.slice(5, 7)}/${yearMonth.slice(0, 4)}`,
-          reference:   `DEPR-${yearMonth}`,
-          sourceModule: 'ECD_IMPORT',
-          createdById: userId,
-          items: {
-            create: logsWithAccounts.flatMap(l => [
-              { accountId: l.asset.depreciationAccId!, value: Number(l.monthlyCharge), type: 'DEBIT' },
-              { accountId: l.asset.accumDeprecAccId!, value: Number(l.monthlyCharge), type: 'CREDIT' },
-            ]),
-          },
-        },
-      });
-      return entry;
-    });
+        const result = await this.prisma.$transaction(async (tx) => {
+          const entry = await (tx.journalEntry.create as any)({
+            data: {
+              companyId,
+              date:        lastDay,
+              description: "Depreciacao do Ativo Imobilizado — " + yearMonth.slice(5, 7) + "/" + yearMonth.slice(0, 4),
+              reference:   "DEPR-" + yearMonth,
+              sourceModule: "ASSET",
+              createdById: userId,
+              items: {
+                create: logsWithAccounts.flatMap(l => [
+                  { accountId: l.asset.depreciationAccId, value: Number(l.monthlyCharge), type: "DEBIT" },
+                  { accountId: l.asset.accumDeprecAccId, value: Number(l.monthlyCharge), type: "CREDIT" },
+                ]),
+              },
+            },
+          });
+          return entry;
+        });
 
     return { created: true, journalEntryId: result.id, totalAssets: logsWithAccounts.length, totalAmount };
   }
