@@ -337,7 +337,6 @@ export class AssetsService {
           FROM asset_depreciation_logs
          WHERE asset_id = ANY($1::uuid[])
            AND DATE_PART('year', period) BETWEEN $2 AND $3
-         GROUP BY asset_id, DATE_PART('year', period)
          ORDER BY asset_id, year`,
         assets.map(a => a.id), yFrom, yTo,
       );
@@ -364,8 +363,8 @@ export class AssetsService {
         internalCode:      a.internalCode,
         description:       a.description,
         group:             a.group,
-        accountCode:       a.assetAccount?.code ?? '—',
-        accountName:       a.assetAccount?.name ?? '—',
+        accountCode:       a.assetAccount?.code ?? "—",
+        accountName:       a.assetAccount?.name ?? "—",
         depreciationStart: a.depreciationStart,
         nonDepreciable:    a.nonDepreciable,
         acquisitionCost:   Number(a.acquisitionCost),
@@ -374,6 +373,44 @@ export class AssetsService {
         years,
         yearTotals,
         totalDeprec,
+      };
+    });
+  }
+
+  async getDepreciationMonthlyTotals(companyId: string, year: number): Promise<any[]> {
+    const rows: Array<{ month: number; total: string }> = await this.prisma.$queryRawUnsafe(`
+      SELECT
+        DATE_PART('month', period)::int AS month,
+        SUM(monthly_charge)::numeric(18,2) AS total
+      FROM asset_depreciation_logs adl
+      JOIN fixed_assets fa ON fa.id = adl.asset_id
+      WHERE fa.company_id = $1
+        AND DATE_PART('year', adl.period) = $2
+      GROUP BY DATE_PART('month', adl.period)
+      ORDER BY month
+    `, companyId, year);
+
+    // Verifica quais meses já têm lançamento contábil gerado
+    const journals = await this.prisma.journalEntry.findMany({
+      where: {
+        companyId,
+        reference: { startsWith: `DEPR-${year}-` },
+        deletedAt: null,
+      },
+      select: { reference: true, id: true },
+    });
+    const journalMap = new Map(journals.map(j => [j.reference, j.id]));
+
+    return Array.from({ length: 12 }, (_, i) => {
+      const month = i + 1;
+      const yearMonth = `${year}-${String(month).padStart(2, "0")}`;
+      const row = rows.find(r => r.month === month);
+      return {
+        month,
+        yearMonth,
+        total: row ? Number(row.total) : 0,
+        hasJournal: journalMap.has(`DEPR-${yearMonth}`),
+        journalEntryId: journalMap.get(`DEPR-${yearMonth}`) ?? null,
       };
     });
   }

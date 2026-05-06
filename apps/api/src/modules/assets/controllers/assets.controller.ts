@@ -115,6 +115,12 @@ export class AssetsController {
   }
 
 
+
+  @Get('depreciation-monthly-totals')
+  getDepreciationMonthlyTotals(@Req() req: any, @Query('year') year: string) {
+    return this.assetsService.getDepreciationMonthlyTotals(req.companyId, parseInt(year));
+  }
+
   @Get('depreciation-report')
   getDepreciationReport(
     @Req() req: any,
