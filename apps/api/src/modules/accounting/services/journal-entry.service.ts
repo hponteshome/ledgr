@@ -504,4 +504,28 @@ private validateItems(items: Array<{ type: string; value: number }>) {
     );
   }
 }
+  async getDistinctSourceModules(companyId: string): Promise<{value: string; label: string; count: number}[]> {
+    const labels: Record<string, string> = {
+      ACCOUNTING:  'Manual',
+      PROVISION:   'Provisao',
+      ADJUSTMENT:  'Ajuste',
+      ECD_IMPORT:  'ECD',
+      BANK_IMPORT: 'Banco',
+      FISCAL:      'Fiscal',
+      ASSET:       'Ativo Imob.',
+      HR:          'RH',
+      FINANCE:     'Financeiro',
+    };
+    const rows = await this.prisma.journalEntry.groupBy({
+      by: ['sourceModule'],
+      where: { companyId, deletedAt: null },
+      _count: { sourceModule: true },
+      orderBy: { sourceModule: 'asc' },
+    });
+    return rows.map(r => ({
+      value: r.sourceModule,
+      label: labels[r.sourceModule] ?? r.sourceModule,
+      count: r._count.sourceModule,
+    }));
+  }
 }

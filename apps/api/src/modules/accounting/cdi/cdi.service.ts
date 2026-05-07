@@ -48,7 +48,8 @@ export class CdiService {
   }[]) {
     let inserted = 0, updated = 0;
     for (const r of rows) {
-      const date = new Date(r.date);
+      const [y,mo,d] = r.date.split('-').map(Number);
+  const date = new Date(Date.UTC(y, mo-1, d, 12, 0, 0));
       const existing = await this.prisma.cdiDailyRate.findUnique({ where: { date } });
       if (existing) {
         await this.prisma.cdiDailyRate.update({

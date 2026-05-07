@@ -199,7 +199,7 @@ export class FixedIncomeService {
             companyId,
             date:         fimMes,
             description:  `Receita financeira CDB — ${inv.issuerName} — ${dto.competence}`,
-            sourceModule: 'ACCOUNTING',
+            sourceModule: 'INVESTMENT',
             createdById,
             items: {
               create: [
@@ -207,10 +207,14 @@ export class FixedIncomeService {
                 { accountId: inv.assetAccountId!, value: rendBruto, type: 'DEBIT' },
                 // Crédito: Receita financeira
                 { accountId: inv.revenueAccountId!, value: rendBruto, type: 'CREDIT' },
-                // Débito: IRRF a recuperar (antecipação de IRPJ/CSLL no Lucro Real)
-                ...(inv.irrfAccountId ? [
-                  { accountId: inv.irrfAccountId, value: irrfTotal - Number(inv.irrfAccumulated), type: 'DEBIT' as any },
-                ] : []),
+                // Débito: IRRF a Recuperar / Crédito: Conta CDB (delta IRRF do período)
+                ...(inv.irrfAccountId && !inv.irrfExempt ? (() => {
+                  const deltaIrrf = Math.max(0, irrfTotal - Number(inv.irrfAccumulated));
+                  return deltaIrrf > 0 ? [
+                    { accountId: inv.irrfAccountId,  value: deltaIrrf, type: 'DEBIT'  as any },
+                    { accountId: inv.assetAccountId!, value: deltaIrrf, type: 'CREDIT' as any },
+                  ] : [];
+                })() : []),
               ],
             },
           },
@@ -551,6 +555,72 @@ export class FixedIncomeService {
         notes: dto.notes,
       },
     });
+  }
+
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // GERAR LANCAMENTOS RETROATIVOS para eventos sem journalEntryId
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  async generateMissingJournals(companyId: string, createdById: string, competenceFrom?: string, competenceTo?: string) {
+    const events = await this.prisma.fixedIncomeEvent.findMany({
+      where: {
+        companyId,
+        eventType: 'ATUALIZACAO_SALDO',
+        journalEntryId: null,
+        ...(competenceFrom ? { competence: { gte: competenceFrom } } : {}),
+        ...(competenceTo   ? { competence: { lte: competenceTo   } } : {}),
+        investment: {
+          assetAccountId:   { not: null },
+          revenueAccountId: { not: null },
+          deletedAt:        null,
+        },
+      },
+      include: { investment: true },
+      orderBy: { eventDate: 'asc' },
+    });
+
+    const results: any[] = [];
+
+    for (const event of events) {
+      const inv = event.investment;
+      try {
+        const rendBruto = Number(event.grossAmount);
+        const irrfDelta = Number(event.irrfAmount ?? 0);
+        const fimMes    = new Date(event.eventDate);
+
+        const journalEntry = await this.prisma.journalEntry.create({
+          data: {
+            companyId,
+            date:         fimMes,
+            description:  `Receita financeira CDB — ${inv.issuerName} — ${event.competence}`,
+            sourceModule: 'INVESTMENT',
+            createdById,
+            items: {
+              create: [
+                { accountId: inv.assetAccountId!,   value: rendBruto, type: 'DEBIT'  },
+                { accountId: inv.revenueAccountId!,  value: rendBruto, type: 'CREDIT' },
+                ...(inv.irrfAccountId && !inv.irrfExempt && irrfDelta > 0 ? [
+                  { accountId: inv.irrfAccountId,   value: irrfDelta, type: 'DEBIT'  as any },
+                  { accountId: inv.assetAccountId!,  value: irrfDelta, type: 'CREDIT' as any },
+                ] : []),
+              ],
+            },
+          },
+        });
+
+        await this.prisma.fixedIncomeEvent.update({
+          where: { id: event.id },
+          data:  { journalEntryId: journalEntry.id },
+        });
+
+        results.push({ eventId: event.id, competence: event.competence, success: true });
+      } catch (e: any) {
+        results.push({ eventId: event.id, competence: event.competence, success: false, error: e.message });
+      }
+    }
+
+    return { total: events.length, results };
   }
 
   async getSummary(companyId: string) {

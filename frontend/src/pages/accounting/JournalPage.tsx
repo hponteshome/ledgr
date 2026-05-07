@@ -103,6 +103,132 @@ const todayRefDefault = (() => {
 })();
 // ── Página Principal ───────────────────────────────────────────
 
+
+// ── Modal de Edição de Lançamento ─────────────────────────────
+const EditModal: React.FC<{ entry: JournalEntry; onClose: () => void; onSaved: () => void }> = ({ entry, onClose, onSaved }) => {
+    const [date, setDate] = useState(entry.date.slice(0, 10));
+    const [description, setDescription] = useState(entry.description);
+    const [items, setItems] = useState(entry.items.map(i => ({
+        id: i.id,
+        accountId: i.accountId,
+        accountCode: i.account?.code ?? '',
+        accountName: i.account?.name ?? '',
+        value: Number(i.value),
+        type: i.type,
+    })));
+    const [sourceModules, setSourceModules] = useState<{value:string;label:string}[]>([]);
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState('');
+
+    const totalDebit  = items.filter(i => i.type === 'DEBIT').reduce((s, i) => s + i.value, 0);
+    const totalCredit = items.filter(i => i.type === 'CREDIT').reduce((s, i) => s + i.value, 0);
+    const balanced    = Math.abs(totalDebit - totalCredit) < 0.01;
+
+    const lookupCode = async (idx: number, code: string) => {
+        if (!code.trim()) return;
+        try {
+            const r = await api.get('/accounting/journal/lookup-account', { params: { code: code.trim() } });
+            setItems(prev => prev.map((it, i) => i === idx ? { ...it, accountId: r.data.id, accountName: r.data.name } : it));
+        } catch { setError('Conta nao encontrada: ' + code); }
+    };
+
+    const handleSave = async () => {
+        if (!balanced) { setError('Lancamento nao esta balanceado'); return; }
+        setSaving(true); setError('');
+        try {
+            await api.put('/accounting/journal/' + entry.id, {
+                date, description,
+                items: items.map(i => ({ accountId: i.accountId, value: i.value, type: i.type })),
+            });
+            onSaved();
+        } catch (e: any) { setError(e?.response?.data?.message ?? 'Erro ao salvar'); }
+        setSaving(false);
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"
+            onClick={e => e.target === e.currentTarget && onClose()}
+            onKeyDown={e => e.key === 'Escape' && onClose()} tabIndex={-1}>
+            <div className="bg-white rounded-xl shadow-xl p-5 w-full max-w-2xl flex flex-col" style={{maxHeight:'90vh'}}>
+                <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-medium text-gray-800">Editar Lancamento</h3>
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><FiX size={18}/></button>
+                </div>
+
+                <div className="flex gap-3 mb-4">
+                    <div>
+                        <label className="text-xs text-gray-500 block mb-1">Data</label>
+                        <input type="date" value={date} onChange={e => setDate(e.target.value)}
+                            className="h-8 border border-gray-200 rounded-lg px-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-36"/>
+                    </div>
+                    <div className="flex-1">
+                        <label className="text-xs text-gray-500 block mb-1">Descricao</label>
+                        <input type="text" value={description} onChange={e => setDescription(e.target.value)}
+                            className="h-8 border border-gray-200 rounded-lg px-3 text-sm w-full focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                    </div>
+                </div>
+
+                <div style={{overflowY:'auto', maxHeight:'50vh'}}>
+                <table className="w-full text-xs mb-3 border-collapse">
+                    <thead>
+                        <tr className="bg-gray-50">
+                            <th className="px-2 py-1.5 text-left text-[10px] text-gray-400 uppercase font-bold border-b border-gray-100">Tipo</th>
+                            <th className="px-2 py-1.5 text-left text-[10px] text-gray-400 uppercase font-bold border-b border-gray-100">Codigo</th>
+                            <th className="px-2 py-1.5 text-left text-[10px] text-gray-400 uppercase font-bold border-b border-gray-100">Conta</th>
+                            <th className="px-2 py-1.5 text-right text-[10px] text-gray-400 uppercase font-bold border-b border-gray-100">Valor</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {items.map((item, idx) => (
+                            <tr key={idx} className="border-b border-gray-50">
+                                <td className="px-2 py-1.5">
+                                    <select value={item.type} onChange={e => setItems(prev => prev.map((it,i) => i===idx ? {...it, type: e.target.value as any} : it))}
+                                        className="h-7 border border-gray-200 rounded px-1 text-xs bg-white">
+                                        <option value="DEBIT">Debito</option>
+                                        <option value="CREDIT">Credito</option>
+                                    </select>
+                                </td>
+                                <td className="px-2 py-1.5">
+                                    <input type="text" value={item.accountCode}
+                                        onChange={e => setItems(prev => prev.map((it,i) => i===idx ? {...it, accountCode: e.target.value, accountName:'', accountId:''} : it))}
+                                        onBlur={() => lookupCode(idx, item.accountCode)}
+                                        className="h-7 border border-gray-200 rounded px-2 text-xs w-28 focus:outline-none focus:ring-1 focus:ring-blue-400"/>
+                                </td>
+                                <td className="px-2 py-1.5 text-gray-500">{item.accountName}</td>
+                                <td className="px-2 py-1.5">
+                                    <input type="number" value={item.value} step="0.01"
+                                        onChange={e => setItems(prev => prev.map((it,i) => i===idx ? {...it, value: parseFloat(e.target.value)||0} : it))}
+                                        className="h-7 border border-gray-200 rounded px-2 text-xs text-right w-28 focus:outline-none focus:ring-1 focus:ring-blue-400"/>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                    <tfoot>
+                        <tr className="bg-gray-50">
+                            <td colSpan={3} className="px-2 py-1.5 text-xs text-gray-400">
+                                D: R$ {fmtCurrency(totalDebit)} · C: R$ {fmtCurrency(totalCredit)}
+                                {balanced ? <span className="text-green-600 ml-2">✓ Balanceado</span> : <span className="text-red-500 ml-2">✗ Diferenca: R$ {fmtCurrency(Math.abs(totalDebit-totalCredit))}</span>}
+                            </td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table>
+
+                </div>
+                {error && <p className="text-xs text-red-600 mb-3 flex items-center gap-1"><FiAlertCircle size={12}/> {error}</p>}
+
+                <div className="flex justify-end gap-2">
+                    <button onClick={onClose} className="px-4 py-1.5 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">Cancelar</button>
+                    <button onClick={handleSave} disabled={saving || !balanced}
+                        className="px-5 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-1.5">
+                        {saving ? <FiLoader size={12} className="animate-spin"/> : <FiCheck size={12}/>} Salvar alteracoes
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const JournalPage: React.FC = () => {
     const { activeCompany } = useCompany();
 
@@ -114,6 +240,7 @@ const JournalPage: React.FC = () => {
     const [refInput, setRefInput] = useState(todayRefDefault);
     const currentMonth = React.useMemo(() => parseRefMonth(refInput), [refInput]);
     const [search, setSearch] = useState('');
+    const [fSource, setFSource] = useState('');
 
     // ── Estado do formulário ───────────────────────────────────
     const [fDate, setFDate] = useState(new Date().toISOString().substring(0, 10));
@@ -136,6 +263,7 @@ const JournalPage: React.FC = () => {
     const [repeatHist, setRepeatHist] = useState(false);
     const [repeatComplement, setRepeatComplement] = useState(false);
 
+    const [sourceModules, setSourceModules] = useState<{value:string;label:string}[]>([]);
     const [saving, setSaving] = useState(false);
     const [formError, setFormError] = useState('');
     const [formSuccess, setFormSuccess] = useState('');
@@ -164,13 +292,13 @@ const JournalPage: React.FC = () => {
         setLoading(true);
         try {
             const params = showRecent
-                ? { dateTo: fDate, search: search || undefined, page, limit: 50, orderBy: 'date', orderDir: 'desc' }
+                ? { dateTo: fDate, search: search || undefined, sources: fSource || undefined, page, limit: 50, orderBy: 'date', orderDir: 'desc' }
                 : { dateFrom: currentMonth.from, dateTo: currentMonth.to, search: search || undefined, page, limit: 100 };
             const r = await api.get('/accounting/journal', { params });
             setData(r.data);
         } catch (e) { console.error(e); }
         finally { setLoading(false); }
-    }, [activeCompany, currentMonth.from, currentMonth.valid, search, page, showRecent, fDate]);
+    }, [activeCompany, currentMonth.from, currentMonth.valid, search, page, showRecent, fDate, fSource]);
 
     const loadTotals = useCallback(async () => {
         if (!activeCompany || !currentMonth.valid) return;
@@ -180,6 +308,11 @@ const JournalPage: React.FC = () => {
         } catch (e) { console.error(e); }
     }, [activeCompany, currentMonth.from, currentMonth.to, currentMonth.valid]);
 
+    useEffect(() => {
+        api.get('/accounting/journal/source-modules')
+            .then(r => setSourceModules(r.data ?? []))
+            .catch(() => {});
+    }, [activeCompany?.id]);
     useEffect(() => { loadEntries(); }, [loadEntries]);
     useEffect(() => { loadTotals(); }, [loadTotals]);
     useEffect(() => { if (currentMonth.valid) setFDate(currentMonth.to); }, [currentMonth.to, currentMonth.valid]);
@@ -340,9 +473,18 @@ const JournalPage: React.FC = () => {
                         {currentMonth.valid && <span className="text-base font-bold text-red-500 hidden sm:inline">{currentMonth.label}</span>}
                         {!currentMonth.valid && refInput.length > 0 && <span className="text-xs text-red-500">formato inválido</span>}
                     </div>
-                    <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-blue-50 text-blue-700 border border-blue-200">ECD</span>
-                    <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-green-50 text-green-700 border border-green-200">Manual</span>
-                    <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-amber-50 text-amber-700 border border-amber-200">Provisão</span>
+                    {sourceModules.map(s => {
+                        const cfg = SOURCE_CONFIG[s.value] ?? { cls: 'bg-gray-100 text-gray-600', label: s.label };
+                        const active = fSource === s.value;
+                        return (
+                            <button key={s.value}
+                                onClick={() => { setFSource(active ? '' : s.value); setPage(1); }}
+                                className={`text-xs px-2 py-0.5 rounded-full font-medium border transition-all ${cfg.cls} ${active ? 'ring-2 ring-offset-1 ring-blue-400' : 'opacity-70 hover:opacity-100'}`}
+                                title={String(s.count) + ' lancamentos'}>
+                                {cfg.label}{active ? ' ×' : ''}
+                            </button>
+                        );
+                    })}
                 </div>
                 <div className="flex items-center gap-2">
                     <button onClick={() => setShowEcdOpening(true)}
@@ -379,8 +521,11 @@ const JournalPage: React.FC = () => {
                         <select value={fType} onChange={e => setFType(e.target.value as any)}
                             className="h-8 border border-gray-200 rounded-lg px-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 w-32">
                             <option value="MANUAL">Manual</option>
-                            <option value="PROVISION">Provisão</option>
+                            <option value="PROVISION">Provisao</option>
                             <option value="ADJUSTMENT">Ajuste</option>
+                            {sourceModules.filter(s => !["ACCOUNTING","PROVISION","ADJUSTMENT","MANUAL"].includes(s.value)).map(s => (
+                                <option key={s.value} value={s.value}>{s.label}</option>
+                            ))}
                         </select>
                     </div>
                     <div className="w-px bg-gray-200 self-stretch" />
@@ -517,6 +662,11 @@ const JournalPage: React.FC = () => {
                             <input type="text" value={search} onChange={e => { setSearch(e.target.value); setPage(1); }}
                                 placeholder="Filtrar conta, histórico..."
                                 className="h-7 border border-gray-200 rounded-lg pl-8 pr-3 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 w-52" />
+                        <select value={fSource} onChange={e => { setFSource(e.target.value); setPage(1); }}
+                            className="h-7 border border-gray-200 rounded-lg px-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 w-36">
+                            <option value="">Todas as fontes</option>
+                            {sourceModules.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                        </select>
                         </div>
                         {data && <span className="text-xs text-gray-400">{data.total} lançamentos</span>}
                     </div>

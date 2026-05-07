@@ -69,6 +69,16 @@ export class FixedIncomeController {
    * Atualização em lote: útil para atualizar todos os investimentos ativos de uma vez.
    * Body: { competence, indexerRate, investmentIds?: string[] }
    */
+
+  /**
+   * POST /accounting/fixed-income/generate-missing-journals
+   * Gera lancamentos contabeis retroativos para eventos sem journalEntryId.
+   */
+  @Post('generate-missing-journals')
+  generateMissingJournals(@Body() body: any, @Request() req: any) {
+    return this.svc.generateMissingJournals(req.companyId, req.user.id, body?.competenceFrom, body?.competenceTo);
+  }
+
   @Post('bulk-update')
   async bulkUpdate(@Body() body: any, @Request() req: any) {
     const { competence, indexerRate, businessDays, calendarDays, generateJournalEntry, investmentIds } = body;
