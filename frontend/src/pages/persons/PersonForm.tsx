@@ -185,7 +185,7 @@ function toPayload(form: FormData): Record<string, any> {
       continue;
     }
     if (typeof v === 'string') {
-      payload[k] = v.trim() === '' ? undefined : v.trim();
+      payload[k === 'cpf' ? 'document' : k] = v.trim() === '' ? undefined : v.trim();
     } else {
       payload[k] = v;
     }
@@ -1292,4 +1292,5 @@ export const PersonForm: React.FC = () => {
     </div >
   );
 };
+
 

@@ -137,7 +137,7 @@ async findByCpf(cpf: string) {
       : dto.document;
 
     // Desestrutura otherRegistrations para cast explícito (Json do Prisma)
-    const { otherRegistrations, birthDate, rgIssueDate, ...rest } = dto;
+    const { otherRegistrations, birthDate, rgIssueDate, document, ...rest } = dto;
     
     return this.prisma.person.create({
       data: {
