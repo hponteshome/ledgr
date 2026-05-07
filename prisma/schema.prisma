@@ -704,6 +704,7 @@ enum SourceModule {
   BANK_IMPORT
   ECD_IMPORT
   ASSET
+  INVESTMENT
   @@map("source_module")
 }
 
@@ -2117,3 +2118,4 @@ model Holiday {
   @@index([type])
   @@map("holidays")
 }
+

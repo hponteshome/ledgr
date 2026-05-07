@@ -155,26 +155,99 @@ const S = {
   } as React.CSSProperties),
 };
 
+// -- AccountPicker -- autocomplete leve para conta contabil
+interface Account { id: string; code: string; name: string; reducedCode?: string; }
+
+function AccountPicker({ label, value, onChange, accounts }: {
+  label: string; value: string; onChange: (id: string) => void; accounts: Account[];
+}) {
+  const [q, setQ] = React.useState('');
+  const [open, setOpen] = React.useState(false);
+  const safeAccounts = Array.isArray(accounts) ? accounts : [];
+  const selected = safeAccounts.find(a => a.id === value);
+  const display = selected ? (selected.reducedCode ?? selected.code) + ' — ' + selected.name : '';
+  const filtered = q.length >= 1
+    ? safeAccounts.filter(a =>
+        a.code.includes(q) ||
+        (a.reducedCode ?? '').includes(q) ||
+        a.name.toLowerCase().includes(q.toLowerCase())
+      ).slice(0, 12)
+    : [];
+  return (
+    <div style={{position:'relative'}}>
+      <label style={S.label}>{label}</label>
+      <input
+        style={{...S.input, cursor:'text'}}
+        value={open ? q : display}
+        placeholder="Digite codigo ou nome..."
+        onFocus={() => { setOpen(true); setQ(''); }}
+        onBlur={() => setTimeout(() => {
+          // Se o texto digitado bate exatamente com uma conta, selecionar automaticamente
+          if (open && q) {
+            const match = safeAccounts.find(a =>
+              a.code === q || (a.reducedCode ?? '') === q ||
+              a.name.toLowerCase() === q.toLowerCase()
+            );
+            if (match) onChange(match.id);
+          }
+          setOpen(false);
+        }, 400)}
+        onChange={e => setQ(e.target.value)}
+      />
+      {value && !open && (
+        <button onClick={() => onChange('')}
+          style={{position:'absolute', right:6, top:22, background:'none', border:'none', cursor:'pointer', color:'#9CA3AF', fontSize:13}}>x</button>
+      )}
+      {open && filtered.length > 0 && (
+        <div style={{position:'absolute', zIndex:999, background:'#fff', border:'0.5px solid #E5E7EB',
+          borderRadius:6, width:'100%', maxHeight:200, overflowY:'auto', boxShadow:'0 4px 12px rgba(0,0,0,.08)'}}>
+          {filtered.map(a => (
+            <div key={a.id}
+              onMouseDown={() => { onChange(a.id); setOpen(false); setQ(''); }}
+              style={{padding:'7px 12px', fontSize:12, cursor:'pointer', borderBottom:'0.5px solid #F5F5F5'}}
+              onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background='#F0F9FF'}
+              onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background='#fff'}
+            >
+              <span style={{fontWeight:500, color:'#1D4ED8'}}>{a.reducedCode ?? a.code}</span>
+              <span style={{color:'#6B7280', marginLeft:8}}>{a.name}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Modal Investimento (Cadastro + Edicao) ────────────────────────────────────
 function InvestimentoModal({ inv, onClose, onSaved }: {
   inv?: Investment; onClose: ()=>void; onSaved: ()=>void;
 }) {
   const isEdit = !!inv;
   const [form, setForm] = useState({
-    description: inv?.description ?? '',
-    type: inv?.type ?? 'CDB',
-    issuerName: inv?.issuerName ?? '',
-    issuerCnpj: inv?.issuerCnpj ?? '',
-    indexer: inv?.indexer ?? 'CDI',
-    indexerRate: String(inv?.indexerRate ?? '96'),
-    capitalInitial: String(inv?.capitalInitial ?? ''),
-    applicationDate: inv?.applicationDate?.slice(0,10) ?? '',
-    maturityDate: inv?.maturityDate?.slice(0,10) ?? '',
-    irrfExempt: inv?.irrfExempt ?? false,
-    notes: inv?.notes ?? '',
+    description:      inv?.description ?? '',
+    type:             inv?.type ?? 'CDB',
+    issuerName:       inv?.issuerName ?? '',
+    issuerCnpj:       inv?.issuerCnpj ?? '',
+    indexer:          inv?.indexer ?? 'CDI',
+    indexerRate:      String(inv?.indexerRate ?? '96'),
+    capitalInitial:   String(inv?.capitalInitial ?? ''),
+    applicationDate:  inv?.applicationDate?.slice(0,10) ?? '',
+    maturityDate:     inv?.maturityDate?.slice(0,10) ?? '',
+    irrfExempt:       inv?.irrfExempt ?? false,
+    notes:            inv?.notes ?? '',
+    assetAccountId:   (inv as any)?.assetAccountId ?? '',
+    revenueAccountId: (inv as any)?.revenueAccountId ?? '',
+    irrfAccountId:    (inv as any)?.irrfAccountId ?? '',
   });
+  const [accounts, setAccounts] = React.useState<Account[]>([]);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
+
+  React.useEffect(() => {
+    api.get('/chart-of-accounts', { params: { limit: 500 } })
+      .then(r => { const raw = r.data; const arr = Array.isArray(raw) ? raw : Array.isArray(raw?.items) ? raw.items : Array.isArray(raw?.data) ? raw.data : []; console.log('[AccountPicker] contas carregadas:', arr.length); setAccounts(arr); })
+      .catch(() => {});
+  }, []);
   const set = (k: string, v: any) => setForm(p => ({...p, [k]: v}));
 
   const save = async () => {
@@ -185,8 +258,11 @@ function InvestimentoModal({ inv, onClose, onSaved }: {
     try {
       const payload = {
         ...form,
-        indexerRate: parseFloat(form.indexerRate),
-        capitalInitial: parseFloat(String(form.capitalInitial).replace(/\./g,'').replace(',','.')),
+        indexerRate:      parseFloat(form.indexerRate),
+        capitalInitial:   parseFloat(String(form.capitalInitial).replace(/\./g,'').replace(',','.')),
+        assetAccountId:   form.assetAccountId   || null,
+        revenueAccountId: form.revenueAccountId || null,
+        irrfAccountId:    form.irrfAccountId    || null,
       };
       if (isEdit) {
         await api.put('/accounting/fixed-income/' + inv!.id, payload);
@@ -257,6 +333,23 @@ function InvestimentoModal({ inv, onClose, onSaved }: {
             <input type='checkbox' id='irrfEx' checked={form.irrfExempt} onChange={e=>set('irrfExempt',e.target.checked)}/>
             <label htmlFor='irrfEx' style={{fontSize:13, cursor:'pointer'}}>Isento de IRRF (LCI / LCA / CRI / CRA)</label>
           </div>
+          {/* Contas Contabeis */}
+          <div style={{gridColumn:'1/-1', borderTop:'0.5px solid #E5E7EB', paddingTop:12, marginTop:4}}>
+            <div style={{fontSize:11, fontWeight:500, color:'#6B7280', textTransform:'uppercase' as const, letterSpacing:'.3px', marginBottom:10}}>
+              Contas Contabeis (opcional)
+            </div>
+            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10}}>
+              <div style={{gridColumn:'1/-1'}}>
+                <AccountPicker label="Conta do CDB (Ativo)"
+                  value={form.assetAccountId} onChange={v => set('assetAccountId', v)} accounts={accounts} />
+              </div>
+              <AccountPicker label="Receitas de Aplicacoes Financeiras"
+                value={form.revenueAccountId} onChange={v => set('revenueAccountId', v)} accounts={accounts} />
+              <AccountPicker label="IRRF a Recuperar"
+                value={form.irrfAccountId} onChange={v => set('irrfAccountId', v)} accounts={accounts} />
+            </div>
+          </div>
+
           <div style={{gridColumn:'1/-1'}}>
             <label style={S.label}>Observacoes</label>
             <textarea style={{...S.input, height:60, resize:'vertical' as const, paddingTop:8}}
@@ -407,6 +500,11 @@ export default function RendaFixaPage() {
   const [msg,             setMsg]             = useState('');
   const [journalEntries,  setJournalEntries]  = useState<any[]>([]);
   const [jLoading,        setJLoading]        = useState(false);
+  const [bulkComp,        setBulkComp]        = useState('');
+  const [bulkRate,        setBulkRate]        = useState('');
+  const [bulkJournal,     setBulkJournal]     = useState(true);
+  const [bulkLoading,     setBulkLoading]     = useState(false);
+  const [bulkResult,      setBulkResult]      = useState<any[]>([]);
 
   const load = async () => {
     setLoading(true);
@@ -446,10 +544,12 @@ export default function RendaFixaPage() {
   const loadJournalEntries = async () => {
     setJLoading(true);
     try {
-      const r = await api.get('/accounting/journal-entries', {
-        params: { sourceModule: 'ACCOUNTING', description: 'CDB', limit: 50 }
+      const r = await api.get('/accounting/journal', {
+        params: { search: 'CDB', sources: 'ACCOUNTING', limit: 100 }
       });
-      setJournalEntries(r.data?.data ?? r.data ?? []);
+      const raw = r.data;
+      const arr = Array.isArray(raw) ? raw : Array.isArray(raw?.entries) ? raw.entries : Array.isArray(raw?.data) ? raw.data : Array.isArray(raw?.items) ? raw.items : [];
+      setJournalEntries(arr);
     } catch { setJournalEntries([]); }
     setJLoading(false);
   };
@@ -527,6 +627,25 @@ export default function RendaFixaPage() {
   }, [investments]);
 
   const onInvSaved = () => { setShowModal(false); setEditInv(null); load(); };
+
+  const runBulkUpdate = async () => {
+    if (!bulkComp || !bulkRate) { alert('Informe competencia e taxa CDI'); return; }
+    setBulkLoading(true); setBulkResult([]);
+    try {
+      const r = await api.post('/accounting/fixed-income/bulk-update', {
+        competence: bulkComp,
+        indexerRate: parseFloat(bulkRate) / 100,
+        generateJournalEntry: bulkJournal,
+      });
+      setBulkResult(r.data ?? []);
+      const ok = (r.data ?? []).filter((x:any) => x.success).length;
+      const fail = (r.data ?? []).filter((x:any) => !x.success).length;
+      alert(ok + ' atualizado(s) com sucesso' + (fail ? ', ' + fail + ' erro(s)' : '') + '.');
+      if (bulkJournal) { setTimeout(loadJournalEntries, 500); }
+      load();
+    } catch(e:any) { alert('Erro: ' + (e?.response?.data?.message ?? e.message)); }
+    setBulkLoading(false);
+  };
   const onResgSaved = () => {
     setShowResgate(false); setEditResgate(null);
     if (selected) { loadRedemptions(selected.id); load(); }
@@ -802,7 +921,7 @@ export default function RendaFixaPage() {
           <div style={S.card}>
             <p style={S.secTit}>Fluxo operacional mensal</p>
             {[
-              {n:'1',titulo:'BCB divulga CDI do mes',desc:'Acesse Tabela CDI -> aba Atualizacao Mensal. Informe competencia e CDI acumulado do mes.'},
+              {n:'1',titulo:'BCB divulga CDI do mes',desc:'Acesse Tabela CDI -> aba Importar CDI. Cole os dados do Portal de Financas e importe. A taxa sera preenchida automaticamente ao selecionar a competencia abaixo.', link:'/app/accounting/investimentos/cdi'},
               {n:'2',titulo:'Executar atualizacao em lote',desc:'Clique Executar — sistema salva a taxa e recalcula todos os investimentos ativos.'},
               {n:'3',titulo:'Lancamento contabil',desc:'Marque Gerar lancamento contabil para registrar receita financeira bruta (regime de competencia).'},
               {n:'4',titulo:'Cadastrar investimentos',desc:'Use + Novo investimento para registrar CDB, LCI, LCA e demais aplicacoes.'},
@@ -810,7 +929,15 @@ export default function RendaFixaPage() {
             ].map(s=>(
               <div key={s.n} style={{display:'flex',gap:14,marginBottom:14,alignItems:'flex-start'}}>
                 <div style={{minWidth:26,height:26,borderRadius:'50%',background:'#EFF6FF',color:'#1D4ED8',display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:500,flexShrink:0}}>{s.n}</div>
-                <div><div style={{fontSize:13,fontWeight:500,marginBottom:2}}>{s.titulo}</div><div style={{fontSize:12,color:'var(--color-text-secondary)',lineHeight:1.6}}>{s.desc}</div></div>
+                <div>
+                  <div style={{fontSize:13,fontWeight:500,marginBottom:2}}>{s.titulo}</div>
+                  <div style={{fontSize:12,color:'var(--color-text-secondary)',lineHeight:1.6}}>{s.desc}</div>
+                  {(s as any).link && (
+                    <a href={(s as any).link} style={{fontSize:11,color:'#2563EB',textDecoration:'underline',marginTop:3,display:'inline-block'}}>
+                      Abrir Tabela CDI →
+                    </a>
+                  )}
+                </div>
               </div>
             ))}
             <div style={{background:'#FEFCE8',border:'0.5px solid #FEF08A',borderRadius:8,padding:'10px 14px',fontSize:12,color:'#854D0E',marginTop:4}}>
@@ -818,10 +945,97 @@ export default function RendaFixaPage() {
             </div>
           </div>
           <div style={S.card}>
+            <p style={S.secTit}>Executar Atualizacao Mensal</p>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:12}}>
+              <div>
+                <label style={S.label}>Competencia (AAAA-MM)</label>
+                <input style={S.input} type='month' value={bulkComp} onChange={e=>{
+                  const comp = e.target.value;
+                  setBulkComp(comp);
+                  // Buscar taxa CDI da tabela local
+                  const found = historicalRates.find(r => r.competence === comp);
+                  if (found) setBulkRate(String((found.rate * 100).toFixed(6)));
+                  else setBulkRate('');
+                }}/>
+              </div>
+              <div>
+                <label style={S.label}>CDI Acumulado do Mes (%)</label>
+                <input style={S.input} type='number' step='0.0001' placeholder='Informe ou selecione competencia'
+                  value={bulkRate} onChange={e=>setBulkRate(e.target.value)}/>
+                {bulkComp && !historicalRates.find(r=>r.competence===bulkComp) && (
+                  <div style={{fontSize:10,color:'#B45309',marginTop:3}}>Taxa nao encontrada na tabela CDI — informe manualmente</div>
+                )}
+                {bulkComp && historicalRates.find(r=>r.competence===bulkComp) && (
+                  <div style={{fontSize:10,color:'#15803D',marginTop:3}}>Taxa obtida da Tabela CDI automaticamente</div>
+                )}
+              </div>
+            </div>
+            <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12}}>
+              <input type='checkbox' id='bulkJournal' checked={bulkJournal} onChange={e=>setBulkJournal(e.target.checked)}/>
+              <label htmlFor='bulkJournal' style={{fontSize:13,cursor:'pointer'}}>Gerar lancamento contabil (regime de competencia)</label>
+            </div>
+            {bulkResult.length > 0 && (
+              <div style={{marginBottom:12}}>
+                {bulkResult.filter((r:any)=>!r.success).map((r:any)=>(
+                  <div key={r.id} style={{fontSize:11,color:'#B91C1C',marginBottom:2}}>✗ {r.id}: {r.error}</div>
+                ))}
+              </div>
+            )}
+            <button style={S.btnP} onClick={runBulkUpdate} disabled={bulkLoading}>
+              {bulkLoading ? 'Atualizando...' : 'Executar atualizacao mensal'}
+            </button>
+          </div>
+
+          <div style={S.card}>
             <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
               <p style={{...S.secTit,margin:0}}>Lancamentos contabeis gerados</p>
-              <button style={S.btn} onClick={loadJournalEntries} disabled={jLoading}>{jLoading?'...':'Atualizar'}</button>
+              <div style={{display:'flex',gap:8}}>
+                <button style={S.btn} onClick={async()=>{
+                  const from = window.prompt('Competencia inicial (AAAA-MM) — deixe em branco para todas:');
+                  if (from === null) return;
+                  const to = window.prompt('Competencia final (AAAA-MM) — deixe em branco para todas:');
+                  if (to === null) return;
+                  try {
+                    const r = await api.post('/accounting/fixed-income/generate-missing-journals', {
+                      competenceFrom: from || undefined,
+                      competenceTo:   to   || undefined,
+                    });
+                    const ok   = r.data.results.filter((x:any)=>x.success).length;
+                    const fail = r.data.results.filter((x:any)=>!x.success).length;
+                    alert(r.data.total + ' eventos encontrados · ' + ok + ' gerados' + (fail ? ' · ' + fail + ' erros' : '') + '.');
+                    loadJournalEntries();
+                  } catch(e:any) { alert('Erro: ' + (e?.response?.data?.message ?? e.message)); }
+                }} disabled={jLoading} style={{...S.btn, background:'#374151', color:'#fff', border:'none'}}>Gerar retroativos</button>
+                <button style={S.btn} onClick={loadJournalEntries} disabled={jLoading}>{jLoading?'...':'Atualizar'}</button>
+              </div>
             </div>
+            {(() => {
+              const semConta = investments.filter((i:any) => i.status==='ATIVO' && (!i.assetAccountId || !i.revenueAccountId));
+              return semConta.length > 0 ? (
+                <div style={{background:'#FEFCE8',border:'0.5px solid #FEF08A',borderRadius:8,padding:'10px 14px',marginBottom:12}}>
+                  <div style={{fontSize:12,fontWeight:500,color:'#854D0E',marginBottom:6}}>
+                    ⚠️ {semConta.length} investimento(s) sem conta contabil cadastrada — lancamentos nao serao gerados:
+                  </div>
+                  {semConta.map((i:any) => (
+                    <div key={i.id} style={{fontSize:11,color:'#92400E',marginTop:3,display:'flex',alignItems:'center',gap:6}}>
+                      <button
+                        onClick={() => setEditInv(i)}
+                        style={{background:'none',border:'none',cursor:'pointer',color:'#92400E',fontSize:11,
+                          textDecoration:'underline',padding:0,textAlign:'left'}}>
+                        • {i.description} ({i.issuerName})
+                      </button>
+                      <span style={{color:'#B45309'}}>
+                        {[!i.assetAccountId&&'Conta CDB',!i.revenueAccountId&&'Conta Receitas',!i.irrfAccountId&&'IRRF a Recuperar']
+                          .filter(Boolean).join(' · ')}
+                      </span>
+                    </div>
+                  ))}
+                  <div style={{fontSize:11,color:'#92400E',marginTop:8,fontStyle:'italic'}}>
+                    Edite cada investimento e preencha as contas contabeis.
+                  </div>
+                </div>
+              ) : null;
+            })()} 
             {journalEntries.length===0
               ?<p style={{fontSize:12,color:'var(--color-text-secondary)',fontStyle:'italic'}}>Nenhum lancamento encontrado. Execute atualizacao mensal com lancamento contabil ativado.</p>
               :<div style={S.tblW}>

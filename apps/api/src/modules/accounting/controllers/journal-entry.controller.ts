@@ -56,6 +56,13 @@ export class JournalEntryController {
   }
 
   // ── GET /accounting/journal/lookup-account ──────────────────────────────────
+  @Get('source-modules')
+  async getSourceModules(@Req() req: any) {
+    const companyId = req.headers['x-company-id'];
+    const results = await this.service.getDistinctSourceModules(companyId);
+    return results;
+  }
+
   @Get('lookup-account')
   lookupAccount(
     @Req() req: any,

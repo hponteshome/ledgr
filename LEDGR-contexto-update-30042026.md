@@ -104,47 +104,47 @@ rfb/             — Consulta RFB
 
 ## Models principais (resumo — não o schema completo)
 
-| Model                    | Tabela                        | Observação                                                           |
-| ------------------------ | ----------------------------- | -------------------------------------------------------------------- |
-| `AccountsPayable`        | `accounts_payable`            | status usa `APStatus` (não `ApEntryStatus`)                          |
-| `ApEntry`                | `ap_entries`                  | model antigo, status usa `ApEntryStatus`                             |
-| `AgendaEvent`            | `agenda_events`               | campo obrigatório: `createdById`                                     |
-| `FiscalDocument`         | `fiscal_documents`            | campo obrigatório: `createdById` · status: `DocumentStatus`          |
-| `BankStatement`          | `bank_statements`             | novo (migrado em 22/03/2026)                                         |
-| `BankTransaction`        | `bank_transactions`           | novo                                                                 |
-| `BankImportRule`         | `bank_import_rules`           | motor de aprendizado                                                 |
-| `JournalEntry`           | `journal_entries`             | campo: `date` (não `entryDate`) · `sourceModule` (não `isAutomatic`) |
-| `JournalEntryItem`       | `journal_entry_items`         | campos: `accountId`, `type`, `value`                                 |
-| `AuditLog`               | `audit_logs`                  | campos: `actorId`, `action`, `targetId`, `before`, `after`, `ip`     |
-| `FixedIncomeInvestment`  | `fixed_income_investments`    | campo `accountingAccountId` (conta contábil do CDB)                  |
-| `FixedIncomeEvent`       | `fixed_income_events`         | resgates e atualizações mensais                                      |
-| `FixedIncomeMonthlyRate` | `fixed_income_monthly_rates`  | taxas CDI mensais por investimento                                   |
-| `CdiDailyRate`           | `cdi_daily_rates`             | taxas CDI diárias importadas da BCB                                  |
-| `Holiday`                | `holidays`                    | feriados nacionais/estaduais/judaicos · campos hebrewName/hebrewDate |
+| Model                    | Tabela                       | Observação                                                           |
+| ------------------------ | ---------------------------- | -------------------------------------------------------------------- |
+| `AccountsPayable`        | `accounts_payable`           | status usa `APStatus` (não `ApEntryStatus`)                          |
+| `ApEntry`                | `ap_entries`                 | model antigo, status usa `ApEntryStatus`                             |
+| `AgendaEvent`            | `agenda_events`              | campo obrigatório: `createdById`                                     |
+| `FiscalDocument`         | `fiscal_documents`           | campo obrigatório: `createdById` · status: `DocumentStatus`          |
+| `BankStatement`          | `bank_statements`            | novo (migrado em 22/03/2026)                                         |
+| `BankTransaction`        | `bank_transactions`          | novo                                                                 |
+| `BankImportRule`         | `bank_import_rules`          | motor de aprendizado                                                 |
+| `JournalEntry`           | `journal_entries`            | campo: `date` (não `entryDate`) · `sourceModule` (não `isAutomatic`) |
+| `JournalEntryItem`       | `journal_entry_items`        | campos: `accountId`, `type`, `value`                                 |
+| `AuditLog`               | `audit_logs`                 | campos: `actorId`, `action`, `targetId`, `before`, `after`, `ip`     |
+| `FixedIncomeInvestment`  | `fixed_income_investments`   | campo `accountingAccountId` (conta contábil do CDB)                  |
+| `FixedIncomeEvent`       | `fixed_income_events`        | resgates e atualizações mensais                                      |
+| `FixedIncomeMonthlyRate` | `fixed_income_monthly_rates` | taxas CDI mensais por investimento                                   |
+| `CdiDailyRate`           | `cdi_daily_rates`            | taxas CDI diárias importadas da BCB                                  |
+| `Holiday`                | `holidays`                   | feriados nacionais/estaduais/judaicos · campos hebrewName/hebrewDate |
 
 ---
 
 ## Estado dos módulos
 
-| Módulo                     | Status         | Observações                                                          |
-| -------------------------- | -------------- | -------------------------------------------------------------------- |
-| Accounting                 | ✅ Produção    | Plano de Contas, Lançamentos, Balancete, Saldos                      |
-| Renda Fixa (CDB)           | ✅ Produção    | Carteira, extrato, projeção, resgates, proporcionalização 1º mês     |
-| Calendário de Feriados     | ✅ Produção    | 63 feriados nacionais 2022-2026, feriados judaicos                   |
-| Sistema — Tabelas Legais   | ✅ Produção    | IRPF 2024/2025/2026 + INSS 2024/2025/2026 + Simulador               |
-| Finance — Doc. Fiscal      | ✅ Funcionando | Integração AP × CT × Agenda via $transaction                         |
-| Finance — Contas a Pagar   | ✅ Funcionando | Baixa individual e lote, Aging/Posição AP                            |
-| Finance — Agenda           | ✅ Funcionando | Calendário post-its, recorrência                                     |
-| Finance — Bank Import      | ✅ Funcionando | Itaú, Bradesco, BB, OFX, CSV · sugestão 3 camadas                   |
-| SPED ECD                   | ✅ Produção    |                                                                      |
-| Ativo Imobilizado          | ✅ Produção    |                                                                      |
-| Societário                 | ✅ Produção    |                                                                      |
-| RFB                        | ✅ Produção    |                                                                      |
-| Finance — Contas a Receber | 🔲 Pendente    | estrutura preparada (arEntryId nos models)                           |
-| Finance — Folha RH         | 🔲 Pendente    | estrutura preparada (payrollId nos models)                           |
-| Finance — Conciliação AP   | 🔲 Pendente    | apEntryId em BankTransaction já existe                               |
-| Finance — Fluxo de Caixa   | 🔲 Pendente    |                                                                      |
-| Sistema — Indicadores      | 🔧 Parcial     | CDI completo; Selic e IGP-M pendentes (abas a implementar)           |
+| Módulo                     | Status         | Observações                                                      |
+| -------------------------- | -------------- | ---------------------------------------------------------------- |
+| Accounting                 | ✅ Produção    | Plano de Contas, Lançamentos, Balancete, Saldos                  |
+| Renda Fixa (CDB)           | ✅ Produção    | Carteira, extrato, projeção, resgates, proporcionalização 1º mês |
+| Calendário de Feriados     | ✅ Produção    | 63 feriados nacionais 2022-2026, feriados judaicos               |
+| Sistema — Tabelas Legais   | ✅ Produção    | IRPF 2024/2025/2026 + INSS 2024/2025/2026 + Simulador            |
+| Finance — Doc. Fiscal      | ✅ Funcionando | Integração AP × CT × Agenda via $transaction                     |
+| Finance — Contas a Pagar   | ✅ Funcionando | Baixa individual e lote, Aging/Posição AP                        |
+| Finance — Agenda           | ✅ Funcionando | Calendário post-its, recorrência                                 |
+| Finance — Bank Import      | ✅ Funcionando | Itaú, Bradesco, BB, OFX, CSV · sugestão 3 camadas                |
+| SPED ECD                   | ✅ Produção    |                                                                  |
+| Ativo Imobilizado          | ✅ Produção    |                                                                  |
+| Societário                 | ✅ Produção    |                                                                  |
+| RFB                        | ✅ Produção    |                                                                  |
+| Finance — Contas a Receber | 🔲 Pendente    | estrutura preparada (arEntryId nos models)                       |
+| Finance — Folha RH         | 🔲 Pendente    | estrutura preparada (payrollId nos models)                       |
+| Finance — Conciliação AP   | 🔲 Pendente    | apEntryId em BankTransaction já existe                           |
+| Finance — Fluxo de Caixa   | 🔲 Pendente    |                                                                  |
+| Sistema — Indicadores      | 🔧 Parcial     | CDI completo; Selic e IGP-M pendentes (abas a implementar)       |
 
 ---
 
@@ -156,10 +156,12 @@ rfb/             — Consulta RFB
 **7 CDBs cadastrados, todos 96% CDI BB** — migrados da LM ADMINISTRACAO (UUID `f00af1b1-d50b-4ae6-aa17-4c2262e058db`)
 
 **Contas contábeis da empresa (Renda Fixa):**
+
 - IRRF a Recuperar: `11309010010` (UUID a confirmar)
 - Receitas Aplic. Financeiras: `32101010001` (UUID `0d5ab7bf-0315-463a-936b-f910d610fae6`)
 
 **CDBs com contas individuais no plano:**
+
 - `11104040001` — CDB 3600889897272 (saldo capital R$ 82.500)
 - `11104040002` — CDB 1600890985631 (saldo capital R$ 9.628.000)
 - `11104040003` — CDB 1500908586930 (saldo capital R$ 1.000.000)
@@ -169,12 +171,15 @@ rfb/             — Consulta RFB
 - `11104040007` — CDB 0100950505802 (saldo capital R$ 31.000)
 
 **Schema — campo adicionado em `FixedIncomeInvestment`:**
+
 ```prisma
 accountingAccountId String? @map("accounting_account_id") @db.Uuid
 ```
+
 Migration: `20260430223656_add_accounting_account_to_fixed_income`
 
 **Frontend `RendaFixaPage.tsx`:**
+
 - Lista consolidada com colunas: Descrição, Tipo, Emissor, Indexador, Capital Inicial, Saldo Capital, Rend. Bruto, IRRF Est., Saldo Líquido, Aplicação, Vencimento, Status, Ações
 - `allProjections` — calcula projeção de todos os investimentos via `buildProjection` + feriados
 - Filtro de período único (acima da tabela, à direita) — aplica na lista E no detalhe
@@ -189,6 +194,7 @@ Migration: `20260430223656_add_accounting_account_to_fixed_income`
 **Atualização mensal executada:** jan-abr/2026 para todos os 7 CDBs
 
 **Correção crítica — `cdi.service.ts`:**
+
 ```typescript
 // ANTES (errado — pegava dia intermediário):
 cur.accum = Number(r.monthlyAccum);
@@ -199,6 +205,7 @@ cur.accum = Math.max(cur.accum, Number(r.monthlyAccum));
 ### Calendário de Feriados (COMPLETO ✅)
 
 **Backend:** `apps/api/src/modules/calendar/`
+
 - `GET /calendar/holidays` — lista por ano/tipo (`@SkipCompanyCheck()`)
 - `POST /calendar/holidays/import/:year` — importa via BrasilAPI
 - `POST /calendar/holidays` — cadastro manual (feriados judaicos)
@@ -210,6 +217,7 @@ cur.accum = Math.max(cur.accum, Number(r.monthlyAccum));
 ### Menu Sistema (COMPLETO ✅)
 
 **Subitens:**
+
 - Calendário de Feriados → `/app/sistema/calendario`
 - Indicadores Econômicos → `/app/sistema/indicadores` (CDI; Selic/IGP-M pendentes)
 - Tabelas Legais → `/app/sistema/tabelas`
@@ -219,6 +227,7 @@ cur.accum = Math.max(cur.accum, Number(r.monthlyAccum));
 ### Tabelas Legais (COMPLETO ✅)
 
 **`frontend/src/pages/sistema/TabelasLegaisPage.tsx`**
+
 - IRPF: 3 vigências (Fev/2024-Abr/2025, Mai/2025+, Jan/2026+)
 - INSS: 2024, 2025, 2026
 - Simulador integrado INSS + IRPF com desconto simplificado / dependentes
@@ -247,6 +256,7 @@ Desconto máximo: R$ 988,09
 
 **168 contas importadas** de arquivo `.txt` do sistema legado (encoding latin1).
 **Importante:** salvar o SQL como `latin1` para o psql interpretar corretamente:
+
 ```powershell
 $env:PGCLIENTENCODING = "LATIN1"
 psql -h localhost -U ledgr -d ledgr_app -f D:\Temp\import_plano.sql
@@ -284,32 +294,72 @@ psql -h localhost -U ledgr -d ledgr_app -f D:\Temp\import_plano.sql
 
 ## Design System (Clean Minimalista)
 
-| Token | Valor | Uso |
-|-------|-------|-----|
-| radius-sm | 6px | Inputs, pills |
-| radius-md | 10px | Cards, botões |
-| radius-lg | 14px | Modais |
-| border | 0.5px solid #E5E7EB | Padrão |
-| surface | #F9FAFB | Backgrounds |
+| Token     | Valor               | Uso           |
+| --------- | ------------------- | ------------- |
+| radius-sm | 6px                 | Inputs, pills |
+| radius-md | 10px                | Cards, botões |
+| radius-lg | 14px                | Modais        |
+| border    | 0.5px solid #E5E7EB | Padrão        |
+| surface   | #F9FAFB             | Backgrounds   |
 
-| Módulo | Accent | Surface |
-|--------|--------|---------|
-| Contábil | `#2563EB` | `#EFF6FF` |
-| Financeiro | `#0369A1` | `#F0F9FF` |
-| SPED | `#7C3AED` | `#FAF5FF` |
+| Módulo      | Accent    | Surface   |
+| ----------- | --------- | --------- |
+| Contábil    | `#2563EB` | `#EFF6FF` |
+| Financeiro  | `#0369A1` | `#F0F9FF` |
+| SPED        | `#7C3AED` | `#FAF5FF` |
 | Ativo Imob. | `#EA580C` | `#FFF7ED` |
-| Societário | `#0891B2` | `#ECFEFF` |
-| Sistema | `#374151` | `#F9FAFB` |
+| Societário  | `#0891B2` | `#ECFEFF` |
+| Sistema     | `#374151` | `#F9FAFB` |
 
 ---
 
 ## Como usar este arquivo
 
 **Início de sessão simples** (bug fix, pequena feature):
+
 > Cole apenas as seções "Stack", "Convenções", "Estado dos módulos" e "Pendências"
 
 **Início de sessão de desenvolvimento** (novo módulo, feature grande):
+
 > Cole o arquivo inteiro + trecho do schema dos models envolvidos
 
 **Handoff entre sessões:**
+
 > `.md` colado inline no chat — nunca DOCX anexado (~400 tokens vs ~4.000)
+
+## Sessão 06/05/2026 — Módulo Ativo Imobilizado (Fase 2)
+
+### Concluído ✅
+
+**Relatório Anual de Depreciação**
+
+- Endpoint `GET /assets/depreciation-report?yearFrom=&yearTo=` — SQL raw com pivot em memória
+- Frontend: nova aba "Relatório Anual" no toggle da AssetsList
+- Tabela dinâmica com colunas por ano, ordenação em todas as colunas, exportar XLSX
+- Linha de totais expansível → painel mensal com grid Mês × Ano
+
+**Gráfico de Depreciação (DepreciationTab)**
+
+- Labels eixo X fixados em dezembro de cada ano (dez/AAAA)
+- Projeção inicia no mês seguinte ao último log do backfill (sem salto)
+- `accumDeprec` da projeção acumulado corretamente a partir do valor atual
+- Ponto de aquisição adicionado como primeiro ponto do gráfico
+- Campo ajustável de meses de projeção (padrão 60 meses)
+- 4 linhas: Valor Contábil real/projeção + Deprec. Acum. real/projeção
+
+**Lançamentos Contábeis de Depreciação**
+
+- `SourceModule` enum: adicionado valor `ASSET` (migração aplicada)
+- Endpoint `POST /assets/depreciation-journal` body: `{ yearMonth: 'YYYY-MM' }`
+  - 1 JournalEntry consolidado por mês (todos os ativos)
+  - Débito: `depreciationAccId` / Crédito: `accumDeprecAccId`
+  - Anti-duplicata via `reference: DEPR-YYYY-MM`
+- Endpoint `GET /assets/depreciation-monthly-totals?year=`
+  - Retorna 12 meses com total e flag `hasJournal`
+- Painel mensal no Relatório Anual: ⚡ gera lançamento, ✓ já gerado
+
+### Pendências Ativo Imobilizado
+
+- Geração automática de lançamentos junto com o backfill
+- Verificar terrenos nonDepreciable (Cotia, Pinhais, etc.)
+- Lançamentos contábeis automáticos mensais (cron job)

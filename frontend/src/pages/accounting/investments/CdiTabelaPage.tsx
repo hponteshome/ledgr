@@ -52,7 +52,8 @@ const S = {
 function parseBrDate(s: string): string {
   const [d, m, y] = s.trim().split('/');
   if (!d || !m || !y) return '';
-  return `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;
+  const year = y.length === 2 ? '20' + y : y;
+  return `${year}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;
 }
 
 function parseTsv(raw: string) {
@@ -90,6 +91,8 @@ export default function CdiTabelaPage() {
   const [filterFrom, setFrom]   = useState('');
   const [filterTo,   setTo]     = useState('');
   const [pasteText,  setPaste]  = useState('');
+  const [dailySortDir,  setDailySortDir]  = useState<'asc'|'desc'>('desc');
+  const [monthlySortDir,setMonthlySortDir]= useState<'asc'|'desc'>('desc');
   const [newRow, setNewRow]     = useState({ date:'', dailyRate:'', monthlyAccum:'', yearAccum:'', accum30d:'', accum12m:'', accumIndex:'' });
 
   const loadMonthly = async () => {
@@ -198,6 +201,9 @@ export default function CdiTabelaPage() {
       <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:20 }}>
         <span style={S.badge}>◆ Contábil</span>
         <span style={S.h1}>Tabela CDI — BCB Série 12</span>
+        <button style={{ ...S.btn }} onClick={() => setTab('importar')}>
+          Importar CDI
+        </button>
         <button style={{ ...S.btn, marginLeft:'auto' }} onClick={load} disabled={loading}>
           {loading ? 'Carregando...' : 'Atualizar'}
         </button>
@@ -235,7 +241,9 @@ export default function CdiTabelaPage() {
         <div style={S.tblW}>
           <table style={{ width:'100%', borderCollapse:'collapse', minWidth:420 }}>
             <thead><tr>
-              <th style={S.thL}>Competência</th>
+              <th style={{...S.thL, cursor:'pointer', userSelect:'none' as const, whiteSpace:'nowrap' as const}} onClick={()=>setMonthlySortDir(d=>d==='desc'?'asc':'desc')}>
+                Competência {monthlySortDir==='desc'?'↓':'↑'}
+              </th>
               <th style={S.th}>Dias úteis</th>
               <th style={S.th}>CDI mensal (%)</th>
               <th style={S.th}>Fator mensal</th>
@@ -243,7 +251,7 @@ export default function CdiTabelaPage() {
               <th style={S.th}>Fator 96%</th>
             </tr></thead>
             <tbody>
-              {monthly.map(m => (
+              {[...monthly].sort((a,b)=>monthlySortDir==='desc'?b.competence.localeCompare(a.competence):a.competence.localeCompare(b.competence)).map(m => (
                 <tr key={m.competence}>
                   <td style={S.tdL}>{fmtComp(m.competence)}</td>
                   <td style={S.td}>{m.businessDays}</td>
@@ -262,7 +270,9 @@ export default function CdiTabelaPage() {
         <div style={S.tblW}>
           <table style={{ width:'100%', borderCollapse:'collapse', minWidth:720 }}>
             <thead><tr>
-              <th style={S.thL}>Data</th>
+              <th style={{...S.thL, cursor:'pointer', userSelect:'none' as const, whiteSpace:'nowrap' as const}} onClick={()=>setDailySortDir(d=>d==='desc'?'asc':'desc')}>
+                Data {dailySortDir==='desc'?'↓':'↑'}
+              </th>
               <th style={S.th}>Diária (%)</th>
               <th style={S.th}>Acum. mês (%)</th>
               <th style={S.th}>Acum. ano (%)</th>
@@ -272,7 +282,7 @@ export default function CdiTabelaPage() {
               <th style={S.th}></th>
             </tr></thead>
             <tbody>
-              {rows.map(r => (
+              {[...rows].sort((a,b)=>dailySortDir==='desc'?b.date.localeCompare(a.date):a.date.localeCompare(b.date)).map(r => (
                 <tr key={r.id}>
                   <td style={S.tdL}>{fmtDate(r.date)}</td>
                   <td style={S.td}>{fmtN(r.dailyRate,6)}</td>
@@ -313,10 +323,16 @@ export default function CdiTabelaPage() {
 
           <div style={S.card}>
             <p style={S.secTit}>Importação em lote — colar da planilha</p>
-            <p style={{ fontSize:12, color:'var(--color-text-secondary)', marginBottom:10, lineHeight:1.6 }}>
+            <p style={{ fontSize:12, color:'var(--color-text-secondary)', marginBottom:6, lineHeight:1.6 }}>
               Cole diretamente da sua planilha Excel (colunas: Data · Diária · Diária Ano · Acum.Mês · Acum.Ano · Acum.30d · Acum.12m · Índice).
               O sistema detecta separador de tabulação automaticamente. Datas no formato DD/MM/AAAA.
             </p>
+            <div style={{fontSize:11, color:'#0369A1', marginBottom:10, display:'flex', alignItems:'center', gap:6}}>
+              Fonte recomendada:
+              <a href="https://www.portaldefinancas.com/cdidiaria26.htm" target="_blank" rel="noopener noreferrer"
+                style={{color:'#0369A1', fontWeight:500}}>Portal de Finanças — CDI Diário</a>
+              <span style={{color:'#9CA3AF'}}>(© Portal de Finanças — dados utilizados com fins acadêmicos/internos)</span>
+            </div>
             <textarea
               style={{ width:'100%', height:180, border:'0.5px solid var(--color-border-secondary)', borderRadius:6, padding:'8px 10px', fontSize:12, fontFamily:'var(--font-mono,monospace)', background:'var(--color-background-primary)', color:'var(--color-text-primary)', resize:'vertical' as const, marginBottom:10 }}
               placeholder={'03/01/2022\t0,034749\t9,15\t0,0347\t0,0347\t0,7157\t4,4599\t100,0347490\n04/01/2022\t...'}
