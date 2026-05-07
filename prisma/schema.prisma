@@ -170,6 +170,8 @@ model Company {
   journalEntries    JournalEntry[]
   accountingRules   AccountingRule[]
   ecdImports        EcdImport[]
+  proLaboreConfigs  ProLaboreConfig[]
+  proLaboreCalculos ProLaboreCalculo[]
   fixedIncomeInvestments FixedIncomeInvestment[]
   loteImports       LoteImport[]
   fixedAssets       FixedAsset[]
@@ -297,6 +299,7 @@ model Person {
 
   // ── Relations ─────────────────────────────────────────────
   companyLinks PersonCompany[]
+  proLaboreConfigs  ProLaboreConfig[]
   user         User?
   apEntries    ApEntry[]
 
@@ -2117,5 +2120,75 @@ model Holiday {
   @@index([date])
   @@index([type])
   @@map("holidays")
+}
+
+
+// =============================================================================
+// PRO-LABORE
+// =============================================================================
+
+/// Configuracao de pro-labore por diretor e empresa
+model ProLaboreConfig {
+  id        String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId String @map("company_id") @db.Uuid
+  personId  String @map("person_id") @db.Uuid
+  cargo     String @map("cargo") @db.VarChar
+
+  valorBruto      Decimal  @map("valor_bruto") @db.Decimal(15,2)
+  competenciaIni  String   @map("competencia_ini") @db.VarChar(7) // AAAA-MM
+  competenciaFim  String?  @map("competencia_fim") @db.VarChar(7)
+  ativo           Boolean  @default(true) @map("ativo")
+
+  // Contas contabeis por empresa
+  contaDespesaId    String? @map("conta_despesa_id") @db.Uuid
+  contaPassivoId    String? @map("conta_passivo_id") @db.Uuid
+  contaInssEmpId    String? @map("conta_inss_emp_id") @db.Uuid
+  contaInssDir      String? @map("conta_inss_dir_id") @db.Uuid
+  contaIrrfId       String? @map("conta_irrf_id") @db.Uuid
+  contaInssRecolherId String? @map("conta_inss_recolher_id") @db.Uuid
+  contaIrrfRecolherId String? @map("conta_irrf_recolher_id") @db.Uuid
+
+  documentoId String? @map("documento_id") @db.Uuid  // Ata de reuniao
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamp(6)
+
+  company   Company @relation(fields: [companyId], references: [id])
+  person    Person  @relation(fields: [personId], references: [id])
+  calculos  ProLaboreCalculo[]
+
+  @@index([companyId, personId])
+  @@index([companyId, competenciaIni])
+  @@map("pro_labore_configs")
+}
+
+/// Calculo mensal de pro-labore
+model ProLaboreCalculo {
+  id         String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  configId   String @map("config_id") @db.Uuid
+  companyId  String @map("company_id") @db.Uuid
+  competencia String @map("competencia") @db.VarChar(7) // AAAA-MM
+
+  valorBruto      Decimal @map("valor_bruto") @db.Decimal(15,2)
+  inssEmpresa     Decimal @map("inss_empresa") @db.Decimal(15,2)   // 20%
+  inssDiretor     Decimal @map("inss_diretor") @db.Decimal(15,2)   // 11% (teto)
+  baseIrrf        Decimal @map("base_irrf") @db.Decimal(15,2)      // bruto - inss diretor
+  irrf            Decimal @map("irrf") @db.Decimal(15,2)
+  aliqIrrf        Decimal @map("aliq_irrf") @db.Decimal(5,4)
+  deducaoIrrf     Decimal @map("deducao_irrf") @db.Decimal(15,2)
+  valorLiquido    Decimal @map("valor_liquido") @db.Decimal(15,2)
+
+  journalEntryId  String? @map("journal_entry_id") @db.Uuid
+  geradoEm        DateTime? @map("gerado_em") @db.Timestamp(6)
+  createdById     String  @map("created_by_id") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+
+  config    ProLaboreConfig @relation(fields: [configId], references: [id])
+  company   Company         @relation(fields: [companyId], references: [id])
+
+  @@unique([configId, competencia])
+  @@index([companyId, competencia])
+  @@map("pro_labore_calculos")
 }
 
