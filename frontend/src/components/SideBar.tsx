@@ -50,6 +50,12 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
     { path: '/app/profiles', icon: FiShield, label: 'Perfis' },
     { path: '/app/persons', icon: FiUsers, label: 'Pessoas Físicas' },
     {
+      path: '/app/hr', icon: FiUsers, label: 'RH',
+      children: [
+        { path: '/app/hr/pro-labore', label: 'Pró-labore', icon: FiDollarSign },
+      ],
+    },
+    {
       path: '/app/finance', icon: FiDollarSign, label: 'Finance',
       children: [
         { path: '/app/finance/fiscal-documents', label: 'Documentos Fiscais', icon: FiFileText },
@@ -336,6 +342,7 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
     </>
   );
 };
+
 
 
 
