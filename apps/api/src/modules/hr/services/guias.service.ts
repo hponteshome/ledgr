@@ -25,34 +25,41 @@ function htmlGPS(data: any): string {
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, sans-serif; }
   body { background: #fff; padding: 20px; }
-  .guia { border: 2px solid #000; width: 720px; margin: 0 auto; }
+  .guia { border: 2px solid #000; width: 720px; margin: 0 auto; margin-bottom: 20px; }
   .header { background: #1a1a6e; color: #fff; padding: 8px 12px; display: flex; justify-content: space-between; align-items: center; }
   .header h1 { font-size: 14px; font-weight: bold; }
   .header .codigo { font-size: 20px; font-weight: bold; }
-  .secao { border-bottom: 1px solid #000; padding: 6px 10px; display: grid; gap: 4px; }
+  .secao { border-bottom: 1px solid #000; padding: 8px 12px; }
   .row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-  .field label { font-size: 9px; text-transform: uppercase; color: #555; display: block; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .field label { font-size: 9px; text-transform: uppercase; color: #555; display: block; margin-bottom: 2px; }
   .field span { font-size: 12px; font-weight: bold; }
-  .total { background: #f0f0f0; padding: 8px 10px; display: flex; justify-content: space-between; }
-  .total label { font-size: 10px; text-transform: uppercase; }
+  .total { background: #f0f0f0; padding: 8px 12px; display: flex; justify-content: space-between; align-items: center; }
+  .total label { font-size: 10px; text-transform: uppercase; color: #555; }
   .total span { font-size: 18px; font-weight: bold; color: #1a1a6e; }
-  .footer { padding: 6px 10px; font-size: 9px; color: #555; text-align: center; }
-  .barcode { text-align: center; padding: 8px; font-family: monospace; font-size: 13px; letter-spacing: 3px; border-top: 1px solid #000; }
+  .footer { padding: 6px 10px; font-size: 9px; color: #555; text-align: center; border-top: 1px solid #ddd; }
 </style>
 </head><body>
 <div class="guia">
   <div class="header">
     <div>
       <h1>GPS — GUIA DA PREVIDÊNCIA SOCIAL</h1>
-      <div style="font-size:10px">Ministério da Previdência Social / DATAPREV</div>
+      <div style="font-size:10px">Ministério da Previdência e Trabalho / DATAPREV</div>
     </div>
     <div class="codigo">Cód. 1007</div>
   </div>
   <div class="secao">
     <div class="row">
-      <div class="field"><label>Identificador (CPF)</label><span>${fmtCPF(data.cpf)}</span></div>
-      <div class="field"><label>Nome / Razão Social</label><span>${data.nome}</span></div>
+      <div class="field"><label>CNPJ do Empregador</label><span>${fmtCNPJ(data.cnpj)}</span></div>
+      <div class="field"><label>Razão Social</label><span>${data.empresa}</span></div>
       <div class="field"><label>Competência</label><span>${data.competencia}</span></div>
+    </div>
+  </div>
+  <div class="secao">
+    <div class="row">
+      <div class="field"><label>Beneficiário (CPF)</label><span>${fmtCPF(data.cpf)}</span></div>
+      <div class="field"><label>Nome do Diretor</label><span>${data.nome}</span></div>
+      <div class="field"><label>Categoria</label><span>Contribuinte Individual</span></div>
     </div>
   </div>
   <div class="secao">
@@ -63,10 +70,15 @@ function htmlGPS(data: any): string {
     </div>
   </div>
   <div class="total">
-    <div><label>Vencimento</label><div style="font-size:13px;font-weight:bold">${data.vencimento}</div></div>
-    <div style="text-align:right"><label>Total a Recolher</label><span>R$ ${fmtBRL(data.totalGPS)}</span></div>
+    <div>
+      <label>Vencimento</label>
+      <div style="font-size:13px;font-weight:bold;margin-top:2px">${data.vencimento}</div>
+    </div>
+    <div style="text-align:right">
+      <label>Total a Recolher</label>
+      <div><span>R$ ${fmtBRL(data.totalGPS)}</span></div>
+    </div>
   </div>
-  <div class="barcode">${data.codigoBarras ?? '000 0 00000 0 00000000000 0 00000000000 0'}</div>
   <div class="footer">Guia gerada pelo LEDGR — Uso interno. Verificar valores antes do pagamento.</div>
 </div>
 </body></html>`;
@@ -179,4 +191,88 @@ export class GuiasService {
 
     return { gpsHtml, darfHtml, gpsPdf, darfPdf, dados };
   }
+  async gerarGuiasLote(companyId: string, competencia: string): Promise<Buffer> {
+    const calculos = await this.prisma.proLaboreCalculo.findMany({
+      where: { companyId, competencia },
+      include: { config: { include: { person: true } }, company: true },
+    });
+    if (!calculos.length) throw new Error('Nenhum calculo encontrado para esta competencia');
+
+    const company = await this.prisma.company.findUnique({ where: { id: companyId } });
+
+    // Gerar HTML consolidado com todos os diretores
+    let htmlSections = '';
+    let totalGPS = 0;
+    let totalDARF = 0;
+
+    for (const calculo of calculos) {
+      const dados = {
+        cpf:         calculo.config.person.cpf,
+        nome:        calculo.config.person.fullName,
+        cnpj:        company!.taxId,
+        empresa:     company!.legalName,
+        competencia: calculo.competencia,
+        inssDiretor: Number(calculo.inssDiretor),
+        inssEmpresa: Number(calculo.inssEmpresa),
+        totalGPS:    Number(calculo.inssDiretor) + Number(calculo.inssEmpresa),
+        irrf:        Number(calculo.irrf),
+        vencimento:  vencimentoGPS(calculo.competencia),
+        vencimentoDARF: vencimentoDARF(calculo.competencia),
+      };
+      totalGPS  += dados.totalGPS;
+      totalDARF += dados.irrf;
+      htmlSections += htmlGPS(dados);
+      if (dados.irrf > 0) htmlSections += htmlDARF(dados);
+    }
+
+    // Pagina de resumo consolidado
+    const resumo = `
+      <div style="page-break-before:always; font-family:Arial; padding:20px; max-width:720px; margin:0 auto;">
+        <h2 style="color:#111; font-size:16px; margin-bottom:16px">Resumo Consolidado — ${competencia}</h2>
+        <table style="width:100%; border-collapse:collapse; font-size:13px">
+          <thead>
+            <tr style="background:#F9FAFB">
+              <th style="padding:8px 12px; text-align:left; border-bottom:1px solid #E5E7EB">Diretor</th>
+              <th style="padding:8px 12px; text-align:right; border-bottom:1px solid #E5E7EB">GPS</th>
+              <th style="padding:8px 12px; text-align:right; border-bottom:1px solid #E5E7EB">DARF</th>
+              <th style="padding:8px 12px; text-align:right; border-bottom:1px solid #E5E7EB">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${calculos.map(c => `
+              <tr>
+                <td style="padding:8px 12px; border-bottom:1px solid #F5F5F5">${c.config.person.fullName}</td>
+                <td style="padding:8px 12px; text-align:right; border-bottom:1px solid #F5F5F5">R$ ${fmtBRL(Number(c.inssDiretor) + Number(c.inssEmpresa))}</td>
+                <td style="padding:8px 12px; text-align:right; border-bottom:1px solid #F5F5F5">${Number(c.irrf) > 0 ? 'R$ ' + fmtBRL(Number(c.irrf)) : '—'}</td>
+                <td style="padding:8px 12px; text-align:right; border-bottom:1px solid #F5F5F5; font-weight:500">R$ ${fmtBRL(Number(c.inssDiretor) + Number(c.inssEmpresa) + Number(c.irrf))}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+          <tfoot>
+            <tr style="background:#F0F9FF">
+              <td style="padding:8px 12px; font-weight:600">TOTAL</td>
+              <td style="padding:8px 12px; text-align:right; font-weight:600">R$ ${fmtBRL(totalGPS)}</td>
+              <td style="padding:8px 12px; text-align:right; font-weight:600">${totalDARF > 0 ? 'R$ ' + fmtBRL(totalDARF) : '—'}</td>
+              <td style="padding:8px 12px; text-align:right; font-weight:600; color:#1a1a6e">R$ ${fmtBRL(totalGPS + totalDARF)}</td>
+            </tr>
+          </tfoot>
+        </table>
+        <p style="margin-top:16px; font-size:11px; color:#6B7280">Gerado pelo LEDGR — Uso interno. Verificar valores antes do pagamento.</p>
+      </div>
+    `;
+
+    const fullHtml = `<!DOCTYPE html><html><head><meta charset="utf-8">
+      <style>@media print { .page { page-break-after: always; } }</style>
+    </head><body>${resumo}${htmlSections}</body></html>`;
+
+    const browser = await puppeteer.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+    try {
+      const page = await browser.newPage();
+      await page.setContent(fullHtml, { waitUntil: 'networkidle0' });
+      return Buffer.from(await page.pdf({ format: 'A4', printBackground: true }));
+    } finally {
+      await browser.close();
+    }
+  }
+
 }
