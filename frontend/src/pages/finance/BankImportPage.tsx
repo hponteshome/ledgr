@@ -3,6 +3,46 @@
 // Design: Clean Minimalista · Accent Azul céu #0369A1
 // ============================================================
 import React, { useState, useEffect, useRef } from 'react';
+import api from '../../services/api';
+
+interface Account { id: string; code: string; name: string; reducedCode?: string; }
+function AccountPicker({ label, value, onChange, accounts, placeholder }: {
+  label: string; value: string; onChange: (id: string) => void; accounts: Account[]; placeholder?: string;
+}) {
+  const [q, setQ] = React.useState('');
+  const [open, setOpen] = React.useState(false);
+  const safe = Array.isArray(accounts) ? accounts : [];
+  const selected = safe.find(a => a.id === value);
+  const display = selected ? (selected.reducedCode ?? selected.code) + ' — ' + selected.name : '';
+  const qNorm = q.replace(/\./g, '');
+  const filtered = qNorm.length >= 1
+    ? safe.filter(a => a.code.replace(/\./g,'').includes(qNorm) || a.name.toLowerCase().includes(q.toLowerCase())).slice(0, 12)
+    : [];
+  return (
+    <div style={{ position: 'relative' }}>
+      {label && <div style={{ fontSize: 10, color: '#9CA3AF', marginBottom: 3, fontWeight: 500 }}>{label}</div>}
+      <input style={{ width: '100%', boxSizing: 'border-box' as const, border: `0.5px solid ${value ? '#86EFAC' : '#E5E7EB'}`, borderRadius: 6, padding: '6px 10px', fontSize: 12, outline: 'none', background: '#fff' }}
+        value={open ? q : display} placeholder={placeholder ?? 'Cód. ou nome...'}
+        onFocus={() => { setOpen(true); setQ(''); }}
+        onBlur={() => setTimeout(() => setOpen(false), 250)}
+        onChange={e => setQ(e.target.value)} />
+      {value && !open && <button onClick={() => onChange('')} style={{ position: 'absolute', right: 6, top: label ? 24 : 6, background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF', fontSize: 12 }}>x</button>}
+      {open && filtered.length > 0 && (
+        <div style={{ position: 'absolute', zIndex: 999, background: '#fff', border: '0.5px solid #E5E7EB', borderRadius: 6, width: '100%', maxHeight: 200, overflowY: 'auto' as const, boxShadow: '0 4px 12px rgba(0,0,0,.08)' }}>
+          {filtered.map(a => (
+            <div key={a.id} onMouseDown={() => { onChange(a.id); setOpen(false); setQ(''); }}
+              style={{ padding: '7px 12px', fontSize: 12, cursor: 'pointer', borderBottom: '0.5px solid #F5F5F5' }}
+              onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = '#F0F9FF'}
+              onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = '#fff'}>
+              <span style={{ fontWeight: 500, color: '#1D4ED8' }}>{a.reducedCode ?? a.code}</span>
+              <span style={{ color: '#6B7280', marginLeft: 8 }}>{a.name}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 import { useBankImport } from './hooks/useBankImport';
 import {
   TransactionGroup, BankStatementSummary, UploadResult,
@@ -109,11 +149,17 @@ export default function BankImportPage() {
     accountId: string; counterAccountId: string; memo: string;
   }>>({});
   const [postResult, setPostResult] = useState<any>(null);
+  const [accounts, setAccounts] = useState<Account[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
   const activeCompany = getActiveCompany();
 
   const loadStatements = () => listStatements().then(setStatements).catch(() => { });
   useEffect(() => { if (step === 'list') loadStatements(); }, [step]);
+  useEffect(() => {
+    api.get('/chart-of-accounts', { params: { limit: 500 } })
+      .then(r => { const raw = r.data; setAccounts(Array.isArray(raw) ? raw : raw?.items ?? []); })
+      .catch(() => {});
+  }, []);
 
   const initGroups = (grps: TransactionGroup[]) => {
     const init: typeof drafts = {};
@@ -531,29 +577,30 @@ export default function BankImportPage() {
                     </div>
 
                     {/* Campos */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '160px 140px 1fr', gap: 8, alignItems: 'end', flexShrink: 0 }}>
-                      {[
-                        { field: 'accountId', label: 'Conta contábil *', placeholder: 'Cód. ou busca...', val: draft.accountId },
-                        { field: 'counterAccountId', label: 'Cta. bancária *', placeholder: 'Ex: 1.1.02', val: draft.counterAccountId },
-                        { field: 'memo', label: 'Histórico', placeholder: '', val: draft.memo },
-                      ].map(f => (
-                        <div key={f.field}>
-                          <div style={{ fontSize: 10, color: T.textHint, marginBottom: 3, fontWeight: 500 }}>{f.label}</div>
-                          <input
-                            style={{
-                              width: '100%', boxSizing: 'border-box',
-                              border: `0.5px solid ${f.val && f.field !== 'memo' ? '#86EFAC' : T.border}`,
-                              borderRadius: 6, padding: '6px 10px',
-                              fontSize: 12, outline: 'none', color: T.text,
-                              background: '#fff',
-                              transition: 'border-color .15s',
-                            }}
-                            placeholder={f.placeholder}
-                            value={f.val}
-                            onChange={e => updateDraft(g.groupKey, f.field, e.target.value)}
-                          />
-                        </div>
-                      ))}
+                    <div style={{ display: 'grid', gridTemplateColumns: '200px 160px 1fr', gap: 8, alignItems: 'end', flexShrink: 0 }}>
+                      <AccountPicker
+                        label="Conta contábil *"
+                        value={draft.accountId}
+                        onChange={id => updateDraft(g.groupKey, 'accountId', id)}
+                        accounts={accounts}
+                        placeholder="Cód. ou nome..."
+                      />
+                      <AccountPicker
+                        label="Cta. bancária *"
+                        value={draft.counterAccountId}
+                        onChange={id => updateDraft(g.groupKey, 'counterAccountId', id)}
+                        accounts={accounts}
+                        placeholder="Cód. ou nome..."
+                      />
+                      <div>
+                        <div style={{ fontSize: 10, color: T.textHint, marginBottom: 3, fontWeight: 500 }}>Histórico</div>
+                        <input
+                          style={{ width: '100%', boxSizing: 'border-box' as const, border: `0.5px solid ${T.border}`, borderRadius: 6, padding: '6px 10px', fontSize: 12, outline: 'none', color: T.text, background: '#fff' }}
+                          placeholder=""
+                          value={draft.memo}
+                          onChange={e => updateDraft(g.groupKey, 'memo', e.target.value)}
+                        />
+                      </div>
                     </div>
 
                     {ok && <span style={{ fontSize: 16, color: T.success, flexShrink: 0 }}>✓</span>}
