@@ -106,8 +106,15 @@ function ConfigModal({ config, persons, accounts, onClose, onSaved }: {
     ativo:              config?.ativo ?? true,
   });
   const [previa, setPrevia] = useState<Previa | null>(null);
+  const [docs, setDocs] = useState<{id:string;title:string;date:string}[]>([]);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
+
+  useEffect(() => {
+    api.get('/documents', { params: { limit: 50, status: 'ASSINADO,REGISTRADO' } })
+      .then(r => { const raw = r.data; setDocs(Array.isArray(raw) ? raw : raw?.items ?? raw?.data ?? []); })
+      .catch(() => {});
+  }, []);
   const set = (k: string, v: any) => setForm(p => ({ ...p, [k]: v }));
 
   useEffect(() => {
@@ -189,6 +196,13 @@ function ConfigModal({ config, persons, accounts, onClose, onSaved }: {
             </div>
           </div>
 
+          <div style={{ gridColumn: '1/-1' }}>
+            <label style={{ fontSize: 10, textTransform: 'uppercase' as const, letterSpacing: '.3px', color: '#6B7280', display: 'block', marginBottom: 3 }}>Ata de Reunião vinculada</label>
+            <select style={S.input} value={form.documentoId} onChange={e => set('documentoId', e.target.value)}>
+              <option value="">— Nenhuma ata vinculada —</option>
+              {docs.map(d => <option key={d.id} value={d.id}>{new Date(d.date).toLocaleDateString('pt-BR')} — {d.title}</option>)}
+            </select>
+          </div>
           {!form.documentoId && (
             <div style={{ gridColumn: '1/-1', background: '#FEFCE8', border: '0.5px solid #FEF08A', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: '#854D0E' }}>
               ⚠️ Nenhuma ata de reunião vinculada. O valor do pró-labore deve ser deliberado em reunião/assembleia.
@@ -215,9 +229,13 @@ export default function ProLaborePage() {
   const [showModal, setShowModal] = useState(false);
   const [editConfig, setEditConfig] = useState<Config | null>(null);
   const [bulkComp, setBulkComp] = useState('');
+  const [bulkCompFim, setBulkCompFim] = useState('');
   const [journalEntries, setJournalEntries] = useState<any[]>([]);
   const [jLoading, setJLoading] = useState(false);
   const [showRetro, setShowRetro] = useState(false);
+  const [guiasCalculo, setGuiasCalculo] = useState<any>(null);
+  const [guiasData, setGuiasData] = useState<any>(null);
+  const [guiasLoading, setGuiasLoading] = useState(false);
   const [retroFrom, setRetroFrom] = useState('');
   const [retroTo, setRetroTo] = useState('');
   const [retroLoading, setRetroLoading] = useState(false);
@@ -354,8 +372,12 @@ export default function ProLaborePage() {
             <p style={{ ...S.secTit, margin: 0, marginBottom: 12 }}>Gerar cálculo mensal em lote</p>
             <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' as const }}>
               <div>
-                <label style={{ fontSize: 10, textTransform: 'uppercase' as const, letterSpacing: '.3px', color: '#6B7280', display: 'block', marginBottom: 3 }}>Competência</label>
+                <label style={{ fontSize: 10, textTransform: 'uppercase' as const, letterSpacing: '.3px', color: '#6B7280', display: 'block', marginBottom: 3 }}>Competência inicial</label>
                 <input style={{ ...S.input, width: 160 }} type="month" value={bulkComp} onChange={e => setBulkComp(e.target.value)} />
+              </div>
+              <div>
+                <label style={{ fontSize: 10, textTransform: 'uppercase' as const, letterSpacing: '.3px', color: '#6B7280', display: 'block', marginBottom: 3 }}>Competência final</label>
+                <input style={{ ...S.input, width: 160 }} type="month" value={bulkCompFim} onChange={e => setBulkCompFim(e.target.value)} />
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingBottom: 2 }}>
                 <input type="checkbox" id="bulkJ" checked={bulkJournal} onChange={e => setBulkJournal(e.target.checked)} />
@@ -380,6 +402,7 @@ export default function ProLaborePage() {
                   <th style={S.th}>IRRF</th>
                   <th style={S.th}>Líquido</th>
                   <th style={S.th}>Lançamento</th>
+                  <th style={S.th}>Guias</th>
                 </tr></thead>
                 <tbody>
                   {calculos.map(c => (
@@ -392,6 +415,14 @@ export default function ProLaborePage() {
                       <td style={{ ...S.td, color: '#DC2626' }}>R$ {fmtBRL(c.irrf)}</td>
                       <td style={{ ...S.td, color: '#15803D', fontWeight: 500 }}>R$ {fmtBRL(c.valorLiquido)}</td>
                       <td style={S.td}>{c.journalEntryId ? <span style={{ color: '#15803D' }}>✓</span> : <span style={{ color: '#9CA3AF' }}>—</span>}</td>
+                      <td style={S.td}>
+                        <button style={{ ...S.btn, fontSize: 11 }} onClick={async () => {
+                          setGuiasLoading(true); setGuiasCalculo(c);
+                          try { const r = await api.get('/hr/pro-labore/calculos/' + c.id + '/guias'); setGuiasData(r.data); }
+                          catch { alert('Erro ao carregar guias'); }
+                          setGuiasLoading(false);
+                        }}>GPS/DARF</button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -434,6 +465,107 @@ export default function ProLaborePage() {
             }
           </div>
         </>
+      )}
+
+
+      {guiasData && guiasCalculo && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+          onClick={e => e.target === e.currentTarget && setGuiasData(null)}>
+          <div style={{ background: "#fff", borderRadius: 12, padding: 24, width: "100%", maxWidth: 780, maxHeight: "90vh", overflowY: "auto" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <span style={{ fontSize: 15, fontWeight: 500 }}>Guias de Recolhimento - {guiasCalculo.competencia}</span>
+              <button style={{ ...S.btn, padding: "0 8px" }} onClick={() => setGuiasData(null)}>x</button>
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                <span style={{ fontSize: 13, fontWeight: 500, color: "#1a1a6e" }}>GPS - Guia da Previdencia Social</span>
+                <button style={{ ...S.btnP, fontSize: 12 }} onClick={async () => {
+                  const r = await api.get('/hr/pro-labore/calculos/' + guiasCalculo.id + '/guias/gps.pdf', { responseType: 'blob' });
+                  const url = URL.createObjectURL(r.data);
+                  const a = document.createElement('a');
+                  a.href = url; a.download = 'GPS-' + guiasCalculo.competencia + '.pdf';
+                  a.click(); URL.revokeObjectURL(url);
+                }}>Download GPS PDF</button>
+              </div>
+              <div style={{ border: "1px solid #E5E7EB", borderRadius: 8, overflow: "hidden" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)" }}>
+                  <div style={{ padding: "10px 14px", borderRight: "1px solid #E5E7EB", borderBottom: "1px solid #E5E7EB" }}>
+                    <div style={{ fontSize: 10, color: "#6B7280", textTransform: "uppercase" }}>CPF</div>
+                    <div style={{ fontSize: 13, fontWeight: 500 }}>{guiasData.dados.cpf}</div>
+                  </div>
+                  <div style={{ padding: "10px 14px", borderRight: "1px solid #E5E7EB", borderBottom: "1px solid #E5E7EB" }}>
+                    <div style={{ fontSize: 10, color: "#6B7280", textTransform: "uppercase" }}>Nome</div>
+                    <div style={{ fontSize: 13, fontWeight: 500 }}>{guiasData.dados.nome}</div>
+                  </div>
+                  <div style={{ padding: "10px 14px", borderBottom: "1px solid #E5E7EB" }}>
+                    <div style={{ fontSize: 10, color: "#6B7280", textTransform: "uppercase" }}>Competencia</div>
+                    <div style={{ fontSize: 13, fontWeight: 500 }}>{guiasData.dados.competencia}</div>
+                  </div>
+                  <div style={{ padding: "10px 14px", borderRight: "1px solid #E5E7EB" }}>
+                    <div style={{ fontSize: 10, color: "#6B7280", textTransform: "uppercase" }}>INSS Diretor 11%</div>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: "#DC2626" }}>R$ {fmtBRL(guiasData.dados.inssDiretor)}</div>
+                  </div>
+                  <div style={{ padding: "10px 14px", borderRight: "1px solid #E5E7EB" }}>
+                    <div style={{ fontSize: 10, color: "#6B7280", textTransform: "uppercase" }}>INSS Patronal 20%</div>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: "#DC2626" }}>R$ {fmtBRL(guiasData.dados.inssEmpresa)}</div>
+                  </div>
+                  <div style={{ padding: "10px 14px", background: "#F0F9FF" }}>
+                    <div style={{ fontSize: 10, color: "#6B7280", textTransform: "uppercase" }}>Total GPS</div>
+                    <div style={{ fontSize: 15, fontWeight: 600, color: "#1a1a6e" }}>R$ {fmtBRL(guiasData.dados.totalGPS)}</div>
+                  </div>
+                </div>
+                <div style={{ padding: "8px 14px", background: "#F9FAFB", fontSize: 11, color: "#6B7280" }}>
+                  Vencimento: <strong>{guiasData.dados.vencimento}</strong> - Codigo: <strong>1007</strong> - Contribuinte Individual
+                </div>
+              </div>
+            </div>
+            {guiasData.dados.irrf > 0 ? (
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: "#006633" }}>DARF - IRRF Codigo 0561</span>
+                  <button style={{ ...S.btnP, background: "#006633", fontSize: 12 }} onClick={async () => {
+                    const r = await api.get('/hr/pro-labore/calculos/' + guiasCalculo.id + '/guias/darf.pdf', { responseType: 'blob' });
+                    const url = URL.createObjectURL(r.data);
+                    const a = document.createElement('a');
+                    a.href = url; a.download = 'DARF-' + guiasCalculo.competencia + '.pdf';
+                    a.click(); URL.revokeObjectURL(url);
+                  }}>Download DARF PDF</button>
+                </div>
+                <div style={{ border: "1px solid #E5E7EB", borderRadius: 8, overflow: "hidden" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)" }}>
+                    <div style={{ padding: "10px 14px", borderRight: "1px solid #E5E7EB", borderBottom: "1px solid #E5E7EB" }}>
+                      <div style={{ fontSize: 10, color: "#6B7280", textTransform: "uppercase" }}>CNPJ</div>
+                      <div style={{ fontSize: 13, fontWeight: 500 }}>{guiasData.dados.cnpj}</div>
+                    </div>
+                    <div style={{ padding: "10px 14px", borderRight: "1px solid #E5E7EB", borderBottom: "1px solid #E5E7EB" }}>
+                      <div style={{ fontSize: 10, color: "#6B7280", textTransform: "uppercase" }}>Codigo Receita</div>
+                      <div style={{ fontSize: 13, fontWeight: 500 }}>0561 - Rendimentos do Trabalho</div>
+                    </div>
+                    <div style={{ padding: "10px 14px", borderBottom: "1px solid #E5E7EB" }}>
+                      <div style={{ fontSize: 10, color: "#6B7280", textTransform: "uppercase" }}>Periodo</div>
+                      <div style={{ fontSize: 13, fontWeight: 500 }}>{guiasData.dados.competencia}</div>
+                    </div>
+                    <div style={{ padding: "10px 14px", gridColumn: "1/3", borderRight: "1px solid #E5E7EB" }}>
+                      <div style={{ fontSize: 10, color: "#6B7280", textTransform: "uppercase" }}>Beneficiario</div>
+                      <div style={{ fontSize: 13, fontWeight: 500 }}>{guiasData.dados.nome} - {guiasData.dados.cpf}</div>
+                    </div>
+                    <div style={{ padding: "10px 14px", background: "#F0FDF4" }}>
+                      <div style={{ fontSize: 10, color: "#6B7280", textTransform: "uppercase" }}>Valor IRRF</div>
+                      <div style={{ fontSize: 15, fontWeight: 600, color: "#006633" }}>R$ {fmtBRL(guiasData.dados.irrf)}</div>
+                    </div>
+                  </div>
+                  <div style={{ padding: "8px 14px", background: "#F9FAFB", fontSize: 11, color: "#6B7280" }}>
+                    Vencimento: <strong>{guiasData.dados.vencimentoDARF}</strong>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div style={{ background: "#F0FDF4", border: "0.5px solid #86EFAC", borderRadius: 8, padding: "12px 16px", fontSize: 13, color: "#15803D" }}>
+                IRRF = R$ 0,00 - Nao ha DARF a recolher.
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {showRetro && (
@@ -489,7 +621,3 @@ export default function ProLaborePage() {
     </div>
   );
 }
-
-
-
-
