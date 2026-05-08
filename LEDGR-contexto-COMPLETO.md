@@ -461,7 +461,77 @@ accumDeprecAcc  ChartOfAccounts? @relation("AccumDeprecAcc", fields: [accumDepre
 
 ---
 
-## Padrões técnicos consolidados
+## Sessões 07-08/05/2026 — O que foi implementado
+
+### Accounting — Diário de Lançamentos
+- Filtro por fonte dinâmico via `GET /accounting/journal/source-modules` (retorna tipos distintos do banco por empresa)
+- Badges do topo clicáveis como filtro rápido ligados ao `fSource`
+- `EditModal` com `maxHeight: 90vh`, scroll interno e fechar com Escape/click fora
+- Enum `INVESTMENT` adicionado ao `SourceModule` do Prisma
+
+### Accounting — Renda Fixa
+- Campo Conta Contábil no cadastro de CDB (AccountPicker para asset/revenue/irrf)
+- Lançamentos automáticos mensais com `sourceModule: 'INVESTMENT'`
+- Geração retroativa com endpoint `POST /accounting/fixed-income/generate-missing-journals`
+- Painel de execução mensal com taxa CDI preenchida automaticamente
+- 28 lançamentos retroativos gerados para JOSE SILVA
+
+### RH — Pró-labore (módulo novo)
+**Schema:** `ProLaboreConfig` + `ProLaboreCalculo` — migration `add_pro_labore` aplicada
+**Backend:** `apps/api/src/modules/hr/`
+- `pro-labore.service.ts` — tabelas INSS/IRPF 2026, cálculo, lançamentos, retroativos
+- `pro-labore.controller.ts` — endpoints CRUD + cálculo + guias
+- `guias.service.ts` — GPS (layout CNPJ empresa) e DARF PDF via Puppeteer
+- `HrModule` registrado no `AppModule`
+
+**Frontend:** `frontend/src/pages/hr/ProLabore.tsx`
+- Aba Configurações: tabela de diretores com cálculo inline, badge Ata Pendente/Vinculada
+- Aba Cálculos: geração em lote com intervalo De/Até, histórico, lançamentos gerados
+- Modal GPS/DARF: visualização estruturada + download PDF autenticado (responseType: blob)
+- Modal "Gerar retroativos" padronizado com De/Até
+- Sweetalert2 em todos os alertas
+
+**Endpoints:**
+- `GET/POST /hr/pro-labore/configs`
+- `PUT /hr/pro-labore/configs/:id`
+- `GET /hr/pro-labore/previa`
+- `POST /hr/pro-labore/calculos`
+- `GET /hr/pro-labore/calculos`
+- `POST /hr/pro-labore/calculos/retroativos`
+- `GET /hr/pro-labore/calculos/:id/guias`
+- `GET /hr/pro-labore/calculos/:id/guias/gps.pdf`
+- `GET /hr/pro-labore/calculos/:id/guias/darf.pdf`
+- `GET /hr/pro-labore/guias/lote?competencia=AAAA-MM`
+
+**Tabelas legais 2026 hardcoded no service:**
+- INSS: patronal 20%, diretor 11%, teto R$ 8.157,41
+- IRPF: 5 faixas (isento até R$ 2.428,80)
+- Mínimo legal: R$ 1.518,00
+
+### Finance — Bank Import
+- `AccountPicker` com autocomplete do Plano de Contas nos campos `accountId` e `counterAccountId`
+- Carrega `GET /chart-of-accounts?limit=500` no mount
+
+### Pessoas Físicas
+- `PersonForm.tsx`: campo `cpf` mapeado para `document` no payload (`payload[k === 'cpf' ? 'document' : k]`)
+- `persons.service.ts`: desestrutura `document` e usa como `cpf` no Prisma create
+
+### Próxima fase — JOSE SILVA (Lucro Real, Receitas Financeiras)
+**Empresa:** JOSE SILVA SOCIEDADE INDIVIDUAL DE ADVOCACIA (UUID: c188b188-de58-4fbd-8aa0-fcf07c35e65e)
+**Regime:** Lucro Real
+**Receitas:** exclusivamente financeiras (CDB) em 2026 — modelo de test
+**Objetivo:** apuração completa IRPJ/CSLL sobre receitas financeiras
+
+**Módulo de Provisões Recorrentes (em arquitetura):**
+Ciclo: `ProvisaoConfig → ProvisaoLancamento → AccountsPayable + JournalEntry + FiscalDocument + RateioItem[]`
+- Tipos: ALUGUEL | SERVICO | ENERGIA | CONDOMINIO | HONORARIOS | OUTROS
+- Campos: periodicidade, dia vencimento, valor, contas contábeis, fornecedor, dedutível LALUR
+- `exigirNF`: bloqueia baixa sem NF vinculada
+- `creditaPisCofins`: gera crédito PIS/COFINS (regime não-cumulativo — Lucro Real)
+- `rateio`: split por percentual entre empresas participantes
+- Efeitos: AP (Financeiro) + Lançamento Contábil + NF Fiscal + LALUR Parte A
+
+## Padrões técnicos consolidados## Padrões técnicos consolidados
 
 - **TDD:** Python scripts em `D:\Temp\` para edições de arquivos — nunca editores visuais
 - **Inspeção antes de editar:** `Select-String` para localizar, `Get-Content -TotalCount` para cabeçalho

@@ -7,12 +7,14 @@ import { FinanceService } from './finance.service';
 import { IntegrationService } from './integration.service';
 import { AgendaService } from './agenda.service';
 import { PrismaModule } from '@/prisma/prisma.module';
+import { ProvisaoController } from './provisao.controller';
+import { ProvisaoService } from './provisao.service';
 
 @Module({
   imports: [PrismaModule],
-  controllers: [FinanceController],
-  providers: [FinanceService, IntegrationService, AgendaService],
-  exports: [FinanceService, AgendaService, IntegrationService],
+  controllers: [FinanceController, ProvisaoController],
+  providers: [FinanceService, IntegrationService, AgendaService, ProvisaoService],
+  exports: [FinanceService, AgendaService, IntegrationService, ProvisaoService],
 })
 export class FinanceModule {}
 
