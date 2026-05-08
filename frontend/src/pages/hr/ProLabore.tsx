@@ -1,6 +1,7 @@
 // frontend/src/pages/hr/ProLabore.tsx
 import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
+import Swal from 'sweetalert2';
 
 const fmtBRL = (v: any) => Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmtCPF = (v: string) => v?.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') ?? '';
@@ -273,7 +274,7 @@ export default function ProLaborePage() {
   useEffect(() => { if (tab === 'calculos') loadJournalEntries(); }, [tab]);
 
   const gerarEmLote = async () => {
-    if (!bulkComp) { alert('Informe a competência'); return; }
+    if (!bulkComp) { Swal.fire({ icon: 'warning', title: 'Atenção', text: 'Informe a competência.' }); return; }
     setBulkLoading(true);
     try {
       const results = [];
@@ -285,9 +286,9 @@ export default function ProLaborePage() {
       }
       const ok = results.filter(r => r.ok).length;
       const fail = results.filter(r => !r.ok).length;
-      alert(`${ok} calculado(s) com sucesso${fail ? ` · ${fail} erro(s)` : ''}.`);
+      Swal.fire({ icon: ok > 0 ? 'success' : 'warning', title: 'Concluído', text: `${ok} calculado(s) com sucesso${fail ? ` · ${fail} erro(s)` : ''}.` });
       load();
-    } catch { alert('Erro ao gerar'); }
+    } catch { Swal.fire({ icon: 'error', title: 'Erro', text: 'Erro ao gerar cálculos.' }); }
     setBulkLoading(false);
   };
 
@@ -385,14 +386,14 @@ export default function ProLaborePage() {
               </div>
               <button style={S.btnP} onClick={gerarEmLote} disabled={bulkLoading}>{bulkLoading ? 'Calculando...' : 'Calcular e lançar'}</button>
               <button style={{ ...S.btn, background: '#1a1a6e', color: '#fff', border: 'none' }} onClick={async () => {
-                if (!bulkComp) { alert('Informe a competência inicial'); return; }
+                if (!bulkComp) { Swal.fire({ icon: 'warning', title: 'Atenção', text: 'Informe a competência inicial.' }); return; }
                 try {
                   const r = await api.get('/hr/pro-labore/guias/lote', { params: { competencia: bulkComp }, responseType: 'blob' });
                   const url = URL.createObjectURL(r.data);
                   const a = document.createElement('a');
                   a.href = url; a.download = 'Guias-' + bulkComp + '.pdf';
                   a.click(); URL.revokeObjectURL(url);
-                } catch { alert('Erro ao gerar guias em lote'); }
+                } catch { Swal.fire({ icon: 'error', title: 'Erro', text: 'Erro ao gerar guias em lote.' }); }
               }}>GPS/DARF Lote</button>
             </div>
           </div>
@@ -429,7 +430,7 @@ export default function ProLaborePage() {
                         <button style={{ ...S.btn, fontSize: 11 }} onClick={async () => {
                           setGuiasLoading(true); setGuiasCalculo(c);
                           try { const r = await api.get('/hr/pro-labore/calculos/' + c.id + '/guias'); setGuiasData(r.data); }
-                          catch { alert('Erro ao carregar guias'); }
+                          catch { Swal.fire({ icon: 'error', title: 'Erro', text: 'Erro ao carregar guias.' }); }
                           setGuiasLoading(false);
                         }}>GPS/DARF</button>
                       </td>
@@ -609,9 +610,9 @@ export default function ProLaborePage() {
                     competenceTo:   retroTo   || undefined,
                   });
                   const ok = r.data.results.filter((x: any) => x.success).length;
-                  alert(r.data.total + ' encontrado(s) · ' + ok + ' lancamento(s) gerado(s).');
+                  Swal.fire({ icon: 'success', title: 'Concluído', text: r.data.total + ' encontrado(s) · ' + ok + ' lancamento(s) gerado(s).' });
                   setShowRetro(false); loadJournalEntries();
-                } catch (e: any) { alert('Erro: ' + (e?.response?.data?.message ?? e.message)); }
+                } catch (e: any) { Swal.fire({ icon: 'error', title: 'Erro', text: e?.response?.data?.message ?? e.message }); }
                 setRetroLoading(false);
               }}>{retroLoading ? 'Processando...' : 'Gerar lancamentos'}</button>
             </div>
