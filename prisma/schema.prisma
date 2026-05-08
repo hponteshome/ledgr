@@ -172,6 +172,9 @@ model Company {
   ecdImports        EcdImport[]
   proLaboreConfigs  ProLaboreConfig[]
   proLaboreCalculos ProLaboreCalculo[]
+  provisaoConfigs   ProvisaoConfig[]
+  provisaoLancamentos ProvisaoLancamento[]
+  provisaoRateios   ProvisaoRateioConfig[]
   fixedIncomeInvestments FixedIncomeInvestment[]
   loteImports       LoteImport[]
   fixedAssets       FixedAsset[]
@@ -2192,3 +2195,136 @@ model ProLaboreCalculo {
   @@map("pro_labore_calculos")
 }
 
+
+// =============================================================================
+// PROVISÕES RECORRENTES
+// =============================================================================
+
+enum TipoProvisao {
+  ALUGUEL
+  CONDOMINIO
+  ENERGIA
+  SERVICO
+  HONORARIOS
+  OUTROS
+
+  @@map("tipo_provisao")
+}
+
+enum PeriodicidadeProvisao {
+  MENSAL
+  TRIMESTRAL
+  SEMESTRAL
+  ANUAL
+
+  @@map("periodicidade_provisao")
+}
+
+enum StatusProvisaoLancamento {
+  PROVISIONADO
+  NF_PENDENTE
+  NF_CONFERIDA
+  PAGO
+  CANCELADO
+
+  @@map("status_provisao_lancamento")
+}
+
+/// Configuracao de despesa recorrente por empresa
+model ProvisaoConfig {
+  id        String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId String @map("company_id") @db.Uuid
+
+  descricao     String             @map("descricao") @db.VarChar
+  tipo          TipoProvisao       @map("tipo")
+  periodicidade PeriodicidadeProvisao @map("periodicidade")
+  diaVencimento Int                @map("dia_vencimento")
+  valor         Decimal            @map("valor") @db.Decimal(15, 2)
+
+  // Contas contabeis
+  contaDespesaId  String? @map("conta_despesa_id") @db.Uuid
+  contaPassivoId  String? @map("conta_passivo_id") @db.Uuid
+
+  // Fiscal
+  exigirNF        Boolean @default(false) @map("exigir_nf")
+  dedutivel       Boolean @default(true)  @map("dedutivel")
+  creditaPisCofins Boolean @default(false) @map("credita_pis_cofins")
+  aliqPis         Decimal @default(0) @map("aliq_pis") @db.Decimal(5, 4)
+  aliqCofins      Decimal @default(0) @map("aliq_cofins") @db.Decimal(5, 4)
+
+  // Fornecedor
+  fornecedorNome  String? @map("fornecedor_nome") @db.VarChar
+  fornecedorCnpj  String? @map("fornecedor_cnpj") @db.VarChar(18)
+
+  // Rateio
+  temRateio Boolean @default(false) @map("tem_rateio")
+
+  competenciaIni String  @map("competencia_ini") @db.VarChar(7)
+  competenciaFim String? @map("competencia_fim") @db.VarChar(7)
+  ativo          Boolean @default(true) @map("ativo")
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamp(6)
+
+  company    Company @relation(fields: [companyId], references: [id])
+  lancamentos ProvisaoLancamento[]
+  rateios     ProvisaoRateioConfig[]
+
+  @@index([companyId, ativo])
+  @@index([companyId, tipo])
+  @@map("provisao_configs")
+}
+
+/// Percentual de rateio por empresa — pode variar por competencia
+model ProvisaoRateioConfig {
+  id          String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  provisaoId  String @map("provisao_id") @db.Uuid
+  empresaId   String @map("empresa_id") @db.Uuid
+  percentual  Decimal @map("percentual") @db.Decimal(5, 2)
+  competencia String? @map("competencia") @db.VarChar(7) // null = padrao, preenchido = override mensal
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+
+  provisao ProvisaoConfig @relation(fields: [provisaoId], references: [id])
+  empresa  Company        @relation(fields: [empresaId], references: [id])
+
+  @@index([provisaoId])
+  @@map("provisao_rateio_configs")
+}
+
+/// Lancamento mensal gerado pela provisao
+model ProvisaoLancamento {
+  id          String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  provisaoId  String @map("provisao_id") @db.Uuid
+  companyId   String @map("company_id") @db.Uuid
+  competencia String @map("competencia") @db.VarChar(7)
+
+  valor          Decimal                  @map("valor") @db.Decimal(15, 2)
+  valorPis       Decimal @default(0)      @map("valor_pis") @db.Decimal(15, 2)
+  valorCofins    Decimal @default(0)      @map("valor_cofins") @db.Decimal(15, 2)
+  status         StatusProvisaoLancamento @default(PROVISIONADO) @map("status")
+
+  // Placeholder NF
+  nfNumero    String?   @map("nf_numero") @db.VarChar
+  nfChave     String?   @map("nf_chave") @db.VarChar(44)
+  nfConferida Boolean   @default(false) @map("nf_conferida")
+  nfConferidaEm DateTime? @map("nf_conferida_em") @db.Timestamp(6)
+
+  // Vinculos gerados
+  apEntryId      String? @map("ap_entry_id") @db.Uuid
+  journalEntryId String? @map("journal_entry_id") @db.Uuid
+  fiscalDocId    String? @map("fiscal_doc_id") @db.Uuid
+
+  createdById String   @map("created_by_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  provisao ProvisaoConfig @relation(fields: [provisaoId], references: [id])
+  company  Company        @relation(fields: [companyId], references: [id])
+
+  @@unique([provisaoId, companyId, competencia])
+  @@index([companyId, competencia])
+  @@index([companyId, status])
+  @@map("provisao_lancamentos")
+}
