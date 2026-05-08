@@ -46,6 +46,13 @@ export class ProLaboreController {
     return this.svc.gerarLancamentosRetroativos(req.companyId, req.user.id, body?.competenceFrom, body?.competenceTo);
   }
 
+  @Get('guias/lote')
+  async downloadGuiasLote(@Query('competencia') competencia: string, @Request() req: any, @Res() res: Response) {
+    const pdf = await this.guias.gerarGuiasLote(req.companyId, competencia);
+    res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename=Guias-' + competencia + '.pdf' });
+    res.send(pdf);
+  }
+
   @Get('calculos/:id/guias')
   async getGuiasData(@Param('id') id: string, @Request() req: any) {
     const result = await this.guias.gerarGuias(req.companyId, id);

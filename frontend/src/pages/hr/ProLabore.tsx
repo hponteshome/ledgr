@@ -384,6 +384,16 @@ export default function ProLaborePage() {
                 <label htmlFor="bulkJ" style={{ fontSize: 13, cursor: 'pointer' }}>Gerar lançamento contábil</label>
               </div>
               <button style={S.btnP} onClick={gerarEmLote} disabled={bulkLoading}>{bulkLoading ? 'Calculando...' : 'Calcular e lançar'}</button>
+              <button style={{ ...S.btn, background: '#1a1a6e', color: '#fff', border: 'none' }} onClick={async () => {
+                if (!bulkComp) { alert('Informe a competência inicial'); return; }
+                try {
+                  const r = await api.get('/hr/pro-labore/guias/lote', { params: { competencia: bulkComp }, responseType: 'blob' });
+                  const url = URL.createObjectURL(r.data);
+                  const a = document.createElement('a');
+                  a.href = url; a.download = 'Guias-' + bulkComp + '.pdf';
+                  a.click(); URL.revokeObjectURL(url);
+                } catch { alert('Erro ao gerar guias em lote'); }
+              }}>GPS/DARF Lote</button>
             </div>
           </div>
 
