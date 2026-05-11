@@ -2337,6 +2337,7 @@ model ProvisaoLancamento {
 enum StatusFechamento {
   ABERTO
   EM_FECHAMENTO
+  FECHADO_PREVIO
   FECHADO
   REABERTO
 

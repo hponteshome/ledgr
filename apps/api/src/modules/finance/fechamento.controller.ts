@@ -35,8 +35,11 @@ export class FechamentoController {
   }
 
   @Post(':competencia/fechar')
-  fecharMes(@Param('competencia') competencia: string, @Request() req: any) {
-    return this.svc.fecharMes(req.companyId, competencia, req.user.id);
+  fecharMes(@Param('competencia') competencia: string, @Body() body: any, @Request() req: any) {
+    return this.svc.fecharMes(req.companyId, competencia, req.user.id, {
+      motivoMesCorrente: body?.motivoMesCorrente,
+      confirmarPrevio: body?.confirmarPrevio,
+    });
   }
 
   @Post(':competencia/reabrir')

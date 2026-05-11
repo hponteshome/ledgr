@@ -6,10 +6,11 @@ import Swal from 'sweetalert2';
 const fmtBRL = (v: any) => Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const STATUS_FECHAMENTO: Record<string, { bg: string; color: string; label: string; icon: string }> = {
-  ABERTO:        { bg: '#F9FAFB', color: '#6B7280', label: 'Em aberto',     icon: '🔓' },
-  EM_FECHAMENTO: { bg: '#FEFCE8', color: '#854D0E', label: 'Em fechamento', icon: '⏳' },
-  FECHADO:       { bg: '#F0FDF4', color: '#15803D', label: 'Fechado',       icon: '🔒' },
-  REABERTO:      { bg: '#FFF7ED', color: '#C2410C', label: 'Reaberto',      icon: '⚠️' },
+  ABERTO:         { bg: '#F9FAFB', color: '#6B7280', label: 'Em aberto',        icon: '🔓' },
+  EM_FECHAMENTO:  { bg: '#FEFCE8', color: '#854D0E', label: 'Em fechamento',    icon: '⏳' },
+  FECHADO_PREVIO: { bg: '#FFF7ED', color: '#C2410C', label: 'Fechamento Prévio',icon: '🔒⚠️' },
+  FECHADO:        { bg: '#F0FDF4', color: '#15803D', label: 'Fechado',          icon: '🔒' },
+  REABERTO:       { bg: '#FFF7ED', color: '#C2410C', label: 'Reaberto',         icon: '⚠️' },
 };
 
 const STATUS_ITEM: Record<string, { bg: string; color: string; label: string }> = {
@@ -224,14 +225,49 @@ export default function FechamentoPage() {
     loadFechamento();
   };
 
+  const MOTIVOS_MES_CORRENTE = [
+    'Encerramento de atividades',
+    'Cisão/fusão societária',
+    'Auditoria ou perícia contábil',
+    'Determinação judicial',
+    'Outro',
+  ];
+
   const fecharMes = async () => {
     const pendentes = fechamento?.itens?.filter((i: any) => i.status === 'PENDENTE') ?? [];
     if (pendentes.length > 0) {
       Swal.fire({ icon: 'warning', title: 'Itens pendentes', text: `Existem ${pendentes.length} item(ns) ainda pendentes de conferência.` });
       return;
     }
+
+    // Verificar se é mês corrente
+    const now = new Date();
+    const mesCorrente = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+    let motivoMesCorrente: string | undefined;
+
+    if (competencia === mesCorrente) {
+      const { value: motivo, isConfirmed } = await Swal.fire({
+        icon: 'warning',
+        title: 'Fechamento do mês corrente',
+        html: `<p style="font-size:13px;color:#6B7280;margin-bottom:12px">Você está fechando o mês ainda em curso (<strong>${competencia}</strong>). Este é um evento excepcional.</p>
+               <p style="font-size:12px;color:#6B7280;margin-bottom:8px">Selecione o motivo:</p>`,
+        input: 'select',
+        inputOptions: Object.fromEntries(MOTIVOS_MES_CORRENTE.map(m => [m, m])),
+        showCancelButton: true,
+        confirmButtonText: 'Continuar',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#111111',
+        cancelButtonColor: '#6B7280',
+        inputPlaceholder: 'Selecione o motivo...',
+      });
+      if (!isConfirmed) return;
+      motivoMesCorrente = motivo;
+    }
+
+    // Confirmar fechamento
     const r = await Swal.fire({
-      icon: 'question', title: 'Fechar competência?',
+      icon: 'question',
+      title: 'Fechar competência?',
       text: `Confirma o fechamento de ${competencia}? Lançamentos serão bloqueados.`,
       showCancelButton: true,
       confirmButtonText: 'Fechar',
@@ -240,13 +276,47 @@ export default function FechamentoPage() {
       cancelButtonColor: '#6B7280',
     });
     if (!r.isConfirmed) return;
+
     setLoading(true);
     try {
-      const res = await api.post('/finance/fechamento/' + competencia + '/fechar');
+      const res = await api.post('/finance/fechamento/' + competencia + '/fechar', { motivoMesCorrente });
       Swal.fire({ icon: 'success', title: 'Fechado!', text: res.data.message });
       loadFechamento();
     } catch (e: any) {
-      Swal.fire({ icon: 'error', title: 'Erro', text: e?.response?.data?.message ?? 'Erro' });
+      const msg = e?.response?.data?.message ?? '';
+      if (msg === 'MES_ANTERIOR_ABERTO') {
+        // Mês anterior em aberto — perguntar se deseja fechamento prévio
+        const { isConfirmed } = await Swal.fire({
+          icon: 'warning',
+          title: 'Mês anterior em aberto',
+          html: `<p style="font-size:13px;color:#6B7280">O mês anterior ao selecionado ainda não foi fechado.</p>
+                 <p style="font-size:13px;color:#C2410C;margin-top:8px"><strong>Deseja realizar um Fechamento Prévio?</strong></p>
+                 <p style="font-size:11px;color:#9CA3AF;margin-top:6px">O fechamento será marcado como "Prévio" na auditoria.</p>`,
+          showCancelButton: true,
+          confirmButtonText: 'Sim, Fechamento Prévio',
+          cancelButtonText: 'Cancelar',
+          confirmButtonColor: '#C2410C',
+          cancelButtonColor: '#6B7280',
+        });
+        if (!isConfirmed) { setLoading(false); return; }
+        // Tentar novamente com confirmarPrevio
+        try {
+          const res2 = await api.post('/finance/fechamento/' + competencia + '/fechar', {
+            motivoMesCorrente,
+            confirmarPrevio: true,
+          });
+          Swal.fire({
+            icon: 'success',
+            title: 'Fechamento Prévio realizado',
+            html: `<p>${res2.data.message}</p><p style="font-size:11px;color:#9CA3AF;margin-top:8px">Registrado na auditoria como Fechamento Prévio.</p>`,
+          });
+          loadFechamento();
+        } catch (e2: any) {
+          Swal.fire({ icon: 'error', title: 'Erro', text: e2?.response?.data?.message ?? 'Erro' });
+        }
+      } else {
+        Swal.fire({ icon: 'error', title: 'Erro', text: msg ?? 'Erro ao fechar' });
+      }
     }
     setLoading(false);
   };
@@ -290,7 +360,14 @@ export default function FechamentoPage() {
                   {calculando ? 'Calculando...' : '⟳ Calcular/Recalcular'}
                 </button>
                 {!isFechado && (
-                  <button style={{ ...S.btnP, background: '#15803D' }} onClick={fecharMes} disabled={loading || pendentes > 0}>
+                  <button style={{ ...S.btnP, background: pendentes > 0 ? '#9CA3AF' : '#15803D' }}
+                    onClick={() => {
+                      if (pendentes > 0) {
+                        Swal.fire({ icon: 'warning', title: 'Itens pendentes', text: `Confira os ${pendentes} item(ns) pendentes antes de fechar o mês.`, confirmButtonColor: '#111' });
+                        return;
+                      }
+                      fecharMes();
+                    }} disabled={loading}>
                     🔒 Fechar mês
                   </button>
                 )}
