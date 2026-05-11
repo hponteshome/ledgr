@@ -6,7 +6,7 @@ import {
   FiFolder, FiBook, FiPenTool, FiClipboard, FiShield, FiLayers,
   FiUserCheck, FiUpload, FiDatabase, FiPieChart, FiCalendar,
   FiServer, FiEdit2, FiEdit3, FiPackage, FiTool, FiTruck, FiTrendingUp,
-  FiAlertCircle, FiTrendingDown, FiLogOut, FiBarChart2, FiArchive, FiBookOpen, FiCpu, FiRepeat} from 'react-icons/fi';
+  FiAlertCircle, FiTrendingDown, FiLogOut, FiBarChart2, FiArchive, FiBookOpen, FiCpu, FiRepeat, FiLock} from 'react-icons/fi';
 import { useCompany } from '../contexts/CompanyContext';
 import { useAuth } from '../contexts/AuthContext';
 import Swal from 'sweetalert2';
@@ -62,6 +62,7 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
         { path: '/app/finance/agenda', label: 'Agenda Financeira', icon: FiCalendar },
         { path: '/app/finance/bank-import', label: 'Importação Bancária', icon: FiUpload },
         { path: '/app/finance/provisoes', label: 'Provisões Recorrentes', icon: FiRepeat },
+        { path: '/app/finance/fechamento', label: 'Fechamento Mensal', icon: FiLock },
       ],
     },
     {
@@ -342,6 +343,7 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
     </>
   );
 };
+
 
 
 

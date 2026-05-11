@@ -175,6 +175,7 @@ model Company {
   provisaoConfigs   ProvisaoConfig[]
   provisaoLancamentos ProvisaoLancamento[]
   provisaoRateios   ProvisaoRateioConfig[]
+  fechamentosMensais FechamentoMensal[]
   fixedIncomeInvestments FixedIncomeInvestment[]
   loteImports       LoteImport[]
   fixedAssets       FixedAsset[]
@@ -2327,4 +2328,81 @@ model ProvisaoLancamento {
   @@index([companyId, competencia])
   @@index([companyId, status])
   @@map("provisao_lancamentos")
+}
+
+// =============================================================================
+// FECHAMENTO MENSAL
+// =============================================================================
+
+enum StatusFechamento {
+  ABERTO
+  EM_FECHAMENTO
+  FECHADO
+  REABERTO
+
+  @@map("status_fechamento")
+}
+
+enum ModuloFechamento {
+  PROVISOES
+  PRO_LABORE
+  RENDA_FIXA
+  DEPRECIACAO
+  PIS_COFINS
+  IRPJ_CSLL
+
+  @@map("modulo_fechamento")
+}
+
+enum StatusItemFechamento {
+  PENDENTE
+  CONFERIDO
+  GERADO
+  IGNORADO
+
+  @@map("status_item_fechamento")
+}
+
+/// Controle de fechamento mensal por empresa e competencia
+model FechamentoMensal {
+  id          String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId   String           @map("company_id") @db.Uuid
+  competencia String           @map("competencia") @db.VarChar(7)
+  status      StatusFechamento @default(ABERTO) @map("status")
+
+  fechadoEm   DateTime? @map("fechado_em") @db.Timestamp(6)
+  fechadoPorId String?  @map("fechado_por_id") @db.Uuid
+  reabertoEm  DateTime? @map("reaberto_em") @db.Timestamp(6)
+  reabertoForId String? @map("reaberto_for_id") @db.Uuid
+  motivoReabertura String? @map("motivo_reabertura") @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  company Company @relation(fields: [companyId], references: [id])
+  itens   FechamentoItem[]
+
+  @@unique([companyId, competencia])
+  @@index([companyId, status])
+  @@map("fechamentos_mensais")
+}
+
+/// Itens do fechamento mensal por modulo
+model FechamentoItem {
+  id            String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  fechamentoId  String              @map("fechamento_id") @db.Uuid
+  modulo        ModuloFechamento    @map("modulo")
+  descricao     String              @map("descricao") @db.VarChar
+  valorCalculado Decimal            @map("valor_calculado") @db.Decimal(15, 2)
+  valorConfirmado Decimal?          @map("valor_confirmado") @db.Decimal(15, 2)
+  status        StatusItemFechamento @default(PENDENTE) @map("status")
+  conferidoPorId String?            @map("conferido_por_id") @db.Uuid
+  conferidoEm   DateTime?           @map("conferido_em") @db.Timestamp(6)
+  journalEntryId String?            @map("journal_entry_id") @db.Uuid
+  obs           String?             @map("obs") @db.Text
+
+  fechamento FechamentoMensal @relation(fields: [fechamentoId], references: [id], onDelete: Cascade)
+
+  @@index([fechamentoId, modulo])
+  @@map("fechamento_itens")
 }
