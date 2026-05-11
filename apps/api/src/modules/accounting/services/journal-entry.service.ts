@@ -240,6 +240,7 @@ account: { select: { id: true, code: true, name: true, type: true, nature: true,
   // ── Criar lançamento ────────────────────────────────────────────────────────
 
   async create(companyId: string, userId: string, dto: CreateJournalEntryDto) {
+    if (dto.date) await this.checkFechamento(companyId, dto.date);
     // Resolve accountId a partir do accountCode quando necessário
     const resolvedItems = await this.resolveItems(companyId, dto.items);
     this.validateItems(resolvedItems);
@@ -273,6 +274,7 @@ account: { select: { id: true, code: true, name: true, type: true, nature: true,
   // ── Editar lançamento ───────────────────────────────────────────────────────
 
   async update(id: string, companyId: string, userId: string, dto: CreateJournalEntryDto) {
+    if (dto.date) await this.checkFechamento(companyId, dto.date);
     const entry = await this.prisma.journalEntry.findFirst({ where: { id, companyId } });
     if (!entry) throw new NotFoundException('Lançamento não encontrado.');
 
@@ -345,6 +347,8 @@ account: { select: { id: true, code: true, name: true, type: true, nature: true,
   // ── Excluir lançamento individual ───────────────────────────────────────────
 
   async remove(id: string, companyId: string) {
+    const entryToRemove = await this.prisma.journalEntry.findUnique({ where: { id } });
+    if (entryToRemove) await this.checkFechamento(companyId, entryToRemove.date);
     const entry = await this.prisma.journalEntry.findFirst({ where: { id, companyId } });
     if (!entry) throw new NotFoundException('Lançamento não encontrado.');
 
@@ -528,4 +532,17 @@ private validateItems(items: Array<{ type: string; value: number }>) {
       count: r._count.sourceModule,
     }));
   }
+  // ── Verificar se competencia esta fechada ─────────────────────────────────
+  private async checkFechamento(companyId: string, date: Date | string) {
+    const d = new Date(date);
+    const competencia = `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}`;
+    const fechamento = await this.prisma.fechamentoMensal.findUnique({
+      where: { companyId_competencia: { companyId, competencia } },
+    });
+    if (fechamento && (fechamento.status === 'FECHADO' || fechamento.status === 'FECHADO_PREVIO')) {
+      throw new BadRequestException(`Competência ${competencia} está fechada. Reabra para editar lançamentos.`);
+    }
+  }
+
+
 }
