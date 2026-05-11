@@ -175,12 +175,26 @@ export default function FechamentoPage() {
   const [calculando, setCalculando] = useState(false);
   const [conferirItem, setConferirItem] = useState<any>(null);
   const [showReabrir, setShowReabrir] = useState(false);
+  const [recente, setRecente] = useState<any[]>([]);
   const [tab, setTab] = useState<'atual' | 'historico'>('atual');
 
   const loadFechamento = async () => {
     try {
-      const r = await api.get('/finance/fechamento/' + competencia);
-      setFechamento(r.data);
+      const [fR, hR] = await Promise.all([
+        api.get('/finance/fechamento/' + competencia),
+        api.get('/finance/fechamento'),
+      ]);
+      setFechamento(fR.data);
+      // Historico: ultimo fechado + posteriores ate mes atual, ordem decrescente
+      const todos: any[] = hR.data ?? [];
+      const now = new Date();
+      const mesAtual = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+      // Filtrar: apenas meses <= mesAtual, ordenar decrescente, pegar os 6 ultimos
+      const filtrado = todos
+        .filter((h: any) => h.competencia <= mesAtual)
+        .sort((a: any, b: any) => b.competencia.localeCompare(a.competencia))
+        .slice(0, 6);
+      setRecente(filtrado);
     } catch { setFechamento(null); }
   };
 
@@ -411,6 +425,53 @@ export default function FechamentoPage() {
                 </tbody>
               </table>
           }
+        </div>
+      )}
+
+      {/* Historico recente */}
+      {recente.length > 0 && (
+        <div style={S.card}>
+          <p style={{ fontSize: 11, fontWeight: 500, color: '#6B7280', textTransform: 'uppercase' as const, letterSpacing: '.3px', marginBottom: 12 }}>
+            Histórico recente
+          </p>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead><tr>
+              <th style={S.th}>Competência</th>
+              <th style={S.th}>Status</th>
+              <th style={S.th}>Fechado em</th>
+              <th style={S.th}>Reaberto em</th>
+              <th style={S.thR}>Itens</th>
+              <th style={S.thR}>Conferidos</th>
+              <th style={S.th}></th>
+            </tr></thead>
+            <tbody>
+              {recente.map((h: any) => {
+                const st = STATUS_FECHAMENTO[h.status] ?? STATUS_FECHAMENTO.ABERTO;
+                const conf = h.itens?.filter((i: any) => i.status === 'CONFERIDO' || i.status === 'GERADO').length ?? 0;
+                const total = h.itens?.length ?? 0;
+                return (
+                  <tr key={h.id} style={{ background: h.competencia === competencia ? '#F0F9FF' : '#fff' }}>
+                    <td style={{ ...S.td, fontWeight: 500 }}>{h.competencia}</td>
+                    <td style={S.td}>
+                      <span style={{ padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 500, background: st.bg, color: st.color }}>
+                        {st.icon} {st.label}
+                      </span>
+                    </td>
+                    <td style={S.td}>{h.fechadoEm ? new Date(h.fechadoEm).toLocaleDateString('pt-BR') : '—'}</td>
+                    <td style={S.td}>{h.reabertoEm ? new Date(h.reabertoEm).toLocaleDateString('pt-BR') : '—'}</td>
+                    <td style={S.tdR}>{total}</td>
+                    <td style={{ ...S.tdR, color: conf === total && total > 0 ? '#15803D' : '#854D0E' }}>{conf}/{total}</td>
+                    <td style={S.td}>
+                      <button style={{ ...S.btn, fontSize: 11 }}
+                        onClick={() => { setCompetencia(h.competencia); window.scrollTo(0, 0); }}>
+                        Ver
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       )}
 
