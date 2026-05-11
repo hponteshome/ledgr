@@ -50,6 +50,7 @@ import RazaoAnaliticoPage from '../pages/accounting/RazaoAnaliticoPage';
 import CdbProjecaoPage from '../pages/accounting/investments/CdbProjecaoPage';
 import ProLaborePage from '../pages/hr/ProLabore';
 import ProvisoesPage from '../pages/finance/ProvisoesPage';
+import FechamentoPage from '../pages/finance/FechamentoPage';
 import RendaFixaPage from '../pages/accounting/investments/RendaFixaPage';
 import CdiTabelaPage from '../pages/accounting/investments/CdiTabelaPage';
 import { IndicadoresPage } from '../pages/sistema/IndicadoresPage';
@@ -92,6 +93,7 @@ export const AppRoutes = () => {
                 <Route path="app/sistema/indicadores" element={<ProtectedRoute><IndicadoresPage /></ProtectedRoute>} />
                 <Route path="app/sistema/calendario" element={<ProtectedRoute><CalendarioPage /></ProtectedRoute>} />
                 <Route path="app/sistema/tabelas" element={<ProtectedRoute><TabelasLegaisPage /></ProtectedRoute>} />
+                <Route path="app/finance/fechamento" element={<ProtectedRoute><FechamentoPage /></ProtectedRoute>} />
                 <Route path="app/finance/provisoes" element={<ProtectedRoute><ProvisoesPage /></ProtectedRoute>} />
                 <Route path="app/hr/pro-labore" element={<ProtectedRoute><ProLaborePage /></ProtectedRoute>} />
                 <Route path="app/accounting/investimentos/renda-fixa" element={<ProtectedRoute><RendaFixaPage /></ProtectedRoute>} />
