@@ -221,29 +221,65 @@ export class FechamentoService {
 
   // ── Fechar mes ────────────────────────────────────────────────────────────
 
-  async fecharMes(companyId: string, competencia: string, userId: string) {
+  async fecharMes(companyId: string, competencia: string, userId: string, opcoes?: { motivoMesCorrente?: string; confirmarPrevio?: boolean }) {
     const fechamento = await this.getOrCreate(companyId, competencia);
     const pendentes = fechamento.itens.filter(i => i.status === 'PENDENTE');
     if (pendentes.length > 0) {
       throw new BadRequestException(`Existem ${pendentes.length} item(ns) pendentes de conferência.`);
     }
 
+    // Validar mes corrente
+    const now = new Date();
+    const mesCorrente = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+    const isMesCorrente = competencia === mesCorrente;
+    if (isMesCorrente && !opcoes?.motivoMesCorrente) {
+      throw new BadRequestException('MES_CORRENTE_SEM_MOTIVO');
+    }
+
+    // Verificar mes anterior
+    const [y, m] = competencia.split('-').map(Number);
+    const mesAnterior = m === 1
+      ? `${y-1}-12`
+      : `${y}-${String(m-1).padStart(2,'0')}`;
+
+    const anterior = await this.prisma.fechamentoMensal.findUnique({
+      where: { companyId_competencia: { companyId, competencia: mesAnterior } },
+    });
+    const previoAberto = !anterior || anterior.status === 'ABERTO' || anterior.status === 'REABERTO';
+
+    if (previoAberto && !opcoes?.confirmarPrevio) {
+      throw new BadRequestException('MES_ANTERIOR_ABERTO');
+    }
+
+    const isFechamentoPrevio = previoAberto && opcoes?.confirmarPrevio;
+
     await this.prisma.fechamentoMensal.update({
       where: { id: fechamento.id },
-      data: { status: 'FECHADO', fechadoEm: new Date(), fechadoPorId: userId },
-    });
-
-    // AuditLog
-    await this.prisma.auditLog.create({
       data: {
-        actorId: userId,
-        action: 'FECHAMENTO_MES',
-        targetId: `${companyId}:${competencia}`,
-        after: { status: 'FECHADO', competencia },
+        status: isFechamentoPrevio ? 'FECHADO_PREVIO' : 'FECHADO',
+        fechadoEm: new Date(),
+        fechadoPorId: userId,
+        motivoReabertura: isFechamentoPrevio
+          ? `Fechamento prévio — mês anterior (${mesAnterior}) não fechado. ${opcoes?.motivoMesCorrente ?? ''}`
+          : opcoes?.motivoMesCorrente ?? null,
       },
     });
 
-    return { ok: true, message: `Competência ${competencia} fechada com sucesso.` };
+    await this.prisma.auditLog.create({
+      data: {
+        actorId: userId,
+        action: isFechamentoPrevio ? 'FECHAMENTO_PREVIO' : isMesCorrente ? 'FECHAMENTO_MES_CORRENTE' : 'FECHAMENTO_MES',
+        targetId: `${companyId}:${competencia}`,
+        after: { status: 'FECHADO', competencia, isMesCorrente, isFechamentoPrevio, motivo: opcoes?.motivoMesCorrente },
+      },
+    });
+
+    return {
+      ok: true,
+      isFechamentoPrevio,
+      isMesCorrente,
+      message: `Competência ${competencia} fechada${isFechamentoPrevio ? ' (Fechamento Prévio — mês anterior em aberto)' : ''}.`,
+    };
   }
 
   // ── Reabrir mes ───────────────────────────────────────────────────────────
