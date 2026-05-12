@@ -22,6 +22,7 @@ interface Account {
     ecdBalance: number | null;
     difference: number | null;
     children?: Account[];
+    reducedCode?: string;
 }
 
 export default function AccountsPage() {

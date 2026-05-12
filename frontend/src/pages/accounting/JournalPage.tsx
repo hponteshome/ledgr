@@ -277,6 +277,8 @@ const JournalPage: React.FC = () => {
     const [showEcdOpening, setShowEcdOpening] = useState(false);
     const [showLotdModal, setShowLotdModal] = useState(false);
     const [showRecent, setShowRecent] = useState(false);
+    const [sortBy, setSortBy] = useState<'date'|'value'|'description'|'debitCode'|'creditCode'|'reference'>('date');
+    const [sortDir, setSortDir] = useState<'asc'|'desc'>('asc');
 
     // Modal "conta não encontrada"
     const [newAccountCode, setNewAccountCode] = useState('');
@@ -292,13 +294,29 @@ const JournalPage: React.FC = () => {
         setLoading(true);
         try {
             const params = showRecent
-                ? { dateTo: fDate, search: search || undefined, sources: fSource || undefined, page, limit: 50, orderBy: 'date', orderDir: 'desc' }
-                : { dateFrom: currentMonth.from, dateTo: currentMonth.to, search: search || undefined, page, limit: 100 };
+                ? { dateTo: fDate, search: search || undefined, sources: fSource || undefined, page, limit: 50, orderBy: sortBy, orderDir: sortDir }
+                : { dateFrom: currentMonth.from, dateTo: currentMonth.to, search: search || undefined, page, limit: 100, orderBy: sortBy, orderDir: sortDir };
             const r = await api.get('/accounting/journal', { params });
-            setData(r.data);
+            let entries = r.data.entries;
+            if (sortBy === 'debitCode' || sortBy === 'creditCode') {
+              const side = sortBy === 'debitCode' ? 'DEBIT' : 'CREDIT';
+              entries = [...entries].sort((a: any, b: any) => {
+                const ca = a.items.find((i: any) => i.type === side)?.account?.code ?? '';
+                const cb = b.items.find((i: any) => i.type === side)?.account?.code ?? '';
+                return sortDir === 'asc' ? ca.localeCompare(cb) : cb.localeCompare(ca);
+              });
+            }
+            if (sortBy === 'value') {
+              entries = [...entries].sort((a: any, b: any) => {
+                const va = a.items.reduce((s: number, i: any) => i.type === 'DEBIT' ? s + Number(i.value) : s, 0);
+                const vb = b.items.reduce((s: number, i: any) => i.type === 'DEBIT' ? s + Number(i.value) : s, 0);
+                return sortDir === 'asc' ? va - vb : vb - va;
+              });
+            }
+            setData({ ...r.data, entries });
         } catch (e) { console.error(e); }
         finally { setLoading(false); }
-    }, [activeCompany, currentMonth.from, currentMonth.valid, search, page, showRecent, fDate, fSource]);
+    }, [activeCompany, currentMonth.from, currentMonth.valid, search, page, showRecent, fDate, fSource, sortBy, sortDir]);
 
     const loadTotals = useCallback(async () => {
         if (!activeCompany || !currentMonth.valid) return;
@@ -495,6 +513,10 @@ const JournalPage: React.FC = () => {
                         className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-purple-700 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 transition-colors">
                         <FiUploadCloud size={13} /> Importar Lote IOB
                     </button>
+                    <button onClick={() => window.location.href='/app/accounting/journal/import'}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-colors">
+                        <FiUploadCloud size={13} /> Importar Diário
+                    </button>
                     <label className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 border border-gray-200 rounded-lg bg-white cursor-pointer hover:bg-gray-50">
                         <input type="checkbox" checked={showRecent} onChange={e => setShowRecent(e.target.checked)} className="accent-blue-600" />
                         Mostrar Lançamentos
@@ -690,14 +712,30 @@ const JournalPage: React.FC = () => {
                         <table className="w-full border-collapse text-xs">
                             <thead className="bg-gray-50 sticky top-0 z-10">
                                 <tr>
-                                    <th className="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 whitespace-nowrap w-16">Data</th>
-                                    <th className="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 whitespace-nowrap w-20">Nº Lanç.</th>
-                                    <th className="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100">Histórico</th>
-                                    <th className="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 whitespace-nowrap w-32">Débito</th>
-                                    <th className="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 whitespace-nowrap w-32">Crédito</th>
-                                    <th className="px-3 py-2 text-right text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 whitespace-nowrap w-36">Valor</th>
-                                    <th className="px-3 py-2 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 w-20">Fonte</th>
-                                    <th className="px-3 py-2 border-b border-gray-100 w-16"></th>
+                                    {(() => {
+                                        const thBase = "px-3 py-2 text-left text-[10px] font-bold uppercase tracking-wider border-b border-gray-100 whitespace-nowrap select-none";
+                                        const sortable = (col: typeof sortBy, label: string, extraCls = "") => {
+                                            const active = sortBy === col;
+                                            const next = active && sortDir === "asc" ? "desc" : "asc";
+                                            return (
+                                                <th onClick={() => { setSortBy(col); setSortDir(active ? next : col === "date" ? "asc" : "desc"); setPage(1); }}
+                                                    className={`${thBase} ${extraCls} cursor-pointer hover:text-blue-600 transition-colors ${active ? "text-blue-600" : "text-gray-400"}`}>
+                                                    {label}{active ? (sortDir === "asc" ? " ↑" : " ↓") : ""}
+                                                </th>
+                                            );
+                                        };
+                                        return (<>
+                                            {sortable("date", "Data", "w-16")}
+                                            {sortable("reference", "Nr Lanc", "w-20")}
+                                            {sortable("description", "Histórico")}
+                                            {sortable("debitCode", "Débito", "w-32")}
+                                            {sortable("creditCode", "Crédito", "w-32")}
+                                            {sortable("value", "Valor", "w-36 text-right")}
+                                            <th className={`${thBase} w-20 text-gray-400`}>Fonte</th>
+                                            <th className="px-3 py-2 border-b border-gray-100 w-16"></th>
+                                        </>);
+                                    })()}
+
                                 </tr>
                             </thead>
                             <tbody>
@@ -820,3 +858,12 @@ const JournalPage: React.FC = () => {
 };
 
 export default JournalPage;
+
+
+
+
+
+
+
+
+

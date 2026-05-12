@@ -45,15 +45,15 @@ Add-Content -Path D:\Projetos\Ledgr\.gitignore -Value "`n<padrão>"
 
 ## Convenções obrigatórias (Prisma / Backend)
 
-| Regra                      | Exemplo                                                                                       |
-| -------------------------- | --------------------------------------------------------------------------------------------- |
-| PK com UUID                | `@id @default(dbgenerated("gen_random_uuid()")) @db.Uuid`                                     |
-| Campos snake_case no banco | `@map("created_at")`                                                                          |
-| Timestamps                 | `@db.Timestamp(6)`                                                                            |
-| Soft delete                | campo `deletedAt DateTime? @db.Timestamp(6)`                                                  |
-| Valores monetários         | `Decimal` — NUNCA `Float`                                                                     |
-| companyId                  | nunca em filtro global do PrismaService — sempre via `request.companyId` (CompanyInterceptor) |
-| AuditLog                   | campos: `actorId`, `action`, `targetId`, `before`, `after`, `ip`                              |
+| Regra | Exemplo |
+| ----- | ------- |
+| PK com UUID | `@id @default(dbgenerated("gen_random_uuid()")) @db.Uuid` |
+| Campos snake_case no banco | `@map("created_at")` |
+| Timestamps | `@db.Timestamp(6)` |
+| Soft delete | campo `deletedAt DateTime? @db.Timestamp(6)` |
+| Valores monetários | `Decimal` — NUNCA `Float` |
+| companyId | nunca em filtro global do PrismaService — sempre via `request.companyId` (CompanyInterceptor) |
+| AuditLog | campos: `actorId`, `action`, `targetId`, `before`, `after`, `ip` |
 
 ---
 
@@ -109,68 +109,68 @@ corporate/       — Societário (shareholders, transfers, corporate-pdf)
 
 ## Models principais (resumo)
 
-| Model                    | Tabela                       | Observação                                                       |
-| ------------------------ | ---------------------------- | ---------------------------------------------------------------- |
-| `AccountsPayable`        | `accounts_payable`           | status usa `APStatus`                                            |
-| `ApEntry`                | `ap_entries`                 | model antigo, status usa `ApEntryStatus`                         |
-| `AgendaEvent`            | `agenda_events`              | campo obrigatório: `createdById`                                 |
-| `FiscalDocument`         | `fiscal_documents`           | campo obrigatório: `createdById` · status: `DocumentStatus`      |
-| `BankStatement`          | `bank_statements`            | migrado em 22/03/2026                                            |
-| `BankTransaction`        | `bank_transactions`          | motor sugestão 3 camadas                                         |
-| `BankImportRule`         | `bank_import_rules`          | motor de aprendizado                                             |
-| `JournalEntry`           | `journal_entries`            | campo: `date` · `sourceModule`                                   |
-| `JournalEntryItem`       | `journal_entry_items`        | campos: `accountId`, `type`, `value`                             |
-| `AuditLog`               | `audit_logs`                 | campos: `actorId`, `action`, `targetId`, `before`, `after`, `ip` |
-| `FixedIncomeInvestment`  | `fixed_income_investments`   | campo `accountingAccountId` (conta contábil do CDB)              |
-| `FixedIncomeEvent`       | `fixed_income_events`        | resgates e atualizações mensais                                  |
-| `FixedIncomeMonthlyRate` | `fixed_income_monthly_rates` | taxas CDI mensais                                                |
-| `CdiDailyRate`           | `cdi_daily_rates`            | taxas CDI diárias da BCB                                         |
-| `Holiday`                | `holidays`                   | feriados · campos hebrewName/hebrewDate                          |
-| `LoteImport`             | `lote_imports`               | source, batchType, batchDate, stats                              |
-| `FixedAsset`             | `fixed_assets`               | relações assetAccount/depreciationAcc/accumDeprecAcc             |
-| `AssetDepreciationLog`   | `asset_depreciation_logs`    | histórico mensal de depreciação                                  |
-| `ChartOfAccounts`        | `chart_of_accounts`          | campo `reducedCode` (shortCode)                                  |
+| Model | Tabela | Observação |
+| ----- | ------ | ---------- |
+| `AccountsPayable` | `accounts_payable` | status usa `APStatus` |
+| `ApEntry` | `ap_entries` | model antigo, status usa `ApEntryStatus` |
+| `AgendaEvent` | `agenda_events` | campo obrigatório: `createdById` |
+| `FiscalDocument` | `fiscal_documents` | campo obrigatório: `createdById` · status: `DocumentStatus` |
+| `BankStatement` | `bank_statements` | migrado em 22/03/2026 |
+| `BankTransaction` | `bank_transactions` | motor sugestão 3 camadas |
+| `BankImportRule` | `bank_import_rules` | motor de aprendizado |
+| `JournalEntry` | `journal_entries` | campo: `date` · `sourceModule` |
+| `JournalEntryItem` | `journal_entry_items` | campos: `accountId`, `type`, `value` |
+| `AuditLog` | `audit_logs` | campos: `actorId`, `action`, `targetId`, `before`, `after`, `ip` |
+| `FixedIncomeInvestment` | `fixed_income_investments` | campo `accountingAccountId` (conta contábil do CDB) |
+| `FixedIncomeEvent` | `fixed_income_events` | resgates e atualizações mensais |
+| `FixedIncomeMonthlyRate` | `fixed_income_monthly_rates` | taxas CDI mensais |
+| `CdiDailyRate` | `cdi_daily_rates` | taxas CDI diárias da BCB |
+| `Holiday` | `holidays` | feriados · campos hebrewName/hebrewDate |
+| `LoteImport` | `lote_imports` | source, batchType, batchDate, stats |
+| `FixedAsset` | `fixed_assets` | relações assetAccount/depreciationAcc/accumDeprecAcc |
+| `AssetDepreciationLog` | `asset_depreciation_logs` | histórico mensal de depreciação |
+| `ChartOfAccounts` | `chart_of_accounts` | campo `reducedCode` (shortCode) |
 
 ---
 
 ## Estado dos módulos
 
-| Módulo                         | Status         | Observações                                                          |
-| ------------------------------ | -------------- | -------------------------------------------------------------------- |
-| Accounting — Plano de Contas   | ✅ Produção    | shortCode, toggle tabela/árvore, inferência automática               |
-| Accounting — Lançamentos       | ✅ Produção    | Diário Geral, Razão Analítico, Balancete                             |
-| Accounting — Balancete         | ✅ Produção    | Mensal + Verificação, baseado exclusivamente em journal_entry_items  |
-| Accounting — Renda Fixa (CDB)  | ✅ Produção    | Carteira, extrato, projeção, resgates, proporcionalização 1º mês     |
-| Accounting — Ativo Imobilizado | ✅ Produção    | Backfill depreciação, relatório anual, lançamentos contábeis mensais |
-| Calendário de Feriados         | ✅ Produção    | 63 feriados nacionais 2022-2026, feriados judaicos                   |
-| Sistema — Tabelas Legais       | ✅ Produção    | IRPF 2024/2025/2026 + INSS 2024/2025/2026 + Simulador                |
-| Finance — Doc. Fiscal          | ✅ Funcionando | Integração AP × CT × Agenda via $transaction                         |
-| Finance — Contas a Pagar       | ✅ Funcionando | Baixa individual e lote, Aging/Posição AP                            |
-| Finance — Agenda               | ✅ Funcionando | Calendário post-its, recorrência                                     |
-| Finance — Bank Import          | ✅ Funcionando | Itaú, Bradesco, BB, OFX, CSV · sugestão 3 camadas                    |
-| Finance — IOB Lotes            | ✅ Funcionando | Multi-arquivo, deduplicação, observação pos.232                      |
-| SPED ECD                       | ✅ Produção    |                                                                      |
-| Societário                     | ✅ Produção    | Shareholders, transferências, corporate-pdf                          |
-| Assinaturas Digitais           | ✅ Funcionando | ClickSign sandbox, validador ICP-Brasil/gov.br, DocumentViewModal    |
-| Arquivo / Repositório          | ✅ Funcionando | Prateleiras por URL, DocumentViewModal, ImportarDocumentoModal       |
-| RFB                            | ✅ Produção    |                                                                      |
-| Finance — Contas a Receber     | 🔲 Pendente    | estrutura preparada (arEntryId nos models)                           |
-| Finance — Folha RH             | 🔲 Pendente    | estrutura preparada (payrollId nos models)                           |
-| Finance — Conciliação AP       | 🔲 Pendente    | apEntryId em BankTransaction já existe                               |
-| Finance — Fluxo de Caixa       | 🔲 Pendente    |                                                                      |
-| Sistema — Indicadores          | 🔧 Parcial     | CDI completo; Selic e IGP-M pendentes                                |
+| Módulo | Status | Observações |
+| ------ | ------ | ----------- |
+| Accounting — Plano de Contas | ✅ Produção | shortCode, toggle tabela/árvore, inferência automática |
+| Accounting — Lançamentos | ✅ Produção | Diário Geral, Razão Analítico, Balancete |
+| Accounting — Balancete | ✅ Produção | Mensal + Verificação, baseado exclusivamente em journal_entry_items |
+| Accounting — Renda Fixa (CDB) | ✅ Produção | Carteira, extrato, projeção, resgates, proporcionalização 1º mês |
+| Accounting — Ativo Imobilizado | ✅ Produção | Backfill depreciação, relatório anual, lançamentos contábeis mensais |
+| Calendário de Feriados | ✅ Produção | 63 feriados nacionais 2022-2026, feriados judaicos |
+| Sistema — Tabelas Legais | ✅ Produção | IRPF 2024/2025/2026 + INSS 2024/2025/2026 + Simulador |
+| Finance — Doc. Fiscal | ✅ Funcionando | Integração AP × CT × Agenda via $transaction |
+| Finance — Contas a Pagar | ✅ Funcionando | Baixa individual e lote, Aging/Posição AP |
+| Finance — Agenda | ✅ Funcionando | Calendário post-its, recorrência |
+| Finance — Bank Import | ✅ Funcionando | Itaú, Bradesco, BB, OFX, CSV · sugestão 3 camadas |
+| Finance — IOB Lotes | ✅ Funcionando | Multi-arquivo, deduplicação, observação pos.232 |
+| SPED ECD | ✅ Produção | |
+| Societário | ✅ Produção | Shareholders, transferências, corporate-pdf |
+| Assinaturas Digitais | ✅ Funcionando | ClickSign sandbox, validador ICP-Brasil/gov.br, DocumentViewModal |
+| Arquivo / Repositório | ✅ Funcionando | Prateleiras por URL, DocumentViewModal, ImportarDocumentoModal |
+| RFB | ✅ Produção | |
+| Finance — Contas a Receber | 🔲 Pendente | estrutura preparada (arEntryId nos models) |
+| Finance — Folha RH | 🔲 Pendente | estrutura preparada (payrollId nos models) |
+| Finance — Conciliação AP | 🔲 Pendente | apEntryId em BankTransaction já existe |
+| Finance — Fluxo de Caixa | 🔲 Pendente | |
+| Sistema — Indicadores | 🔧 Parcial | CDI completo; Selic e IGP-M pendentes |
 
 ---
 
 ## Empresas de teste
 
-| Empresa                                      | CNPJ               | UUID                                   | Observação                         |
-| -------------------------------------------- | ------------------ | -------------------------------------- | ---------------------------------- |
-| SUNRISE HOTELS & RESORTS HOLDING LTDA        | 16.846.468/0001-31 | `4ef0b48b-80c1-4bc6-b06b-781e90a78fd8` | Empresa principal                  |
-| HALLO ADMINISTRACAO E PARTICIPACOES LTDA     | 07.432.458/0001-69 | `06a88dfa-d4cf-4c5c-8dc1-83538d6b8b7c` |                                    |
-| LM ADMINISTRACAO DE BENS IMOVEIS LTDA        | 17.970.759/0001-08 | `f00af1b1-d50b-4ae6-aa17-4c2262e058db` | ECD 2024, 20 ativos imobilizados   |
+| Empresa | CNPJ | UUID | Observação |
+| ------- | ---- | ---- | ---------- |
+| SUNRISE HOTELS & RESORTS HOLDING LTDA | 16.846.468/0001-31 | `4ef0b48b-80c1-4bc6-b06b-781e90a78fd8` | Empresa principal |
+| HALLO ADMINISTRACAO E PARTICIPACOES LTDA | 07.432.458/0001-69 | `06a88dfa-d4cf-4c5c-8dc1-83538d6b8b7c` | |
+| LM ADMINISTRACAO DE BENS IMOVEIS LTDA | 17.970.759/0001-08 | `f00af1b1-d50b-4ae6-aa17-4c2262e058db` | ECD 2024, 20 ativos imobilizados |
 | JOSE SILVA SOCIEDADE INDIVIDUAL DE ADVOCACIA | 35.416.962/0001-00 | `c188b188-de58-4fbd-8aa0-fcf07c35e65e` | 7 CDBs, plano de contas 168 contas |
-| F5 PARTICIPACOES S/A                         | 33.652.701/0001-64 | `30437192-bfe5-4344-8407-b758d7382153` | Societário, assinaturas            |
+| F5 PARTICIPACOES S/A | 33.652.701/0001-64 | `30437192-bfe5-4344-8407-b758d7382153` | Societário, assinaturas |
 
 ---
 
@@ -215,7 +215,6 @@ corporate/       — Societário (shareholders, transfers, corporate-pdf)
 ## Sessão 18/04/2026 — Módulo Societário + Assinaturas Digitais
 
 **Societário (COMPLETO):**
-
 - `shareholders.service.ts` — findAll, findOne, create, update, softDelete, getCapitalSummary
 - `transfers.service.ts` — create em $transaction atômica, averbar, recálculo percentOwned
 - `corporate-pdf.service.ts` — template HTML completo (IN DREI 82/2021)
@@ -224,7 +223,6 @@ corporate/       — Societário (shareholders, transfers, corporate-pdf)
 - Empresa teste: F5 PARTICIPACOES S/A — Helenilto (50%) + J.A.A.H. (50%)
 
 **Assinaturas Digitais (FUNCIONANDO):**
-
 - `certificates.service.ts` — upload A1 (.pfx), criptografia AES-256-GCM
 - `govbr.service.ts` — OAuth2 com PKCE, cache TTL 10min, one-time use
 - `clicksign.service.ts` — upload PDF, signatários, sequenciamento
@@ -236,7 +234,6 @@ corporate/       — Societário (shareholders, transfers, corporate-pdf)
 ## Sessão 19/04/2026 — Validador de Assinaturas + Repositório
 
 **Validador (COMPLETO):**
-
 - `signature-validator.service.ts` — extração PKCS#7/PAdES/CAdES, 4 abordagens em cascata
 - Detecta ICP-Brasil (ITI, SERPRO, Certisign, SERASA, etc.) vs gov.br
 - Extração de CPF do CN (formato `NOME:CPF11DIGITOS`)
@@ -244,7 +241,6 @@ corporate/       — Societário (shareholders, transfers, corporate-pdf)
 - Testado com PDF real — 3 signatários ICP-Brasil detectados ✅
 
 **Repositório/Arquivo (COMPLETO):**
-
 - `RepositorioPage.tsx` — prateleiras por URL via `SHELF_CONFIG`, filtro por status
 - Prateleiras: Societário, Contábil, Fiscal, RH
 - `DocumentViewModal.tsx` — iframe HTML/PDF, SHA-256
@@ -262,7 +258,6 @@ corporate/       — Societário (shareholders, transfers, corporate-pdf)
 ## Sessão 26/04/2026 — IOB Multi-arquivo + DocumentViewModal + Assinaturas
 
 **IOB Lotes (melhorias):**
-
 - Seleção múltipla de arquivos (`input multiple`)
 - Deduplicação por `fileName` — bloqueia reimportação do mesmo lote
 - Parser corrigido: observação na posição 232 (sem pipe)
@@ -270,13 +265,11 @@ corporate/       — Societário (shareholders, transfers, corporate-pdf)
 - Histórico de importações no modal
 
 **JournalPage (melhorias):**
-
 - Toggle "Mostrar Lançamentos" — lista 100 últimos em ordem decrescente
 - Coluna Histórico na tabela, data com 4 dígitos (dd/mm/yyyy)
 - `BulkDeleteModal` — período, fontes, dry-run, confirmação
 
 **DocumentViewModal (COMPLETO):**
-
 - Header com badge Societário, status pill, tipo, versão
 - Meta bar com data, SHA-256 truncado, número de registro
 - Abas: Documento e Assinaturas
@@ -284,17 +277,14 @@ corporate/       — Societário (shareholders, transfers, corporate-pdf)
 - Footer legal LEDGR / MP 2.200-2/2001 / Lei 14.063/2020
 
 **Assinaturas — persistência:**
-
 - Após validação, persiste `DocumentSigner` por CPF único (`deleteMany + create`)
 - Guard `didValidate.current` evita dupla execução em StrictMode
 
 **Schema / Migrations:**
-
 - `LoteImport` model + tabela `lote_imports`
 - `reducedCode` em `ChartOfAccounts`
 
 **Balancetes:**
-
 - Datas padrão usam ano atual `(Get-Date).Year`
 
 ---
@@ -307,7 +297,6 @@ corporate/       — Societário (shareholders, transfers, corporate-pdf)
 **7 CDBs, todos 96% CDI BB** — migrados da LM via UPDATE direto no banco
 
 **Contas contábeis (Renda Fixa):**
-
 - IRRF a Recuperar: `11309010010`
 - Receitas Aplic. Financeiras: `32101010001` (UUID `0d5ab7bf-0315-463a-936b-f910d610fae6`)
 
@@ -326,7 +315,6 @@ corporate/       — Societário (shareholders, transfers, corporate-pdf)
 Migration: `20260430223656_add_accounting_account_to_fixed_income`
 
 **Frontend `RendaFixaPage.tsx`:**
-
 - Lista: Descrição, Tipo, Emissor, Indexador, Capital Inicial, Saldo Capital, Rend. Bruto, IRRF Est., Saldo Líquido, Aplicação, Vencimento, Status, Ações
 - `allProjections` — calcula projeção de todos via `buildProjection` + feriados
 - Filtro de período único (direita, acima da tabela) — aplica na lista E no detalhe
@@ -338,7 +326,6 @@ Migration: `20260430223656_add_accounting_account_to_fixed_income`
 - Atualização mensal jan-abr/2026 executada para todos os 7 CDBs
 
 **Correção crítica — `cdi.service.ts`:**
-
 ```typescript
 // CORRETO — pega último dia do mês:
 cur.accum = Math.max(cur.accum, Number(r.monthlyAccum));
@@ -362,7 +349,6 @@ cur.accum = Math.max(cur.accum, Number(r.monthlyAccum));
 ### Tabelas Legais (COMPLETO ✅)
 
 `frontend/src/pages/sistema/TabelasLegaisPage.tsx`
-
 - IRPF 3 vigências + INSS 2024/2025/2026 + Simulador integrado
 - Redutor 2026 (Lei 15.270/2025): `R$ 978,62 − (0,133145 × renda bruta)`
 
@@ -388,7 +374,6 @@ Desconto máximo: R$ 988,09
 ### Plano de Contas — Importação (latin1)
 
 168 contas importadas de `.txt` do sistema legado. **Procedimento:**
-
 ```powershell
 # Salvar SQL como latin1 e setar encoding antes do psql:
 $env:PGCLIENTENCODING = "LATIN1"
@@ -445,7 +430,6 @@ psql -h localhost -U ledgr -d ledgr_app -f D:\Temp\import_plano.sql
 - 20 ativos da LM Administração processados ✅
 
 **Estado LM Administração — Ativos:**
-
 - 20 ativos ACTIVE
 - Valor bruto: R$ 21.156.680,31
 - Valor contábil: R$ 18.520.794,53
@@ -480,14 +464,12 @@ accumDeprecAcc  ChartOfAccounts? @relation("AccumDeprecAcc", fields: [accumDepre
 ## Sessões 07-08/05/2026 — O que foi implementado
 
 ### Accounting — Diário de Lançamentos
-
 - Filtro por fonte dinâmico via `GET /accounting/journal/source-modules` (retorna tipos distintos do banco por empresa)
 - Badges do topo clicáveis como filtro rápido ligados ao `fSource`
 - `EditModal` com `maxHeight: 90vh`, scroll interno e fechar com Escape/click fora
 - Enum `INVESTMENT` adicionado ao `SourceModule` do Prisma
 
 ### Accounting — Renda Fixa
-
 - Campo Conta Contábil no cadastro de CDB (AccountPicker para asset/revenue/irrf)
 - Lançamentos automáticos mensais com `sourceModule: 'INVESTMENT'`
 - Geração retroativa com endpoint `POST /accounting/fixed-income/generate-missing-journals`
@@ -495,17 +477,14 @@ accumDeprecAcc  ChartOfAccounts? @relation("AccumDeprecAcc", fields: [accumDepre
 - 28 lançamentos retroativos gerados para JOSE SILVA
 
 ### RH — Pró-labore (módulo novo)
-
 **Schema:** `ProLaboreConfig` + `ProLaboreCalculo` — migration `add_pro_labore` aplicada
 **Backend:** `apps/api/src/modules/hr/`
-
 - `pro-labore.service.ts` — tabelas INSS/IRPF 2026, cálculo, lançamentos, retroativos
 - `pro-labore.controller.ts` — endpoints CRUD + cálculo + guias
 - `guias.service.ts` — GPS (layout CNPJ empresa) e DARF PDF via Puppeteer
 - `HrModule` registrado no `AppModule`
 
 **Frontend:** `frontend/src/pages/hr/ProLabore.tsx`
-
 - Aba Configurações: tabela de diretores com cálculo inline, badge Ata Pendente/Vinculada
 - Aba Cálculos: geração em lote com intervalo De/Até, histórico, lançamentos gerados
 - Modal GPS/DARF: visualização estruturada + download PDF autenticado (responseType: blob)
@@ -513,7 +492,6 @@ accumDeprecAcc  ChartOfAccounts? @relation("AccumDeprecAcc", fields: [accumDepre
 - Sweetalert2 em todos os alertas
 
 **Endpoints:**
-
 - `GET/POST /hr/pro-labore/configs`
 - `PUT /hr/pro-labore/configs/:id`
 - `GET /hr/pro-labore/previa`
@@ -526,23 +504,19 @@ accumDeprecAcc  ChartOfAccounts? @relation("AccumDeprecAcc", fields: [accumDepre
 - `GET /hr/pro-labore/guias/lote?competencia=AAAA-MM`
 
 **Tabelas legais 2026 hardcoded no service:**
-
 - INSS: patronal 20%, diretor 11%, teto R$ 8.157,41
 - IRPF: 5 faixas (isento até R$ 2.428,80)
 - Mínimo legal: R$ 1.518,00
 
 ### Finance — Bank Import
-
 - `AccountPicker` com autocomplete do Plano de Contas nos campos `accountId` e `counterAccountId`
 - Carrega `GET /chart-of-accounts?limit=500` no mount
 
 ### Pessoas Físicas
-
 - `PersonForm.tsx`: campo `cpf` mapeado para `document` no payload (`payload[k === 'cpf' ? 'document' : k]`)
 - `persons.service.ts`: desestrutura `document` e usa como `cpf` no Prisma create
 
 ### Próxima fase — JOSE SILVA (Lucro Real, Receitas Financeiras)
-
 **Empresa:** JOSE SILVA SOCIEDADE INDIVIDUAL DE ADVOCACIA (UUID: c188b188-de58-4fbd-8aa0-fcf07c35e65e)
 **Regime:** Lucro Real
 **Receitas:** exclusivamente financeiras (CDB) em 2026 — modelo de test
@@ -550,7 +524,6 @@ accumDeprecAcc  ChartOfAccounts? @relation("AccumDeprecAcc", fields: [accumDepre
 
 **Módulo de Provisões Recorrentes (em arquitetura):**
 Ciclo: `ProvisaoConfig → ProvisaoLancamento → AccountsPayable + JournalEntry + FiscalDocument + RateioItem[]`
-
 - Tipos: ALUGUEL | SERVICO | ENERGIA | CONDOMINIO | HONORARIOS | OUTROS
 - Campos: periodicidade, dia vencimento, valor, contas contábeis, fornecedor, dedutível LALUR
 - `exigirNF`: bloqueia baixa sem NF vinculada
@@ -574,25 +547,24 @@ Ciclo: `ProvisaoConfig → ProvisaoLancamento → AccountsPayable + JournalEntry
 
 ## Design System (Clean Minimalista)
 
-| Token     | Valor               | Uso           |
-| --------- | ------------------- | ------------- |
-| radius-sm | 6px                 | Inputs, pills |
-| radius-md | 10px                | Cards, botões |
-| radius-lg | 14px                | Modais        |
-| border    | 0.5px solid #E5E7EB | Padrão        |
-| surface   | #F9FAFB             | Backgrounds   |
+| Token | Valor | Uso |
+|-------|-------|-----|
+| radius-sm | 6px | Inputs, pills |
+| radius-md | 10px | Cards, botões |
+| radius-lg | 14px | Modais |
+| border | 0.5px solid #E5E7EB | Padrão |
+| surface | #F9FAFB | Backgrounds |
 
-| Módulo      | Accent    | Surface   |
-| ----------- | --------- | --------- |
-| Contábil    | `#2563EB` | `#EFF6FF` |
-| Financeiro  | `#0369A1` | `#F0F9FF` |
-| SPED        | `#7C3AED` | `#FAF5FF` |
+| Módulo | Accent | Surface |
+|--------|--------|---------|
+| Contábil | `#2563EB` | `#EFF6FF` |
+| Financeiro | `#0369A1` | `#F0F9FF` |
+| SPED | `#7C3AED` | `#FAF5FF` |
 | Ativo Imob. | `#EA580C` | `#FFF7ED` |
-| Societário  | `#0891B2` | `#ECFEFF` |
-| Sistema     | `#374151` | `#F9FAFB` |
+| Societário | `#0891B2` | `#ECFEFF` |
+| Sistema | `#374151` | `#F9FAFB` |
 
 **Regras:**
-
 - Verde (`#16A34A`) — reservado para status "Pago/Sucesso"
 - Vermelho (`#DC2626`) — reservado para status "Vencido/Erro"
 - Tabelas, inputs e modais sempre neutros — identidade só no header/nav
@@ -602,260 +574,10 @@ Ciclo: `ProvisaoConfig → ProvisaoLancamento → AccountsPayable + JournalEntry
 ## Como usar este arquivo
 
 **Início de sessão simples** (bug fix, pequena feature):
-
 > Cole as seções "Stack", "Convenções", "Estado dos módulos" e "Pendências"
 
 **Início de sessão de desenvolvimento** (novo módulo, feature grande):
-
 > Cole o arquivo inteiro + trecho do schema dos models envolvidos
 
 **Handoff entre sessões:**
-
 > `.md` colado inline no chat — nunca DOCX (~400 tokens vs ~4.000)
-
-# LEDGR — Contexto do Projeto
-
-> Arquivo de referência para novas sessões com Claude.
-> Última atualização: 11/05/2026
-
----
-
-## Stack
-
-- **Monorepo:** `D:\Projetos\Ledgr`
-- **Backend:** NestJS + Prisma + PostgreSQL (`ledgr_app` na porta 5432)
-- **Frontend:** React + TypeScript + Vite (porta 5173)
-- **Auth:** JWT · token em `@ledgr:token` · empresa em `@ledgr:activeCompany`
-- **API client:** axios em `apps/web/src/services/api.ts` · interceptor injeta `x-company-id` automaticamente
-- **Upload de arquivo:** usar `fetch` direto (não axios) — axios corrompe multipart boundary
-
----
-
-## Convenções obrigatórias (Prisma / Backend)
-
-| Regra                      | Exemplo                                                                      |
-| -------------------------- | ---------------------------------------------------------------------------- |
-| PK com UUID                | `@id @default(dbgenerated("gen_random_uuid()")) @db.Uuid`                    |
-| Campos snake_case no banco | `@map("created_at")`                                                         |
-| Timestamps                 | `@db.Timestamp(6)`                                                           |
-| Soft delete                | campo `deletedAt DateTime? @db.Timestamp(6)`                                 |
-| Valores monetários         | `Decimal` — NUNCA `Float`                                                    |
-| companyId                  | nunca em filtro global — sempre via `request.companyId` (CompanyInterceptor) |
-| AuditLog                   | campos: `actorId`, `action`, `targetId`, `before`, `after`, `ip`             |
-
----
-
-## Enums importantes (já no schema)
-
-- ApEntryStatus: OPEN | PAID | OVERDUE | PARTIALLY_PAID | CANCELLED | SCHEDULED
-- APStatus: OPEN | PARTIAL | PAID | OVERDUE | CANCELLED
-- DocumentStatus: RASCUNHO | EM_REVISAO | AGUARDANDO_ASSINATURA | ASSINADO | REGISTRADO | ARQUIVADO | CANCELADO
-- BankCode: ITAU | BRADESCO | BB | SANTANDER | CAIXA | SICREDI | SICOOB | NUBANK | INTER | GENERIC
-- SourceModule: ACCOUNTING | FINANCE | FISCAL | HR | BANK_IMPORT | ECD_IMPORT | INVESTMENT | ASSET
-- StatusFechamento: ABERTO | EM_FECHAMENTO | FECHADO_PREVIO | FECHADO | REABERTO
-- ModuloFechamento: PROVISOES | PRO_LABORE | RENDA_FIXA | DEPRECIACAO | PIS_COFINS | IRPJ_CSLL
-- StatusItemFechamento: PENDENTE | CONFERIDO | GERADO | IGNORADO
-- TipoProvisao: ALUGUEL | HONORARIOS | SERVICO | ENERGIA | TELEFONIA | SEGURO | IPTU | OUTRO
-- PeriodicidadeProvisao: MENSAL | BIMESTRAL | TRIMESTRAL | SEMESTRAL | ANUAL
-
----
-
-## Estrutura de módulos (`apps/api/src/modules/`)
-
-- accounting/ — Contabilidade, Plano de Contas, Lançamentos
-- assets/ — Ativo Imobilizado
-- finance/ — Financeiro
-  - finance.service/controller/module
-  - accounts-payable.service/controller
-  - agenda.service
-  - integration.service — AP x Fiscal x Contabil x Agenda ($transaction)
-  - provisao.service/controller — Provisoes Recorrentes
-  - fechamento.service/controller — Fechamento Mensal com bloqueio de lancamentos
-  - bank-import.service/controller/module
-  - suggestion.service — motor 3 camadas sugestao de conta
-  - parsers/bank-parser.service — Itau, Bradesco, BB, Santander, OFX, CSV
-- hr/ — pro-labore.service/controller — Prolabore diretoria, GPS, DARF
-- fiscal/ — Fiscal
-- sped/ ecd/ ecf/ efd/
-- rfb/ — Consulta RFB
-
----
-
-## Models principais
-
-| Model                | Tabela                  | Observacao                                   |
-| -------------------- | ----------------------- | -------------------------------------------- |
-| AccountsPayable      | accounts_payable        | status usa APStatus                          |
-| ApEntry              | ap_entries              | model antigo, status usa ApEntryStatus       |
-| AgendaEvent          | agenda_events           | campo obrigatorio: createdById               |
-| FiscalDocument       | fiscal_documents        | campo obrigatorio: createdById               |
-| BankStatement        | bank_statements         | novo                                         |
-| BankTransaction      | bank_transactions       | novo                                         |
-| BankImportRule       | bank_import_rules       | motor de aprendizado                         |
-| JournalEntry         | journal_entries         | campo: date, sourceModule                    |
-| JournalEntryItem     | journal_entry_items     | campos: accountId, type, value               |
-| ProvisaoConfig       | provisao_configs        | provisoes recorrentes                        |
-| ProvisaoLancamento   | provisao_lancamentos    | lancamento mensal por provisao               |
-| ProvisaoRateioConfig | provisao_rateio_configs | rateio variavel por competencia              |
-| FechamentoMensal     | fechamentos_mensais     | controle fechamento por competencia          |
-| FechamentoItem       | fechamento_itens        | itens por modulo do fechamento               |
-| ProLaboreConfig      | pro_labore_configs      | configuracao por diretor                     |
-| ProLaboreCalculo     | pro_labore_calculos     | calculo mensal INSS/IRRF                     |
-| AuditLog             | audit_logs              | actorId, action, targetId, before, after, ip |
-
----
-
-## Estado dos modulos
-
-| Modulo                        | Status      | Observacoes                                              |
-| ----------------------------- | ----------- | -------------------------------------------------------- |
-| Accounting                    | Producao    | Plano de Contas, Lancamentos, Balancete, Saldos          |
-| Finance Doc. Fiscal           | Funcionando | Integracao AP x CT x Agenda via $transaction             |
-| Finance Contas a Pagar        | Funcionando | Baixa individual e lote, Aging                           |
-| Finance Agenda                | Funcionando | Calendario post-its, recorrencia                         |
-| Finance Bank Import           | Funcionando | Itau, Bradesco, BB, OFX, CSV, AccountPicker              |
-| Finance Provisoes Recorrentes | Producao    | Configs, geracao mensal, conferencia NF, rateio          |
-| Finance Fechamento Mensal     | Producao    | Bloqueio lancamentos, FECHADO_PREVIO, cascata, auditoria |
-| RH Prolabore                  | Producao    | INSS/IRRF 2026, GPS, DARF, retroativos                   |
-| SPED ECD                      | Producao    |                                                          |
-| Ativo Imobilizado             | Producao    |                                                          |
-| Societario                    | Producao    |                                                          |
-| RFB                           | Producao    |                                                          |
-| Renda Fixa                    | Producao    | CDB, lancamentos automaticos, enum INVESTMENT            |
-| Finance Contas a Receber      | Pendente    | estrutura preparada (arEntryId nos models)               |
-| Finance Folha RH              | Pendente    | estrutura preparada (payrollId nos models)               |
-| Finance Conciliacao AP        | Pendente    | apEntryId em BankTransaction ja existe                   |
-| Finance Fluxo de Caixa        | Pendente    |                                                          |
-
----
-
-## Pendencias (ordem de prioridade)
-
-1. Provisoes — lancamentos PIS/COFINS como partidas contabeis (creditaPisCofins = true)
-2. Finance — Contas a Receber
-3. Finance — Fluxo de Caixa
-4. Reimport LM Administracao ECD — validar Balancete saldo anterior 2023-12-31 (empresa: f00af1b1-d50b-4ae6-aa17-4c2262e058db)
-5. Selic e IGP-M — abas pendentes em frontend/src/pages/sistema/IndicadoresPage.tsx
-
-Horizon:
-
-- Apuracao IRPJ/CSLL JOSE SILVA — lancamentos definitivos a partir do Fechamento Mensal
-- Guias DARF IRPJ/CSLL geradas pelo fechamento
-- Consulta CPF via Serpro
-- Integracao gov.br assinatura digital
-- ECF parser blocos J/K/L/M/N
-- Conciliacao AP x Banco
-- Livros Societarios — Assembleias e Reunioes
-- LM Administracao — receitas com alugueis
-
----
-
-## Empresas de teste
-
-| Empresa                                      | CNPJ           | UUID                                 | Uso                               |
-| -------------------------------------------- | -------------- | ------------------------------------ | --------------------------------- |
-| JOSE SILVA SOCIEDADE INDIVIDUAL DE ADVOCACIA | 35416962000100 | c188b188-de58-4fbd-8aa0-fcf07c35e65e | Principal — Lucro Real            |
-| HALLO ADMINISTRACAO E PARTICIPACOES LTDA     | 07432458000169 | 06a88dfa-d4cf-4c5c-8dc1-83538d6b8b7c | Testes gerais                     |
-| LM Administracao                             | —              | f00af1b1-d50b-4ae6-aa17-4c2262e058db | ECD import — Balancete            |
-| F5 PARTICIPACOES S/A                         | 33652701000164 | 30437192-bfe5-4344-8407-b758d7382153 | Societario — Livros e Assinaturas |
-
----
-
-## Fechamento Mensal — Regras de negocio
-
-- Fechamento sempre manual, mes a mes
-- Status FECHADO_PREVIO quando mes anterior esta em aberto — registrado na auditoria
-- Reabrir um mes: cascata em todos os meses posteriores fechados para REABERTO
-- Mes corrente exige selecao de motivo (encerramento, cisao, auditoria, judicial, outro)
-- JournalEntry.create/update/remove verifica FechamentoMensal — rejeita com BadRequestException se FECHADO ou FECHADO_PREVIO
-- Reabertura exige motivo obrigatorio + AuditLog
-
-## Status visual Fechamento
-
-| Status         | Cor     | Badge              |
-| -------------- | ------- | ------------------ |
-| ABERTO         | Cinza   | Descanso Em aberto |
-| EM_FECHAMENTO  | Amarelo | Em fechamento      |
-| FECHADO_PREVIO | Laranja | Fechamento Previo  |
-| FECHADO        | Verde   | Fechado            |
-| REABERTO       | Laranja | Reaberto           |
-
----
-
-## Endpoints principais
-
-### Finance/Fechamento
-
-- GET /finance/fechamento
-- GET /finance/fechamento/:competencia
-- POST /finance/fechamento/:competencia/calcular
-- PUT /finance/fechamento/itens/:id/conferir
-- PUT /finance/fechamento/itens/:id/ignorar
-- POST /finance/fechamento/:competencia/fechar (body: motivoMesCorrente?, confirmarPrevio?)
-- POST /finance/fechamento/:competencia/reabrir (body: motivo)
-- GET /finance/fechamento/:competencia/status
-
-### Finance/Provisoes
-
-- GET/POST /finance/provisoes/configs
-- PUT/DELETE /finance/provisoes/configs/:id
-- POST /finance/provisoes/gerar (body: competencia)
-- GET /finance/provisoes/lancamentos
-- PUT /finance/provisoes/lancamentos/:id/conferir-nf
-- PUT /finance/provisoes/configs/:id/rateio/:competencia
-
-### HR/Prolabore
-
-- GET/POST /hr/pro-labore/configs
-- PUT /hr/pro-labore/configs/:id
-- GET /hr/pro-labore/previa
-- POST/GET /hr/pro-labore/calculos
-- POST /hr/pro-labore/calculos/retroativos
-- GET /hr/pro-labore/calculos/:id/guias
-- GET /hr/pro-labore/calculos/:id/guias/gps.pdf
-- GET /hr/pro-labore/calculos/:id/guias/darf.pdf
-- GET /hr/pro-labore/guias/lote?competencia=AAAA-MM
-
----
-
-## Padroes tecnicos
-
-- TDD PowerShell: Python scripts em D:\Temp\ para edicoes de arquivos
-- SQL via Docker: subprocess.run(['docker','exec','-i','ledgr-postgres','psql','-U','ledgr','-d','ledgr_app','-c', sql])
-- Timezone Windows: Date.UTC(..., 12) para campos @db.Date
-- Todos os relatorios: exclusivamente via journal_entry_items
-- Download autenticado: api.get(url, { responseType: 'blob' }) + URL.createObjectURL
-- Alertas: Sweetalert2 com confirmButtonColor: '#111111'
-- Modal padrao: maxHeight: 90vh, overflowY: auto, fechar com Escape/click fora
-- Primeira linha de cada arquivo: comentada com nome e caminho completo
-- Ao propor alteracao: indicar entre quais trechos/linhas deve ser implementada
-- Numeros: sem formatacao no banco — mascaras aplicadas na exibicao
-
----
-
-## Design System
-
-| Modulo            | Accent  | Surface |
-| ----------------- | ------- | ------- |
-| Financeiro        | #0369A1 | #F0F9FF |
-| Contabil          | #2563EB | #EFF6FF |
-| SPED              | #7C3AED | #FAF5FF |
-| Ativo Imobilizado | #EA580C | #FFF7ED |
-| Societario        | #0891B2 | #ECFEFF |
-| RFB/Tax           | #0F766E | #F0FDFA |
-| RH                | #0891B2 | #ECFEFF |
-| Primario UI       | #111111 | #F9FAFB |
-
-Tokens: radius-sm 6px, radius-md 10px, radius-lg 14px, border 0.5px #E5E7EB, surface #F9FAFB
-
-Botoes:
-
-- Primario: background #111111, color #fff, radius 8px, padding 8px 18px
-- Secundario: background #fff, border 0.5px #D1D5DB, color #374151
-- Ghost: background transparent, border 0.5px accent, color accent
-
-Tabelas:
-
-- th: background #F9FAFB, color #6B7280, font-size 11px, uppercase, border-bottom 0.5px #E5E7EB
-- td: color #374151, border-bottom 0.5px #F5F5F5
-- tr hover: background #FAFAFA

@@ -61,13 +61,15 @@ export class JournalEntryService {
     dateFrom?:    string;
     dateTo?:      string;
     search?:      string;
-    sources?:     string;   // CSV: "ECD_IMPORT,ACCOUNTING"
+    sources?:     string;
     accountCode?: string;
     page?:        number;
     limit?:       number;
+    orderBy?:     string;
+    orderDir?:    string;
   }) {
-    const { dateFrom, dateTo, search, sources, accountCode, page = 1, limit = 50 } = params;
 
+    const { dateFrom, dateTo, search, sources, accountCode, page = 1, limit = 50, orderBy = 'date', orderDir = 'asc' } = params;
     const where: any = { companyId };
 
     // ── Filtro de período ───────────────────────────────────────
@@ -113,13 +115,13 @@ export class JournalEntryService {
           items: {
             include: {
               account: {
-                select: { id: true, code: true, name: true, type: true, nature: true, isAnalytic: true, level: true  },
+                select: { id: true, code: true, name: true, type: true, nature: true, isAnalytic: true, level: true, reducedCode: true },
               },
             },
             orderBy: { type: 'asc' },
           },
         },
-        orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
+        orderBy: orderBy === 'description' ? [{ description: orderDir as any }, { date: 'asc' }] : orderBy === 'reference' ? [{ reference: orderDir as any }, { date: 'asc' }] : [{ date: orderDir as any }, { createdAt: orderDir as any }],
         skip:  (page - 1) * limit,
         take:  limit,
       }),
@@ -546,3 +548,6 @@ private validateItems(items: Array<{ type: string; value: number }>) {
 
 
 }
+
+
+

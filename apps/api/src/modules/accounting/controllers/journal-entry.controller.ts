@@ -29,6 +29,8 @@ export class JournalEntryController {
     @Query('accountCode') accountCode?: string,
     @Query('page')        page?:        string,
     @Query('limit')       limit?:       string,
+    @Query('orderBy')     orderBy?:     string,
+    @Query('orderDir')    orderDir?:    string,
   ) {
     return this.service.findAll(req.headers['x-company-id'], {
       dateFrom,
@@ -38,8 +40,11 @@ export class JournalEntryController {
       accountCode,
       page:  page  ? parseInt(page)  : 1,
       limit: limit ? parseInt(limit) : 100,
+      orderBy,
+      orderDir,
     });
   }
+
 
   // ── GET /accounting/journal/totals ──────────────────────────────────────────
   @Get('totals')
@@ -125,3 +130,4 @@ export class JournalEntryController {
     return this.service.remove(id, req.headers['x-company-id']);
   }
 }
+

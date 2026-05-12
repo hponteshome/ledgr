@@ -7,7 +7,7 @@ import { useCompany } from '../../contexts/CompanyContext';
 import { ReportToolbar } from '../../components/accounting/ReportToolbar';
 
 // ── Tipos ──────────────────────────────────────────────────────
-interface Account { id: string; code: string; name: string; }
+interface Account { id: string; code: string; name: string; reducedCode?: string; }
 interface JournalItem { accountId: string; account?: Account; value: number; type: 'DEBIT' | 'CREDIT'; }
 interface JournalEntry { id: string; date: string; description: string; reference?: string; sourceModule: string; items: JournalItem[]; }
 interface JournalResponse { total: number; page: number; pages: number; entries: JournalEntry[]; }
@@ -33,7 +33,7 @@ const yr = new Date().getFullYear();
 const DEF = {
     dateFrom: `${yr}-01-01`, dateTo: `${yr}-12-31`,
     accountFrom: '', accountTo: '', search: '',
-    sources: ['ECD_IMPORT', 'ACCOUNTING', 'PROVISION', 'BANK_IMPORT', 'FISCAL'],
+    sources: ['ECD_IMPORT', 'ACCOUNTING', 'PROVISION', 'BANK_IMPORT', 'FISCAL', 'JOURNAL_IMPORT'],
 };
 type F = typeof DEF;
 
@@ -157,6 +157,7 @@ const DiarioGeralPage: React.FC = () => {
                 if (pg >= r.data.pages) break;
                 pg++;
             }
+            console.log('[diario] total:', all.length, 'params:', {dateFrom: f.dateFrom, dateTo: f.dateTo});
             setData({ total: all.length, page: 1, pages: 1, entries: all });
         } catch (e: any) { setError(e.response?.data?.message || 'Erro ao carregar.'); }
         finally { setLoading(false); }
@@ -164,6 +165,9 @@ const DiarioGeralPage: React.FC = () => {
 
     const handleApply = (f: F) => { setFilters(f); setShowModal(false); load(f); };
 
+    // Autoload no mount
+    // Abre modal ao entrar na pagina
+    React.useEffect(() => { if (activeCompany) setShowModal(true); }, [activeCompany?.id]);
     const grouped = React.useMemo(() => data ? groupByMonthDay(data.entries) : [], [data]);
     const seqMap = React.useMemo(() => data ? buildSeqMap(data.entries) : new Map(), [data]);
 
@@ -171,6 +175,104 @@ const DiarioGeralPage: React.FC = () => {
     const totD = data?.entries.reduce((s, e) => s + e.items.filter(i => i.type === 'DEBIT').reduce((a, i) => a + Number(i.value), 0), 0) ?? 0;
     const totC = data?.entries.reduce((s, e) => s + e.items.filter(i => i.type === 'CREDIT').reduce((a, i) => a + Number(i.value), 0), 0) ?? 0;
 
+    const printLivroDiario = () => {
+        if (!data?.entries.length || !activeCompany) return;
+        const empresa = activeCompany.legalName || activeCompany.tradeName || '';
+        const cnpj = fmtCnpj(activeCompany.cnpj || '');
+        const periodo = filters.dateFrom.split('-').reverse().join('/') + ' a ' + filters.dateTo.split('-').reverse().join('/');
+        const hoje = new Date().toLocaleDateString('pt-BR');
+        const hora = new Date().toLocaleTimeString('pt-BR');
+
+        let rows = '';
+        let totalGeralD = 0;
+        let totalGeralC = 0;
+
+        grouped.forEach(function(mg) {
+            const month = mg.month;
+            const days = mg.days;
+            let totalMesD = 0;
+            let totalMesC = 0;
+            const mesAno = fmtMonthYear(days[0].day);
+
+            rows += "<tr class='mes-header'><td colspan='7'><b>CNPJ: " + cnpj + "</b><span style='float:right'><b>M&ecirc;s/Ano: " + mesAno + "</b></span></td></tr>";
+            rows += "<tr class='col-header'><td>Dia</td><td>Conta</td><td>Red.</td><td>Hist&oacute;rico</td><td>Lote/Lcto</td><td class='num'>D&eacute;bito</td><td class='num'>Cr&eacute;dito</td></tr>";
+
+            days.forEach(function(dg) {
+                const day = dg.day;
+                const entries = dg.entries;
+                let totalDiaD = 0;
+                let totalDiaC = 0;
+                let firstEntry = true;
+
+                entries.forEach(function(entry) {
+                    const lcto = seqMap.get(entry.id) || '';
+                    const ref = entry.reference || '';
+                    const debits = entry.items.filter(function(i) { return i.type === 'DEBIT'; });
+                    const credits = entry.items.filter(function(i) { return i.type === 'CREDIT'; });
+                    const allItems = debits.concat(credits);
+
+                    allItems.forEach(function(item, idx) {
+                        const val = Number(item.value);
+                        const isD = item.type === 'DEBIT';
+                        if (isD) { totalDiaD += val; totalMesD += val; totalGeralD += val; }
+                        else { totalDiaC += val; totalMesC += val; totalGeralC += val; }
+                        const dia = (idx === 0 && firstEntry) ? fmtDay(entry.date) : '';
+                        const hist = idx === 0 ? entry.description.substring(0, 55) : '';
+                        const lote = idx === 0 ? ref : '';
+                        const code = (item.account && item.account.code) ? item.account.code : '';
+                        const red = (item.account && item.account.reducedCode) ? item.account.reducedCode : '—';
+                        rows += "<tr>";
+                        rows += "<td>" + dia + "</td>";
+                        rows += "<td class='mono'>" + code + "</td>";
+                        rows += "<td class='mono'>" + code + "</td>";
+                        rows += "<td style='color:#6B7280;font-family:monospace'>" + red + "</td>";
+
+                        rows += "<td class='mono'>" + lote + "</td>";
+                        rows += "<td class='num'>" + (isD ? fmtNumTotal(val) : '') + "</td>";
+                        rows += "<td class='num'>" + (!isD ? fmtNumTotal(val) : '') + "</td>";
+                        rows += "</tr>";
+                    });
+                    firstEntry = false;
+                });
+
+                rows += "<tr class='total-dia'><td colspan='5' style='text-align:right'><b>Total do Dia:</b></td><td class='num'><b>" + fmtNumTotal(totalDiaD) + "</b></td><td class='num'><b>" + fmtNumTotal(totalDiaC) + "</b></td></tr>";
+            });
+
+            rows += "<tr class='total-mes'><td colspan='5' style='text-align:right'><b>Total do M&ecirc;s:</b></td><td class='num'><b>" + fmtNumTotal(totalMesD) + "</b></td><td class='num'><b>" + fmtNumTotal(totalMesC) + "</b></td></tr>";
+        });
+
+        rows += "<tr class='total-geral'><td colspan='5' style='text-align:right'><b>Total Geral:</b></td><td class='num'><b>" + fmtNumTotal(totalGeralD) + "</b></td><td class='num'><b>" + fmtNumTotal(totalGeralC) + "</b></td></tr>";
+
+        const css = "@page{size:A4 landscape;margin:10mm 12mm}" +
+            "body{font-family:'Courier New',monospace;font-size:9pt;color:#000}" +
+            "h2{font-size:10pt;margin:0}" +
+            ".header-top{display:flex;justify-content:space-between;margin-bottom:4px}" +
+            "table{width:100%;border-collapse:collapse;margin-top:6px}" +
+            "td{padding:1px 4px;vertical-align:top}" +
+            ".mes-header td{background:#f0f0f0;border-top:1px solid #000;border-bottom:0.5px solid #999;padding:3px 4px}" +
+            ".col-header td{font-weight:bold;border-bottom:1px solid #000;font-size:8pt;text-transform:uppercase}" +
+            ".total-dia td{border-top:0.5px solid #999;background:#f9f9f9}" +
+            ".total-mes td{border-top:1px solid #000;border-bottom:1px solid #000;background:#efefef}" +
+            ".total-geral td{border-top:2px solid #000;background:#e0e0e0}" +
+            ".num{text-align:right;white-space:nowrap}" +
+            ".mono{font-family:'Courier New',monospace}";
+
+        const html = "<!DOCTYPE html><html lang='pt-BR'><head><meta charset='UTF-8'/>" +
+            "<title>Livro Di&aacute;rio - " + empresa + "</title>" +
+            "<style>" + css + "</style></head><body>" +
+            "<div class='header-top'>" +
+            "<div><h2>" + empresa + "</h2><div>Contabilidade</div></div>" +
+            "<div style='text-align:center'><h2>Di&aacute;rio Geral</h2></div>" +
+            "<div style='text-align:right'><div>Data: " + hoje + "</div><div>Hora: " + hora + "</div></div>" +
+            "</div>" +
+            "<div><b>Per&iacute;odo: " + periodo + "</b></div>" +
+            "<table>" + rows + "</table>" +
+            "<script>window.onload=function(){window.print();}<\/script>" +
+            "</body></html>";
+
+        const w = window.open('', '_blank');
+        if (w) { w.document.write(html); w.document.close(); }
+    };
     const exportCSV = () => {
         if (!data?.entries.length) return;
         const rows = [['Mês', 'Dia', 'Conta', 'Nome', 'Red.', 'Histórico', 'Lcto', 'Débito', 'Crédito']];
@@ -216,7 +318,7 @@ const DiarioGeralPage: React.FC = () => {
                     load(f);
                 }}
                 onFilter={() => setShowModal(true)}
-                onPrint={() => window.print()}
+                onPrint={printLivroDiario}
                 onExportCSV={data ? exportCSV : undefined}
                 hasData={!!data}
             />
@@ -321,7 +423,7 @@ const DiarioGeralPage: React.FC = () => {
                                                                             <span style={{ color: '#374151', marginLeft: 6 }}>{item.account?.name || ''}</span>
                                                                         </td>
                                                                         {/* Red. desabilitado */}
-                                                                        <td style={{ ...TD, color: '#D1D5DB', fontSize: 10, textAlign: 'center' }}>—</td>
+                                                                        <td style={{ ...TD, color: '#6B7280', fontSize: 12, fontFamily: 'monospace' }}>{item.account?.reducedCode || '—'}</td>
                                                                         {/* Histórico — só 1ª linha de cada lançamento */}
                                                                         <td style={{ ...TD, color: '#374151', maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={entry.description}>
                                                                             {idx === 0 ? entry.description : ''}
@@ -412,8 +514,10 @@ const DiarioGeralPage: React.FC = () => {
                     </div>
                 </>
             ) : data ? (
-                <div style={{ textAlign: 'center', padding: 80, border: '0.5px dashed #E5E7EB', borderRadius: 10, color: '#9CA3AF', fontSize: 15 }}>
-                    Nenhum lançamento encontrado no período selecionado.
+                <div style={{ textAlign: 'center', padding: 60, border: '0.5px dashed #FBBF24', borderRadius: 10, background: '#FFFBEB' }}>
+                    <div style={{ fontSize: 32, marginBottom: 12 }}>📭</div>
+                    <div style={{ fontSize: 15, color: '#92400E', fontWeight: 600, marginBottom: 6 }}>Nenhum lan&ccedil;amento encontrado no per&iacute;odo selecionado.</div>
+                    <div style={{ fontSize: 13, color: '#B45309' }}>Use &quot;Mais filtros&quot; para alterar o per&iacute;odo ou verificar as fontes selecionadas.</div>
                 </div>
             ) : null}
         </div>
@@ -421,3 +525,4 @@ const DiarioGeralPage: React.FC = () => {
 };
 
 export default DiarioGeralPage;
+

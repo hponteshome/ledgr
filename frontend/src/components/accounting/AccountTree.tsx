@@ -16,7 +16,8 @@ interface AccountNode {
     calculatedBalance?: number;
     ecdBalance?: number | null;
     difference?: number | null;
-    children?: AccountNode[];
+    difference?: number | null;
+    reducedCode?: string;
 }
 
 interface AccountTreeProps {
@@ -78,7 +79,7 @@ const TreeNode: React.FC<{ node: AccountNode }> = ({ node }) => {
                 onClick={() => hasChildren && setIsOpen(!isOpen)}
             >
                 {/* Coluna 1 — Conta / Descrição */}
-                <div className="col-span-5 flex items-center min-w-0">
+                <div className="col-span-4 flex items-center min-w-0">
                     <div style={{ width: `${depth * 16}px`, flexShrink: 0 }} />
                     <span className="text-slate-400 mr-1.5 flex-shrink-0">
                         {hasChildren
@@ -90,10 +91,9 @@ const TreeNode: React.FC<{ node: AccountNode }> = ({ node }) => {
                             ? <FiFolder size={14} className="text-blue-400 fill-blue-50" />
                             : <FiFileText size={14} className="text-slate-300" />}
                     </span>
-                    <span className="font-mono text-[11px] text-blue-600 mr-3 flex-shrink-0 w-20">
-                        {node.code}
-                    </span>
-                    <span className="text-xs tracking-tight truncate">{label}</span>
+                    <span className='font-mono text-[11px] text-blue-600 mr-2 flex-shrink-0 w-20'>{node.code}</span>
+                    <span className='font-mono text-[10px] text-slate-500 bg-blue-50 border border-blue-100 px-1 rounded mr-3 flex-shrink-0 w-16 text-center inline-block'>{(node as any).reducedCode || ''}</span>
+                    <span className='text-xs tracking-tight truncate'>{label}</span>
                 </div>
 
                 {/* Coluna 2 — Saldo Calculado */}
@@ -137,7 +137,7 @@ export const AccountTree: React.FC<AccountTreeProps> = ({ nodes }) => {
         <div className="rounded-lg overflow-hidden">
             {/* Cabeçalho interno da árvore */}
             <div className="grid grid-cols-12 bg-slate-100 border-b border-slate-200 px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                <div className="col-span-5 flex items-center gap-2 pl-12">
+                <div className="col-span-4 flex items-center gap-2 pl-12">
                     Código / Descrição
                 </div>
                 <div className="col-span-3 text-right pr-3">Saldo Calculado</div>

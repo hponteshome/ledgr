@@ -16,6 +16,8 @@ import { AccountingMaskController }     from './controllers/accounting-mask.cont
 import { AccountingImportController }   from './controllers/accounting-import.controller';
 import { BalanceComparisonController }  from './controllers/balance-comparison.controller';
 import { IobImportController }          from './controllers/iob-import.controller';
+import { ChartImporterController }   from './controllers/chart-importer.controller';
+import { JournalImporterController } from './controllers/journal-importer.controller';
 
 // Services
 import { AccountingService }        from './services/accounting.service';
@@ -28,6 +30,8 @@ import { JournalEntryService }      from './services/journal-entry.service';
 import { AccountingMaskService }    from './services/accounting-mask.service';
 import { IobImportService }         from './services/iob-import.service';
 import { IobPlanoParserService }    from './services/iob-plano-parser.service';
+import { ChartImporterService }       from './services/chart-importer.service';
+import { JournalImporterService }    from './services/journal-importer.service';
 import { IobLotdParserService }     from './services/iob-lotd-parser.service';
 import { FixedIncomeModule } from './fixed-income/fixed-income.module';
 import { CdiModule } from './cdi/cdi.module';
@@ -51,6 +55,8 @@ import { IobLotdImportService }     from './services/iob-lotd-import.service';
     AccountingImportController,
     BalanceComparisonController,
     IobImportController,
+    ChartImporterController,
+    JournalImporterController,
   ],
   providers: [
     PrismaService,
@@ -63,6 +69,8 @@ import { IobLotdImportService }     from './services/iob-lotd-import.service';
     JournalEntryService,
     AccountingMaskService,
     IobImportService,
+    ChartImporterService,
+    JournalImporterService,
     IobPlanoParserService,
     IobLotdParserService,
     IobLotdImportService,
@@ -75,3 +83,8 @@ import { IobLotdImportService }     from './services/iob-lotd-import.service';
   ],
 })
 export class AccountingModule {}
+
+
+
+
+

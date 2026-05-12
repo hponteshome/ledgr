@@ -32,6 +32,7 @@ import { AuditLogs as AuditList } from '../pages/audit/AuditLogs';
 import { BackupRestore } from '../pages/system/BackupRestore';
 import { TableManager } from '../pages/system/TableManager';
 import Accounts from '../pages/accounting/AccountsPage';
+import ImportChartOfAccountsPage from '../pages/accounting/ImportChartOfAccountsPage';
 import BalancesPage from '../pages/accounting/BalancesPage';
 import TrialBalanceView from '../pages/accounting/TrialBalanceView';
 import EcdValidationPage from '../pages/accounting/EcdValidationPage';
@@ -40,6 +41,7 @@ import EcfPage from '../pages/sped/EcfPage';
 import { EcdViewerPage } from '../pages/sped/EcdViewerPage';
 //import { EcdHistoryPage } from '../pages/sped/EcdHistoryPage';
 import JournalPage from '../pages/accounting/JournalPage';
+import ImportJournalPage from '../pages/accounting/ImportJournalPage';
 import AssetsList from '../pages/assets/AssetsList';
 import AssetsView from '../pages/assets/AssetsView';
 import MaintenancesPage from '../pages/assets/MaintenancesPage';
@@ -83,9 +85,11 @@ export const AppRoutes = () => {
 
                 {/* Contabilidade */}
                 <Route path="app/accounting/accounts" element={<ProtectedRoute><Accounts /></ProtectedRoute>} />
+                <Route path="app/accounting/accounts/import" element={<ProtectedRoute><ImportChartOfAccountsPage /></ProtectedRoute>} />
                 <Route path="app/accounting/balances" element={<ProtectedRoute><BalancesPage /></ProtectedRoute>} />
                 <Route path="app/accounting/trial-balance" element={<ProtectedRoute><TrialBalanceView /></ProtectedRoute>} />
                 <Route path="app/accounting/journal" element={<ProtectedRoute><JournalPage /></ProtectedRoute>} />
+                <Route path="app/accounting/journal/import" element={<ProtectedRoute><ImportJournalPage /></ProtectedRoute>} />
                 <Route path="app/reports/balance-comparison" element={<ProtectedRoute><BalanceComparisonPage /></ProtectedRoute>} />
                 <Route path="app/accounting/validate-ecd" element={<ProtectedRoute><EcdValidationPage /></ProtectedRoute>} />
                 <Route path="app/accounting/diario" element={<ProtectedRoute><DiarioGeralPage /></ProtectedRoute>} />
@@ -198,6 +202,8 @@ export const AppRoutes = () => {
         </Routes>
     );
 };
+
+
 
 
 

@@ -62,11 +62,14 @@ const fmtSaldo = (v: number): string => {
 
 const yr = new Date().getFullYear();
 const DEF = {
-    startDate: `${yr}-01-01`,
-    endDate: `${yr}-12-31`,
-    filterMode: 'all' as 'all' | 'one' | 'range',
+    startDate: `-01-01`,
+    endDate: `-12-31`,
+    filterMode: 'all' as 'all' | 'one' | 'range' | 'list',
     accountFrom: '',
     accountTo: '',
+    accountList: '',
+    reducedFrom: '',
+    reducedTo: '',
     showZero: false,
 };
 type F = typeof DEF;
@@ -124,23 +127,29 @@ const FilterModal: React.FC<{ f: F; onApply: (f: F) => void }> = ({ f: init, onA
                         <div style={{ marginBottom: 10 }}>
                             <label style={{ fontSize: 13, color: '#6B7280', display: 'block', marginBottom: 4 }}>Filtrar por</label>
                             <select value={f.filterMode} onChange={e => s({ filterMode: e.target.value as any })} style={inp}>
+
                                 <option value="all">Todas as contas analíticas</option>
                                 <option value="one">Apenas uma conta</option>
                                 <option value="range">Faixa de contas</option>
+                                <option value="list">Lista de contas (separe por ;)</option>
                             </select>
                         </div>
-                        {(f.filterMode === 'one' || f.filterMode === 'range') && (
+                        {(f.filterMode === 'one' || f.filterMode === 'range' || f.filterMode === 'list') && (
                             <div style={{ display: 'flex', gap: 12 }}>
                                 <div style={{ flex: 1 }}>
                                     <label style={{ fontSize: 13, color: '#6B7280', display: 'block', marginBottom: 4 }}>
-                                        Conta{f.filterMode === 'range' ? ' (de)' : ''}
+                                        {f.filterMode === 'list' ? 'Contas (separadas por ;)' : f.filterMode === 'range' ? 'Conta (de)' : 'Conta'}
                                     </label>
-                                    <input type="text" value={f.accountFrom} placeholder="Ex: 1.1.4.01.001" onChange={e => s({ accountFrom: e.target.value })} style={inp} />
+                                    {f.filterMode === 'list' ? (
+                                        <textarea value={f.accountList} onChange={e => s({ accountList: e.target.value })} placeholder='Ex: 11102010001;11104030002' style={{ ...inp, height: 60, resize: 'vertical' as any }} />
+                                    ) : (
+                                        <input type='text' value={f.accountFrom} placeholder='Ex: 1.1.4.01.001' onChange={e => s({ accountFrom: e.target.value })} style={inp} />
+                                    )}
                                 </div>
                                 {f.filterMode === 'range' && (
                                     <div style={{ flex: 1 }}>
                                         <label style={{ fontSize: 13, color: '#6B7280', display: 'block', marginBottom: 4 }}>Conta (até)</label>
-                                        <input type="text" value={f.accountTo} placeholder="Ex: 2.9.9.99" onChange={e => s({ accountTo: e.target.value })} style={inp} />
+                                        <input type='text' value={f.accountTo} placeholder='Ex: 2.9.9.99' onChange={e => s({ accountTo: e.target.value })} style={inp} />
                                     </div>
                                 )}
                             </div>
@@ -274,6 +283,10 @@ const RazaoAnaliticoPage: React.FC = () => {
 
         if (filters.filterMode === 'one' && filters.accountFrom)
             list = list.filter(r => r.account.code === filters.accountFrom);
+        else if (filters.filterMode === 'list' && filters.accountList) {
+            const codes = filters.accountList.split(';').map((c: string) => c.trim()).filter(Boolean);
+            list = list.filter(r => codes.some((c: string) => r.account.code === c || r.account.reducedCode === c));
+        }
         else if (filters.filterMode === 'range' && filters.accountFrom)
             list = list.filter(r =>
                 r.account.code >= filters.accountFrom &&
@@ -444,7 +457,7 @@ const RazaoAnaliticoPage: React.FC = () => {
                                     }}>
                                         <div style={{ display: 'flex', alignItems: 'baseline', gap: 15, fontSize: 15, fontWeight: 700, color: '#111' }}>
                                             <span>Conta: <span style={{ fontFamily: 'monospace', fontSize: 15, color: '#1D4ED8' }}>{a.code}</span></span>
-                                            <span style={{ fontWeight: 400, fontSize: 15, color: '#6B7280' }}>Red.: <span style={{ color: '#D1D5DB' }}>—</span></span>
+                                            <span style={{ fontWeight: 400, fontSize: 15, color: '#6B7280' }}>Red.: <span style={{ fontFamily: 'monospace', color: '#374151' }}>{a.reducedCode || '—'}</span></span>
                                             <span style={{ fontWeight: 600, fontSize: 15, color: '#374151' }}>{a.name}</span>
                                         </div>
                                         <div style={{ fontSize: 15, fontWeight: 700, color: '#374151', whiteSpace: 'nowrap' }}>
@@ -552,3 +565,4 @@ const RazaoAnaliticoPage: React.FC = () => {
 };
 
 export default RazaoAnaliticoPage;
+

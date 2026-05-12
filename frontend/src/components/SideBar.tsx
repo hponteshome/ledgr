@@ -66,16 +66,36 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
       ],
     },
     {
+
       path: '/app/accounting', icon: FiBarChart2, label: 'Accounting',
       children: [
         { path: '/app/accounting/accounts', label: 'Plano de Contas', icon: FiLayers },
-        { path: '/app/accounting/journal', label: 'Lançamentos', icon: FiEdit3 },
+        { path: '/app/accounting/journal', label: 'Lancamentos', icon: FiEdit3 },
         { path: '/app/accounting/trial-balance', label: 'Balancete', icon: FiPieChart },
         { path: '/app/accounting/investimentos/renda-fixa', label: 'Renda Fixa', icon: FiTrendingUp },
         { path: '/app/accounting/investimentos/simulador', label: 'Simulador CDB', icon: FiActivity },
         { path: '/app/accounting/balance-comparison', label: 'Comparativo de Saldos', icon: FiActivity },
+        {
+          path: '/app/accounting/relatorios',
+          label: 'Relatorios',
+          icon: FiBookOpen,
+          children: [
+            { path: '/app/accounting/diario', label: 'Diario Geral', icon: FiBook },
+            { path: '/app/accounting/razao', label: 'Razao Analitico', icon: FiBarChart2 },
+          ],
+        },
+        {
+          path: '/app/accounting/importacao',
+          label: 'Importacao',
+          icon: FiUpload,
+          children: [
+            { path: '/app/accounting/accounts/import', label: 'Importar Plano de Contas', icon: FiLayers },
+            { path: '/app/accounting/journal/import', label: 'Importar Lancamentos', icon: FiEdit3 },
+          ],
+        },
       ],
     },
+
     {
       path: '/app/sistema',
       icon: FiSettings,
@@ -343,6 +363,9 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
     </>
   );
 };
+
+
+
 
 
 

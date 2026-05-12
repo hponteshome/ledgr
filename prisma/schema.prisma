@@ -713,6 +713,7 @@ enum SourceModule {
   ASSET
   INVESTMENT
   @@map("source_module")
+  JOURNAL_IMPORT
 }
 
 /// Plano de contas hierárquico. Suporta até 8 níveis conforme configuração
