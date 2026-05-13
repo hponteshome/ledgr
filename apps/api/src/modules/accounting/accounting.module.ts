@@ -7,6 +7,8 @@ import { PrismaService } from '@prisma/prisma.service';
 
 // Controllers
 import { AccountingController }        from './controllers/accounting.controller';
+import { AccountingConfigController }  from './controllers/accounting-config.controller';
+import { AccountingConfigService }     from './services/accounting-config.service';
 import { BalancesController }           from './controllers/balances.controller';
 import { TrialBalanceController }       from './controllers/trial-balance.controller';
 import { BalanceImportController }      from './controllers/balance-import.controller';
@@ -45,6 +47,7 @@ import { IobLotdImportService }     from './services/iob-lotd-import.service';
     MulterModule.register({ limits: { fileSize: 50 * 1024 * 1024 } }),
   ],
   controllers: [
+    AccountingConfigController,
     AccountingController,
     BalancesController,
     TrialBalanceController,
@@ -59,6 +62,7 @@ import { IobLotdImportService }     from './services/iob-lotd-import.service';
     JournalImporterController,
   ],
   providers: [
+    AccountingConfigService,
     PrismaService,
     AccountingService,
     BalancesService,
@@ -83,6 +87,8 @@ import { IobLotdImportService }     from './services/iob-lotd-import.service';
   ],
 })
 export class AccountingModule {}
+
+
 
 
 
