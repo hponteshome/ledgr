@@ -60,10 +60,17 @@ const fmtSaldo = (v: number): string => {
     return v < 0 ? `(${s})` : s;
 };
 
-const yr = new Date().getFullYear();
+const getActiveYear = () => {
+    try {
+        const saved = localStorage.getItem('@ledgr:activeMonth');
+        if (saved) return new Date(saved).getFullYear();
+    } catch {}
+    return new Date().getFullYear();
+};
+const yr = getActiveYear();
 const DEF = {
-    startDate: `-01-01`,
-    endDate: `-12-31`,
+    startDate: yr + '-01-01',
+    endDate: yr + '-12-31',
     filterMode: 'all' as 'all' | 'one' | 'range' | 'list',
     accountFrom: '',
     accountTo: '',
@@ -179,7 +186,7 @@ const FilterModal: React.FC<{ f: F; onApply: (f: F) => void }> = ({ f: init, onA
 // ── Página ─────────────────────────────────────────────────────
 const RazaoAnaliticoPage: React.FC = () => {
     const { activeCompany } = useCompany();
-    const [filters, setFilters] = useState<F>(DEF);
+    const [filters, setFilters] = useState<F>(() => { const yr = getActiveYear(); return { ...DEF, startDate: yr + '-01-01', endDate: yr + '-12-31' }; });
     const f = filters;
     const [showModal, setShowModal] = useState(true);
     const [reportData, setReportData] = useState<ReportData | null>(null);
@@ -329,6 +336,112 @@ const RazaoAnaliticoPage: React.FC = () => {
     const totC = rows.reduce((s, r) => s + r.credits, 0);
     const totFin = rows.reduce((s, r) => s + r.currentBalance, 0);
 
+    const printLivroRazao = () => {
+        if (!reportData || !activeCompany) return;
+        const empresa = activeCompany.legalName || activeCompany.tradeName || '';
+        const cnpj = (activeCompany.cnpj || '').replace(/\D/g,'').replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/,'$1.$2.$3/$4-$5');
+        const periodo = filters.startDate.split('-').reverse().join('/') + ' a ' + filters.endDate.split('-').reverse().join('/');
+        const hoje = new Date().toLocaleDateString('pt-BR');
+        const hora = new Date().toLocaleTimeString('pt-BR');
+
+        let body = '';
+        rows.forEach(function(row) {
+            const a = row.account;
+            const accountEntries = entriesByAccount.get(a.id) || [];
+            let saldo = row.previousBalance;
+
+            body += "<div class='conta-bloco'>";
+            body += "<div class='conta-header'>";
+            body += "<div class='conta-info'>";
+            body += "<span class='conta-code'>" + a.code + "</span>";
+            if (a.reducedCode) body += "<span class='conta-red'>" + a.reducedCode + "</span>";
+            body += "<span class='conta-name'>" + a.name + "</span>";
+            body += "</div>";
+            body += "<div class='saldo-anterior'>Saldo Anterior: <b>" + fmtSaldo(row.previousBalance) + "</b></div>";
+            body += "</div>";
+
+            if (accountEntries.length === 0) {
+                body += "<div class='sem-movimento'>Sem movimentos no período</div>";
+            } else {
+                body += "<table><thead><tr><th class='w90'>Data</th><th>Histórico</th><th class='w80'>Lcto</th><th class='num w100'>Débito</th><th class='num w100'>Crédito</th><th class='num w110'>Saldo</th></tr></thead><tbody>";
+                accountEntries.forEach(function(entry) {
+                    const items = entry.items.filter(function(i) { return i.accountId === a.id; });
+                    items.forEach(function(item) {
+                        const val = Number(item.value);
+                        const isD = item.type === 'DEBIT';
+                        const nature = a.nature === 'DEBIT' ? 1 : -1;
+                        saldo += (isD ? val : -val) * nature;
+                        body += "<tr>";
+                        body += "<td>" + entry.date.substring(0,10).split('-').reverse().join('/') + "</td>";
+                        body += "<td class='hist'>" + (entry.description || '').substring(0,60) + "</td>";
+                        body += "<td>" + (entry.reference || '') + "</td>";
+                        body += "<td class='num'>" + (isD ? fmtSaldo(val) : '') + "</td>";
+                        body += "<td class='num'>" + (!isD ? fmtSaldo(val) : '') + "</td>";
+                        body += "<td class='num saldo-" + (saldo < 0 ? 'neg' : 'pos') + "'>" + fmtSaldo(saldo) + "</td>";
+                        body += "</tr>";
+                    });
+                });
+                body += "</tbody></table>";
+            }
+
+            body += "<div class='conta-footer'>";
+            body += "<span>Débitos: <b>" + fmtSaldo(row.debits) + "</b></span>";
+            body += "<span>Créditos: <b>" + fmtSaldo(row.credits) + "</b></span>";
+            body += "<span>Saldo Final: <b>" + fmtSaldo(row.currentBalance) + "</b></span>";
+            body += "</div>";
+            body += "</div>";
+        });
+
+        const css =
+            "@page{size:A4 portrait;margin:12mm 14mm}" +
+            "body{font-family:Arial,sans-serif;font-size:9pt;color:#111;margin:0}" +
+            ".header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #111;padding-bottom:6px;margin-bottom:10px}" +
+            ".header-left h2{margin:0;font-size:11pt}" +
+            ".header-left p{margin:2px 0;font-size:8pt;color:#555}" +
+            ".header-center{text-align:center;font-size:13pt;font-weight:700;letter-spacing:1px}" +
+            ".header-right{text-align:right;font-size:8pt;color:#555}" +
+            ".periodo{font-size:9pt;font-weight:600;border-bottom:0.5px solid #ccc;padding-bottom:4px;margin-bottom:8px}" +
+            ".conta-bloco{margin-bottom:12px;page-break-inside:avoid}" +
+            ".conta-header{display:flex;justify-content:space-between;align-items:baseline;background:#F3F4F6;border-top:1px solid #374151;border-bottom:0.5px solid #D1D5DB;padding:3px 6px}" +
+            ".conta-info{display:flex;align-items:baseline;gap:10px}" +
+            ".conta-code{font-family:monospace;font-size:9pt;color:#1D4ED8;font-weight:700}" +
+            ".conta-red{font-family:monospace;font-size:8pt;color:#6B7280;background:#E5E7EB;padding:0 4px;border-radius:3px}" +
+            ".conta-name{font-size:9pt;font-weight:600;color:#111}" +
+            ".saldo-anterior{font-size:9pt;color:#374151;white-space:nowrap}" +
+            ".sem-movimento{color:#9CA3AF;font-style:italic;font-size:8pt;padding:4px 6px}" +
+            "table{width:100%;border-collapse:collapse;font-size:8pt}" +
+            "th{padding:3px 5px;border-bottom:1px solid #111;text-align:left;font-weight:700;font-size:8pt}" +
+            "td{padding:2px 5px;border-bottom:0.5px solid #F3F4F6}" +
+            ".num{text-align:right;font-family:monospace}" +
+            ".w90{width:70px}.w80{width:70px}.w100{width:85px}.w110{width:90px}" +
+            ".hist{max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}" +
+            ".saldo-neg{color:#B91C1C}" +
+            ".saldo-pos{color:#111}" +
+            ".conta-footer{display:flex;gap:20px;justify-content:flex-end;padding:3px 6px;font-size:8pt;border-top:1px solid #374151;background:#F9FAFB}" +
+            ".totais{margin-top:10px;border-top:2px solid #111;padding-top:6px;display:flex;gap:20px;justify-content:flex-end;font-size:9pt}";
+
+        const html =
+            "<!DOCTYPE html><html lang='pt-BR'><head><meta charset='UTF-8'/>" +
+            "<title>Razao Analitico - " + empresa + "</title>" +
+            "<style>" + css + "</style></head><body>" +
+            "<div class='header'>" +
+            "<div class='header-left'><h2>" + empresa + "</h2><p>CNPJ: " + cnpj + "</p></div>" +
+            "<div class='header-center'>Razão Analítico</div>" +
+            "<div class='header-right'><div>Data: " + hoje + "</div><div>Hora: " + hora + "</div></div>" +
+            "</div>" +
+            "<div class='periodo'>Período: " + periodo + " · " + rows.length + " contas</div>" +
+            body +
+            "<div class='totais'>" +
+            "<span>Total Débitos: <b>" + fmtSaldo(totD) + "</b></span>" +
+            "<span>Total Créditos: <b>" + fmtSaldo(totC) + "</b></span>" +
+            "</div>" +
+            "<script>window.onload=function(){window.print();}<\/script>" +
+            "</body></html>";
+
+        const w = window.open('', '_blank');
+        if (w) { w.document.write(html); w.document.close(); }
+    };
+
     const exportCSV = () => {
         const lines = [['Conta', 'Red.', 'Nome', 'Saldo Anterior', 'Data', 'Histórico', 'Lcto', 'Débito', 'Crédito', 'Saldo']];
         rows.forEach(row => {
@@ -377,7 +490,7 @@ const RazaoAnaliticoPage: React.FC = () => {
                     load(f);
                 }}
                 onFilter={() => setShowModal(true)}
-                onPrint={() => window.print()}
+                onPrint={printLivroRazao}
                 onExportCSV={reportData ? exportCSV : undefined}
                 hasData={!!reportData}
             />
@@ -565,4 +678,6 @@ const RazaoAnaliticoPage: React.FC = () => {
 };
 
 export default RazaoAnaliticoPage;
+
+
 

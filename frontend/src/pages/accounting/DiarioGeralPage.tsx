@@ -29,7 +29,14 @@ const fmtCnpj = (cnpj: string) => {
     const d = cnpj.replace(/\D/g, ''); return d.length === 14 ? `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}` : cnpj;
 };
 
-const yr = new Date().getFullYear();
+const getActiveYear = () => {
+    try {
+        const saved = localStorage.getItem('@ledgr:activeMonth');
+        if (saved) return new Date(saved).getFullYear();
+    } catch {}
+    return new Date().getFullYear();
+};
+const yr = getActiveYear();
 const DEF = {
     dateFrom: `${yr}-01-01`, dateTo: `${yr}-12-31`,
     accountFrom: '', accountTo: '', search: '',
@@ -131,7 +138,7 @@ const TD: React.CSSProperties = { padding: '3px 8px', fontSize: 15, color: '#111
 // ── Página ─────────────────────────────────────────────────────
 const DiarioGeralPage: React.FC = () => {
     const { activeCompany } = useCompany();
-    const [filters, setFilters] = useState<F>(DEF);
+    const [filters, setFilters] = useState<F>(() => { const yr = getActiveYear(); return { ...DEF, dateFrom: yr + '-01-01', dateTo: yr + '-12-31' }; });
     const [showModal, setShowModal] = useState(true);
     const [data, setData] = useState<JournalResponse | null>(null);
     const [loading, setLoading] = useState(false);
@@ -525,4 +532,5 @@ const DiarioGeralPage: React.FC = () => {
 };
 
 export default DiarioGeralPage;
+
 
