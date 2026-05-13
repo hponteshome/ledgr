@@ -75,7 +75,7 @@ const groupByMonthDay = (entries: JournalEntry[]) => {
 };
 
 // ── Modal de filtros ───────────────────────────────────────────
-const FilterModal: React.FC<{ f: F; onApply: (f: F) => void }> = ({ f: init, onApply }) => {
+const FilterModal: React.FC<{ f: F; onApply: (f: F) => void; inclTermos: boolean; setInclTermos: (v: boolean) => void; termoAbertura: string; setTermoAbertura: (v: string) => void; termoEncerramento: string; setTermoEncerramento: (v: string) => void }> = ({ f: init, onApply, inclTermos, setInclTermos, termoAbertura, setTermoAbertura, termoEncerramento, setTermoEncerramento }) => {
     const [f, setF] = useState<F>({ ...init });
     const s = (p: Partial<F>) => setF(prev => ({ ...prev, ...p }));
     const tog = (v: string) => s({ sources: f.sources.includes(v) ? f.sources.filter(x => x !== v) : [...f.sources, v] });
@@ -120,6 +120,26 @@ const FilterModal: React.FC<{ f: F; onApply: (f: F) => void }> = ({ f: init, onA
                         </div>
                     </div>
                 </div>
+                <div style={{ padding: '12px 20px', borderTop: '0.5px solid #E5E7EB' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#374151', cursor: 'pointer' }}>
+                        <input type="checkbox" checked={inclTermos} onChange={e => setInclTermos(e.target.checked)} style={{ accentColor: '#2563EB' }} />
+                        Incluir Termos de Abertura e Encerramento
+                    </label>
+                </div>
+                {inclTermos && (
+                  <div style={{ padding: '0 20px 12px' }}>
+                    <div style={{ marginBottom: 10 }}>
+                      <label style={{ fontSize: 10, fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', display: 'block', marginBottom: 4 }}>Termo de Abertura</label>
+                      <textarea value={termoAbertura} onChange={e => setTermoAbertura(e.target.value)} rows={5}
+                        style={{ width: '100%', fontSize: 11, fontFamily: 'monospace', padding: 8, border: '0.5px solid #E5E7EB', borderRadius: 6, resize: 'vertical', outline: 'none' }} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 10, fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', display: 'block', marginBottom: 4 }}>Termo de Encerramento</label>
+                      <textarea value={termoEncerramento} onChange={e => setTermoEncerramento(e.target.value)} rows={6}
+                        style={{ width: '100%', fontSize: 11, fontFamily: 'monospace', padding: 8, border: '0.5px solid #E5E7EB', borderRadius: 6, resize: 'vertical', outline: 'none' }} />
+                    </div>
+                  </div>
+                )}
                 <div style={{ padding: '12px 20px', borderTop: '0.5px solid #E5E7EB', background: '#F9FAFB', display: 'flex', justifyContent: 'flex-end' }}>
                     <button onClick={() => onApply(f)}
                         style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 20px', borderRadius: 8, border: 'none', background: '#111', fontSize: 13, fontWeight: 500, color: '#fff', cursor: 'pointer' }}>
@@ -143,6 +163,10 @@ const DiarioGeralPage: React.FC = () => {
     const [data, setData] = useState<JournalResponse | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [inclTermos, setInclTermos] = React.useState(false);
+    const [accountingConfig, setAccountingConfig] = React.useState<any>({});
+    const [termoAbertura, setTermoAbertura] = React.useState('');
+    const [termoEncerramento, setTermoEncerramento] = React.useState('');
 
     const load = useCallback(async (f: F) => {
         if (!activeCompany) return;
@@ -176,6 +200,33 @@ const DiarioGeralPage: React.FC = () => {
     // Abre modal ao entrar na pagina
     React.useEffect(() => { if (activeCompany) setShowModal(true); }, [activeCompany?.id]);
     const grouped = React.useMemo(() => data ? groupByMonthDay(data.entries) : [], [data]);
+    React.useEffect(() => {
+        if (!activeCompany) return;
+        api.get('/accounting/config', { headers: { 'x-company-id': activeCompany.id } })
+            .then(res => {
+                const c = res.data || {};
+                setAccountingConfig(c);
+                const empresa = activeCompany.legalName || activeCompany.tradeName || '';
+                const cnpj = fmtCnpj(activeCompany.taxId || '');
+                const contador = (c.accountantName || '[NOME DO CONTADOR]') + ', ' + (c.accountantRole || 'Contador') + ', CRC/' + (c.accountantCrcState || 'XX') + ' nº ' + (c.accountantCrc || '[CRC]');
+                setTermoAbertura(
+                    'TERMO DE ABERTURA\n\n' +
+                    'Eu, ' + contador + ', declaro aberto o presente Livro Diario da empresa ' + empresa + ', ' +
+                    'inscrita no CNPJ sob o n ' + cnpj + ', ' +
+                    'contendo os lancamentos contabeis do exercicio social.'
+                );
+                setTermoEncerramento(
+                    'TERMO DE ENCERRAMENTO\n\n' +
+                    'Para os devidos fins, declaro encerrado o presente Livro Diario da empresa ' + empresa + ', ' +
+                    'inscrita no CNPJ sob o n ' + cnpj + ', ' +
+                    'contendo todos os lancamentos contabeis do exercicio informado.\n\n' +
+                    contador + '\n' +
+                    (c.legalRepName ? '\n' + c.legalRepName + ' - ' + (c.legalRepRole || 'Responsavel Legal') : '')
+                );
+            })
+            .catch(() => {});
+    }, [activeCompany?.id]);
+
     const seqMap = React.useMemo(() => data ? buildSeqMap(data.entries) : new Map(), [data]);
 
     // Totais gerais
@@ -262,9 +313,12 @@ const DiarioGeralPage: React.FC = () => {
             ".total-mes td{border-top:1px solid #000;border-bottom:1px solid #000;background:#efefef}" +
             ".total-geral td{border-top:2px solid #000;background:#e0e0e0}" +
             ".num{text-align:right;white-space:nowrap}" +
-            ".mono{font-family:'Courier New',monospace}";
-
-        const html = "<!DOCTYPE html><html lang='pt-BR'><head><meta charset='UTF-8'/>" +
+            ".num{text-align:right;white-space:nowrap}" +
+            ".mono{font-family:'Courier New',monospace}" +
+            ".termo{margin:20px 0;padding:16px;border:1px solid #ccc;background:#fafafa}" +
+            ".termo pre{font-family:'Courier New',monospace;font-size:9pt;white-space:pre-wrap;line-height:1.6}";
+            ".termo pre{font-family:'Courier New',monospace;font-size:9pt;white-space:pre-wrap;line-height:1.6}";
+        const html = "<!DOCTYPE html><html lang='pt-BR'><head><meta charset='UTF-8'/>"  +
             "<title>Livro Di&aacute;rio - " + empresa + "</title>" +
             "<style>" + css + "</style></head><body>" +
             "<div class='header-top'>" +
@@ -273,12 +327,11 @@ const DiarioGeralPage: React.FC = () => {
             "<div style='text-align:right'><div>Data: " + hoje + "</div><div>Hora: " + hora + "</div></div>" +
             "</div>" +
             "<div><b>Per&iacute;odo: " + periodo + "</b></div>" +
+            (inclTermos ? "<div class='termo'><pre>" + termoAbertura + "</pre></div><hr/>" : '') +
             "<table>" + rows + "</table>" +
+            (inclTermos ? "<hr/><div class='termo'><pre>" + termoEncerramento + "</pre></div>" : '') +
             "<script>window.onload=function(){window.print();}<\/script>" +
             "</body></html>";
-
-        const w = window.open('', '_blank');
-        if (w) { w.document.write(html); w.document.close(); }
     };
     const exportCSV = () => {
         if (!data?.entries.length) return;
@@ -310,7 +363,7 @@ const DiarioGeralPage: React.FC = () => {
 
     return (
         <div style={{ padding: 24, background: 'var(--color-background-tertiary)', minHeight: '100vh' }}>
-            {showModal && <FilterModal f={filters} onApply={handleApply} />}
+            {showModal && <FilterModal f={filters} onApply={handleApply} inclTermos={inclTermos} setInclTermos={setInclTermos} termoAbertura={termoAbertura} setTermoAbertura={setTermoAbertura} termoEncerramento={termoEncerramento} setTermoEncerramento={setTermoEncerramento} />}
 
             {/* Toolbar flutuante */}
             <ReportToolbar
@@ -532,5 +585,6 @@ const DiarioGeralPage: React.FC = () => {
 };
 
 export default DiarioGeralPage;
+
 
 
