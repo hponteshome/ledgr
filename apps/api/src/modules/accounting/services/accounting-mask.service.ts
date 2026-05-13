@@ -119,7 +119,7 @@ export class AccountingMaskService {
   async getActiveMask(companyId: string, date?: Date): Promise<MaskConfig> {
     const refDate = date ?? new Date();
 
-    const config = await this.prisma.companyAccountingConfig.findFirst({
+    const config = await this.prisma.companyMaskConfig.findFirst({
       where: {
         companyId,
         validFrom: { lte: refDate },
@@ -159,7 +159,7 @@ export class AccountingMaskService {
   // ── Listar histórico de máscaras ────────────────────────────────────────────
 
   async listMasks(companyId: string) {
-    return this.prisma.companyAccountingConfig.findMany({
+    return this.prisma.companyMaskConfig.findMany({
       where: { companyId },
       orderBy: { validFrom: 'desc' },
     });
@@ -172,7 +172,7 @@ export class AccountingMaskService {
     const levels = parseMask(dto.mask);
 
     // Verificar sobreposição de períodos
-    const overlap = await this.prisma.companyAccountingConfig.findFirst({
+    const overlap = await this.prisma.companyMaskConfig.findFirst({
       where: {
         companyId,
         validFrom: { lte: dto.validTo ?? new Date('9999-12-31') },
@@ -191,7 +191,7 @@ export class AccountingMaskService {
       );
     }
 
-    return this.prisma.companyAccountingConfig.create({
+    return this.prisma.companyMaskConfig.create({
       data: {
         companyId,
         mask: dto.mask,
@@ -205,12 +205,12 @@ export class AccountingMaskService {
   // ── Atualizar vigência ──────────────────────────────────────────────────────
 
   async closeMask(companyId: string, configId: string, validTo: Date) {
-    const config = await this.prisma.companyAccountingConfig.findFirst({
+    const config = await this.prisma.companyMaskConfig.findFirst({
       where: { id: configId, companyId },
     });
     if (!config) throw new NotFoundException('Configuração não encontrada.');
 
-    return this.prisma.companyAccountingConfig.update({
+    return this.prisma.companyMaskConfig.update({
       where: { id: configId },
       data: { validTo },
     });
@@ -307,3 +307,4 @@ export class AccountingMaskService {
     };
   }
 }
+
