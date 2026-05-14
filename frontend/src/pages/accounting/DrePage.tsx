@@ -1,4 +1,4 @@
-// frontend/src/pages/accounting/DrePage.tsx
+﻿// frontend/src/pages/accounting/DrePage.tsx
 import React, { useState, useCallback } from 'react';
 import { FiLoader, FiAlertCircle } from 'react-icons/fi';
 import api from '../../services/api';
@@ -44,10 +44,8 @@ const DrePage: React.FC = () => {
 
     const receitas = data.filter(i => i.account.type === 'REVENUE' && !i.account.code.startsWith('49'));
     const despesas = data.filter(i => i.account.type === 'EXPENSE' && !i.account.code.startsWith('49'));
-
     const val = (item: DREItem) => item.account.nature === 'CREDIT' ? Math.abs(item.currentBalance) : -Math.abs(item.currentBalance);
     const valTotal = (items: DREItem[]) => items.filter(i => i.account.level === 1).reduce((s, i) => s + val(i), 0);
-
     const totalReceitas = valTotal(receitas);
     const totalDespesas = valTotal(despesas);
     const resultado = totalReceitas + totalDespesas;
@@ -55,16 +53,17 @@ const DrePage: React.FC = () => {
     const DRERow = ({ item }: { item: DREItem }) => {
         const v = val(item);
         const cor = v < 0 ? '#B91C1C' : '#111';
+        const fw = item.account.isAnalytic ? 400 : 700;
         return (
             <tr>
-                <td style={{ paddingLeft: 8, fontSize: 12, color: item.account.isAnalytic ? '#374151' : '#111', fontWeight: item.account.isAnalytic ? 400 : 700, padding: '3px 8px', borderBottom: '0.5px solid #F3F4F6' }}>
+                <td style={{ fontSize: 12, color: item.account.isAnalytic ? '#374151' : '#111', fontWeight: fw, padding: '3px 8px', borderBottom: '0.5px solid #F3F4F6' }}>
                     <span style={{ fontFamily: 'monospace', color: '#9CA3AF', fontSize: 11, marginRight: 8 }}>{item.account.code}</span>
                     {item.account.name}
                 </td>
-                <td style={{ textAlign: 'right', fontFamily: 'monospace', fontSize: 12, padding: '3px 8px', borderBottom: '0.5px solid #F3F4F6', color: cor, fontWeight: item.account.isAnalytic ? 400 : 700, width: 120 }}>
+                <td style={{ textAlign: 'right', fontFamily: 'monospace', fontSize: 12, padding: '3px 8px', borderBottom: '0.5px solid #F3F4F6', color: cor, fontWeight: fw }}>
                     {item.account.isAnalytic ? fmtNum(v) : ''}
                 </td>
-                <td style={{ textAlign: 'right', fontFamily: 'monospace', fontSize: 12, padding: '3px 8px', borderBottom: '0.5px solid #F3F4F6', color: cor, fontWeight: item.account.isAnalytic ? 400 : 700, width: 120 }}>
+                <td style={{ textAlign: 'right', fontFamily: 'monospace', fontSize: 12, padding: '3px 8px', borderBottom: '0.5px solid #F3F4F6', color: cor, fontWeight: fw }}>
                     {!item.account.isAnalytic ? fmtNum(v) : ''}
                 </td>
             </tr>
@@ -77,62 +76,24 @@ const DrePage: React.FC = () => {
         const cnpj = fmtCnpj(activeCompany.taxId || '');
         const hoje = new Date().toLocaleDateString('pt-BR');
         const periodo = dateFrom.split('-').reverse().join('/') + ' a ' + dateTo.split('-').reverse().join('/');
-
         const buildRows = (items: DREItem[]): string => items.map(item => {
             const v = val(item);
             const cor = v < 0 ? '#B91C1C' : '#000';
-            return "<tr><td style='padding:2px 6px;font-weight:" + (item.account.isAnalytic ? 400 : 700) + ";font-size:9pt'>" +
-                "<span style='font-family:monospace;color:#888;font-size:8pt;margin-right:6px'>" + item.account.code + "</span>" +
-                item.account.name + "</td>" +
-                "<td style='text-align:right;font-family:monospace;padding:2px 6px;color:" + cor + "'>" + (item.account.isAnalytic ? fmtNum(v) : '') + "</td>" +
-                "<td style='text-align:right;font-family:monospace;padding:2px 6px;font-weight:700;color:" + cor + "'>" + (!item.account.isAnalytic ? fmtNum(v) : '') + "</td></tr>";
+            return "<tr><td style='padding:2px 6px;font-weight:" + (item.account.isAnalytic ? 400 : 700) + ";font-size:9pt'><span style='font-family:monospace;color:#888;font-size:8pt;margin-right:6px'>" + item.account.code + "</span>" + item.account.name + "</td><td style='text-align:right;font-family:monospace;padding:2px 6px;color:" + cor + "'>" + (item.account.isAnalytic ? fmtNum(v) : '') + "</td><td style='text-align:right;font-family:monospace;padding:2px 6px;font-weight:700;color:" + cor + "'>" + (!item.account.isAnalytic ? fmtNum(v) : '') + "</td></tr>";
         }).join('');
-
-        const css = "@page{size:A4 portrait;margin:12mm 14mm}" +
-            "body{font-family:Arial,sans-serif;font-size:9pt;color:#000}" +
-            ".header{display:flex;justify-content:space-between;border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:8px}" +
-            "table{width:100%;border-collapse:collapse}" +
-            "th{padding:4px 6px;border-bottom:1px solid #000;border-top:1px solid #000;font-size:8pt;text-transform:uppercase;text-align:left}" +
-            "th.num{text-align:right}" +
-            "td{padding:2px 6px;border-bottom:0.5px solid #eee;font-size:9pt}" +
-            ".sec{background:#F3F4F6;font-weight:700;padding:4px 6px}" +
-            ".tot{border-top:1px solid #000;font-weight:700;background:#E5E7EB}" +
-            ".res{border-top:2px solid #000;font-weight:700;font-size:10pt}";
-
-        const html = "<!DOCTYPE html><html><head><meta charset='UTF-8'/><title>DRE</title><style>" + css + "</style></head><body>" +
-            "<div class='header'><div><b>" + empresa + "</b><br/><span style='font-size:8pt'>CNPJ: " + cnpj + "</span></div>" +
-            "<div style='text-align:center'><b>DEMONSTRACAO DO RESULTADO DO EXERCICIO</b><br/>" + periodo + "</div>" +
-            "<div style='text-align:right;font-size:8pt'>Emissao: " + hoje + "</div></div>" +
-            "<table><thead><tr><th>Conta</th><th class='num' style='width:110px'>Parcial</th><th class='num' style='width:110px'>Total</th></tr></thead><tbody>" +
-            "<tr><td class='sec' colspan='3'>RECEITAS</td></tr>" +
-            buildRows(receitas) +
-            "<tr class='tot'><td colspan='2'>TOTAL DAS RECEITAS</td><td style='text-align:right;font-family:monospace'>" + fmtNum(totalReceitas) + "</td></tr>" +
-            "<tr><td class='sec' colspan='3'>DESPESAS</td></tr>" +
-            buildRows(despesas) +
-            "<tr class='tot'><td colspan='2'>TOTAL DAS DESPESAS</td><td style='text-align:right;font-family:monospace'>" + fmtNum(totalDespesas) + "</td></tr>" +
-            "<tr class='res' style='background:" + (resultado >= 0 ? '#F0FDF4' : '#FEF2F2') + ";color:" + (resultado >= 0 ? '#16A34A' : '#DC2626') + "'>" +
-            "<td colspan='2'>" + (resultado >= 0 ? 'LUCRO DO EXERCICIO' : 'PREJUIZO DO EXERCICIO') + "</td>" +
-            "<td style='text-align:right;font-family:monospace'>" + fmtNum(Math.abs(resultado)) + "</td></tr>" +
-            "</tbody></table><script>window.onload=function(){window.print();}<\/script></body></html>";
-
+        const css = "@page{size:A4 portrait;margin:12mm 14mm}body{font-family:Arial,sans-serif;font-size:9pt}.header{display:flex;justify-content:space-between;border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:8px}table{width:100%;border-collapse:collapse}th{padding:4px 6px;border-bottom:1px solid #000;border-top:1px solid #000;font-size:8pt;text-transform:uppercase}th.num{text-align:right}td{padding:2px 6px;border-bottom:0.5px solid #eee}.sec{background:#F3F4F6;font-weight:700}.tot{border-top:1px solid #000;font-weight:700;background:#E5E7EB}.res{border-top:2px solid #000;font-weight:700;font-size:10pt}";
+        const html = "<!DOCTYPE html><html><head><meta charset='UTF-8'/><title>DRE</title><style>" + css + "</style></head><body><div class='header'><div><b>" + empresa + "</b><br/><span style='font-size:8pt'>CNPJ: " + cnpj + "</span></div><div style='text-align:center'><b>DEMONSTRACAO DO RESULTADO DO EXERCICIO</b><br/>" + periodo + "</div><div style='text-align:right;font-size:8pt'>Emissao: " + hoje + "</div></div><table><thead><tr><th>Conta</th><th class='num' style='width:110px'>Parcial</th><th class='num' style='width:110px'>Total</th></tr></thead><tbody><tr><td class='sec' colspan='3'>RECEITAS</td></tr>" + buildRows(receitas) + "<tr class='tot'><td colspan='2'>TOTAL DAS RECEITAS</td><td style='text-align:right;font-family:monospace'>" + fmtNum(totalReceitas) + "</td></tr><tr><td class='sec' colspan='3'>DESPESAS</td></tr>" + buildRows(despesas) + "<tr class='tot'><td colspan='2'>TOTAL DAS DESPESAS</td><td style='text-align:right;font-family:monospace'>" + fmtNum(totalDespesas) + "</td></tr><tr class='res' style='background:" + (resultado >= 0 ? '#F0FDF4' : '#FEF2F2') + ";color:" + (resultado >= 0 ? '#16A34A' : '#DC2626') + "'><td colspan='2'>" + (resultado >= 0 ? 'LUCRO DO EXERCICIO' : 'PREJUIZO DO EXERCICIO') + "</td><td style='text-align:right;font-family:monospace'>" + fmtNum(Math.abs(resultado)) + "</td></tr></tbody></table><script>window.onload=function(){window.print();}<\/script></body></html>";
         const w = window.open('', '_blank');
         if (w) { w.document.write(html); w.document.close(); }
     };
 
     return (
         <div style={{ padding: 24, background: 'var(--color-background-tertiary)', minHeight: '100vh' }}>
-            <ReportToolbar
-                title="DRE"
-                dateFrom={dateFrom}
-                dateTo={dateTo}
-                count={generated ? receitas.length + despesas.length : undefined}
-                countLabel="contas"
+            <ReportToolbar title="DRE" dateFrom={dateFrom} dateTo={dateTo}
+                count={generated ? receitas.length + despesas.length : undefined} countLabel="contas"
                 onPeriodChange={(from, to) => { setDateFrom(from); setDateTo(to); load(from, to); }}
-                onFilter={() => load(dateFrom, dateTo)}
-                filterLabel="Gerar DRE"
-                onPrint={generated ? printDRE : undefined}
-                hasData={generated}
-            />
+                onFilter={() => load(dateFrom, dateTo)} filterLabel="Gerar DRE"
+                onPrint={generated ? printDRE : undefined} hasData={generated} />
 
             {loading ? (
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 80, gap: 12, color: '#9CA3AF' }}>
@@ -144,21 +105,23 @@ const DrePage: React.FC = () => {
                 </div>
             ) : generated ? (
                 <div style={{ background: '#fff', border: '0.5px solid #E5E7EB', borderRadius: 10, overflow: 'hidden' }}>
-                    <div style={{ padding: '16px 24px', borderBottom: '0.5px solid #E5E7EB', background: '#F9FAFB', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div>
-                            <div style={{ fontSize: 14, fontWeight: 700, color: '#111' }}>{activeCompany?.legalName || activeCompany?.tradeName}</div>
-                            <div style={{ fontSize: 11, color: '#6B7280' }}>CNPJ: {fmtCnpj(activeCompany?.taxId || '')} &nbsp;|&nbsp; {dateFrom.split('-').reverse().join('/')} a {dateTo.split('-').reverse().join('/')}</div>
-                        </div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: '#1D4ED8' }}>DRE — DEMONSTRACAO DO RESULTADO</div>
+                    <div style={{ padding: '12px 16px', borderBottom: '0.5px solid #E5E7EB', background: '#F9FAFB', textAlign: 'center' }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: '#1D4ED8' }}>DRE — DEMONSTRACAO DO RESULTADO DO EXERCICIO</div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: '#111', marginTop: 2 }}>{activeCompany?.legalName || activeCompany?.tradeName}</div>
+                        <div style={{ fontSize: 11, color: '#6B7280', marginTop: 2 }}>CNPJ: {fmtCnpj(activeCompany?.taxId || '')} | {dateFrom.split('-').reverse().join('/')} a {dateTo.split('-').reverse().join('/')}</div>
                     </div>
-
-                    <div style={{ overflowX: 'auto', maxHeight: 'calc(100vh - 280px)', overflowY: 'auto' }}>
+                    <div style={{ overflowY: 'auto', maxHeight: 'calc(100vh - 300px)' }}>
                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, tableLayout: 'fixed' }}>
-                            <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
-                                <tr style={{ background: '#F9FAFB', borderBottom: '0.5px solid #E5E7EB' }}>
+                            <colgroup>
+                                <col style={{ width: '60%' }} />
+                                <col style={{ width: '20%' }} />
+                                <col style={{ width: '20%' }} />
+                            </colgroup>
+                            <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: '#F9FAFB' }}>
+                                <tr style={{ borderBottom: '0.5px solid #E5E7EB' }}>
                                     <th style={{ padding: '6px 8px', fontSize: 10, fontWeight: 600, color: '#6B7280', textAlign: 'left' }}>Conta / Descricao</th>
-                                    <th style={{ padding: '6px 8px', fontSize: 10, fontWeight: 600, color: '#6B7280', textAlign: 'right', width: 120 }}>Parcial</th>
-                                    <th style={{ padding: '6px 8px', fontSize: 10, fontWeight: 600, color: '#6B7280', textAlign: 'right', width: 120 }}>Total</th>
+                                    <th style={{ padding: '6px 8px', fontSize: 10, fontWeight: 600, color: '#6B7280', textAlign: 'right' }}>Parcial</th>
+                                    <th style={{ padding: '6px 8px', fontSize: 10, fontWeight: 600, color: '#6B7280', textAlign: 'right' }}>Total</th>
                                 </tr>
                             </thead>
                             <tbody>
