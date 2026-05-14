@@ -67,7 +67,7 @@ export default function AssetsList() {
         'x-company-id': activeCompany?.id ?? '',
     };
 
-    useEffect(() => { fetch({ search, grupo, status, limit: 1000 }); }, []);
+    useEffect(() => { fetch({ search, grupo, status, limit: 1000 }); }, [activeCompany?.id]);
 
     function handleFilter() {
         fetch({ search: search || undefined, grupo: grupo || undefined, status: status || undefined, limit: 1000 });

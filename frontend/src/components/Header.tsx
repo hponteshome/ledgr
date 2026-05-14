@@ -274,7 +274,7 @@ export const Header: React.FC<{ sidebarOpen: boolean }> = ({ sidebarOpen }) => {
                       </div>
                     </div>
 
-                    <div className="max-h-64 overflow-y-auto mt-1 custom-scrollbar">
+                    <div className="max-h-48 overflow-y-scroll mt-1" style={{ scrollbarWidth: 'thin', scrollbarColor: '#CBD5E1 #F1F5F9' }}>
                       {/* OPÇÃO MODO GLOBAL */}
                       <button
                         onClick={() => handleSelectCompany(null)}
