@@ -48,6 +48,7 @@ import MaintenancesPage from '../pages/assets/MaintenancesPage';
 
 import { BalanceComparisonPage } from '../pages/reports/BalanceComparisonPage';
 import DiarioGeralPage from '../pages/accounting/DiarioGeralPage';
+import DrePage from '../pages/accounting/DrePage';
 import BalancoPatrimonialPage from '../pages/accounting/BalancoPatrimonialPage';
 import RazaoAnaliticoPage from '../pages/accounting/RazaoAnaliticoPage';
 import CdbProjecaoPage from '../pages/accounting/investments/CdbProjecaoPage';
@@ -93,7 +94,7 @@ export const AppRoutes = () => {
                 <Route path="app/accounting/journal/import" element={<ProtectedRoute><ImportJournalPage /></ProtectedRoute>} />
                 <Route path="app/reports/balance-comparison" element={<ProtectedRoute><BalanceComparisonPage /></ProtectedRoute>} />
                 <Route path="app/accounting/validate-ecd" element={<ProtectedRoute><EcdValidationPage /></ProtectedRoute>} />
-                <Route path="app/accounting/balanco" element={<ProtectedRoute><BalancoPatrimonialPage /></ProtectedRoute>} />
+                <Route path="app/accounting/dre" element={<ProtectedRoute><DrePage /></ProtectedRoute>} /><Route path="app/accounting/balanco" element={<ProtectedRoute><BalancoPatrimonialPage /></ProtectedRoute>} />
                 <Route path="app/accounting/diario" element={<ProtectedRoute><DiarioGeralPage /></ProtectedRoute>} />
                 <Route path="app/accounting/investimentos/cdi" element={<ProtectedRoute><CdiTabelaPage /></ProtectedRoute>} />
                 <Route path="app/sistema/indicadores" element={<ProtectedRoute><IndicadoresPage /></ProtectedRoute>} />
@@ -204,6 +205,8 @@ export const AppRoutes = () => {
         </Routes>
     );
 };
+
+
 
 
 

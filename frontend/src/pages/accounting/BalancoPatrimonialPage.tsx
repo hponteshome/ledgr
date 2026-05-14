@@ -160,7 +160,7 @@ const BalancoPatrimonialPage: React.FC = () => {
                         <div style={{ fontSize: 13, fontWeight: 700, color: '#1D4ED8' }}>BALANCO PATRIMONIAL</div>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0, maxHeight: 'calc(100vh - 280px)', overflowY: 'auto' }}>
                         {/* ATIVO */}
                         <div style={{ borderRight: '1px solid #E5E7EB' }}>
                             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
@@ -229,3 +229,4 @@ const BalancoPatrimonialPage: React.FC = () => {
 };
 
 export default BalancoPatrimonialPage;
+

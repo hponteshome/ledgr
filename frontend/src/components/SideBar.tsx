@@ -82,11 +82,12 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
           children: [
             { path: '/app/accounting/diario', label: 'Diario Geral', icon: FiBook },
             { path: '/app/accounting/razao', label: 'Razao Analitico', icon: FiBarChart2 },
+            { path: '/app/accounting/dre', label: 'DRE', icon: FiTrendingUp },
             { path: '/app/accounting/balanco', label: 'Balanco Patrimonial', icon: FiPieChart },
           ],
-
         },
         {
+
           path: '/app/accounting/importacao',
           label: 'Importacao',
           icon: FiUpload,
