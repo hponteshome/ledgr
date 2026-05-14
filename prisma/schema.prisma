@@ -2260,6 +2260,11 @@ model ProvisaoConfig {
 
   // Fornecedor
   fornecedorNome  String? @map("fornecedor_nome") @db.VarChar
+  favorecidoPersonId  String? @map("favorecido_person_id") @db.Uuid
+  favorecidoCompanyId String? @map("favorecido_company_id") @db.Uuid
+  geraContabil        Boolean @default(true)  @map("gera_contabil")
+  geraAgenda          Boolean @default(true)  @map("gera_agenda")
+  agendaColor         String? @default("BLUE") @map("agenda_color") @db.VarChar(20)
   fornecedorCnpj  String? @map("fornecedor_cnpj") @db.VarChar(18)
 
   // Rateio
@@ -2276,6 +2281,7 @@ model ProvisaoConfig {
   company    Company @relation(fields: [companyId], references: [id])
   lancamentos ProvisaoLancamento[]
   rateios     ProvisaoRateioConfig[]
+
 
   @@index([companyId, ativo])
   @@index([companyId, tipo])
@@ -2319,8 +2325,7 @@ model ProvisaoLancamento {
 
   // Vinculos gerados
   apEntryId      String? @map("ap_entry_id") @db.Uuid
-  journalEntryId String? @map("journal_entry_id") @db.Uuid
-  fiscalDocId    String? @map("fiscal_doc_id") @db.Uuid
+  agendaEventId  String? @map("agenda_event_id") @db.Uuid
 
   createdById String   @map("created_by_id") @db.Uuid
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp(6)
@@ -2463,6 +2468,5 @@ model CompanyAccountingConfig {
 
   @@map("company_accounting_configs")
 }
-
 
 
