@@ -1,5 +1,6 @@
 // frontend/src/pages/finance/ProvisoesPage.tsx
 import React, { useState, useEffect } from 'react';
+import { useCompany } from '../../contexts/CompanyContext';
 import api from '../../services/api';
 import Swal from 'sweetalert2';
 
@@ -189,7 +190,8 @@ function ConfigModal({ config, accounts, onClose, onSaved }: { config?: any; acc
 
 export default function ProvisoesPage() {
   const [configs, setConfigs] = useState<any[]>([]);
-  const [lancamentos, setLancamentos] = useState<any[]>([]);
+  const { activeCompany } = useCompany();
+
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [tab, setTab] = useState<'configs'|'lancamentos'>('configs');
   const [showModal, setShowModal] = useState(false);
@@ -218,7 +220,7 @@ export default function ProvisoesPage() {
     } catch {}
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { setConfigs([]); load(); }, [activeCompany?.id]);
   useEffect(() => { if (tab === 'lancamentos') loadLancamentos(); }, [tab, filterComp]);
 
   const gerar = async () => {
