@@ -29,6 +29,7 @@ const BalancoPatrimonialPage: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [generated, setGenerated] = useState(false);
+    React.useEffect(() => { setData([]); setGenerated(false); }, [activeCompany?.id]);
 
     const load = useCallback(async (from: string, to: string) => {
         if (!activeCompany) return;
@@ -229,4 +230,5 @@ const BalancoPatrimonialPage: React.FC = () => {
 };
 
 export default BalancoPatrimonialPage;
+
 

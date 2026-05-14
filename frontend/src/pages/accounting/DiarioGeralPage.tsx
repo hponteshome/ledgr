@@ -198,7 +198,7 @@ const DiarioGeralPage: React.FC = () => {
 
     // Autoload no mount
     // Abre modal ao entrar na pagina
-    React.useEffect(() => { if (activeCompany) setShowModal(true); }, [activeCompany?.id]);
+    React.useEffect(() => { if (activeCompany) { setData(null); setShowModal(true); } }, [activeCompany?.id]);
     const grouped = React.useMemo(() => data ? groupByMonthDay(data.entries) : [], [data]);
     React.useEffect(() => {
         if (!activeCompany) return;

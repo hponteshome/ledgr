@@ -190,6 +190,7 @@ const RazaoAnaliticoPage: React.FC = () => {
     const f = filters;
     const [showModal, setShowModal] = useState(true);
     const [reportData, setReportData] = useState<ReportData | null>(null);
+    React.useEffect(() => { if (activeCompany) { setReportData(null); setShowModal(true); } }, [activeCompany?.id]);
     const [allEntries, setAllEntries] = useState<JournalEntry[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');

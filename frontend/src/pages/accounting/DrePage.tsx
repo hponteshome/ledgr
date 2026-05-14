@@ -1,4 +1,4 @@
-﻿// frontend/src/pages/accounting/DrePage.tsx
+// frontend/src/pages/accounting/DrePage.tsx
 import React, { useState, useCallback } from 'react';
 import { FiLoader, FiAlertCircle } from 'react-icons/fi';
 import api from '../../services/api';
@@ -28,6 +28,7 @@ const DrePage: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [generated, setGenerated] = useState(false);
+    React.useEffect(() => { setData([]); setGenerated(false); }, [activeCompany?.id]);
 
     const load = useCallback(async (from: string, to: string) => {
         if (!activeCompany) return;
