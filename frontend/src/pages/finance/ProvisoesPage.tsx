@@ -99,7 +99,7 @@ function ConfigModal({ config, accounts, onClose, onSaved }: { config?: any; acc
   const set = (k: string, v: any) => setForm(p => ({ ...p, [k]: v }));
 
 
-  React.useEffect(() => { try { if (!config && localStorage.getItem('@ledgr:provisao_draft')) { localStorage.removeItem('@ledgr:provisao_draft'); } } catch {} }, []);
+
   const save = async () => {
     if (!form.descricao || !form.valor || !form.competenciaIni) {
       Swal.fire({ icon:'warning', title:'Atenção', text:'Preencha descrição, valor e competência inicial.' }); return;
@@ -117,14 +117,14 @@ function ConfigModal({ config, accounts, onClose, onSaved }: { config?: any; acc
       };
       if (isEdit) await api.put('/finance/provisoes/configs/' + config.id, dto);
       else await api.post('/finance/provisoes/configs', dto);
+      try { localStorage.removeItem('@ledgr:provisao_draft'); } catch {}
+
       onSaved();
     } catch (e: any) { Swal.fire({ icon:'error', title:'Erro', text: e?.response?.data?.message ?? 'Erro ao salvar' }); }
     setSaving(false);
   };
-
   const isCnpj = form.fornecedorCnpj.replace(/\D/g,'').length === 14;
   const naoEncontrado = form.fornecedorNome === 'Nao encontrado — cadastrar';
-
   return (
     <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.4)',zIndex:50,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}
       onClick={e=>e.target===e.currentTarget&&onClose()}>

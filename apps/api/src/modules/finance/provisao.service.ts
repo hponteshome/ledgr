@@ -20,10 +20,11 @@ export class ProvisaoService {
   }
 
   async createConfig(companyId: string, dto: any) {
-    const { rateios, ...data } = dto;
+    const { rateios, companyId: _cid, ...data } = dto;
+    const cleanData: any = Object.fromEntries(Object.entries(data).map(([k,v]) => [k, v === '' ? null : v]));
     return this.prisma.$transaction(async tx => {
       const config = await tx.provisaoConfig.create({
-        data: { ...data, companyId },
+        data: { ...cleanData, companyId } as any,
       });
       if (rateios?.length) {
         await tx.provisaoRateioConfig.createMany({
