@@ -49,6 +49,7 @@ import MaintenancesPage from '../pages/assets/MaintenancesPage';
 import { BalanceComparisonPage } from '../pages/reports/BalanceComparisonPage';
 import DiarioGeralPage from '../pages/accounting/DiarioGeralPage';
 import DrePage from '../pages/accounting/DrePage';
+import AgendaPage from '../pages/finance/AgendaPage';
 import BalancoPatrimonialPage from '../pages/accounting/BalancoPatrimonialPage';
 import RazaoAnaliticoPage from '../pages/accounting/RazaoAnaliticoPage';
 import CdbProjecaoPage from '../pages/accounting/investments/CdbProjecaoPage';
@@ -101,6 +102,7 @@ export const AppRoutes = () => {
                 <Route path="app/sistema/calendario" element={<ProtectedRoute><CalendarioPage /></ProtectedRoute>} />
                 <Route path="app/sistema/tabelas" element={<ProtectedRoute><TabelasLegaisPage /></ProtectedRoute>} />
                 <Route path="app/finance/fechamento" element={<ProtectedRoute><FechamentoPage /></ProtectedRoute>} />
+                <Route path="app/finance/agenda" element={<ProtectedRoute><AgendaPage /></ProtectedRoute>} />
                 <Route path="app/finance/provisoes" element={<ProtectedRoute><ProvisoesPage /></ProtectedRoute>} />
                 <Route path="app/hr/pro-labore" element={<ProtectedRoute><ProLaborePage /></ProtectedRoute>} />
                 <Route path="app/accounting/investimentos/renda-fixa" element={<ProtectedRoute><RendaFixaPage /></ProtectedRoute>} />
@@ -205,6 +207,7 @@ export const AppRoutes = () => {
         </Routes>
     );
 };
+
 
 
 

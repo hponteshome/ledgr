@@ -133,6 +133,24 @@ export class ProvisaoService {
           });
         }
 
+        // Criar evento de agenda
+        let agendaEvent = null;
+        if (config.geraAgenda) {
+          agendaEvent = await tx.agendaEvent.create({
+            data: {
+              companyId,
+              eventType:   'PAYMENT',
+              title:       config.descricao + ' — ' + competencia,
+              description: config.fornecedorNome ?? undefined,
+              color:       (config.agendaColor as any) ?? 'BLUE',
+              dueDate:     venc,
+              amount:      config.valor,
+              apEntryId:   apEntry?.id ?? undefined,
+              createdById,
+            },
+          });
+        }
+
         // Criar lancamento contabil
         let journalEntry = null;
         if (config.contaDespesaId && config.contaPassivoId) {
@@ -155,8 +173,8 @@ export class ProvisaoService {
         await tx.provisaoLancamento.update({
           where: { id: lanc.id },
           data: {
-            apEntryId: apEntry?.id,
-          },
+            apEntryId:     apEntry?.id,
+            agendaEventId: agendaEvent?.id,
         });
 
 
