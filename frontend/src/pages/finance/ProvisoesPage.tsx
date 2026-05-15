@@ -1,7 +1,9 @@
 // frontend/src/pages/finance/ProvisoesPage.tsx
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useCompany } from '../../contexts/CompanyContext';
 import api from '../../services/api';
+import { parseCompetencia } from '../../utils/formatters';
 import Swal from 'sweetalert2';
 
 const fmtBRL = (v: any) => Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -63,37 +65,56 @@ const S = {
   tdR:   { padding:'8px 12px', borderBottom:'0.5px solid #F5F5F5', fontSize:12, color:'#374151', textAlign:'right' as const },
 };
 
+
 function ConfigModal({ config, accounts, onClose, onSaved }: { config?: any; accounts: Account[]; onClose:()=>void; onSaved:()=>void }) {
   const isEdit = !!config;
-  const [form, setForm] = useState({
-    descricao:       config?.descricao ?? '',
-    tipo:            config?.tipo ?? 'SERVICO',
-    periodicidade:   config?.periodicidade ?? 'MENSAL',
-    diaVencimento:   String(config?.diaVencimento ?? '10'),
-    valor:           String(config?.valor ?? ''),
-    contaDespesaId:  config?.contaDespesaId ?? '',
-    contaPassivoId:  config?.contaPassivoId ?? '',
-    fornecedorNome:  config?.fornecedorNome ?? '',
-    fornecedorCnpj:  config?.fornecedorCnpj ?? '',
-    exigirNF:        config?.exigirNF ?? false,
-    dedutivel:       config?.dedutivel ?? true,
-    creditaPisCofins:config?.creditaPisCofins ?? false,
-    aliqPis:         String(config?.aliqPis ?? '0.0065'),
-    aliqCofins:      String(config?.aliqCofins ?? '0.03'),
-    competenciaIni:  config?.competenciaIni ?? '',
-    competenciaFim:  config?.competenciaFim ?? '',
-    ativo:           config?.ativo ?? true,
+  const navigate = useNavigate();
+  const [form, setForm] = useState(() => {
+    try { const d = localStorage.getItem('@ledgr:provisao_draft'); if (d && !config) { return JSON.parse(d); } } catch {}
+    return {
+      descricao:          config?.descricao ?? '',
+      tipo:               config?.tipo ?? 'SERVICO',
+      periodicidade:      config?.periodicidade ?? 'MENSAL',
+      diaVencimento:      String(config?.diaVencimento ?? '10'),
+      valor:              String(config?.valor ?? ''),
+      contaDespesaId:     config?.contaDespesaId ?? '',
+      contaPassivoId:     config?.contaPassivoId ?? '',
+      fornecedorNome:     config?.fornecedorNome ?? '',
+      fornecedorCnpj:     config?.fornecedorCnpj ?? '',
+      favorecidoPersonId: config?.favorecidoPersonId ?? '',
+      favorecidoCompanyId:config?.favorecidoCompanyId ?? '',
+      exigirNF:           config?.exigirNF ?? false,
+      dedutivel:          config?.dedutivel ?? true,
+      geraContabil:       config?.geraContabil ?? true,
+      geraAgenda:         config?.geraAgenda ?? true,
+      creditaPisCofins:   config?.creditaPisCofins ?? false,
+      aliqPis:            String(config?.aliqPis ?? '0.0065'),
+      aliqCofins:         String(config?.aliqCofins ?? '0.03'),
+      competenciaIni:     config?.competenciaIni ?? '',
+      competenciaFim:     config?.competenciaFim ?? '',
+      ativo:              config?.ativo ?? true,
+    };
   });
   const [saving, setSaving] = useState(false);
   const set = (k: string, v: any) => setForm(p => ({ ...p, [k]: v }));
 
+
+  React.useEffect(() => { try { if (!config && localStorage.getItem('@ledgr:provisao_draft')) { localStorage.removeItem('@ledgr:provisao_draft'); } } catch {} }, []);
   const save = async () => {
     if (!form.descricao || !form.valor || !form.competenciaIni) {
       Swal.fire({ icon:'warning', title:'Atenção', text:'Preencha descrição, valor e competência inicial.' }); return;
     }
     setSaving(true);
     try {
-      const dto = { ...form, valor: parseFloat(form.valor), diaVencimento: parseInt(form.diaVencimento), aliqPis: parseFloat(form.aliqPis), aliqCofins: parseFloat(form.aliqCofins) };
+      const dto = {
+        ...form,
+        valor: parseFloat(form.valor),
+        diaVencimento: parseInt(form.diaVencimento),
+        aliqPis: parseFloat(form.aliqPis),
+        aliqCofins: parseFloat(form.aliqCofins),
+        favorecidoPersonId: form.favorecidoPersonId || undefined,
+        favorecidoCompanyId: form.favorecidoCompanyId || undefined,
+      };
       if (isEdit) await api.put('/finance/provisoes/configs/' + config.id, dto);
       else await api.post('/finance/provisoes/configs', dto);
       onSaved();
@@ -101,71 +122,118 @@ function ConfigModal({ config, accounts, onClose, onSaved }: { config?: any; acc
     setSaving(false);
   };
 
+  const isCnpj = form.fornecedorCnpj.replace(/\D/g,'').length === 14;
+  const naoEncontrado = form.fornecedorNome === 'Nao encontrado — cadastrar';
+
   return (
     <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.4)',zIndex:50,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}
       onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div style={{background:'#fff',borderRadius:12,padding:24,width:'100%',maxWidth:680,maxHeight:'90vh',overflowY:'auto' as const}}>
+      <div style={{background:'#fff',borderRadius:12,padding:24,width:'100%',maxWidth:680,maxHeight:'90vh',overflowY:'auto'}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
           <span style={{fontSize:15,fontWeight:500}}>{isEdit?'Editar Provisão':'Nova Provisão Recorrente'}</span>
           <button style={{...S.btn,padding:'0 8px'}} onClick={onClose}>x</button>
         </div>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+
           <div style={{gridColumn:'1/-1'}}>
             <label style={{fontSize:10,textTransform:'uppercase' as const,color:'#6B7280',display:'block',marginBottom:3}}>Descrição *</label>
             <input style={S.input} value={form.descricao} onChange={e=>set('descricao',e.target.value)} placeholder="Ex: Aluguel sede, Honorários contábeis..." />
           </div>
+
           <div>
             <label style={{fontSize:10,textTransform:'uppercase' as const,color:'#6B7280',display:'block',marginBottom:3}}>Tipo</label>
             <select style={S.input} value={form.tipo} onChange={e=>set('tipo',e.target.value)}>
               {TIPOS.map(t=><option key={t} value={t}>{t}</option>)}
             </select>
           </div>
+
           <div>
             <label style={{fontSize:10,textTransform:'uppercase' as const,color:'#6B7280',display:'block',marginBottom:3}}>Periodicidade</label>
             <select style={S.input} value={form.periodicidade} onChange={e=>set('periodicidade',e.target.value)}>
               {PERIODICIDADES.map(p=><option key={p} value={p}>{p}</option>)}
             </select>
           </div>
+
           <div>
             <label style={{fontSize:10,textTransform:'uppercase' as const,color:'#6B7280',display:'block',marginBottom:3}}>Valor (R$) *</label>
             <input style={S.input} type="number" value={form.valor} onChange={e=>set('valor',e.target.value)} />
           </div>
+
           <div>
             <label style={{fontSize:10,textTransform:'uppercase' as const,color:'#6B7280',display:'block',marginBottom:3}}>Dia Vencimento</label>
             <input style={S.input} type="number" min={1} max={31} value={form.diaVencimento} onChange={e=>set('diaVencimento',e.target.value)} />
           </div>
+
           <div>
             <label style={{fontSize:10,textTransform:'uppercase' as const,color:'#6B7280',display:'block',marginBottom:3}}>Competência Inicial *</label>
-            <input style={S.input} type="month" value={form.competenciaIni} onChange={e=>set('competenciaIni',e.target.value)} disabled={isEdit} />
+            <input style={S.input} value={form.competenciaIni} onChange={e=>set('competenciaIni',e.target.value)} onBlur={e=>set('competenciaIni',parseCompetencia(e.target.value))} placeholder="mm/aaaa ou aaaa-mm" />
           </div>
+
           <div>
             <label style={{fontSize:10,textTransform:'uppercase' as const,color:'#6B7280',display:'block',marginBottom:3}}>Competência Final</label>
-            <input style={S.input} type="month" value={form.competenciaFim} onChange={e=>set('competenciaFim',e.target.value)} />
+            <input style={S.input} value={form.competenciaFim} onChange={e=>set('competenciaFim',e.target.value)} onBlur={e=>set('competenciaFim',parseCompetencia(e.target.value))} placeholder="mm/aaaa (vazio = indeterminado)" />
           </div>
-          <div>
-            <label style={{fontSize:10,textTransform:'uppercase' as const,color:'#6B7280',display:'block',marginBottom:3}}>Fornecedor</label>
-            <input style={S.input} value={form.fornecedorNome} onChange={e=>set('fornecedorNome',e.target.value)} placeholder="Nome do fornecedor" />
+
+          {/* Favorecido */}
+          <div style={{gridColumn:'1/-1'}}>
+            <label style={{fontSize:10,textTransform:'uppercase' as const,color:'#6B7280',display:'block',marginBottom:3}}>CPF / CNPJ do Favorecido</label>
+            <div style={{display:'flex',gap:8,alignItems:'center'}}>
+              <input style={{...S.input,fontFamily:'monospace',width:200}} value={form.fornecedorCnpj}
+                onChange={e=>set('fornecedorCnpj',e.target.value)}
+                onBlur={async e=>{
+                  const doc=e.target.value.replace(/\D/g,'');
+                  if(!doc||doc.length<11) return;
+                  try {
+                    const isPj=doc.length===14;
+                    const url=isPj?'/companies/taxid/'+doc:'/persons/document/'+doc;
+                    const r=await api.get(url);
+                    const d=r.data;
+                    set('fornecedorNome',d.legalName||d.tradeName||d.fullName||'');
+                    if(isPj) set('favorecidoCompanyId',d.id);
+                    else set('favorecidoPersonId',d.id);
+                  } catch { set('fornecedorNome','Nao encontrado — cadastrar'); }
+                }}
+                placeholder="CPF ou CNPJ" maxLength={18} />
+              <span style={{fontSize:12,color:'#374151',minWidth:200}}>{form.fornecedorNome}</span>
+            </div>
+            {naoEncontrado && (
+              <div style={{marginTop:4,fontSize:11,color:'#D97706'}}>
+                Favorecido nao cadastrado.{' '}
+                {isCnpj
+                  ? <button type='button' onClick={()=>{localStorage.setItem('@ledgr:provisao_draft',JSON.stringify(form));navigate('/app/companies/new?cnpj='+form.fornecedorCnpj.replace(/\D/g,'')+'&returnTo='+encodeURIComponent('/app/finance/provisoes'));}} style={{color:'#2563EB',textDecoration:'underline',background:'none',border:'none',cursor:'pointer',fontSize:11}}>Cadastrar empresa</button>
+                  : <button type='button' onClick={()=>{localStorage.setItem('@ledgr:provisao_draft',JSON.stringify(form));navigate('/app/persons/new?cpf='+form.fornecedorCnpj.replace(/\D/g,''),{state:{returnTo:'/app/finance/provisoes'}});}} style={{color:'#2563EB',textDecoration:'underline',background:'none',border:'none',cursor:'pointer',fontSize:11}}>Cadastrar pessoa</button>
+                }
+              </div>
+            )}
           </div>
-          <div>
-            <label style={{fontSize:10,textTransform:'uppercase' as const,color:'#6B7280',display:'block',marginBottom:3}}>CNPJ Fornecedor</label>
-            <input style={S.input} value={form.fornecedorCnpj} onChange={e=>set('fornecedorCnpj',e.target.value)} placeholder="00.000.000/0000-00" />
-          </div>
+
           <AccountPicker label="Conta Despesa (D)" value={form.contaDespesaId} onChange={v=>set('contaDespesaId',v)} accounts={accounts} />
           <AccountPicker label="Conta Passivo (C)" value={form.contaPassivoId} onChange={v=>set('contaPassivoId',v)} accounts={accounts} />
+
+          {/* Opcoes */}
           <div style={{gridColumn:'1/-1',borderTop:'0.5px solid #E5E7EB',paddingTop:12,display:'flex',gap:20,flexWrap:'wrap' as const}}>
             <label style={{display:'flex',alignItems:'center',gap:8,fontSize:13,cursor:'pointer'}}>
-              <input type="checkbox" checked={form.exigirNF} onChange={e=>set('exigirNF',e.target.checked)} />
+              <input type='checkbox' checked={form.exigirNF} onChange={e=>set('exigirNF',e.target.checked)} />
               Exigir NF para conferência
             </label>
             <label style={{display:'flex',alignItems:'center',gap:8,fontSize:13,cursor:'pointer'}}>
-              <input type="checkbox" checked={form.dedutivel} onChange={e=>set('dedutivel',e.target.checked)} />
+              <input type='checkbox' checked={form.dedutivel} onChange={e=>set('dedutivel',e.target.checked)} />
               Dedutível (LALUR)
             </label>
             <label style={{display:'flex',alignItems:'center',gap:8,fontSize:13,cursor:'pointer'}}>
-              <input type="checkbox" checked={form.creditaPisCofins} onChange={e=>set('creditaPisCofins',e.target.checked)} />
+              <input type='checkbox' checked={form.geraContabil} onChange={e=>set('geraContabil',e.target.checked)} />
+              Gerar Lançamento Contábil
+            </label>
+            <label style={{display:'flex',alignItems:'center',gap:8,fontSize:13,cursor:'pointer'}}>
+              <input type='checkbox' checked={form.geraAgenda} onChange={e=>set('geraAgenda',e.target.checked)} />
+              Gerar Agenda Financeira
+            </label>
+            <label style={{display:'flex',alignItems:'center',gap:8,fontSize:13,cursor:'pointer'}}>
+              <input type='checkbox' checked={form.creditaPisCofins} onChange={e=>set('creditaPisCofins',e.target.checked)} />
               Credita PIS/COFINS
             </label>
           </div>
+
           {form.creditaPisCofins && (
             <>
               <div>
@@ -178,7 +246,9 @@ function ConfigModal({ config, accounts, onClose, onSaved }: { config?: any; acc
               </div>
             </>
           )}
+
         </div>
+
         <div style={{display:'flex',gap:8,justifyContent:'flex-end',marginTop:20}}>
           <button style={S.btn} onClick={onClose}>Cancelar</button>
           <button style={S.btnP} onClick={save} disabled={saving}>{saving?'Salvando...':isEdit?'Salvar':'Criar provisão'}</button>
@@ -194,7 +264,7 @@ export default function ProvisoesPage() {
 
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [tab, setTab] = useState<'configs'|'lancamentos'>('configs');
-  const [showModal, setShowModal] = useState(false);
+  const [showModal, setShowModal] = useState(() => { try { return !!localStorage.getItem('@ledgr:provisao_draft'); } catch { return false; } });
   const [editConfig, setEditConfig] = useState<any>(null);
   const [gerarComp, setGerarComp] = useState('');
   const [filterComp, setFilterComp] = useState('');
@@ -414,3 +484,4 @@ export default function ProvisoesPage() {
     </div>
   );
 }
+

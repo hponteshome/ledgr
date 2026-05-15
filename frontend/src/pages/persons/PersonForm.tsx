@@ -475,7 +475,7 @@ export const PersonForm: React.FC = () => {
       } else {
         await api.post('/persons', payload);
       }
-      navigate('/app/persons');
+      navigate(returnTo);
     } catch (err: any) {
       const msg = err?.response?.data?.message;
       if (typeof msg === 'string' && msg.toLowerCase().includes('cpf')) {
@@ -543,7 +543,7 @@ export const PersonForm: React.FC = () => {
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => navigate('/app/persons')}
+            onClick={() => navigate(returnTo)}
             className="p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
           >
             <FiArrowLeft size={20} />

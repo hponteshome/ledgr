@@ -154,10 +154,10 @@ export class ProvisaoService {
         await tx.provisaoLancamento.update({
           where: { id: lanc.id },
           data: {
-            apEntryId:      apEntry?.id,
-            journalEntryId: journalEntry?.id,
+            apEntryId: apEntry?.id,
           },
         });
+
 
         results.push({ id: config.id, descricao: config.descricao, status: 'gerado', lancId: lanc.id });
       });

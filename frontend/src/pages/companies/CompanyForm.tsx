@@ -64,9 +64,11 @@ export const CompanyForm: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const initialCnpj = new URLSearchParams(location.search).get('cnpj') ?? '';
-  const [formData, setFormData] = useState<CompanyFormData>({ ...EMPTY, taxId: initialCnpj });
+  const returnTo = new URLSearchParams(location.search).get('returnTo') ?? '/app/companies';
+
   const [preenchido, setPreenchido] = useState(false);
 
+  const [formData, setFormData] = useState<CompanyFormData>({ taxId: initialCnpj, legalName: '', tradeName: '', openingDate: '', legalNature: '', taxRegime: '', size: '', status: 'ativa', statusDate: '', equity: '', street: '', number: '', complement: '', neighborhood: '', zipCode: '', city: '', state: '', email: '', phone1: '', phone2: '', isHeadquarter: false, registerOrg: '', registerNumber: '', registerDate: '', registerBook: '', registerSheet: '', mainActivity: '', secondaryActivities: [] });
   const [loading, setLoading] = useState(false);
   const set = (name: keyof CompanyFormData, value: any) =>
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -153,7 +155,7 @@ export const CompanyForm: React.FC = () => {
       if (response.ok) {
 
         alert('✅ Empresa cadastrada com sucesso!');
-        navigate('/app/companies');
+        navigate(returnTo);
       } else {
         const err = await response.json();
         alert(`Erro: ${err.message || 'Falha ao salvar'}`);
@@ -392,7 +394,7 @@ export const CompanyForm: React.FC = () => {
 
         {/* ── AÇÕES ─────────────────────────────────────────── */}
         <div className="flex justify-end gap-3 pt-2">
-          <button type="button" onClick={() => navigate('/app/companies')}
+          <button type="button" onClick={() => navigate(returnTo)}
             className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:border-gray-400 transition-colors">
             Cancelar
           </button>
