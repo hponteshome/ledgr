@@ -1319,9 +1319,10 @@ enum IntegrationStatus {
 }
 
 enum AgendaEventType {
-  PAYMENT /// Pagamento de documento fiscal / AP
-  TAX /// Obrigação fiscal (DARF, GPS, FGTS, DAS)
-  CLOSING /// Fechamento de período contábil/fiscal
+  PAYMENT         /// Pagamento confirmado (lancamento gerado)
+  PLANNED_PAYMENT /// Planejamento — criado ao cadastrar provisao
+  TAX /// Obrigacao fiscal (DARF, GPS, FGTS, DAS)
+  CLOSING /// Fechamento de periodo contabil/fiscal
   MEETING
   REMINDER
   OTHER
@@ -1330,12 +1331,11 @@ enum AgendaEventType {
 enum AgendaColor {
   YELLOW /// NF-e / NFS-e
   BLUE /// Pagamentos fixos (folha, aluguel)
-  GREEN /// Obrigações fiscais (DARF, GPS)
+  GREEN /// Obrigacoes fiscais (DARF, GPS)
   RED /// Urgente / vencido
   ORANGE /// Contas de consumo
-  PURPLE /// Reuniões / avisos
+  PURPLE /// Reunioes / avisos
 }
-
 /// Documentos fiscais de entrada (NF-e, NFS-e, faturas, boletos).
 /// Ponto de entrada do fluxo de integração AP × Contábil × Agenda.
 model FiscalDocument {
@@ -1412,6 +1412,7 @@ model AgendaEvent {
   fiscalDocumentId String? @map("fiscal_document_id") @db.Uuid
   apEntryId        String? @map("ap_entry_id") @db.Uuid
 
+  provisaoConfigId String? @map("provisao_config_id") @db.Uuid
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
   deletedAt   DateTime? @map("deleted_at") @db.Timestamp(6)

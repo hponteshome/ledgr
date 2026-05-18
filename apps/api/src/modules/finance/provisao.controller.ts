@@ -16,12 +16,12 @@ export class ProvisaoController {
 
   @Post('configs')
   createConfig(@Body() dto: any, @Request() req: any) {
-    return this.svc.createConfig(req.companyId, dto);
+    return this.svc.createConfig(req.companyId, dto, req.user?.id);
   }
 
   @Put('configs/:id')
   updateConfig(@Param('id') id: string, @Body() dto: any, @Request() req: any) {
-    return this.svc.updateConfig(id, req.companyId, dto);
+    return this.svc.updateConfig(id, req.companyId, dto, req.user?.id);
   }
 
   @Delete('configs/:id')
