@@ -271,6 +271,7 @@ export default function ProvisoesPage() {
   const [loading, setLoading] = useState(false);
   const [nfModal, setNfModal] = useState<any>(null);
   const [nfForm, setNfForm] = useState({ nfNumero:'', nfChave:'' });
+  const [lancamentos, setLancamentos] = useState<any[]>([]);
 
   const load = async () => {
     try {

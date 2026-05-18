@@ -75,6 +75,7 @@ export class ProvisaoService {
   }
 
   // ── Geracao de Lancamentos ────────────────────────────────────────────────
+  // ── Geracao de Lancamentos ────────────────────────────────────────────────
 
   async gerarLancamentos(companyId: string, createdById: string, competencia: string) {
     const configs = await this.prisma.provisaoConfig.findMany({
@@ -85,24 +86,20 @@ export class ProvisaoService {
     const results: any[] = [];
 
     for (const config of configs) {
-      // Verificar idempotencia
       const existing = await this.prisma.provisaoLancamento.findUnique({
         where: { provisaoId_companyId_competencia: { provisaoId: config.id, companyId, competencia } },
       });
       if (existing) { results.push({ id: config.id, descricao: config.descricao, status: 'ja_existia' }); continue; }
 
-      // Calcular vencimento
       const [y, m] = competencia.split('-').map(Number);
       const venc = new Date(Date.UTC(y, m - 1, config.diaVencimento, 12));
-      if (venc.getUTCMonth() !== m - 1) venc.setUTCDate(0); // ultimo dia do mes se dia > dias do mes
+      if (venc.getUTCMonth() !== m - 1) venc.setUTCDate(0);
 
-      // Calcular PIS/COFINS
       const valor = Number(config.valor);
       const valorPis    = config.creditaPisCofins ? Math.round(valor * Number(config.aliqPis) * 100) / 100 : 0;
       const valorCofins = config.creditaPisCofins ? Math.round(valor * Number(config.aliqCofins) * 100) / 100 : 0;
 
       await this.prisma.$transaction(async tx => {
-        // Criar lancamento de provisao
         const lanc = await tx.provisaoLancamento.create({
           data: {
             provisaoId:  config.id,
@@ -116,24 +113,22 @@ export class ProvisaoService {
           },
         });
 
-        // Criar AP
         let apEntry = null;
         if (config.contaPassivoId) {
           apEntry = await tx.apEntry.create({
             data: {
               companyId,
-              title:         config.descricao + ' — ' + competencia,
-              amount:        config.valor,
-              dueDate:       venc,
-              supplierName:  config.fornecedorNome ?? undefined,
+              title:           config.descricao + ' — ' + competencia,
+              amount:          config.valor,
+              dueDate:         venc,
+              supplierName:    config.fornecedorNome ?? undefined,
               supplierCnpjCpf: config.fornecedorCnpj ?? undefined,
-              status:        'OPEN',
+              status:          'OPEN',
               createdById,
             },
           });
         }
 
-        // Criar evento de agenda
         let agendaEvent = null;
         if (config.geraAgenda) {
           agendaEvent = await tx.agendaEvent.create({
@@ -151,9 +146,8 @@ export class ProvisaoService {
           });
         }
 
-        // Criar lancamento contabil
         let journalEntry = null;
-        if (config.contaDespesaId && config.contaPassivoId) {
+        if (config.geraContabil && config.contaDespesaId && config.contaPassivoId) {
           journalEntry = await tx.journalEntry.create({
             data: {
               companyId,
@@ -163,20 +157,19 @@ export class ProvisaoService {
               createdById,
               items: { create: [
                 { accountId: config.contaDespesaId, value: config.valor, type: 'DEBIT'  },
-                { accountId: config.contaPassivoId,  value: config.valor, type: 'CREDIT' },
+                { accountId: config.contaPassivoId, value: config.valor, type: 'CREDIT' },
               ]},
             },
           });
         }
 
-        // Atualizar lancamento com vinculos
         await tx.provisaoLancamento.update({
           where: { id: lanc.id },
           data: {
             apEntryId:     apEntry?.id,
             agendaEventId: agendaEvent?.id,
+          },
         });
-
 
         results.push({ id: config.id, descricao: config.descricao, status: 'gerado', lancId: lanc.id });
       });
@@ -184,6 +177,7 @@ export class ProvisaoService {
 
     return { competencia, total: configs.length, results };
   }
+
 
   // ── NF e Status ───────────────────────────────────────────────────────────
 

@@ -9,7 +9,7 @@ import type { AgendaEvent, AgendaMonthResponse } from '../types/finance';
 const API = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
 
 function getHeaders(companyId: string) {
-  const token = localStorage.getItem('access_token');
+  const token = localStorage.getItem('@ledgr:token');
   return {
     'Content-Type': 'application/json',
     Authorization: `Bearer ${token}`,
@@ -140,3 +140,4 @@ export function useAgenda() {
     error,
   };
 }
+
