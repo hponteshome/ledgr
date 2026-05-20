@@ -54,6 +54,7 @@ import BalancoPatrimonialPage from '../pages/accounting/BalancoPatrimonialPage';
 import RazaoAnaliticoPage from '../pages/accounting/RazaoAnaliticoPage';
 import CdbProjecaoPage from '../pages/accounting/investments/CdbProjecaoPage';
 import ProLaborePage from '../pages/hr/ProLabore';
+import InformeRendimentosPage from '../pages/hr/InformeRendimentosPage';
 import ProvisoesPage from '../pages/finance/ProvisoesPage';
 import FechamentoPage from '../pages/finance/FechamentoPage';
 import RendaFixaPage from '../pages/accounting/investments/RendaFixaPage';
@@ -105,6 +106,7 @@ export const AppRoutes = () => {
                 <Route path="app/finance/agenda" element={<ProtectedRoute><AgendaPage /></ProtectedRoute>} />
                 <Route path="app/finance/provisoes" element={<ProtectedRoute><ProvisoesPage /></ProtectedRoute>} />
                 <Route path="app/hr/pro-labore" element={<ProtectedRoute><ProLaborePage /></ProtectedRoute>} />
+                <Route path="app/hr/informe-rendimentos" element={<ProtectedRoute><InformeRendimentosPage /></ProtectedRoute>} />
                 <Route path="app/accounting/investimentos/renda-fixa" element={<ProtectedRoute><RendaFixaPage /></ProtectedRoute>} />
                 <Route path="app/accounting/investimentos/simulador" element={<ProtectedRoute><CdbProjecaoPage /></ProtectedRoute>} />
                 <Route path="app/accounting/razao" element={<ProtectedRoute><RazaoAnaliticoPage /></ProtectedRoute>} />

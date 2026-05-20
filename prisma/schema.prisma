@@ -187,11 +187,12 @@ model Company {
   ecfPartBs         EcfPartB[]
   maskConfigs       CompanyMaskConfig[]       @relation("CompanyMaskConfigs")
   accountingConfigs CompanyAccountingConfig[]
-
+  informesRendimentos InformeRendimentos[]
+  
   @@map("companies")
 }
 
-/// Vínculo N:N entre usuários e empresas.
+/// Vinculo N:N entre usuarios e empresas.
 model UserCompany {
   id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId    String  @map("user_id") @db.Uuid
@@ -200,10 +201,11 @@ model UserCompany {
 
   company Company @relation(fields: [companyId], references: [id])
   user    User    @relation(fields: [userId], references: [id])
-
   @@unique([userId, companyId])
   @@map("user_companies")
-}
+  }
+
+
 
 // =============================================================================
 // 03 · PESSOAS FÍSICAS
@@ -313,11 +315,12 @@ model Person {
 
   @@index([cpf])
   @@index([fullName])
-  @@index([deletedAt])
+  informesRendimentos InformeRendimentos[]
+
   @@map("persons")
 }
 
-/// Vínculo de pessoas físicas a empresas (sócios, procuradores, representantes).
+/// Vinculo de pessoas fisicas a empresas (socios, procuradores, representantes).
 model PersonCompany {
   id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   personId  String    @map("person_id") @db.Uuid
@@ -337,6 +340,8 @@ model PersonCompany {
   @@index([personId])
   @@map("person_companies")
 }
+
+
 
 // =============================================================================
 // 04 · IMÓVEIS, RH E SOCIETÁRIO
@@ -2471,3 +2476,64 @@ model CompanyAccountingConfig {
 }
 
 
+
+model InformeRendimentos {
+  id        String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId String @map("company_id") @db.Uuid
+  personId  String @map("person_id") @db.Uuid
+  anoCalendario Int @map("ano_calendario")
+
+  // Natureza do rendimento
+  naturezaRendimento String @default("Rendimentos do trabalho sem vínculo empregatício") @map("natureza_rendimento") @db.VarChar
+
+  // Quadro 3 — Rendimentos Tributáveis
+  q3TotalRendimentos        Decimal @default(0) @map("q3_total_rendimentos") @db.Decimal(15,2)
+  q3ContribPrevidenciaria   Decimal @default(0) @map("q3_contrib_previdenciaria") @db.Decimal(15,2)
+  q3ContribPrevidCompl      Decimal @default(0) @map("q3_contrib_previd_compl") @db.Decimal(15,2)
+  q3PensaoAlimenticia       Decimal @default(0) @map("q3_pensao_alimenticia") @db.Decimal(15,2)
+  q3Irrf                    Decimal @default(0) @map("q3_irrf") @db.Decimal(15,2)
+
+  // Quadro 4 — Rendimentos Isentos
+  q4ParcelaIsentaAposent    Decimal @default(0) @map("q4_parcela_isenta_aposent") @db.Decimal(15,2)
+  q4ParcelaIsenta13         Decimal @default(0) @map("q4_parcela_isenta_13") @db.Decimal(15,2)
+  q4DiariasAjudaCusto       Decimal @default(0) @map("q4_diarias_ajuda_custo") @db.Decimal(15,2)
+  q4PensaoMolestia          Decimal @default(0) @map("q4_pensao_molestia") @db.Decimal(15,2)
+  q4LucrosDividendos        Decimal @default(0) @map("q4_lucros_dividendos") @db.Decimal(15,2)
+  q4ValoresMEI              Decimal @default(0) @map("q4_valores_mei") @db.Decimal(15,2)
+  q4IndenizacaoRescisao     Decimal @default(0) @map("q4_indenizacao_rescisao") @db.Decimal(15,2)
+  q4JurosMora               Decimal @default(0) @map("q4_juros_mora") @db.Decimal(15,2)
+  q4Outros                  Decimal @default(0) @map("q4_outros") @db.Decimal(15,2)
+
+  // Quadro 5 — Tributação Exclusiva
+  q5DecimoTerceiro          Decimal @default(0) @map("q5_decimo_terceiro") @db.Decimal(15,2)
+  q5IrrfDecimoTerceiro      Decimal @default(0) @map("q5_irrf_decimo_terceiro") @db.Decimal(15,2)
+  q5Outros                  Decimal @default(0) @map("q5_outros") @db.Decimal(15,2)
+
+  // Quadro 6 — Rendimentos Acumulados
+  q6NumeroProcesso          String? @map("q6_numero_processo") @db.VarChar
+  q6QtdMeses                Decimal @default(0) @map("q6_qtd_meses") @db.Decimal(5,1)
+  q6NaturezaRendimento      String? @map("q6_natureza_rendimento") @db.VarChar
+  q6TotalRendimentos        Decimal @default(0) @map("q6_total_rendimentos") @db.Decimal(15,2)
+  q6ExclusaoDespesas        Decimal @default(0) @map("q6_exclusao_despesas") @db.Decimal(15,2)
+  q6ContribPrevidenciaria   Decimal @default(0) @map("q6_contrib_previdenciaria") @db.Decimal(15,2)
+  q6PensaoAlimenticia       Decimal @default(0) @map("q6_pensao_alimenticia") @db.Decimal(15,2)
+  q6Irrf                    Decimal @default(0) @map("q6_irrf") @db.Decimal(15,2)
+  q6RendIsentoMolestia      Decimal @default(0) @map("q6_rend_isento_molestia") @db.Decimal(15,2)
+
+  // Quadro 7 — Informações complementares
+  q7InformacoesCompl        String? @map("q7_informacoes_compl") @db.Text
+
+  // Quadro 8 — Responsável
+  q8NomeResponsavel         String? @map("q8_nome_responsavel") @db.VarChar
+  q8DataAssinatura          DateTime? @map("q8_data_assinatura") @db.Date
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  createdById String @map("created_by_id") @db.Uuid
+
+  company Company @relation(fields: [companyId], references: [id])
+  person  Person  @relation(fields: [personId], references: [id])
+
+  @@unique([companyId, personId, anoCalendario])
+  @@map("informes_rendimentos")
+}
