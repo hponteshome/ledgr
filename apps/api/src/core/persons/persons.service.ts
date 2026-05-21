@@ -119,38 +119,38 @@ async findByCpf(cpf: string) {
 }
 
 
-
   // ✅ MÉTODO CREATE CORRETO (com validação de CPF e formatação)
+
   async create(dto: CreatePersonDto) {
     if (!validarCpf(dto.document)) {
       throw new BadRequestException('CPF inválido — dígitos verificadores não conferem.');
     }
 
+    const cpfDigits = dto.document.replace(/\D/g, '');
     const exists = await this.prisma.person.findFirst({
-      where: { cpf: dto.document, deletedAt: null },
+      where: { cpf: cpfDigits, deletedAt: null },
     });
     if (exists) throw new ConflictException(`CPF ${dto.document} já cadastrado.`);
 
-    // Normaliza o CPF para o formato com pontos/traço
-    const formattedCpf = dto.document.replace(/\D/g, '').length === 11 
-      ? dto.document.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4")
-      : dto.document;
-
-    // Desestrutura otherRegistrations para cast explícito (Json do Prisma)
     const { otherRegistrations, birthDate, rgIssueDate, document, ...rest } = dto;
-    
+    const cleanRest: any = Object.fromEntries(Object.entries(rest).map(([k,v]) => [k, v === '' ? null : v]));
+
     return this.prisma.person.create({
       data: {
-        ...rest,
-        cpf: formattedCpf,
+        ...cleanRest,
+        cpf: cpfDigits,
         birthDate: birthDate ? new Date(birthDate) : undefined,
         rgIssueDate: rgIssueDate ? new Date(rgIssueDate) : undefined,
-        otherRegistrations: otherRegistrations
-          ? (otherRegistrations as unknown as Prisma.InputJsonValue)
-          : undefined,
+        otherRegistrations: otherRegistrations ?? undefined,
       },
     });
   }
+
+
+
+
+
+
 
   async update(id: string, dto: UpdatePersonDto) {
     await this.findOne(id); // garante que existe

@@ -185,8 +185,8 @@ function toPayload(form: FormData): Record<string, any> {
       continue;
     }
     if (typeof v === 'string') {
-      payload[k === 'cpf' ? 'document' : k] = v.trim() === '' ? undefined : v.trim();
-    } else {
+      const val = v.trim() === '' ? undefined : (k === 'cpf' || k === 'spouseCpf' ? v.replace(/\D/g,'') : v.trim());
+      payload[k === 'cpf' ? 'document' : k] = val;
       payload[k] = v;
     }
   }

@@ -9,39 +9,34 @@ import {
   CreatePersonCompanyDto, UpdatePersonCompanyDto,
 } from './persons.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt.guard';
+import { SkipCompanyCheck } from '../../multi-company/company.interceptor';
 
+@SkipCompanyCheck()
 @UseGuards(JwtAuthGuard)
 @Controller('persons')
 export class PersonsController {
   constructor(private readonly service: PersonsService) {}
 
-  // ── Listar com paginação e busca ──────────────────────────
   @Get()
   async findAll(@Query() query: { search?: string; isActive?: string; page?: string; limit?: string }) {
     return await this.service.findAll(query);
   }
 
-  // ── Busca por Documento (Corrigido para alinhar com o Frontend) ──
-  // Alterado de 'cpf/:cpf' para 'document/:document'
   @Get('document/:document')
   async findByDocument(@Param('document') document: string) {
-    // Chamamos a service passando o documento (que ela tratará como CPF)
     return await this.service.findByCpf(document);
   }
 
-  // Mantido por compatibilidade com outros módulos (AgeEdit / docs)
   @Get('cpf/:cpf')
   async findByCpf(@Param('cpf') cpf: string) {
     return await this.service.findByCpf(cpf);
   }
 
-  // ── Qualificação completa para inserção em documentos ──────
   @Get(':id/qualificacao')
   async qualificacao(@Param('id') id: string) {
     return await this.service.qualificacao(id);
   }
 
-  // ── CRUD ──────────────────────────────────────────────────
   @Get(':id')
   async findOne(@Param('id') id: string) {
     return await this.service.findOne(id);
@@ -63,7 +58,6 @@ export class PersonsController {
     return await this.service.remove(id);
   }
 
-  // ── Vínculos Pessoa ↔ Empresa ─────────────────────────────
   @Post('links')
   async createLink(@Body() dto: CreatePersonCompanyDto) {
     return await this.service.createLink(dto);
