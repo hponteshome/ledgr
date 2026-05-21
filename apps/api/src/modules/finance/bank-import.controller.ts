@@ -1,11 +1,10 @@
 // ============================================================
 // LEDGR — apps/api/src/modules/finance/bank-import.controller.ts
-// FIX: FileInterceptor com memoryStorage explícito
 // ============================================================
 import {
   Controller, Post, Get, Patch, Body, Param,
   UseGuards, UseInterceptors, Req, UploadedFile,
-  HttpCode, HttpStatus,
+  HttpCode, HttpStatus, BadRequestException
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
@@ -19,64 +18,39 @@ import { BankImportService, ClassifyGroupDto, PostStatementDto } from './bank-im
 export class BankImportController {
   constructor(private readonly service: BankImportService) {}
 
-  // Lista extratos já importados
   @Get('statements')
   listStatements(@Req() req: any) {
     return this.service.listStatements(req.companyId);
   }
 
-  // Upload e parse do extrato
   @Post('upload')
-  @UseInterceptors(
-    FileInterceptor('file', {
-      storage: memoryStorage(), // mantém o arquivo em buffer na memória
-      limits: { fileSize: 10 * 1024 * 1024 }, // 10MB máximo
-    }),
-  )
-  upload(
-    @Req() req: any,
-    @UploadedFile() file: Express.Multer.File,
-  ) {
-    if (!file) {
-      throw new Error('Arquivo não enviado.');
-    }
-    return this.service.uploadStatement(
-      req.companyId,
-      file.buffer,
-      file.originalname,
-      req.user.id,
-    );
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } }))
+  upload(@Req() req: any, @UploadedFile() file: Express.Multer.File) {
+    if (!file) throw new BadRequestException('Arquivo não enviado.');
+    return this.service.uploadStatement(req.companyId, file.buffer, file.originalname, req.user.id);
   }
 
-  // Retorna grupos de transações para classificação
+  @Post('upload-excel')
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } }))
+  uploadExcel(@Req() req: any, @UploadedFile() file: Express.Multer.File) {
+    if (!file) throw new BadRequestException('Arquivo Excel não fornecido.');
+    return this.service.uploadExcelMapped(req.companyId, file.buffer, file.originalname, req.user.id);
+  }
+
   @Get('statements/:id/groups')
   getGroups(@Param('id') id: string, @Req() req: any) {
     return this.service.getGroups(req.companyId, id);
   }
 
-  // Classifica um grupo
   @Patch('statements/:id/groups')
   @HttpCode(HttpStatus.OK)
-  classifyGroup(
-    @Param('id') id: string,
-    @Req() req: any,
-    @Body() dto: ClassifyGroupDto,
-  ) {
+  classifyGroup(@Param('id') id: string, @Req() req: any, @Body() dto: ClassifyGroupDto) {
     return this.service.classifyGroup(req.companyId, id, dto, req.user.id);
   }
 
-  // Confirma e gera JournalEntries
-  @Post('statements/:id/post')
+  @Post('statements/confirm')
   @HttpCode(HttpStatus.OK)
-  post(
-    @Param('id') id: string,
-    @Req() req: any,
-    @Body() dto: Omit<PostStatementDto, 'statementId'>,
-  ) {
-    return this.service.postStatement(
-      req.companyId,
-      { ...dto, statementId: id },
-      req.user.id,
-    );
+  postStatement(@Req() req: any, @Body() dto: PostStatementDto) {
+    return this.service.postStatement(req.companyId, dto, req.user.id);
   }
 }

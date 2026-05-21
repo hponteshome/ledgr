@@ -46,9 +46,7 @@ export class IobPlanoParserService {
         const balanceSign    = line.length > 146 ? line.substring(146, 147).trim() : '+';
         const spedRef        = line.length > 220 ? line.substring(170, 220).trim() : '';
 
-        if (!classification || !reducedCode) return;
-        // Ignorar contas sinteticas sem reduzida (0000000)
-        if (reducedCode === '0000000' || reducedCode === '000000') return;
+        if (!classification) return;
 
         const balanceInt = parseInt(balanceRaw.replace(/\s/g, '')) || 0;
         const balance    = (balanceSign === '-' ? -1 : 1) * balanceInt / 100;
@@ -72,3 +70,4 @@ export class IobPlanoParserService {
     return { records, errors, totalLines: lines.length };
   }
 }
+

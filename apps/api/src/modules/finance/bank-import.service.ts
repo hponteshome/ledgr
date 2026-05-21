@@ -1,4 +1,4 @@
-// ============================================================
+﻿// ============================================================
 // LEDGR — apps/api/src/modules/bank-import/bank-import.service.ts
 // ============================================================
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
@@ -304,5 +304,163 @@ export class BankImportService {
     });
     if (!stmt) throw new NotFoundException('Extrato não encontrado.');
     return stmt;
+  }
+
+  async uploadExcelMapped(
+    companyId: string,
+    buffer:    Buffer,
+    fileName:  string,
+    userId:    string,
+  ) {
+    const XLSX = await import('xlsx');
+    const workbook = XLSX.read(buffer, { type: 'buffer', cellDates: true });
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+    const rows = XLSX.utils.sheet_to_json<any>(worksheet);
+
+    if (!rows || rows.length === 0) {
+      throw new BadRequestException('A planilha enviada esta vazia.');
+    }
+
+    const today = new Date();
+    const statement = await this.prisma.bankStatement.create({
+      data: {
+        companyId,
+        bankCode:     'GENERIC' as any,
+        bankName:     'Planilha Mapeada Contabil',
+        periodFrom:   today,
+        periodTo:     today,
+        fileName,
+        fileFormat:   'XLSX',
+        totalLines:   rows.length,
+        totalDebits:  new Prisma.Decimal(0),
+        totalCredits: new Prisma.Decimal(0),
+        createdById:  userId,
+      },
+    });
+
+    let importedCount = 0;
+    let accumulatedDebits  = 0;
+    let accumulatedCredits = 0;
+    const errors: Array<{ row: number; error: string }> = [];
+
+    const toNum = (v: any) =>
+      typeof v === 'number' ? v : parseFloat(String(v).replace(/[^\d.-]/g, ''));
+
+    const findAccount = async (code: any) => {
+      if (!code) return null;
+      const c = String(code).trim().padStart(6, '0');
+      return this.prisma.chartOfAccounts.findFirst({
+        where: {
+          companyId,
+          deletedAt: null,
+          OR: [
+            { reducedCode: c },
+            { code: c },
+            { code: c },
+          ],
+        },
+      });
+    };
+    const normKey = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    const rowKeys = (r: any) => Object.fromEntries(Object.entries(r).map(([k,v]) => [normKey(k), v]));
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const r = rowKeys(row);
+      if (i === 0) console.log('COLUNAS XLSX:', Object.keys(row));
+      const rowNumber = i + 2;
+      try {
+        const dateRaw    = r['data'] as any;
+        const memoRaw    = r['complemento'] ?? r['descricao'] ?? r['historico'] ?? null;
+        const valorRaw   = r['valor'] ?? null;
+        const debitCode  = r['conta debito'] ?? r['conta'] ?? null;
+        const creditCode = r['conta credito'] ?? r['contrapartida'] ?? null;
+
+        const transactionDate = dateRaw instanceof Date ? dateRaw : new Date(dateRaw);
+        if (isNaN(transactionDate.getTime())) throw new Error('Data invalida: ' + dateRaw);
+
+        // Valor: positivo = CREDIT, negativo ou entre parenteses = DEBIT
+        if (valorRaw === null || valorRaw === undefined) throw new Error('Coluna Valor ausente.');
+        const valorNum = typeof valorRaw === 'number' ? valorRaw : parseFloat(String(valorRaw).replace(/[()]/g, '').replace(/,/g, '.'));
+        if (isNaN(valorNum)) throw new Error('Valor invalido na linha.');
+        const isNeg = valorNum < 0 || String(valorRaw).trim().startsWith('(');
+        const amountNum = Math.abs(valorNum);
+        const type: 'DEBIT' | 'CREDIT' = isNeg ? 'DEBIT' : 'CREDIT';
+
+        if (type === 'DEBIT') accumulatedDebits  += amountNum;
+        else                  accumulatedCredits += amountNum;
+
+        const debitAcc  = await findAccount(debitCode);
+        const creditAcc = await findAccount(creditCode);
+
+        if (debitCode  && !debitAcc)  throw new Error('Conta Debito '  + debitCode  + ' nao encontrada.');
+        if (creditCode && !creditAcc) throw new Error('Conta Credito ' + creditCode + ' nao encontrada.');
+
+        const isAutoPostable = debitAcc !== null && creditAcc !== null;
+        const amount = new Prisma.Decimal(amountNum.toFixed(2));
+
+        await this.prisma.$transaction(async (tx) => {
+          const bankTx = await tx.bankTransaction.create({
+            data: {
+              companyId,
+              statementId:      statement.id,
+              transactionDate,
+              description:      String(memoRaw),
+              descriptionNorm:  String(memoRaw).trim().toUpperCase(),
+              amount,
+              type:             type as any,
+              status:           isAutoPostable ? ('POSTED' as any) : ('PENDING' as any),
+              accountId:        type === 'DEBIT' ? debitAcc?.id ?? null : creditAcc?.id ?? null,
+              counterAccountId: type === 'DEBIT' ? creditAcc?.id ?? null : debitAcc?.id ?? null,
+              memo:             String(memoRaw),
+              groupKey:         String(memoRaw).trim().toUpperCase().slice(0, 50),
+            },
+          });
+
+          if (isAutoPostable) {
+            const journal = await tx.journalEntry.create({
+              data: {
+                companyId,
+                date:         transactionDate,
+                description:  String(memoRaw),
+                sourceModule: 'BANK_IMPORT' as any,
+                createdById:  userId,
+              },
+            });
+            const abs = amount.abs();
+            await tx.journalEntryItem.createMany({
+              data: [
+                { journalEntryId: journal.id, accountId: debitAcc!.id,  type: 'DEBIT'  as any, value: abs },
+                { journalEntryId: journal.id, accountId: creditAcc!.id, type: 'CREDIT' as any, value: abs },
+              ],
+            });
+            await tx.bankTransaction.update({
+              where: { id: bankTx.id },
+              data:  { journalEntryId: journal.id },
+            });
+          }
+        });
+
+        importedCount++;
+      } catch (e: any) {
+        errors.push({ row: rowNumber, error: e.message });
+      }
+    }
+
+    await this.prisma.bankStatement.update({
+      where: { id: statement.id },
+      data: {
+        totalDebits:  new Prisma.Decimal(accumulatedDebits.toFixed(2)),
+        totalCredits: new Prisma.Decimal(accumulatedCredits.toFixed(2)),
+      },
+    });
+
+    return {
+      statementId:   statement.id,
+      imported:      importedCount,
+      errors,
+      totalDebits:   accumulatedDebits,
+      totalCredits:  accumulatedCredits,
+    };
   }
 }

@@ -27,6 +27,13 @@ interface Person {
   }>;
 }
 
+const fmtCpf = (v: string) =>
+  v.replace(/\D/g, '')
+    .replace(/(\d{3})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d{1,2})$/, '$1-$2')
+    .slice(0, 14);
+
 const MARITAL: Record<string, string> = {
   SOLTEIRO: 'Solteiro(a)', CASADO: 'Casado(a)', UNIAO_ESTAVEL: 'União estável',
   SEPARADO: 'Separado(a)', DIVORCIADO: 'Divorciado(a)', VIUVO: 'Viúvo(a)',
@@ -151,7 +158,7 @@ export const PersonList: React.FC = () => {
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-gray-600 font-mono text-xs">{p.cpf}</td>
+                    <td className="px-4 py-3 text-gray-600 font-mono text-xs">{fmtCpf(p.cpf)}</td>
                     <td className="px-4 py-3 hidden md:table-cell">
                       {reg
                         ? <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded text-xs font-medium">{reg}</span>

@@ -219,6 +219,8 @@ Horizon:
   - CPF: `v.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4')`
   - CNPJ: `v.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5')`
 
+- **Plano de Contas:** Contas são tratadas sem formatação, nas views e forms, deve apresentar formatados
+
 ---
 
 ## Informe de Rendimentos — Detalhes

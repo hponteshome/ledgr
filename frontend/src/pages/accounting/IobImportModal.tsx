@@ -91,6 +91,7 @@ export const IobImportModal: React.FC<Props> = ({ onClose, onSuccess }) => {
                   { label: 'Total no arquivo', value: preview.stats?.total, color: '#111' },
                   { label: 'Contas mapeadas', value: preview.stats?.matched, color: '#15803D' },
                   { label: 'Não encontradas', value: preview.stats?.notFound, color: preview.stats?.notFound > 0 ? '#B91C1C' : '#15803D' },
+                  { label: 'Contas a criar', value: preview.stats?.created, color: preview.stats?.created > 0 ? '#1D4ED8' : '#9CA3AF' },
                 ].map(k => (
                   <div key={k.label} style={{ background: '#F9FAFB', border: '0.5px solid #E5E7EB', borderRadius: 8, padding: '10px 14px' }}>
                     <div style={{ fontSize: 10, color: '#9CA3AF', textTransform: 'uppercase', marginBottom: 4 }}>{k.label}</div>
@@ -130,7 +131,7 @@ export const IobImportModal: React.FC<Props> = ({ onClose, onSuccess }) => {
               {result.status === 'done' || result.status === 'partial' ? (
                 <><FiCheckCircle size={40} color="#15803D" style={{ marginBottom: 12 }} />
                 <h3 style={{ fontSize: 16, fontWeight: 500, color: '#111', margin: '0 0 8px' }}>Importação concluída</h3>
-                <p style={{ fontSize: 13, color: '#6B7280' }}>{result.stats?.matched} contas atualizadas com código reduzido IOB.</p>
+                <p style={{ fontSize: 13, color: '#6B7280' }}>{result.stats?.created > 0 ? `${result.stats.created} contas criadas. ` : ""}{result.stats?.matched > 0 ? `${result.stats.matched} contas atualizadas com código reduzido IOB.` : ""}</p>
                 {result.stats?.notFound > 0 && <p style={{ fontSize: 12, color: '#B91C1C' }}>{result.stats.notFound} contas não encontradas.</p>}</>
               ) : (
                 <><FiXCircle size={40} color="#B91C1C" style={{ marginBottom: 12 }} />
@@ -151,7 +152,7 @@ export const IobImportModal: React.FC<Props> = ({ onClose, onSuccess }) => {
             </button>
           )}
           {step === 'preview' && (
-            <button onClick={handleConfirm} disabled={loading || preview?.stats?.matched === 0} style={{ padding: '8px 18px', borderRadius: 8, border: 'none', background: '#111', color: '#fff', fontSize: 13, cursor: 'pointer', opacity: loading || preview?.stats?.matched === 0 ? 0.5 : 1 }}>
+            <button onClick={handleConfirm} disabled={loading || (preview?.stats?.matched === 0 && preview?.stats?.created === 0)} style={{ padding: '8px 18px', borderRadius: 8, border: 'none', background: '#111', color: '#fff', fontSize: 13, cursor: 'pointer', opacity: loading || preview?.stats?.matched === 0 ? 0.5 : 1 }}>
               {loading ? 'Importando...' : 'Confirmar Importação'}
             </button>
           )}
@@ -160,3 +161,6 @@ export const IobImportModal: React.FC<Props> = ({ onClose, onSuccess }) => {
     </div>
   );
 };
+
+
+
