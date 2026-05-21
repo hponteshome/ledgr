@@ -1,9 +1,9 @@
 ﻿// LEDGR — frontend/src/pages/finance/BankImportPage.tsx
 import React, { useState, useEffect, useRef } from 'react';
 import api from '../../services/api';
+import { ExcelPreviewModal } from './ExcelPreviewModal';
 import { useBankImport } from './hooks/useBankImport';
 import { TransactionGroup, BankStatementSummary, UploadResult, BANK_NAME, BANK_COLOR, SUGGESTION_SOURCE_LABEL } from './types/bank-import';
-
 interface Account { id: string; code: string; name: string; reducedCode?: string; }
 
 function AccountPicker({ label, value, onChange, accounts, placeholder }: { label: string; value: string; onChange: (id: string) => void; accounts: Account[]; placeholder?: string; }) {
@@ -81,8 +81,8 @@ export default function BankImportPage() {
   const [drafts, setDrafts] = useState<Record<string, { accountId: string; counterAccountId: string; memo: string; }>>({});
   const [postResult, setPostResult] = useState<any>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [showExcelModal, setShowExcelModal] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
-  const excelRef = useRef<HTMLInputElement>(null);
   const activeCompany = getActiveCompany();
 
   const loadStatements = () => listStatements().then(setStatements).catch(() => {});
@@ -169,11 +169,11 @@ export default function BankImportPage() {
         {step === 'list' && (
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={() => setStep('upload')} style={{ background: T.accent, color: '#fff', border: 'none', borderRadius: 8, padding: '9px 18px', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>+ Importar Extrato</button>
-            <button onClick={() => excelRef.current?.click()} style={{ background: '#059669', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 18px', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>📊 Planilha Mapeada</button>
-            <input ref={excelRef} type="file" accept=".xlsx" style={{ display: 'none' }} onChange={e => { const f2 = e.target.files?.[0]; if (f2) handleUploadExcel(f2); if (excelRef.current) excelRef.current.value = ''; }} />
+            <button onClick={() => setShowExcelModal(true)} style={{ background: '#059669', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 18px', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>📊 Planilha Mapeada</button>
           </div>
         )}
       </div>
+
 
       {/* Erro global */}
       {error && <div style={{ background: T.dangerSurf, color: T.danger, border: `0.5px solid #FECACA`, borderRadius: 10, padding: '10px 14px', fontSize: 13, marginBottom: 16 }}>⚠ {error}</div>}
@@ -382,7 +382,18 @@ export default function BankImportPage() {
       )}
 
       {/* Input oculto extrato */}
-      <input ref={fileRef} type="file" accept=".xls,.xlsx,.ofx,.ofc,.csv" style={{ display: 'none' }} onChange={handleFileChange} />
+      {/* Input oculto extrato */}
+      <input ref={fileRef} type='file' accept='.xls,.xlsx,.ofx,.ofc,.csv' style={{ display: 'none' }} onChange={handleFileChange} />
+
+      {/* Modal planilha mapeada */}
+      {showExcelModal && (
+        <ExcelPreviewModal
+          onClose={() => setShowExcelModal(false)}
+          onSuccess={() => { setShowExcelModal(false); loadStatements(); }}
+          companyId={localStorage.getItem('@ledgr:activeCompany') ? JSON.parse(localStorage.getItem('@ledgr:activeCompany')!).id : ''}
+          token={localStorage.getItem('@ledgr:token') ?? ''}
+        />
+      )}
     </div>
   );
 }

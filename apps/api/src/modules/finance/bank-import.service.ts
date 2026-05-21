@@ -306,6 +306,92 @@ export class BankImportService {
     return stmt;
   }
 
+
+  async previewExcelMapped(companyId: string, buffer: Buffer) {
+    const XLSX = await import('xlsx');
+    const workbook = XLSX.read(buffer, { type: 'buffer', cellDates: true });
+    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json<any>(worksheet);
+
+    if (!rows || rows.length === 0) throw new BadRequestException('Planilha vazia.');
+
+    const normKey = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    const rowKeys = (r: any) => Object.fromEntries(Object.entries(r).map(([k, v]) => [normKey(k), v]));
+
+    const findAccount = async (code: any) => {
+      if (!code) return null;
+      const c = String(code).trim().padStart(6, '0');
+      return this.prisma.chartOfAccounts.findFirst({
+        where: { companyId, deletedAt: null, OR: [{ reducedCode: c }, { code: c }] },
+        select: { id: true, code: true, name: true, reducedCode: true },
+      });
+    };
+
+    const lines: Array<{
+      row: number;
+      date: string;
+      description: string;
+      value: number;
+      type: string;
+      debitCode: string;
+      creditCode: string;
+      debitAccount: any;
+      creditAccount: any;
+      status: 'ok' | 'warn' | 'error';
+      issues: string[];
+    }> = [];
+
+    for (let i = 0; i < rows.length; i++) {
+      const r = rowKeys(rows[i]);
+      const issues: string[] = [];
+      const dateRaw    = r['data'] as any;
+      const memoRaw    = r['complemento'] ?? r['descricao'] ?? r['historico'] ?? '';
+      const valorRaw   = r['valor'] ?? null;
+      const debitCode  = r['conta debito'] ?? r['conta'] ?? null;
+      const creditCode = r['conta credito'] ?? r['contrapartida'] ?? null;
+
+      if (!debitCode)  issues.push('Conta Débito ausente');
+      if (!creditCode) issues.push('Conta Crédito ausente');
+
+      const valorNum = typeof valorRaw === 'number' ? valorRaw : parseFloat(String(valorRaw ?? '0').replace(/[()]/g, '').replace(/,/g, '.'));
+      const isNeg = valorNum < 0 || String(valorRaw ?? '').trim().startsWith('(');
+      const type  = isNeg ? 'DEBIT' : 'CREDIT';
+
+      const [debitAccount, creditAccount] = await Promise.all([
+        findAccount(debitCode),
+        findAccount(creditCode),
+      ]);
+
+      if (debitCode  && !debitAccount)  issues.push(`Conta Débito '${debitCode}' não encontrada`);
+      if (creditCode && !creditAccount) issues.push(`Conta Crédito '${creditCode}' não encontrada`);
+
+      const status = issues.length === 0 ? 'ok' : (debitAccount && creditAccount ? 'warn' : 'error');
+
+      lines.push({
+        row: i + 2,
+        date: dateRaw instanceof Date ? dateRaw.toISOString().slice(0, 10) : String(dateRaw ?? ''),
+        description: String(memoRaw),
+        value: Math.abs(valorNum),
+        type,
+        debitCode:    String(debitCode  ?? ''),
+        creditCode:   String(creditCode ?? ''),
+        debitAccount,
+        creditAccount,
+        status,
+        issues,
+      });
+    }
+
+    const total   = lines.length;
+    const ok      = lines.filter(l => l.status === 'ok').length;
+    const errors  = lines.filter(l => l.status === 'error').length;
+    const warns   = lines.filter(l => l.status === 'warn').length;
+    const totalDebits  = lines.filter(l => l.type === 'DEBIT').reduce((s, l) => s + l.value, 0);
+    const totalCredits = lines.filter(l => l.type === 'CREDIT').reduce((s, l) => s + l.value, 0);
+
+    return { total, ok, errors, warns, totalDebits, totalCredits, lines };
+  }
+
   async uploadExcelMapped(
     companyId: string,
     buffer:    Buffer,
