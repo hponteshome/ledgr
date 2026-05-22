@@ -22,7 +22,8 @@ export default function FluxoCaixaPage() {
   const [properties, setProperties] = useState<any[]>([]);
   const [data, setData]       = useState<any>(null);
   const [loading, setLoading] = useState(false);
-  const [view, setView]       = useState<'mensal'|'grafico'>('mensal');
+  const [bancario, setBancario] = useState<any>(null);
+  const [view, setView]       = useState<'mensal'|'grafico'|'bancario'>('mensal');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -34,6 +35,15 @@ export default function FluxoCaixaPage() {
     } catch { }
     finally { setLoading(false); }
   }, [from, to, propertyId]);
+
+  const loadBancario = useCallback(async () => {
+    try {
+      const { data: d } = await api.get('/finance/cashflow/bancario', { params: { from, to } });
+      setBancario(d);
+    } catch { }
+  }, [from, to]);
+
+  useEffect(() => { if (view === 'bancario') loadBancario(); }, [view, loadBancario]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -79,7 +89,7 @@ export default function FluxoCaixaPage() {
           <div style={{ display: 'flex', gap: 6, marginTop: 18 }}>
             {(['mensal','grafico'] as const).map(v => (
               <button key={v} onClick={() => setView(v)} style={{ padding: '6px 14px', borderRadius: 6, border: `0.5px solid ${view===v ? AC : '#E5E7EB'}`, background: view===v ? AC : '#fff', color: view===v ? '#fff' : '#374151', fontSize: 12, cursor: 'pointer', fontWeight: view===v ? 600 : 400 }}>
-                {v === 'mensal' ? '📋 Tabela' : '📊 Gráfico'}
+                {v === 'mensal' ? '📋 Tabela' : v === 'grafico' ? '📊 Gráfico' : '🏦 Bancário'}
               </button>
             ))}
           </div>
@@ -170,6 +180,45 @@ export default function FluxoCaixaPage() {
               </div>
             ))}
           </div>
+        )}
+        {/* Tab: Bancário */}
+        {view === 'bancario' && bancario && (
+          <div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10, marginBottom: 20 }}>
+              {[
+                { label: 'Total Entradas', value: bancario.totals.credits, color: '#15803D' },
+                { label: 'Total Saídas',   value: bancario.totals.debits,  color: '#B91C1C' },
+                { label: 'Saldo Período',  value: bancario.totals.balance, color: bancario.totals.balance >= 0 ? '#0369A1' : '#B91C1C' },
+              ].map(k => (
+                <div key={k.label} style={{ background: '#fff', border: '0.5px solid #E5E7EB', borderRadius: 10, padding: '12px 16px', borderTop: 3px solid  }}>
+                  <div style={{ fontSize: 10, color: '#9CA3AF', textTransform: 'uppercase', marginBottom: 4 }}>{k.label}</div>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: k.color }}>{fmtBRL(k.value)}</div>
+                </div>
+              ))}
+            </div>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead><tr>
+                {['Mês','Entradas','Saídas','Saldo','Acumulado','Transações'].map(h => (
+                  <th key={h} style={S.th}>{h}</th>
+                ))}
+              </tr></thead>
+              <tbody>
+                {bancario.months.map((m: any) => (
+                  <tr key={m.month}>
+                    <td style={{ ...S.td, fontWeight: 600 }}>{m.label}</td>
+                    <td style={{ ...S.td, color: '#15803D', fontFamily: 'monospace' }}>{fmtBRL(m.credits)}</td>
+                    <td style={{ ...S.td, color: '#B91C1C', fontFamily: 'monospace' }}>{fmtBRL(m.debits)}</td>
+                    <td style={{ ...S.td, fontFamily: 'monospace', fontWeight: 600, color: m.balance >= 0 ? '#0369A1' : '#B91C1C' }}>{fmtBRL(m.balance)}</td>
+                    <td style={{ ...S.td, fontFamily: 'monospace', fontWeight: 700, color: m.cumulative >= 0 ? '#111' : '#B91C1C' }}>{fmtBRL(m.cumulative)}</td>
+                    <td style={{ ...S.td, color: '#6B7280' }}>{m.transactionCount}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {view === 'bancario' && !bancario && (
+          <div style={{ textAlign: 'center', padding: '60px', color: '#9CA3AF' }}>Carregando dados bancários...</div>
         )}
       </div>
     </div>

@@ -18,6 +18,14 @@ export class CashflowController {
     return this.service.gerencial(req.companyId, fromMonth, toMonth, q.propertyId);
   }
 
+  @Get('bancario')
+  bancario(@Req() req: any, @Query() q: any) {
+    const now = new Date();
+    const fromMonth = q.from ?? \${now.getFullYear()}-01\`;
+    const toMonth   = q.to   ?? \${now.getFullYear()}-12\`;
+    return this.service.bancario(req.companyId, fromMonth, toMonth);
+  }
+
   @Get('summary')
   summary(@Req() req: any, @Query() q: any) {
     const now = new Date();

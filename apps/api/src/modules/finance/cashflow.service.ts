@@ -115,4 +115,65 @@ export class CashflowService {
       },
     };
   }
+  async bancario(companyId: string, fromMonth: string, toMonth: string): Promise<any> {
+    const from = new Date(`${fromMonth}-01T00:00:00`);
+    const to   = new Date(`${toMonth}-01T00:00:00`);
+    to.setMonth(to.getMonth() + 1);
+
+    const transactions = await this.prisma.bankTransaction.findMany({
+      where: {
+        companyId,
+        transactionDate: { gte: from, lt: to },
+      },
+      include: { statement: { select: { bankName: true, agency: true, account: true } } },
+      orderBy: { transactionDate: 'asc' },
+    });
+
+    // Agrupar por mês
+    const monthMap: Record<string, { credits: number; debits: number; transactions: any[] }> = {};
+
+    for (const tx of transactions) {
+      const d = new Date(tx.transactionDate);
+      const m = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+      if (!monthMap[m]) monthMap[m] = { credits: 0, debits: 0, transactions: [] };
+      if (tx.type === 'CREDIT') monthMap[m].credits += Number(tx.amount);
+      else                      monthMap[m].debits  += Math.abs(Number(tx.amount));
+      monthMap[m].transactions.push(tx);
+    }
+
+    const MONTH_LABEL = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+    const months: string[] = [];
+    const cur = new Date(from);
+    while (cur < to) {
+      months.push(`${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,'0')}`);
+      cur.setMonth(cur.getMonth()+1);
+    }
+
+    let cumulative = 0;
+    const result = months.map(m => {
+      const [y, mo] = m.split('-').map(Number);
+      const label = `${MONTH_LABEL[mo-1]}/${y}`;
+      const data  = monthMap[m] ?? { credits: 0, debits: 0, transactions: [] };
+      const balance = data.credits - data.debits;
+      cumulative += balance;
+      return {
+        month: m, label,
+        credits: data.credits,
+        debits:  data.debits,
+        balance,
+        cumulative,
+        transactionCount: data.transactions.length,
+        transactions: data.transactions,
+      };
+    });
+
+    return {
+      months: result,
+      totals: {
+        credits:  result.reduce((s, m) => s + m.credits, 0),
+        debits:   result.reduce((s, m) => s + m.debits, 0),
+        balance:  result.reduce((s, m) => s + m.balance, 0),
+      },
+    };
+  }
 }
