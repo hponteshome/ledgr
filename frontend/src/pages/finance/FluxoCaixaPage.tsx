@@ -190,7 +190,7 @@ export default function FluxoCaixaPage() {
                 { label: 'Total Saídas',   value: bancario.totals.debits,  color: '#B91C1C' },
                 { label: 'Saldo Período',  value: bancario.totals.balance, color: bancario.totals.balance >= 0 ? '#0369A1' : '#B91C1C' },
               ].map(k => (
-                <div key={k.label} style={{ background: '#fff', border: '0.5px solid #E5E7EB', borderRadius: 10, padding: '12px 16px', borderTop: 3px solid  }}>
+                <div key={k.label} style={{ background: '#fff', border: '0.5px solid #E5E7EB', borderRadius: 10, padding: '12px 16px', borderTop: '3px solid ' + k.color }}}>
                   <div style={{ fontSize: 10, color: '#9CA3AF', textTransform: 'uppercase', marginBottom: 4 }}>{k.label}</div>
                   <div style={{ fontSize: 18, fontWeight: 700, color: k.color }}>{fmtBRL(k.value)}</div>
                 </div>

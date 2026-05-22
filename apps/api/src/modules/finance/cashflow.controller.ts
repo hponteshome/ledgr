@@ -10,27 +10,29 @@ import { CashflowService } from './cashflow.service';
 export class CashflowController {
   constructor(private readonly service: CashflowService) {}
 
+  private defaults(q: any) {
+    const y = new Date().getFullYear();
+    return {
+      from: q.from || (y + '-01'),
+      to:   q.to   || (y + '-12'),
+    };
+  }
+
   @Get('gerencial')
   gerencial(@Req() req: any, @Query() q: any) {
-    const now = new Date();
-    const fromMonth = q.from ?? `${now.getFullYear()}-01`;
-    const toMonth   = q.to   ?? `${now.getFullYear()}-12`;
-    return this.service.gerencial(req.companyId, fromMonth, toMonth, q.propertyId);
+    const { from, to } = this.defaults(q);
+    return this.service.gerencial(req.companyId, from, to, q.propertyId);
   }
 
   @Get('bancario')
   bancario(@Req() req: any, @Query() q: any) {
-    const now = new Date();
-    const fromMonth = q.from ?? \${now.getFullYear()}-01\`;
-    const toMonth   = q.to   ?? \${now.getFullYear()}-12\`;
-    return this.service.bancario(req.companyId, fromMonth, toMonth);
+    const { from, to } = this.defaults(q);
+    return this.service.bancario(req.companyId, from, to);
   }
 
   @Get('summary')
   summary(@Req() req: any, @Query() q: any) {
-    const now = new Date();
-    const fromMonth = q.from ?? `${now.getFullYear()}-01`;
-    const toMonth   = q.to   ?? `${now.getFullYear()}-12`;
-    return this.service.summary(req.companyId, fromMonth, toMonth);
+    const { from, to } = this.defaults(q);
+    return this.service.summary(req.companyId, from, to);
   }
 }
