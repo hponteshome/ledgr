@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 
@@ -180,10 +180,23 @@ export class CompanyService {
       before: company,
     });
 
-    const result = await this.prisma.company.delete({
-      where: { id },
-    });
+    // Verificar dependencias antes de deletar
+    const [masks, accounts, journals, employees] = await Promise.all([
+      this.prisma.companyMaskConfig.count({ where: { companyId: id } }),
+      this.prisma.chartOfAccounts.count({ where: { companyId: id } }),
+      this.prisma.journalEntry.count({ where: { companyId: id } }),
+      this.prisma.employee.count({ where: { companyId: id } }),
+    ]);
+    const bloqueios: string[] = [];
+    if (masks > 0)     bloqueios.push(masks + ' configuracao(oes) de mascara contabil');
+    if (accounts > 0)  bloqueios.push(accounts + ' conta(s) no plano de contas');
+    if (journals > 0)  bloqueios.push(journals + ' lancamento(s) contabil(is)');
+    if (employees > 0) bloqueios.push(employees + ' funcionario(s) cadastrado(s)');
+    if (bloqueios.length > 0) {
+      throw new BadRequestException('Nao e possivel excluir esta empresa pois ela possui dados vinculados: ' + bloqueios.join(', ') + '. Desative a empresa ao inves de excluir.');
+    }
 
+    const result = await this.prisma.company.delete({ where: { id } });
     return result;
   }
 

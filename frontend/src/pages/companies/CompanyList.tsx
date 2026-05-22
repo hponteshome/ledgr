@@ -142,16 +142,9 @@ export const CompanyList: React.FC = () => {
     } catch (error: any) {
       console.error('❌ Erro detalhado:', error.response?.data);
 
+      const backendMsg = error?.response?.data?.message;
       const errorInfo = handleApiError(error);
-
-      let message = errorInfo.message;
-
-      // Mensagens específicas para exclusão
-      if (errorInfo.statusCode === 403) {
-        message = 'Você não tem permissão para excluir esta empresa.';
-      } else if (errorInfo.statusCode === 400 && errorInfo.message.includes('vínculos')) {
-        message = 'Esta empresa possui vínculos (sócios/documentos) e não pode ser excluída.';
-      }
+      const message = backendMsg || errorInfo.message;
 
       showNotification({
         type: 'error',
