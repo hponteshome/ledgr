@@ -1,4 +1,4 @@
-// frontend/src/pages/hr/EmployeesPage.tsx
+﻿// frontend/src/pages/hr/EmployeesPage.tsx
 import React, { useState, useEffect } from 'react';
 import { FiPlus, FiUser, FiUpload } from 'react-icons/fi';
 import api from '@/services/api';
@@ -95,8 +95,8 @@ export const EmployeesPage: React.FC = () => {
 
       {showImport && (
         <EmployeeImportModal
-          onClose={() => setShowImport(false)}
-          onSuccess={() => { setShowImport(false); load(); }}
+          onSuccess={() => setShowImport(false)}
+          onClose={() => { setShowImport(false); load(); }}
         />
       )}
     </div>
