@@ -62,6 +62,7 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
         { path: '/app/finance/fiscal-documents', label: 'Documentos Fiscais', icon: FiFileText },
         { path: '/app/finance/accounts-payable', label: 'Contas a Pagar', icon: FiTrendingDown },
         { path: '/app/finance/contas-receber', label: 'Contas a Receber', icon: FiTrendingUp },
+        { path: '/app/finance/fluxo-caixa', label: 'Fluxo de Caixa', icon: FiActivity },
         { path: '/app/finance/agenda', label: 'Agenda Financeira', icon: FiCalendar },
         { path: '/app/finance/bank-import', label: 'Importação Bancária', icon: FiUpload },
         { path: '/app/finance/provisoes', label: 'Provisões Recorrentes', icon: FiRepeat },
