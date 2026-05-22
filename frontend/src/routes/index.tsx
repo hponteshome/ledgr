@@ -59,6 +59,7 @@ import InformeRendimentosPage from '../pages/hr/InformeRendimentosPage';
 import { EmployeesPage } from '../pages/hr/EmployeesPage';
 import FechamentoPage from '../pages/finance/FechamentoPage';
 import ContasAReceberPage from '../pages/finance/ContasAReceberPage';
+import ContasAPagarPage from '../pages/finance/ContasAPagarPage';
 import RendaFixaPage from '../pages/accounting/investments/RendaFixaPage';
 import CdiTabelaPage from '../pages/accounting/investments/CdiTabelaPage';
 import { IndicadoresPage } from '../pages/sistema/IndicadoresPage';
@@ -105,6 +106,7 @@ export const AppRoutes = () => {
                 <Route path="app/sistema/calendario" element={<ProtectedRoute><CalendarioPage /></ProtectedRoute>} />
                 <Route path="app/sistema/tabelas" element={<ProtectedRoute><TabelasLegaisPage /></ProtectedRoute>} />
                 <Route path="app/finance/fechamento" element={<ProtectedRoute><FechamentoPage /></ProtectedRoute>} />
+                <Route path="app/finance/accounts-payable" element={<ProtectedRoute><ContasAPagarPage /></ProtectedRoute>} />
                 <Route path="app/finance/contas-receber" element={<ProtectedRoute><ContasAReceberPage /></ProtectedRoute>} />
                 <Route path="app/finance/agenda" element={<ProtectedRoute><AgendaPage /></ProtectedRoute>} />
                 <Route path="app/finance/provisoes" element={<ProtectedRoute><ProvisoesPage /></ProtectedRoute>} />
