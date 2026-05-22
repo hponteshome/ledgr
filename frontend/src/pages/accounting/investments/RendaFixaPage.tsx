@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+﻿import React, { useState, useEffect, useMemo } from 'react';
 import api from '../../../services/api';
 
 interface Investment {
@@ -762,7 +762,7 @@ export default function RendaFixaPage() {
           </div>
 
           {selected && (
-            <div style={{...S.card, marginLeft:32, marginTop:-8, borderTop:'none', borderTopLeftRadius:0, borderTopRightRadius:0, borderTop:'3px solid #2563EB'}}>
+            <div style={{...S.card, marginLeft:32, marginTop:-8, borderTopLeftRadius:0, borderTopRightRadius:0, borderTop:'3px solid #2563EB'}}>
               <div style={{display:'flex', alignItems:'center', gap:12, marginBottom:16, flexWrap:'wrap' as const}}>
                 <span style={{fontSize:13, fontWeight:500}}>{selected.description}</span>
                 <span style={S.pill(selected.status)}>{selected.status}</span>
