@@ -4,6 +4,7 @@ import {
   FiBriefcase, FiChevronUp, FiChevronDown
 } from 'react-icons/fi';
 import { useNavigate, Link } from 'react-router-dom';
+import { useCompany } from '../../contexts/CompanyContext';
 import api from '../../services/api';
 
 import { useNotification } from '../../components/hooks/useNotification';
@@ -25,6 +26,7 @@ export const CompanyList: React.FC = () => {
   const navigate = useNavigate();
   const { showNotification } = useNotification();
   const { confirm, confirmState, handleConfirm, handleCancel } = useConfirm();
+  const { loadCompanies } = useCompany();
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -34,7 +36,7 @@ export const CompanyList: React.FC = () => {
   });
 
   // Carregamento de dados
-  const loadCompanies = async () => {
+  const fetchLocalCompanies = async () => {
     try {
       setLoading(true);
       const response = await api.get('/companies/available');
@@ -67,7 +69,7 @@ export const CompanyList: React.FC = () => {
   };
 
   useEffect(() => {
-    loadCompanies();
+    fetchLocalCompanies();
   }, []);
 
   // Handlers
@@ -129,6 +131,9 @@ export const CompanyList: React.FC = () => {
       console.log('✅ Status:', response.status);
 
       setCompanies(prev => prev.filter(c => c.id !== id));
+      const lastId = localStorage.getItem('@ledgr:lastCompanyId');
+      if (lastId === id) localStorage.removeItem('@ledgr:lastCompanyId');
+      await loadCompanies();
 
       showNotification({
         type: 'success',

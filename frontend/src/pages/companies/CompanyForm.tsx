@@ -68,6 +68,9 @@ export const CompanyForm: React.FC = () => {
   const returnTo = new URLSearchParams(location.search).get('returnTo') ?? '/app/companies';
 
   const [preenchido, setPreenchido] = useState(false);
+
+  const [formData, setFormData] = useState<CompanyFormData>({ taxId: initialCnpj, legalName: '', tradeName: '', openingDate: '', legalNature: '', taxRegime: '', size: '', status: 'ativa', statusDate: '', equity: '', street: '', number: '', complement: '', neighborhood: '', zipCode: '', city: '', state: '', email: '', phone1: '', phone2: '', isHeadquarter: false, registerOrg: '', registerNumber: '', registerDate: '', registerBook: '', registerSheet: '', mainActivity: '', secondaryActivities: [] });
+  const [loading, setLoading] = useState(false);
   const set = (name: keyof CompanyFormData, value: any) =>
     setFormData(prev => ({ ...prev, [name]: value }));
 
