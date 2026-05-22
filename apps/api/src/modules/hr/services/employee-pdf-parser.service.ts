@@ -1,7 +1,7 @@
-﻿// apps/api/src/modules/hr/services/employee-pdf-parser.service.ts
+// apps/api/src/modules/hr/services/employee-pdf-parser.service.ts
 import { Injectable } from '@nestjs/common';
-// eslint-disable-next-line @typescript-eslint/no-var-requires
 const pdfParse = require('pdf-parse');
+
 export interface ParsedDependent {
   code:         string;
   name:         string;

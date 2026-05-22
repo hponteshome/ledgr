@@ -1,4 +1,4 @@
-// src/routes/AppRoutes.tsx
+﻿// src/routes/index.tsx
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { Layout } from '../components/Layout';
@@ -6,6 +6,7 @@ import { LedgrHome } from '../pages/LedgrHome';
 import { Dashboard } from '../pages/Dashboard';
 import FinancePage from '../pages/finance/FinancePage';
 import BankImport from '../pages/finance/BankImportPage';
+import ProvisoesPage from '../pages/finance/ProvisoesPage';
 import { CompanyList } from '../pages/companies/CompanyList';
 import { CompanyForm } from '../pages/companies/CompanyForm';
 import { UserList } from '../pages/users/UserList';
@@ -55,7 +56,7 @@ import RazaoAnaliticoPage from '../pages/accounting/RazaoAnaliticoPage';
 import CdbProjecaoPage from '../pages/accounting/investments/CdbProjecaoPage';
 import ProLaborePage from '../pages/hr/ProLabore';
 import InformeRendimentosPage from '../pages/hr/InformeRendimentosPage';
-import ProvisoesPage from '../pages/finance/ProvisoesPage';
+import { EmployeesPage } from '../pages/hr/EmployeesPage';
 import FechamentoPage from '../pages/finance/FechamentoPage';
 import RendaFixaPage from '../pages/accounting/investments/RendaFixaPage';
 import CdiTabelaPage from '../pages/accounting/investments/CdiTabelaPage';
@@ -107,9 +108,9 @@ export const AppRoutes = () => {
                 <Route path="app/finance/provisoes" element={<ProtectedRoute><ProvisoesPage /></ProtectedRoute>} />
                 <Route path="app/hr/pro-labore" element={<ProtectedRoute><ProLaborePage /></ProtectedRoute>} />
                 <Route path="app/hr/informe-rendimentos" element={<ProtectedRoute><InformeRendimentosPage /></ProtectedRoute>} />
-                <Route path="app/accounting/investimentos/renda-fixa" element={<ProtectedRoute><RendaFixaPage /></ProtectedRoute>} />
-                <Route path="app/accounting/investimentos/simulador" element={<ProtectedRoute><CdbProjecaoPage /></ProtectedRoute>} />
+                <Route path="app/hr/employees" element={<ProtectedRoute><EmployeesPage /></ProtectedRoute>} />
                 <Route path="app/accounting/razao" element={<ProtectedRoute><RazaoAnaliticoPage /></ProtectedRoute>} />
+
 
                 {/* SPED */}
                 <Route path="app/sped/ecd" element={<ProtectedRoute><EcdPage /></ProtectedRoute>} />
