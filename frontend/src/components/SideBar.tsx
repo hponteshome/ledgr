@@ -111,6 +111,8 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
         { path: '/app/sistema/calendario', label: 'Calendario de Feriados', icon: FiCalendar },
         { path: '/app/sistema/indicadores', label: 'Indicadores Economicos', icon: FiBarChart2 },
         { path: '/app/sistema/tabelas', label: 'Tabelas Legais', icon: FiBook },
+        { path: '/app/system/backup', label: 'Backup e Restauração', icon: FiDatabase },
+        { path: '/app/settings/data-management', label: 'Manutenção de Dados', icon: FiSettings },
       ],
     },
     {

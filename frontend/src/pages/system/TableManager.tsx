@@ -16,6 +16,27 @@ const TABLES = [
   // Tabelas de relacionamento (dependentes das anteriores)
   { id: 'user_companies', name: 'Vínculo Usuário-Empresa' },
   { id: 'person_companies', name: 'Vínculo Pessoa-Empresa' },
+  // Contabilidade e RH
+  { id: 'employees', name: 'Funcionários (RH)' },
+  { id: 'chart_of_accounts', name: 'Plano de Contas' },
+  { id: 'journal_entries', name: 'Lançamentos Contábeis' },
+  { id: 'journal_entry_items', name: 'Itens de Lançamento' },
+  { id: 'fixed_assets', name: 'Ativos Imobilizados' },
+  { id: 'fixed_income_investments', name: 'Investimentos Renda Fixa' },
+  { id: 'employee_dependents', name: 'Dependentes de Funcionários' },
+  { id: 'ap_entries', name: 'Contas a Pagar' },
+  { id: 'bank_statements', name: 'Extratos Bancários' },
+  { id: 'bank_transactions', name: 'Transações Bancárias' },
+  { id: 'fiscal_documents', name: 'Documentos Fiscais' },
+  { id: 'agenda_events', name: 'Agenda Financeira' },
+  { id: 'provisao_configs', name: 'Provisões Recorrentes' },
+  { id: 'pro_labore_configs', name: 'Configurações Pró-labore' },
+  { id: 'pro_labore_calculos', name: 'Cálculos Pró-labore' },
+  { id: 'informes_rendimentos', name: 'Informes de Rendimentos' },
+  { id: 'ecd_imports', name: 'Importações ECD' },
+  { id: 'documents', name: 'Documentos Societários' },
+  { id: 'holidays', name: 'Feriados' },
+  { id: 'cdi_daily_rates', name: 'Taxas CDI' },
 ];
 
 // Mapeamento para os endpoints (plural → singular)
