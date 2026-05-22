@@ -1,8 +1,8 @@
 // src/pages/companies/CompanyForm.tsx
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useCompany } from '../../contexts/CompanyContext';
 import SearchRFBButton from '../../components/SearchRFBButton';
-
 interface CompanyFormData {
   taxId: string;
   legalName: string;
@@ -63,8 +63,7 @@ const UF_OPTIONS = [
 export const CompanyForm: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const initialCnpj = new URLSearchParams(location.search).get('cnpj') ?? '';
-  const returnTo = new URLSearchParams(location.search).get('returnTo') ?? '/app/companies';
+  const { loadCompanies } = useCompany();
 
   const [preenchido, setPreenchido] = useState(false);
 
@@ -153,12 +152,12 @@ export const CompanyForm: React.FC = () => {
       });
 
       if (response.ok) {
-
-        alert('✅ Empresa cadastrada com sucesso!');
+        await loadCompanies();
+        alert('Empresa cadastrada com sucesso!');
         navigate(returnTo);
       } else {
         const err = await response.json();
-        alert(`Erro: ${err.message || 'Falha ao salvar'}`);
+        alert('Erro: ' + (err.message || 'Falha ao salvar'));
       }
     } catch {
       alert('Erro de conexão com o servidor');

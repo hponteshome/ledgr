@@ -3,9 +3,9 @@ import React, { useState, useEffect } from 'react';
 import { FiPlus, FiUser, FiUpload } from 'react-icons/fi';
 import api from '@/services/api';
 import { EmployeeImportModal } from './EmployeeImportModal';
-
+function fmtDate(s: string | null) { if (!s) return '—'; try { const p = s.split('T')[0].split('-'); return p[2]+'/'+p[1]+'/'+p[0]; } catch { return s ?? '—'; } }
 function fmtCpf(v: string) { return v?.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') ?? v; }
-function fmtDate(s: string | null) { if (!s) return '—'; try { return new Date(s + 'T12:00:00').toLocaleDateString('pt-BR'); } catch { return s; } }
+
 function fmtSalary(v: any) { return v ? Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—'; }
 
 export const EmployeesPage: React.FC = () => {
@@ -95,8 +95,8 @@ export const EmployeesPage: React.FC = () => {
 
       {showImport && (
         <EmployeeImportModal
-          onSuccess={() => setShowImport(false)}
-          onClose={() => { setShowImport(false); load(); }}
+          onSuccess={() => { setShowImport(false); load(); }}
+          onClose={() => setShowImport(false)}
         />
       )}
     </div>

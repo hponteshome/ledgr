@@ -129,7 +129,7 @@ export class EmployeePdfParserService {
     // Documentação
     const taxId     = f(/CPF\s*:\s*([\d\.\-]+)/i);
     const rgNumber  = f(/Identidade\s*:\s*([\d\.\-\/]+)/i);
-    const rgIssuer  = f(/Org[aã]o Emissor\s*:\s*(\w+)/i);
+    const rgIssuer  = f(/Org[aã]o Emissor\s*:\s*(\w{2,10})(?:\s|$)/i);
     const rgState   = f(/Org[aã]o Emissor[^\n]*?Estado\s*:\s*([A-Z]{2})/i);
     const rgDate    = f(/Emiss[aã]o\s*:\s*(\d{2}\/\d{2}\/\d{4})/i);
     const pisNumber = f(/PIS\/PASEP\s*:\s*([\d\.\-\/]+)/i);
