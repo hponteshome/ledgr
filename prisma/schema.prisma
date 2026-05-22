@@ -316,7 +316,7 @@ model Person {
   @@index([cpf])
   @@index([fullName])
   informesRendimentos InformeRendimentos[]
-
+  employees         Employee[] @relation("EmployeePerson")
   @@map("persons")
 }
 
@@ -408,28 +408,186 @@ model Property {
   @@map("properties")
 }
 
-/// Funcionários vinculados a empresas. Módulo de RH em preparação.
+// =============================================================================
+// ENUMS — RH / eSocial
+// =============================================================================
+
+enum RaceColor {
+  BRANCA
+  PRETA
+  PARDA
+  AMARELA
+  INDIGENA
+  NAO_INFORMADO
+
+  @@map("race_color")
+}
+
+enum EducationLevel {
+  ANALFABETO
+  FUNDAMENTAL_INCOMPLETO
+  FUNDAMENTAL_COMPLETO
+  MEDIO_INCOMPLETO
+  MEDIO_COMPLETO
+  SUPERIOR_INCOMPLETO
+  SUPERIOR_COMPLETO
+  POS_GRADUACAO
+  MESTRADO
+  DOUTORADO
+
+  @@map("education_level")
+}
+
+enum EmploymentBond {
+  URBANO_INDETERMINADO
+  URBANO_DETERMINADO
+  RURAL_INDETERMINADO
+  RURAL_DETERMINADO
+  DIRETOR_SEM_VINCULO
+  AUTONOMO
+  ESTAGIARIO
+  MENOR_APRENDIZ
+  DOMESTICO
+
+  @@map("employment_bond")
+}
+
+enum GfipCategory {
+  EMPREGADO
+  TRABALHADOR_AVULSO
+  MEDICO_RESIDENTE
+  MENOR_APRENDIZ
+  DIRETOR_SEM_VINCULO
+
+  @@map("gfip_category")
+}
+
+enum DependentRelationship {
+  CONJUGE
+  FILHO
+  FILHA
+  ENTEADO
+  ENTEADA
+  PAI
+  MAE
+  IRMAO
+  IRMA
+  OUTROS
+
+  @@map("dependent_relationship")
+}
+
+/// Funcionários vinculados a empresas — eSocial S-2200 ready.
 model Employee {
-  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  companyId       String    @map("company_id") @db.Uuid
-  fullName        String    @map("full_name") @db.VarChar
-  taxId           String    @map("tax_id") @db.VarChar(11)
-  socialId        String?   @map("social_id") @db.VarChar
-  birthDate       DateTime  @map("birth_date") @db.Date
-  hireDate        DateTime  @map("hire_date") @db.Date
-  terminationDate DateTime? @map("termination_date") @db.Date
-  role            String    @map("role") @db.VarChar
-  salary          Decimal   @map("salary") @db.Decimal(15, 2)
-  department      String?   @map("department") @db.VarChar
-  status          String    @default("active") @map("status") @db.VarChar
-  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
-  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
-  deletedAt       DateTime? @map("deleted_at") @db.Timestamp(6)
+  id        String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId String @map("company_id") @db.Uuid
+  personId  String? @map("person_id") @db.Uuid
 
-  company Company @relation(fields: [companyId], references: [id])
+  // ── Dados Pessoais ─────────────────────────────────────────
+  fullName     String  @map("full_name") @db.VarChar
+  nickname     String? @map("nickname") @db.VarChar
+  taxId        String  @map("tax_id") @db.VarChar(11)
+  motherName   String? @map("mother_name") @db.VarChar
+  fatherName   String? @map("father_name") @db.VarChar
+  birthDate    DateTime @map("birth_date") @db.Date
+  birthCity    String? @map("birth_city") @db.VarChar
+  birthState   String? @map("birth_state") @db.VarChar(2)
+  nationality  String? @default("10") @map("nationality") @db.VarChar(3)
+  raceColor    RaceColor? @map("race_color")
+  maritalStatus String? @map("marital_status") @db.VarChar(20)
+  educationLevel EducationLevel? @map("education_level")
+  hasDisability Boolean @default(false) @map("has_disability")
+  phone        String? @map("phone") @db.VarChar(20)
+  cellPhone    String? @map("cell_phone") @db.VarChar(20)
 
+  // ── Endereço ───────────────────────────────────────────────
+  street       String? @map("street") @db.VarChar
+  number       String? @map("number") @db.VarChar(20)
+  complement   String? @map("complement") @db.VarChar
+  neighborhood String? @map("neighborhood") @db.VarChar
+  zipCode      String? @map("zip_code") @db.VarChar(9)
+  city         String? @map("city") @db.VarChar
+  addressState String? @map("address_state") @db.VarChar(2)
+
+  // ── Documentação ───────────────────────────────────────────
+  rgNumber  String? @map("rg_number") @db.VarChar(20)
+  rgIssuer  String? @map("rg_issuer") @db.VarChar(10)
+  rgState   String? @map("rg_state") @db.VarChar(2)
+  rgDate    DateTime? @map("rg_date") @db.Date
+  pisNumber String? @map("pis_number") @db.VarChar(14)
+  pisDate   DateTime? @map("pis_date") @db.Date
+  ctpsNumber String? @map("ctps_number") @db.VarChar(20)
+  ctpsSeries String? @map("ctps_series") @db.VarChar(10)
+  ctpsState  String? @map("ctps_state") @db.VarChar(2)
+  voterTitle   String? @map("voter_title") @db.VarChar(15)
+  voterZone    String? @map("voter_zone") @db.VarChar(5)
+  voterSection String? @map("voter_section") @db.VarChar(5)
+  voterDate    DateTime? @map("voter_date") @db.Date
+  militaryCert String? @map("military_cert") @db.VarChar(30)
+  cnhNumber    String? @map("cnh_number") @db.VarChar(20)
+
+  // ── Dados Funcionais ───────────────────────────────────────
+  registrationNumber String? @map("registration_number") @db.VarChar(20)
+  hireDate           DateTime @map("hire_date") @db.Date
+  terminationDate    DateTime? @map("termination_date") @db.Date
+  experienceDays     Int? @map("experience_days")
+  role               String @map("role") @db.VarChar
+  salary             Decimal @map("salary") @db.Decimal(15, 2)
+  weeklyHours        Decimal? @map("weekly_hours") @db.Decimal(5, 2)
+  department         String? @map("department") @db.VarChar
+  lotacao            String? @map("lotacao") @db.VarChar
+  workSchedule       Json? @map("work_schedule") @db.Json
+
+  // ── eSocial / GFIP ─────────────────────────────────────────
+  employmentBond   EmploymentBond? @map("employment_bond")
+  gfipCategory     GfipCategory? @map("gfip_category")
+  gfipOccurrence   String? @default("00") @map("gfip_occurrence") @db.VarChar(2)
+  inssOption       String? @default("1") @map("inss_option") @db.VarChar(1)
+  cagedCode        String? @map("caged_code") @db.VarChar(2)
+  isUnionized      Boolean @default(false) @map("is_unionized")
+  unionCode        String? @map("union_code") @db.VarChar(10)
+  unionName        String? @map("union_name") @db.VarChar
+
+  // ── Pagamento ──────────────────────────────────────────────
+  paymentBank    String? @map("payment_bank") @db.VarChar(10)
+  bankAgency     String? @map("bank_agency") @db.VarChar(10)
+  bankAccount    String? @map("bank_account") @db.VarChar(20)
+
+  // ── Controle ───────────────────────────────────────────────
+  status    String @default("active") @map("status") @db.VarChar
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamp(6)
+
+  company    Company @relation(fields: [companyId], references: [id])
+  person     Person? @relation("EmployeePerson", fields: [personId], references: [id])
+  dependents EmployeeDependent[]
+
+  @@index([companyId, deletedAt])
+  @@index([taxId])
   @@map("employees")
 }
+
+/// Dependentes de funcionários — eSocial S-2200 / IR / Salário Família.
+model EmployeeDependent {
+  id           String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  employeeId   String @map("employee_id") @db.Uuid
+  companyId    String @map("company_id") @db.Uuid
+  name         String @map("name") @db.VarChar
+  relationship DependentRelationship @map("relationship")
+  birthDate    DateTime? @map("birth_date") @db.Date
+  taxId        String? @map("tax_id") @db.VarChar(11)
+  salaryFamily Boolean @default(false) @map("salary_family")
+  irDeduction  Boolean @default(false) @map("ir_deduction")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  employee Employee @relation(fields: [employeeId], references: [id])
+
+  @@index([employeeId])
+  @@map("employee_dependents")
+}
+
 
 /// Livros societários digitais. Suporta assinatura digital e certificação JUCESP.
 model CorporateBook {
