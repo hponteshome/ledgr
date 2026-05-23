@@ -169,6 +169,7 @@ function ProgressBar({ p }: { p: Progress }) {
 
 // ── Componente Principal ──────────────────────────────────────
 
+const EcdPage: React.FC = () => {
     const [tab, setTab] = useState<'import' | 'export' | 'history'>('import');
 
     const [file, setFile] = useState<File | null>(null);
@@ -189,10 +190,10 @@ function ProgressBar({ p }: { p: Progress }) {
     const [exportBookType, setExportBookType] = useState('G');
     const [exportBookNumber, setExportBookNumber] = useState('1');
     const [exporting, setExporting] = useState(false);
-
     const [preValidating, setPreValidating] = useState(false);
     const [preValidateResult, setPreValidateResult] = useState<any>(null);
     const [showPreValidate, setShowPreValidate] = useState(false);
+
     const [history, setHistory] = useState<ImportRecord[]>([]);
     const [loadingHistory, setLoadingHistory] = useState(false);
 
@@ -290,10 +291,10 @@ function ProgressBar({ p }: { p: Progress }) {
             setPreValidateResult(r.data);
             setShowPreValidate(true);
         } catch (e: any) {
-            alert('Erro na validação: ' + (e.response?.data?.message || e.message));
+            alert('Erro na validacao: ' + (e.response?.data?.message || e.message));
         } finally { setPreValidating(false); }
     };
-    const handleExport = async () => {
+        const handleExport = async () => {
         setExporting(true);
         try {
             const r = await api.get('/sped/ecd/export', {
@@ -305,7 +306,6 @@ function ProgressBar({ p }: { p: Progress }) {
             a.download = 'ECD_' + new Date(exportPeriodEnd).getFullYear() + '.txt';
             a.click();
             window.URL.revokeObjectURL(url);
-            setShowPreValidate(false);
         } catch (e: any) {
             alert('Erro ao gerar ECD: ' + (e.response?.data?.message || e.message));
         } finally { setExporting(false); }
@@ -635,7 +635,6 @@ function ProgressBar({ p }: { p: Progress }) {
                                                             const abs = Math.abs(v).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
                                                             return v < 0 ? `(${abs})` : abs;
                                                         };
-    );
                                                         return (
                                                             <tr key={i} className="hover:bg-slate-50/50">
                                                                 <td className="px-3 py-2">
@@ -804,6 +803,7 @@ function ProgressBar({ p }: { p: Progress }) {
             )}
             {showPreValidate && <EcdPreValidateModal result={preValidateResult} onClose={() => setShowPreValidate(false)} onGenerate={handleExport} exporting={exporting} />}
         </div>
+    );
 };
 
 export default EcdPage;
