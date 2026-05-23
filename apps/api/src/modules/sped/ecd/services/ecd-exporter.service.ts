@@ -41,6 +41,7 @@ export class EcdExporterService {
     });
     const codeById    = new Map(accounts.map(a => [a.id, a.code]));
     const analyticIds = new Set(accounts.filter(a => a.isAnalytic).map(a => a.id));
+    const accountById = new Map(accounts.map(a => [a.id, a]));
 
     // Lancamentos do periodo
     const entries = await this.prisma.journalEntry.findMany({
@@ -50,7 +51,6 @@ export class EcdExporterService {
     });
 
     // Saldo inicial: exclusivamente do account_balance (ECD anterior)
-    // balance positivo = devedor, negativo = credor
     const i155Rows = await this.prisma.accountBalance.findMany({
       where: { companyId, referenceDate: { lt: new Date(periodStart) } },
       orderBy: { referenceDate: 'desc' },
@@ -79,12 +79,56 @@ export class EcdExporterService {
       else                       mv.cre += Number(item.value);
     }
 
+    // Movimentos totais do periodo (para BP e DRE)
+    const allPeriodItems = await this.prisma.journalEntryItem.findMany({
+      where: { journalEntry: { companyId, date: { gte: periodStart, lte: periodEnd }, deletedAt: null } },
+      select: { accountId: true, type: true, value: true },
+    });
+
+    // Saldo final por conta analitica (para BP)
+    const saldoFinalMap = new Map<string, number>(saldoIni);
+    for (const item of allPeriodItems) {
+      if (!analyticIds.has(item.accountId)) continue;
+      const cur = saldoFinalMap.get(item.accountId) ?? 0;
+      saldoFinalMap.set(item.accountId, cur + (item.type === 'DEBIT' ? 1 : -1) * Number(item.value));
+    }
+
+    // Rollup bottom-up para sinteticas
+    const rollupMap = new Map<string, number>(saldoFinalMap);
+    const idToCode  = new Map(accounts.map(a => [a.id, a.code]));
+    const sorted    = [...accounts].sort((a, b) => idToCode.get(b.id)!.localeCompare(idToCode.get(a.id)!));
+    for (const acc of sorted) {
+      if (!acc.parentId) continue;
+      const child = rollupMap.get(acc.id) ?? 0;
+      rollupMap.set(acc.parentId, (rollupMap.get(acc.parentId) ?? 0) + child);
+    }
+
+    // Movimentos de resultado do periodo por conta (para DRE)
+    const dreMap = new Map<string, { deb: number; cre: number }>();
+    for (const item of allPeriodItems) {
+      const acc = accountById.get(item.accountId);
+      if (!acc || !['REVENUE', 'EXPENSE'].includes(acc.type.toString())) continue;
+      if (!dreMap.has(item.accountId)) dreMap.set(item.accountId, { deb: 0, cre: 0 });
+      const mv = dreMap.get(item.accountId)!;
+      if (item.type === 'DEBIT') mv.deb += Number(item.value);
+      else                       mv.cre += Number(item.value);
+    }
+    // Rollup DRE para sinteticas
+    const dreRollup = new Map<string, { deb: number; cre: number }>(dreMap);
+    for (const acc of sorted) {
+      if (!acc.parentId) continue;
+      if (!['REVENUE', 'EXPENSE'].includes(acc.type.toString())) continue;
+      const child  = dreRollup.get(acc.id) ?? { deb: 0, cre: 0 };
+      const parent = dreRollup.get(acc.parentId) ?? { deb: 0, cre: 0 };
+      dreRollup.set(acc.parentId, { deb: parent.deb + child.deb, cre: parent.cre + child.cre });
+    }
+
     const months = this.monthRange(periodStart, periodEnd);
     const lines: string[] = [];
     const add = (l: string) => lines.push(l);
     const P = '|';
 
-    // BLOCO 0 — layout leiaute 9, 23 campos
+    // BLOCO 0
     add('|0000|LECD|'+dtIni+'|'+dtFin+'|'+company.legalName+'|'+cnpj+'|'+company.state+'|||||0|0|0||0|0||N|N|0|0||');
     add(P+'0001'+P+'0'+P);
     add(P+'0007'+P+cnpj+P+P);
@@ -109,50 +153,36 @@ export class EcdExporterService {
       add(P+'I050'+P+dtAlt+P+natCode+P+indCta+P+acc.level+P+acc.code+P+parentCode+P+acc.name+P);
     }
 
-    // I150/I155 — saldos mensais
-    // saldoCorrente: balance positivo = devedor, negativo = credor
+    // I150/I155
     const saldoCorrente = new Map<string, number>(saldoIni);
-
     for (const { year, month, firstDay, lastDay } of months) {
       const monthKey = year + '-' + String(month).padStart(2, '0');
       const accMap   = byMonthAcc.get(monthKey);
-
-      // Contas com saldo != 0 OU com movimento no mes
       const contasDoMes = new Set<string>([
         ...Array.from(saldoCorrente.entries()).filter(([, v]) => v !== 0).map(([k]) => k),
         ...(accMap ? Array.from(accMap.keys()) : []),
       ]);
-
       if (accMap) {
         for (const [aid, mv] of accMap) {
-          if (!contasDoMes.has(aid)) {
-            const cur = saldoCorrente.get(aid) ?? 0;
-            saldoCorrente.set(aid, cur + mv.deb - mv.cre);
-          }
+          if (!contasDoMes.has(aid)) saldoCorrente.set(aid, (saldoCorrente.get(aid) ?? 0) + mv.deb - mv.cre);
         }
       }
       if (contasDoMes.size === 0) continue;
-
       add(P+'I150'+P+this.fmtDate(firstDay)+P+this.fmtDate(lastDay)+P);
-
-      const sorted = Array.from(contasDoMes).sort((a, b) =>
-        (codeById.get(a) ?? '').localeCompare(codeById.get(b) ?? ''));
-
-      for (const aid of sorted) {
+      const sortedContas = Array.from(contasDoMes).sort((a, b) => (codeById.get(a) ?? '').localeCompare(codeById.get(b) ?? ''));
+      for (const aid of sortedContas) {
         const mv     = accMap?.get(aid) ?? { deb: 0, cre: 0 };
         const sldIni = saldoCorrente.get(aid) ?? 0;
-        // Aplicar movimento: debito aumenta saldo devedor, credito aumenta saldo credor
         const sldFin = sldIni + mv.deb - mv.cre;
         saldoCorrente.set(aid, sldFin);
         const cod   = codeById.get(aid) ?? '';
-        // dc: positivo = D, negativo = C
         const dcIni = sldIni >= 0 ? 'D' : 'C';
         const dcFin = sldFin >= 0 ? 'D' : 'C';
         add(P+'I155'+P+cod+P+P+this.fmtDec(Math.abs(sldIni))+P+dcIni+P+this.fmtDec(mv.deb)+P+this.fmtDec(mv.cre)+P+this.fmtDec(Math.abs(sldFin))+P+dcFin+P);
       }
     }
 
-    // I200/I250 — lancamentos
+    // I200/I250
     let lctoNum = 1;
     for (const entry of entries) {
       if (!entry.items.length) continue;
@@ -174,8 +204,67 @@ export class EcdExporterService {
     const blocoIQtd = lines.length - idxI001;
     add(P+'I990'+P+(blocoIQtd + 1)+P);
 
-    add(P+'J001'+P+'1'+P);
-    add(P+'J990'+P+'2'+P);
+    // ── BLOCO J ──────────────────────────────────────────────────────────
+    add(P+'J001'+P+'0'+P);
+
+    // J005 — identificacao do BP e DRE
+    // |J005|DT_INI|DT_FIN|MOEDA|ESCALA_MON|IND_ESC|NOME_AUDITOR|NR_CRC_AUDITOR|CNPJ_AUDITOR|
+    add(P+'J005'+P+dtIni+P+dtFin+P+'BRL'+P+'1'+P+'1'+P+P+P+P);
+
+    // J100 — Balanco Patrimonial (contas ASSET, LIABILITY, EQUITY)
+    // |J100|COD_CTA|DESC_CTA|COD_CTA_SUPERIOR|COD_NAT|IND_CTA|NÍVEL|VL_CTA_FIN|IND_DC_FIN|
+    const bpTypes = new Set(['ASSET', 'LIABILITY', 'EQUITY']);
+    for (const acc of accounts) {
+      if (!bpTypes.has(acc.type.toString())) continue;
+      const saldo      = rollupMap.get(acc.id) ?? 0;
+      if (saldo === 0 && !acc.isAnalytic) continue; // omitir sinteticas zeradas
+      const parentCode = acc.parentId ? (codeById.get(acc.parentId) ?? '') : '';
+      const natCode    = this.typeToNat(acc.type.toString());
+      const indCta     = acc.isAnalytic ? 'A' : 'S';
+      const dc         = saldo >= 0 ? 'D' : 'C';
+      add(P+'J100'+P+acc.code+P+acc.name+P+parentCode+P+natCode+P+indCta+P+acc.level+P+this.fmtDec(Math.abs(saldo))+P+dc+P);
+    }
+
+    // J150 — totais do BP por nivel (linhas de nivel 1)
+    // |J150|COD_AGL|DESC_AGL|VL_CTA|IND_DC|
+    const nivel1Bp = accounts.filter(a => a.level === 1 && bpTypes.has(a.type.toString()));
+    for (const acc of nivel1Bp) {
+      const saldo = rollupMap.get(acc.id) ?? 0;
+      const dc    = saldo >= 0 ? 'D' : 'C';
+      add(P+'J150'+P+acc.code+P+acc.name+P+this.fmtDec(Math.abs(saldo))+P+dc+P);
+    }
+
+    // J210 — DRE (contas REVENUE, EXPENSE)
+    // |J210|COD_CTA|DESC_CTA|COD_CTA_SUPERIOR|COD_NAT|IND_CTA|NÍVEL|VL_CTA_FIN|IND_DC_FIN|
+    const dreTypes = new Set(['REVENUE', 'EXPENSE']);
+    for (const acc of accounts) {
+      if (!dreTypes.has(acc.type.toString())) continue;
+      const mv    = dreRollup.get(acc.id) ?? { deb: 0, cre: 0 };
+      const saldo = mv.cre - mv.deb; // receita positiva = credito; despesa positiva = debito
+      if (saldo === 0 && !acc.isAnalytic) continue;
+      const parentCode = acc.parentId ? (codeById.get(acc.parentId) ?? '') : '';
+      const natCode    = this.typeToNat(acc.type.toString());
+      const indCta     = acc.isAnalytic ? 'A' : 'S';
+      const dc         = saldo >= 0 ? 'C' : 'D';
+      add(P+'J210'+P+acc.code+P+acc.name+P+parentCode+P+natCode+P+indCta+P+acc.level+P+this.fmtDec(Math.abs(saldo))+P+dc+P);
+    }
+
+    // J215 — totais DRE por nivel 1
+    // |J215|COD_AGL|DESC_AGL|VL_CTA|IND_DC|
+    const nivel1Dre = accounts.filter(a => a.level === 1 && dreTypes.has(a.type.toString()));
+    for (const acc of nivel1Dre) {
+      const mv    = dreRollup.get(acc.id) ?? { deb: 0, cre: 0 };
+      const saldo = mv.cre - mv.deb;
+      const dc    = saldo >= 0 ? 'C' : 'D';
+      add(P+'J215'+P+acc.code+P+acc.name+P+this.fmtDec(Math.abs(saldo))+P+dc+P);
+    }
+
+    // J900 — encerramento bloco J
+    const idxJ001   = lines.findIndex(l => l === P+'J001'+P+'0'+P);
+    const blocoJQtd = lines.length - idxJ001;
+    add(P+'J900'+P+(blocoJQtd + 1)+P);
+
+    // BLOCO K (vazio)
     add(P+'K001'+P+'1'+P);
     add(P+'K990'+P+'2'+P);
 
