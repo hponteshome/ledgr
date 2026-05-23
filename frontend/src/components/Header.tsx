@@ -313,64 +313,6 @@ export const Header: React.FC<{ sidebarOpen: boolean }> = ({ sidebarOpen }) => {
                   </div>
                 )}
               </div>
-
-              {/* MONTH SELECTOR */}
-              <div className="relative month-trigger">
-                <button
-                  onClick={() => setIsMonthOpen(!isMonthOpen)}
-                  className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 rounded-lg transition-all border border-transparent hover:border-gray-200"
-                >
-                  <FiCalendar size={16} className="text-blue-600" />
-                  <span className="text-sm font-bold text-gray-800 hidden sm:block">
-                    {formatMonthYearShort(activeMonth)}
-                  </span>
-                  <FiChevronDown size={14} className={`text-gray-400 transition-transform ${isMonthOpen ? 'rotate-180' : ''}`} />
-                </button>
-
-                {isMonthOpen && (
-                  <div className="month-dropdown absolute top-full left-0 mt-2 w-64 bg-white border border-gray-200 rounded-xl shadow-xl p-4 z-50">
-                    <div className="mb-4">
-                      <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Digite MM/AA</label>
-                      <input
-                        ref={monthInputRef}
-                        type="text"
-                        value={monthInput}
-                        onChange={handleMonthInputChange}
-                        onKeyDown={handleMonthInputKeyDown}
-                        onBlur={handleMonthInputBlur}
-                        placeholder="12/24"
-                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-center font-mono"
-                        maxLength={5}
-                      />
-                      {inputError && <p className="text-xs text-red-600 mt-1">{inputError}</p>}
-                    </div>
-                    <div className="relative mb-4">
-                      <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-200"></div></div>
-                      <div className="relative flex justify-center text-xs"><span className="px-2 bg-white text-gray-400">ou</span></div>
-                    </div>
-                    <div>
-                      <div className="flex items-center justify-between mb-3">
-                        <button onClick={handlePrevYear} className="p-1 hover:bg-gray-100 rounded-lg"><FiChevronLeft size={18} /></button>
-                        <span className="text-sm font-bold text-gray-700">{calendarYear}</span>
-                        <button onClick={handleNextYear} className="p-1 hover:bg-gray-100 rounded-lg"><FiChevronRight size={18} /></button>
-                      </div>
-                      <div className="grid grid-cols-3 gap-2">
-                        {months.map((month, index) => (
-                          <button
-                            key={index}
-                            onClick={() => handleSelectMonth(calendarYear, index)}
-                            className={`px-2 py-2 text-xs font-medium rounded-lg ${activeMonth.getMonth() === index && activeMonth.getFullYear() === calendarYear
-                              ? 'bg-blue-600 text-white' : 'hover:bg-gray-100 text-gray-700'
-                              }`}
-                          >
-                            {month.slice(0, 3)}.
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
             </div>
           ) : (
             <div className="text-center">
