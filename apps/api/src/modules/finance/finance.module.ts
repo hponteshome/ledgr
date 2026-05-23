@@ -15,11 +15,13 @@ import { AccountsReceivableController } from './accounts-receivable.controller';
 import { AccountsReceivableService } from './accounts-receivable.service';
 import { CashflowController } from './cashflow.controller';
 import { CashflowService } from './cashflow.service';
+import { PettyCashController } from './petty-cash.controller';
+import { PettyCashService } from './petty-cash.service';
 
 @Module({
   imports: [PrismaModule],
-  controllers: [FinanceController, ProvisaoController, FechamentoController, AccountsReceivableController, CashflowController],
-  providers: [FinanceService, IntegrationService, AgendaService, ProvisaoService, FechamentoService, AccountsReceivableService, CashflowService],
+  controllers: [FinanceController, ProvisaoController, FechamentoController, AccountsReceivableController, CashflowController, PettyCashController],
+  providers: [FinanceService, IntegrationService, AgendaService, ProvisaoService, FechamentoService, AccountsReceivableService, CashflowService, PettyCashService],
   exports: [FinanceService, AgendaService, IntegrationService, ProvisaoService, FechamentoService, AccountsReceivableService],
 })
 export class FinanceModule {}

@@ -189,6 +189,8 @@ model Company {
   accountingConfigs CompanyAccountingConfig[]
   informesRendimentos InformeRendimentos[]
   arEntries         ArEntry[]
+  pettyCash        PettyCash[]
+  pettyCashEntries PettyCashEntry[]
   
   @@map("companies")
 }
@@ -319,6 +321,7 @@ model Person {
   informesRendimentos InformeRendimentos[]
   employees         Employee[] @relation("EmployeePerson")
   arEntries        ArEntry[]  @relation("ArEntryCustomer")
+  pettyCashFunds   PettyCash[]  @relation("PettyCashResponsible")
   @@map("persons")
 }
 
@@ -2807,4 +2810,77 @@ model InformeRendimentos {
 
   @@unique([companyId, personId, anoCalendario])
   @@map("informes_rendimentos")
+}
+
+// =============================================================================
+// FUNDO FIXO / CAIXA PEQUENO
+// =============================================================================
+
+enum PettyCashEntryType {
+  OPENING
+  EXPENSE
+  REPLENISHMENT
+}
+
+enum PettyCashCategory {
+  ALIMENTACAO
+  TRANSPORTE
+  MATERIAL_ESCRITORIO
+  LIMPEZA
+  CORREIOS
+  MANUTENCAO
+  OUTROS
+}
+
+/// Configuração do fundo fixo da empresa.
+model PettyCash {
+  id            String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId     String  @map("company_id") @db.Uuid
+  name          String  @map("name") @db.VarChar(100)
+  targetBalance Decimal @map("target_balance") @db.Decimal(15, 2)
+  alertThreshold Decimal @map("alert_threshold") @db.Decimal(15, 2)
+  currentBalance Decimal @default(0) @map("current_balance") @db.Decimal(15, 2)
+
+  responsibleId    String? @map("responsible_id") @db.Uuid
+  expenseAccountId String? @map("expense_account_id") @db.Uuid
+  cashAccountId    String? @map("cash_account_id") @db.Uuid
+
+  active    Boolean  @default(true) @map("active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  company     Company       @relation(fields: [companyId], references: [id])
+  responsible Person?       @relation("PettyCashResponsible", fields: [responsibleId], references: [id])
+  entries     PettyCashEntry[]
+
+  @@index([companyId])
+  @@map("petty_cash")
+}
+
+/// Movimentos do fundo fixo.
+model PettyCashEntry {
+  id           String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  pettyCashId  String              @map("petty_cash_id") @db.Uuid
+  companyId    String              @map("company_id") @db.Uuid
+  type         PettyCashEntryType  @map("type")
+  category     PettyCashCategory?  @map("category")
+  date         DateTime            @map("date") @db.Timestamp(6)
+  amount       Decimal             @map("amount") @db.Decimal(15, 2)
+  description  String              @map("description") @db.Text
+  receiptRef   String?             @map("receipt_ref") @db.VarChar(100)
+  supplier     String?             @map("supplier") @db.VarChar(200)
+  balanceAfter Decimal             @map("balance_after") @db.Decimal(15, 2)
+
+  journalEntryId String? @map("journal_entry_id") @db.Uuid
+
+  createdById String   @map("created_by_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  pettyCash    PettyCash @relation(fields: [pettyCashId], references: [id])
+  company      Company   @relation(fields: [companyId], references: [id])
+
+  @@index([pettyCashId])
+  @@index([companyId, date])
+  @@map("petty_cash_entries")
 }
