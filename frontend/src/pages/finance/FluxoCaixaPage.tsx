@@ -25,6 +25,10 @@ export default function FluxoCaixaPage() {
   const [bancario, setBancario] = useState<any>(null);
   const [view, setView]       = useState<'mensal'|'grafico'|'bancario'>('mensal');
 
+  const MESES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  const parseYM = (ym: string) => ({ y: ym.split('-')[0], m: ym.split('-')[1] });
+  const fromP = parseYM(from); const toP = parseYM(to);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -74,11 +78,25 @@ export default function FluxoCaixaPage() {
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
           <div>
             <label style={{ fontSize: 11, color: '#9CA3AF', display: 'block', marginBottom: 3 }}>De</label>
-            <input type="month" value={from} onChange={e => setFrom(e.target.value)} style={S.input} />
+            <div style={{ display: 'flex', gap: 4 }}>
+              <select value={fromP.m} onChange={e => setFrom(fromP.y + '-' + e.target.value)} style={{ ...S.input, width: 80 }}>
+                {MESES.map((ml, i) => <option key={i} value={String(i+1).padStart(2,'0')}>{ml}</option>)}
+              </select>
+              <select value={fromP.y} onChange={e => setFrom(e.target.value + '-' + fromP.m)} style={{ ...S.input, width: 80 }}>
+                {[2023,2024,2025,2026,2027].map(y => <option key={y} value={String(y)}>{y}</option>)}
+              </select>
+            </div>
           </div>
           <div>
             <label style={{ fontSize: 11, color: '#9CA3AF', display: 'block', marginBottom: 3 }}>Até</label>
-            <input type="month" value={to} onChange={e => setTo(e.target.value)} style={S.input} />
+            <div style={{ display: 'flex', gap: 4 }}>
+              <select value={toP.m} onChange={e => setTo(toP.y + '-' + e.target.value)} style={{ ...S.input, width: 80 }}>
+                {MESES.map((ml, i) => <option key={i} value={String(i+1).padStart(2,'0')}>{ml}</option>)}
+              </select>
+              <select value={toP.y} onChange={e => setTo(e.target.value + '-' + toP.m)} style={{ ...S.input, width: 80 }}>
+                {[2023,2024,2025,2026,2027].map(y => <option key={y} value={String(y)}>{y}</option>)}
+              </select>
+            </div>
           </div>
           <div>
             <label style={{ fontSize: 11, color: '#9CA3AF', display: 'block', marginBottom: 3 }}>Imóvel</label>
