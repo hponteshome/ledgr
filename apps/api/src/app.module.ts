@@ -1,5 +1,6 @@
 // app.module.ts
 import { join } from 'path';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_INTERCEPTOR } from '@nestjs/core';
@@ -29,6 +30,7 @@ import { SignaturesModule } from './modules/signatures/signatures.module';
 
 @Module({
   imports: [
+    DashboardModule,
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: join(process.cwd(), '../../.env'),
@@ -66,4 +68,5 @@ import { SignaturesModule } from './modules/signatures/signatures.module';
 export class AppModule {
   constructor() {}
 }
+
 

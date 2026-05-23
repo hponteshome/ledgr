@@ -3,7 +3,7 @@ import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { LedgrHome } from '../pages/LedgrHome';
-import { Dashboard } from '../pages/Dashboard';
+import DashboardPage from '../pages/DashboardPage';
 import FinancePage from '../pages/finance/FinancePage';
 import BankImport from '../pages/finance/BankImportPage';
 import ProvisoesPage from '../pages/finance/ProvisoesPage';
@@ -88,7 +88,7 @@ export const AppRoutes = () => {
                 <Route path="app" element={<Navigate to="/app/dashboard" replace />} />
 
                 {/* Dashboard & Financeiro */}
-                <Route path="app/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+                <Route path="app/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
                 <Route path="app/finance/" element={<ProtectedRoute><FinancePage /></ProtectedRoute>} />
                 <Route path="app/finance/bank-import" element={<ProtectedRoute><BankImport /></ProtectedRoute>} />
 
@@ -218,6 +218,8 @@ export const AppRoutes = () => {
         </Routes>
     );
 };
+
+
 
 
 

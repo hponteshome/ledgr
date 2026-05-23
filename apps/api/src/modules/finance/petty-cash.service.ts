@@ -28,7 +28,7 @@ export class PettyCashService {
     const targetBalance = new Prisma.Decimal(String(dto.targetBalance).replace(',','.'));
     const alertThreshold = new Prisma.Decimal(String(dto.alertThreshold).replace(',','.'));
 
-    return this.prisma.(async (tx) => {
+    return this.prisma.$transaction(async (tx) => {
       const fund = await tx.pettyCash.create({
         data: {
           companyId,

@@ -1,0 +1,228 @@
+// frontend/src/pages/hr/EmployeeImportModal.tsx
+import React, { useState, useRef } from 'react';
+import { FiX, FiUpload, FiCheckCircle, FiAlertTriangle, FiEdit2, FiUser } from 'react-icons/fi';
+
+interface Props { onClose: () => void; onSuccess: () => void; }
+
+const API = 'http://localhost:3000';
+
+function fmtCpf(v: string) { return v?.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') ?? v; }
+function fmtDate(s: string | null) { if (!s) return '—'; try { return new Date(s + 'T12:00:00').toLocaleDateString('pt-BR'); } catch { return s; } }
+function fmtSalary(v: number | null) { return v ? v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—'; }
+
+const FIELD_LABELS: Record<string, string> = {
+  fullName: 'Nome', taxId: 'CPF', birthDate: 'Nascimento', hireDate: 'Admissão',
+  role: 'Função', salary: 'Salário', weeklyHours: 'Horas/Sem', maritalStatus: 'Est. Civil',
+  motherName: 'Mãe', phone: 'Telefone', street: 'Endereço', city: 'Cidade',
+  addressState: 'UF', zipCode: 'CEP', rgNumber: 'RG', pisNumber: 'PIS',
+  ctpsNumber: 'CTPS', educationLevel: 'Escolaridade', lotacao: 'Lotação',
+};
+
+export const EmployeeImportModal: React.FC<Props> = ({ onClose, onSuccess }) => {
+  const [step, setStep]         = useState<'upload' | 'preview' | 'importing' | 'done'>('upload');
+  const [file, setFile]         = useState<File | null>(null);
+  const [loading, setLoading]   = useState(false);
+  const [employees, setEmployees] = useState<any[]>([]);
+  const [selected, setSelected] = useState<number | null>(null);
+  const [results, setResults]   = useState<any[]>([]);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const token   = localStorage.getItem('@ledgr:token');
+  const company = JSON.parse(localStorage.getItem('@ledgr:activeCompany') ?? '{}');
+  const headers = { Authorization: `Bearer ${token}`, 'x-company-id': company.id ?? '' };
+
+  async function handleParse() {
+    if (!file) return;
+    setLoading(true);
+    try {
+      const fd = new FormData(); fd.append('file', file);
+      const res = await fetch(`${API}/hr/employees/parse-pdf`, { method: 'POST', headers, body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message ?? 'Erro ao processar PDF');
+      setEmployees(data);
+      setStep('preview');
+    } catch (e: any) { alert(e.message); }
+    finally { setLoading(false); }
+  }
+
+  async function handleImport() {
+    setStep('importing');
+    try {
+      const res = await fetch(`${API}/hr/employees/import-batch`, {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ employees }),
+      });
+      const data = await res.json();
+      setResults(data);
+      setStep('done');
+      onSuccess();
+    } catch (e: any) { alert(e.message); setStep('preview'); }
+  }
+
+  function updateField(idx: number, field: string, value: any) {
+    setEmployees(prev => prev.map((e, i) => i === idx ? { ...e, [field]: value } : e));
+  }
+
+  const ok    = employees.filter(e => e.taxId && e.fullName && e.hireDate).length;
+  const warn  = employees.length - ok;
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+      <div style={{ background: '#fff', borderRadius: 14, width: 900, maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,.18)' }}>
+
+        {/* Header */}
+        <div style={{ padding: '14px 20px', borderBottom: '0.5px solid #E5E7EB', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#F0F9FF' }}>
+          <div>
+            <span style={{ fontSize: 11, fontWeight: 600, color: '#0369A1' }}>◆ RH</span>
+            <h2 style={{ margin: '2px 0 0', fontSize: 15, fontWeight: 500, color: '#111' }}>Importar Funcionários — Ficha Cadastral</h2>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6B7280' }}><FiX size={18} /></button>
+        </div>
+
+        <div style={{ padding: 20, overflowY: 'auto', flex: 1 }}>
+
+          {/* STEP 1: Upload */}
+          {step === 'upload' && (
+            <div>
+              <p style={{ fontSize: 13, color: '#6B7280', marginBottom: 16 }}>
+                Selecione o PDF de <strong>Relação do Cadastro de Funcionários</strong> exportado do sistema de folha de pagamento. O sistema extrai automaticamente os dados de cada funcionário.
+              </p>
+              <div onClick={() => fileRef.current?.click()} style={{ border: '2px dashed #D1D5DB', borderRadius: 10, padding: '40px 24px', textAlign: 'center', cursor: 'pointer', background: file ? '#F0FDF4' : '#F9FAFB' }}>
+                <FiUpload size={28} style={{ color: file ? '#15803D' : '#9CA3AF', marginBottom: 10 }} />
+                <p style={{ fontSize: 14, color: file ? '#15803D' : '#6B7280', margin: 0, fontWeight: 500 }}>{file ? file.name : 'Clique para selecionar o PDF'}</p>
+                {file && <p style={{ fontSize: 11, color: '#9CA3AF', margin: '4px 0 0' }}>{(file.size / 1024).toFixed(1)} KB</p>}
+              </div>
+              <input ref={fileRef} type="file" accept=".pdf" style={{ display: 'none' }} onChange={e => setFile(e.target.files?.[0] ?? null)} />
+            </div>
+          )}
+
+          {/* STEP 2: Preview */}
+          {step === 'preview' && (
+            <div>
+              {/* KPIs */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8, marginBottom: 16 }}>
+                {[
+                  { label: 'Funcionários', value: employees.length, color: '#111' },
+                  { label: 'Prontos', value: ok, color: '#15803D' },
+                  { label: 'Incompletos', value: warn, color: warn > 0 ? '#D97706' : '#15803D' },
+                  { label: 'Empresa', value: company.name ?? '—', color: '#0369A1' },
+                ].map(k => (
+                  <div key={k.label} style={{ background: '#F9FAFB', border: '0.5px solid #E5E7EB', borderRadius: 8, padding: '10px 14px' }}>
+                    <div style={{ fontSize: 10, color: '#9CA3AF', textTransform: 'uppercase', marginBottom: 4 }}>{k.label}</div>
+                    <div style={{ fontSize: 16, fontWeight: 500, color: k.color }}>{k.value}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Lista de funcionários */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {employees.map((emp, idx) => {
+                  const isOk = emp.taxId && emp.fullName && emp.hireDate;
+                  const isOpen = selected === idx;
+                  return (
+                    <div key={idx} style={{ border: `0.5px solid ${isOk ? '#BBF7D0' : '#FED7AA'}`, borderRadius: 10, overflow: 'hidden' }}>
+                      {/* Linha resumo */}
+                      <div onClick={() => setSelected(isOpen ? null : idx)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', cursor: 'pointer', background: isOpen ? '#F9FAFB' : '#fff' }}>
+                        <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#EFF6FF', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <FiUser size={16} color="#3B82F6" />
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 13, fontWeight: 500, color: '#111' }}>{emp.fullName || <span style={{ color: '#EF4444' }}>Nome não extraído</span>}</div>
+                          <div style={{ fontSize: 11, color: '#6B7280', marginTop: 2 }}>
+                            CPF: {emp.taxId ? fmtCpf(emp.taxId) : <span style={{ color: '#EF4444' }}>ausente</span>}
+                            {emp.role && <> · {emp.role}</>}
+                            {emp.salary && <> · {fmtSalary(emp.salary)}</>}
+                            {emp.hireDate && <> · Admissão: {fmtDate(emp.hireDate)}</>}
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          {isOk ? <FiCheckCircle size={16} color="#15803D" /> : <FiAlertTriangle size={16} color="#D97706" />}
+                          <FiEdit2 size={14} color="#9CA3AF" />
+                        </div>
+                      </div>
+
+                      {/* Detalhes editáveis */}
+                      {isOpen && (
+                        <div style={{ padding: '12px 14px', borderTop: '0.5px solid #F3F4F6', background: '#FAFAFA' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10 }}>
+                            {Object.entries(FIELD_LABELS).map(([field, label]) => (
+                              <div key={field}>
+                                <div style={{ fontSize: 10, color: '#9CA3AF', marginBottom: 3, fontWeight: 600, textTransform: 'uppercase' }}>{label}</div>
+                                <input
+                                  style={{ width: '100%', boxSizing: 'border-box' as const, border: '0.5px solid #E5E7EB', borderRadius: 6, padding: '5px 8px', fontSize: 12, outline: 'none' }}
+                                  value={emp[field] ?? ''}
+                                  onChange={e => updateField(idx, field, e.target.value)}
+                                />
+                              </div>
+                            ))}
+                          </div>
+                          {emp.dependents?.length > 0 && (
+                            <div style={{ marginTop: 12 }}>
+                              <div style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', marginBottom: 6 }}>DEPENDENTES ({emp.dependents.length})</div>
+                              {emp.dependents.map((d: any, di: number) => (
+                                <div key={di} style={{ fontSize: 12, color: '#374151', padding: '3px 0', borderBottom: '0.5px solid #F3F4F6' }}>
+                                  {d.name} · {d.relationship} · {fmtDate(d.birthDate)} · SF: {d.salaryFamily ? 'S' : 'N'} · IR: {d.irDeduction ? 'S' : 'N'}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* STEP: Importing */}
+          {step === 'importing' && (
+            <div style={{ textAlign: 'center', padding: '40px 0' }}>
+              <div style={{ fontSize: 14, color: '#6B7280' }}>Importando funcionários...</div>
+            </div>
+          )}
+
+          {/* STEP: Done */}
+          {step === 'done' && (
+            <div>
+              <div style={{ textAlign: 'center', marginBottom: 20 }}>
+                <FiCheckCircle size={40} color="#15803D" style={{ marginBottom: 12 }} />
+                <h3 style={{ fontSize: 16, fontWeight: 500, color: '#111', margin: '0 0 6px' }}>Importação concluída</h3>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {results.map((r, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 8, background: r.success ? '#F0FDF4' : '#FEF2F2', border: `0.5px solid ${r.success ? '#BBF7D0' : '#FECACA'}` }}>
+                    {r.success ? <FiCheckCircle size={14} color="#15803D" /> : <FiAlertTriangle size={14} color="#EF4444" />}
+                    <span style={{ fontSize: 13, color: '#111', flex: 1 }}>{r.name}</span>
+                    {r.error && <span style={{ fontSize: 11, color: '#EF4444' }}>{r.error}</span>}
+                    {r.success && <span style={{ fontSize: 11, color: '#15803D' }}>Importado</span>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding: '12px 20px', borderTop: '0.5px solid #E5E7EB', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <button onClick={onClose} style={{ padding: '8px 16px', borderRadius: 8, border: '0.5px solid #D1D5DB', background: '#fff', color: '#374151', fontSize: 13, cursor: 'pointer' }}>
+            {step === 'done' ? 'Fechar' : 'Cancelar'}
+          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {step === 'upload' && (
+              <button onClick={handleParse} disabled={!file || loading} style={{ padding: '8px 20px', borderRadius: 8, border: 'none', background: '#0369A1', color: '#fff', fontSize: 13, fontWeight: 500, cursor: 'pointer', opacity: !file || loading ? 0.5 : 1 }}>
+                {loading ? 'Processando...' : 'Extrair Dados do PDF'}
+              </button>
+            )}
+            {step === 'preview' && (
+              <button onClick={handleImport} disabled={ok === 0} style={{ padding: '8px 20px', borderRadius: 8, border: 'none', background: ok > 0 ? '#15803D' : '#9CA3AF', color: '#fff', fontSize: 13, fontWeight: 500, cursor: ok > 0 ? 'pointer' : 'not-allowed' }}>
+                Importar {ok} Funcionário{ok !== 1 ? 's' : ''}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};

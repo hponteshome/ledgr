@@ -25,6 +25,13 @@ export class AccountsPayableController {
     return this.service.findAll(companyId, filters);
   }
 
+  @Get('aging')
+  async aging(
+    @Company() companyId: string,
+  ) {
+    return this.service.getPositionReport(companyId);
+  }
+
   @Get(':id')
   async findOne(
     @Company() companyId: string,
