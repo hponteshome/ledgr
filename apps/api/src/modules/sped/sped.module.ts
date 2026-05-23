@@ -11,6 +11,7 @@ import { PrismaService } from '@/prisma/prisma.service';
 import { EcdParserService } from './ecd/services/ecd-parser.service';
 import { EcdImporterService } from './ecd/services/ecd-importer.service';
 import { EcdExporterService } from './ecd/services/ecd-exporter.service';
+import { EcdPreValidateService } from './ecd/services/ecd-pre-validate.service';
 import { EcdValidatorService } from './ecd/services/ecd-validator.service';
 import { EcdController } from './ecd/controllers/ecd.controller';
 import { EcdViewerService } from './ecd/services/ecd-viewer.service';
@@ -43,6 +44,7 @@ import { EcfController } from './ecf/controllers/ecf.controller';
     EcdImporterService,
     EcdViewerService,
     EcdExporterService,
+    EcdPreValidateService,
     EcdValidatorService,
 
     // ECF
@@ -53,6 +55,7 @@ import { EcfController } from './ecf/controllers/ecf.controller';
   exports: [
     EcdParserService,
     EcdExporterService,
+    EcdPreValidateService,
     EcfParserService,   // ← ADICIONADO
   ],
 })

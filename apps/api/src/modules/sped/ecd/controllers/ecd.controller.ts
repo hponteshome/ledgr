@@ -13,6 +13,7 @@ import { EcdParserService } from './../services/ecd-parser.service';
 import { EcdImporterService } from './../services/ecd-importer.service';
 import { EcdExporterService } from './../services/ecd-exporter.service';
 import { EcdValidatorService } from './../services/ecd-validator.service';
+import { EcdPreValidateService } from './../services/ecd-pre-validate.service';
 import { PrismaService } from '@prisma/prisma.service';
 
 @Controller('sped/ecd')
@@ -23,6 +24,7 @@ export class EcdController {
     private importer: EcdImporterService,
     private exporter: EcdExporterService,
     private validator: EcdValidatorService,
+    private preValidator: EcdPreValidateService,
     private prisma: PrismaService,
   ) {}
 
@@ -141,6 +143,17 @@ export class EcdController {
   }
 
   // ── GET /sped/ecd/export — gera arquivo .txt ─────────────────
+  @Get('pre-validate')
+  async preValidate(
+    @Query('periodStart') periodStart: string,
+    @Query('periodEnd') periodEnd: string,
+    @Req() req: any,
+  ) {
+    const companyId = req.headers['x-company-id'];
+    if (!periodStart || !periodEnd) throw new BadRequestException('Informe periodStart e periodEnd (YYYY-MM-DD).');
+    return this.preValidator.validate(companyId, new Date(periodStart), new Date(periodEnd));
+  }
+
   @Get('export')
   async export(
     @Query('periodStart') periodStart: string,
