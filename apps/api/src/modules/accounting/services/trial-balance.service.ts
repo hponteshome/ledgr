@@ -196,22 +196,22 @@ select: {
   //   - Créditos       : créditos do período
   //   - Saldo Final    : saldo anterior + débitos - créditos do período
   // ═══════════════════════════════════════════════════════════════════════════
-
   async getVerificationBalance(companyId: string, startDate: Date, endDate: Date) {
     const start       = this.toUTCStart(startDate);
     const end         = this.toUTCEnd(endDate);
     const beginning   = new Date(Date.UTC(1900, 0, 1));
     const beforeStart = new Date(start.getTime() - 1);
+    const accounts    = await this.getAccounts(companyId);
 
-    const accounts = await this.getAccounts(companyId);
-
+    // Movimentos reais antes do periodo (lancamentos historicos)
     const prevMap = await this.getMovements(companyId, beginning, beforeStart);
     this.rollUp(accounts, prevMap);
 
+    // Movimentos do periodo
     const periodMap = await this.getMovements(companyId, start, end);
     this.rollUp(accounts, periodMap);
 
-    // Fallback: AccountBalance (I155) para contas sem lancamentos anteriores
+    // I155: saldos de abertura do ECD — apenas para analiticas sem lancamentos historicos
     const accountBalances = await this.prisma.accountBalance.findMany({
       where: { companyId, referenceDate: { lt: start } },
       orderBy: { referenceDate: "desc" },
@@ -222,19 +222,42 @@ select: {
         i155Map.set(ab.accountId, Number(ab.balance));
     }
 
+    // Mapa auxiliar: accountId -> previousBalance ja resolvido
+    // Para analiticas: prevMap se != 0, senao i155Map
+    // Para sinteticas: sera calculado bottom-up abaixo
+    const prevBalMap = new Map<string, number>();
+
+    // 1) Resolver analiticas primeiro
+    for (const acc of accounts) {
+      if (!acc.isAnalytic) continue;
+      const mov = prevMap.get(acc.id) ?? { debits: 0, credits: 0 };
+      const fromMov = mov.debits - mov.credits;
+      if (fromMov !== 0) {
+        prevBalMap.set(acc.id, fromMov);
+      } else if (i155Map.has(acc.id)) {
+        prevBalMap.set(acc.id, i155Map.get(acc.id)!);
+      } else {
+        prevBalMap.set(acc.id, 0);
+      }
+    }
+
+    // 2) Propagar bottom-up para sinteticas (filhos ja resolvidos)
+    // Ordenar por codigo decrescente garante filhos antes dos pais
+    const idToCode = new Map(accounts.map(a => [a.id, a.code]));
+    const sorted = [...accounts].sort((a, b) => idToCode.get(b.id)!.localeCompare(idToCode.get(a.id)!));
+    for (const acc of sorted) {
+      if (!acc.parentId) continue;
+      const childBal = prevBalMap.get(acc.id) ?? 0;
+      prevBalMap.set(acc.parentId, (prevBalMap.get(acc.parentId) ?? 0) + childBal);
+    }
+
     const balances = accounts
       .map(account => {
-        const prev   = prevMap.get(account.id)   ?? { debits: 0, credits: 0 };
-        const period = periodMap.get(account.id) ?? { debits: 0, credits: 0 };
-
-        let previousBalance = prev.debits - prev.credits;
-        if (previousBalance === 0 && i155Map.has(account.id))
-          previousBalance = i155Map.get(account.id)!;
-
-        const debits         = period.debits;
-        const credits        = period.credits;
+        const previousBalance = prevBalMap.get(account.id) ?? 0;
+        const period  = periodMap.get(account.id) ?? { debits: 0, credits: 0 };
+        const debits  = period.debits;
+        const credits = period.credits;
         const currentBalance = previousBalance + debits - credits;
-
         if (previousBalance === 0 && debits === 0 && credits === 0) return null;
         return { account, previousBalance, debits, credits, currentBalance, hasData: true };
       })
