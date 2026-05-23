@@ -414,4 +414,11 @@ export class AssetsService {
       };
     });
   }
+  async findProperties(companyId: string) {
+    return this.prisma.property.findMany({
+      where: { companyId, deletedAt: null },
+      orderBy: { street: 'asc' },
+      select: { id: true, street: true, number: true, complement: true, neighborhood: true, city: true, state: true, zipCode: true, propertyTaxId: true },
+    });
+  }
 }

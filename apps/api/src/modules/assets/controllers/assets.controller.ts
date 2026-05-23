@@ -134,6 +134,11 @@ export class AssetsController {
     );
   }
 
+  @Get('properties')
+  findProperties(@Req() req: any) {
+    return this.assetsService.findProperties(req.companyId);
+  }
+
   @Get(':id')
   findOne(@Req() req: any, @Param('id') id: string) {
     return this.assetsService.findOne(req.companyId, id);

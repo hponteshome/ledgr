@@ -36,14 +36,12 @@ export default function FluxoCaixaPage() {
     finally { setLoading(false); }
   }, [from, to, propertyId]);
 
-  const loadBancario = useCallback(async () => {
-    try {
-      const { data: d } = await api.get('/finance/cashflow/bancario', { params: { from, to } });
-      setBancario(d);
-    } catch { }
-  }, [from, to]);
-
-  useEffect(() => { if (view === 'bancario') loadBancario(); }, [view, loadBancario]);
+  useEffect(() => {
+    if (view !== 'bancario') return;
+    api.get('/finance/cashflow/bancario', { params: { from, to } })
+      .then(r => setBancario(r.data))
+      .catch(() => {});
+  }, [view, from, to]);
 
   useEffect(() => { load(); }, [load]);
 
