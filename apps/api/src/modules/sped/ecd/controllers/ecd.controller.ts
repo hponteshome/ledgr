@@ -172,9 +172,9 @@ export class EcdController {
     const year     = new Date(periodEnd).getFullYear();
     const filename = `ECD_${cnpj}_${year}.txt`;
 
-    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Content-Type', 'text/plain; charset=iso-8859-1');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    res.send(content);
+    res.end(content);
   }
 
   // ── GET /sped/ecd/imports — histórico de importações ─────────
