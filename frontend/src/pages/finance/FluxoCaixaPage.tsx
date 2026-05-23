@@ -87,7 +87,7 @@ export default function FluxoCaixaPage() {
             </select>
           </div>
           <div style={{ display: 'flex', gap: 6, marginTop: 18 }}>
-            {(['mensal','grafico'] as const).map(v => (
+            {(['mensal','grafico','bancario'] as const).map(v => (
               <button key={v} onClick={() => setView(v)} style={{ padding: '6px 14px', borderRadius: 6, border: `0.5px solid ${view===v ? AC : '#E5E7EB'}`, background: view===v ? AC : '#fff', color: view===v ? '#fff' : '#374151', fontSize: 12, cursor: 'pointer', fontWeight: view===v ? 600 : 400 }}>
                 {v === 'mensal' ? '📋 Tabela' : v === 'grafico' ? '📊 Gráfico' : '🏦 Bancário'}
               </button>
@@ -190,7 +190,7 @@ export default function FluxoCaixaPage() {
                 { label: 'Total Saídas',   value: bancario.totals.debits,  color: '#B91C1C' },
                 { label: 'Saldo Período',  value: bancario.totals.balance, color: bancario.totals.balance >= 0 ? '#0369A1' : '#B91C1C' },
               ].map(k => (
-                <div key={k.label} style={{ background: '#fff', border: '0.5px solid #E5E7EB', borderRadius: 10, padding: '12px 16px', borderTop: '3px solid ' + k.color }}}>
+                <div key={k.label} style={{ background: '#fff', border: '0.5px solid #E5E7EB', borderRadius: 10, padding: '12px 16px', borderTop: '3px solid ' + k.color }}>
                   <div style={{ fontSize: 10, color: '#9CA3AF', textTransform: 'uppercase', marginBottom: 4 }}>{k.label}</div>
                   <div style={{ fontSize: 18, fontWeight: 700, color: k.color }}>{fmtBRL(k.value)}</div>
                 </div>
