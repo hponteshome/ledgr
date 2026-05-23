@@ -68,7 +68,11 @@ export default function PettyCashPage() {
 
   async function handleCreateFund() {
     try {
-      await api.post('/finance/petty-cash', newFund);
+      await api.post('/finance/petty-cash', {
+        ...newFund,
+        targetBalance:  parseFloat(newFund.targetBalance.replace(',','.')),
+        alertThreshold: parseFloat(newFund.alertThreshold.replace(',','.')),
+      });
       setShowFund(false);
       setRefreshKey(k=>k+1);
     } catch(e:any) { alert(e?.response?.data?.message ?? 'Erro'); }
