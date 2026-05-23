@@ -18,6 +18,11 @@ export class CashflowController {
     };
   }
 
+  @Get('min-year')
+  minYear(@Req() req: any) {
+    return this.service.minYear(req.companyId);
+  }
+
   @Get('gerencial')
   gerencial(@Req() req: any, @Query() q: any) {
     const { from, to } = this.defaults(q);

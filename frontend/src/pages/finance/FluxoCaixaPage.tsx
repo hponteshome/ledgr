@@ -20,6 +20,7 @@ export default function FluxoCaixaPage() {
   const [to, setTo]           = useState(`${year}-12`);
   const [propertyId, setPropertyId] = useState('');
   const [properties, setProperties] = useState<any[]>([]);
+  const [minYear, setMinYear] = useState(2021);
   const [data, setData]       = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [bancario, setBancario] = useState<any>(null);
@@ -53,6 +54,10 @@ export default function FluxoCaixaPage() {
   }, [load]);
 
   useEffect(() => {
+    api.get('/finance/cashflow/min-year').then(r => setMinYear(r.data)).catch(() => {});
+  }, []);
+
+  useEffect(() => {
     api.get('/assets/properties').then(r => setProperties(r.data ?? [])).catch(() => {});
   }, []);
 
@@ -83,7 +88,7 @@ export default function FluxoCaixaPage() {
                 {MESES.map((ml, i) => <option key={i} value={String(i+1).padStart(2,'0')}>{ml}</option>)}
               </select>
               <select value={fromP.y} onChange={e => setFrom(e.target.value + '-' + fromP.m)} style={{ ...S.input, width: 80 }}>
-                {[2023,2024,2025,2026,2027].map(y => <option key={y} value={String(y)}>{y}</option>)}
+                {Array.from({ length: new Date().getFullYear() - minYear + 2 }, (_,i) => minYear + i).map(y => <option key={y} value={String(y)}>{y}</option>)}
               </select>
             </div>
           </div>
@@ -94,7 +99,7 @@ export default function FluxoCaixaPage() {
                 {MESES.map((ml, i) => <option key={i} value={String(i+1).padStart(2,'0')}>{ml}</option>)}
               </select>
               <select value={toP.y} onChange={e => setTo(e.target.value + '-' + toP.m)} style={{ ...S.input, width: 80 }}>
-                {[2023,2024,2025,2026,2027].map(y => <option key={y} value={String(y)}>{y}</option>)}
+                {Array.from({ length: new Date().getFullYear() - minYear + 2 }, (_,i) => minYear + i).map(y => <option key={y} value={String(y)}>{y}</option>)}
               </select>
             </div>
           </div>

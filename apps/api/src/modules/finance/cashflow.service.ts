@@ -13,6 +13,16 @@ export interface CashflowMonth {
 @Injectable()
 export class CashflowService {
   constructor(private readonly prisma: PrismaService) {}
+  async minYear(companyId: string): Promise<number> {
+    const [ar, ap, je] = await Promise.all([
+      this.prisma.arEntry.findFirst({ where: { companyId }, orderBy: { dueDate: 'asc' }, select: { dueDate: true } }),
+      this.prisma.apEntry.findFirst({ where: { companyId }, orderBy: { dueDate: 'asc' }, select: { dueDate: true } }),
+      this.prisma.journalEntry.findFirst({ where: { companyId }, orderBy: { date: 'asc' }, select: { date: true } }),
+    ]);
+    const years = [ar?.dueDate, ap?.dueDate, je?.date].filter(Boolean).map(d => new Date(d!).getFullYear());
+    return years.length ? Math.min(...years) : new Date().getFullYear();
+  }
+
 
   async gerencial(companyId: string, fromMonth: string, toMonth: string, propertyId?: string): Promise<CashflowMonth[]> {
     const from = new Date(`${fromMonth}-01T00:00:00`);
