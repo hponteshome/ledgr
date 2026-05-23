@@ -7,6 +7,7 @@
 //   5. Query journalEntries no backend agora filtra sourceModule: ECD_IMPORT (fix no controller)
 
 import React, { useState, useRef, useEffect } from 'react';
+import { EcdPreValidateModal } from './EcdPreValidateModal';
 import {
     FiUpload, FiDownload, FiCheckCircle, FiAlertCircle,
     FiClock, FiFile, FiTrash2, FiEye, FiAlertTriangle,
@@ -168,7 +169,6 @@ function ProgressBar({ p }: { p: Progress }) {
 
 // ── Componente Principal ──────────────────────────────────────
 
-const EcdPage: React.FC = () => {
     const [tab, setTab] = useState<'import' | 'export' | 'history'>('import');
 
     const [file, setFile] = useState<File | null>(null);
@@ -636,33 +636,6 @@ const EcdPage: React.FC = () => {
                                                             return v < 0 ? `(${abs})` : abs;
                                                         };
     );
-    const PreValidateModal = () => {
-        if (!showPreValidate || !preValidateResult) return null;
-        const { canGenerate, errors, warnings } = preValidateResult;
-        return (
-            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col">
-                    <div className="flex items-center justify-between p-5 border-b border-gray-100">
-                        <div>
-                            <h2 className="text-lg font-semibold text-gray-800">Validacao Pre-ECD</h2>
-                            <p className="text-sm text-gray-500 mt-0.5">{canGenerate ? <span className="text-green-600 font-medium">Pronto para gerar</span> : <span className="text-red-600 font-medium">{errors.length} erro(s) bloqueante(s)</span>}</p>
-                        </div>
-                        <button onClick={() => setShowPreValidate(false)} className="text-gray-400 hover:text-gray-600 text-xl">x</button>
-                    </div>
-                    <div className="overflow-y-auto p-5 space-y-4 flex-1">
-                        {errors.length > 0 && <div><p className="text-sm font-semibold text-red-700 mb-2">Bloqueantes ({errors.length})</p><div className="space-y-2">{errors.map((e: any, i: number) => <div key={i} className="bg-red-50 border border-red-200 rounded-lg p-3"><p className="text-sm font-medium text-red-800">{e.message}</p>{e.detail && <p className="text-xs text-red-600 mt-1">{e.detail}</p>}</div>)}</div></div>}
-                        {warnings.length > 0 && <div className="mt-3"><p className="text-sm font-semibold text-yellow-700 mb-2">Avisos ({warnings.length}) - regularizar antes de transmitir</p><div className="space-y-2">{warnings.map((w: any, i: number) => <div key={i} className="bg-yellow-50 border border-yellow-200 rounded-lg p-3"><p className="text-sm font-medium text-yellow-800">{w.message}</p>{w.detail && <p className="text-xs text-yellow-600 mt-1">{w.detail}</p>}</div>)}</div></div>}
-                        {errors.length === 0 && warnings.length === 0 && <div className="text-center py-6"><div className="text-4xl mb-2">OK</div><p className="text-green-700 font-medium">Tudo certo! Pronto para gerar a ECD.</p></div>}
-                    </div>
-                    <div className="flex items-center justify-between p-4 border-t border-gray-100 bg-gray-50 rounded-b-xl">
-                        <button onClick={() => setShowPreValidate(false)} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Cancelar</button>
-                        {canGenerate ? <button onClick={handleExport} disabled={exporting} className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-medium">{exporting ? 'Gerando...' : 'Gerar ECD'}</button> : <span className="text-sm text-red-500">Corrija os erros antes de gerar</span>}
-                    </div>
-                </div>
-            </div>
-        );
-    };
-
                                                         return (
                                                             <tr key={i} className="hover:bg-slate-50/50">
                                                                 <td className="px-3 py-2">
@@ -829,7 +802,7 @@ const EcdPage: React.FC = () => {
                     )}
                 </div>
             )}
-            <PreValidateModal />
+            {showPreValidate && <EcdPreValidateModal result={preValidateResult} onClose={() => setShowPreValidate(false)} onGenerate={handleExport} exporting={exporting} />}
         </div>
 };
 
