@@ -43,7 +43,10 @@ export default function FluxoCaixaPage() {
       .catch(() => {});
   }, [view, from, to]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const t = setTimeout(() => load(), 400);
+    return () => clearTimeout(t);
+  }, [load]);
 
   useEffect(() => {
     api.get('/assets/properties').then(r => setProperties(r.data ?? [])).catch(() => {});

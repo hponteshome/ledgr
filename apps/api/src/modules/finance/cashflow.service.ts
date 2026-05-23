@@ -18,6 +18,7 @@ export class CashflowService {
     const from = new Date(`${fromMonth}-01T00:00:00`);
     const to   = new Date(`${toMonth}-01T00:00:00`);
     to.setMonth(to.getMonth() + 1);
+    if (isNaN(from.getTime()) || isNaN(to.getTime())) return [];
 
     // Receitas (AR)
     const arEntries = await this.prisma.arEntry.findMany({
