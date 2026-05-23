@@ -301,3 +301,226 @@ Tabelas:
 **Início de sessão de desenvolvimento** (novo módulo, feature grande):
 
 > Cole o arquivo inteiro + trecho do schema dos models envolvidos
+
+---
+
+## Atualização — 21/05/2026 (sessão anterior ao contexto)
+
+### Finance — Bank Import (Excel Mapeado)
+- `ExcelPreviewModal.tsx` — modal de preview com validação de contas antes de importar
+- Normalização NFD para colunas com acento (`Conta Débito`, `Conta Crédito`)
+- Valores: Excel entrega número puro, `Math.abs()` para DEBIT
+- Contas resolvidas por `reducedCode` com `padStart(6,'0')`
+- Endpoint `POST /bank-import/preview-excel` (dry-run)
+- 24 lançamentos gerados, balanceados em R$ 108.729,16
+- Commit: `feat: modal ExcelPreviewModal com preview e validacao de contas antes de importar planilha mapeada`
+
+### Vite Console Warnings
+- `RendaFixaPage.tsx` — removido `borderTop` duplicado e `style` duplicado
+
+---
+
+## Atualização — 22/05/2026
+
+### RH — Funcionários (eSocial S-2200)
+- Schema `Employee` expandido com ~50 campos eSocial
+- Enums novos: `RaceColor`, `EducationLevel`, `EmploymentBond`, `GfipCategory`, `DependentRelationship`
+- Model `EmployeeDependent` com SF/IR
+- `personId` FK → `Person` via `@relation("EmployeePerson")`
+- Migration aplicada via diff script
+- `employee-pdf-parser.service.ts` — parser PDF ficha Kipstone usando `pdf-parse` (npm)
+  - Regex calibrado para `Funcionário: 00002ANTONIA` (sem espaço entre número e nome)
+  - Normalização NFD para acentos no texto extraído
+- `employee.service.ts` — cria Person + Employee + Dependents em `$transaction`
+- `employee.controller.ts` — endpoints `parse-pdf`, `import`, `import-batch`, `GET /`
+- `EmployeeImportModal.tsx` — 3 etapas: upload PDF → preview editável → confirmação batch
+- `EmployeesPage.tsx` — listagem + botão importar + refresh automático
+- Rota `app/hr/employees` adicionada
+- 3 funcionários Kipstone importados (ANTONIA, Patricia, RAQUEL)
+- Commits:
+  - `feat: expand Employee model para eSocial + EmployeeDependent + enums RH`
+  - `feat: RH employees - parser PDF ficha funcionario + service + controller eSocial`
+  - `feat: RH employees - modal importacao PDF ficha cadastral + pagina listagem`
+  - `feat: RH employees completo + refresh automatico empresas no header apos cadastro`
+
+### Company Management
+- `CompanyForm.tsx` — `loadCompanies()` após criar empresa → refresh automático no header
+- `CompanyList.tsx` — `loadCompanies()` após excluir + `localStorage.removeItem('@ledgr:lastCompanyId')`
+- `company.service.ts` — verificação de dependências antes de deletar (`companyMaskConfig`, `chartOfAccounts`, `journalEntry`, `employee`) com `BadRequestException` clara
+- `Layout.tsx` — `<Toaster position="top-right" />` adicionado (react-hot-toast)
+- Commits:
+  - `fix: CompanyForm - restaurar initialCnpj e returnTo + loadCompanies apos cadastro`
+  - `fix: CompanyList - refresh contexto apos excluir empresa sem conflito de nome`
+  - `fix: company delete - verificar dependencias antes de excluir com mensagem clara`
+  - `fix: adicionar Toaster no Layout para exibir notificacoes toast`
+
+### Sistema — Backup e Manutenção
+- `TableManager.tsx` — expandido para 29 tabelas cobertas
+- Menu Sistema → "Backup e Restauração" e "Manutenção de Dados" adicionados no SideBar
+- Commits:
+  - `feat: TableManager - adicionar todas as tabelas relevantes para backup`
+  - `feat: adicionar Backup e Manutencao de Dados no menu Sistema`
+
+### Finance — Contas a Receber
+- Schema: enums `ArEntryStatus` (OPEN|PARTIAL|RECEIVED|OVERDUE|CANCELLED) e `AROrigin` (MANUAL|FISCAL_DOCUMENT|ALUGUEL|RECURRING)
+- Model `ArEntry` com `propertyId` → FK `Property`, `customerId` → FK `Person`
+- Model `ARPayment` para baixas parciais
+- `propertyId` adicionado também no `ApEntry` existente
+- Relações inversas em `Property` (`apEntries`, `arEntries`), `Person` (`arEntries`), `Company` (`arEntries`)
+- Migration aplicada via diff script
+- `accounts-receivable.service.ts` + `accounts-receivable.controller.ts`
+- Endpoints: `GET/POST /finance/ar`, `POST /finance/ar/:id/receive`, `GET /finance/ar/aging`
+- `ContasAReceberPage.tsx` — listagem, filtros status/origem/período, baixa parcial, aging por buckets
+- Rota `app/finance/contas-receber`
+- Rota `app/finance/accounts-payable` adicionada (faltava)
+- Commit: `feat: Contas a Receber - pagina completa com listagem, filtros, baixa e aging`
+
+### Assets — Endpoint Properties
+- `GET /assets/properties` — listagem de imóveis (model `Property`) para uso nos selects Finance
+- Método `findProperties()` em `AssetsService`
+- Commit: `feat: assets - endpoint GET properties para listagem de imoveis no finance`
+
+### Finance — Fluxo de Caixa
+- `cashflow.service.ts`:
+  - `gerencial()` — AR+AP por mês, previsto vs realizado
+  - `bancario()` — BankTransaction por mês, entradas/saídas/saldo/acumulado
+  - `summary()` — totais do período
+  - `minYear()` — ano mínimo de lançamentos no banco (para selects dinâmicos)
+- `cashflow.controller.ts` — `/finance/cashflow/gerencial`, `/bancario`, `/summary`, `/min-year`
+- `FluxoCaixaPage.tsx`:
+  - Aba Tabela: mensal previsto vs realizado com acumulado
+  - Aba Gráfico: barras coloridas por tipo
+  - Aba Bancário: transações reais por mês
+  - Selects mês+ano separados (ano dinâmico via `min-year`)
+  - Filtro por imóvel
+  - Debounce 400ms no load
+- Rota `app/finance/fluxo-caixa`
+- Commits:
+  - `feat: Fluxo de Caixa Gerencial - tabela mensal + grafico barras + filtro por imovel`
+  - `feat: Fluxo de Caixa Bancario - aba bancaria + fix controller template literals`
+  - `fix: FluxoCaixa - selects mes/ano em vez de input type=month`
+  - `feat: FluxoCaixa - anos dinamicos via min-year endpoint + selects mes/ano`
+
+### Finance — Fundo Fixo / Caixa Pequeno
+- Schema: enums `PettyCashEntryType` (OPENING|EXPENSE|REPLENISHMENT), `PettyCashCategory` (7 categorias)
+- Model `PettyCash` — targetBalance, alertThreshold, currentBalance, responsibleId→Person
+- Model `PettyCashEntry` — type, category, date, amount, description TEXT longo, receiptRef, supplier, balanceAfter
+- Migration aplicada via diff script
+- `petty-cash.service.ts` — create com abertura automática via `$transaction`, addEntry com validação de saldo
+- `petty-cash.controller.ts` — `/finance/petty-cash`
+- `PettyCashPage.tsx`:
+  - Barra de progresso colorida (verde/amarelo/vermelho)
+  - Alerta visual "REPOR FUNDO" quando abaixo do threshold
+  - Botões "Registrar Despesa" e "Repor Fundo"
+  - Modal de despesa com categoria, fornecedor, comprovante, descrição detalhada (textarea)
+  - Histórico com saldo após cada movimento
+  - Sidebar de fundos quando há múltiplos fundos
+- Rota `app/finance/petty-cash`
+- Commits:
+  - `feat: Fundo Fixo - schema + backend + frontend completo com alertas e historico`
+  - `fix: PettyCash - converter valores com virgula antes de enviar ao backend`
+  - `fix: PettyCash - transaction na criacao + abertura automatica com saldo inicial`
+
+---
+
+## Novos models no schema (22/05/2026)
+
+| Model             | Tabela                | Observação                                                          |
+| ----------------- | --------------------- | ------------------------------------------------------------------- |
+| ArEntry           | ar_entries            | ArEntryStatus; propertyId→Property; customerId→Person               |
+| ARPayment         | ar_payments           | baixas parciais de ArEntry                                          |
+| PettyCash         | petty_cash            | targetBalance, alertThreshold, currentBalance; responsibleId→Person |
+| PettyCashEntry    | petty_cash_entries    | OPENING/EXPENSE/REPLENISHMENT; balanceAfter; description TEXT       |
+| Employee          | employees             | ~50 campos eSocial S-2200                                           |
+| EmployeeDependent | employee_dependents   | SF/IR; @relation("EmployeePerson")                                  |
+
+## Alterações em models existentes (22/05/2026)
+
+- `ApEntry` — campo `propertyId` → FK `Property` com relação `"ApEntryProperty"`
+- `Property` — relações inversas `apEntries[]` e `arEntries[]`
+- `Company` — relações `arEntries[]`, `pettyCash[]`, `pettyCashEntries[]`
+- `Person` — relações `arEntries[]` e `pettyCashFunds[]`
+
+---
+
+## Estado dos módulos — atualizado 23/05/2026
+
+| Módulo                               | Status         | Observações                                                              |
+| ------------------------------------ | -------------- | ------------------------------------------------------------------------ |
+| Accounting — Plano de Contas         | ✅ Produção    | shortCode, toggle tabela/árvore, inferência automática                   |
+| Accounting — Lançamentos             | ✅ Produção    | Diário Geral, Razão Analítico, Balancete                                 |
+| Accounting — Balancete               | ✅ Produção    | Mensal + Verificação, exclusivamente via journal_entry_items             |
+| Accounting — Livro Diário            | ✅ Produção    | Layout IOB, termos abertura/encerramento editáveis                       |
+| Accounting — Livro Razão             | ✅ Produção    | Layout LEDGR, filtro por lista de contas, reducedCode                    |
+| Accounting — Balanço Patrimonial     | ✅ Produção    | Grid 2 colunas Ativo/Passivo+PL, equilibrado                             |
+| Accounting — DRE                     | ✅ Produção    | Filtra REVENUE/EXPENSE, exclui código 49                                 |
+| Accounting — Renda Fixa              | ✅ Produção    | CDB, lançamentos automáticos, enum INVESTMENT                            |
+| Accounting — Ativo Imobilizado       | ✅ Produção    | Backfill depreciação, relatório anual, lançamentos contábeis             |
+| Accounting — ECD Import              | ✅ Produção    | ECD 2024 LM importado, saldo anterior via i155                           |
+| Accounting — CompanyAccountingConfig | ✅ Produção    | GET/PUT /accounting/config                                               |
+| Calendário de Feriados               | ✅ Produção    | 63 feriados nacionais 2022-2026, feriados judaicos                       |
+| Sistema — Tabelas Legais             | ✅ Produção    | IRPF 2024/2025/2026 + INSS 2024/2025/2026 + Simulador                   |
+| Sistema — Backup/Manutenção          | ✅ Funcionando | TableManager 29 tabelas, BackupRestore, menu Sistema                     |
+| Finance — Doc. Fiscal                | ✅ Funcionando | Integração AP × CT × Agenda via $transaction                             |
+| Finance — Contas a Pagar             | ✅ Funcionando | Baixa individual e lote, Aging/Posição AP                                |
+| Finance — Contas a Receber           | ✅ Funcionando | ArEntry, baixa parcial, aging, vínculo imóvel/cliente                    |
+| Finance — Fluxo de Caixa Gerencial   | ✅ Funcionando | Tabela mensal, gráfico barras, filtro imóvel, selects mês/ano dinâmicos  |
+| Finance — Fluxo de Caixa Bancário    | ✅ Funcionando | Aba bancária com BankTransactions por mês                                |
+| Finance — Fundo Fixo                 | ✅ Funcionando | PettyCash, abertura automática, alerta visual, histórico detalhado       |
+| Finance — Agenda Financeira          | ✅ Produção    | PLANNED_PAYMENT ao cadastrar provisão; PAYMENT ao gerar lançamento       |
+| Finance — Bank Import                | ✅ Funcionando | Itaú, Bradesco, BB, OFX, CSV, ExcelPreviewModal                          |
+| Finance — Provisões Recorrentes      | ✅ Produção    | Configs, geração mensal, NF, rateio, favorecido, geraAgenda/geraContabil |
+| Finance — Fechamento Mensal          | ✅ Produção    | Bloqueio lançamentos, FECHADO_PREVIO, cascata, auditoria                 |
+| RH — Funcionários                    | ✅ Funcionando | Parser PDF Kipstone, eSocial S-2200, importação batch                    |
+| RH — Pró-labore                      | ✅ Produção    | INSS/IRRF 2026, GPS, DARF, retroativos                                   |
+| RH — Informe de Rendimentos          | ✅ Produção    | Formulário RFB Q3-Q8, preview fiel, PDF Puppeteer, edição, filtro ano    |
+| SPED ECD                             | ✅ Produção    | Import OK; export txt pendente                                           |
+| Societário                           | ✅ Produção    | Shareholders, transferências, corporate-pdf, DocumentViewModal           |
+| Assinaturas Digitais                 | ✅ Funcionando | ClickSign sandbox, validador ICP-Brasil/gov.br                           |
+| Arquivo / Repositório                | ✅ Funcionando | DocumentViewModal, ImportarDocumentoModal                                |
+| RFB                                  | ✅ Produção    |                                                                          |
+| Finance — Conciliação AP             | 🔲 Pendente    | apEntryId em BankTransaction já existe                                   |
+| Finance — Fluxo de Caixa Completo    | 🔲 Pendente    | Combinar gerencial + bancário para compliance                            |
+| Sistema — Indicadores                | 🔧 Parcial     | CDI completo; Selic e IGP-M pendentes                                    |
+
+---
+
+## Pendências — atualizado 23/05/2026
+
+### Fila imediata
+1. **Reimportar ECD LM Administração** — validar saldo anterior 2023-12-31
+2. **SPED ECD export** — gerar arquivo txt, validar PGE
+3. **Padronizar filtros de data** — selects mês/ano em todas as telas (padrão JournalPage)
+4. **Finance — Fluxo de Caixa Completo** — combinar gerencial + bancário para compliance
+
+### Em análise / design
+5. **Controle de acesso por link da Sidebar** — model no DB listando todos os links/sublinks; Master Admin habilita/desabilita por usuário ou grupo. Granularidade total por item de menu.
+6. **Dashboard logado e não-logado** — reconstruir com dados reais úteis conforme perfil do usuário ou empresa ativa
+
+### Horizon
+- Apuração IRPJ/CSLL JOSE SILVA
+- Guias DARF IRPJ/CSLL geradas pelo fechamento
+- Consulta CPF via Serpro
+- Integração gov.br assinatura digital
+- ECF parser blocos J/K/L/M/N
+- Conciliação AP x Banco
+- Livros Societários — Assembleias e Reuniões
+- LM Administração — receitas com aluguéis (ArEntry)
+- Informe de Rendimentos — alimentação automática via folha pró-labore
+- LALUR/LACS — Fechamento Mensal JSSIA Lucro Real 2025
+- Provisões — PIS/COFINS como partidas contábeis (creditaPisCofins = true)
+
+---
+
+## Padrões técnicos novos (22/05/2026)
+
+- **Migrate sem reset:** `npx prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --script | docker exec -i ledgr-postgres psql -U ledgr -d ledgr_app`
+- **BOM UTF-8:** SEMPRE `[System.IO.File]::WriteAllText($f, $text, (New-Object System.Text.UTF8Encoding $false))` — `WriteAllLines` reinsere BOM e quebra o Prisma
+- **Edições seguras:** ler antes (`Get-Content`), confirmar padrão exato, substituir com `-replace` no conteúdo raw, verificar resultado ANTES de gravar
+- **Template literals PS:** NUNCA usar backtick+$ em blocos heredoc PS para strings TS — usar concatenação `+`
+- **Valores com vírgula:** backend Prisma espera ponto decimal — sempre `String(v).replace(',','.')` antes de `new Prisma.Decimal()`
+- **Enums com string vazia:** `dto.field || null` (não `?? null`) para tratar string vazia como null
+- **Debounce em filtros:** `setTimeout` 400ms no `useEffect` do load evita requisições em cada tecla
+- **Selects mês/ano:** preferir dois selects separados a `<input type="month">` — Chrome envia valores parciais durante digitação causando `Invalid Date`
+- **$transaction no service:** sempre usar `prisma.$transaction` quando criar entidade pai + filhos juntos
+
