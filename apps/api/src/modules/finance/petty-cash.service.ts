@@ -25,23 +25,43 @@ export class PettyCashService {
   }
 
   async create(companyId: string, dto: any, userId: string) {
-    return this.prisma.pettyCash.create({
-      data: {
-        companyId,
-        name:            dto.name,
-        targetBalance:   new Prisma.Decimal(dto.targetBalance),
-        alertThreshold:  new Prisma.Decimal(dto.alertThreshold),
-        currentBalance:  new Prisma.Decimal(0),
-        responsibleId:   dto.responsibleId ?? null,
-        expenseAccountId: dto.expenseAccountId ?? null,
-        cashAccountId:   dto.cashAccountId ?? null,
-      },
+    const targetBalance = new Prisma.Decimal(String(dto.targetBalance).replace(',','.'));
+    const alertThreshold = new Prisma.Decimal(String(dto.alertThreshold).replace(',','.'));
+
+    return this.prisma.(async (tx) => {
+      const fund = await tx.pettyCash.create({
+        data: {
+          companyId,
+          name:             dto.name,
+          targetBalance,
+          alertThreshold,
+          currentBalance:   targetBalance,
+          responsibleId:    dto.responsibleId || null,
+          expenseAccountId: dto.expenseAccountId || null,
+          cashAccountId:    dto.cashAccountId || null,
+        },
+      });
+
+      await tx.pettyCashEntry.create({
+        data: {
+          pettyCashId:  fund.id,
+          companyId,
+          type:         'OPENING',
+          date:         new Date(),
+          amount:       targetBalance,
+          description:  'Abertura do fundo fixo — saldo inicial',
+          balanceAfter: targetBalance,
+          createdById:  userId,
+        },
+      });
+
+      return fund;
     });
   }
 
   async addEntry(companyId: string, fundId: string, dto: any, userId: string) {
     const fund = await this.findOne(companyId, fundId);
-    const amount = new Prisma.Decimal(dto.amount);
+    const amount = new Prisma.Decimal(String(dto.amount).replace(',','.'));
     let newBalance: Prisma.Decimal;
 
     if (dto.type === 'EXPENSE') {
