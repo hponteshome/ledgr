@@ -124,9 +124,10 @@ export class ProvisaoService {
       const valor = Number(config.valor);
       const valorPis    = config.creditaPisCofins ? Math.round(valor * Number(config.aliqPis) * 100) / 100 : 0;
       const valorCofins = config.creditaPisCofins ? Math.round(valor * Number(config.aliqCofins) * 100) / 100 : 0;
-      await this.prisma.$transaction(async tx => {
+      const valorCsll   = config.creditaPisCofins ? Math.round(valor * Number(config.aliqCsll)   * 100) / 100 : 0;
+      const valorIrpj   = config.creditaPisCofins ? Math.round(valor * Number(config.aliqIrpj)   * 100) / 100 : 0;
         const lanc = await tx.provisaoLancamento.create({
-          data: { provisaoId: config.id, companyId, competencia, valor: config.valor, valorPis, valorCofins, status: config.exigirNF ? 'NF_PENDENTE' : 'PROVISIONADO', createdById },
+          data: { provisaoId: config.id, companyId, competencia, valor: config.valor, valorPis, valorCofins, valorCsll, valorIrpj, status: config.exigirNF ? 'NF_PENDENTE' : 'PROVISIONADO', createdById },
         });
         let apEntry = null;
         if (config.contaPassivoId) {
@@ -151,8 +152,29 @@ export class ProvisaoService {
           }
         }
         if (config.geraContabil && config.contaDespesaId && config.contaPassivoId) {
+          const vPis    = config.creditaPisCofins ? Number(config.valor) * Number(config.aliqPis)    : 0;
+          const vCofins = config.creditaPisCofins ? Number(config.valor) * Number(config.aliqCofins) : 0;
+          const vCsll   = config.creditaPisCofins ? Number(config.valor) * Number(config.aliqCsll)   : 0;
+          const vIrpj   = config.creditaPisCofins ? Number(config.valor) * Number(config.aliqIrpj)   : 0;
+          const extraItems: any[] = [];
+          if (config.creditaPisCofins) {
+            if (vPis > 0 && config.contaPisId)    { extraItems.push({ accountId: config.contaPisId,    value: vPis,    type: 'DEBIT' }, { accountId: config.contaDespesaId, value: vPis,    type: 'CREDIT' }); }
+            if (vCofins > 0 && config.contaCofinsId) { extraItems.push({ accountId: config.contaCofinsId, value: vCofins, type: 'DEBIT' }, { accountId: config.contaDespesaId, value: vCofins, type: 'CREDIT' }); }
+            if (vCsll > 0 && config.contaCsllId)  { extraItems.push({ accountId: config.contaCsllId,  value: vCsll,   type: 'DEBIT' }, { accountId: config.contaDespesaId, value: vCsll,   type: 'CREDIT' }); }
+            if (vIrpj > 0 && config.contaIrpjId)  { extraItems.push({ accountId: config.contaIrpjId,  value: vIrpj,   type: 'DEBIT' }, { accountId: config.contaDespesaId, value: vIrpj,   type: 'CREDIT' }); }
+          }
           await tx.journalEntry.create({
-            data: { companyId, date: venc, description: config.descricao + ' — ' + competencia, sourceModule: 'FINANCE', createdById, items: { create: [{ accountId: config.contaDespesaId, value: config.valor, type: 'DEBIT' }, { accountId: config.contaPassivoId, value: config.valor, type: 'CREDIT' }] } },
+            data: { companyId, date: venc, description: config.descricao + ' — ' + competencia, sourceModule: 'FINANCE', createdById,
+              items: { create: [
+                { accountId: config.contaDespesaId, value: config.valor, type: 'DEBIT' },
+                { accountId: config.contaPassivoId, value: config.valor, type: 'CREDIT' },
+                ...extraItems,
+              ]},
+            },
+          });
+          await tx.provisaoLancamento.update({
+            where: { id: lanc.id },
+            data: { valorPis: vPis, valorCofins: vCofins, valorCsll: vCsll, valorIrpj: vIrpj },
           });
         }
         await tx.provisaoLancamento.update({

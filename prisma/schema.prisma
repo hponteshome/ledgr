@@ -2538,6 +2538,12 @@ model ProvisaoConfig {
   aliqPis         Decimal @default(0) @map("aliq_pis") @db.Decimal(5, 4)
   aliqCofins      Decimal @default(0) @map("aliq_cofins") @db.Decimal(5, 4)
 
+  aliqCsll        Decimal @default(0) @map("aliq_csll") @db.Decimal(5, 4)
+  aliqIrpj        Decimal @default(0) @map("aliq_irpj") @db.Decimal(5, 4)
+  contaPisId      String? @map("conta_pis_id") @db.Uuid
+  contaCofinsId   String? @map("conta_cofins_id") @db.Uuid
+  contaCsllId     String? @map("conta_csll_id") @db.Uuid
+  contaIrpjId     String? @map("conta_irpj_id") @db.Uuid
   // Fornecedor
   fornecedorNome  String? @map("fornecedor_nome") @db.VarChar
   favorecidoPersonId  String? @map("favorecido_person_id") @db.Uuid
@@ -2596,6 +2602,8 @@ model ProvisaoLancamento {
   valorPis       Decimal @default(0)      @map("valor_pis") @db.Decimal(15, 2)
   valorCofins    Decimal @default(0)      @map("valor_cofins") @db.Decimal(15, 2)
   status         StatusProvisaoLancamento @default(PROVISIONADO) @map("status")
+  valorCsll      Decimal @default(0)      @map("valor_csll") @db.Decimal(15, 2)
+  valorIrpj      Decimal @default(0)      @map("valor_irpj") @db.Decimal(15, 2)
 
   // Placeholder NF
   nfNumero    String?   @map("nf_numero") @db.VarChar

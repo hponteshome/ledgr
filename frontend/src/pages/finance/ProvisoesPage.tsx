@@ -90,6 +90,12 @@ function ConfigModal({ config, accounts, onClose, onSaved }: { config?: any; acc
       creditaPisCofins:   config?.creditaPisCofins ?? false,
       aliqPis:            String(config?.aliqPis ?? '0.0065'),
       aliqCofins:         String(config?.aliqCofins ?? '0.03'),
+      aliqCsll:           String(config?.aliqCsll ?? '0.0108'),
+      aliqIrpj:           String(config?.aliqIrpj ?? '0.015'),
+      contaPisId:         config?.contaPisId ?? '',
+      contaCofinsId:      config?.contaCofinsId ?? '',
+      contaCsllId:        config?.contaCsllId ?? '',
+      contaIrpjId:        config?.contaIrpjId ?? '',
       competenciaIni:     config?.competenciaIni ?? '',
       competenciaFim:     config?.competenciaFim ?? '',
       ativo:              config?.ativo ?? true,
@@ -112,6 +118,12 @@ function ConfigModal({ config, accounts, onClose, onSaved }: { config?: any; acc
         diaVencimento: parseInt(form.diaVencimento),
         aliqPis: parseFloat(form.aliqPis),
         aliqCofins: parseFloat(form.aliqCofins),
+        aliqCsll:           parseFloat(form.aliqCsll),
+        aliqIrpj:           parseFloat(form.aliqIrpj),
+        contaPisId:         form.contaPisId || undefined,
+        contaCofinsId:      form.contaCofinsId || undefined,
+        contaCsllId:        form.contaCsllId || undefined,
+        contaIrpjId:        form.contaIrpjId || undefined,
         favorecidoPersonId: form.favorecidoPersonId || undefined,
         favorecidoCompanyId: form.favorecidoCompanyId || undefined,
       };
@@ -244,6 +256,18 @@ function ConfigModal({ config, accounts, onClose, onSaved }: { config?: any; acc
                 <label style={{fontSize:10,textTransform:'uppercase' as const,color:'#6B7280',display:'block',marginBottom:3}}>Alíq. COFINS</label>
                 <input style={S.input} type="number" step={0.0001} value={form.aliqCofins} onChange={e=>set('aliqCofins',e.target.value)} />
               </div>
+              <div>
+                <label style={{fontSize:10,textTransform:'uppercase' as const,color:'#6B7280',display:'block',marginBottom:3}}>Aliq. CSLL</label>
+                <input style={S.input} type="number" step={0.0001} value={form.aliqCsll} onChange={e=>set('aliqCsll',e.target.value)} />
+              </div>
+              <div>
+                <label style={{fontSize:10,textTransform:'uppercase' as const,color:'#6B7280',display:'block',marginBottom:3}}>Aliq. IRPJ</label>
+                <input style={S.input} type="number" step={0.0001} value={form.aliqIrpj} onChange={e=>set('aliqIrpj',e.target.value)} />
+              </div>
+              <AccountPicker label="Conta PIS a Recuperar (D)" value={form.contaPisId} onChange={v=>set('contaPisId',v)} accounts={accounts} />
+              <AccountPicker label="Conta COFINS a Recuperar (D)" value={form.contaCofinsId} onChange={v=>set('contaCofinsId',v)} accounts={accounts} />
+              <AccountPicker label="Conta CSLL a Recuperar (D)" value={form.contaCsllId} onChange={v=>set('contaCsllId',v)} accounts={accounts} />
+              <AccountPicker label="Conta IRPJ a Recuperar (D)" value={form.contaIrpjId} onChange={v=>set('contaIrpjId',v)} accounts={accounts} />
             </>
           )}
 
