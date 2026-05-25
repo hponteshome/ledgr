@@ -33,6 +33,16 @@ interface CompanyFormData {
   registerBook: string;
   registerSheet: string;
   registerUF: string;
+  // SPED / eSocial
+  nire?: string;
+  orgRegistro?: string;
+  codMun?: string;
+  ieEstadual?: string;
+  cnae?: string;
+  fpas?: string;
+  isHeadquarter?: boolean;
+  mainActivity?: string;
+  secondaryActivities?: any[];
 }
 
 const EMPTY: CompanyFormData = {
@@ -69,7 +79,7 @@ export const CompanyForm: React.FC = () => {
 
   const [preenchido, setPreenchido] = useState(false);
 
-  const [formData, setFormData] = useState<CompanyFormData>({ taxId: initialCnpj, legalName: '', tradeName: '', openingDate: '', legalNature: '', taxRegime: '', size: '', status: 'ativa', statusDate: '', equity: '', street: '', number: '', complement: '', neighborhood: '', zipCode: '', city: '', state: '', email: '', phone1: '', phone2: '', isHeadquarter: false, registerOrg: '', registerNumber: '', registerDate: '', registerBook: '', registerSheet: '', mainActivity: '', secondaryActivities: [] });
+  const [formData, setFormData] = useState<CompanyFormData>({ taxId: initialCnpj, legalName: '', tradeName: '', openingDate: '', legalNature: '', taxRegime: '', size: '', status: 'ativa', statusDate: '', equity: '', street: '', number: '', complement: '', neighborhood: '', zipCode: '', city: '', state: '', email: '', phone1: '', phone2: '', isHeadquarter: false, registerOrg: '', registerNumber: '', registerDate: '', registerBook: '', registerSheet: '', mainActivity: '', secondaryActivities: [], nire: '', orgRegistro: '', codMun: '', ieEstadual: '', cnae: '', fpas: '' });
   const [loading, setLoading] = useState(false);
   const set = (name: keyof CompanyFormData, value: any) =>
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -394,6 +404,24 @@ export const CompanyForm: React.FC = () => {
         </fieldset>
 
         {/* ── AÇÕES ─────────────────────────────────────────── */}
+        {/* ── SPED / eSocial (opcional) ───────────────── */}
+        <fieldset className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4">
+          <legend className="text-xs font-bold text-gray-500 uppercase tracking-widest px-1 border-l-4 border-purple-500 pl-3 ml-[-1rem]">SPED / eSocial (opcional)</legend>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div><label className={labelCls}>NIRE</label>
+              <input name="nire" value={formData.nire || ''} onChange={handleChange} className={inputCls} /></div>
+            <div><label className={labelCls}>Orgao de Registro</label>
+              <input name="orgRegistro" value={formData.orgRegistro || ''} onChange={handleChange} className={inputCls} placeholder="JUCESP, RCPJ..." /></div>
+            <div><label className={labelCls}>Cod. Municipio IBGE</label>
+              <input name="codMun" value={formData.codMun || ''} onChange={handleChange} className={inputCls} placeholder="3550308" maxLength={7} /></div>
+            <div><label className={labelCls}>Inscricao Estadual</label>
+              <input name="ieEstadual" value={formData.ieEstadual || ''} onChange={handleChange} className={inputCls} /></div>
+            <div><label className={labelCls}>CNAE Principal</label>
+              <input name="cnae" value={formData.cnae || ''} onChange={handleChange} className={inputCls} placeholder="0000-0/00" /></div>
+            <div><label className={labelCls}>FPAS</label>
+              <input name="fpas" value={formData.fpas || ''} onChange={handleChange} className={inputCls} placeholder="000" /></div>
+          </div>
+        </fieldset>
         <div className="flex justify-end gap-3 pt-2">
           <button type="button" onClick={() => navigate(returnTo)}
             className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:border-gray-400 transition-colors">

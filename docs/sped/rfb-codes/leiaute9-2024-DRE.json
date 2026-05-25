@@ -1,0 +1,31 @@
+{
+  "leiaute": 9,
+  "anoBase": 2024,
+  "tipo": "DRE",
+  "codes": [
+    { "codigo": "3.01", "descricao": "Receita Bruta", "nivel": 1, "codigoPai": null, "ordem": 1 },
+    { "codigo": "3.01.01", "descricao": "Receita de Venda de Bens e/ou Servicos", "nivel": 2, "codigoPai": "3.01", "ordem": 2 },
+    { "codigo": "3.02", "descricao": "Deducoes da Receita Bruta", "nivel": 1, "codigoPai": null, "ordem": 3 },
+    { "codigo": "3.03", "descricao": "Receita Liquida", "nivel": 1, "codigoPai": null, "ordem": 4 },
+    { "codigo": "3.04", "descricao": "Custo de Bens e Servicos Vendidos", "nivel": 1, "codigoPai": null, "ordem": 5 },
+    { "codigo": "3.05", "descricao": "Resultado Bruto", "nivel": 1, "codigoPai": null, "ordem": 6 },
+    { "codigo": "3.06", "descricao": "Despesas Operacionais", "nivel": 1, "codigoPai": null, "ordem": 7 },
+    { "codigo": "3.06.01", "descricao": "Despesas com Vendas", "nivel": 2, "codigoPai": "3.06", "ordem": 8 },
+    { "codigo": "3.06.02", "descricao": "Despesas Gerais e Administrativas", "nivel": 2, "codigoPai": "3.06", "ordem": 9 },
+    { "codigo": "3.06.03", "descricao": "Perdas pela Nao Recuperabilidade de Ativos", "nivel": 2, "codigoPai": "3.06", "ordem": 10 },
+    { "codigo": "3.06.04", "descricao": "Outras Receitas Operacionais", "nivel": 2, "codigoPai": "3.06", "ordem": 11 },
+    { "codigo": "3.06.05", "descricao": "Outras Despesas Operacionais", "nivel": 2, "codigoPai": "3.06", "ordem": 12 },
+    { "codigo": "3.06.06", "descricao": "Resultado de Equivalencia Patrimonial", "nivel": 2, "codigoPai": "3.06", "ordem": 13 },
+    { "codigo": "3.07", "descricao": "Resultado antes do Resultado Financeiro", "nivel": 1, "codigoPai": null, "ordem": 14 },
+    { "codigo": "3.08", "descricao": "Resultado Financeiro", "nivel": 1, "codigoPai": null, "ordem": 15 },
+    { "codigo": "3.08.01", "descricao": "Receitas Financeiras", "nivel": 2, "codigoPai": "3.08", "ordem": 16 },
+    { "codigo": "3.08.02", "descricao": "Despesas Financeiras", "nivel": 2, "codigoPai": "3.08", "ordem": 17 },
+    { "codigo": "3.09", "descricao": "Resultado antes dos Tributos sobre o Lucro", "nivel": 1, "codigoPai": null, "ordem": 18 },
+    { "codigo": "3.10", "descricao": "Imposto de Renda e Contribuicao Social", "nivel": 1, "codigoPai": null, "ordem": 19 },
+    { "codigo": "3.10.01", "descricao": "Corrente", "nivel": 2, "codigoPai": "3.10", "ordem": 20 },
+    { "codigo": "3.10.02", "descricao": "Diferido", "nivel": 2, "codigoPai": "3.10", "ordem": 21 },
+    { "codigo": "3.11", "descricao": "Resultado Liquido das Operacoes Continuadas", "nivel": 1, "codigoPai": null, "ordem": 22 },
+    { "codigo": "3.12", "descricao": "Resultado Liquido de Operacoes Descontinuadas", "nivel": 1, "codigoPai": null, "ordem": 23 },
+    { "codigo": "3.13", "descricao": "Lucro/Prejuizo do Periodo", "nivel": 1, "codigoPai": null, "ordem": 24 }
+  ]
+}

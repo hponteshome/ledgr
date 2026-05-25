@@ -12,6 +12,8 @@ import { EcdParserService } from './ecd/services/ecd-parser.service';
 import { EcdImporterService } from './ecd/services/ecd-importer.service';
 import { EcdExporterService } from './ecd/services/ecd-exporter.service';
 import { EcdPreValidateService } from './ecd/services/ecd-pre-validate.service';
+import { AccountingViewsService } from './visoes/accounting-views.service';
+import { AccountingViewsController } from './visoes/accounting-views.controller';
 import { EcdValidatorService } from './ecd/services/ecd-validator.service';
 import { EcdController } from './ecd/controllers/ecd.controller';
 import { EcdViewerService } from './ecd/services/ecd-viewer.service';
@@ -32,6 +34,7 @@ import { EcfController } from './ecf/controllers/ecf.controller';
     }),
   ],
   controllers: [
+    AccountingViewsController,
     EcdController,    
     EcfController,   // ← ADICIONADO
     EcdViewerController,
@@ -45,6 +48,7 @@ import { EcfController } from './ecf/controllers/ecf.controller';
     EcdViewerService,
     EcdExporterService,
     EcdPreValidateService,
+    AccountingViewsService,
     EcdValidatorService,
 
     // ECF
@@ -56,6 +60,7 @@ import { EcfController } from './ecf/controllers/ecf.controller';
     EcdParserService,
     EcdExporterService,
     EcdPreValidateService,
+    AccountingViewsService,
     EcfParserService,   // ← ADICIONADO
   ],
 })

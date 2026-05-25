@@ -38,6 +38,7 @@ export const CompanyEdit: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState<any>({});
+  const [activeTab, setActiveTab] = useState<'geral'|'contabil'|'esocial'|'sped'>('geral');
 
   useEffect(() => {
     api.get(`/companies/${id}`)
@@ -151,7 +152,20 @@ export const CompanyEdit: React.FC = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-x-6 gap-y-4 bg-white p-8 rounded-xl shadow-sm border border-gray-200">
+                {/* ABA NAV */}
+        <div className="flex gap-1 border-b border-gray-200">
+          {(['geral','contabil','esocial','sped'] as const).map(t => {
+            const labels = { geral:'Geral', contabil:'Contabil', esocial:'eSocial', sped:'SPED/ECD' };
+            const active = activeTab === t;
+            return <button key={t} type="button" onClick={() => setActiveTab(t)}
+              style={{ padding:'8px 16px', fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.05em',
+                borderBottom: active ? '2px solid #2563EB' : '2px solid transparent',
+                color: active ? '#2563EB' : '#9CA3AF', background:'none', cursor:'pointer' }}>
+              {labels[t]}
+            </button>;
+          })}
+        </div>
+        {activeTab === 'geral' && (<div className="grid grid-cols-1 md:grid-cols-4 gap-x-6 gap-y-4 bg-white p-8 rounded-xl shadow-sm border border-gray-200">
 
           {/* ── IDENTIFICAÇÃO ─────────────────────────────── */}
           <SectionTitle title="Identificação Jurídica" color="bg-blue-600" />
@@ -335,7 +349,62 @@ export const CompanyEdit: React.FC = () => {
             </select>
           </div>
 
-        </div>
+        </div>        )}
+        {activeTab === 'contabil' && (
+          <div style={{ background:'#fff', border:'0.5px solid #E5E7EB', borderRadius:10, padding:32 }}>
+            <p style={{ fontSize:12, color:'#9CA3AF', fontStyle:'italic' }}>Em desenvolvimento — configuracoes contabeis da empresa.</p>
+          </div>
+        )}
+        {activeTab === 'esocial' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 bg-white p-8 rounded-xl shadow-sm border border-gray-200">
+            <SectionTitle title="eSocial" color="bg-teal-600" />
+            <div><label className={labelCls}>CNPJ Empregador (eSocial)</label>
+              <input name="esocialCnpj" value={formData.esocialCnpj || ''} onChange={handleChange} className={inputCls} placeholder="00.000.000/0000-00" /></div>
+            <div><label className={labelCls}>CNAE Principal</label>
+              <input name="cnae" value={formData.cnae || ''} onChange={handleChange} className={inputCls} placeholder="0000-0/00" /></div>
+            <div><label className={labelCls}>FPAS</label>
+              <input name="fpas" value={formData.fpas || ''} onChange={handleChange} className={inputCls} placeholder="000" /></div>
+            <div><label className={labelCls}>Codigo de Terceiros</label>
+              <input name="codTerceiros" value={formData.codTerceiros || ''} onChange={handleChange} className={inputCls} placeholder="0000" /></div>
+            <div><label className={labelCls}>FAP</label>
+              <input name="fap" value={formData.fap || ''} onChange={handleChange} className={inputCls} placeholder="1.0000" /></div>
+            <div><label className={labelCls}>RAT (%)</label>
+              <input name="rat" value={formData.rat || ''} onChange={handleChange} className={inputCls} placeholder="1" /></div>
+          </div>
+        )}
+        {activeTab === 'sped' && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4 bg-white p-8 rounded-xl shadow-sm border border-gray-200">
+            <SectionTitle title="SPED / ECD" color="bg-purple-600" />
+            <div><label className={labelCls}>NIRE</label>
+              <input name="nire" value={formData.nire || ''} onChange={handleChange} className={inputCls} /></div>
+            <div><label className={labelCls}>Orgao de Registro</label>
+              <input name="orgRegistro" value={formData.orgRegistro || ''} onChange={handleChange} className={inputCls} placeholder="JUCESP, RCPJ..." /></div>
+            <div><label className={labelCls}>Cod. Municipio IBGE (7 dig.)</label>
+              <input name="codMun" value={formData.codMun || ''} onChange={handleChange} className={inputCls} placeholder="3550308" maxLength={7} /></div>
+            <div><label className={labelCls}>Inscricao Estadual</label>
+              <input name="ieEstadual" value={formData.ieEstadual || ''} onChange={handleChange} className={inputCls} /></div>
+            <div><label className={labelCls}>Natureza do Livro</label>
+              <input name="natLivro" value={formData.natLivro || ''} onChange={handleChange} className={inputCls} placeholder="DIARIO E BALANCETES" /></div>
+            <div><label className={labelCls}>Tipo ECD</label>
+              <select name="tipEcd" value={formData.tipEcd || '0'} onChange={handleChange} className={inputCls}>
+                <option value="0">0 - Original</option>
+                <option value="1">1 - Com SCP</option>
+                <option value="2">2 - Da SCP</option>
+              </select></div>
+            <div><label className={labelCls}>Escrituracao Consolidada</label>
+              <select name="indEscCons" value={formData.indEscCons || 'N'} onChange={handleChange} className={inputCls}>
+                <option value="N">N - Nao</option><option value="S">S - Sim</option>
+              </select></div>
+            <div><label className={labelCls}>Moeda Funcional</label>
+              <select name="indMoedaFunc" value={formData.indMoedaFunc || 'N'} onChange={handleChange} className={inputCls}>
+                <option value="N">N - Nao</option><option value="S">S - Sim</option>
+              </select></div>
+            <div><label className={labelCls}>Escrituracao Centralizada</label>
+              <select name="indCentralizada" value={formData.indCentralizada || '0'} onChange={handleChange} className={inputCls}>
+                <option value="0">0 - Centralizada</option><option value="1">1 - Descentralizada</option>
+              </select></div>
+          </div>
+        )}
       </form>
     </div>
   );

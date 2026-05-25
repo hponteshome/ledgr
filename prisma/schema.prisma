@@ -190,6 +190,17 @@ model Company {
   informesRendimentos InformeRendimentos[]
   arEntries         ArEntry[]
   pettyCash        PettyCash[]
+  accountingViews     AccountingView[]
+  // -- Dados SPED/ECD ----------------------------------------
+  nire             String? @map("nire") @db.VarChar(20)
+  orgRegistro      String? @map("org_registro") @db.VarChar(100)
+  codMun           String? @map("cod_mun") @db.VarChar(7)
+  natLivro         String? @map("nat_livro") @db.VarChar(10)
+  ieEstadual       String? @map("ie_estadual") @db.VarChar(20)
+  indEscCons       String? @default("N") @map("ind_esc_cons") @db.VarChar(1)
+  indCentralizada  String? @default("0") @map("ind_centralizada") @db.VarChar(1)
+  tipEcd           String? @default("0") @map("tip_ecd") @db.VarChar(1)
+  indMoedaFunc     String? @default("N") @map("ind_moeda_func") @db.VarChar(1)
   pettyCashEntries PettyCashEntry[]
   
   @@map("companies")
@@ -926,6 +937,7 @@ model ChartOfAccounts {
   createdBy    User?              @relation("CreatedAccounts", fields: [createdById], references: [id])
   updatedBy    User?              @relation("UpdatedAccounts", fields: [updatedById], references: [id])
   journalItems JournalEntryItem[]
+  viewMappings        AccountingViewMapping[]
   rules        AccountingRule[]
   balances     AccountBalance[]
   fixedAssetsAsset    FixedAsset[] @relation("AssetAccount")
@@ -978,8 +990,8 @@ model JournalEntry {
 
   company   Company            @relation(fields: [companyId], references: [id])
   items     JournalEntryItem[]
-  apEntries ApEntry[]
 
+  apEntries ApEntry[]
   @@index([companyId, date])
   @@map("journal_entries")
 }
@@ -2891,4 +2903,70 @@ model PettyCashEntry {
   @@index([pettyCashId])
   @@index([companyId, date])
   @@map("petty_cash_entries")
+}
+
+// =============================================================================
+// 11 · VISOES CONTABEIS / SPED I052 + BLOCO J
+// =============================================================================
+
+/// Codigos de aglutinacao RFB por leiaute e ano-base.
+/// Populados via POST /sped/rfb-codes/import (JSON).
+model RfbAglutinationCode {
+  id        String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  leiaute   Int    @map("leiaute")
+  anoBase   Int    @map("ano_base")
+  tipo      String @map("tipo") @db.VarChar(3)   // BP | DRE
+  codigo    String @map("codigo") @db.VarChar(20)
+  descricao String @map("descricao") @db.VarChar(200)
+  nivel     Int    @map("nivel")
+  codigoPai String? @map("codigo_pai") @db.VarChar(20)
+  ordem     Int    @map("ordem")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+
+  @@unique([leiaute, anoBase, tipo, codigo])
+  @@index([leiaute, anoBase, tipo])
+  @@map("rfb_aglutination_codes")
+}
+
+/// Visao Contabil por empresa e exercicio (BP ou DRE).
+model AccountingView {
+  id        String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId String @map("company_id") @db.Uuid
+  name      String @map("name") @db.VarChar(100)
+  tipo      String @map("tipo") @db.VarChar(3)   // BP | DRE
+  leiaute   Int    @map("leiaute")
+  anoBase   Int    @map("ano_base")
+  isActive  Boolean @default(true) @map("is_active")
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamp(6)
+
+  company  Company @relation(fields: [companyId], references: [id])
+  mappings AccountingViewMapping[]
+
+  @@unique([companyId, tipo, anoBase])
+  @@index([companyId, isActive])
+  @@map("accounting_views")
+}
+
+/// Mapeamento conta analitica -> codigo de aglutinacao RFB (= registro I052 do ECD).
+model AccountingViewMapping {
+  id               String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  viewId           String @map("view_id") @db.Uuid
+  accountId        String @map("account_id") @db.Uuid
+  aglutinationCode String @map("aglutination_code") @db.VarChar(20)
+  ordem            Int    @default(0) @map("ordem")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  view    AccountingView  @relation(fields: [viewId], references: [id], onDelete: Cascade)
+  account ChartOfAccounts @relation(fields: [accountId], references: [id])
+
+  @@unique([viewId, accountId])
+  @@index([viewId])
+  @@index([accountId])
+  @@map("accounting_view_mappings")
 }
