@@ -80,6 +80,7 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
         { path: '/app/accounting/investimentos/renda-fixa', label: 'Renda Fixa', icon: FiTrendingUp },
         { path: '/app/accounting/investimentos/simulador', label: 'Simulador CDB', icon: FiActivity },
         { path: '/app/accounting/balance-comparison', label: 'Comparativo de Saldos', icon: FiActivity },
+        { path: '/app/accounting/visoes-contabeis', label: 'Visões Contábeis (I052)', icon: FiCpu },
         {
           path: '/app/accounting/relatorios',
           label: 'Relatorios',

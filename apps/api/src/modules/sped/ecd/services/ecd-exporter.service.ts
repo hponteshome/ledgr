@@ -200,6 +200,24 @@ export class EcdExporterService {
       }
     }
 
+    // ── I052 — Mapeamento conta → codigo de aglutinacao RFB ──────────────
+    const anoBase = periodStart.getUTCFullYear();
+    const viewsBP = await this.prisma.accountingView.findMany({
+      where: { companyId, anoBase, isActive: true },
+      include: {
+        mappings: {
+          include: { account: { select: { code: true, reducedCode: true } } },
+          orderBy: { aglutinationCode: 'asc' },
+        },
+      },
+    });
+    for (const view of viewsBP) {
+      for (const m of view.mappings) {
+        const codCta = m.account.reducedCode || m.account.code;
+        add(P+'I052'+P+codCta+P+m.aglutinationCode+P);
+      }
+    }
+
     const idxI001   = lines.findIndex(l => l === P+'I001'+P+'0'+P);
     const blocoIQtd = lines.length - idxI001;
     add(P+'I990'+P+(blocoIQtd + 1)+P);

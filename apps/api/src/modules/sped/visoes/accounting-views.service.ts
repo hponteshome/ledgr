@@ -39,6 +39,16 @@ export class AccountingViewsService {
   }
 
   async createView(companyId: string, dto: any) {
+    // Tenta reativar view soft-deleted antes de criar nova
+    const existing = await this.prisma.accountingView.findFirst({
+      where: { companyId, tipo: dto.tipo, anoBase: dto.anoBase },
+    });
+    if (existing) {
+      return this.prisma.accountingView.update({
+        where: { id: existing.id },
+        data: { isActive: true, deletedAt: null, name: dto.name ?? existing.name },
+      });
+    }
     return this.prisma.accountingView.create({
       data: { companyId, ...dto },
     });
@@ -53,11 +63,29 @@ export class AccountingViewsService {
 
   // ── Mapeamentos (I052) ──────────────────────────────────────────────────
   async findMappings(viewId: string) {
-    return this.prisma.accountingViewMapping.findMany({
-      where: { viewId },
-      include: { account: { select: { code: true, name: true, type: true, level: true, isAnalytic: true } } },
-      orderBy: { account: { code: 'asc' } },
+    const view = await this.prisma.accountingView.findUnique({ where: { id: viewId } });
+    if (!view) throw new NotFoundException('Visao nao encontrada');
+
+    // Todas as contas analiticas da empresa
+    const accounts = await this.prisma.chartOfAccounts.findMany({
+      where: { companyId: view.companyId, isAnalytic: true, deletedAt: null },
+      orderBy: { code: 'asc' },
+      select: { id: true, code: true, reducedCode: true, name: true, type: true, level: true, isAnalytic: true },
     });
+
+    // Mapeamentos existentes para esta view
+    const mappings = await this.prisma.accountingViewMapping.findMany({
+      where: { viewId },
+    });
+    const mappingMap = new Map(mappings.map(m => [m.accountId, m]));
+
+    // Retorna todas as contas com o mapeamento (ou null)
+    return accounts.map(a => ({
+      accountId: a.id,
+      account: { code: a.code, reducedCode: a.reducedCode, name: a.name, type: a.type, level: a.level, isAnalytic: a.isAnalytic },
+      aglutinationCode: mappingMap.get(a.id)?.aglutinationCode ?? null,
+      id: mappingMap.get(a.id)?.id ?? null,
+    }));
   }
 
   async upsertMapping(viewId: string, accountId: string, aglutinationCode: string) {
