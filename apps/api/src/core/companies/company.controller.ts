@@ -11,8 +11,8 @@ import {
   UseGuards,
   NotFoundException,
   Request,
+  Query,
 } from '@nestjs/common';
-
 import { JwtAuthGuard } from '../../auth/guards/jwt.guard';
 import { ProfileGuard } from '../../auth/guards/profile.guard';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
@@ -74,8 +74,8 @@ export class CompanyController {
   }
 
   @Get()
-  async findAll() {
-    const companies = await this.companyService.findAll();
+  async findAll(@Query('role') role?: string) {
+    const companies = await this.companyService.findAll(role);
     return companies.map(c => new CompanyDto(c));
   }
 
@@ -91,6 +91,11 @@ export class CompanyController {
     const company = await this.companyService.findById(id);
     if (!company) throw new NotFoundException('Empresa não encontrada.');
     return new CompanyDto(company);
+  }
+
+  @Post('quick')
+  async quickCreate(@Body() body: any) {
+    return this.companyService.quickCreate(body);
   }
 
   @Post()

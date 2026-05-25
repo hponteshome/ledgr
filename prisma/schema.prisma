@@ -149,7 +149,7 @@ model Company {
   lastRfbSync DateTime? @map("last_rfb_sync") @db.Timestamp(6)
   partners    Json?     @map("partners")
 
-  type      String?   @default("CLIENT") @map("type") @db.VarChar
+  roles     String[]  @default(["LEDGR_USER"]) @map("roles")
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
   deletedAt DateTime? @map("deleted_at") @db.Timestamp(6)

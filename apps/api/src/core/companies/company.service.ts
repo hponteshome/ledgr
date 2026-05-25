@@ -24,11 +24,13 @@ export class CompanyService {
   }
 
   // CORREÇÃO: Adicionado filtro para esconder a Global da listagem geral
-  async findAll() {
+  async findAll(role?: string) {
     return this.prisma.company.findMany({
       where: {
-        id: { not: GLOBAL_COMPANY_ID }
-      }
+        id: { not: GLOBAL_COMPANY_ID },
+        ...(role ? { roles: { has: role } } : {}),
+      },
+      orderBy: { legalName: 'asc' },
     });
   }
 
@@ -95,6 +97,16 @@ export class CompanyService {
           status:        dto.status        || 'active',
           statusDate:    dto.statusDate    ? new Date(dto.statusDate) : new Date(),
           partners:      partnersData      || null,
+          roles:           dto.roles           || ['LEDGR_USER'],
+          nire:            dto.nire            || null,
+          orgRegistro:     dto.orgRegistro     || null,
+          codMun:          dto.codMun          || null,
+          natLivro:        dto.natLivro        || null,
+          ieEstadual:      dto.ieEstadual      || null,
+          indEscCons:      dto.indEscCons      || 'N',
+          indCentralizada: dto.indCentralizada || '0',
+          tipEcd:          dto.tipEcd          || '0',
+          indMoedaFunc:    dto.indMoedaFunc    || 'N',
         },
       });
 
@@ -104,6 +116,29 @@ export class CompanyService {
       this.logger.error(`Error creating company: ${error.message}`);
       throw error;
     }
+  }
+
+  async quickCreate(dto: { taxId: string; legalName: string; roles: string[]; tradeName?: string; email?: string; phone1?: string }) {
+    const existing = await this.prisma.company.findFirst({ where: { taxId: dto.taxId } });
+    if (existing) {
+      const newRoles = [...new Set([...existing.roles, ...dto.roles])];
+      return this.prisma.company.update({ where: { id: existing.id }, data: { roles: newRoles } });
+    }
+    return this.prisma.company.create({
+      data: {
+        taxId:         dto.taxId,
+        legalName:     dto.legalName,
+        tradeName:     dto.tradeName   || '',
+        roles:         dto.roles,
+        email:         dto.email       || '',
+        phone1:        dto.phone1      || '',
+        isHeadquarter: false,
+        openingDate:   new Date(),
+        zipCode: '', street: '', number: '', neighborhood: '', city: '', state: '',
+        equity: 0, legalNature: '', size: '', taxRegime: '',
+        status: 'active', statusDate: new Date(),
+      },
+    });
   }
 
   async update(id: string, data: any, adminId: string) {
@@ -207,6 +242,7 @@ async findAvailable(user: any) {
     where: {
       id: { not: GLOBAL_COMPANY_ID },
       deletedAt: null,
+      roles: { has: 'LEDGR_USER' },
       // Master Admin vê todas — usuário normal só vê ativas
       ...(isMasterAdmin ? {} : { status: 'active' }),
     },
@@ -232,3 +268,4 @@ async findHeadquarters() {
 }
 
 }
+
