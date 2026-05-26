@@ -116,13 +116,13 @@ const EditModal: React.FC<{ entry: JournalEntry; onClose: () => void; onSaved: (
         value: Number(i.value),
         type: i.type,
     })));
-    const [sourceModules, setSourceModules] = useState<{value:string;label:string}[]>([]);
+    const [sourceModules, setSourceModules] = useState<{ value: string; label: string }[]>([]);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
 
-    const totalDebit  = items.filter(i => i.type === 'DEBIT').reduce((s, i) => s + i.value, 0);
+    const totalDebit = items.filter(i => i.type === 'DEBIT').reduce((s, i) => s + i.value, 0);
     const totalCredit = items.filter(i => i.type === 'CREDIT').reduce((s, i) => s + i.value, 0);
-    const balanced    = Math.abs(totalDebit - totalCredit) < 0.01;
+    const balanced = Math.abs(totalDebit - totalCredit) < 0.01;
 
     const lookupCode = async (idx: number, code: string) => {
         if (!code.trim()) return;
@@ -149,79 +149,79 @@ const EditModal: React.FC<{ entry: JournalEntry; onClose: () => void; onSaved: (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"
             onClick={e => e.target === e.currentTarget && onClose()}
             onKeyDown={e => e.key === 'Escape' && onClose()} tabIndex={-1}>
-            <div className="bg-white rounded-xl shadow-xl p-5 w-full max-w-2xl flex flex-col" style={{maxHeight:'90vh'}}>
+            <div className="bg-white rounded-xl shadow-xl p-5 w-full max-w-2xl flex flex-col" style={{ maxHeight: '90vh' }}>
                 <div className="flex items-center justify-between mb-4">
                     <h3 className="font-medium text-gray-800">Editar Lancamento</h3>
-                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><FiX size={18}/></button>
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><FiX size={18} /></button>
                 </div>
 
                 <div className="flex gap-3 mb-4">
                     <div>
                         <label className="text-xs text-gray-500 block mb-1">Data</label>
                         <input type="date" value={date} onChange={e => setDate(e.target.value)}
-                            className="h-8 border border-gray-200 rounded-lg px-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-36"/>
+                            className="h-8 border border-gray-200 rounded-lg px-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-36" />
                     </div>
                     <div className="flex-1">
                         <label className="text-xs text-gray-500 block mb-1">Descricao</label>
                         <input type="text" value={description} onChange={e => setDescription(e.target.value)}
-                            className="h-8 border border-gray-200 rounded-lg px-3 text-sm w-full focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                            className="h-8 border border-gray-200 rounded-lg px-3 text-sm w-full focus:outline-none focus:ring-2 focus:ring-blue-500" />
                     </div>
                 </div>
 
-                <div style={{overflowY:'auto', maxHeight:'50vh'}}>
-                <table className="w-full text-xs mb-3 border-collapse">
-                    <thead>
-                        <tr className="bg-gray-50">
-                            <th className="px-2 py-1.5 text-left text-[10px] text-gray-400 uppercase font-bold border-b border-gray-100">Tipo</th>
-                            <th className="px-2 py-1.5 text-left text-[10px] text-gray-400 uppercase font-bold border-b border-gray-100">Codigo</th>
-                            <th className="px-2 py-1.5 text-left text-[10px] text-gray-400 uppercase font-bold border-b border-gray-100">Conta</th>
-                            <th className="px-2 py-1.5 text-right text-[10px] text-gray-400 uppercase font-bold border-b border-gray-100">Valor</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {items.map((item, idx) => (
-                            <tr key={idx} className="border-b border-gray-50">
-                                <td className="px-2 py-1.5">
-                                    <select value={item.type} onChange={e => setItems(prev => prev.map((it,i) => i===idx ? {...it, type: e.target.value as any} : it))}
-                                        className="h-7 border border-gray-200 rounded px-1 text-xs bg-white">
-                                        <option value="DEBIT">Debito</option>
-                                        <option value="CREDIT">Credito</option>
-                                    </select>
-                                </td>
-                                <td className="px-2 py-1.5">
-                                    <input type="text" value={item.accountCode}
-                                        onChange={e => setItems(prev => prev.map((it,i) => i===idx ? {...it, accountCode: e.target.value, accountName:'', accountId:''} : it))}
-                                        onBlur={() => lookupCode(idx, item.accountCode)}
-                                        className="h-7 border border-gray-200 rounded px-2 text-xs w-28 focus:outline-none focus:ring-1 focus:ring-blue-400"/>
-                                </td>
-                                <td className="px-2 py-1.5 text-gray-500">{item.accountName}</td>
-                                <td className="px-2 py-1.5">
-                                    <input type="number" value={item.value} step="0.01"
-                                        onChange={e => setItems(prev => prev.map((it,i) => i===idx ? {...it, value: parseFloat(e.target.value)||0} : it))}
-                                        className="h-7 border border-gray-200 rounded px-2 text-xs text-right w-28 focus:outline-none focus:ring-1 focus:ring-blue-400"/>
-                                </td>
+                <div style={{ overflowY: 'auto', maxHeight: '50vh' }}>
+                    <table className="w-full text-xs mb-3 border-collapse">
+                        <thead>
+                            <tr className="bg-gray-50">
+                                <th className="px-2 py-1.5 text-left text-[10px] text-gray-400 uppercase font-bold border-b border-gray-100">Tipo</th>
+                                <th className="px-2 py-1.5 text-left text-[10px] text-gray-400 uppercase font-bold border-b border-gray-100">Codigo</th>
+                                <th className="px-2 py-1.5 text-left text-[10px] text-gray-400 uppercase font-bold border-b border-gray-100">Conta</th>
+                                <th className="px-2 py-1.5 text-right text-[10px] text-gray-400 uppercase font-bold border-b border-gray-100">Valor</th>
                             </tr>
-                        ))}
-                    </tbody>
-                    <tfoot>
-                        <tr className="bg-gray-50">
-                            <td colSpan={3} className="px-2 py-1.5 text-xs text-gray-400">
-                                D: R$ {fmtCurrency(totalDebit)} · C: R$ {fmtCurrency(totalCredit)}
-                                {balanced ? <span className="text-green-600 ml-2">✓ Balanceado</span> : <span className="text-red-500 ml-2">✗ Diferenca: R$ {fmtCurrency(Math.abs(totalDebit-totalCredit))}</span>}
-                            </td>
-                            <td></td>
-                        </tr>
-                    </tfoot>
-                </table>
+                        </thead>
+                        <tbody>
+                            {items.map((item, idx) => (
+                                <tr key={idx} className="border-b border-gray-50">
+                                    <td className="px-2 py-1.5">
+                                        <select value={item.type} onChange={e => setItems(prev => prev.map((it, i) => i === idx ? { ...it, type: e.target.value as any } : it))}
+                                            className="h-7 border border-gray-200 rounded px-1 text-xs bg-white">
+                                            <option value="DEBIT">Debito</option>
+                                            <option value="CREDIT">Credito</option>
+                                        </select>
+                                    </td>
+                                    <td className="px-2 py-1.5">
+                                        <input type="text" value={item.accountCode}
+                                            onChange={e => setItems(prev => prev.map((it, i) => i === idx ? { ...it, accountCode: e.target.value, accountName: '', accountId: '' } : it))}
+                                            onBlur={() => lookupCode(idx, item.accountCode)}
+                                            className="h-7 border border-gray-200 rounded px-2 text-xs w-28 focus:outline-none focus:ring-1 focus:ring-blue-400" />
+                                    </td>
+                                    <td className="px-2 py-1.5 text-gray-500">{item.accountName}</td>
+                                    <td className="px-2 py-1.5">
+                                        <input type="number" value={item.value} step="0.01"
+                                            onChange={e => setItems(prev => prev.map((it, i) => i === idx ? { ...it, value: parseFloat(e.target.value) || 0 } : it))}
+                                            className="h-7 border border-gray-200 rounded px-2 text-xs text-right w-28 focus:outline-none focus:ring-1 focus:ring-blue-400" />
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                        <tfoot>
+                            <tr className="bg-gray-50">
+                                <td colSpan={3} className="px-2 py-1.5 text-xs text-gray-400">
+                                    D: R$ {fmtCurrency(totalDebit)} · C: R$ {fmtCurrency(totalCredit)}
+                                    {balanced ? <span className="text-green-600 ml-2">✓ Balanceado</span> : <span className="text-red-500 ml-2">✗ Diferenca: R$ {fmtCurrency(Math.abs(totalDebit - totalCredit))}</span>}
+                                </td>
+                                <td></td>
+                            </tr>
+                        </tfoot>
+                    </table>
 
                 </div>
-                {error && <p className="text-xs text-red-600 mb-3 flex items-center gap-1"><FiAlertCircle size={12}/> {error}</p>}
+                {error && <p className="text-xs text-red-600 mb-3 flex items-center gap-1"><FiAlertCircle size={12} /> {error}</p>}
 
                 <div className="flex justify-end gap-2">
                     <button onClick={onClose} className="px-4 py-1.5 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">Cancelar</button>
                     <button onClick={handleSave} disabled={saving || !balanced}
                         className="px-5 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-1.5">
-                        {saving ? <FiLoader size={12} className="animate-spin"/> : <FiCheck size={12}/>} Salvar alteracoes
+                        {saving ? <FiLoader size={12} className="animate-spin" /> : <FiCheck size={12} />} Salvar alteracoes
                     </button>
                 </div>
             </div>
@@ -263,7 +263,7 @@ const JournalPage: React.FC = () => {
     const [repeatHist, setRepeatHist] = useState(false);
     const [repeatComplement, setRepeatComplement] = useState(false);
 
-    const [sourceModules, setSourceModules] = useState<{value:string;label:string}[]>([]);
+    const [sourceModules, setSourceModules] = useState<{ value: string; label: string }[]>([]);
     const [saving, setSaving] = useState(false);
     const [formError, setFormError] = useState('');
     const [formSuccess, setFormSuccess] = useState('');
@@ -276,9 +276,9 @@ const JournalPage: React.FC = () => {
     const [showBulkDelete, setShowBulkDelete] = useState(false);
     const [showEcdOpening, setShowEcdOpening] = useState(false);
     const [showLotdModal, setShowLotdModal] = useState(false);
-    const [showRecent, setShowRecent] = useState(false);
-    const [sortBy, setSortBy] = useState<'date'|'value'|'description'|'debitCode'|'creditCode'|'reference'>('date');
-    const [sortDir, setSortDir] = useState<'asc'|'desc'>('asc');
+    const [showRecent, setShowRecent] = useState(true);
+    const [sortBy, setSortBy] = useState<'date' | 'value' | 'description' | 'debitCode' | 'creditCode' | 'reference'>('date');
+    const [sortDir, setSortDir] = useState<'desc' | 'asc'>('desc');
 
     // Modal "conta não encontrada"
     const [newAccountCode, setNewAccountCode] = useState('');
@@ -299,19 +299,19 @@ const JournalPage: React.FC = () => {
             const r = await api.get('/accounting/journal', { params });
             let entries = r.data.entries;
             if (sortBy === 'debitCode' || sortBy === 'creditCode') {
-              const side = sortBy === 'debitCode' ? 'DEBIT' : 'CREDIT';
-              entries = [...entries].sort((a: any, b: any) => {
-                const ca = a.items.find((i: any) => i.type === side)?.account?.code ?? '';
-                const cb = b.items.find((i: any) => i.type === side)?.account?.code ?? '';
-                return sortDir === 'asc' ? ca.localeCompare(cb) : cb.localeCompare(ca);
-              });
+                const side = sortBy === 'debitCode' ? 'DEBIT' : 'CREDIT';
+                entries = [...entries].sort((a: any, b: any) => {
+                    const ca = a.items.find((i: any) => i.type === side)?.account?.code ?? '';
+                    const cb = b.items.find((i: any) => i.type === side)?.account?.code ?? '';
+                    return sortDir === 'asc' ? ca.localeCompare(cb) : cb.localeCompare(ca);
+                });
             }
             if (sortBy === 'value') {
-              entries = [...entries].sort((a: any, b: any) => {
-                const va = a.items.reduce((s: number, i: any) => i.type === 'DEBIT' ? s + Number(i.value) : s, 0);
-                const vb = b.items.reduce((s: number, i: any) => i.type === 'DEBIT' ? s + Number(i.value) : s, 0);
-                return sortDir === 'asc' ? va - vb : vb - va;
-              });
+                entries = [...entries].sort((a: any, b: any) => {
+                    const va = a.items.reduce((s: number, i: any) => i.type === 'DEBIT' ? s + Number(i.value) : s, 0);
+                    const vb = b.items.reduce((s: number, i: any) => i.type === 'DEBIT' ? s + Number(i.value) : s, 0);
+                    return sortDir === 'asc' ? va - vb : vb - va;
+                });
             }
             setData({ ...r.data, entries });
         } catch (e) { console.error(e); }
@@ -329,7 +329,7 @@ const JournalPage: React.FC = () => {
     useEffect(() => {
         api.get('/accounting/journal/source-modules')
             .then(r => setSourceModules(r.data ?? []))
-            .catch(() => {});
+            .catch(() => { });
     }, [activeCompany?.id]);
     useEffect(() => { loadEntries(); }, [loadEntries]);
     useEffect(() => { loadTotals(); }, [loadTotals]);
@@ -513,7 +513,7 @@ const JournalPage: React.FC = () => {
                         className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-purple-700 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 transition-colors">
                         <FiUploadCloud size={13} /> Importar Lote IOB
                     </button>
-                    <button onClick={() => window.location.href='/app/accounting/journal/import'}
+                    <button onClick={() => window.location.href = '/app/accounting/journal/import'}
                         className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-colors">
                         <FiUploadCloud size={13} /> Importar Diário
                     </button>
@@ -545,7 +545,7 @@ const JournalPage: React.FC = () => {
                             <option value="MANUAL">Manual</option>
                             <option value="PROVISION">Provisao</option>
                             <option value="ADJUSTMENT">Ajuste</option>
-                            {sourceModules.filter(s => !["ACCOUNTING","PROVISION","ADJUSTMENT","MANUAL"].includes(s.value)).map(s => (
+                            {sourceModules.filter(s => !["ACCOUNTING", "PROVISION", "ADJUSTMENT", "MANUAL"].includes(s.value)).map(s => (
                                 <option key={s.value} value={s.value}>{s.label}</option>
                             ))}
                         </select>
@@ -684,11 +684,11 @@ const JournalPage: React.FC = () => {
                             <input type="text" value={search} onChange={e => { setSearch(e.target.value); setPage(1); }}
                                 placeholder="Filtrar conta, histórico..."
                                 className="h-7 border border-gray-200 rounded-lg pl-8 pr-3 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 w-52" />
-                        <select value={fSource} onChange={e => { setFSource(e.target.value); setPage(1); }}
-                            className="h-7 border border-gray-200 rounded-lg px-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 w-36">
-                            <option value="">Todas as fontes</option>
-                            {sourceModules.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-                        </select>
+                            <select value={fSource} onChange={e => { setFSource(e.target.value); setPage(1); }}
+                                className="h-7 border border-gray-200 rounded-lg px-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 w-36">
+                                <option value="">Todas as fontes</option>
+                                {sourceModules.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                            </select>
                         </div>
                         {data && <span className="text-xs text-gray-400">{data.total} lançamentos</span>}
                     </div>
@@ -720,7 +720,7 @@ const JournalPage: React.FC = () => {
                                             return (
                                                 <th onClick={() => { setSortBy(col); setSortDir(active ? next : col === "date" ? "asc" : "desc"); setPage(1); }}
                                                     className={`${thBase} ${extraCls} cursor-pointer hover:text-blue-600 transition-colors ${active ? "text-blue-600" : "text-gray-400"}`}>
-                                                    {label}{active ? (sortDir === "asc" ? " ↑" : " ↓") : ""}
+                                                    {label}{active ? (sortDir === "desc" ? " ↑" : " ↓") : ""}
                                                 </th>
                                             );
                                         };

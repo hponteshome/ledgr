@@ -13,25 +13,25 @@ interface MappingRow {
 }
 
 const TIPO_OPTS = [{ v: 'BP', l: 'BP — Balanço Patrimonial' }, { v: 'DRE', l: 'DRE — Demonstrativo de Resultado' }];
-const ANO_OPTS = [2024, 2023, 2022];
+const ANO_OPTS = [2025, 2024, 2023, 2022, 2021, 2020, 2019];
 
 // ── Componente principal ──────────────────────────────────────────────────────
 export default function VisoesContabeisPage() {
   // Seleção de contexto
-  const [anoBase, setAnoBase]   = useState(2024);
-  const [tipo, setTipo]         = useState('BP');
-  const [leiaute]               = useState(9);
+  const [anoBase, setAnoBase] = useState(2024);
+  const [tipo, setTipo] = useState('BP');
+  const [leiaute] = useState(9);
 
   // Estado geral
-  const [views, setViews]             = useState<AccountingView[]>([]);
-  const [activeView, setActiveView]   = useState<AccountingView | null>(null);
-  const [rows, setRows]               = useState<MappingRow[]>([]);
-  const [rfbCodes, setRfbCodes]       = useState<RfbCode[]>([]);
-  const [rfbCount, setRfbCount]       = useState(0);
-  const [dirty, setDirty]             = useState<Record<string, string>>({}); // accountId → aglCode pendente
-  const [loading, setLoading]         = useState(false);
-  const [saving, setSaving]           = useState(false);
-  const [filter, setFilter]           = useState('');
+  const [views, setViews] = useState<AccountingView[]>([]);
+  const [activeView, setActiveView] = useState<AccountingView | null>(null);
+  const [rows, setRows] = useState<MappingRow[]>([]);
+  const [rfbCodes, setRfbCodes] = useState<RfbCode[]>([]);
+  const [rfbCount, setRfbCount] = useState(0);
+  const [dirty, setDirty] = useState<Record<string, string>>({}); // accountId → aglCode pendente
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [filter, setFilter] = useState('');
   const [onlyUnmapped, setOnlyUnmapped] = useState(false);
 
   // ── Carregar views da empresa ────────────────────────────────────────────
@@ -186,6 +186,9 @@ export default function VisoesContabeisPage() {
   const filtered = useMemo(() => {
     return rows.filter(r => {
       if (!r.isAnalytic) return false;
+      // Filtrar contas por tipo de view: BP=ASSET/LIABILITY/EQUITY, DRE=REVENUE/EXPENSE
+      if (tipo === "BP" && !["ASSET", "LIABILITY", "EQUITY"].includes(r.type)) return false;
+      if (tipo === "DRE" && !["REVENUE", "EXPENSE"].includes(r.type)) return false;
       if (onlyUnmapped && effectiveCode(r)) return false;
       if (filter) {
         const q = filter.toLowerCase();
@@ -196,15 +199,15 @@ export default function VisoesContabeisPage() {
   }, [rows, filter, onlyUnmapped, dirty]);
 
   const totalAnalytic = rows.filter(r => r.isAnalytic).length;
-  const totalMapped   = rows.filter(r => r.isAnalytic && effectiveCode(r)).length;
-  const dirtyCount    = Object.values(dirty).filter(v => v !== '').length;
+  const totalMapped = rows.filter(r => r.isAnalytic && effectiveCode(r)).length;
+  const dirtyCount = Object.values(dirty).filter(v => v !== '').length;
 
   // ── Opções do select RFB agrupadas por nível 1 ───────────────────────────
   const rfbGroups = useMemo(() => {
     const top = rfbCodes.filter(c => c.nivel === 1);
     return top.map(g => ({
       label: g.codigo + ' — ' + g.descricao,
-      options: rfbCodes.filter(c => c.codigoPai === g.codigo || c.codigo === g.codigo),
+      options: rfbCodes.filter(c => c.codigo.startsWith(g.codigo + '.') || c.codigo === g.codigo),
     }));
   }, [rfbCodes]);
 
