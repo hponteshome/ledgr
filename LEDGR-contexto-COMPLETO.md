@@ -358,3 +358,88 @@ Tabelas:
 - **I155 leiaute 9:** 8 campos (VL_SLD_360 removido vs leiautes anteriores)
 - **Bloco J ECD:** requer I052 (aglutinação) + I350/I355 + Visões Contábeis — não implementável sem infraestrutura
 - **Pré-validação ECD:** sempre validar equilíbrio, fechamentos e plano antes de gerar
+---
+
+## Sessão 28/05/2026 — ECD Exporter Kipstone S/A (Lucro Real)
+
+### Contexto
+- Empresa: **Kipstone Tecnologia S/A** — CNPJ `31.799.461/0001-08`
+- companyId: `9047fcd8-41f4-4656-8423-187f44659e1b`
+- Período: 01/01/2025 a 31/12/2025 — Leiaute 9
+
+### Caminhos do projeto (definitivos)
+- Backend: `D:\Projetos\Ledgr\apps\api\src\modules\sped\ecd\`
+  - Controller: `controllers\ecd.controller.ts` — rotas: `@Controller('sped/ecd')`, `@Get('export')`, `@Get('pre-validate')`, `@Post('import')`, `@Post('validate')`, `@Get('imports')`, `@Get('imports/:id')`
+  - Exporter: `services\ecd-exporter.service.ts`
+- Frontend: `D:\Projetos\Ledgr\frontend\src\pages\VisoesContabeisPage.tsx`
+- Visões: `D:\Projetos\Ledgr\apps\api\src\modules\sped\visoes\`
+
+### Problemas resolvidos
+
+**1. Views vinculadas à empresa errada**
+- As `AccountingView` BP 2024, BP 2025 e DRE 2025 estavam vinculadas à Kipstone LTDA (`671d09ef`) em vez da Kipstone S/A (`9047fcd8`).
+- Correção: `UPDATE accounting_views SET company_id = '9047fcd8...' WHERE id IN (...)`
+
+**2. DRE 2024 inexistente**
+- Criada via SQL com 3 mapeamentos: `42103010050 → 3.01.01.07.01.23`, `42301010005 → 3.01.01.09.01.08`, `42401010001 → 3.01.01.09.01.09`
+
+**3. I050 emitindo todas as contas**
+- Adicionado filtro `accountsFiltered` — apenas contas com movimento, saldo ou mapeamento I052, expandindo ancestrais sintéticos.
+
+**4. bookNumber hardcoded como "1" no controller**
+- Corrigido: `bookNumber || undefined` no controller; default no exporter: `String(periodStart.getUTCFullYear()).slice(-2)` (ex: `"25"` para 2025).
+- O frontend tem campo "Número do livro" que o usuário preenche manualmente.
+
+**5. J100 usando BAL_+reducedCode inventado**
+- Corrigido para usar `i052Map` (código RFB real) nas linhas de detalhe.
+- J150 corrigido para usar `aglCode152.padEnd(30, " ")` em vez de `DRE_NNN_DO0_*`.
+
+**6. J100 com COD_AGL duplicado (múltiplas contas para mesmo código RFB)**
+- Substituído loop por conta por agregação: `j100Map` acumula `ini/fin` por código RFB antes de emitir.
+
+**7. J100 sem hierarquia de totalizadores**
+- Implementada busca completa da tabela `rfb_aglutination_codes` (leiaute 9, anoBase, tipo BP).
+- Totalizadores (`T`) emitidos para todos os ancestrais dos códigos de detalhe, com saldos propagados bottom-up.
+- Detalhes (`D`) emitidos após totalizadores.
+
+**8. Bug saldo duplo nos totalizadores raiz (1 e 2)**
+- A propagação somava ATIVO + PASSIVO na raiz. Corrigido: loop para quando `codigoPai` é vazio — não propaga além da raiz imediata.
+
+**9. Mapeamentos com códigos totalizadores (2.01.01, 2.03.01)**
+- Contas `22101020002`, `22101020003`, `22101030003` remapeadas para `2.01.01.17.03`
+- Contas `23101010001`, `23101020001`, `23101020002` remapeadas para `2.03.01.01.01`
+- Correção feita via frontend Visões Contábeis (VisoesContabeisPage.tsx)
+
+### Resultado final
+- **PGE: 1 erro — apenas assinatura do contador (J930) — não técnico**
+- ECD pronto para assinar e transmitir
+
+### Estado das AccountingViews — Kipstone S/A
+| View | Tipo | Ano | Mapeamentos |
+|---|---|---|---|
+| Balanço Patrimonial 2024 | BP | 2024 | 38 |
+| DRE 2024 | DRE | 2024 | 3 |
+| Balanço Patrimonial 2025 | BP | 2025 | 39 |
+| DRE 2025 | DRE | 2025 | 4 |
+
+### Aprendizados técnicos desta sessão
+- Schema: `Company.legalName` → coluna `legal_name` (não `name`)
+- J100 exige hierarquia completa de totalizadores RFB — não pode emitir apenas detalhes
+- COD_AGL do J100 deve ser único — múltiplas contas analíticas com mesmo código RFB devem ser agregadas
+- Totalizadores (`T`) no J100 não podem constar no I052 — apenas detalhes (`D`)
+- A propagação de saldo para totalizadores deve parar ao atingir a raiz (sem `codigoPai`)
+- `bookNumber` vem do frontend (campo "Número do livro"); default é `slice(-2)` do ano
+
+### Commits desta sessão
+- `feat(ecd): exporter - hierarquia J100 RFB, agregacao COD_AGL, bookNumber por ano`
+- `feat(visoes): editor de visoes contabeis + JSONs RFB leiaute 9 2025`
+
+### Complemento sessão 28/05/2026 — Nome do arquivo ECD
+
+**Problema:** arquivo gerado com nome `ECD_2026.txt` sem CNPJ
+**Causa raiz:** nome hardcoded no frontend (`EcdPage.tsx` linha 306); `Content-Disposition` não exposto no CORS
+**Solução:**
+1. `apps/api/src/main.ts` — adicionado `Content-Disposition` em `exposedHeaders`
+2. `apps/api/src/modules/sped/ecd/controllers/ecd.controller.ts` — nome gerado a partir do CNPJ extraído via `companyForName` do banco
+3. `frontend/src/pages/sped/EcdPage.tsx` — `a.download` lê o `content-disposition` do response header
+**Resultado:** `ECD_2026_31799461.txt` (formato `ECD_ANO_RAIZCNPJ.txt`)
