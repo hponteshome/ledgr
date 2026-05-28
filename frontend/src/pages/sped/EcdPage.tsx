@@ -303,7 +303,7 @@ const EcdPage: React.FC = () => {
             });
             const url = window.URL.createObjectURL(new Blob([r.data]));
             const a = document.createElement('a'); a.href = url;
-            a.download = 'ECD_' + new Date(exportPeriodEnd).getFullYear() + '.txt';
+            const cd = r.headers['content-disposition'] || ''; const fnMatch = cd.match(/filename="([^"]+)"/); a.download = fnMatch ? fnMatch[1] : 'ECD_' + new Date(exportPeriodEnd).getFullYear() + '.txt';
             a.click();
             window.URL.revokeObjectURL(url);
         } catch (e: any) {

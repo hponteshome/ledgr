@@ -180,9 +180,8 @@ export class EcdController {
       bookType:    (bookType as any) || 'G',
     });
 
-    // CNPJ extraido da linha 0000 do proprio arquivo gerado (campo 6)
-    const linha0000 = content.toString().split("\n").find((l: string) => l.startsWith("|0000|"));
-    const cnpj      = linha0000 ? linha0000.split("|")[6]?.replace(/\D/g, '') || 'ECD' : 'ECD';
+    const companyForName = await this.prisma.company.findUnique({ where: { id: companyId }, select: { taxId: true } });
+    const cnpj = companyForName?.taxId?.replace(/\D/g, '') || 'ECD';
     const year      = new Date(periodEnd).getFullYear();
     const raiz      = cnpj.substring(0, 8);
     const filename  = `ECD_${year}_${raiz}.txt`;

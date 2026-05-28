@@ -9,7 +9,7 @@ async function bootstrap() {
   app.enableCors({
     origin: 'http://localhost:5173',
     credentials: true,
-      exposedHeaders: ['x-company-id'], // ← ISSO ESTÁ FALTANDO
+      exposedHeaders: ['x-company-id', 'Content-Disposition'], // ← ISSO ESTÁ FALTANDO
   allowedHeaders: ['Content-Type', 'Authorization', 'x-company-id'],
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   });
