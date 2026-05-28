@@ -176,7 +176,7 @@ export class EcdController {
       companyId,
       periodStart: new Date(periodStart),
       periodEnd:   new Date(periodEnd),
-      bookNumber:  bookNumber || '1',
+      bookNumber:  bookNumber || undefined,
       bookType:    (bookType as any) || 'G',
     });
 

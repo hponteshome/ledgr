@@ -21,7 +21,7 @@ export class EcdExporterService {
   async export(options: EcdExportOptions): Promise<Buffer> {
     const {
       companyId, periodStart, periodEnd,
-      bookNumber = "1", bookNature = "Livro Diario Geral",
+      bookNumber = String(periodStart.getUTCFullYear()).slice(-2), bookNature = "Livro Diario Geral",
       bookType = "G", layoutVersion = "9.00",
     } = options;
 
@@ -54,6 +54,20 @@ export class EcdExporterService {
     for (const view of viewsI052) {
       for (const m of view.mappings) i052Map.set(m.accountId, m.aglutinationCode);
     }
+
+          // i051Map: accountId -> codigo referencial RFB (COD_CTA_REF)
+          const aglCodes = Array.from(new Set(Array.from(i052Map.values())));
+          const rfbRows = aglCodes.length > 0
+            ? await this.prisma.rfbAglutinationCode.findMany({
+                where: { anoBase, codigo: { in: aglCodes } },
+                select: { codigo: true },
+              })
+            : [];
+          const rfbCodigoSet = new Set(rfbRows.map((r: any) => r.codigo));
+          const i051Map = new Map<string, string>();
+          for (const [accountId, aglCode] of i052Map.entries()) {
+            if (rfbCodigoSet.has(aglCode)) i051Map.set(accountId, aglCode);
+          }
 
     // Lancamentos do periodo
     const entries = await this.prisma.journalEntry.findMany({
@@ -165,8 +179,26 @@ export class EcdExporterService {
       dreSeq++;
     }
 
-    // I050 + I051 + I052 — plano de contas com referencial
-    for (const acc of accounts) {
+    // I050 + I051 + I052 — apenas contas com movimento ou saldo (+ ancestrais sinteticos)
+    const analyticWithData = new Set<string>();
+    for (const [, accMap] of byMonthAcc) {
+      for (const aid of accMap.keys()) analyticWithData.add(aid);
+    }
+    for (const [aid, saldo] of saldoIni) {
+      if (saldo !== 0) analyticWithData.add(aid);
+    }
+    for (const aid of i052Map.keys()) analyticWithData.add(aid);
+    const accountById = new Map(accounts.map(a => [a.id, a]));
+    const activeIds = new Set<string>(analyticWithData);
+    for (const aid of analyticWithData) {
+      let cur = accountById.get(aid);
+      while (cur?.parentId) {
+        activeIds.add(cur.parentId);
+        cur = accountById.get(cur.parentId);
+      }
+    }
+    const accountsFiltered = accounts.filter(a => activeIds.has(a.id));
+    for (const acc of accountsFiltered) {
       const dtAlt      = this.fmtDate(acc.createdAt);
       const natCode    = this.typeToNat(acc.type.toString());
       const indCta     = acc.isAnalytic ? "A" : "S";
@@ -174,16 +206,15 @@ export class EcdExporterService {
       const reducedCode = (acc as any).reducedCode || acc.code;
       // |I050|DT_ALT|COD_NAT|IND_CTA|NIVEL|COD_CTA|COD_CTA_SUP|NOME_CTA|
       add(P+"I050"+P+dtAlt+P+natCode+P+indCta+P+acc.level+P+reducedCode+P+parentCode+P+acc.name+P);
-      if (acc.isAnalytic) {
-        // I051: |I051||COD_REF| — codigo referencial RFB (mapeado via Visoes Contabeis)
-        const aglCode = i052Map.get(acc.id) ?? "";
-        add(P+"I051"+P+P+aglCode+P);
-        // I052: |I052||BAL_codCta| — codigo de aglutinacao com padding 20 chars
-        const balCode = "BAL_" + reducedCode.padEnd(20, " ");
-        add(P+"I052"+P+P+balCode+P);
-      }
+          if (acc.isAnalytic) {
+            // I051: COD_CTA_REF = codigo referencial RFB (obrigatorio para todas as naturezas)
+            const i051Val = i051Map.get(acc.id) ?? "";
+            if (i051Val) add(P+"I051"+P+P+i051Val+P);
+            // I052: COD_AGL = codigo de aglutinacao para Bloco J
+            const i052Val = i052Map.get(acc.id) ?? "";
+            if (i052Val) add(P+"I052"+P+P+i052Val+P);
+          }
     }
-
     // I075 — historico padronizado (minimo requerido)
     add(P+"I075"+P+"1"+P+"Livre"+P);
 
@@ -243,27 +274,37 @@ export class EcdExporterService {
       }
     }
 
-    // I350/I355 — saldos de contas de resultado antes do encerramento
-    const dreTypes = new Set(["REVENUE","EXPENSE"]);
-    // I355: excluir contas que nao sao de resultado (ex: depreciacoes classificadas como despesa mas sem lancamento de encerramento)
-    const dreAccounts = accounts.filter(a => {
-      if (!a.isAnalytic || !dreTypes.has(a.type.toString())) return false;
-      const mv = dreMap.get(a.id);
-      if (!mv) return false;
-      const saldo = mv.cre - mv.deb;
-      return saldo !== 0; // so incluir contas com saldo liquido nao zero
-    });
-    if (dreAccounts.length > 0) {
-      add(P+"I350"+P+dtFin+P);
-      for (const acc of dreAccounts) {
-        const mv = dreMap.get(acc.id) ?? { deb: 0, cre: 0 };
-        const saldo = mv.cre - mv.deb;
-        if (saldo === 0) continue;
-        const dc = saldo >= 0 ? "C" : "D";
-        const reducedCode = (acc as any).reducedCode || acc.code;
-        add(P+"I355"+P+reducedCode+P+P+this.fmtDec(Math.abs(saldo))+P+dc+P);
-      }
-    }
+        // I350/I355 — saldos de contas de resultado antes do encerramento
+        const dreTypes = new Set(["REVENUE","EXPENSE"]);
+        // Fallback: se dreMap vazio (dados via ECD import), usar saldoFinalMap
+        const dreAccounts = accounts.filter(a => {
+          if (!a.isAnalytic || !dreTypes.has(a.type.toString())) return false;
+          const mv = dreMap.get(a.id);
+          if (mv) { const s = mv.cre - mv.deb; return s !== 0; }
+          // fallback account_balance
+          const s = saldoFinalMap.get(a.id) ?? 0;
+          return s !== 0;
+        });
+        if (dreAccounts.length > 0) {
+          add(P+"I350"+P+dtFin+P);
+          for (const acc of dreAccounts) {
+            const mv = dreMap.get(acc.id);
+            let saldo: number;
+            if (mv) {
+              saldo = mv.cre - mv.deb;
+            } else {
+              // fallback: saldo via account_balance (ECD import)
+              const bal = saldoFinalMap.get(acc.id) ?? 0;
+              // account_balance: positivo=devedor, negativo=credor
+              // I355 saldo = liquido (cre - deb); inverter sinal
+              saldo = -bal;
+            }
+            if (saldo === 0) continue;
+            const dc = saldo >= 0 ? "C" : "D";
+            const reducedCode = (acc as any).reducedCode || acc.code;
+            add(P+"I355"+P+reducedCode+P+P+this.fmtDec(Math.abs(saldo))+P+dc+P);
+          }
+        }
 
     const idxI001   = lines.findIndex(l => l === P+"I001"+P+"0"+P);
     const blocoIQtd = lines.length - idxI001;
@@ -285,26 +326,63 @@ export class EcdExporterService {
       const child = saldoIniRollup.get(acc.id) ?? 0;
       saldoIniRollup.set(acc.parentId, (saldoIniRollup.get(acc.parentId) ?? 0) + child);
     }
+    // J100 — hierarquia completa usando tabela RFB (totalizadores T + detalhes D)
+    // 1. Buscar todos os codigos RFB do BP 2025
+    const rfbBP = await this.prisma.rfbAglutinationCode.findMany({
+      where: { leiaute: 9, anoBase, tipo: "BP" },
+      orderBy: { ordem: "asc" },
+    });
+    const rfbBPMap = new Map(rfbBP.map(r => [r.codigo, r]));
+    // 2. Acumular saldos por codigo RFB (detalhe)
+    const j100Det = new Map<string, { ini: number; fin: number; nome: string; indCta: string }>();
     for (const acc of accounts) {
       if (!bpTypes.has(acc.type.toString())) continue;
-      const hasMaping   = acc.isAnalytic && i052Map.has(acc.id);
-      // Incluir: sinteticas (T) sempre; analiticas so se tem mapeamento I052 (D)
-      if (acc.isAnalytic && !hasMaping) continue;
+      if (!acc.isAnalytic || !i052Map.has(acc.id)) continue;
+      const aglCode     = i052Map.get(acc.id)!;
       const saldoFin    = rollupMap.get(acc.id) ?? 0;
       const saldoIniVal = saldoIniRollup.get(acc.id) ?? 0;
-      // Incluir sinteticas mesmo com saldo zero se tiverem filhos com mapeamento
-      const hasMapedChild = !acc.isAnalytic && accounts.some(child => child.parentId === acc.id && i052Map.has(child.id));
-      if (saldoFin === 0 && saldoIniVal === 0 && !hasMaping && !hasMapedChild) continue;
-      const reducedCode = (acc as any).reducedCode || acc.code;
-      const balCode     = "BAL_" + reducedCode;
-      const parentRed   = acc.parentId ? ((accounts.find(a => a.id === acc.parentId) as any)?.reducedCode || codeById.get(acc.parentId) || "") : "";
-      const balParent   = parentRed ? "BAL_" + parentRed : "";
       const indCta      = acc.type.toString() === "ASSET" ? "A" : "P";
-      const dcIni       = saldoIniVal >= 0 ? "D" : "C";
-      const dcFin       = saldoFin >= 0 ? "D" : "C";
-      const tipoCodAgl  = hasMaping ? "D" : "T";
-      add(P+"J100"+P+balCode+P+tipoCodAgl+P+acc.level+P+balParent+P+indCta+P+acc.name+P+this.fmtDec(Math.abs(saldoIniVal))+P+dcIni+P+this.fmtDec(Math.abs(saldoFin))+P+dcFin+P+P);
+      if (!j100Det.has(aglCode)) j100Det.set(aglCode, { ini: 0, fin: 0, nome: rfbBPMap.get(aglCode)?.descricao || acc.name, indCta });
+      const e = j100Det.get(aglCode)!; e.ini += saldoIniVal; e.fin += saldoFin;
     }
+    // 3. Expandir para incluir todos os ancestrais como totalizadores
+    const j100Tot = new Map<string, { ini: number; fin: number; nome: string; indCta: string; nivel: number; pai: string }>();
+    for (const [aglCode, det] of j100Det) {
+      // Propagar saldo para todos os ancestrais
+      // Propagar do detalhe ate a raiz, incluindo a raiz
+      let cur = rfbBPMap.get(aglCode);
+      while (cur) {
+        const paiCod = cur.codigoPai;
+        if (!paiCod) break; // chegou na raiz, nao propagar mais
+        const pai = rfbBPMap.get(paiCod);
+        if (!pai) break;
+        if (!j100Tot.has(pai.codigo)) {
+          j100Tot.set(pai.codigo, { ini: 0, fin: 0, nome: pai.descricao, indCta: pai.codigo.startsWith("1") ? "A" : "P", nivel: pai.nivel, pai: pai.codigoPai || "" });
+        }
+        const t = j100Tot.get(pai.codigo)!; t.ini += det.ini; t.fin += det.fin;
+        cur = pai;
+      }
+    }
+    // 4. Emitir na ordem RFB: totalizadores primeiro (por ordem), depois detalhes
+    const j100Lines: string[] = [];
+    // Totalizadores ordenados por ordem RFB
+    const totOrdered = rfbBP.filter(r => j100Tot.has(r.codigo));
+    for (const r of totOrdered) {
+      const t = j100Tot.get(r.codigo)!;
+      const dcIni = t.ini >= 0 ? "D" : "C";
+      const dcFin = t.fin >= 0 ? "D" : "C";
+      j100Lines.push(P+"J100"+P+r.codigo+P+"T"+P+r.nivel+P+(r.codigoPai||"")+P+t.indCta+P+r.descricao.substring(0,60)+P+this.fmtDec(Math.abs(t.ini))+P+dcIni+P+this.fmtDec(Math.abs(t.fin))+P+dcFin+P+P);
+    }
+    // Detalhes
+    for (const [aglCode, det] of j100Det) {
+      const rfbRow = rfbBPMap.get(aglCode);
+      const nivel  = rfbRow?.nivel ?? 5;
+      const pai    = rfbRow?.codigoPai ?? "";
+      const dcIni  = det.ini >= 0 ? "D" : "C";
+      const dcFin  = det.fin >= 0 ? "D" : "C";
+      j100Lines.push(P+"J100"+P+aglCode+P+"D"+P+nivel+P+pai+P+det.indCta+P+det.nome.substring(0,60)+P+this.fmtDec(Math.abs(det.ini))+P+dcIni+P+this.fmtDec(Math.abs(det.fin))+P+dcFin+P+P);
+    }
+    for (const l of j100Lines) add(l);
 
     // J150 — DRE usando codigos do I052 (gabarito Kipstone)
     // COD_AGL=DRE_NNN_DO0_codCta pad30, COD_AGL_SUP=totalizador pad30, IND_ENCERR sequencial
@@ -320,9 +398,7 @@ export class EcdExporterService {
       const mv152 = dreRollup.get(acc.id) ?? { deb: 0, cre: 0 };
       const vlOri  = Math.abs(mv152.deb - mv152.cre);
       const dc152  = "D"; // J150 IND_DC sempre D para linhas de detalhe
-      const seq152 = String(indEncerr).padStart(3, "0");
-      const cod152 = (acc as any).reducedCode || acc.code;
-      const dreCode152 = ("DRE_" + seq152 + "_DO0_" + cod152).padEnd(30, " ");
+      const dreCode152 = aglCode152.padEnd(30, " ");
       totalDREVal += (dc152 === "D" ? 1 : -1) * vlOri;
       j150Lines.push(P+"J150"+P+indEncerr+P+dreCode152+P+dc152+P+"2"+P+TITULO_DRE+P+acc.name+P+this.fmtDec(vlOri)+P+dc152+P+this.fmtDec(vlOri)+P+dc152+P+"D"+P+P);
       indEncerr++;
@@ -417,7 +493,7 @@ export class EcdExporterService {
       case "LIABILITY": return "02";
       case "EQUITY":    return "03";
       case "REVENUE":   return "04";
-      case "EXPENSE":   return "05";
+          case "EXPENSE":   return "04";
       default:          return "09";
     }
   }
