@@ -3,121 +3,112 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import api from '../services/api';
 import Swal from 'sweetalert2';
 
-// ── Tipos ────────────────────────────────────────────────────────────────────
+// ── Tipos ─────────────────────────────────────────────────────────────────────
 interface RfbCode { id: string; codigo: string; descricao: string; nivel: number; codigoPai?: string; ordem: number; tipo: string; }
-interface AccountingView { id: string; name: string; tipo: string; leiaute: number; anoBase: number; _count?: { mappings: number }; }
-interface MappingRow {
-  id: string; code: string; reducedCode?: string; name: string;
-  type: string; level: number; isAnalytic: boolean;
-  mapping: { id: string; aglutinationCode: string } | null;
-}
+interface AccountingView { id: string; name: string; tipo: string; leiaute: number; anoBase: number; }
+interface ChildRow { accountId: string; code: string; reducedCode?: string; name: string; type: string; level: number; aglutinationCode: string | null; overridden: boolean; }
+interface GroupRow { parentId: string; parentCode: string; parentName: string; parentLevel: number; groupCode: string | null; children: ChildRow[]; }
 
 const TIPO_OPTS = [{ v: 'BP', l: 'BP — Balanço Patrimonial' }, { v: 'DRE', l: 'DRE — Demonstrativo de Resultado' }];
-const ANO_OPTS = [2025, 2024, 2023, 2022, 2021, 2020, 2019];
+const ANO_OPTS = Array.from({ length: 2025 - 2015 + 1 }, (_, i) => 2025 - i);
 
-// ── Componente principal ──────────────────────────────────────────────────────
 export default function VisoesContabeisPage() {
-  // Seleção de contexto
-  const [anoBase, setAnoBase] = useState(2024);
+  const [anoBase, setAnoBase] = useState(2025);
   const [tipo, setTipo] = useState('BP');
   const [leiaute] = useState(9);
 
-  // Estado geral
-  const [views, setViews] = useState<AccountingView[]>([]);
   const [activeView, setActiveView] = useState<AccountingView | null>(null);
-  const [rows, setRows] = useState<MappingRow[]>([]);
+  const [groups, setGroups] = useState<GroupRow[]>([]);
   const [rfbCodes, setRfbCodes] = useState<RfbCode[]>([]);
   const [rfbCount, setRfbCount] = useState(0);
-  const [dirty, setDirty] = useState<Record<string, string>>({}); // accountId → aglCode pendente
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [filter, setFilter] = useState('');
   const [onlyUnmapped, setOnlyUnmapped] = useState(false);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
-  // ── Carregar views da empresa ────────────────────────────────────────────
-  const loadViews = useCallback(async () => {
-    try {
-      const r = await api.get('/sped/visoes/views');
-      setViews(r.data);
-    } catch { /* silencioso */ }
-  }, []);
+  // dirty: accountId -> aglutinationCode ('') = remover
+  const [dirty, setDirty] = useState<Record<string, string>>({});
 
-  useEffect(() => { loadViews(); }, [loadViews]);
-
-  // ── Carregar/criar view ao mudar ano+tipo ────────────────────────────────
+  // ── Carregar/criar view ───────────────────────────────────────────────────
   const loadOrCreateView = useCallback(async () => {
     setLoading(true);
     try {
-      // Procura view existente para o par ano+tipo
-      const all: AccountingView[] = (await api.get('/sped/visoes/views')).data;
-      setViews(all);
-      let view = all.find(v => v.anoBase === anoBase && v.tipo === tipo) ?? null;
-
+      const all = (await api.get('/sped/visoes/views')).data;
+      let view = all.find((v: AccountingView) => v.anoBase === anoBase && v.tipo === tipo) ?? null;
       if (!view) {
-        // Cria automaticamente
-        const r = await api.post('/sped/visoes/views', { name: tipo === 'BP' ? `Balanço Patrimonial ${anoBase}` : `DRE ${anoBase}`, tipo, leiaute, anoBase });
+        const r = await api.post('/sped/visoes/views', {
+          name: tipo === 'BP' ? `Balanço Patrimonial ${anoBase}` : `DRE ${anoBase}`,
+          tipo, leiaute, anoBase,
+        });
         view = r.data;
-        await loadViews();
       }
       setActiveView(view);
 
-      // Carrega mapeamentos
-      const mR = await api.get('/sped/visoes/views/' + view!.id + '/mappings');
-      setRows(mR.data.map((m: any) => ({
-        id: m.accountId,
-        code: m.account.code,
-        reducedCode: m.account.reducedCode,
-        name: m.account.name,
-        type: m.account.type,
-        level: m.account.level,
-        isAnalytic: m.account.isAnalytic,
-        mapping: m.aglutinationCode ? { id: m.id, aglutinationCode: m.aglutinationCode } : null,
-      })));
-      setDirty({});
-
-      // Carrega códigos RFB
-      const [rfbR, cntR] = await Promise.all([
+      const [grpR, rfbR, cntR] = await Promise.all([
+        api.get('/sped/visoes/views/' + view.id + '/mappings/grouped'),
         api.get('/sped/visoes/rfb-codes', { params: { leiaute, anoBase, tipo } }),
         api.get('/sped/visoes/rfb-codes', { params: { leiaute, anoBase } }),
       ]);
+      setGroups(grpR.data);
       setRfbCodes(rfbR.data);
       setRfbCount(cntR.data.length);
+      setDirty({});
     } catch (e: any) {
       Swal.fire('Erro', e?.response?.data?.message ?? 'Falha ao carregar visão', 'error');
     } finally {
       setLoading(false);
     }
-  }, [anoBase, tipo, leiaute, loadViews]);
+  }, [anoBase, tipo, leiaute]);
 
   useEffect(() => { loadOrCreateView(); }, [loadOrCreateView]);
 
-  // ── Mapeamentos locais (dirty) ───────────────────────────────────────────
-  const effectiveCode = (row: MappingRow) => dirty[row.id] !== undefined ? dirty[row.id] : (row.mapping?.aglutinationCode ?? '');
+  // ── Helpers dirty ────────────────────────────────────────────────────────
+  const effectiveCode = (accountId: string, savedCode: string | null) =>
+    dirty[accountId] !== undefined ? dirty[accountId] : (savedCode ?? '');
 
-  const handleSelect = (accountId: string, code: string) => {
+  const effectiveGroupCode = (group: GroupRow) => {
+    const codes = group.children.map(c => effectiveCode(c.accountId, c.aglutinationCode)).filter(Boolean);
+    const unique = [...new Set(codes)];
+    if (unique.length === 0) return '';
+    if (unique.length === 1) return unique[0];
+    return '__mixed__';
+  };
+
+  // Aplicar código a todas as filhas do grupo
+  const handleGroupSelect = (group: GroupRow, code: string) => {
+    const updates: Record<string, string> = {};
+    group.children.forEach(c => { updates[c.accountId] = code; });
+    setDirty(prev => ({ ...prev, ...updates }));
+  };
+
+  const handleChildSelect = (accountId: string, code: string) => {
     setDirty(prev => ({ ...prev, [accountId]: code }));
   };
 
-  const handleRemove = (accountId: string) => {
-    setDirty(prev => ({ ...prev, [accountId]: '' }));
+  const handleGroupRemove = (group: GroupRow) => {
+    const updates: Record<string, string> = {};
+    group.children.forEach(c => { updates[c.accountId] = ''; });
+    setDirty(prev => ({ ...prev, ...updates }));
   };
 
-  // ── Salvar em lote ───────────────────────────────────────────────────────
+  const toggleExpand = (parentId: string) => {
+    setExpanded(prev => {
+      const next = new Set(prev);
+      next.has(parentId) ? next.delete(parentId) : next.add(parentId);
+      return next;
+    });
+  };
+
+  // ── Salvar ───────────────────────────────────────────────────────────────
   const handleSave = async () => {
     if (!activeView) return;
     setSaving(true);
     try {
-      // Monta itens: dirty com valor → upsert; dirty vazio → delete
-      const toUpsert = Object.entries(dirty)
-        .filter(([, c]) => c !== '')
-        .map(([accountId, aglutinationCode]) => ({ accountId, aglutinationCode }));
-      const toDelete = Object.entries(dirty)
-        .filter(([, c]) => c === '')
-        .map(([accountId]) => accountId);
-
+      const toUpsert = Object.entries(dirty).filter(([, c]) => c !== '').map(([accountId, aglutinationCode]) => ({ accountId, aglutinationCode }));
+      const toDelete = Object.entries(dirty).filter(([, c]) => c === '').map(([accountId]) => accountId);
       if (toUpsert.length) await api.post('/sped/visoes/views/' + activeView.id + '/mappings/bulk', { mappings: toUpsert });
       await Promise.all(toDelete.map(aid => api.delete('/sped/visoes/views/' + activeView.id + '/mappings/' + aid)));
-
       Swal.fire({ icon: 'success', title: 'Mapeamentos salvos', timer: 1500, showConfirmButton: false });
       await loadOrCreateView();
     } catch (e: any) {
@@ -127,10 +118,10 @@ export default function VisoesContabeisPage() {
     }
   };
 
-  // ── Auto-match ────────────────────────────────────────────────────────────
+  // ── Auto-match ───────────────────────────────────────────────────────────
   const handleAutoMatch = async () => {
     if (!activeView) return;
-    const conf = await Swal.fire({ title: 'Auto-mapear contas?', text: 'Sugerirá códigos RFB por tipo de conta. Você pode revisar antes de salvar.', icon: 'question', showCancelButton: true, confirmButtonColor: '#111111', confirmButtonText: 'Sugerir' });
+    const conf = await Swal.fire({ title: 'Auto-mapear contas?', text: 'Sugerirá códigos RFB por grupo/tipo. Você pode revisar antes de salvar.', icon: 'question', showCancelButton: true, confirmButtonColor: '#111111', confirmButtonText: 'Sugerir' });
     if (!conf.isConfirmed) return;
     try {
       const r = await api.post('/sped/visoes/views/' + activeView.id + '/auto-match', { leiaute, anoBase });
@@ -144,65 +135,28 @@ export default function VisoesContabeisPage() {
     }
   };
 
-  // ── Import JSON RFB ───────────────────────────────────────────────────────
+  // ── Import RFB ───────────────────────────────────────────────────────────
   const handleImportRfb = async () => {
-    const { value: file } = await Swal.fire({
-      title: 'Importar tabela RFB',
-      text: 'Selecione o arquivo JSON com os códigos de aglutinação RFB.',
-      input: 'file',
-      inputAttributes: { accept: '.json' },
-      confirmButtonColor: '#111111',
-      showCancelButton: true,
-    });
+    const { value: file } = await Swal.fire({ title: 'Importar tabela RFB', input: 'file', inputAttributes: { accept: '.json' }, confirmButtonColor: '#111111', showCancelButton: true });
     if (!file) return;
     try {
-      const text = await (file as File).text();
+      const text = await file.text();
       const codes = JSON.parse(text);
-      const r = await api.post('/sped/visoes/rfb-codes/import', { codes });
-      Swal.fire({ icon: 'success', title: r.data.imported + ' códigos importados', timer: 1800, showConfirmButton: false });
+      await api.post('/sped/visoes/rfb-codes/import', { codes });
+      Swal.fire({ icon: 'success', title: codes.length + ' códigos importados', timer: 1500, showConfirmButton: false });
       await loadOrCreateView();
-    } catch {
-      Swal.fire('Erro', 'Arquivo inválido ou falha na importação.', 'error');
+    } catch (e: any) {
+      Swal.fire('Erro', 'Falha ao importar JSON RFB', 'error');
     }
   };
 
-  // ── Preview I052 ──────────────────────────────────────────────────────────
-  const handlePreview = async () => {
-    if (!activeView) return;
-    try {
-      const r = await api.get('/sped/visoes/views/' + activeView.id + '/mappings');
-      const lines: any[] = r.data.filter((m: any) => m.aglutinationCode);
-      const text = lines.map(m => `|I052|${m.account?.reducedCode || m.account?.code}|${m.aglutinationCode}|`).join('\n');
-      Swal.fire({
-        title: 'Preview I052 (' + lines.length + ' registros)',
-        html: '<pre style="text-align:left;font-size:11px;max-height:400px;overflow:auto">' + text + '</pre>',
-        width: 700,
-        confirmButtonColor: '#111111',
-      });
-    } catch { /**/ }
-  };
-
-  // ── Filtros visuais ───────────────────────────────────────────────────────
-  const filtered = useMemo(() => {
-    return rows.filter(r => {
-      if (!r.isAnalytic) return false;
-      // Filtrar contas por tipo de view: BP=ASSET/LIABILITY/EQUITY, DRE=REVENUE/EXPENSE
-      if (tipo === "BP" && !["ASSET", "LIABILITY", "EQUITY"].includes(r.type)) return false;
-      if (tipo === "DRE" && !["REVENUE", "EXPENSE"].includes(r.type)) return false;
-      if (onlyUnmapped && effectiveCode(r)) return false;
-      if (filter) {
-        const q = filter.toLowerCase();
-        return r.code.toLowerCase().includes(q) || r.name.toLowerCase().includes(q);
-      }
-      return true;
-    });
-  }, [rows, filter, onlyUnmapped, dirty]);
-
-  const totalAnalytic = rows.filter(r => r.isAnalytic).length;
-  const totalMapped = rows.filter(r => r.isAnalytic && effectiveCode(r)).length;
+  // ── Estatísticas ─────────────────────────────────────────────────────────
+  const allChildren = useMemo(() => groups.flatMap(g => g.children), [groups]);
+  const totalAnalytic = allChildren.length;
+  const totalMapped = allChildren.filter(c => effectiveCode(c.accountId, c.aglutinationCode) !== '').length;
   const dirtyCount = Object.values(dirty).filter(v => v !== '').length;
 
-  // ── Opções do select RFB agrupadas por nível 1 ───────────────────────────
+  // ── Select RFB agrupado ──────────────────────────────────────────────────
   const rfbGroups = useMemo(() => {
     const top = rfbCodes.filter(c => c.nivel === 1);
     return top.map(g => ({
@@ -210,6 +164,29 @@ export default function VisoesContabeisPage() {
       options: rfbCodes.filter(c => c.codigo.startsWith(g.codigo + '.') || c.codigo === g.codigo),
     }));
   }, [rfbCodes]);
+
+  const RfbSelect = ({ value, onChange }: { value: string; onChange: (v: string) => void }) => (
+    <select value={value} onChange={e => onChange(e.target.value)}
+      style={{ flex: 1, border: '0.5px solid ' + (value && value !== '__mixed__' ? '#D1D5DB' : '#FCA5A5'), borderRadius: 6, padding: '5px 8px', fontSize: 12, background: value && value !== '__mixed__' ? 'white' : '#FEF2F2' }}>
+      <option value="">{value === '__mixed__' ? '— Múltiplos valores —' : '— Selecionar código RFB —'}</option>
+      {rfbGroups.map(g => (
+        <optgroup key={g.label} label={g.label}>
+          {g.options.map(o => <option key={o.codigo} value={o.codigo}>{o.codigo} — {o.descricao}</option>)}
+        </optgroup>
+      ))}
+    </select>
+  );
+
+  // ── Filtro ───────────────────────────────────────────────────────────────
+  const filteredGroups = useMemo(() => {
+    const q = filter.toLowerCase();
+    return groups.filter(g => {
+      const groupMatch = !q || g.parentCode.toLowerCase().includes(q) || g.parentName.toLowerCase().includes(q);
+      const childMatch = g.children.some(c => c.code.toLowerCase().includes(q) || c.name.toLowerCase().includes(q));
+      const hasUnmapped = !onlyUnmapped || g.children.some(c => !effectiveCode(c.accountId, c.aglutinationCode));
+      return (groupMatch || childMatch) && hasUnmapped;
+    });
+  }, [groups, filter, onlyUnmapped, dirty]);
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -220,21 +197,19 @@ export default function VisoesContabeisPage() {
           <span style={{ background: '#7C3AED', color: '#fff', borderRadius: 6, padding: '2px 10px', fontSize: 11, fontWeight: 700, letterSpacing: 1 }}>SPED</span>
           <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>Visões Contábeis (I052)</h1>
         </div>
-        <p style={{ margin: 0, color: '#6B7280', fontSize: 13 }}>
-          Mapeie as contas analíticas aos códigos de aglutinação RFB — gera os registros I052 para o Bloco J do ECD.
-        </p>
+        <p style={{ margin: 0, color: '#6B7280', fontSize: 13 }}>Mapeie grupos de contas analíticas aos códigos de aglutinação RFB — gera I051/I052 para o Bloco J do ECD.</p>
       </div>
 
-      {/* Filtros de contexto */}
+      {/* Filtros contexto */}
       <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 16, flexWrap: 'wrap' }}>
         <div>
-          <label style={{ fontSize: 11, color: '#6B7280', display: 'block', marginBottom: 2 }}>ANO BASE</label>
+          <label style={labelStyle}>ANO BASE</label>
           <select value={anoBase} onChange={e => setAnoBase(Number(e.target.value))} style={selStyle}>
             {ANO_OPTS.map(y => <option key={y} value={y}>{y}</option>)}
           </select>
         </div>
         <div>
-          <label style={{ fontSize: 11, color: '#6B7280', display: 'block', marginBottom: 2 }}>TIPO</label>
+          <label style={labelStyle}>TIPO</label>
           <select value={tipo} onChange={e => setTipo(e.target.value)} style={selStyle}>
             {TIPO_OPTS.map(t => <option key={t.v} value={t.v}>{t.l}</option>)}
           </select>
@@ -244,15 +219,12 @@ export default function VisoesContabeisPage() {
             {rfbCount > 0 ? `✓ ${rfbCount} códigos RFB` : '⚠ Sem códigos RFB'}
           </span>
         </div>
-        {rfbCount === 0 && (
-          <button onClick={handleImportRfb} style={{ ...btnSec, marginTop: 14 }}>Importar JSON RFB</button>
-        )}
-        {rfbCount > 0 && (
-          <button onClick={handleImportRfb} style={{ ...btnSec, marginTop: 14, fontSize: 11 }}>↑ Reimportar RFB</button>
-        )}
+        <button onClick={handleImportRfb} style={{ ...btnSec, marginTop: 14, fontSize: 11 }}>
+          {rfbCount > 0 ? '↑ Reimportar RFB' : 'Importar JSON RFB'}
+        </button>
       </div>
 
-      {/* Barra de status + ações */}
+      {/* Barra status + ações */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#F9FAFB', border: '0.5px solid #E5E7EB', borderRadius: 8, padding: '10px 16px', marginBottom: 16 }}>
         <div style={{ fontSize: 13, color: '#374151' }}>
           <strong>{totalAnalytic}</strong> contas analíticas &nbsp;·&nbsp;
@@ -261,7 +233,6 @@ export default function VisoesContabeisPage() {
           {dirtyCount > 0 && <span style={{ marginLeft: 12, color: '#D97706', fontWeight: 600 }}>● {dirtyCount} alteração(ões) não salvas</span>}
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={handlePreview} style={btnSec} disabled={loading}>Preview I052</button>
           <button onClick={handleAutoMatch} style={btnSec} disabled={loading}>Auto-mapear</button>
           <button onClick={handleSave} style={btnPri} disabled={saving || loading || Object.keys(dirty).length === 0}>
             {saving ? 'Salvando...' : `Salvar${dirtyCount > 0 ? ' (' + dirtyCount + ')' : ''}`}
@@ -269,21 +240,17 @@ export default function VisoesContabeisPage() {
         </div>
       </div>
 
-      {/* Filtro da tabela */}
+      {/* Filtro tabela */}
       <div style={{ display: 'flex', gap: 12, marginBottom: 12, alignItems: 'center' }}>
-        <input
-          placeholder="🔍  Filtrar por código ou nome..."
-          value={filter}
-          onChange={e => setFilter(e.target.value)}
-          style={{ flex: 1, border: '0.5px solid #D1D5DB', borderRadius: 6, padding: '7px 12px', fontSize: 13 }}
-        />
+        <input placeholder="🔍  Filtrar por código ou nome..." value={filter} onChange={e => setFilter(e.target.value)}
+          style={{ flex: 1, border: '0.5px solid #D1D5DB', borderRadius: 6, padding: '7px 12px', fontSize: 13 }} />
         <label style={{ fontSize: 13, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', color: '#374151' }}>
           <input type="checkbox" checked={onlyUnmapped} onChange={e => setOnlyUnmapped(e.target.checked)} />
           Só sem mapeamento
         </label>
       </div>
 
-      {/* Tabela */}
+      {/* Tabela grupos */}
       {loading ? (
         <div style={{ textAlign: 'center', padding: 48, color: '#9CA3AF' }}>Carregando...</div>
       ) : (
@@ -291,56 +258,86 @@ export default function VisoesContabeisPage() {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ background: '#F9FAFB' }}>
-                <th style={thStyle}>CÓDIGO</th>
-                <th style={thStyle}>CONTA</th>
-                <th style={{ ...thStyle, width: 380 }}>CÓDIGO RFB (I052)</th>
-                <th style={{ ...thStyle, width: 60, textAlign: 'center' }}>STATUS</th>
+                <th style={thStyle}>GRUPO / CONTA</th>
+                <th style={{ ...thStyle, width: 400 }}>CÓDIGO RFB (I052)</th>
+                <th style={{ ...thStyle, width: 70, textAlign: 'center' }}>STATUS</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.length === 0 && (
-                <tr><td colSpan={4} style={{ textAlign: 'center', padding: 32, color: '#9CA3AF' }}>Nenhuma conta encontrada</td></tr>
+              {filteredGroups.length === 0 && (
+                <tr><td colSpan={3} style={{ textAlign: 'center', padding: 32, color: '#9CA3AF' }}>Nenhum grupo encontrado</td></tr>
               )}
-              {filtered.map(row => {
-                const current = effectiveCode(row);
-                const isDirty = dirty[row.id] !== undefined;
-                const rfbSelected = rfbCodes.find(c => c.codigo === current);
+              {filteredGroups.map(group => {
+                const gCode = effectiveGroupCode(group);
+                const isExpanded = expanded.has(group.parentId);
+                const allMapped = group.children.every(c => effectiveCode(c.accountId, c.aglutinationCode));
+                const isDirtyGroup = group.children.some(c => dirty[c.accountId] !== undefined);
+
                 return (
-                  <tr key={row.id} style={{ borderTop: '0.5px solid #F5F5F5', background: isDirty ? '#FFFBEB' : 'white' }}>
-                    <td style={{ padding: '8px 12px', fontFamily: 'monospace', color: '#7C3AED', fontWeight: 600, whiteSpace: 'nowrap' }}>
-                      {row.reducedCode || row.code}
-                    </td>
-                    <td style={{ padding: '8px 12px', color: '#374151' }}>{row.name}</td>
-                    <td style={{ padding: '6px 12px' }}>
-                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                        <select
-                          value={current}
-                          onChange={e => handleSelect(row.id, e.target.value)}
-                          style={{ flex: 1, border: '0.5px solid ' + (current ? '#D1D5DB' : '#FCA5A5'), borderRadius: 6, padding: '5px 8px', fontSize: 12, background: current ? 'white' : '#FEF2F2' }}
-                        >
-                          <option value="">— Selecionar código RFB —</option>
-                          {rfbGroups.map(g => (
-                            <optgroup key={g.label} label={g.label}>
-                              {g.options.map(o => (
-                                <option key={o.codigo} value={o.codigo}>
-                                  {o.codigo} — {o.descricao}
-                                </option>
-                              ))}
-                            </optgroup>
-                          ))}
-                        </select>
-                        {current && (
-                          <button onClick={() => handleRemove(row.id)} title="Remover mapeamento"
-                            style={{ border: 'none', background: 'none', color: '#DC2626', cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: '2px 4px' }}>×</button>
-                        )}
-                      </div>
-                    </td>
-                    <td style={{ textAlign: 'center', padding: '8px 12px' }}>
-                      {current
-                        ? <span style={{ color: '#059669', fontSize: 16 }}>✓</span>
-                        : <span style={{ color: '#FCA5A5', fontSize: 13 }}>⚠</span>}
-                    </td>
-                  </tr>
+                  <React.Fragment key={group.parentId}>
+                    {/* Linha do grupo */}
+                    <tr style={{ background: isDirtyGroup ? '#FFFBEB' : '#F9FAFB', borderTop: '0.5px solid #E5E7EB' }}>
+                      <td style={{ padding: '9px 12px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <button onClick={() => toggleExpand(group.parentId)}
+                            style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 11, color: '#6B7280', padding: '2px 4px', borderRadius: 4 }}>
+                            {isExpanded ? '▼' : '▶'}
+                          </button>
+                          <span style={{ fontFamily: 'monospace', color: '#7C3AED', fontWeight: 700, fontSize: 12 }}>{group.parentCode}</span>
+                          <span style={{ color: '#374151', fontWeight: 600 }}>{group.parentName}</span>
+                          <span style={{ fontSize: 11, color: '#9CA3AF' }}>({group.children.length} conta{group.children.length !== 1 ? 's' : ''})</span>
+                        </div>
+                      </td>
+                      <td style={{ padding: '6px 12px' }}>
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          <RfbSelect value={gCode === '__mixed__' ? '__mixed__' : gCode} onChange={v => handleGroupSelect(group, v)} />
+                          {gCode && gCode !== '__mixed__' && (
+                            <button onClick={() => handleGroupRemove(group)} title="Remover mapeamento do grupo"
+                              style={{ border: 'none', background: 'none', color: '#DC2626', cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: '2px 4px' }}>×</button>
+                          )}
+                        </div>
+                      </td>
+                      <td style={{ textAlign: 'center', padding: '8px 12px' }}>
+                        {gCode === '__mixed__'
+                          ? <span style={{ color: '#D97706', fontSize: 13 }}>≠</span>
+                          : allMapped
+                            ? <span style={{ color: '#059669', fontSize: 16 }}>✓</span>
+                            : <span style={{ color: '#FCA5A5', fontSize: 13 }}>⚠</span>}
+                      </td>
+                    </tr>
+
+                    {/* Linhas filhas (expandidas) */}
+                    {isExpanded && group.children.map(child => {
+                      const cCode = effectiveCode(child.accountId, child.aglutinationCode);
+                      const isChildDirty = dirty[child.accountId] !== undefined;
+                      const diverges = cCode !== gCode && gCode !== '' && gCode !== '__mixed__';
+                      return (
+                        <tr key={child.accountId} style={{ background: isChildDirty ? '#FFFDE7' : '#FAFAFA', borderTop: '0.5px solid #F5F5F5' }}>
+                          <td style={{ padding: '7px 12px 7px 44px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <span style={{ fontFamily: 'monospace', color: '#9CA3AF', fontSize: 11 }}>{child.reducedCode || child.code}</span>
+                              <span style={{ color: '#6B7280' }}>{child.name}</span>
+                              {diverges && <span style={{ fontSize: 10, color: '#D97706', background: '#FEF3C7', padding: '1px 6px', borderRadius: 99, fontWeight: 600 }}>✎ individual</span>}
+                            </div>
+                          </td>
+                          <td style={{ padding: '5px 12px' }}>
+                            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                              <RfbSelect value={cCode} onChange={v => handleChildSelect(child.accountId, v)} />
+                              {cCode && (
+                                <button onClick={() => handleChildSelect(child.accountId, '')} title="Remover"
+                                  style={{ border: 'none', background: 'none', color: '#DC2626', cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: '2px 4px' }}>×</button>
+                              )}
+                            </div>
+                          </td>
+                          <td style={{ textAlign: 'center', padding: '7px 12px' }}>
+                            {cCode
+                              ? <span style={{ color: diverges ? '#D97706' : '#059669', fontSize: 16 }}>{diverges ? '✎' : '✓'}</span>
+                              : <span style={{ color: '#FCA5A5', fontSize: 13 }}>⚠</span>}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </React.Fragment>
                 );
               })}
             </tbody>
@@ -351,7 +348,7 @@ export default function VisoesContabeisPage() {
   );
 }
 
-// ── Estilos inline ────────────────────────────────────────────────────────────
+const labelStyle: React.CSSProperties = { fontSize: 11, color: '#6B7280', display: 'block', marginBottom: 2 };
 const selStyle: React.CSSProperties = { border: '0.5px solid #D1D5DB', borderRadius: 6, padding: '7px 10px', fontSize: 13, background: 'white', minWidth: 200 };
 const btnPri: React.CSSProperties = { background: '#111111', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 18px', fontSize: 13, cursor: 'pointer', fontWeight: 600 };
 const btnSec: React.CSSProperties = { background: '#fff', color: '#374151', border: '0.5px solid #D1D5DB', borderRadius: 8, padding: '8px 14px', fontSize: 13, cursor: 'pointer' };

@@ -48,6 +48,12 @@ export class AccountingViewsController {
     return this.svc.findMappings(viewId);
   }
 
+        @Get('views/:id/mappings/grouped')
+        findMappingsGrouped(@Param('id') viewId: string) {
+          return this.svc.findMappingsGrouped(viewId);
+        }
+
+
   @Put('views/:id/mappings/:accountId')
   upsertMapping(
     @Param('id') viewId: string,

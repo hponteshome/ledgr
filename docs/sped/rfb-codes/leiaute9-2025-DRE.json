@@ -1,0 +1,2132 @@
+[
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3",
+    "descricao": "RESULTADO LÍQUIDO DO PERÍODO",
+    "nivel": 1,
+    "codigoPai": null,
+    "ordem": 1
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01",
+    "descricao": "RESULTADO LÍQUIDO DO PERÍODO ANTES DO IRPJ E DA CSLL - ATIVIDADE GERAL",
+    "nivel": 2,
+    "codigoPai": "3",
+    "ordem": 2
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01",
+    "descricao": "RESULTADO OPERACIONAL",
+    "nivel": 3,
+    "codigoPai": "3.01",
+    "ordem": 3
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.01",
+    "descricao": "RECEITA LIQUIDA",
+    "nivel": 4,
+    "codigoPai": "3.01.01",
+    "ordem": 4
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.01.01",
+    "descricao": "RECEITA BRUTA",
+    "nivel": 5,
+    "codigoPai": "3.01.01.01",
+    "ordem": 5
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.01.01.01",
+    "descricao": "Receita de Exportação Direta de Mercadorias e Produtos",
+    "nivel": 6,
+    "codigoPai": "3.01.01.01.01",
+    "ordem": 6
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.01.01.02",
+    "descricao": "Receita de Vendas de Mercadorias e Produtos a Comercial Exportadora com Fim Específico de Exportação",
+    "nivel": 6,
+    "codigoPai": "3.01.01.01.01",
+    "ordem": 7
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.01.01.03",
+    "descricao": "Receita de Exportação de Serviços",
+    "nivel": 6,
+    "codigoPai": "3.01.01.01.01",
+    "ordem": 8
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.01.01.04",
+    "descricao": "Receita da Venda de Produtos de Fabricação Própria no Mercado Interno",
+    "nivel": 6,
+    "codigoPai": "3.01.01.01.01",
+    "ordem": 9
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.01.01.05",
+    "descricao": "Receita da Revenda de Mercadorias no Mercado Interno",
+    "nivel": 6,
+    "codigoPai": "3.01.01.01.01",
+    "ordem": 10
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.01.01.06",
+    "descricao": "Receita da Prestação de Serviços no Mercado Interno",
+    "nivel": 6,
+    "codigoPai": "3.01.01.01.01",
+    "ordem": 11
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.01.01.07",
+    "descricao": "Receita da Venda de Unidades Imobiliárias",
+    "nivel": 6,
+    "codigoPai": "3.01.01.01.01",
+    "ordem": 12
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.01.01.08",
+    "descricao": "Receita da Locação de Bens Móveis e Imóveis",
+    "nivel": 6,
+    "codigoPai": "3.01.01.01.01",
+    "ordem": 13
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.01.01.20",
+    "descricao": "Receita de Contrato de Construção",
+    "nivel": 6,
+    "codigoPai": "3.01.01.01.01",
+    "ordem": 14
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.01.01.25",
+    "descricao": "Receita de Direito de Exploração Serviço Público",
+    "nivel": 6,
+    "codigoPai": "3.01.01.01.01",
+    "ordem": 15
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.01.01.30",
+    "descricao": "Receita de Securitização de Créditos",
+    "nivel": 6,
+    "codigoPai": "3.01.01.01.01",
+    "ordem": 16
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.01.01.35",
+    "descricao": "Receitas Relacionadas ao Lucro na Exploração",
+    "nivel": 6,
+    "codigoPai": "3.01.01.01.01",
+    "ordem": 17
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.01.01.98",
+    "descricao": "Outras Receitas da Atividade Geral",
+    "nivel": 6,
+    "codigoPai": "3.01.01.01.01",
+    "ordem": 18
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.01.02",
+    "descricao": "DEDUÇÕES DA RECEITA BRUTA",
+    "nivel": 5,
+    "codigoPai": "3.01.01.01",
+    "ordem": 19
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.01.02.01",
+    "descricao": "(-) Vendas Canceladas e Devoluções de Vendas",
+    "nivel": 6,
+    "codigoPai": "3.01.01.01.02",
+    "ordem": 20
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.01.02.02",
+    "descricao": "(-) Descontos Incondicionais e Abatimentos",
+    "nivel": 6,
+    "codigoPai": "3.01.01.01.02",
+    "ordem": 21
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.01.02.03",
+    "descricao": "(-) ICMS",
+    "nivel": 6,
+    "codigoPai": "3.01.01.01.02",
+    "ordem": 22
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.01.02.04",
+    "descricao": "(-) COFINS Sobre Receita Bruta",
+    "nivel": 6,
+    "codigoPai": "3.01.01.01.02",
+    "ordem": 23
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.01.02.05",
+    "descricao": "(-) PIS/PASEP Sobre Receita Bruta",
+    "nivel": 6,
+    "codigoPai": "3.01.01.01.02",
+    "ordem": 24
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.01.02.06",
+    "descricao": "(-) ISS",
+    "nivel": 6,
+    "codigoPai": "3.01.01.01.02",
+    "ordem": 25
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.01.02.09",
+    "descricao": "(-) Demais Impostos e Contribuições Incidentes sobre Vendas e Serviços",
+    "nivel": 6,
+    "codigoPai": "3.01.01.01.02",
+    "ordem": 26
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.01.02.10",
+    "descricao": "(-) Ajuste a Valor Presente sobre Receita Bruta",
+    "nivel": 6,
+    "codigoPai": "3.01.01.01.02",
+    "ordem": 27
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.01.02.60",
+    "descricao": "(-) CPC 47 - Modificações Contratuais",
+    "nivel": 6,
+    "codigoPai": "3.01.01.01.02",
+    "ordem": 28
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.01.02.62",
+    "descricao": "(-) CPC 47 - Reconhecimento de Passivos de Contrato - Garantias",
+    "nivel": 6,
+    "codigoPai": "3.01.01.01.02",
+    "ordem": 29
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.01.02.64",
+    "descricao": "(-) CPC 47 - Reconhecimento de Passivos de Contrato - Direitos Não Exercidos",
+    "nivel": 6,
+    "codigoPai": "3.01.01.01.02",
+    "ordem": 30
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.01.02.66",
+    "descricao": "(-) CPC 47 - Reconhecimento de Passivos de Contrato - Serviços de Custódia - Vendas para Entrega Futura",
+    "nivel": 6,
+    "codigoPai": "3.01.01.01.02",
+    "ordem": 31
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.01.02.68",
+    "descricao": "(-) CPC 47 - Preço de Transação - Contraprestações Variáveis",
+    "nivel": 6,
+    "codigoPai": "3.01.01.01.02",
+    "ordem": 32
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.01.02.70",
+    "descricao": "(-) CPC 47 - Preço de Transação - Reavaliações de Contraprestação Variável",
+    "nivel": 6,
+    "codigoPai": "3.01.01.01.02",
+    "ordem": 33
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.01.02.72",
+    "descricao": "(-) CPC 47 - Preço de Transação - Contraprestações Pagas ou a Pagar",
+    "nivel": 6,
+    "codigoPai": "3.01.01.01.02",
+    "ordem": 34
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.01.02.74",
+    "descricao": "(-) CPC 47 - Preço de Transação - Obrigações de Desempenho",
+    "nivel": 6,
+    "codigoPai": "3.01.01.01.02",
+    "ordem": 35
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.01.02.76",
+    "descricao": "(-) CPC 47 - Critérios Divergentes da Legislação Tributária - Não Recebimento de Contraprestação",
+    "nivel": 6,
+    "codigoPai": "3.01.01.01.02",
+    "ordem": 36
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.01.02.78",
+    "descricao": "(-) CPC 47 - Critérios Divergentes da Legislação Tributária - Passivo de Contrato - Direito à Devolução",
+    "nivel": 6,
+    "codigoPai": "3.01.01.01.02",
+    "ordem": 37
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.01.02.80",
+    "descricao": "(-) CPC 47 - Critérios Divergentes da Legislação Tributária - Passivo de Contrato - Direito de Aquisição Opcional",
+    "nivel": 6,
+    "codigoPai": "3.01.01.01.02",
+    "ordem": 38
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.03",
+    "descricao": "CUSTO DOS BENS E SERVIÇOS",
+    "nivel": 4,
+    "codigoPai": "3.01.01",
+    "ordem": 39
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.03.01",
+    "descricao": "CUSTO DOS BENS E SERVIÇOS VENDIDOS DAS ATIVIDADES EM GERAL",
+    "nivel": 5,
+    "codigoPai": "3.01.01.03",
+    "ordem": 40
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.03.01.01",
+    "descricao": "(-) Custo dos Produtos de Fabricação Própria Vendidos",
+    "nivel": 6,
+    "codigoPai": "3.01.01.03.01",
+    "ordem": 41
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.03.01.02",
+    "descricao": "(-) Custo das Mercadorias Revendidas",
+    "nivel": 6,
+    "codigoPai": "3.01.01.03.01",
+    "ordem": 42
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.03.01.03",
+    "descricao": "(-) Custo dos Serviços Prestados",
+    "nivel": 6,
+    "codigoPai": "3.01.01.03.01",
+    "ordem": 43
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.03.01.04",
+    "descricao": "(-) Custo das Unidades Imobiliárias Vendidas",
+    "nivel": 6,
+    "codigoPai": "3.01.01.03.01",
+    "ordem": 44
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.03.01.10",
+    "descricao": "(-) Custo dos Bens Arrendados",
+    "nivel": 6,
+    "codigoPai": "3.01.01.03.01",
+    "ordem": 45
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.03.01.20",
+    "descricao": "(-) Custo de Construção",
+    "nivel": 6,
+    "codigoPai": "3.01.01.03.01",
+    "ordem": 46
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.03.01.30",
+    "descricao": "(-) Custo de Operação de Securitização",
+    "nivel": 6,
+    "codigoPai": "3.01.01.03.01",
+    "ordem": 47
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.05",
+    "descricao": "OUTRAS RECEITAS OPERACIONAIS",
+    "nivel": 4,
+    "codigoPai": "3.01.01",
+    "ordem": 48
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.05.01",
+    "descricao": "OUTRAS RECEITAS OPERACIONAIS DAS ATIVIDADES EM GERAL",
+    "nivel": 5,
+    "codigoPai": "3.01.01.05",
+    "ordem": 49
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.05.01.01",
+    "descricao": "Variações Cambiais Ativas",
+    "nivel": 6,
+    "codigoPai": "3.01.01.05.01",
+    "ordem": 50
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.05.01.02",
+    "descricao": "Ganhos Auferidos no Mercado de Renda Variável, exceto Day-Trade",
+    "nivel": 6,
+    "codigoPai": "3.01.01.05.01",
+    "ordem": 51
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.05.01.03",
+    "descricao": "Ganhos em Operações Day-Trade",
+    "nivel": 6,
+    "codigoPai": "3.01.01.05.01",
+    "ordem": 52
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.05.01.04",
+    "descricao": "Receitas de Juros sobre o Capital Próprio",
+    "nivel": 6,
+    "codigoPai": "3.01.01.05.01",
+    "ordem": 53
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.05.01.05",
+    "descricao": "Outras Receitas Financeiras",
+    "nivel": 6,
+    "codigoPai": "3.01.01.05.01",
+    "ordem": 54
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.05.01.06",
+    "descricao": "Resultados Positivos em Participações Societárias Avaliadas pelo Método de Equivalência Patrimonial",
+    "nivel": 6,
+    "codigoPai": "3.01.01.05.01",
+    "ordem": 55
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.05.01.07",
+    "descricao": "Resultados Positivos em SCP Avaliadas pelo Método de Equivalência Patrimonial",
+    "nivel": 6,
+    "codigoPai": "3.01.01.05.01",
+    "ordem": 56
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.05.01.08",
+    "descricao": "Rendimentos e Ganhos de Capital Auferidos no Exterior",
+    "nivel": 6,
+    "codigoPai": "3.01.01.05.01",
+    "ordem": 57
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.05.01.09",
+    "descricao": "Reversão das Perdas Estimadas Decorrentes de Teste de Recuperabilidade (Impairment)",
+    "nivel": 6,
+    "codigoPai": "3.01.01.05.01",
+    "ordem": 58
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.05.01.10",
+    "descricao": "Reversão dos Saldos das Provisões",
+    "nivel": 6,
+    "codigoPai": "3.01.01.05.01",
+    "ordem": 59
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.05.01.11",
+    "descricao": "Prêmios Recebidos na Emissão de Debêntures",
+    "nivel": 6,
+    "codigoPai": "3.01.01.05.01",
+    "ordem": 60
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.05.01.12",
+    "descricao": "Doações e Subvenções para Custeio ou Operações",
+    "nivel": 6,
+    "codigoPai": "3.01.01.05.01",
+    "ordem": 61
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.05.01.13",
+    "descricao": "Doações e Subvenções para Investimentos",
+    "nivel": 6,
+    "codigoPai": "3.01.01.05.01",
+    "ordem": 62
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.05.01.14",
+    "descricao": "Receitas de Reclassificação de Ajustes de Avaliação Patrimonial",
+    "nivel": 6,
+    "codigoPai": "3.01.01.05.01",
+    "ordem": 63
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.05.01.15",
+    "descricao": "Receitas de Reclassificação de Ajustes de Avaliação Patrimonial - Reflexo",
+    "nivel": 6,
+    "codigoPai": "3.01.01.05.01",
+    "ordem": 64
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.05.01.16",
+    "descricao": "Receitas Financeiras Decorrentes de Ajustes ao Valor Presente",
+    "nivel": 6,
+    "codigoPai": "3.01.01.05.01",
+    "ordem": 65
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.05.01.17",
+    "descricao": "Ganho Por Compra Vantajosa em Investimentos",
+    "nivel": 6,
+    "codigoPai": "3.01.01.05.01",
+    "ordem": 66
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.05.01.18",
+    "descricao": "Amortização de Menos-Valia",
+    "nivel": 6,
+    "codigoPai": "3.01.01.05.01",
+    "ordem": 67
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.05.01.19",
+    "descricao": "Receita de Aluguel de Bens Imóveis - Atividade Não Principal",
+    "nivel": 6,
+    "codigoPai": "3.01.01.05.01",
+    "ordem": 68
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.05.01.20",
+    "descricao": "Receita de Aluguel de Bens Móveis - Atividade Não Principal",
+    "nivel": 6,
+    "codigoPai": "3.01.01.05.01",
+    "ordem": 69
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.05.01.21",
+    "descricao": "Créditos Presumidos de IPI",
+    "nivel": 6,
+    "codigoPai": "3.01.01.05.01",
+    "ordem": 70
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.05.01.22",
+    "descricao": "Créditos Presumidos de PIS/COFINS",
+    "nivel": 6,
+    "codigoPai": "3.01.01.05.01",
+    "ordem": 71
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.05.01.23",
+    "descricao": "Outros Créditos Fiscais Presumidos",
+    "nivel": 6,
+    "codigoPai": "3.01.01.05.01",
+    "ordem": 72
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.05.01.24",
+    "descricao": "Multas e Outras Vantagens Recebidas",
+    "nivel": 6,
+    "codigoPai": "3.01.01.05.01",
+    "ordem": 73
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.05.01.25",
+    "descricao": "Lucros e Dividendos Derivados de Participações Societárias Avaliadas pelo Custos de Aquisição",
+    "nivel": 6,
+    "codigoPai": "3.01.01.05.01",
+    "ordem": 74
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.05.01.26",
+    "descricao": "Receitas com Empréstimos de Valores Mobiliários",
+    "nivel": 6,
+    "codigoPai": "3.01.01.05.01",
+    "ordem": 75
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.05.01.27",
+    "descricao": "Rendimentos Auferidos em Operações de Mútuo - Partes Relacionadas",
+    "nivel": 6,
+    "codigoPai": "3.01.01.05.01",
+    "ordem": 76
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.05.01.28",
+    "descricao": "Rendimentos Auferidos em Operações de Mútuo - Partes Não Relacionadas",
+    "nivel": 6,
+    "codigoPai": "3.01.01.05.01",
+    "ordem": 77
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.05.01.29",
+    "descricao": "Rendimentos Auferidos com Debêntures - Emitente Partes  Relacionadas",
+    "nivel": 6,
+    "codigoPai": "3.01.01.05.01",
+    "ordem": 78
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.05.01.30",
+    "descricao": "Rendimentos Auferidos com Debêntures - Emitente Partes Não Relacionadas",
+    "nivel": 6,
+    "codigoPai": "3.01.01.05.01",
+    "ordem": 79
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.05.01.31",
+    "descricao": "Rendimentos Auferidos com Títulos Públicos",
+    "nivel": 6,
+    "codigoPai": "3.01.01.05.01",
+    "ordem": 80
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.05.01.32",
+    "descricao": "Juros Auferidos com Outros Ativos Financeiros Mensurados Pelo Custo Amortizado",
+    "nivel": 6,
+    "codigoPai": "3.01.01.05.01",
+    "ordem": 81
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.05.01.33",
+    "descricao": "Ganho de Ajustes a Valor Justo - Instrumentos Financeiros  para Negociação - Não Hedge - Valor Justo pelo Resultado (VJPR).",
+    "nivel": 6,
+    "codigoPai": "3.01.01.05.01",
+    "ordem": 82
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.05.01.34",
+    "descricao": "Ganho de Ajustes a Valor Justo  - Instrumentos Financeiros  Disponíveis para Venda - Reclassificação de Ajustes de Avaliação Patrimonial",
+    "nivel": 6,
+    "codigoPai": "3.01.01.05.01",
+    "ordem": 83
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.05.01.35",
+    "descricao": "Ganho de Ajustes a Valor Justo - Instrumentos Financeiros  de Hedge  de Valor Justo",
+    "nivel": 6,
+    "codigoPai": "3.01.01.05.01",
+    "ordem": 84
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.05.01.36",
+    "descricao": "Ganho de Ajustes a Valor Justo - Instrumentos Financeiros  de Hedge -  Reclassificação de Ajustes de Avaliação Patrimonial",
+    "nivel": 6,
+    "codigoPai": "3.01.01.05.01",
+    "ordem": 85
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.05.01.37",
+    "descricao": "Ganho de Ajustes a Valor Justo - Item Objeto de Hedge de Valor Justo",
+    "nivel": 6,
+    "codigoPai": "3.01.01.05.01",
+    "ordem": 86
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.05.01.38",
+    "descricao": "Ganho de Ajustes a Valor Justo - Propriedade para Investimento",
+    "nivel": 6,
+    "codigoPai": "3.01.01.05.01",
+    "ordem": 87
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.05.01.39",
+    "descricao": "Ganho de Ajustes a Valor Justo - Ativo Biológico Consumível",
+    "nivel": 6,
+    "codigoPai": "3.01.01.05.01",
+    "ordem": 88
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.05.01.40",
+    "descricao": "Ganho de Ajustes a Valor Justo - Ativo Biológico de Produção",
+    "nivel": 6,
+    "codigoPai": "3.01.01.05.01",
+    "ordem": 89
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.05.01.41",
+    "descricao": "Ganho de Ajustes a Valor Justo - Ativos Não Circulantes Mantidos para Venda",
+    "nivel": 6,
+    "codigoPai": "3.01.01.05.01",
+    "ordem": 90
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.05.01.42",
+    "descricao": "Ganho de Ajustes a Valor Justo - Subscrição de Capital com demais Bens",
+    "nivel": 6,
+    "codigoPai": "3.01.01.05.01",
+    "ordem": 91
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.05.01.43",
+    "descricao": "Ganho de Ajustes a Valor Justo - Subscrição de Capital com Participação Societária",
+    "nivel": 6,
+    "codigoPai": "3.01.01.05.01",
+    "ordem": 92
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.05.01.44",
+    "descricao": "Ganho de Ajustes a Valor Justo - Aquisição de Participação Societária em Estágios",
+    "nivel": 6,
+    "codigoPai": "3.01.01.05.01",
+    "ordem": 93
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.05.01.45",
+    "descricao": "Ganho de Ajustes a Valor Justo  - Decorrente de Permuta de Ativos ou Passivos",
+    "nivel": 6,
+    "codigoPai": "3.01.01.05.01",
+    "ordem": 94
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.05.01.46",
+    "descricao": "Ganho de Ajustes a Valor Justo  - Outras Operações",
+    "nivel": 6,
+    "codigoPai": "3.01.01.05.01",
+    "ordem": 95
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.05.01.47",
+    "descricao": "Doações e Subvenções para investimentos Habilitadas para Crédito Fiscal de IRPJ",
+    "nivel": 6,
+    "codigoPai": "3.01.01.05.01",
+    "ordem": 96
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.05.01.99",
+    "descricao": "Outras Receitas Operacionais",
+    "nivel": 6,
+    "codigoPai": "3.01.01.05.01",
+    "ordem": 97
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.07",
+    "descricao": "DESPESAS OPERACIONAIS",
+    "nivel": 4,
+    "codigoPai": "3.01.01",
+    "ordem": 98
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.07.01",
+    "descricao": "DESPESAS OPERACIONAIS DAS ATIVIDADES EM GERAL",
+    "nivel": 5,
+    "codigoPai": "3.01.01.07",
+    "ordem": 99
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.07.01.01",
+    "descricao": "(-) Remuneração a Dirigentes e a Conselho de Administração",
+    "nivel": 6,
+    "codigoPai": "3.01.01.07.01",
+    "ordem": 100
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.07.01.02",
+    "descricao": "(-) Ordenados, Salários, Gratificações e Outras Remunerações a Empregados",
+    "nivel": 6,
+    "codigoPai": "3.01.01.07.01",
+    "ordem": 101
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.07.01.03",
+    "descricao": "(-) Outros Gastos com Pessoal",
+    "nivel": 6,
+    "codigoPai": "3.01.01.07.01",
+    "ordem": 102
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.07.01.04",
+    "descricao": "(-) Outros Serviços Prestados  por Pessoa Física ou Jurídica",
+    "nivel": 6,
+    "codigoPai": "3.01.01.07.01",
+    "ordem": 103
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.07.01.05",
+    "descricao": "(-) Encargos Sociais - Previdência Social",
+    "nivel": 6,
+    "codigoPai": "3.01.01.07.01",
+    "ordem": 104
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.07.01.06",
+    "descricao": "(-) Encargos Sociais - FGTS",
+    "nivel": 6,
+    "codigoPai": "3.01.01.07.01",
+    "ordem": 105
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.07.01.07",
+    "descricao": "(-) Encargos Sociais - Outros",
+    "nivel": 6,
+    "codigoPai": "3.01.01.07.01",
+    "ordem": 106
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.07.01.08",
+    "descricao": "(-) Doações e Patrocínios de Caráter Cultural e Artístico (Lei no 8.313/1991)",
+    "nivel": 6,
+    "codigoPai": "3.01.01.07.01",
+    "ordem": 107
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.07.01.09",
+    "descricao": "(-) Operações de Aquisição de Vale Cultura (Lei no 12.761/2012, art. 10)",
+    "nivel": 6,
+    "codigoPai": "3.01.01.07.01",
+    "ordem": 108
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.07.01.10",
+    "descricao": "(-) Doações a Instituições de Ensino e Pesquisa (Lei nº 9.249/1995, art.13, § 2º)",
+    "nivel": 6,
+    "codigoPai": "3.01.01.07.01",
+    "ordem": 109
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.07.01.11",
+    "descricao": "(-) Doações a Entidades Civis",
+    "nivel": 6,
+    "codigoPai": "3.01.01.07.01",
+    "ordem": 110
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.07.01.12",
+    "descricao": "(-) Outras Contribuições, Doações e Patrocínios",
+    "nivel": 6,
+    "codigoPai": "3.01.01.07.01",
+    "ordem": 111
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.07.01.13",
+    "descricao": "(-) Alimentação do Trabalhador",
+    "nivel": 6,
+    "codigoPai": "3.01.01.07.01",
+    "ordem": 112
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.07.01.14",
+    "descricao": "(-) PIS/PASEP",
+    "nivel": 6,
+    "codigoPai": "3.01.01.07.01",
+    "ordem": 113
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.07.01.15",
+    "descricao": "(-) COFINS",
+    "nivel": 6,
+    "codigoPai": "3.01.01.07.01",
+    "ordem": 114
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.07.01.16",
+    "descricao": "(-) Demais Impostos, Taxas e Contribuições, exceto IR e CSLL",
+    "nivel": 6,
+    "codigoPai": "3.01.01.07.01",
+    "ordem": 115
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.07.01.17",
+    "descricao": "(-) Arrendamento Mercantil",
+    "nivel": 6,
+    "codigoPai": "3.01.01.07.01",
+    "ordem": 116
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.07.01.18",
+    "descricao": "(-) Aluguéis",
+    "nivel": 6,
+    "codigoPai": "3.01.01.07.01",
+    "ordem": 117
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.07.01.19",
+    "descricao": "(-) Despesas com Veículos e de Conservação de Bens e Instalações",
+    "nivel": 6,
+    "codigoPai": "3.01.01.07.01",
+    "ordem": 118
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.07.01.20",
+    "descricao": "(-) Propaganda, Publicidade e Patrocínio",
+    "nivel": 6,
+    "codigoPai": "3.01.01.07.01",
+    "ordem": 119
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.07.01.21",
+    "descricao": "(-) Propaganda, Publicidade e Patrocínio de Assoc. Desportivas que Mantenha Equipe de Futebol Profissional",
+    "nivel": 6,
+    "codigoPai": "3.01.01.07.01",
+    "ordem": 120
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.07.01.22",
+    "descricao": "(-) Multas",
+    "nivel": 6,
+    "codigoPai": "3.01.01.07.01",
+    "ordem": 121
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.07.01.23",
+    "descricao": "(-) Encargos de Depreciação",
+    "nivel": 6,
+    "codigoPai": "3.01.01.07.01",
+    "ordem": 122
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.07.01.24",
+    "descricao": "(-) Encargos de Amortização",
+    "nivel": 6,
+    "codigoPai": "3.01.01.07.01",
+    "ordem": 123
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.07.01.25",
+    "descricao": "(-) Perdas em Operações de Crédito",
+    "nivel": 6,
+    "codigoPai": "3.01.01.07.01",
+    "ordem": 124
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.07.01.26",
+    "descricao": "(-) Provisões para Férias",
+    "nivel": 6,
+    "codigoPai": "3.01.01.07.01",
+    "ordem": 125
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.07.01.27",
+    "descricao": "(-) Provisões para 13º Salário de Empregados",
+    "nivel": 6,
+    "codigoPai": "3.01.01.07.01",
+    "ordem": 126
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.07.01.28",
+    "descricao": "(-) Provisão para Perda de Estoque de Livros",
+    "nivel": 6,
+    "codigoPai": "3.01.01.07.01",
+    "ordem": 127
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.07.01.29",
+    "descricao": "(-) Demais Provisões",
+    "nivel": 6,
+    "codigoPai": "3.01.01.07.01",
+    "ordem": 128
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.07.01.30",
+    "descricao": "(-) Gratificações a Administradores",
+    "nivel": 6,
+    "codigoPai": "3.01.01.07.01",
+    "ordem": 129
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.07.01.31",
+    "descricao": "(-) Royalties e Assistência Técnica - no PAÍS",
+    "nivel": 6,
+    "codigoPai": "3.01.01.07.01",
+    "ordem": 130
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.07.01.32",
+    "descricao": "(-) Royalties e Assistência Técnica - no EXTERIOR",
+    "nivel": 6,
+    "codigoPai": "3.01.01.07.01",
+    "ordem": 131
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.07.01.33",
+    "descricao": "(-) Assistência Médica, Odontológica e Farmacêutica a Empregados",
+    "nivel": 6,
+    "codigoPai": "3.01.01.07.01",
+    "ordem": 132
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.07.01.34",
+    "descricao": "(-) Pesquisas Científicas e Tecnológicas",
+    "nivel": 6,
+    "codigoPai": "3.01.01.07.01",
+    "ordem": 133
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.07.01.35",
+    "descricao": "(-) Bens de Pequeno Valor Unitário ou de Vida Útil de até um Ano Deduzidos como Despesa",
+    "nivel": 6,
+    "codigoPai": "3.01.01.07.01",
+    "ordem": 134
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.07.01.36",
+    "descricao": "(-) Despesas com Energia Elétrica",
+    "nivel": 6,
+    "codigoPai": "3.01.01.07.01",
+    "ordem": 135
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.07.01.37",
+    "descricao": "(-) Despesas com Água e Esgoto",
+    "nivel": 6,
+    "codigoPai": "3.01.01.07.01",
+    "ordem": 136
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.07.01.38",
+    "descricao": "(-) Despesas com Telefone e Internet",
+    "nivel": 6,
+    "codigoPai": "3.01.01.07.01",
+    "ordem": 137
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.07.01.39",
+    "descricao": "(-) Despesas com Correios e Malotes",
+    "nivel": 6,
+    "codigoPai": "3.01.01.07.01",
+    "ordem": 138
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.07.01.40",
+    "descricao": "(-) Despesas com Seguros",
+    "nivel": 6,
+    "codigoPai": "3.01.01.07.01",
+    "ordem": 139
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.07.01.41",
+    "descricao": "(-) Benefícios Previdenciários a Empregados",
+    "nivel": 6,
+    "codigoPai": "3.01.01.07.01",
+    "ordem": 140
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.07.01.42",
+    "descricao": "(-) Fundo de Aposentadora Individual - FAPI",
+    "nivel": 6,
+    "codigoPai": "3.01.01.07.01",
+    "ordem": 141
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.07.01.43",
+    "descricao": "(-) Planos de Poupança e Investimento - PAIT",
+    "nivel": 6,
+    "codigoPai": "3.01.01.07.01",
+    "ordem": 142
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.07.01.44",
+    "descricao": "(-) Pesquisa e Desenvolvimento Abrangidas no Programa Rota 2030",
+    "nivel": 6,
+    "codigoPai": "3.01.01.07.01",
+    "ordem": 143
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.09",
+    "descricao": "OUTRAS DESPESAS OPERACIONAIS",
+    "nivel": 4,
+    "codigoPai": "3.01.01",
+    "ordem": 144
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.09.01",
+    "descricao": "OUTRAS DESPESAS OPERACIONAIS DAS ATIVIDADES EM GERAL",
+    "nivel": 5,
+    "codigoPai": "3.01.01.09",
+    "ordem": 145
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.09.01.01",
+    "descricao": "(-) Variações Cambiais Passivas",
+    "nivel": 6,
+    "codigoPai": "3.01.01.09.01",
+    "ordem": 146
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.09.01.02",
+    "descricao": "(-) Perdas Incorridas no Mercado de Renda Variável, exceto Day-Trade",
+    "nivel": 6,
+    "codigoPai": "3.01.01.09.01",
+    "ordem": 147
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.09.01.03",
+    "descricao": "(-) Perdas em Operações Day-Trade",
+    "nivel": 6,
+    "codigoPai": "3.01.01.09.01",
+    "ordem": 148
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.09.01.04",
+    "descricao": "(-) Despesas de Juros sobre o Capital Próprio",
+    "nivel": 6,
+    "codigoPai": "3.01.01.09.01",
+    "ordem": 149
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.09.01.05",
+    "descricao": "(-) Despesas de Remuneração de Debêntures",
+    "nivel": 6,
+    "codigoPai": "3.01.01.09.01",
+    "ordem": 150
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.09.01.06",
+    "descricao": "(-) Juros com Empréstimos de Pessoas Vinculadas ou Situadas em País com Tributação favorecida",
+    "nivel": 6,
+    "codigoPai": "3.01.01.09.01",
+    "ordem": 151
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.09.01.07",
+    "descricao": "(-) Despesas Financeiras Relativas a Arrendamento",
+    "nivel": 6,
+    "codigoPai": "3.01.01.09.01",
+    "ordem": 152
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.09.01.08",
+    "descricao": "(-) Outras Despesas Financeiras",
+    "nivel": 6,
+    "codigoPai": "3.01.01.09.01",
+    "ordem": 153
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.09.01.09",
+    "descricao": "(-) Resultados Negativos em Participações Societárias Avaliadas pelo Método de Equivalência Patrimonial",
+    "nivel": 6,
+    "codigoPai": "3.01.01.09.01",
+    "ordem": 154
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.09.01.10",
+    "descricao": "(-) Resultados Negativos em SCP Avaliadas pelo Método de Equivalência Patrimonial",
+    "nivel": 6,
+    "codigoPai": "3.01.01.09.01",
+    "ordem": 155
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.09.01.11",
+    "descricao": "(-) Perdas em Operações Realizadas no Exterior",
+    "nivel": 6,
+    "codigoPai": "3.01.01.09.01",
+    "ordem": 156
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.09.01.12",
+    "descricao": "(-) Perdas Estimadas Decorrentes de Teste de Recuperabilidade (Impairment)",
+    "nivel": 6,
+    "codigoPai": "3.01.01.09.01",
+    "ordem": 157
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.09.01.13",
+    "descricao": "(-) Despesas de Reclassificação de Ajustes de Avaliação Patrimonial",
+    "nivel": 6,
+    "codigoPai": "3.01.01.09.01",
+    "ordem": 158
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.09.01.14",
+    "descricao": "(-) Despesas de Reclassificação de Ajustes de Avaliação Patrimonial -Reflexo",
+    "nivel": 6,
+    "codigoPai": "3.01.01.09.01",
+    "ordem": 159
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.09.01.15",
+    "descricao": "(-) Despesas Financeiras Decorrentes dos Ajustes ao Valor Presente",
+    "nivel": 6,
+    "codigoPai": "3.01.01.09.01",
+    "ordem": 160
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.09.01.16",
+    "descricao": "(-) Encargos de Depreciação de Bens Objeto de Arrendamento",
+    "nivel": 6,
+    "codigoPai": "3.01.01.09.01",
+    "ordem": 161
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.09.01.17",
+    "descricao": "(-) Encargos de Amortização de Mais - Valia",
+    "nivel": 6,
+    "codigoPai": "3.01.01.09.01",
+    "ordem": 162
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.09.01.18",
+    "descricao": "(-) Aluguéis de Bens Imóveis- Locador  Parte Relacionada",
+    "nivel": 6,
+    "codigoPai": "3.01.01.09.01",
+    "ordem": 163
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.09.01.19",
+    "descricao": "(-) Aluguéis de Bens Imóveis Locador  Parte Não Relacionada",
+    "nivel": 6,
+    "codigoPai": "3.01.01.09.01",
+    "ordem": 164
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.09.01.20",
+    "descricao": "(-) Despesas com Empréstimos de Valores Mobiliários",
+    "nivel": 6,
+    "codigoPai": "3.01.01.09.01",
+    "ordem": 165
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.09.01.21",
+    "descricao": "(-) Despesas com Corretagem e Emolumentos",
+    "nivel": 6,
+    "codigoPai": "3.01.01.09.01",
+    "ordem": 166
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.09.01.22",
+    "descricao": "(-) Despesas  com Deságio na Cessão de Títulos",
+    "nivel": 6,
+    "codigoPai": "3.01.01.09.01",
+    "ordem": 167
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.09.01.23",
+    "descricao": "(-) Despesas Incorridas em Operações de Mútuo - Parte Relacionada",
+    "nivel": 6,
+    "codigoPai": "3.01.01.09.01",
+    "ordem": 168
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.09.01.24",
+    "descricao": "(-) Despesas Incorridas em Operações de Mútuo - Parte Não Relacionada",
+    "nivel": 6,
+    "codigoPai": "3.01.01.09.01",
+    "ordem": 169
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.09.01.25",
+    "descricao": "(-) Despesas Incorridas  em Outros Passivos Financeiros Mensurados Pelo Custo Amortizado",
+    "nivel": 6,
+    "codigoPai": "3.01.01.09.01",
+    "ordem": 170
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.09.01.26",
+    "descricao": "(-) Perda de Ajuste a Valor Justo - Instrumentos Financeiros  para Negociação - Não Hedge - Valor Justo pelo Resultado",
+    "nivel": 6,
+    "codigoPai": "3.01.01.09.01",
+    "ordem": 171
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.09.01.27",
+    "descricao": "(-) Perda de Ajuste a Valor Justo - Instrumentos Financeiros  Disponíveis para Venda - Reclassificação de Ajustes de Avaliação Patrimonial",
+    "nivel": 6,
+    "codigoPai": "3.01.01.09.01",
+    "ordem": 172
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.09.01.28",
+    "descricao": "(-) Perda de Ajuste a Valor Justo - Instrumentos Financeiros  de Hedge  de Valor Justo",
+    "nivel": 6,
+    "codigoPai": "3.01.01.09.01",
+    "ordem": 173
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.09.01.29",
+    "descricao": "(-) Perda de Ajuste a Valor Justo - Instrumentos Financeiros  de Hedge -  Reclassificação de Ajustes de Avaliação Patrimonial",
+    "nivel": 6,
+    "codigoPai": "3.01.01.09.01",
+    "ordem": 174
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.09.01.30",
+    "descricao": "(-) Perda de Ajuste a Valor Justo - Item Objeto de Hedge de Valor Justo",
+    "nivel": 6,
+    "codigoPai": "3.01.01.09.01",
+    "ordem": 175
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.09.01.31",
+    "descricao": "(-) Perda de Ajuste a Valor Justo - Propriedade para Investimento",
+    "nivel": 6,
+    "codigoPai": "3.01.01.09.01",
+    "ordem": 176
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.09.01.32",
+    "descricao": "(-) Perda de Ajuste a Valor Justo - Ativo Biológico Consumível",
+    "nivel": 6,
+    "codigoPai": "3.01.01.09.01",
+    "ordem": 177
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.09.01.33",
+    "descricao": "(-) Perda de Ajuste a Valor Justo - Ativo Biológico de Produção",
+    "nivel": 6,
+    "codigoPai": "3.01.01.09.01",
+    "ordem": 178
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.09.01.34",
+    "descricao": "(-) Perda de Ajuste a Valor Justo - Ativos Não Circulantes Mantidos para Venda",
+    "nivel": 6,
+    "codigoPai": "3.01.01.09.01",
+    "ordem": 179
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.09.01.35",
+    "descricao": "(-) Perda de Ajuste a Valor Justo - Subscrição de Capital com demais Bens",
+    "nivel": 6,
+    "codigoPai": "3.01.01.09.01",
+    "ordem": 180
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.09.01.36",
+    "descricao": "(-) Perda de Ajuste a Valor Justo - Subscrição de Capital com Participação Societária",
+    "nivel": 6,
+    "codigoPai": "3.01.01.09.01",
+    "ordem": 181
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.09.01.37",
+    "descricao": "(-) Perda de Ajuste a Valor Justo - Aquisição de Participação Societária em Estágios",
+    "nivel": 6,
+    "codigoPai": "3.01.01.09.01",
+    "ordem": 182
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.09.01.38",
+    "descricao": "(-) Perda de Ajuste a Valor Justo - Decorrente de Permuta de Ativos ou Passivos",
+    "nivel": 6,
+    "codigoPai": "3.01.01.09.01",
+    "ordem": 183
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.09.01.39",
+    "descricao": "(-) Perda de Ajuste a Valor Justo - Outras Operações",
+    "nivel": 6,
+    "codigoPai": "3.01.01.09.01",
+    "ordem": 184
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.09.01.99",
+    "descricao": "(-) Outras Despesas Operacionais",
+    "nivel": 6,
+    "codigoPai": "3.01.01.09.01",
+    "ordem": 185
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.11",
+    "descricao": "OUTRAS RECEITAS, OUTRAS DESPESAS E RESULTADO DE OPERAÇÕES DESCONTINUADAS",
+    "nivel": 4,
+    "codigoPai": "3.01.01",
+    "ordem": 186
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.11.01",
+    "descricao": "OUTRAS RECEITAS, OUTRAS DESPESAS E RESULTADO DE OPERAÇÕES DESCONTINUADAS DAS ATIVIDADES EM GERAL",
+    "nivel": 5,
+    "codigoPai": "3.01.01.11",
+    "ordem": 187
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.11.01.01",
+    "descricao": "Receitas na Alienação de Participações Integrantes do Ativo Circulante ou do Ativo Realizável a Longo Prazo",
+    "nivel": 6,
+    "codigoPai": "3.01.01.11.01",
+    "ordem": 188
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.11.01.02",
+    "descricao": "Receitas de Alienações de Bens e Direitos do Ativo Não Circulante Investimentos, Imobilizado e Intangível",
+    "nivel": 6,
+    "codigoPai": "3.01.01.11.01",
+    "ordem": 189
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.11.01.03",
+    "descricao": "Ganhos de Capital por Variação Percentual em Participação Societária Avaliada pelo Patrimônio Líquido",
+    "nivel": 6,
+    "codigoPai": "3.01.01.11.01",
+    "ordem": 190
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.11.01.04",
+    "descricao": "(-) Valor Contábil de Participações Integrantes do Ativo Circulante ou do Ativo Realizável a Longo Prazo Alienadas",
+    "nivel": 6,
+    "codigoPai": "3.01.01.11.01",
+    "ordem": 191
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.11.01.05",
+    "descricao": "(-) Valor Contábil dos Bens e Direitos do Ativo Não Circulante Investimentos, Intangível e Imobilizado Alienados",
+    "nivel": 6,
+    "codigoPai": "3.01.01.11.01",
+    "ordem": 192
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.11.01.06",
+    "descricao": "(-) Perdas de Capital por Variação Percentual em Participação Societária Avaliada pelo Patrimônio Líquido",
+    "nivel": 6,
+    "codigoPai": "3.01.01.11.01",
+    "ordem": 193
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.11.01.07",
+    "descricao": "Receitas de Operações Descontinuadas",
+    "nivel": 6,
+    "codigoPai": "3.01.01.11.01",
+    "ordem": 194
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.01.11.01.08",
+    "descricao": "(-) Despesas de Operações Descontinuadas",
+    "nivel": 6,
+    "codigoPai": "3.01.01.11.01",
+    "ordem": 195
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.05",
+    "descricao": "PARTICIPAÇÕES",
+    "nivel": 3,
+    "codigoPai": "3.01",
+    "ordem": 196
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.05.01",
+    "descricao": "PARTICIPAÇÕES NOS LUCROS",
+    "nivel": 4,
+    "codigoPai": "3.01.05",
+    "ordem": 197
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.05.01.01",
+    "descricao": "PARTICIPAÇÕES DE EMPREGADOS",
+    "nivel": 5,
+    "codigoPai": "3.01.05.01",
+    "ordem": 198
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.05.01.01.01",
+    "descricao": "(-) Participações de Empregados",
+    "nivel": 6,
+    "codigoPai": "3.01.05.01.01",
+    "ordem": 199
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.05.01.01.02",
+    "descricao": "(-) Contribuições para Assistência ou Previdência de Empregados",
+    "nivel": 6,
+    "codigoPai": "3.01.05.01.01",
+    "ordem": 200
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.05.01.01.98",
+    "descricao": "(-) Outras Participações de Empregados",
+    "nivel": 6,
+    "codigoPai": "3.01.05.01.01",
+    "ordem": 201
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.05.01.03",
+    "descricao": "OUTRAS PARTICIPAÇÕES",
+    "nivel": 5,
+    "codigoPai": "3.01.05.01",
+    "ordem": 202
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.05.01.03.01",
+    "descricao": "(-) Participações de Administradores e Partes Beneficiárias",
+    "nivel": 6,
+    "codigoPai": "3.01.05.01.03",
+    "ordem": 203
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.05.01.03.02",
+    "descricao": "(-) Participações de Debêntures",
+    "nivel": 6,
+    "codigoPai": "3.01.05.01.03",
+    "ordem": 204
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.01.05.01.03.98",
+    "descricao": "(-) Outras Participações",
+    "nivel": 6,
+    "codigoPai": "3.01.05.01.03",
+    "ordem": 205
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.02",
+    "descricao": "PROVISÃO PARA CSLL E IRPJ",
+    "nivel": 2,
+    "codigoPai": "3",
+    "ordem": 206
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.02.01",
+    "descricao": "PROVISÃO PARA CSLL E IRPJ",
+    "nivel": 3,
+    "codigoPai": "3.02",
+    "ordem": 207
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.02.01.01",
+    "descricao": "PROVISÃO PARA CSLL E IRPJ",
+    "nivel": 4,
+    "codigoPai": "3.02.01",
+    "ordem": 208
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.02.01.01.01",
+    "descricao": "PROVISÃO PARA CSLL E IRPJ",
+    "nivel": 5,
+    "codigoPai": "3.02.01.01",
+    "ordem": 209
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.02.01.01.01.01",
+    "descricao": "(-) Provisão para Contribuição Social sobre o Lucro Líquido (Atividade Geral)",
+    "nivel": 6,
+    "codigoPai": "3.02.01.01.01",
+    "ordem": 210
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.02.01.01.01.02",
+    "descricao": "(-) Provisão para Imposto de Renda - Pessoa Jurídica (Atividade Geral e Rural)",
+    "nivel": 6,
+    "codigoPai": "3.02.01.01.01",
+    "ordem": 211
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.02.01.01.01.11",
+    "descricao": "(-) Provisão para Contribuição Social sobre o Lucro Líquido - Lucros Diferidos (Atividade Geral)",
+    "nivel": 6,
+    "codigoPai": "3.02.01.01.01",
+    "ordem": 212
+  },
+  {
+    "leiaute": 9,
+    "anoBase": 2025,
+    "tipo": "DRE",
+    "codigo": "3.02.01.01.01.12",
+    "descricao": "(-) Provisão para Imposto de Renda - Pessoa Jurídica - Lucros Diferidos (Atividade Geral e Rural)",
+    "nivel": 6,
+    "codigoPai": "3.02.01.01.01",
+    "ordem": 213
+  }
+]
