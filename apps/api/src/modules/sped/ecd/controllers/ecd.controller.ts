@@ -186,7 +186,8 @@ export class EcdController {
     });
     const cnpj     = company?.taxId.replace(/\D/g, '') || 'ECD';
     const year     = new Date(periodEnd).getFullYear();
-    const filename = `ECD_${cnpj}_${year}.txt`;
+    const raiz     = cnpj.substring(0, 8);
+    const filename = `ECD_${year}_${raiz}.txt`;
 
     res.setHeader('Content-Type', 'text/plain; charset=iso-8859-1');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
