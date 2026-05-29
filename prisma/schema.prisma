@@ -2778,6 +2778,14 @@ model CompanyAccountingConfig {
   // Dados ECD/ECF
   codigoScp       String? @map("codigo_scp") @db.VarChar
   indicadorSitEsp String? @map("indicador_sit_esp") @db.VarChar
+  // Escritorio contabil externo
+  escritorioCnpj     String? @map("escritorio_cnpj") @db.VarChar(14)
+  escritorioNome     String? @map("escritorio_nome") @db.VarChar
+  escritorioCrc      String? @map("escritorio_crc") @db.VarChar
+  escritorioCrcState String? @map("escritorio_crc_state") @db.VarChar(2)
+  escritorioEmail    String? @map("escritorio_email") @db.VarChar
+  escritorioTelefone String? @map("escritorio_telefone") @db.VarChar
+  accountantCpf      String? @map("accountant_cpf") @db.VarChar(14)
 
   // Configuracao contabil
   moeda         String? @default("BRL") @map("moeda") @db.VarChar(3)

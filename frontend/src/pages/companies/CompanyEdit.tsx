@@ -1,9 +1,11 @@
 // src/pages/companies/CompanyEdit.tsx
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import api from '../../services/api';
 import { toast } from 'react-toastify';
 import SearchRFBButton from '../../components/SearchRFBButton';
+import { ContabilTab } from './ContabilTab';
 
 const inputCls = 'w-full p-2.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400';
 const labelCls = 'block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1';
@@ -34,11 +36,12 @@ function SectionTitle({ title, color }: { title: string; color: string }) {
 
 export const CompanyEdit: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState<any>({});
-  const [activeTab, setActiveTab] = useState<'geral'|'contabil'|'esocial'|'sped'>('geral');
+  const [activeTab, setActiveTab] = useState<'geral'|'contabil'|'esocial'|'sped'>((searchParams.get('tab') as any) || 'geral');
 
   useEffect(() => {
     api.get(`/companies/${id}`)
@@ -260,9 +263,7 @@ export const CompanyEdit: React.FC = () => {
           </div>
         )}
         {activeTab === 'contabil' && (
-          <div style={{ background:'#fff', border:'0.5px solid #E5E7EB', borderRadius:10, padding:32 }}>
-            <p style={{ fontSize:12, color:'#9CA3AF', fontStyle:'italic' }}>Em desenvolvimento — configuracoes contabeis da empresa.</p>
-          </div>
+          <ContabilTab companyId={id!} labelCls={labelCls} inputCls={inputCls} />
         )}
         {activeTab === 'esocial' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 bg-white p-8 rounded-xl shadow-sm border border-gray-200">
