@@ -58,33 +58,31 @@ export const CompanyEdit: React.FC = () => {
   const handleRFBData = (dados: any) => {
     setFormData((prev: any) => ({
       ...prev,
-      taxId: dados.cnpj || prev.taxId,
-      legalName: dados.razaoSocial || prev.legalName,
-      tradeName: dados.nomeFantasia || prev.tradeName,
-      openingDate: dados.dataAbertura || prev.openingDate,
-      zipCode: dados.endereco?.cep || prev.zipCode,
-      street: dados.endereco?.logradouro || prev.street,
-      number: dados.endereco?.numero || prev.number,
-      complement: dados.endereco?.complemento || prev.complement,
+      taxId:        dados.cnpj || prev.taxId,
+      legalName:    dados.razaoSocial || prev.legalName,
+      tradeName:    dados.nomeFantasia || prev.tradeName,
+      openingDate:  dados.dataAbertura || prev.openingDate,
+      zipCode:      dados.endereco?.cep || prev.zipCode,
+      street:       dados.endereco?.logradouro || prev.street,
+      number:       dados.endereco?.numero || prev.number,
+      complement:   dados.endereco?.complemento || prev.complement,
       neighborhood: dados.endereco?.bairro || prev.neighborhood,
-      state: dados.endereco?.uf || prev.state,
-      city: dados.endereco?.cidade || dados.endereco?.municipio || prev.city,
-      email: dados.contato?.email || prev.email,
-      phone1: dados.contato?.telefone1 || prev.phone1,
-      phone2: dados.contato?.telefone2 || prev.phone2,
-      equity: dados.capitalSocial || prev.equity,
-      legalNature: dados.naturezaJuridica || prev.legalNature,
-      size: dados.porte || prev.size,
-      taxRegime: dados.regimeTributario || prev.taxRegime,
-      status: dados.situacao || prev.status,
-      statusDate: dados.dataSituacao || prev.statusDate,
-      partners: dados.qsa || prev.partners,
-      registerOrg: '',
-      registerNumber: '',
-      registerDate: '',
-      registerBook: '',
-      registerSheet: '',
-      mainActivity: dados.cnaes?.find((c: any) => c.principal)?.codigo || prev.mainActivity,
+      state:        dados.endereco?.uf || prev.state,
+      city:         dados.endereco?.municipio || prev.city,
+      email:        dados.contato?.email || prev.email,
+      phone1:       dados.contato?.telefone1 || prev.phone1,
+      phone2:       dados.contato?.telefone2 || prev.phone2,
+      equity:       dados.capitalSocial || prev.equity,
+      legalNature:  dados.naturezaJuridica || prev.legalNature,
+      size:         dados.porte || prev.size,
+      taxRegime:    (dados.regimeTributario?.length ? dados.regimeTributario[dados.regimeTributario.length - 1].forma_de_tributacao : null) || prev.taxRegime,
+      status:       dados.situacaoCadastral || prev.status,
+      statusDate:   dados.dataSituacao || prev.statusDate,
+      partners:     dados.qsa || prev.partners,
+      cnaePrincipal: dados.cnaePrincipal || prev.cnaePrincipal,
+      cnaes:        dados.cnaesSecundarios || prev.cnaes,
+      codMun:       dados.codMun || prev.codMun,
+      mainActivity: dados.cnaePrincipal ? `${dados.cnaePrincipal.codigo} - ${dados.cnaePrincipal.descricao}` : prev.mainActivity,
     }));
     toast.success('Dados da RFB carregados! Revise e salve.');
   };
@@ -347,6 +345,30 @@ export const CompanyEdit: React.FC = () => {
               <option value="inactive">INATIVA</option>
               <option value="suspended">SUSPENSA</option>
             </select>
+          {/* ── PORTE E CNAE ──────────────────────────────── */}
+          <SectionTitle title="Atividade e Porte" color="bg-indigo-500" />
+          <div>
+            <label className={labelCls}>Porte</label>
+            <input name="size" value={formData.size || ""} onChange={handleChange} className={inputCls} />
+          </div>
+          <div className="md:col-span-3">
+            <label className={labelCls}>CNAE Principal</label>
+            <input name="mainActivity" value={formData.mainActivity || ""} onChange={handleChange} className={inputCls} />
+          </div>
+          {/* ── QSA ──────────────────────────────────────── */}
+          {(formData.partners && formData.partners.length > 0) && (<>
+            <SectionTitle title="QSA — Quadro de Sócios e Administradores" color="bg-blue-500" />
+            <div className="md:col-span-4 divide-y divide-gray-100">
+              {formData.partners.map((s: any, idx: number) => (
+                <div key={idx} className="py-3 grid grid-cols-4 gap-4 text-sm border-b border-gray-100 last:border-0">
+                  <div><span className="text-xs text-gray-400 block">Nome</span><span className="font-medium">{s.nome}</span></div>
+                  <div><span className="text-xs text-gray-400 block">Qualificação</span><span>{s.qualificacao}</span></div>
+                  <div><span className="text-xs text-gray-400 block">CPF/CNPJ</span><span className="font-mono text-xs text-gray-500">{s.cpfCnpj}</span></div>
+                  <div><span className="text-xs text-gray-400 block">Entrada</span><span className="text-gray-500">{s.dataEntrada ? new Date(s.dataEntrada + "T00:00:00").toLocaleDateString("pt-BR") : "-"}</span></div>
+                </div>
+              ))}
+            </div>
+          </>)}
           </div>
 
         </div>        )}

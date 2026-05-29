@@ -39,6 +39,7 @@ interface CompanyFormData {
   codMun?: string;
   ieEstadual?: string;
   cnae?: string;
+  cnaePrincipal?: { codigo: number; descricao: string };
   fpas?: string;
   isHeadquarter?: boolean;
   mainActivity?: string;
@@ -50,7 +51,7 @@ const EMPTY: CompanyFormData = {
   zipCode: '', street: '', number: '', complement: '', neighborhood: '', state: '', city: '',
   email: '', phone1: '', phone2: '',
   equity: '', legalNature: '', size: '', taxRegime: '', status: '', statusDate: '',
-  partners: [], cnaes: [],
+  partners: [], cnaes: [], cnaePrincipal: undefined,
   registerOrg: '', registerNumber: '', registerDate: '', registerBook: '', registerSheet: '', registerUF: '',
 };
 
@@ -79,7 +80,7 @@ export const CompanyForm: React.FC = () => {
 
   const [preenchido, setPreenchido] = useState(false);
 
-  const [formData, setFormData] = useState<CompanyFormData>({ taxId: initialCnpj, legalName: '', tradeName: '', openingDate: '', legalNature: '', taxRegime: '', size: '', status: 'ativa', statusDate: '', equity: '', street: '', number: '', complement: '', neighborhood: '', zipCode: '', city: '', state: '', email: '', phone1: '', phone2: '', isHeadquarter: false, registerOrg: '', registerNumber: '', registerDate: '', registerBook: '', registerSheet: '', mainActivity: '', secondaryActivities: [], nire: '', orgRegistro: '', codMun: '', ieEstadual: '', cnae: '', fpas: '' });
+  const [formData, setFormData] = useState<CompanyFormData>({ taxId: initialCnpj, legalName: '', tradeName: '', openingDate: '', legalNature: '', taxRegime: '', size: '', status: '', statusDate: '', equity: '', street: '', number: '', complement: '', neighborhood: '', zipCode: '', city: '', state: '', email: '', phone1: '', phone2: '', isHeadquarter: false, registerOrg: '', registerNumber: '', registerDate: '', registerBook: '', registerSheet: '', mainActivity: '', secondaryActivities: [], nire: '', orgRegistro: '', codMun: '', ieEstadual: '', cnae: '', fpas: '' });
   const [loading, setLoading] = useState(false);
   const set = (name: keyof CompanyFormData, value: any) =>
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -91,28 +92,30 @@ export const CompanyForm: React.FC = () => {
   const preencherDadosRFB = (dados: any) => {
     setFormData(prev => ({
       ...prev,
-      taxId: dados.cnpj || prev.taxId,
-      legalName: dados.razaoSocial || prev.legalName,
-      tradeName: dados.nomeFantasia || prev.tradeName,
-      openingDate: dados.dataAbertura || prev.openingDate,
-      zipCode: dados.endereco?.cep || prev.zipCode,
-      street: dados.endereco?.logradouro || prev.street,
-      number: dados.endereco?.numero || prev.number,
-      complement: dados.endereco?.complemento || prev.complement,
+      taxId:        dados.cnpj || prev.taxId,
+      legalName:    dados.razaoSocial || prev.legalName,
+      tradeName:    dados.nomeFantasia || prev.tradeName,
+      openingDate:  dados.dataAbertura || prev.openingDate,
+      zipCode:      dados.endereco?.cep || prev.zipCode,
+      street:       dados.endereco?.logradouro || prev.street,
+      number:       dados.endereco?.numero || prev.number,
+      complement:   dados.endereco?.complemento || prev.complement,
       neighborhood: dados.endereco?.bairro || prev.neighborhood,
-      state: dados.endereco?.uf || prev.state,
-      city: dados.endereco?.cidade || dados.endereco?.municipio || prev.city,
-      email: dados.contato?.email || prev.email,
-      phone1: dados.contato?.telefone1 || prev.phone1,
-      phone2: dados.contato?.telefone2 || prev.phone2,
-      equity: dados.capitalSocial?.toString() || prev.equity,
-      legalNature: dados.naturezaJuridica || prev.legalNature,
-      size: dados.porte || prev.size,
-      taxRegime: dados.regimeTributario || prev.taxRegime,
-      status: dados.situacao?.toString() || prev.status,
-      statusDate: dados.dataSituacao || prev.statusDate,
-      partners: dados.qsa || prev.partners,
-      cnaes: dados.cnaes || prev.cnaes,
+      state:        dados.endereco?.uf || prev.state,
+      city:         dados.endereco?.municipio || prev.city,
+      email:        dados.contato?.email || prev.email,
+      phone1:       dados.contato?.telefone1 || prev.phone1,
+      phone2:       dados.contato?.telefone2 || prev.phone2,
+      equity:       dados.capitalSocial?.toString() || prev.equity,
+      legalNature:  dados.naturezaJuridica || prev.legalNature,
+      size:         dados.porte || prev.size,
+      taxRegime:    (dados.regimeTributario?.length ? dados.regimeTributario[dados.regimeTributario.length - 1].forma_de_tributacao : '') || prev.taxRegime,
+      status:       dados.situacaoCadastral || prev.status,
+      statusDate:   dados.dataSituacao || prev.statusDate,
+      partners:     dados.qsa || prev.partners,
+      cnaes:        dados.cnaesSecundarios || prev.cnaes,
+      cnaePrincipal: dados.cnaePrincipal || prev.cnaePrincipal,
+      codMun:       dados.codMun || prev.codMun,
     }));
     setPreenchido(true);
     setTimeout(() => setPreenchido(false), 3000);
@@ -230,72 +233,6 @@ export const CompanyForm: React.FC = () => {
           </div>
         </fieldset>
 
-        {/* ── REGISTRO INSTITUCIONAL ────────────────────────── */}
-        <fieldset className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4">
-          <legend className="text-xs font-bold text-gray-500 uppercase tracking-widest px-1
-                             border-l-4 border-purple-500 pl-3 ml-[-1rem]">
-            Registro Institucional
-          </legend>
-
-          {/* Linha única: Órgão [UF] Número Data [Livro Folha] */}
-          <div className="flex flex-wrap gap-3 items-end">
-            {/* Órgão */}
-            <div className="flex-shrink-0">
-              <label className={labelCls}>Órgão de Registro</label>
-              <select name="registerOrg" value={formData.registerOrg}
-                onChange={handleChange} className={inputCls + ' bg-white w-44'}>
-                {ORG_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
-            </div>
-
-            {/* UF — só Junta Comercial */}
-            {isJunta && (
-              <div className="flex-shrink-0">
-                <label className={labelCls}>UF</label>
-                <select name="registerUF" value={formData.registerUF}
-                  onChange={handleChange} className={inputCls + ' bg-white w-20'}>
-                  <option value="">UF</option>
-                  {UF_OPTIONS.map(uf => <option key={uf} value={uf}>{uf}</option>)}
-                </select>
-              </div>
-            )}
-
-            {/* Número / NIRE */}
-            <div className="flex-1 min-w-[140px]">
-              <label className={labelCls}>{isJunta ? 'NIRE' : 'Número'}</label>
-              <input name="registerNumber" value={formData.registerNumber}
-                onChange={handleChange}
-                placeholder={isJunta ? 'Ex: 35300xxxxxx' : 'Número do registro'}
-                className={inputCls} />
-            </div>
-
-            {/* Data */}
-            <div className="flex-shrink-0">
-              <label className={labelCls}>Data do Registro</label>
-              <input type="date" name="registerDate" value={formData.registerDate}
-                onChange={handleChange} className={inputCls + ' w-40'} />
-            </div>
-
-            {/* Livro e Folha — só Cartório */}
-            {isCartorio && (
-              <>
-                <div className="flex-shrink-0">
-                  <label className={labelCls}>Livro</label>
-                  <input name="registerBook" value={formData.registerBook}
-                    onChange={handleChange} placeholder="Ex: A-3"
-                    className={inputCls + ' w-24'} />
-                </div>
-                <div className="flex-shrink-0">
-                  <label className={labelCls}>Folha</label>
-                  <input name="registerSheet" value={formData.registerSheet}
-                    onChange={handleChange} placeholder="45"
-                    className={inputCls + ' w-20'} />
-                </div>
-              </>
-            )}
-          </div>
-        </fieldset>
-
         {/* ── ENDEREÇO ──────────────────────────────────────── */}
         <fieldset className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4">
           <legend className="text-xs font-bold text-gray-500 uppercase tracking-widest px-1
@@ -371,6 +308,14 @@ export const CompanyForm: React.FC = () => {
           </legend>
           <div className="grid grid-cols-2 gap-4">
             <div>
+              <label className={labelCls}>CNAE Principal</label>
+              <input readOnly value={formData.cnaePrincipal ? `${formData.cnaePrincipal.codigo} - ${formData.cnaePrincipal.descricao}` : formData.cnae || ""} className={inputCls + " bg-gray-50"} />
+            </div>
+            <div className="md:col-span-2">
+            </div>
+            <div className="md:col-span-2">
+              <label className={labelCls}>CNAEs Secundárias</label>
+              <input readOnly value={formData.cnaes?.map((c: any) => `${c.codigo} - ${c.descricao}`).join(" | ") || "Não informada"} className={inputCls + " bg-gray-50"} />
               <label className={labelCls}>Capital Social</label>
               <input name="equity" value={formData.equity} onChange={handleChange}
                 placeholder="R$ 100.000,00" className={inputCls} />
@@ -380,48 +325,38 @@ export const CompanyForm: React.FC = () => {
               <input name="legalNature" value={formData.legalNature} onChange={handleChange} className={inputCls} />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className={labelCls}>Porte</label>
-              <select name="size" value={formData.size} onChange={handleChange} className={inputCls + ' bg-white'}>
-                <option value="">Selecione…</option>
-                <option value="MEI">MEI</option>
-                <option value="ME">ME</option>
-                <option value="EPP">EPP</option>
-                <option value="DEMAIS">Demais</option>
-              </select>
+              <input readOnly value={formData.size} className={inputCls + " bg-gray-50"} />
             </div>
             <div>
-              <label className={labelCls}>Regime Tributário</label>
-              <select name="taxRegime" value={formData.taxRegime} onChange={handleChange} className={inputCls + ' bg-white'}>
-                <option value="">Selecione…</option>
-                <option value="SIMPLES_NACIONAL">Simples Nacional</option>
-                <option value="LUCRO_PRESUMIDO">Lucro Presumido</option>
-                <option value="LUCRO_REAL">Lucro Real</option>
-              </select>
+              <label className={labelCls}>Regime Tributário (último)</label>
+              <input readOnly value={formData.taxRegime} className={inputCls + " bg-gray-50"} />
+            </div>
+            <div>
+              <label className={labelCls}>Situação</label>
+              <input readOnly value={formData.status} className={inputCls + " bg-gray-50"} />
             </div>
           </div>
         </fieldset>
 
-        {/* ── AÇÕES ─────────────────────────────────────────── */}
-        {/* ── SPED / eSocial (opcional) ───────────────── */}
-        <fieldset className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4">
-          <legend className="text-xs font-bold text-gray-500 uppercase tracking-widest px-1 border-l-4 border-purple-500 pl-3 ml-[-1rem]">SPED / eSocial (opcional)</legend>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div><label className={labelCls}>NIRE</label>
-              <input name="nire" value={formData.nire || ''} onChange={handleChange} className={inputCls} /></div>
-            <div><label className={labelCls}>Orgao de Registro</label>
-              <input name="orgRegistro" value={formData.orgRegistro || ''} onChange={handleChange} className={inputCls} placeholder="JUCESP, RCPJ..." /></div>
-            <div><label className={labelCls}>Cod. Municipio IBGE</label>
-              <input name="codMun" value={formData.codMun || ''} onChange={handleChange} className={inputCls} placeholder="3550308" maxLength={7} /></div>
-            <div><label className={labelCls}>Inscricao Estadual</label>
-              <input name="ieEstadual" value={formData.ieEstadual || ''} onChange={handleChange} className={inputCls} /></div>
-            <div><label className={labelCls}>CNAE Principal</label>
-              <input name="cnae" value={formData.cnae || ''} onChange={handleChange} className={inputCls} placeholder="0000-0/00" /></div>
-            <div><label className={labelCls}>FPAS</label>
-              <input name="fpas" value={formData.fpas || ''} onChange={handleChange} className={inputCls} placeholder="000" /></div>
-          </div>
-        </fieldset>
+        {/* ── QSA ─────────────────────────────────────── */}
+        {formData.partners && formData.partners.length > 0 && (
+          <fieldset className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-3">
+            <legend className="text-xs font-bold text-gray-500 uppercase tracking-widest px-1 border-l-4 border-blue-500 pl-3 ml-[-1rem]">QSA — Quadro de Sócios e Administradores</legend>
+            <div className="divide-y divide-gray-100">
+              {formData.partners.map((s: any, i: number) => (
+                <div key={i} className="py-3 grid grid-cols-4 gap-4 text-sm border-b border-gray-100 last:border-0">
+                  <div><span className="text-xs text-gray-400 block">Nome</span><span className="font-medium text-gray-800">{s.nome}</span></div>
+                  <div><span className="text-xs text-gray-400 block">Qualificação</span><span className="text-gray-700">{s.qualificacao}</span></div>
+                  <div><span className="text-xs text-gray-400 block">CPF/CNPJ</span><span className="text-gray-500 font-mono text-xs">{s.cpfCnpj}</span></div>
+                  <div><span className="text-xs text-gray-400 block">Entrada</span><span className="text-gray-500">{s.dataEntrada ? new Date(s.dataEntrada + "T00:00:00").toLocaleDateString("pt-BR") : "-"}</span></div>
+                </div>
+              ))}
+            </div>
+          </fieldset>
+        )}
         <div className="flex justify-end gap-3 pt-2">
           <button type="button" onClick={() => navigate(returnTo)}
             className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:border-gray-400 transition-colors">
