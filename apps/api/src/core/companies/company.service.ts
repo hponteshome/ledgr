@@ -198,6 +198,10 @@ export class CompanyService {
       });
 
       this.logger.log(`Company ${id} updated by admin ${adminId}`);
+      // Auto-sync QSA: vincula socios ja cadastrados como Person
+      if (data.partners && Array.isArray(data.partners) && data.partners.length > 0) {
+        await this.syncQsaLinks(id, data.partners);
+      }
       return updatedCompany;
     } catch (error) {
       this.logger.error(`Error updating company ${id}: ${error.message}`);
@@ -275,4 +279,37 @@ async findHeadquarters() {
   });
 }
 
+
+  private async syncQsaLinks(companyId: string, partners: any[]) {
+    for (const socio of partners) {
+      if (!socio.cpfCnpj || !socio.nome) continue;
+      // Extrai digitos visiveis do CPF mascarado (ex: ***240219** -> 240219)
+      const digits = socio.cpfCnpj.replace(/\*/g, '').replace(/\D/g, '');
+      if (digits.length < 4) continue;
+      // Busca person pelo CPF parcial
+      const persons = await this.prisma.person.findMany({
+        where: { cpf: { contains: digits }, deletedAt: null },
+        select: { id: true, fullName: true, cpf: true },
+      });
+      if (persons.length !== 1) continue; // ambiguo ou nao encontrado
+      const person = persons[0];
+      // Verifica se vínculo já existe
+      const existing = await this.prisma.personCompany.findFirst({
+        where: { personId: person.id, companyId, role: socio.qualificacao },
+      });
+      if (existing) continue;
+      // Cria vínculo automatico
+      await this.prisma.personCompany.create({
+        data: {
+          personId: person.id,
+          companyId,
+          role: socio.qualificacao || 'Sócio',
+          qualificacaoCvm: String(socio.codigoQualificacao || ''),
+          startDate: socio.dataEntrada ? new Date(socio.dataEntrada) : undefined,
+          notes: 'Vinculo criado automaticamente via QSA/RFB',
+        },
+      });
+      this.logger.log(`QSA sync: vinculado ${person.fullName} a empresa ${companyId}`);
+    }
+  }
 }

@@ -32,8 +32,11 @@ api.interceptors.request.use(
     
     // Só NÃO envia companyId se for rota da blacklist
     if (companyId && !shouldSkipCompanyId) {
-      config.headers['x-company-id'] = companyId;
-      console.log(`[API] Adding x-company-id: ${companyId}`);
+      // Respeita header ja definido (ex: ContabilTab passando companyId explicito)
+      if (!config.headers['x-company-id']) {
+        config.headers['x-company-id'] = companyId;
+        console.log(`[API] Adding x-company-id: ${companyId}`);
+      }
     } else {
       console.log(`[API] Skipping x-company-id for route: ${config.url}`);
     }

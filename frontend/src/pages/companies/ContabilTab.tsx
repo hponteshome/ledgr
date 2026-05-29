@@ -13,7 +13,7 @@ export const ContabilTab: React.FC<Props> = ({ companyId, labelCls, inputCls, pa
   const [searchParams] = useSearchParams();
   const [saving, setSaving] = useState(false);
   useEffect(() => {
-    api.get('/accounting/config')
+    api.get('/accounting/config', { headers: { 'x-company-id': companyId } })
     .then(({ data }) => {
       const base = data || {};
       const cnpjParam = searchParams.get('escritorioCnpj');
@@ -34,7 +34,7 @@ export const ContabilTab: React.FC<Props> = ({ companyId, labelCls, inputCls, pa
 
   const handleSave = async () => {
     setSaving(true);
-    try { await api.put('/accounting/config', config); toast.success('Configuração contábil salva!'); }
+    try { await api.put('/accounting/config', config, { headers: { 'x-company-id': companyId } }); toast.success('Configuracao contabil salva!'); }
     catch { toast.error('Erro ao salvar.'); }
     finally { setSaving(false); }
   };
