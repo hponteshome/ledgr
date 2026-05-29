@@ -189,6 +189,10 @@ const EcdPage: React.FC = () => {
     );
     const [exportBookType, setExportBookType] = useState('G');
     const [exportBookNumber, setExportBookNumber] = useState('1');
+    const [exportTipEcd, setExportTipEcd] = useState('0');
+    const [exportIndSitEsp, setExportIndSitEsp] = useState('');
+    const [exportCodPlanRef, setExportCodPlanRef] = useState('');
+    const [exportHashAnterior, setExportHashAnterior] = useState('');
     const [exporting, setExporting] = useState(false);
     const [preValidating, setPreValidating] = useState(false);
     const [preValidateResult, setPreValidateResult] = useState<any>(null);
@@ -298,7 +302,7 @@ const EcdPage: React.FC = () => {
         setExporting(true);
         try {
             const r = await api.get('/sped/ecd/export', {
-                params: { periodStart: exportPeriodStart, periodEnd: exportPeriodEnd, bookNumber: exportBookNumber, bookType: exportBookType },
+                params: { periodStart: exportPeriodStart, periodEnd: exportPeriodEnd, bookNumber: exportBookNumber, bookType: exportBookType, tipEcd: exportTipEcd, indSitEsp: exportIndSitEsp, codPlanRef: exportCodPlanRef, hashAnterior: exportHashAnterior },
                 responseType: 'blob',
             });
             const url = window.URL.createObjectURL(new Blob([r.data]));
@@ -728,6 +732,45 @@ const EcdPage: React.FC = () => {
                             <label className="text-xs text-gray-500 block mb-1">Número do livro</label>
                             <input type="number" value={exportBookNumber} onChange={e => setExportBookNumber(e.target.value)} min={1}
                                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                        </div>
+                        <div>
+                            <label className="text-xs text-gray-500 block mb-1">Tipo ECD</label>
+                            <select value={exportTipEcd} onChange={e => setExportTipEcd(e.target.value)}
+                                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="0">0 — Original</option>
+                                <option value="1">1 — Retificadora</option>
+                                <option value="2">2 — Com SCP</option>
+                                <option value="3">3 — Da SCP</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="text-xs text-gray-500 block mb-1">Situação Especial</label>
+                            <select value={exportIndSitEsp} onChange={e => setExportIndSitEsp(e.target.value)}
+                                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="">Normal</option>
+                                <option value="CI">CI — Cisão</option>
+                                <option value="FU">FU — Fusão</option>
+                                <option value="EX">EX — Extinção</option>
+                                <option value="TR">TR — Transformação</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="text-xs text-gray-500 block mb-1">Cód. Plano Referencial RFB</label>
+                            <input value={exportCodPlanRef} onChange={e => setExportCodPlanRef(e.target.value)} placeholder="Ex: 60959347"
+                                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                        </div>
+                        {exportTipEcd === '1' && (
+                        <div className="col-span-2">
+                            <label className="text-xs text-gray-500 block mb-1">Hash ECD Anterior (obrigatório para retificadora)</label>
+                            <input value={exportHashAnterior} onChange={e => setExportHashAnterior(e.target.value)} placeholder="Hash do arquivo substituído"
+                                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                        </div>
+                        )}
+                    </div>
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 font-serif text-xs text-blue-700 overflow-x-auto">
+                        <div className="text-gray-500 mb-1 text-[10px]">Preview — Registro 0000</div>
+                        <div className="whitespace-nowrap">
+                            {`|0000|LECD|${exportPeriodStart.replace(/-/g,"")}|${exportPeriodEnd.replace(/-/g,"")}|EMPRESA|CNPJ|UF||CODMUN|${exportCodPlanRef||""}||${exportTipEcd}|INDNIRE|0|${exportHashAnterior||""}|0|0|${exportIndSitEsp||""}|N|N|0|0|1|`}
                         </div>
                     </div>
                     <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-xs text-yellow-700">

@@ -163,6 +163,10 @@ export class EcdController {
     @Query('periodEnd') periodEnd: string,
     @Query('bookNumber') bookNumber: string,
     @Query('bookType') bookType: string,
+    @Query('tipEcd') tipEcd: string,
+    @Query('indSitEsp') indSitEsp: string,
+    @Query('codPlanRef') codPlanRef: string,
+    @Query('hashAnterior') hashAnterior: string,
     @Req() req: any,
     @Res() res: Response,
   ) {
@@ -176,6 +180,10 @@ export class EcdController {
       companyId,
       periodStart: new Date(periodStart),
       periodEnd:   new Date(periodEnd),
+      tipEcd:       tipEcd || '0',
+      indSitEsp:    indSitEsp || '',
+      codPlanRef:   codPlanRef || '',
+      hashAnterior: hashAnterior || '',
       bookNumber:  bookNumber || undefined,
       bookType:    (bookType as any) || 'G',
     });

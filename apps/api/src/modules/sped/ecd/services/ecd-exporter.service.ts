@@ -10,6 +10,10 @@ export interface EcdExportOptions {
   bookNumber?: string;
   bookNature?: string;
   bookType?: "G" | "R" | "B";
+  tipEcd?: string;
+  indSitEsp?: string;
+  codPlanRef?: string;
+  hashAnterior?: string;
   layoutVersion?: string;
 }
 
@@ -23,11 +27,12 @@ export class EcdExporterService {
       companyId, periodStart, periodEnd,
       bookNumber = String(periodStart.getUTCFullYear()).slice(-2), bookNature = "Livro Diario Geral",
       bookType = "G", layoutVersion = "9.00",
+      tipEcd = "0", indSitEsp = "", codPlanRef = "", hashAnterior = "",
     } = options;
 
     const company = await this.prisma.company.findUnique({
       where: { id: companyId },
-      select: { taxId: true, legalName: true, state: true, city: true, nire: true },
+      select: { taxId: true, legalName: true, state: true, city: true, nire: true, codMun: true, registerOrg: true },
     });
     if (!company) throw new Error("Empresa nao encontrada.");
 
@@ -147,7 +152,8 @@ export class EcdExporterService {
     // ── BLOCO 0 ──────────────────────────────────────────────────────────
     // |0000|LECD|DT_INI|DT_FIN|NOME|CNPJ|UF|COD_MUN|COD_PLAN_REF|IND_ESC|COD_SCP|
     //       HASH|VERSAO_APP|DT_LAS_EXP|TP_LIVRACAO|IND_SIT|NR_REC_ANT|NR_SEQ_ECD|
-    add(P+"0000"+P+"LECD"+P+dtIni+P+dtFin+P+company.legalName+P+cnpj+P+(company.state||"")+P+P+"3550308"+P+"60959347"+P+P+"0"+P+(company.nire?"1":"1")+P+"0"+P+P+"0"+P+"0"+P+P+"N"+P+"N"+P+"0"+P+"0"+P+"1"+P);
+    const indNireVal = (company.registerOrg||"").match(/OAB|RCPJ|Cartorio/i) ? "0" : (company.nire ? "1" : "0");
+    add(P+"0000"+P+"LECD"+P+dtIni+P+dtFin+P+company.legalName+P+cnpj+P+(company.state||"")+P+P+(company.codMun||"3550308")+P+(codPlanRef||"")+P+P+tipEcd+P+indNireVal+P+"0"+P+(hashAnterior||"")+P+"0"+P+"0"+P+(indSitEsp||"")+P+"N"+P+"N"+P+"0"+P+"0"+P+"1"+P);
     add(P+"0001"+P+"0"+P);
     add(P+"0007"+P+(company.state||"")+P+P);
     const idx0990 = lines.length;
@@ -204,6 +210,7 @@ export class EcdExporterService {
       const indCta     = acc.isAnalytic ? "A" : "S";
       const parentCode = acc.parentId ? (codeById.get(acc.parentId) ?? "") : "";
       const reducedCode = (acc as any).reducedCode || acc.code;
+      if (!reducedCode || reducedCode === "000000") continue; // skip contas sem codigo valido
       // |I050|DT_ALT|COD_NAT|IND_CTA|NIVEL|COD_CTA|COD_CTA_SUP|NOME_CTA|
       add(P+"I050"+P+dtAlt+P+natCode+P+indCta+P+acc.level+P+reducedCode+P+parentCode+P+acc.name+P);
           if (acc.isAnalytic) {

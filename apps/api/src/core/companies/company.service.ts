@@ -99,7 +99,7 @@ export class CompanyService {
           partners:      partnersData      || null,
           roles:           dto.roles           || ['LEDGR_USER'],
           nire:            dto.nire            || null,
-          orgRegistro:     dto.orgRegistro     || null,
+          registerOrg:     dto.registerOrg     || null,
           codMun:          dto.codMun          || null,
           natLivro:        dto.natLivro        || null,
           ieEstadual:      dto.ieEstadual      || null,
@@ -107,6 +107,11 @@ export class CompanyService {
           indCentralizada: dto.indCentralizada || '0',
           tipEcd:          dto.tipEcd          || '0',
           indMoedaFunc:    dto.indMoedaFunc    || 'N',
+          indNire:         dto.indNire         || '0',
+          indSitEsp:       dto.indSitEsp       || null,
+          codPlanRef:      dto.codPlanRef      || null,
+          hashAnterior:    dto.hashAnterior    || null,
+          tabelasRfbPath:  dto.tabelasRfbPath  || null,
         },
       });
 
@@ -157,7 +162,10 @@ export class CompanyService {
       'email', 'phone1', 'phone2',
       'equity', 'legalNature', 'size', 'taxRegime',
       'status', 'statusDate', 'statusReason',
-      'simplesData', 'meiData', 'partners', 'lastRfbSync'
+      'simplesData', 'meiData', 'partners', 'lastRfbSync',
+      'nire', 'registerOrg', 'codMun', 'natLivro', 'ieEstadual',
+      'indEscCons', 'indCentralizada', 'tipEcd', 'indMoedaFunc',
+      'indNire', 'indSitEsp', 'codPlanRef', 'hashAnterior', 'tabelasRfbPath'
     ];
 
     allowedFields.forEach(field => {
@@ -268,4 +276,3 @@ async findHeadquarters() {
 }
 
 }
-

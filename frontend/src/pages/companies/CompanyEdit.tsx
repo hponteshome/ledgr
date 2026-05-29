@@ -373,36 +373,42 @@ export const CompanyEdit: React.FC = () => {
           </div>
         )}
         {activeTab === 'sped' && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4 bg-white p-8 rounded-xl shadow-sm border border-gray-200">
-            <SectionTitle title="SPED / ECD" color="bg-purple-600" />
-            <div><label className={labelCls}>NIRE</label>
-              <input name="nire" value={formData.nire || ''} onChange={handleChange} className={inputCls} /></div>
-            <div><label className={labelCls}>Orgao de Registro</label>
-              <input name="orgRegistro" value={formData.orgRegistro || ''} onChange={handleChange} className={inputCls} placeholder="JUCESP, RCPJ..." /></div>
-            <div><label className={labelCls}>Cod. Municipio IBGE (7 dig.)</label>
-              <input name="codMun" value={formData.codMun || ''} onChange={handleChange} className={inputCls} placeholder="3550308" maxLength={7} /></div>
-            <div><label className={labelCls}>Inscricao Estadual</label>
-              <input name="ieEstadual" value={formData.ieEstadual || ''} onChange={handleChange} className={inputCls} /></div>
-            <div><label className={labelCls}>Natureza do Livro</label>
-              <input name="natLivro" value={formData.natLivro || ''} onChange={handleChange} className={inputCls} placeholder="DIARIO E BALANCETES" /></div>
-            <div><label className={labelCls}>Tipo ECD</label>
-              <select name="tipEcd" value={formData.tipEcd || '0'} onChange={handleChange} className={inputCls}>
-                <option value="0">0 - Original</option>
-                <option value="1">1 - Com SCP</option>
-                <option value="2">2 - Da SCP</option>
-              </select></div>
-            <div><label className={labelCls}>Escrituracao Consolidada</label>
-              <select name="indEscCons" value={formData.indEscCons || 'N'} onChange={handleChange} className={inputCls}>
-                <option value="N">N - Nao</option><option value="S">S - Sim</option>
-              </select></div>
-            <div><label className={labelCls}>Moeda Funcional</label>
-              <select name="indMoedaFunc" value={formData.indMoedaFunc || 'N'} onChange={handleChange} className={inputCls}>
-                <option value="N">N - Nao</option><option value="S">S - Sim</option>
-              </select></div>
-            <div><label className={labelCls}>Escrituracao Centralizada</label>
-              <select name="indCentralizada" value={formData.indCentralizada || '0'} onChange={handleChange} className={inputCls}>
-                <option value="0">0 - Centralizada</option><option value="1">1 - Descentralizada</option>
-              </select></div>
+          <div className="space-y-8">
+            {/* ── ECD ── */}
+            <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-200">
+              <SectionTitle title="ECD — Escrituracao Contabil Digital" color="bg-purple-600" />
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4 mt-4">
+                <div><label className={labelCls}>NIRE</label>
+                  <input name="nire" value={formData.nire || ''} onChange={handleChange} className={inputCls} /></div>
+                <div><label className={labelCls}>Indicador NIRE</label>
+                  <select name="indNire" value={formData.indNire || '0'} onChange={handleChange} className={inputCls}>
+                    <option value="0">0 - Nao possui registro na Junta</option>
+                    <option value="1">1 - Possui NIRE</option>
+                  </select></div>
+                <div><label className={labelCls}>Orgao de Registro</label>
+                  <input name="registerOrg" value={formData.registerOrg || ''} onChange={handleChange} className={inputCls} placeholder="OAB/SP, JUCESP, RCPJ..." /></div>
+                <div><label className={labelCls}>Cod. Municipio IBGE (7 dig.)</label>
+                  <input name="codMun" value={formData.codMun || ''} onChange={handleChange} className={inputCls} placeholder="3550308" maxLength={7} /></div>
+                <div><label className={labelCls}>Inscricao Estadual</label>
+                  <input name="ieEstadual" value={formData.ieEstadual || ''} onChange={handleChange} className={inputCls} /></div>
+
+                <div><label className={labelCls}>Escrituracao Consolidada</label>
+                  <select name="indEscCons" value={formData.indEscCons || 'N'} onChange={handleChange} className={inputCls}>
+                    <option value="N">N - Nao</option><option value="S">S - Sim</option>
+                  </select></div>
+                <div><label className={labelCls}>Moeda Funcional</label>
+                  <select name="indMoedaFunc" value={formData.indMoedaFunc || 'N'} onChange={handleChange} className={inputCls}>
+                    <option value="N">N - Nao</option><option value="S">S - Sim</option>
+                  </select></div>
+                <div><label className={labelCls}>Escrituracao Centralizada</label>
+                  <select name="indCentralizada" value={formData.indCentralizada || '0'} onChange={handleChange} className={inputCls}>
+                    <option value="0">0 - Centralizada</option><option value="1">1 - Descentralizada</option>
+                  </select></div>
+
+                <div className="md:col-span-3"><label className={labelCls}>Caminho Tabelas RFB</label>
+                  <input name="tabelasRfbPath" value={formData.tabelasRfbPath || ''} onChange={handleChange} className={inputCls} placeholder="C:\Arquivos de Programas RFB\Programas SPED" /></div>
+              </div>
+            </div>
           </div>
         )}
       </form>

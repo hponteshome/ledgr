@@ -22,6 +22,20 @@ export class CompanyDto {
   status: string;
   statusDate?: Date;
   partners?: any;
+  nire?: string;
+  registerOrg?: string;
+  codMun?: string;
+  natLivro?: string;
+  ieEstadual?: string;
+  indEscCons?: string;
+  indCentralizada?: string;
+  tipEcd?: string;
+  indMoedaFunc?: string;
+  indNire?: string;
+  indSitEsp?: string;
+  codPlanRef?: string;
+  hashAnterior?: string;
+  tabelasRfbPath?: string;
   cnaes?: any;
   
   constructor(company: any) {
@@ -57,5 +71,19 @@ export class CompanyDto {
     this.statusDate = company.statusDate;
     this.partners = company.partners;
     this.cnaes = company.cnaes;
+    this.nire           = company.nire;
+    this.registerOrg    = company.registerOrg;
+    this.codMun         = company.codMun;
+    this.natLivro       = company.natLivro;
+    this.ieEstadual     = company.ieEstadual;
+    this.indEscCons     = company.indEscCons;
+    this.indCentralizada= company.indCentralizada;
+    this.tipEcd         = company.tipEcd;
+    this.indMoedaFunc   = company.indMoedaFunc;
+    this.indNire        = company.indNire;
+    this.indSitEsp      = company.indSitEsp;
+    this.codPlanRef     = company.codPlanRef;
+    this.hashAnterior   = company.hashAnterior;
+    this.tabelasRfbPath = company.tabelasRfbPath;
   }
 }

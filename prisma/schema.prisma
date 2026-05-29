@@ -71,8 +71,6 @@ model User {
   accountingConfigs CompanyAccountingConfig[] @relation("AccountingConfigCreator")
   maskConfigs       CompanyMaskConfig[]       @relation("MaskConfigCreator")
 
-
-
   @@map("users")
 }
 
@@ -158,52 +156,78 @@ model Company {
   shareholderRecords ShareholderRecord[]
   shareTransfers     ShareTransfer[]
 
-
   // ── Relations ─────────────────────────────────────────────
-  users             UserCompany[]
-  properties        Property[]
-  employees         Employee[]
-  corporateBooks    CorporateBook[]
-  documents         Document[]
-  documentTemplates DocumentTemplate[]
-  personLinks       PersonCompany[]
-  certificates      Certificate[]
-  accountBalances   AccountBalance[]
-  chartOfAccounts   ChartOfAccounts[]
-  journalEntries    JournalEntry[]
-  accountingRules   AccountingRule[]
-  ecdImports        EcdImport[]
-  proLaboreConfigs  ProLaboreConfig[]
-  proLaboreCalculos ProLaboreCalculo[]
-  provisaoConfigs   ProvisaoConfig[]
-  provisaoLancamentos ProvisaoLancamento[]
-  provisaoRateios   ProvisaoRateioConfig[]
-  fechamentosMensais FechamentoMensal[]
+  users                  UserCompany[]
+  properties             Property[]
+  employees              Employee[]
+  corporateBooks         CorporateBook[]
+  documents              Document[]
+  documentTemplates      DocumentTemplate[]
+  personLinks            PersonCompany[]
+  certificates           Certificate[]
+  accountBalances        AccountBalance[]
+  chartOfAccounts        ChartOfAccounts[]
+  journalEntries         JournalEntry[]
+  accountingRules        AccountingRule[]
+  ecdImports             EcdImport[]
+  proLaboreConfigs       ProLaboreConfig[]
+  proLaboreCalculos      ProLaboreCalculo[]
+  provisaoConfigs        ProvisaoConfig[]
+  provisaoLancamentos    ProvisaoLancamento[]
+  provisaoRateios        ProvisaoRateioConfig[]
+  fechamentosMensais     FechamentoMensal[]
   fixedIncomeInvestments FixedIncomeInvestment[]
-  loteImports       LoteImport[]
-  fixedAssets       FixedAsset[]
-  apEntries         ApEntry[]
-  ecfPartAs         EcfPartA[]
-  ecfPartBs         EcfPartB[]
-  maskConfigs       CompanyMaskConfig[]       @relation("CompanyMaskConfigs")
-  accountingConfigs CompanyAccountingConfig[]
-  informesRendimentos InformeRendimentos[]
-  arEntries         ArEntry[]
-  pettyCash        PettyCash[]
-  accountingViews     AccountingView[]
+  loteImports            LoteImport[]
+  fixedAssets            FixedAsset[]
+  apEntries              ApEntry[]
+  ecfPartAs              EcfPartA[]
+  ecfPartBs              EcfPartB[]
+  maskConfigs            CompanyMaskConfig[]       @relation("CompanyMaskConfigs")
+  accountingConfigs      CompanyAccountingConfig[]
+  informesRendimentos    InformeRendimentos[]
+  arEntries              ArEntry[]
+  pettyCash              PettyCash[]
+  accountingViews        AccountingView[]
   // -- Dados SPED/ECD ----------------------------------------
-  nire             String? @map("nire") @db.VarChar(20)
-  orgRegistro      String? @map("org_registro") @db.VarChar(100)
-  codMun           String? @map("cod_mun") @db.VarChar(7)
-  natLivro         String? @map("nat_livro") @db.VarChar(10)
-  ieEstadual       String? @map("ie_estadual") @db.VarChar(20)
-  indEscCons       String? @default("N") @map("ind_esc_cons") @db.VarChar(1)
-  indCentralizada  String? @default("0") @map("ind_centralizada") @db.VarChar(1)
-  tipEcd           String? @default("0") @map("tip_ecd") @db.VarChar(1)
-  indMoedaFunc     String? @default("N") @map("ind_moeda_func") @db.VarChar(1)
-  pettyCashEntries PettyCashEntry[]
-  
+  nire                   String?                   @map("nire") @db.VarChar(20)
+  codMun                 String?                   @map("cod_mun") @db.VarChar(7)
+  natLivro               String?                   @map("nat_livro") @db.VarChar(10)
+  ieEstadual             String?                   @map("ie_estadual") @db.VarChar(20)
+  indEscCons             String?                   @default("N") @map("ind_esc_cons") @db.VarChar(1)
+  indCentralizada        String?                   @default("0") @map("ind_centralizada") @db.VarChar(1)
+  tipEcd                 String?                   @default("0") @map("tip_ecd") @db.VarChar(1)
+  indMoedaFunc           String?                   @default("N") @map("ind_moeda_func") @db.VarChar(1)
+  indNire                String?                   @default("0") @map("ind_nire") @db.VarChar(1)
+  indSitEsp              String?                   @map("ind_sit_esp") @db.VarChar(2)
+  codPlanRef             String?                   @map("cod_plan_ref") @db.VarChar(20)
+  hashAnterior           String?                   @map("hash_anterior") @db.VarChar(255)
+  tabelasRfbPath         String?                   @map("tabelas_rfb_path") @db.VarChar(500)
+  pettyCashEntries       PettyCashEntry[]
+  companyTaxRegimes      CompanyTaxRegime[]
+
   @@map("companies")
+}
+
+/// Regime tributario da empresa por periodo (pode mudar a cada exercicio).
+model CompanyTaxRegime {
+  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId           String   @map("company_id") @db.Uuid
+  dtIni               DateTime @map("dt_ini") @db.Date
+  dtFin               DateTime @map("dt_fin") @db.Date
+  formaTributacao     String   @map("forma_tributacao") @db.VarChar(1)
+  periodoApuracaoIRPJ String?  @map("periodo_apuracao_irpj") @db.VarChar(1)
+  qualificacaoPJ      String?  @map("qualificacao_pj") @db.VarChar(2)
+  tipoEscritECF       String?  @map("tipo_escrit_ecf") @db.VarChar(1)
+  criterioReceitas    String?  @map("criterio_receitas") @db.VarChar(1)
+  indOptanteRefis     String?  @default("N") @map("ind_optante_refis") @db.VarChar(1)
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt           DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@unique([companyId, dtIni])
+  @@index([companyId])
+  @@map("company_tax_regimes")
 }
 
 /// Vinculo N:N entre usuarios e empresas.
@@ -215,11 +239,10 @@ model UserCompany {
 
   company Company @relation(fields: [companyId], references: [id])
   user    User    @relation(fields: [userId], references: [id])
+
   @@unique([userId, companyId])
   @@map("user_companies")
-  }
-
-
+}
 
 // =============================================================================
 // 03 · PESSOAS FÍSICAS
@@ -322,17 +345,17 @@ model Person {
   shareholderRecords ShareholderRecord[]
 
   // ── Relations ─────────────────────────────────────────────
-  companyLinks PersonCompany[]
-  proLaboreConfigs  ProLaboreConfig[]
-  user         User?
-  apEntries    ApEntry[]
+  companyLinks        PersonCompany[]
+  proLaboreConfigs    ProLaboreConfig[]
+  user                User?
+  apEntries           ApEntry[]
+  informesRendimentos InformeRendimentos[]
+  employees           Employee[]           @relation("EmployeePerson")
+  arEntries           ArEntry[]            @relation("ArEntryCustomer")
+  pettyCashFunds      PettyCash[]          @relation("PettyCashResponsible")
 
   @@index([cpf])
   @@index([fullName])
-  informesRendimentos InformeRendimentos[]
-  employees         Employee[] @relation("EmployeePerson")
-  arEntries        ArEntry[]  @relation("ArEntryCustomer")
-  pettyCashFunds   PettyCash[]  @relation("PettyCashResponsible")
   @@map("persons")
 }
 
@@ -356,8 +379,6 @@ model PersonCompany {
   @@index([personId])
   @@map("person_companies")
 }
-
-
 
 // =============================================================================
 // 04 · IMÓVEIS, RH E SOCIETÁRIO
@@ -417,8 +438,8 @@ model Property {
 
   company     Company      @relation(fields: [companyId], references: [id])
   fixedAssets FixedAsset[]
-  apEntries  ApEntry[]  @relation("ApEntryProperty")
-  arEntries  ArEntry[]  @relation("ArEntryProperty")
+  apEntries   ApEntry[]    @relation("ApEntryProperty")
+  arEntries   ArEntry[]    @relation("ArEntryProperty")
 
   @@index([companyId, deletedAt])
   @@index([iptu])
@@ -497,26 +518,26 @@ enum DependentRelationship {
 
 /// Funcionários vinculados a empresas — eSocial S-2200 ready.
 model Employee {
-  id        String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  companyId String @map("company_id") @db.Uuid
+  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId String  @map("company_id") @db.Uuid
   personId  String? @map("person_id") @db.Uuid
 
   // ── Dados Pessoais ─────────────────────────────────────────
-  fullName     String  @map("full_name") @db.VarChar
-  nickname     String? @map("nickname") @db.VarChar
-  taxId        String  @map("tax_id") @db.VarChar(11)
-  motherName   String? @map("mother_name") @db.VarChar
-  fatherName   String? @map("father_name") @db.VarChar
-  birthDate    DateTime @map("birth_date") @db.Date
-  birthCity    String? @map("birth_city") @db.VarChar
-  birthState   String? @map("birth_state") @db.VarChar(2)
-  nationality  String? @default("10") @map("nationality") @db.VarChar(3)
-  raceColor    RaceColor? @map("race_color")
-  maritalStatus String? @map("marital_status") @db.VarChar(20)
+  fullName       String          @map("full_name") @db.VarChar
+  nickname       String?         @map("nickname") @db.VarChar
+  taxId          String          @map("tax_id") @db.VarChar(11)
+  motherName     String?         @map("mother_name") @db.VarChar
+  fatherName     String?         @map("father_name") @db.VarChar
+  birthDate      DateTime        @map("birth_date") @db.Date
+  birthCity      String?         @map("birth_city") @db.VarChar
+  birthState     String?         @map("birth_state") @db.VarChar(2)
+  nationality    String?         @default("10") @map("nationality") @db.VarChar(3)
+  raceColor      RaceColor?      @map("race_color")
+  maritalStatus  String?         @map("marital_status") @db.VarChar(20)
   educationLevel EducationLevel? @map("education_level")
-  hasDisability Boolean @default(false) @map("has_disability")
-  phone        String? @map("phone") @db.VarChar(20)
-  cellPhone    String? @map("cell_phone") @db.VarChar(20)
+  hasDisability  Boolean         @default(false) @map("has_disability")
+  phone          String?         @map("phone") @db.VarChar(20)
+  cellPhone      String?         @map("cell_phone") @db.VarChar(20)
 
   // ── Endereço ───────────────────────────────────────────────
   street       String? @map("street") @db.VarChar
@@ -528,57 +549,57 @@ model Employee {
   addressState String? @map("address_state") @db.VarChar(2)
 
   // ── Documentação ───────────────────────────────────────────
-  rgNumber  String? @map("rg_number") @db.VarChar(20)
-  rgIssuer  String? @map("rg_issuer") @db.VarChar(10)
-  rgState   String? @map("rg_state") @db.VarChar(2)
-  rgDate    DateTime? @map("rg_date") @db.Date
-  pisNumber String? @map("pis_number") @db.VarChar(14)
-  pisDate   DateTime? @map("pis_date") @db.Date
-  ctpsNumber String? @map("ctps_number") @db.VarChar(20)
-  ctpsSeries String? @map("ctps_series") @db.VarChar(10)
-  ctpsState  String? @map("ctps_state") @db.VarChar(2)
-  voterTitle   String? @map("voter_title") @db.VarChar(15)
-  voterZone    String? @map("voter_zone") @db.VarChar(5)
-  voterSection String? @map("voter_section") @db.VarChar(5)
+  rgNumber     String?   @map("rg_number") @db.VarChar(20)
+  rgIssuer     String?   @map("rg_issuer") @db.VarChar(10)
+  rgState      String?   @map("rg_state") @db.VarChar(2)
+  rgDate       DateTime? @map("rg_date") @db.Date
+  pisNumber    String?   @map("pis_number") @db.VarChar(14)
+  pisDate      DateTime? @map("pis_date") @db.Date
+  ctpsNumber   String?   @map("ctps_number") @db.VarChar(20)
+  ctpsSeries   String?   @map("ctps_series") @db.VarChar(10)
+  ctpsState    String?   @map("ctps_state") @db.VarChar(2)
+  voterTitle   String?   @map("voter_title") @db.VarChar(15)
+  voterZone    String?   @map("voter_zone") @db.VarChar(5)
+  voterSection String?   @map("voter_section") @db.VarChar(5)
   voterDate    DateTime? @map("voter_date") @db.Date
-  militaryCert String? @map("military_cert") @db.VarChar(30)
-  cnhNumber    String? @map("cnh_number") @db.VarChar(20)
+  militaryCert String?   @map("military_cert") @db.VarChar(30)
+  cnhNumber    String?   @map("cnh_number") @db.VarChar(20)
 
   // ── Dados Funcionais ───────────────────────────────────────
-  registrationNumber String? @map("registration_number") @db.VarChar(20)
-  hireDate           DateTime @map("hire_date") @db.Date
+  registrationNumber String?   @map("registration_number") @db.VarChar(20)
+  hireDate           DateTime  @map("hire_date") @db.Date
   terminationDate    DateTime? @map("termination_date") @db.Date
-  experienceDays     Int? @map("experience_days")
-  role               String @map("role") @db.VarChar
-  salary             Decimal @map("salary") @db.Decimal(15, 2)
-  weeklyHours        Decimal? @map("weekly_hours") @db.Decimal(5, 2)
-  department         String? @map("department") @db.VarChar
-  lotacao            String? @map("lotacao") @db.VarChar
-  workSchedule       Json? @map("work_schedule") @db.Json
+  experienceDays     Int?      @map("experience_days")
+  role               String    @map("role") @db.VarChar
+  salary             Decimal   @map("salary") @db.Decimal(15, 2)
+  weeklyHours        Decimal?  @map("weekly_hours") @db.Decimal(5, 2)
+  department         String?   @map("department") @db.VarChar
+  lotacao            String?   @map("lotacao") @db.VarChar
+  workSchedule       Json?     @map("work_schedule") @db.Json
 
   // ── eSocial / GFIP ─────────────────────────────────────────
-  employmentBond   EmploymentBond? @map("employment_bond")
-  gfipCategory     GfipCategory? @map("gfip_category")
-  gfipOccurrence   String? @default("00") @map("gfip_occurrence") @db.VarChar(2)
-  inssOption       String? @default("1") @map("inss_option") @db.VarChar(1)
-  cagedCode        String? @map("caged_code") @db.VarChar(2)
-  isUnionized      Boolean @default(false) @map("is_unionized")
-  unionCode        String? @map("union_code") @db.VarChar(10)
-  unionName        String? @map("union_name") @db.VarChar
+  employmentBond EmploymentBond? @map("employment_bond")
+  gfipCategory   GfipCategory?   @map("gfip_category")
+  gfipOccurrence String?         @default("00") @map("gfip_occurrence") @db.VarChar(2)
+  inssOption     String?         @default("1") @map("inss_option") @db.VarChar(1)
+  cagedCode      String?         @map("caged_code") @db.VarChar(2)
+  isUnionized    Boolean         @default(false) @map("is_unionized")
+  unionCode      String?         @map("union_code") @db.VarChar(10)
+  unionName      String?         @map("union_name") @db.VarChar
 
   // ── Pagamento ──────────────────────────────────────────────
-  paymentBank    String? @map("payment_bank") @db.VarChar(10)
-  bankAgency     String? @map("bank_agency") @db.VarChar(10)
-  bankAccount    String? @map("bank_account") @db.VarChar(20)
+  paymentBank String? @map("payment_bank") @db.VarChar(10)
+  bankAgency  String? @map("bank_agency") @db.VarChar(10)
+  bankAccount String? @map("bank_account") @db.VarChar(20)
 
   // ── Controle ───────────────────────────────────────────────
-  status    String @default("active") @map("status") @db.VarChar
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
-  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  status    String    @default("active") @map("status") @db.VarChar
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
   deletedAt DateTime? @map("deleted_at") @db.Timestamp(6)
 
-  company    Company @relation(fields: [companyId], references: [id])
-  person     Person? @relation("EmployeePerson", fields: [personId], references: [id])
+  company    Company             @relation(fields: [companyId], references: [id])
+  person     Person?             @relation("EmployeePerson", fields: [personId], references: [id])
   dependents EmployeeDependent[]
 
   @@index([companyId, deletedAt])
@@ -588,24 +609,23 @@ model Employee {
 
 /// Dependentes de funcionários — eSocial S-2200 / IR / Salário Família.
 model EmployeeDependent {
-  id           String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  employeeId   String @map("employee_id") @db.Uuid
-  companyId    String @map("company_id") @db.Uuid
-  name         String @map("name") @db.VarChar
+  id           String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  employeeId   String                @map("employee_id") @db.Uuid
+  companyId    String                @map("company_id") @db.Uuid
+  name         String                @map("name") @db.VarChar
   relationship DependentRelationship @map("relationship")
-  birthDate    DateTime? @map("birth_date") @db.Date
-  taxId        String? @map("tax_id") @db.VarChar(11)
-  salaryFamily Boolean @default(false) @map("salary_family")
-  irDeduction  Boolean @default(false) @map("ir_deduction")
-  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamp(6)
-  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  birthDate    DateTime?             @map("birth_date") @db.Date
+  taxId        String?               @map("tax_id") @db.VarChar(11)
+  salaryFamily Boolean               @default(false) @map("salary_family")
+  irDeduction  Boolean               @default(false) @map("ir_deduction")
+  createdAt    DateTime              @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt    DateTime              @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
 
   employee Employee @relation(fields: [employeeId], references: [id])
 
   @@index([employeeId])
   @@map("employee_dependents")
 }
-
 
 /// Livros societários digitais. Suporta assinatura digital e certificação JUCESP.
 model CorporateBook {
@@ -897,8 +917,9 @@ enum SourceModule {
   ECD_IMPORT
   ASSET
   INVESTMENT
-  @@map("source_module")
   JOURNAL_IMPORT
+
+  @@map("source_module")
 }
 
 /// Plano de contas hierárquico. Suporta até 8 níveis conforme configuração
@@ -933,16 +954,16 @@ model ChartOfAccounts {
   deletedAt   DateTime? @map("deleted_at") @db.Timestamp(6)
 
   // ── Relations ─────────────────────────────────────────────
-  company      Company?           @relation(fields: [companyId], references: [id])
-  createdBy    User?              @relation("CreatedAccounts", fields: [createdById], references: [id])
-  updatedBy    User?              @relation("UpdatedAccounts", fields: [updatedById], references: [id])
-  journalItems JournalEntryItem[]
-  viewMappings        AccountingViewMapping[]
-  rules        AccountingRule[]
-  balances     AccountBalance[]
-  fixedAssetsAsset    FixedAsset[] @relation("AssetAccount")
-  fixedAssetsDeprec   FixedAsset[] @relation("DepreciationAcc")
-  fixedAssetsAccum    FixedAsset[] @relation("AccumDeprecAcc")
+  company           Company?                @relation(fields: [companyId], references: [id])
+  createdBy         User?                   @relation("CreatedAccounts", fields: [createdById], references: [id])
+  updatedBy         User?                   @relation("UpdatedAccounts", fields: [updatedById], references: [id])
+  journalItems      JournalEntryItem[]
+  viewMappings      AccountingViewMapping[]
+  rules             AccountingRule[]
+  balances          AccountBalance[]
+  fixedAssetsAsset  FixedAsset[]            @relation("AssetAccount")
+  fixedAssetsDeprec FixedAsset[]            @relation("DepreciationAcc")
+  fixedAssetsAccum  FixedAsset[]            @relation("AccumDeprecAcc")
 
   @@unique([companyId, code])
   @@index([companyId, type])
@@ -988,10 +1009,11 @@ model JournalEntry {
   updatedAt    DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
   deletedAt    DateTime?    @map("deleted_at") @db.Timestamp(6)
 
-  company   Company            @relation(fields: [companyId], references: [id])
-  items     JournalEntryItem[]
+  company Company            @relation(fields: [companyId], references: [id])
+  items   JournalEntryItem[]
 
   apEntries ApEntry[]
+
   @@index([companyId, date])
   @@map("journal_entries")
 }
@@ -1256,13 +1278,13 @@ model FixedAsset {
   city             String?          @map("city") @db.VarChar(100)
 
   // ── Vínculos contábeis ────────────────────────────────────
-  assetAccountId    String? @map("asset_account_id") @db.Uuid
-  depreciationAccId String? @map("depreciation_acc_id") @db.Uuid
-  assetAccount      ChartOfAccounts? @relation("AssetAccount",      fields: [assetAccountId],    references: [id])
-  depreciationAcc   ChartOfAccounts? @relation("DepreciationAcc",   fields: [depreciationAccId], references: [id])
-  accumDeprecAcc    ChartOfAccounts? @relation("AccumDeprecAcc",     fields: [accumDeprecAccId],  references: [id])
-  accumDeprecAccId  String? @map("accum_deprec_acc_id") @db.Uuid
-  writeOffAccountId String? @map("write_off_account_id") @db.Uuid
+  assetAccountId    String?          @map("asset_account_id") @db.Uuid
+  depreciationAccId String?          @map("depreciation_acc_id") @db.Uuid
+  assetAccount      ChartOfAccounts? @relation("AssetAccount", fields: [assetAccountId], references: [id])
+  depreciationAcc   ChartOfAccounts? @relation("DepreciationAcc", fields: [depreciationAccId], references: [id])
+  accumDeprecAcc    ChartOfAccounts? @relation("AccumDeprecAcc", fields: [accumDeprecAccId], references: [id])
+  accumDeprecAccId  String?          @map("accum_deprec_acc_id") @db.Uuid
+  writeOffAccountId String?          @map("write_off_account_id") @db.Uuid
 
   isActive  Boolean   @default(true) @map("is_active")
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
@@ -1448,12 +1470,11 @@ model AssetDepreciationLog {
   accumDeprecAfter  Decimal @map("accum_deprec_after") @db.Decimal(15, 2)
   bookValueAfter    Decimal @map("book_value_after") @db.Decimal(15, 2)
 
-  journalEntryId String?  @map("journal_entry_id") @db.Uuid
+  journalEntryId String?    @map("journal_entry_id") @db.Uuid
+  asset          FixedAsset @relation(fields: [assetId], references: [id])
+
   @@unique([assetId, method, period])
   @@index([companyId, period])
-  asset FixedAsset @relation(fields: [assetId], references: [id])
-
-
   @@index([companyId, method])
   @@map("asset_depreciation_logs")
 }
@@ -1501,7 +1522,7 @@ enum IntegrationStatus {
 }
 
 enum AgendaEventType {
-  PAYMENT         /// Pagamento confirmado (lancamento gerado)
+  PAYMENT /// Pagamento confirmado (lancamento gerado)
   PLANNED_PAYMENT /// Planejamento — criado ao cadastrar provisao
   TAX /// Obrigacao fiscal (DARF, GPS, FGTS, DAS)
   CLOSING /// Fechamento de periodo contabil/fiscal
@@ -1518,6 +1539,7 @@ enum AgendaColor {
   ORANGE /// Contas de consumo
   PURPLE /// Reunioes / avisos
 }
+
 /// Documentos fiscais de entrada (NF-e, NFS-e, faturas, boletos).
 /// Ponto de entrada do fluxo de integração AP × Contábil × Agenda.
 model FiscalDocument {
@@ -1594,12 +1616,12 @@ model AgendaEvent {
   fiscalDocumentId String? @map("fiscal_document_id") @db.Uuid
   apEntryId        String? @map("ap_entry_id") @db.Uuid
 
-  provisaoConfigId String? @map("provisao_config_id") @db.Uuid
-  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
-  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
-  deletedAt   DateTime? @map("deleted_at") @db.Timestamp(6)
-  createdById String    @map("created_by_id") @db.Uuid
-  updatedById String?   @map("updated_by_id") @db.Uuid
+  provisaoConfigId String?   @map("provisao_config_id") @db.Uuid
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  deletedAt        DateTime? @map("deleted_at") @db.Timestamp(6)
+  createdById      String    @map("created_by_id") @db.Uuid
+  updatedById      String?   @map("updated_by_id") @db.Uuid
 
   apEntry ApEntry?
 
@@ -1797,7 +1819,6 @@ model APPayment {
   @@map("ap_payments")
 }
 
-
 // =============================================================================
 // 09B · CONTAS A RECEBER
 // =============================================================================
@@ -1823,15 +1844,15 @@ model ArEntry {
   id        String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   companyId String @map("company_id") @db.Uuid
 
-  title          String  @map("title") @db.VarChar(200)
-  description    String? @map("description") @db.Text
-  documentNumber String? @map("document_number") @db.VarChar(50)
+  title          String   @map("title") @db.VarChar(200)
+  description    String?  @map("description") @db.Text
+  documentNumber String?  @map("document_number") @db.VarChar(50)
   origin         AROrigin @default(MANUAL) @map("origin")
 
-  issueDate     DateTime? @map("issue_date") @db.Timestamp(6)
-  dueDate       DateTime  @map("due_date") @db.Timestamp(6)
-  receivedAt    DateTime? @map("received_at") @db.Timestamp(6)
-  competenceMonth String? @map("competence_month") @db.Char(7)
+  issueDate       DateTime? @map("issue_date") @db.Timestamp(6)
+  dueDate         DateTime  @map("due_date") @db.Timestamp(6)
+  receivedAt      DateTime? @map("received_at") @db.Timestamp(6)
+  competenceMonth String?   @map("competence_month") @db.Char(7)
 
   amount         Decimal @map("amount") @db.Decimal(15, 2)
   receivedAmount Decimal @default(0) @map("received_amount") @db.Decimal(15, 2)
@@ -1839,7 +1860,7 @@ model ArEntry {
   fineAmount     Decimal @default(0) @map("fine_amount") @db.Decimal(15, 2)
   interestAmount Decimal @default(0) @map("interest_amount") @db.Decimal(15, 2)
 
-  status        ArEntryStatus @default(OPEN) @map("status")
+  status        ArEntryStatus  @default(OPEN) @map("status")
   paymentMethod PaymentMethod? @map("payment_method")
   bankAccount   String?        @map("bank_account") @db.VarChar(100)
 
@@ -1864,10 +1885,10 @@ model ArEntry {
   updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
   deletedAt   DateTime? @map("deleted_at") @db.Timestamp(6)
 
-  company    Company       @relation(fields: [companyId], references: [id])
-  customer   Person?       @relation("ArEntryCustomer", fields: [customerId], references: [id])
-  property   Property?     @relation("ArEntryProperty", fields: [propertyId], references: [id])
-  payments   ARPayment[]
+  company  Company     @relation(fields: [companyId], references: [id])
+  customer Person?     @relation("ArEntryCustomer", fields: [customerId], references: [id])
+  property Property?   @relation("ArEntryProperty", fields: [propertyId], references: [id])
+  payments ARPayment[]
 
   @@index([companyId])
   @@index([companyId, dueDate])
@@ -1894,15 +1915,16 @@ model ARPayment {
   receiptRef      String?       @map("receipt_ref") @db.VarChar
   notes           String?       @map("notes") @db.Text
 
-  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
-  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
-  createdById String    @map("created_by_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  createdById String   @map("created_by_id") @db.Uuid
 
   arEntry ArEntry @relation(fields: [arEntryId], references: [id])
 
   @@index([arEntryId])
   @@map("ar_payments")
 }
+
 // =============================================================================
 // 10 · ECF (ESCRITURAÇÃO CONTÁBIL FISCAL)
 // =============================================================================
@@ -2068,29 +2090,29 @@ model BankImportRule {
 // =============================================================================
 
 enum ShareType {
-  ORDINARIA    /// ON — direito a voto
+  ORDINARIA /// ON — direito a voto
   PREFERENCIAL /// PN — sem voto, preferência em dividendos
-  QUOTA        /// Ltda — quota social
+  QUOTA /// Ltda — quota social
 
   @@map("share_type")
 }
 
 enum ShareEntryType {
-  SA    /// Sociedade Anônima — usa ações
-  LTDA  /// Limitada — usa quotas
+  SA /// Sociedade Anônima — usa ações
+  LTDA /// Limitada — usa quotas
 
   @@map("share_entry_type")
 }
 
 enum TransferReason {
-  COMPRA_VENDA     /// Cessão onerosa entre partes
-  DOACAO           /// Transmissão gratuita
-  HERANCA          /// Sucessão causa mortis
-  INTEGRALIZACAO   /// Integralização de capital
-  REDUCAO_CAPITAL  /// Redução de capital com devolução
-  BONIFICACAO      /// Emissão por incorporação de reservas
-  CISAO            /// Cisão total ou parcial
-  INCORPORACAO     /// Absorção por outra sociedade
+  COMPRA_VENDA /// Cessão onerosa entre partes
+  DOACAO /// Transmissão gratuita
+  HERANCA /// Sucessão causa mortis
+  INTEGRALIZACAO /// Integralização de capital
+  REDUCAO_CAPITAL /// Redução de capital com devolução
+  BONIFICACAO /// Emissão por incorporação de reservas
+  CISAO /// Cisão total ou parcial
+  INCORPORACAO /// Absorção por outra sociedade
   OUTRO
 
   @@map("transfer_reason")
@@ -2100,40 +2122,40 @@ enum TransferReason {
 /// Mantém o saldo atual de cada titular por série/tipo de ação.
 /// Base legal: Lei 6.404/76 art. 31 (S/A) e CC art. 1.053 (Ltda).
 model ShareholderRecord {
-  id           String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  companyId    String         @map("company_id") @db.Uuid
-  bookId       String?        @map("book_id") @db.Uuid          /// vínculo com CorporateBook
-  entryType    ShareEntryType @map("entry_type")                /// SA ou LTDA
+  id        String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId String         @map("company_id") @db.Uuid
+  bookId    String?        @map("book_id") @db.Uuid /// vínculo com CorporateBook
+  entryType ShareEntryType @map("entry_type") /// SA ou LTDA
 
   // ── Titular ───────────────────────────────────────────────
-  holderName   String         @map("holder_name") @db.VarChar
-  holderTaxId  String         @map("holder_tax_id") @db.VarChar(18)  /// CPF ou CNPJ
-  holderType   String         @default("PF") @map("holder_type") @db.VarChar(2) /// PF | PJ
-  personId     String?        @map("person_id") @db.Uuid        /// vínculo opcional com Person
-  address      String?        @map("address") @db.VarChar
+  holderName  String  @map("holder_name") @db.VarChar
+  holderTaxId String  @map("holder_tax_id") @db.VarChar(18) /// CPF ou CNPJ
+  holderType  String  @default("PF") @map("holder_type") @db.VarChar(2) /// PF | PJ
+  personId    String? @map("person_id") @db.Uuid /// vínculo opcional com Person
+  address     String? @map("address") @db.VarChar
 
   // ── Participação ──────────────────────────────────────────
-  shareType    ShareType      @map("share_type")
-  series       String?        @map("series") @db.VarChar(10)    /// série (ex: "A", "B")
-  quantity     Decimal        @map("quantity") @db.Decimal(18, 6)
-  nominalValue Decimal        @map("nominal_value") @db.Decimal(15, 2)  /// valor nominal por ação/quota
-  totalValue   Decimal        @map("total_value") @db.Decimal(18, 2)    /// qty × nominalValue
-  percentOwned Decimal        @map("percent_owned") @db.Decimal(8, 4)   /// % do capital
+  shareType    ShareType @map("share_type")
+  series       String?   @map("series") @db.VarChar(10) /// série (ex: "A", "B")
+  quantity     Decimal   @map("quantity") @db.Decimal(18, 6)
+  nominalValue Decimal   @map("nominal_value") @db.Decimal(15, 2) /// valor nominal por ação/quota
+  totalValue   Decimal   @map("total_value") @db.Decimal(18, 2) /// qty × nominalValue
+  percentOwned Decimal   @map("percent_owned") @db.Decimal(8, 4) /// % do capital
 
   // ── Integralização ────────────────────────────────────────
-  subscriptionDate   DateTime? @map("subscription_date") @db.Date
+  subscriptionDate    DateTime? @map("subscription_date") @db.Date
   integralizationDate DateTime? @map("integralization_date") @db.Date
-  paidInAmount       Decimal   @default(0) @map("paid_in_amount") @db.Decimal(18, 2)
-  isFullyPaid        Boolean   @default(false) @map("is_fully_paid")
+  paidInAmount        Decimal   @default(0) @map("paid_in_amount") @db.Decimal(18, 2)
+  isFullyPaid         Boolean   @default(false) @map("is_fully_paid")
 
   // ── Restrições / Gravames ─────────────────────────────────
-  hasEncumbrance  Boolean   @default(false) @map("has_encumbrance")
-  encumbranceDesc String?   @map("encumbrance_desc") @db.Text
-  isPledged       Boolean   @default(false) @map("is_pledged")
+  hasEncumbrance  Boolean @default(false) @map("has_encumbrance")
+  encumbranceDesc String? @map("encumbrance_desc") @db.Text
+  isPledged       Boolean @default(false) @map("is_pledged")
 
   // ── Numeração ─────────────────────────────────────────────
-  shareNumberFrom  Int?     @map("share_number_from")     /// nº inicial do certificado
-  shareNumberTo    Int?     @map("share_number_to")       /// nº final do certificado
+  shareNumberFrom   Int?    @map("share_number_from") /// nº inicial do certificado
+  shareNumberTo     Int?    @map("share_number_to") /// nº final do certificado
   certificateNumber String? @map("certificate_number") @db.VarChar(30)
 
   // ── Controle ──────────────────────────────────────────────
@@ -2145,10 +2167,10 @@ model ShareholderRecord {
   deletedAt   DateTime? @map("deleted_at") @db.Timestamp(6)
 
   // ── Relations ─────────────────────────────────────────────
-  company          Company          @relation(fields: [companyId], references: [id])
-  person           Person?          @relation(fields: [personId], references: [id])
-  transfersAsFrom  ShareTransfer[]  @relation("TransferFrom")
-  transfersAsTo    ShareTransfer[]  @relation("TransferTo")
+  company         Company         @relation(fields: [companyId], references: [id])
+  person          Person?         @relation(fields: [personId], references: [id])
+  transfersAsFrom ShareTransfer[] @relation("TransferFrom")
+  transfersAsTo   ShareTransfer[] @relation("TransferTo")
 
   @@index([companyId, isActive])
   @@index([companyId, holderTaxId])
@@ -2160,55 +2182,56 @@ model ShareholderRecord {
 /// Cada transferência é imutável após registrada (append-only).
 /// Base legal: Lei 6.404/76 art. 36 (S/A) e CC art. 1.057 (Ltda).
 model ShareTransfer {
-  id          String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  companyId   String         @map("company_id") @db.Uuid
-  bookId      String?        @map("book_id") @db.Uuid
-  entryType   ShareEntryType @map("entry_type")
+  id        String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId String         @map("company_id") @db.Uuid
+  bookId    String?        @map("book_id") @db.Uuid
+  entryType ShareEntryType @map("entry_type")
 
   // ── Partes ────────────────────────────────────────────────
-  fromRecordId String  @map("from_record_id") @db.Uuid   /// ShareholderRecord do cedente
-  toRecordId   String  @map("to_record_id") @db.Uuid     /// ShareholderRecord do cessionário
+  fromRecordId String @map("from_record_id") @db.Uuid /// ShareholderRecord do cedente
+  toRecordId   String @map("to_record_id") @db.Uuid /// ShareholderRecord do cessionário
 
   // ── Objeto da transferência ───────────────────────────────
-  shareType      ShareType      @map("share_type")
-  series         String?        @map("series") @db.VarChar(10)
-  quantity       Decimal        @map("quantity") @db.Decimal(18, 6)
-  nominalValue   Decimal        @map("nominal_value") @db.Decimal(15, 2)
-  transferValue  Decimal        @map("transfer_value") @db.Decimal(18, 2)  /// preço efetivo da cessão
-  shareNumberFrom Int?          @map("share_number_from")
-  shareNumberTo   Int?          @map("share_number_to")
+  shareType       ShareType @map("share_type")
+  series          String?   @map("series") @db.VarChar(10)
+  quantity        Decimal   @map("quantity") @db.Decimal(18, 6)
+  nominalValue    Decimal   @map("nominal_value") @db.Decimal(15, 2)
+  transferValue   Decimal   @map("transfer_value") @db.Decimal(18, 2) /// preço efetivo da cessão
+  shareNumberFrom Int?      @map("share_number_from")
+  shareNumberTo   Int?      @map("share_number_to")
 
   // ── Dados do ato ──────────────────────────────────────────
   transferDate   DateTime       @map("transfer_date") @db.Date
   reason         TransferReason @map("reason")
   instrumentType String?        @map("instrument_type") @db.VarChar(100) /// "Contrato de Cessão", "Escritura", etc.
   instrumentDate DateTime?      @map("instrument_date") @db.Date
-  notaryOffice   String?        @map("notary_office") @db.VarChar(255)   /// Cartório (se escriturado)
+  notaryOffice   String?        @map("notary_office") @db.VarChar(255) /// Cartório (se escriturado)
   bookNumber     String?        @map("book_number_notary") @db.VarChar(30)
   pageNumber     String?        @map("page_number") @db.VarChar(10)
 
   // ── Averbação no livro ────────────────────────────────────
-  averbacaoDate    DateTime?   @map("averbacao_date") @db.Date
-  averbacaoUserId  String?     @map("averbacao_user_id") @db.Uuid
+  averbacaoDate   DateTime? @map("averbacao_date") @db.Date
+  averbacaoUserId String?   @map("averbacao_user_id") @db.Uuid
 
   // ── Documento gerado ──────────────────────────────────────
-  documentId  String?   @map("document_id") @db.Uuid
+  documentId String? @map("document_id") @db.Uuid
 
-  notes       String?   @map("notes") @db.Text
-  createdById String    @map("created_by_id") @db.Uuid
-  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
-  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  notes       String?  @map("notes") @db.Text
+  createdById String   @map("created_by_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
 
   // ── Relations ─────────────────────────────────────────────
-  company     Company            @relation(fields: [companyId], references: [id])
-  fromRecord  ShareholderRecord  @relation("TransferFrom", fields: [fromRecordId], references: [id])
-  toRecord    ShareholderRecord  @relation("TransferTo", fields: [toRecordId], references: [id])
+  company    Company           @relation(fields: [companyId], references: [id])
+  fromRecord ShareholderRecord @relation("TransferFrom", fields: [fromRecordId], references: [id])
+  toRecord   ShareholderRecord @relation("TransferTo", fields: [toRecordId], references: [id])
 
   @@index([companyId, transferDate])
   @@index([fromRecordId])
   @@index([toRecordId])
   @@map("share_transfers")
 }
+
 // =============================================================================
 // LEDGR — Adição ao schema.prisma
 // Módulo: Renda Fixa (CDB / LCI / LCA / CRI / CRA / Debêntures)
@@ -2253,8 +2276,8 @@ enum FixedIncomeEventType {
   APLICACAO
   RESGATE_ANTECIPADO
   RESGATE_VENCIMENTO
-  ATUALIZACAO_SALDO    // registro mensal de competência (Lucro Real)
-  LANCAMENTO_CONTABIL  // vínculo com JournalEntry
+  ATUALIZACAO_SALDO // registro mensal de competência (Lucro Real)
+  LANCAMENTO_CONTABIL // vínculo com JournalEntry
 
   @@map("fixed_income_event_type")
 }
@@ -2267,22 +2290,22 @@ model FixedIncomeInvestment {
   companyId String @map("company_id") @db.Uuid
 
   // ── Identificação ─────────────────────────────────────────
-  description   String            @map("description") @db.VarChar(200)
-  type          FixedIncomeType   @default(CDB) @map("type")
-  issuerName    String            @map("issuer_name") @db.VarChar(100)  // Banco emissor
-  issuerCnpj    String?           @map("issuer_cnpj") @db.VarChar(18)
-  externalCode  String?           @map("external_code") @db.VarChar(50) // Código na corretora
+  description  String          @map("description") @db.VarChar(200)
+  type         FixedIncomeType @default(CDB) @map("type")
+  issuerName   String          @map("issuer_name") @db.VarChar(100) // Banco emissor
+  issuerCnpj   String?         @map("issuer_cnpj") @db.VarChar(18)
+  externalCode String?         @map("external_code") @db.VarChar(50) // Código na corretora
 
   // ── Condições financeiras ──────────────────────────────────
-  indexer         FixedIncomeIndexer @default(CDI) @map("indexer")
-  indexerRate     Decimal            @map("indexer_rate") @db.Decimal(8, 4)   // 96.00 = 96% do CDI
-  fixedRate       Decimal?           @map("fixed_rate") @db.Decimal(8, 4)     // Para prefixados
-  capitalInitial  Decimal            @map("capital_initial") @db.Decimal(15, 2)
-  capitalBalance  Decimal            @map("capital_balance") @db.Decimal(15, 2) // Saldo do principal apos resgates
-  capitalCurrent  Decimal            @map("capital_current") @db.Decimal(15, 2) // Saldo bruto total (principal + rendimentos)
-  accumulatedYield Decimal           @default(0) @map("accumulated_yield") @db.Decimal(15, 2) // Rendimento bruto acumulado
-  totalRedeemed        Decimal       @default(0) @map("total_redeemed") @db.Decimal(15, 2)         // Total liquido resgatado
-  totalRedeemedPrincipal Decimal     @default(0) @map("total_redeemed_principal") @db.Decimal(15, 2) // Total principal resgatado
+  indexer                FixedIncomeIndexer @default(CDI) @map("indexer")
+  indexerRate            Decimal            @map("indexer_rate") @db.Decimal(8, 4) // 96.00 = 96% do CDI
+  fixedRate              Decimal?           @map("fixed_rate") @db.Decimal(8, 4) // Para prefixados
+  capitalInitial         Decimal            @map("capital_initial") @db.Decimal(15, 2)
+  capitalBalance         Decimal            @map("capital_balance") @db.Decimal(15, 2) // Saldo do principal apos resgates
+  capitalCurrent         Decimal            @map("capital_current") @db.Decimal(15, 2) // Saldo bruto total (principal + rendimentos)
+  accumulatedYield       Decimal            @default(0) @map("accumulated_yield") @db.Decimal(15, 2) // Rendimento bruto acumulado
+  totalRedeemed          Decimal            @default(0) @map("total_redeemed") @db.Decimal(15, 2) // Total liquido resgatado
+  totalRedeemedPrincipal Decimal            @default(0) @map("total_redeemed_principal") @db.Decimal(15, 2) // Total principal resgatado
 
   // ── Datas ─────────────────────────────────────────────────
   applicationDate DateTime  @map("application_date") @db.Date
@@ -2290,14 +2313,14 @@ model FixedIncomeInvestment {
   lastUpdateDate  DateTime? @map("last_update_date") @db.Date // Última atualização de saldo
 
   // ── IRRF ──────────────────────────────────────────────────
-  irrfExempt      Boolean  @default(false) @map("irrf_exempt")  // LCI/LCA/CRI/CRA são isentos
-  accountingAccountId String? @map("accounting_account_id") @db.Uuid  // Conta contabil do investimento
-  irrfAccumulated Decimal  @default(0) @map("irrf_accumulated") @db.Decimal(15, 2)
+  irrfExempt          Boolean @default(false) @map("irrf_exempt") // LCI/LCA/CRI/CRA são isentos
+  accountingAccountId String? @map("accounting_account_id") @db.Uuid // Conta contabil do investimento
+  irrfAccumulated     Decimal @default(0) @map("irrf_accumulated") @db.Decimal(15, 2)
 
   // ── Contas contábeis ──────────────────────────────────────
-  assetAccountId   String? @map("asset_account_id") @db.Uuid   // Ativo: CDB a receber
-  revenueAccountId String? @map("revenue_account_id") @db.Uuid  // Receita financeira
-  irrfAccountId    String? @map("irrf_account_id") @db.Uuid     // IRRF a recuperar (antecipação)
+  assetAccountId   String? @map("asset_account_id") @db.Uuid // Ativo: CDB a receber
+  revenueAccountId String? @map("revenue_account_id") @db.Uuid // Receita financeira
+  irrfAccountId    String? @map("irrf_account_id") @db.Uuid // IRRF a recuperar (antecipação)
 
   status    FixedIncomeStatus @default(ATIVO) @map("status")
   notes     String?           @map("notes") @db.Text
@@ -2305,9 +2328,9 @@ model FixedIncomeInvestment {
   updatedAt DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
   deletedAt DateTime?         @map("deleted_at") @db.Timestamp(6)
 
-  company  Company                @relation(fields: [companyId], references: [id])
-  events   FixedIncomeEvent[]
-  rates    FixedIncomeMonthlyRate[]
+  company Company                  @relation(fields: [companyId], references: [id])
+  events  FixedIncomeEvent[]
+  rates   FixedIncomeMonthlyRate[]
 
   @@index([companyId, status])
   @@index([companyId, maturityDate])
@@ -2319,7 +2342,7 @@ model FixedIncomeMonthlyRate {
   id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   investmentId String   @map("investment_id") @db.Uuid
   companyId    String   @map("company_id") @db.Uuid
-  competence   String   @map("competence") @db.Char(7)   // "2024-01"
+  competence   String   @map("competence") @db.Char(7) // "2024-01"
   indexerRate  Decimal  @map("indexer_rate") @db.Decimal(12, 10) // Taxa mensal acumulada (ex: 0.0096669)
   businessDays Int?     @map("business_days")
   calendarDays Int?     @map("calendar_days")
@@ -2340,19 +2363,19 @@ model FixedIncomeEvent {
   companyId    String               @map("company_id") @db.Uuid
   eventType    FixedIncomeEventType @map("event_type")
   eventDate    DateTime             @map("event_date") @db.Date
-  competence   String?              @map("competence") @db.Char(7)  // "2024-01" para atualizações
+  competence   String?              @map("competence") @db.Char(7) // "2024-01" para atualizações
 
   // ── Valores do evento ─────────────────────────────────────
-  grossAmount   Decimal  @default(0) @map("gross_amount") @db.Decimal(15, 2)   // Rendimento bruto do período
-  netAmount     Decimal  @default(0) @map("net_amount") @db.Decimal(15, 2)     // Líquido após IRRF
-  irrfAmount    Decimal  @default(0) @map("irrf_amount") @db.Decimal(15, 2)    // IRRF retido
-  irrfRate      Decimal? @map("irrf_rate") @db.Decimal(5, 4)                   // Alíquota aplicada
-  balanceAfter  Decimal  @map("balance_after") @db.Decimal(15, 2)              // Saldo bruto após evento
+  grossAmount  Decimal  @default(0) @map("gross_amount") @db.Decimal(15, 2) // Rendimento bruto do período
+  netAmount    Decimal  @default(0) @map("net_amount") @db.Decimal(15, 2) // Líquido após IRRF
+  irrfAmount   Decimal  @default(0) @map("irrf_amount") @db.Decimal(15, 2) // IRRF retido
+  irrfRate     Decimal? @map("irrf_rate") @db.Decimal(5, 4) // Alíquota aplicada
+  balanceAfter Decimal  @map("balance_after") @db.Decimal(15, 2) // Saldo bruto após evento
 
   // ── Para resgates ─────────────────────────────────────────
   redemptionPrincipal Decimal? @map("redemption_principal") @db.Decimal(15, 2) // Parcela do principal resgatado
-  redemptionYield     Decimal? @map("redemption_yield") @db.Decimal(15, 2)     // Parcela de rendimento resgatado
-  redemptionTotal     Decimal? @map("redemption_total") @db.Decimal(15, 2)     // Total líquido recebido
+  redemptionYield     Decimal? @map("redemption_yield") @db.Decimal(15, 2) // Parcela de rendimento resgatado
+  redemptionTotal     Decimal? @map("redemption_total") @db.Decimal(15, 2) // Total líquido recebido
 
   // ── Vínculo contábil ──────────────────────────────────────
   journalEntryId String? @map("journal_entry_id") @db.Uuid
@@ -2403,26 +2426,25 @@ enum HolidayType {
 }
 
 model Holiday {
-  id        String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  date      DateTime    @map("date") @db.Date
-  name      String      @map("name") @db.VarChar(100)
-  type      HolidayType @map("type")
-  state     String?     @map("state") @db.VarChar(2)
-  city      String?     @map("city") @db.VarChar(100)
-  recurring Boolean     @default(false) @map("recurring")
+  id         String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  date       DateTime    @map("date") @db.Date
+  name       String      @map("name") @db.VarChar(100)
+  type       HolidayType @map("type")
+  state      String?     @map("state") @db.VarChar(2)
+  city       String?     @map("city") @db.VarChar(100)
+  recurring  Boolean     @default(false) @map("recurring")
   // Feriados judaicos
-  hebrewName    String? @map("hebrew_name") @db.VarChar(100)
-  hebrewDate    String? @map("hebrew_date") @db.VarChar(20)  // ex: "15 Nissan"
-  erevStart     Boolean @default(false) @map("erev_start")   // inicia na vespera ao por do sol
-  createdAt DateTime    @default(now()) @map("created_at") @db.Timestamp(6)
-  updatedAt DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  hebrewName String?     @map("hebrew_name") @db.VarChar(100)
+  hebrewDate String?     @map("hebrew_date") @db.VarChar(20) // ex: "15 Nissan"
+  erevStart  Boolean     @default(false) @map("erev_start") // inicia na vespera ao por do sol
+  createdAt  DateTime    @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt  DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
 
   @@unique([date, type, state, city])
   @@index([date])
   @@index([type])
   @@map("holidays")
 }
-
 
 // =============================================================================
 // PRO-LABORE
@@ -2435,29 +2457,29 @@ model ProLaboreConfig {
   personId  String @map("person_id") @db.Uuid
   cargo     String @map("cargo") @db.VarChar
 
-  valorBruto      Decimal  @map("valor_bruto") @db.Decimal(15,2)
-  competenciaIni  String   @map("competencia_ini") @db.VarChar(7) // AAAA-MM
-  competenciaFim  String?  @map("competencia_fim") @db.VarChar(7)
-  ativo           Boolean  @default(true) @map("ativo")
+  valorBruto     Decimal @map("valor_bruto") @db.Decimal(15, 2)
+  competenciaIni String  @map("competencia_ini") @db.VarChar(7) // AAAA-MM
+  competenciaFim String? @map("competencia_fim") @db.VarChar(7)
+  ativo          Boolean @default(true) @map("ativo")
 
   // Contas contabeis por empresa
-  contaDespesaId    String? @map("conta_despesa_id") @db.Uuid
-  contaPassivoId    String? @map("conta_passivo_id") @db.Uuid
-  contaInssEmpId    String? @map("conta_inss_emp_id") @db.Uuid
-  contaInssDir      String? @map("conta_inss_dir_id") @db.Uuid
-  contaIrrfId       String? @map("conta_irrf_id") @db.Uuid
+  contaDespesaId      String? @map("conta_despesa_id") @db.Uuid
+  contaPassivoId      String? @map("conta_passivo_id") @db.Uuid
+  contaInssEmpId      String? @map("conta_inss_emp_id") @db.Uuid
+  contaInssDir        String? @map("conta_inss_dir_id") @db.Uuid
+  contaIrrfId         String? @map("conta_irrf_id") @db.Uuid
   contaInssRecolherId String? @map("conta_inss_recolher_id") @db.Uuid
   contaIrrfRecolherId String? @map("conta_irrf_recolher_id") @db.Uuid
 
-  documentoId String? @map("documento_id") @db.Uuid  // Ata de reuniao
+  documentoId String? @map("documento_id") @db.Uuid // Ata de reuniao
 
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
   deletedAt DateTime? @map("deleted_at") @db.Timestamp(6)
 
-  company   Company @relation(fields: [companyId], references: [id])
-  person    Person  @relation(fields: [personId], references: [id])
-  calculos  ProLaboreCalculo[]
+  company  Company            @relation(fields: [companyId], references: [id])
+  person   Person             @relation(fields: [personId], references: [id])
+  calculos ProLaboreCalculo[]
 
   @@index([companyId, personId])
   @@index([companyId, competenciaIni])
@@ -2466,33 +2488,32 @@ model ProLaboreConfig {
 
 /// Calculo mensal de pro-labore
 model ProLaboreCalculo {
-  id         String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  configId   String @map("config_id") @db.Uuid
-  companyId  String @map("company_id") @db.Uuid
+  id          String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  configId    String @map("config_id") @db.Uuid
+  companyId   String @map("company_id") @db.Uuid
   competencia String @map("competencia") @db.VarChar(7) // AAAA-MM
 
-  valorBruto      Decimal @map("valor_bruto") @db.Decimal(15,2)
-  inssEmpresa     Decimal @map("inss_empresa") @db.Decimal(15,2)   // 20%
-  inssDiretor     Decimal @map("inss_diretor") @db.Decimal(15,2)   // 11% (teto)
-  baseIrrf        Decimal @map("base_irrf") @db.Decimal(15,2)      // bruto - inss diretor
-  irrf            Decimal @map("irrf") @db.Decimal(15,2)
-  aliqIrrf        Decimal @map("aliq_irrf") @db.Decimal(5,4)
-  deducaoIrrf     Decimal @map("deducao_irrf") @db.Decimal(15,2)
-  valorLiquido    Decimal @map("valor_liquido") @db.Decimal(15,2)
+  valorBruto   Decimal @map("valor_bruto") @db.Decimal(15, 2)
+  inssEmpresa  Decimal @map("inss_empresa") @db.Decimal(15, 2) // 20%
+  inssDiretor  Decimal @map("inss_diretor") @db.Decimal(15, 2) // 11% (teto)
+  baseIrrf     Decimal @map("base_irrf") @db.Decimal(15, 2) // bruto - inss diretor
+  irrf         Decimal @map("irrf") @db.Decimal(15, 2)
+  aliqIrrf     Decimal @map("aliq_irrf") @db.Decimal(5, 4)
+  deducaoIrrf  Decimal @map("deducao_irrf") @db.Decimal(15, 2)
+  valorLiquido Decimal @map("valor_liquido") @db.Decimal(15, 2)
 
-  journalEntryId  String? @map("journal_entry_id") @db.Uuid
-  geradoEm        DateTime? @map("gerado_em") @db.Timestamp(6)
-  createdById     String  @map("created_by_id") @db.Uuid
-  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  journalEntryId String?   @map("journal_entry_id") @db.Uuid
+  geradoEm       DateTime? @map("gerado_em") @db.Timestamp(6)
+  createdById    String    @map("created_by_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
 
-  config    ProLaboreConfig @relation(fields: [configId], references: [id])
-  company   Company         @relation(fields: [companyId], references: [id])
+  config  ProLaboreConfig @relation(fields: [configId], references: [id])
+  company Company         @relation(fields: [companyId], references: [id])
 
   @@unique([configId, competencia])
   @@index([companyId, competencia])
   @@map("pro_labore_calculos")
 }
-
 
 // =============================================================================
 // PROVISÕES RECORRENTES
@@ -2533,37 +2554,37 @@ model ProvisaoConfig {
   id        String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   companyId String @map("company_id") @db.Uuid
 
-  descricao     String             @map("descricao") @db.VarChar
-  tipo          TipoProvisao       @map("tipo")
+  descricao     String                @map("descricao") @db.VarChar
+  tipo          TipoProvisao          @map("tipo")
   periodicidade PeriodicidadeProvisao @map("periodicidade")
-  diaVencimento Int                @map("dia_vencimento")
-  valor         Decimal            @map("valor") @db.Decimal(15, 2)
+  diaVencimento Int                   @map("dia_vencimento")
+  valor         Decimal               @map("valor") @db.Decimal(15, 2)
 
   // Contas contabeis
-  contaDespesaId  String? @map("conta_despesa_id") @db.Uuid
-  contaPassivoId  String? @map("conta_passivo_id") @db.Uuid
+  contaDespesaId String? @map("conta_despesa_id") @db.Uuid
+  contaPassivoId String? @map("conta_passivo_id") @db.Uuid
 
   // Fiscal
-  exigirNF        Boolean @default(false) @map("exigir_nf")
-  dedutivel       Boolean @default(true)  @map("dedutivel")
+  exigirNF         Boolean @default(false) @map("exigir_nf")
+  dedutivel        Boolean @default(true) @map("dedutivel")
   creditaPisCofins Boolean @default(false) @map("credita_pis_cofins")
-  aliqPis         Decimal @default(0) @map("aliq_pis") @db.Decimal(5, 4)
-  aliqCofins      Decimal @default(0) @map("aliq_cofins") @db.Decimal(5, 4)
+  aliqPis          Decimal @default(0) @map("aliq_pis") @db.Decimal(5, 4)
+  aliqCofins       Decimal @default(0) @map("aliq_cofins") @db.Decimal(5, 4)
 
-  aliqCsll        Decimal @default(0) @map("aliq_csll") @db.Decimal(5, 4)
-  aliqIrpj        Decimal @default(0) @map("aliq_irpj") @db.Decimal(5, 4)
-  contaPisId      String? @map("conta_pis_id") @db.Uuid
-  contaCofinsId   String? @map("conta_cofins_id") @db.Uuid
-  contaCsllId     String? @map("conta_csll_id") @db.Uuid
-  contaIrpjId     String? @map("conta_irpj_id") @db.Uuid
+  aliqCsll            Decimal @default(0) @map("aliq_csll") @db.Decimal(5, 4)
+  aliqIrpj            Decimal @default(0) @map("aliq_irpj") @db.Decimal(5, 4)
+  contaPisId          String? @map("conta_pis_id") @db.Uuid
+  contaCofinsId       String? @map("conta_cofins_id") @db.Uuid
+  contaCsllId         String? @map("conta_csll_id") @db.Uuid
+  contaIrpjId         String? @map("conta_irpj_id") @db.Uuid
   // Fornecedor
-  fornecedorNome  String? @map("fornecedor_nome") @db.VarChar
+  fornecedorNome      String? @map("fornecedor_nome") @db.VarChar
   favorecidoPersonId  String? @map("favorecido_person_id") @db.Uuid
   favorecidoCompanyId String? @map("favorecido_company_id") @db.Uuid
-  geraContabil        Boolean @default(true)  @map("gera_contabil")
-  geraAgenda          Boolean @default(true)  @map("gera_agenda")
+  geraContabil        Boolean @default(true) @map("gera_contabil")
+  geraAgenda          Boolean @default(true) @map("gera_agenda")
   agendaColor         String? @default("BLUE") @map("agenda_color") @db.VarChar(20)
-  fornecedorCnpj  String? @map("fornecedor_cnpj") @db.VarChar(18)
+  fornecedorCnpj      String? @map("fornecedor_cnpj") @db.VarChar(18)
 
   // Rateio
   temRateio Boolean @default(false) @map("tem_rateio")
@@ -2576,10 +2597,9 @@ model ProvisaoConfig {
   updatedAt DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
   deletedAt DateTime? @map("deleted_at") @db.Timestamp(6)
 
-  company    Company @relation(fields: [companyId], references: [id])
+  company     Company                @relation(fields: [companyId], references: [id])
   lancamentos ProvisaoLancamento[]
   rateios     ProvisaoRateioConfig[]
-
 
   @@index([companyId, ativo])
   @@index([companyId, tipo])
@@ -2588,9 +2608,9 @@ model ProvisaoConfig {
 
 /// Percentual de rateio por empresa — pode variar por competencia
 model ProvisaoRateioConfig {
-  id          String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  provisaoId  String @map("provisao_id") @db.Uuid
-  empresaId   String @map("empresa_id") @db.Uuid
+  id          String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  provisaoId  String  @map("provisao_id") @db.Uuid
+  empresaId   String  @map("empresa_id") @db.Uuid
   percentual  Decimal @map("percentual") @db.Decimal(5, 2)
   competencia String? @map("competencia") @db.VarChar(7) // null = padrao, preenchido = override mensal
 
@@ -2610,22 +2630,22 @@ model ProvisaoLancamento {
   companyId   String @map("company_id") @db.Uuid
   competencia String @map("competencia") @db.VarChar(7)
 
-  valor          Decimal                  @map("valor") @db.Decimal(15, 2)
-  valorPis       Decimal @default(0)      @map("valor_pis") @db.Decimal(15, 2)
-  valorCofins    Decimal @default(0)      @map("valor_cofins") @db.Decimal(15, 2)
-  status         StatusProvisaoLancamento @default(PROVISIONADO) @map("status")
-  valorCsll      Decimal @default(0)      @map("valor_csll") @db.Decimal(15, 2)
-  valorIrpj      Decimal @default(0)      @map("valor_irpj") @db.Decimal(15, 2)
+  valor       Decimal                  @map("valor") @db.Decimal(15, 2)
+  valorPis    Decimal                  @default(0) @map("valor_pis") @db.Decimal(15, 2)
+  valorCofins Decimal                  @default(0) @map("valor_cofins") @db.Decimal(15, 2)
+  status      StatusProvisaoLancamento @default(PROVISIONADO) @map("status")
+  valorCsll   Decimal                  @default(0) @map("valor_csll") @db.Decimal(15, 2)
+  valorIrpj   Decimal                  @default(0) @map("valor_irpj") @db.Decimal(15, 2)
 
   // Placeholder NF
-  nfNumero    String?   @map("nf_numero") @db.VarChar
-  nfChave     String?   @map("nf_chave") @db.VarChar(44)
-  nfConferida Boolean   @default(false) @map("nf_conferida")
+  nfNumero      String?   @map("nf_numero") @db.VarChar
+  nfChave       String?   @map("nf_chave") @db.VarChar(44)
+  nfConferida   Boolean   @default(false) @map("nf_conferida")
   nfConferidaEm DateTime? @map("nf_conferida_em") @db.Timestamp(6)
 
   // Vinculos gerados
-  apEntryId      String? @map("ap_entry_id") @db.Uuid
-  agendaEventId  String? @map("agenda_event_id") @db.Uuid
+  apEntryId     String? @map("ap_entry_id") @db.Uuid
+  agendaEventId String? @map("agenda_event_id") @db.Uuid
 
   createdById String   @map("created_by_id") @db.Uuid
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp(6)
@@ -2681,16 +2701,16 @@ model FechamentoMensal {
   competencia String           @map("competencia") @db.VarChar(7)
   status      StatusFechamento @default(ABERTO) @map("status")
 
-  fechadoEm   DateTime? @map("fechado_em") @db.Timestamp(6)
-  fechadoPorId String?  @map("fechado_por_id") @db.Uuid
-  reabertoEm  DateTime? @map("reaberto_em") @db.Timestamp(6)
-  reabertoForId String? @map("reaberto_for_id") @db.Uuid
-  motivoReabertura String? @map("motivo_reabertura") @db.Text
+  fechadoEm        DateTime? @map("fechado_em") @db.Timestamp(6)
+  fechadoPorId     String?   @map("fechado_por_id") @db.Uuid
+  reabertoEm       DateTime? @map("reaberto_em") @db.Timestamp(6)
+  reabertoForId    String?   @map("reaberto_for_id") @db.Uuid
+  motivoReabertura String?   @map("motivo_reabertura") @db.Text
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
 
-  company Company @relation(fields: [companyId], references: [id])
+  company Company          @relation(fields: [companyId], references: [id])
   itens   FechamentoItem[]
 
   @@unique([companyId, competencia])
@@ -2700,17 +2720,17 @@ model FechamentoMensal {
 
 /// Itens do fechamento mensal por modulo
 model FechamentoItem {
-  id            String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  fechamentoId  String              @map("fechamento_id") @db.Uuid
-  modulo        ModuloFechamento    @map("modulo")
-  descricao     String              @map("descricao") @db.VarChar
-  valorCalculado Decimal            @map("valor_calculado") @db.Decimal(15, 2)
-  valorConfirmado Decimal?          @map("valor_confirmado") @db.Decimal(15, 2)
-  status        StatusItemFechamento @default(PENDENTE) @map("status")
-  conferidoPorId String?            @map("conferido_por_id") @db.Uuid
-  conferidoEm   DateTime?           @map("conferido_em") @db.Timestamp(6)
-  journalEntryId String?            @map("journal_entry_id") @db.Uuid
-  obs           String?             @map("obs") @db.Text
+  id              String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  fechamentoId    String               @map("fechamento_id") @db.Uuid
+  modulo          ModuloFechamento     @map("modulo")
+  descricao       String               @map("descricao") @db.VarChar
+  valorCalculado  Decimal              @map("valor_calculado") @db.Decimal(15, 2)
+  valorConfirmado Decimal?             @map("valor_confirmado") @db.Decimal(15, 2)
+  status          StatusItemFechamento @default(PENDENTE) @map("status")
+  conferidoPorId  String?              @map("conferido_por_id") @db.Uuid
+  conferidoEm     DateTime?            @map("conferido_em") @db.Timestamp(6)
+  journalEntryId  String?              @map("journal_entry_id") @db.Uuid
+  obs             String?              @map("obs") @db.Text
 
   fechamento FechamentoMensal @relation(fields: [fechamentoId], references: [id], onDelete: Cascade)
 
@@ -2746,10 +2766,10 @@ model CompanyAccountingConfig {
   esocialRole     String? @map("esocial_role") @db.VarChar
 
   // Auditor independente
-  auditorName     String? @map("auditor_name") @db.VarChar
-  auditorCpf      String? @map("auditor_cpf") @db.VarChar(14)
-  auditorCrc      String? @map("auditor_crc") @db.VarChar
-  auditorRole     String? @map("auditor_role") @db.VarChar
+  auditorName String? @map("auditor_name") @db.VarChar
+  auditorCpf  String? @map("auditor_cpf") @db.VarChar(14)
+  auditorCrc  String? @map("auditor_crc") @db.VarChar
+  auditorRole String? @map("auditor_role") @db.VarChar
 
   // Dados ECD/ECF
   codigoScp       String? @map("codigo_scp") @db.VarChar
@@ -2763,67 +2783,65 @@ model CompanyAccountingConfig {
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
 
-  company          Company @relation(fields: [companyId], references: [id])
-  createdBy        User    @relation("AccountingConfigCreator", fields: [createdById], references: [id])
+  company   Company @relation(fields: [companyId], references: [id])
+  createdBy User    @relation("AccountingConfigCreator", fields: [createdById], references: [id])
 
   @@map("company_accounting_configs")
 }
 
-
-
 model InformeRendimentos {
-  id        String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  companyId String @map("company_id") @db.Uuid
-  personId  String @map("person_id") @db.Uuid
-  anoCalendario Int @map("ano_calendario")
+  id            String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId     String @map("company_id") @db.Uuid
+  personId      String @map("person_id") @db.Uuid
+  anoCalendario Int    @map("ano_calendario")
 
   // Natureza do rendimento
   naturezaRendimento String @default("Rendimentos do trabalho sem vínculo empregatício") @map("natureza_rendimento") @db.VarChar
 
   // Quadro 3 — Rendimentos Tributáveis
-  q3TotalRendimentos        Decimal @default(0) @map("q3_total_rendimentos") @db.Decimal(15,2)
-  q3ContribPrevidenciaria   Decimal @default(0) @map("q3_contrib_previdenciaria") @db.Decimal(15,2)
-  q3ContribPrevidCompl      Decimal @default(0) @map("q3_contrib_previd_compl") @db.Decimal(15,2)
-  q3PensaoAlimenticia       Decimal @default(0) @map("q3_pensao_alimenticia") @db.Decimal(15,2)
-  q3Irrf                    Decimal @default(0) @map("q3_irrf") @db.Decimal(15,2)
+  q3TotalRendimentos      Decimal @default(0) @map("q3_total_rendimentos") @db.Decimal(15, 2)
+  q3ContribPrevidenciaria Decimal @default(0) @map("q3_contrib_previdenciaria") @db.Decimal(15, 2)
+  q3ContribPrevidCompl    Decimal @default(0) @map("q3_contrib_previd_compl") @db.Decimal(15, 2)
+  q3PensaoAlimenticia     Decimal @default(0) @map("q3_pensao_alimenticia") @db.Decimal(15, 2)
+  q3Irrf                  Decimal @default(0) @map("q3_irrf") @db.Decimal(15, 2)
 
   // Quadro 4 — Rendimentos Isentos
-  q4ParcelaIsentaAposent    Decimal @default(0) @map("q4_parcela_isenta_aposent") @db.Decimal(15,2)
-  q4ParcelaIsenta13         Decimal @default(0) @map("q4_parcela_isenta_13") @db.Decimal(15,2)
-  q4DiariasAjudaCusto       Decimal @default(0) @map("q4_diarias_ajuda_custo") @db.Decimal(15,2)
-  q4PensaoMolestia          Decimal @default(0) @map("q4_pensao_molestia") @db.Decimal(15,2)
-  q4LucrosDividendos        Decimal @default(0) @map("q4_lucros_dividendos") @db.Decimal(15,2)
-  q4ValoresMEI              Decimal @default(0) @map("q4_valores_mei") @db.Decimal(15,2)
-  q4IndenizacaoRescisao     Decimal @default(0) @map("q4_indenizacao_rescisao") @db.Decimal(15,2)
-  q4JurosMora               Decimal @default(0) @map("q4_juros_mora") @db.Decimal(15,2)
-  q4Outros                  Decimal @default(0) @map("q4_outros") @db.Decimal(15,2)
+  q4ParcelaIsentaAposent Decimal @default(0) @map("q4_parcela_isenta_aposent") @db.Decimal(15, 2)
+  q4ParcelaIsenta13      Decimal @default(0) @map("q4_parcela_isenta_13") @db.Decimal(15, 2)
+  q4DiariasAjudaCusto    Decimal @default(0) @map("q4_diarias_ajuda_custo") @db.Decimal(15, 2)
+  q4PensaoMolestia       Decimal @default(0) @map("q4_pensao_molestia") @db.Decimal(15, 2)
+  q4LucrosDividendos     Decimal @default(0) @map("q4_lucros_dividendos") @db.Decimal(15, 2)
+  q4ValoresMEI           Decimal @default(0) @map("q4_valores_mei") @db.Decimal(15, 2)
+  q4IndenizacaoRescisao  Decimal @default(0) @map("q4_indenizacao_rescisao") @db.Decimal(15, 2)
+  q4JurosMora            Decimal @default(0) @map("q4_juros_mora") @db.Decimal(15, 2)
+  q4Outros               Decimal @default(0) @map("q4_outros") @db.Decimal(15, 2)
 
   // Quadro 5 — Tributação Exclusiva
-  q5DecimoTerceiro          Decimal @default(0) @map("q5_decimo_terceiro") @db.Decimal(15,2)
-  q5IrrfDecimoTerceiro      Decimal @default(0) @map("q5_irrf_decimo_terceiro") @db.Decimal(15,2)
-  q5Outros                  Decimal @default(0) @map("q5_outros") @db.Decimal(15,2)
+  q5DecimoTerceiro     Decimal @default(0) @map("q5_decimo_terceiro") @db.Decimal(15, 2)
+  q5IrrfDecimoTerceiro Decimal @default(0) @map("q5_irrf_decimo_terceiro") @db.Decimal(15, 2)
+  q5Outros             Decimal @default(0) @map("q5_outros") @db.Decimal(15, 2)
 
   // Quadro 6 — Rendimentos Acumulados
-  q6NumeroProcesso          String? @map("q6_numero_processo") @db.VarChar
-  q6QtdMeses                Decimal @default(0) @map("q6_qtd_meses") @db.Decimal(5,1)
-  q6NaturezaRendimento      String? @map("q6_natureza_rendimento") @db.VarChar
-  q6TotalRendimentos        Decimal @default(0) @map("q6_total_rendimentos") @db.Decimal(15,2)
-  q6ExclusaoDespesas        Decimal @default(0) @map("q6_exclusao_despesas") @db.Decimal(15,2)
-  q6ContribPrevidenciaria   Decimal @default(0) @map("q6_contrib_previdenciaria") @db.Decimal(15,2)
-  q6PensaoAlimenticia       Decimal @default(0) @map("q6_pensao_alimenticia") @db.Decimal(15,2)
-  q6Irrf                    Decimal @default(0) @map("q6_irrf") @db.Decimal(15,2)
-  q6RendIsentoMolestia      Decimal @default(0) @map("q6_rend_isento_molestia") @db.Decimal(15,2)
+  q6NumeroProcesso        String? @map("q6_numero_processo") @db.VarChar
+  q6QtdMeses              Decimal @default(0) @map("q6_qtd_meses") @db.Decimal(5, 1)
+  q6NaturezaRendimento    String? @map("q6_natureza_rendimento") @db.VarChar
+  q6TotalRendimentos      Decimal @default(0) @map("q6_total_rendimentos") @db.Decimal(15, 2)
+  q6ExclusaoDespesas      Decimal @default(0) @map("q6_exclusao_despesas") @db.Decimal(15, 2)
+  q6ContribPrevidenciaria Decimal @default(0) @map("q6_contrib_previdenciaria") @db.Decimal(15, 2)
+  q6PensaoAlimenticia     Decimal @default(0) @map("q6_pensao_alimenticia") @db.Decimal(15, 2)
+  q6Irrf                  Decimal @default(0) @map("q6_irrf") @db.Decimal(15, 2)
+  q6RendIsentoMolestia    Decimal @default(0) @map("q6_rend_isento_molestia") @db.Decimal(15, 2)
 
   // Quadro 7 — Informações complementares
-  q7InformacoesCompl        String? @map("q7_informacoes_compl") @db.Text
+  q7InformacoesCompl String? @map("q7_informacoes_compl") @db.Text
 
   // Quadro 8 — Responsável
-  q8NomeResponsavel         String? @map("q8_nome_responsavel") @db.VarChar
-  q8DataAssinatura          DateTime? @map("q8_data_assinatura") @db.Date
+  q8NomeResponsavel String?   @map("q8_nome_responsavel") @db.VarChar
+  q8DataAssinatura  DateTime? @map("q8_data_assinatura") @db.Date
 
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
-  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
-  createdById String @map("created_by_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  createdById String   @map("created_by_id") @db.Uuid
 
   company Company @relation(fields: [companyId], references: [id])
   person  Person  @relation(fields: [personId], references: [id])
@@ -2854,10 +2872,10 @@ enum PettyCashCategory {
 
 /// Configuração do fundo fixo da empresa.
 model PettyCash {
-  id            String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  companyId     String  @map("company_id") @db.Uuid
-  name          String  @map("name") @db.VarChar(100)
-  targetBalance Decimal @map("target_balance") @db.Decimal(15, 2)
+  id             String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId      String  @map("company_id") @db.Uuid
+  name           String  @map("name") @db.VarChar(100)
+  targetBalance  Decimal @map("target_balance") @db.Decimal(15, 2)
   alertThreshold Decimal @map("alert_threshold") @db.Decimal(15, 2)
   currentBalance Decimal @default(0) @map("current_balance") @db.Decimal(15, 2)
 
@@ -2869,8 +2887,8 @@ model PettyCash {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
 
-  company     Company       @relation(fields: [companyId], references: [id])
-  responsible Person?       @relation("PettyCashResponsible", fields: [responsibleId], references: [id])
+  company     Company          @relation(fields: [companyId], references: [id])
+  responsible Person?          @relation("PettyCashResponsible", fields: [responsibleId], references: [id])
   entries     PettyCashEntry[]
 
   @@index([companyId])
@@ -2879,17 +2897,17 @@ model PettyCash {
 
 /// Movimentos do fundo fixo.
 model PettyCashEntry {
-  id           String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  pettyCashId  String              @map("petty_cash_id") @db.Uuid
-  companyId    String              @map("company_id") @db.Uuid
-  type         PettyCashEntryType  @map("type")
-  category     PettyCashCategory?  @map("category")
-  date         DateTime            @map("date") @db.Timestamp(6)
-  amount       Decimal             @map("amount") @db.Decimal(15, 2)
-  description  String              @map("description") @db.Text
-  receiptRef   String?             @map("receipt_ref") @db.VarChar(100)
-  supplier     String?             @map("supplier") @db.VarChar(200)
-  balanceAfter Decimal             @map("balance_after") @db.Decimal(15, 2)
+  id           String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  pettyCashId  String             @map("petty_cash_id") @db.Uuid
+  companyId    String             @map("company_id") @db.Uuid
+  type         PettyCashEntryType @map("type")
+  category     PettyCashCategory? @map("category")
+  date         DateTime           @map("date") @db.Timestamp(6)
+  amount       Decimal            @map("amount") @db.Decimal(15, 2)
+  description  String             @map("description") @db.Text
+  receiptRef   String?            @map("receipt_ref") @db.VarChar(100)
+  supplier     String?            @map("supplier") @db.VarChar(200)
+  balanceAfter Decimal            @map("balance_after") @db.Decimal(15, 2)
 
   journalEntryId String? @map("journal_entry_id") @db.Uuid
 
@@ -2897,8 +2915,8 @@ model PettyCashEntry {
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
 
-  pettyCash    PettyCash @relation(fields: [pettyCashId], references: [id])
-  company      Company   @relation(fields: [companyId], references: [id])
+  pettyCash PettyCash @relation(fields: [pettyCashId], references: [id])
+  company   Company   @relation(fields: [companyId], references: [id])
 
   @@index([pettyCashId])
   @@index([companyId, date])
@@ -2912,15 +2930,15 @@ model PettyCashEntry {
 /// Codigos de aglutinacao RFB por leiaute e ano-base.
 /// Populados via POST /sped/rfb-codes/import (JSON).
 model RfbAglutinationCode {
-  id        String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  leiaute   Int    @map("leiaute")
-  anoBase   Int    @map("ano_base")
-  tipo      String @map("tipo") @db.VarChar(3)   // BP | DRE
-  codigo    String @map("codigo") @db.VarChar(20)
-  descricao String @map("descricao") @db.VarChar(200)
-  nivel     Int    @map("nivel")
+  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  leiaute   Int     @map("leiaute")
+  anoBase   Int     @map("ano_base")
+  tipo      String  @map("tipo") @db.VarChar(3) // BP | DRE
+  codigo    String  @map("codigo") @db.VarChar(20)
+  descricao String  @map("descricao") @db.VarChar(200)
+  nivel     Int     @map("nivel")
   codigoPai String? @map("codigo_pai") @db.VarChar(20)
-  ordem     Int    @map("ordem")
+  ordem     Int     @map("ordem")
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
 
@@ -2931,19 +2949,19 @@ model RfbAglutinationCode {
 
 /// Visao Contabil por empresa e exercicio (BP ou DRE).
 model AccountingView {
-  id        String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  companyId String @map("company_id") @db.Uuid
-  name      String @map("name") @db.VarChar(100)
-  tipo      String @map("tipo") @db.VarChar(3)   // BP | DRE
-  leiaute   Int    @map("leiaute")
-  anoBase   Int    @map("ano_base")
+  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId String  @map("company_id") @db.Uuid
+  name      String  @map("name") @db.VarChar(100)
+  tipo      String  @map("tipo") @db.VarChar(3) // BP | DRE
+  leiaute   Int     @map("leiaute")
+  anoBase   Int     @map("ano_base")
   isActive  Boolean @default(true) @map("is_active")
 
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
   deletedAt DateTime? @map("deleted_at") @db.Timestamp(6)
 
-  company  Company @relation(fields: [companyId], references: [id])
+  company  Company                 @relation(fields: [companyId], references: [id])
   mappings AccountingViewMapping[]
 
   @@unique([companyId, tipo, anoBase])
