@@ -263,7 +263,7 @@ export const CompanyEdit: React.FC = () => {
           </div>
         )}
         {activeTab === 'contabil' && (
-          <ContabilTab companyId={id!} labelCls={labelCls} inputCls={inputCls} />
+          <ContabilTab companyId={id!} labelCls={labelCls} inputCls={inputCls} partners={formData.partners || []} />
         )}
         {activeTab === 'esocial' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 bg-white p-8 rounded-xl shadow-sm border border-gray-200">

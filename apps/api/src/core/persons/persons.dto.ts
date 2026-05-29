@@ -127,6 +127,9 @@ export class CreatePersonDto {
 
   // ── Metadados ──────────────────────────────────────────────
   @IsOptional() @IsString()  notes?: string;
+  @IsOptional() @IsString()     qualificacaoCvm?: string;
+  @IsOptional() @IsBoolean()    assinaEcd?: boolean;
+  @IsOptional() @IsBoolean()    assinaEcf?: boolean;
   @IsOptional() @IsBoolean() isActive?: boolean;
 }
 
@@ -144,6 +147,9 @@ export class CreatePersonCompanyDto {
   @IsOptional() @IsDateString() startDate?: string;
   @IsOptional() @IsDateString() endDate?: string;
   @IsOptional() @IsString()     notes?: string;
+  @IsOptional() @IsString()     qualificacaoCvm?: string;
+  @IsOptional() @IsBoolean()    assinaEcd?: boolean;
+  @IsOptional() @IsBoolean()    assinaEcf?: boolean;
 }
 
 export class UpdatePersonCompanyDto extends PartialType(CreatePersonCompanyDto) {}

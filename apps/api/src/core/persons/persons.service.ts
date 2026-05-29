@@ -194,6 +194,13 @@ async findByCpf(cpf: string) {
 
   // ── VÍNCULOS PESSOA ↔ EMPRESA ─────────────────────────────
 
+  async linksByCompany(companyId: string) {
+    return this.prisma.personCompany.findMany({
+      where: { companyId },
+      include: { person: { select: { id: true, fullName: true, cpf: true, crcNumber: true, crcState: true } } },
+      orderBy: { startDate: 'desc' },
+    });
+  }
   async createLink(dto: CreatePersonCompanyDto) {
     await this.findOne(dto.personId);
     return this.prisma.personCompany.create({

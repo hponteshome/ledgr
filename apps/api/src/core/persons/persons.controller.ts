@@ -58,6 +58,10 @@ export class PersonsController {
     return await this.service.remove(id);
   }
 
+  @Get('links/company/:companyId')
+  async linksByCompany(@Param('companyId') companyId: string) {
+    return await this.service.linksByCompany(companyId);
+  }
   @Post('links')
   async createLink(@Body() dto: CreatePersonCompanyDto) {
     return await this.service.createLink(dto);

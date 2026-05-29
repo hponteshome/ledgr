@@ -4,10 +4,11 @@ import api from '../../services/api';
 import { useSearchParams } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { PersonLookupField } from '../../components/PersonLookupField';
+import { QsaVinculoGrid } from './QsaVinculoGrid';
 
-interface Props { companyId: string; labelCls: string; inputCls: string; }
+interface Props { companyId: string; labelCls: string; inputCls: string; partners?: any[]; }
 
-export const ContabilTab: React.FC<Props> = ({ companyId, labelCls, inputCls }) => {
+export const ContabilTab: React.FC<Props> = ({ companyId, labelCls, inputCls, partners }) => {
   const [config, setConfig] = useState<any>({});
   const [searchParams] = useSearchParams();
   const [saving, setSaving] = useState(false);
@@ -43,6 +44,10 @@ export const ContabilTab: React.FC<Props> = ({ companyId, labelCls, inputCls }) 
 
       {/* Escritorio Contabil */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4">
+      {partners && partners.length > 0 && (
+        <QsaVinculoGrid companyId={companyId} partners={partners} labelCls={labelCls} />
+      )}
+
         <div className="text-xs font-bold text-gray-500 uppercase tracking-widest border-l-4 border-green-500 pl-3">Escritório / Organização Contábil</div>
         <PersonLookupField
           label="Escritório Contábil"

@@ -102,12 +102,6 @@ export const PersonLookupField: React.FC<Props> = ({
           )}
         </div>
       )}
-
-              )}
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 };
