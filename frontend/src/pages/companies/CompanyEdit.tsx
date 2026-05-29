@@ -75,8 +75,8 @@ export const CompanyEdit: React.FC = () => {
       equity:       dados.capitalSocial || prev.equity,
       legalNature:  dados.naturezaJuridica || prev.legalNature,
       size:         dados.porte || prev.size,
-      taxRegime:    (dados.regimeTributario?.length ? dados.regimeTributario[dados.regimeTributario.length - 1].forma_de_tributacao : null) || prev.taxRegime,
-      status:       dados.situacaoCadastral || prev.status,
+      taxRegime:    (dados.regimeTributario?.length ? (dados.regimeTributario[dados.regimeTributario.length - 1].forma_de_tributacao || '').replace(/ /g, '_') : null) || prev.taxRegime,
+      status:       dados.situacaoCadastral === 'ATIVA' ? 'active' : dados.situacaoCadastral === 'BAIXADA' ? 'inactive' : dados.situacaoCadastral === 'SUSPENSA' ? 'suspended' : prev.status,
       statusDate:   dados.dataSituacao || prev.statusDate,
       partners:     dados.qsa || prev.partners,
       cnaePrincipal: dados.cnaePrincipal || prev.cnaePrincipal,
@@ -163,215 +163,102 @@ export const CompanyEdit: React.FC = () => {
             </button>;
           })}
         </div>
-        {activeTab === 'geral' && (<div className="grid grid-cols-1 md:grid-cols-4 gap-x-6 gap-y-4 bg-white p-8 rounded-xl shadow-sm border border-gray-200">
-
-          {/* ── IDENTIFICAÇÃO ─────────────────────────────── */}
-          <SectionTitle title="Identificação Jurídica" color="bg-blue-600" />
-
-          <div className="md:col-span-3">
-            <label className={labelCls}>Razão Social</label>
-            <input name="legalName" value={formData.legalName || ''} onChange={handleChange} className={inputCls} />
-          </div>
-          <div>
-            <label className={labelCls}>CNPJ</label>
-            <input value={formData.taxId || ''} readOnly
-              className="w-full p-2.5 text-sm border border-gray-100 rounded-md bg-gray-50 text-gray-400 cursor-not-allowed" />
-          </div>
-          <div className="md:col-span-2">
-            <label className={labelCls}>Nome Fantasia</label>
-            <input name="tradeName" value={formData.tradeName || ''} onChange={handleChange} className={inputCls} />
-          </div>
-          <div>
-            <label className={labelCls}>Data de Abertura</label>
-            <input type="date" name="openingDate"
-              value={formData.openingDate ? formData.openingDate.split('T')[0] : ''}
-              onChange={handleChange} className={inputCls} />
-          </div>
-          <div className="flex items-center pl-2">
-            <label className="flex items-center gap-3 cursor-pointer group">
-              <input type="checkbox" name="isHeadquarter"
-                checked={formData.isHeadquarter || false} onChange={handleChange}
-                className="w-5 h-5 rounded text-blue-600 border-gray-300" />
-              <span className="text-[10px] font-black text-gray-500 uppercase group-hover:text-blue-600">
-                Unidade Matriz
-              </span>
-            </label>
-          </div>
-
-          {/* ── REGISTRO INSTITUCIONAL ────────────────────── */}
-          <SectionTitle title="Registro Institucional" color="bg-purple-600" />
-
-          {/* Linha única: Órgão [UF] Número Data [Livro Folha] */}
-          <div className="md:col-span-4 flex flex-wrap gap-3 items-end">
-            {/* Órgão */}
-            <div className="flex-shrink-0">
-              <label className={labelCls}>Órgão de Registro</label>
-              <select name="registerOrg" value={formData.registerOrg || ''}
-                onChange={handleChange} className={inputCls + ' bg-white w-44'}>
-                {ORG_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
-            </div>
-
-            {/* UF — só Junta Comercial */}
-            {isJunta && (
-              <div className="flex-shrink-0">
-                <label className={labelCls}>UF</label>
-                <select name="registerUF" value={formData.registerUF || ''}
-                  onChange={handleChange} className={inputCls + ' bg-white w-20'}>
-                  <option value="">UF</option>
-                  {UF_OPTIONS.map(uf => <option key={uf} value={uf}>{uf}</option>)}
-                </select>
+        {activeTab === 'geral' && (
+          <div className="space-y-6">
+            <fieldset className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4">
+              <legend className="text-xs font-bold text-gray-500 uppercase tracking-widest px-1 border-l-4 border-blue-500 pl-3 ml-[-1rem]">Identificação</legend>
+              <div>
+                <label className={labelCls}>Razão Social *</label>
+                <input name="legalName" value={formData.legalName || ''} onChange={handleChange} required className={inputCls} />
               </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div><label className={labelCls}>Nome Fantasia</label>
+                  <input name="tradeName" value={formData.tradeName || ''} onChange={handleChange} className={inputCls} /></div>
+                <div><label className={labelCls}>Data de Abertura</label>
+                  <input type="date" name="openingDate" value={formData.openingDate ? formData.openingDate.split('T')[0] : ''} onChange={handleChange} className={inputCls} /></div>
+              </div>
+            </fieldset>
+            <fieldset className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4">
+              <legend className="text-xs font-bold text-gray-500 uppercase tracking-widest px-1 border-l-4 border-orange-500 pl-3 ml-[-1rem]">Endereço</legend>
+              <div className="grid grid-cols-3 gap-4">
+                <div><label className={labelCls}>CEP</label>
+                  <input name="zipCode" value={formData.zipCode || ''} onChange={handleChange} className={inputCls} /></div>
+                <div className="col-span-2"><label className={labelCls}>Logradouro</label>
+                  <input name="street" value={formData.street || ''} onChange={handleChange} className={inputCls} /></div>
+              </div>
+              <div className="grid grid-cols-4 gap-4">
+                <div><label className={labelCls}>Número</label>
+                  <input name="number" value={formData.number || ''} onChange={handleChange} className={inputCls} /></div>
+                <div className="col-span-2"><label className={labelCls}>Complemento</label>
+                  <input name="complement" value={formData.complement || ''} onChange={handleChange} className={inputCls} /></div>
+                <div><label className={labelCls}>UF</label>
+                  <input name="state" value={formData.state || ''} onChange={handleChange} maxLength={2} className={inputCls} /></div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div><label className={labelCls}>Cidade</label>
+                  <input name="city" value={formData.city || ''} onChange={handleChange} className={inputCls} /></div>
+                <div><label className={labelCls}>Bairro</label>
+                  <input name="neighborhood" value={formData.neighborhood || ''} onChange={handleChange} className={inputCls} /></div>
+              </div>
+            </fieldset>
+            <fieldset className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4">
+              <legend className="text-xs font-bold text-gray-500 uppercase tracking-widest px-1 border-l-4 border-teal-500 pl-3 ml-[-1rem]">Contato</legend>
+              <div className="grid grid-cols-3 gap-4">
+                <div><label className={labelCls}>E-mail</label>
+                  <input type="email" name="email" value={formData.email || ''} onChange={handleChange} className={inputCls} /></div>
+                <div><label className={labelCls}>Telefone 1</label>
+                  <input name="phone1" value={formData.phone1 || ''} onChange={handleChange} className={inputCls} /></div>
+                <div><label className={labelCls}>Telefone 2</label>
+                  <input name="phone2" value={formData.phone2 || ''} onChange={handleChange} className={inputCls} /></div>
+              </div>
+            </fieldset>
+            <fieldset className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4">
+              <legend className="text-xs font-bold text-gray-500 uppercase tracking-widest px-1 border-l-4 border-green-500 pl-3 ml-[-1rem]">Dados Fiscais</legend>
+              <div className="grid grid-cols-2 gap-4">
+                <div><label className={labelCls}>CNAE Principal</label>
+                  <input name="mainActivity" value={formData.mainActivity || ''} onChange={handleChange} className={inputCls} /></div>
+                <div><label className={labelCls}>CNAEs Secundárias</label>
+                  <input readOnly value={(formData.cnaes || []).map((c: any) => c.codigo + ' - ' + c.descricao).join(' | ') || 'Não informada'} className={inputCls + ' bg-gray-50'} /></div>
+                <div><label className={labelCls}>Capital Social</label>
+                  <input name="equity" type="number" step="0.01" value={formData.equity || 0} onChange={handleChange} className={inputCls} /></div>
+                <div><label className={labelCls}>Natureza Jurídica</label>
+                  <input name="legalNature" value={formData.legalNature || ''} onChange={handleChange} className={inputCls} /></div>
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div><label className={labelCls}>Porte</label>
+                  <input name="size" value={formData.size || ''} onChange={handleChange} className={inputCls} /></div>
+                <div><label className={labelCls}>Regime Tributário</label>
+                  <select name="taxRegime" value={formData.taxRegime || ''} onChange={handleChange} className={inputCls + ' bg-white'}>
+                    <option value="">Selecione…</option>
+                    <option value="SIMPLES_NACIONAL">Simples Nacional</option>
+                    <option value="LUCRO_PRESUMIDO">Lucro Presumido</option>
+                    <option value="LUCRO_REAL">Lucro Real</option>
+                  </select></div>
+                <div><label className={labelCls}>Situação Cadastral</label>
+                  <select name="status" value={formData.status || 'active'} onChange={handleChange} className={inputCls + ' bg-white'}>
+                    <option value="active">ATIVA</option>
+                    <option value="inactive">INATIVA</option>
+                    <option value="suspended">SUSPENSA</option>
+                  </select></div>
+              </div>
+            </fieldset>
+            {formData.partners && formData.partners.length > 0 && (
+              <fieldset className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-3">
+                <legend className="text-xs font-bold text-gray-500 uppercase tracking-widest px-1 border-l-4 border-blue-500 pl-3 ml-[-1rem]">QSA — Quadro de Sócios e Administradores</legend>
+                <div className="divide-y divide-gray-100">
+                  {formData.partners.map((s: any, idx: number) => (
+                    <div key={idx} className="py-3 grid grid-cols-4 gap-4 text-sm">
+                      <div><span className="text-xs text-gray-400 block">Nome</span><span className="font-medium">{s.nome}</span></div>
+                      <div><span className="text-xs text-gray-400 block">Qualificação</span><span>{s.qualificacao}</span></div>
+                      <div><span className="text-xs text-gray-400 block">CPF/CNPJ</span><span className="font-mono text-xs text-gray-500">{s.cpfCnpj}</span></div>
+                      <div><span className="text-xs text-gray-400 block">Entrada</span><span className="text-gray-500">{s.dataEntrada ? new Date(s.dataEntrada + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}</span></div>
+                    </div>
+                  ))}
+                </div>
+              </fieldset>
             )}
-
-            {/* Número / NIRE */}
-            <div className="flex-1 min-w-[140px]">
-              <label className={labelCls}>{isJunta ? 'NIRE' : 'Número'}</label>
-              <input name="registerNumber" value={formData.registerNumber || ''}
-                onChange={handleChange}
-                placeholder={isJunta ? 'Ex: 35300xxxxxx' : 'Número do registro'}
-                className={inputCls} />
-            </div>
-
-            {/* Data */}
-            <div className="flex-shrink-0">
-              <label className={labelCls}>Data do Registro</label>
-              <input type="date" name="registerDate"
-                value={formData.registerDate ? formData.registerDate.split('T')[0] : ''}
-                onChange={handleChange} className={inputCls + ' w-40'} />
-            </div>
-
-            {/* Livro e Folha — só Cartório */}
-            {isCartorio && (
-              <>
-                <div className="flex-shrink-0">
-                  <label className={labelCls}>Livro</label>
-                  <input name="registerBook" value={formData.registerBook || ''}
-                    onChange={handleChange} placeholder="Ex: A-3"
-                    className={inputCls + ' w-24'} />
-                </div>
-                <div className="flex-shrink-0">
-                  <label className={labelCls}>Folha</label>
-                  <input name="registerSheet" value={formData.registerSheet || ''}
-                    onChange={handleChange} placeholder="45"
-                    className={inputCls + ' w-20'} />
-                </div>
-              </>
-            )}
           </div>
-
-          {/* ── ATIVIDADE ECONÔMICA ───────────────────────── */}
-          <SectionTitle title="Atividade Econômica (CNAE)" color="bg-purple-600" />
-          <div className="md:col-span-4">
-            <label className={labelCls}>CNAE Principal</label>
-            <input name="mainActivity" value={formData.mainActivity || ''}
-              onChange={handleChange}
-              placeholder="Ex: 6201-5/01 - Desenvolvimento de programas de computador"
-              className={inputCls} />
-          </div>
-
-          {/* ── ENDEREÇO ──────────────────────────────────── */}
-          <SectionTitle title="Endereço e Localização" color="bg-orange-500" />
-
-          <div className="md:col-span-3">
-            <label className={labelCls}>Logradouro</label>
-            <input name="street" value={formData.street || ''} onChange={handleChange} className={inputCls} />
-          </div>
-          <div>
-            <label className={labelCls}>Número</label>
-            <input name="number" value={formData.number || ''} onChange={handleChange} className={inputCls} />
-          </div>
-          <div className="md:col-span-2">
-            <label className={labelCls}>Complemento</label>
-            <input name="complement" value={formData.complement || ''} onChange={handleChange} className={inputCls} />
-          </div>
-          <div className="md:col-span-2">
-            <label className={labelCls}>Bairro</label>
-            <input name="neighborhood" value={formData.neighborhood || ''} onChange={handleChange} className={inputCls} />
-          </div>
-          <div>
-            <label className={labelCls}>Cidade</label>
-            <input name="city" value={formData.city || ''} onChange={handleChange} className={inputCls} />
-          </div>
-          <div>
-            <label className={labelCls}>UF</label>
-            <input name="state" value={formData.state || ''} onChange={handleChange} maxLength={2} className={inputCls} />
-          </div>
-          <div>
-            <label className={labelCls}>CEP</label>
-            <input name="zipCode" value={formData.zipCode || ''} onChange={handleChange} className={inputCls} />
-          </div>
-
-          {/* ── FISCAL E CONTATO ──────────────────────────── */}
-          <SectionTitle title="Dados Fiscais e Contato" color="bg-green-600" />
-
-          <div>
-            <label className={labelCls}>Capital Social</label>
-            <input name="equity" type="number" step="0.01"
-              value={formData.equity || 0} onChange={handleChange}
-              className={inputCls + ' font-bold text-green-700'} />
-          </div>
-          <div className="md:col-span-2">
-            <label className={labelCls}>Natureza Jurídica</label>
-            <input name="legalNature" value={formData.legalNature || ''} onChange={handleChange} className={inputCls} />
-          </div>
-          <div>
-            <label className={labelCls}>Regime Tributário</label>
-            <select name="taxRegime" value={formData.taxRegime || ''} onChange={handleChange}
-              className={inputCls + ' bg-white'}>
-              <option value="">Selecione…</option>
-              <option value="Simples Nacional">Simples Nacional</option>
-              <option value="Lucro Presumido">Lucro Presumido</option>
-              <option value="Lucro Real">Lucro Real</option>
-            </select>
-          </div>
-          <div className="md:col-span-2">
-            <label className={labelCls}>E-mail Corporativo</label>
-            <input name="email" type="email" value={formData.email || ''} onChange={handleChange} className={inputCls} />
-          </div>
-          <div>
-            <label className={labelCls}>Telefone 1</label>
-            <input name="phone1" value={formData.phone1 || ''} onChange={handleChange} className={inputCls} />
-          </div>
-          <div>
-            <label className={labelCls}>Telefone 2</label>
-            <input name="phone2" value={formData.phone2 || ''} onChange={handleChange} className={inputCls} />
-          </div>
-          <div>
-            <label className={labelCls}>Status no Sistema</label>
-            <select name="status" value={formData.status || 'active'} onChange={handleChange}
-              className={`${inputCls} bg-white font-bold ${formData.status === 'active' ? 'text-blue-600' : 'text-red-600'}`}>
-              <option value="active">ATIVA</option>
-              <option value="inactive">INATIVA</option>
-              <option value="suspended">SUSPENSA</option>
-            </select>
-          {/* ── PORTE E CNAE ──────────────────────────────── */}
-          <SectionTitle title="Atividade e Porte" color="bg-indigo-500" />
-          <div>
-            <label className={labelCls}>Porte</label>
-            <input name="size" value={formData.size || ""} onChange={handleChange} className={inputCls} />
-          </div>
-          <div className="md:col-span-3">
-            <label className={labelCls}>CNAE Principal</label>
-            <input name="mainActivity" value={formData.mainActivity || ""} onChange={handleChange} className={inputCls} />
-          </div>
-          {/* ── QSA ──────────────────────────────────────── */}
-          {(formData.partners && formData.partners.length > 0) && (<>
-            <SectionTitle title="QSA — Quadro de Sócios e Administradores" color="bg-blue-500" />
-            <div className="md:col-span-4 divide-y divide-gray-100">
-              {formData.partners.map((s: any, idx: number) => (
-                <div key={idx} className="py-3 grid grid-cols-4 gap-4 text-sm border-b border-gray-100 last:border-0">
-                  <div><span className="text-xs text-gray-400 block">Nome</span><span className="font-medium">{s.nome}</span></div>
-                  <div><span className="text-xs text-gray-400 block">Qualificação</span><span>{s.qualificacao}</span></div>
-                  <div><span className="text-xs text-gray-400 block">CPF/CNPJ</span><span className="font-mono text-xs text-gray-500">{s.cpfCnpj}</span></div>
-                  <div><span className="text-xs text-gray-400 block">Entrada</span><span className="text-gray-500">{s.dataEntrada ? new Date(s.dataEntrada + "T00:00:00").toLocaleDateString("pt-BR") : "-"}</span></div>
-                </div>
-              ))}
-            </div>
-          </>)}
-          </div>
-
-        </div>        )}
+        )}
         {activeTab === 'contabil' && (
           <div style={{ background:'#fff', border:'0.5px solid #E5E7EB', borderRadius:10, padding:32 }}>
             <p style={{ fontSize:12, color:'#9CA3AF', fontStyle:'italic' }}>Em desenvolvimento — configuracoes contabeis da empresa.</p>

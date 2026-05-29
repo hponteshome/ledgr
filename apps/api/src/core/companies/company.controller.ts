@@ -86,6 +86,7 @@ export class CompanyController {
     return company;
   }
 
+  @SkipCompanyCheck()
   @Get(':id')
   async findOne(@Param('id') id: string) {
     const company = await this.companyService.findById(id);

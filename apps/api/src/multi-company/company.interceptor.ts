@@ -36,7 +36,8 @@ export class CompanyInterceptor implements NestInterceptor {
     const isPublicRoute =
       url.includes('/auth/') ||
       url.includes('/companies/available') ||
-      url.includes('/companies/headquarters');
+      url.includes('/companies/headquarters') ||
+      url.match(/\/companies\/[0-9a-f-]{36}$/);
 
     if (isPublicRoute) return next.handle();
 

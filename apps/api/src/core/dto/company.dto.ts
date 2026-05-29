@@ -18,6 +18,7 @@ export class CompanyDto {
   equity?: number;
   legalNature?: string;
   size?: string;
+  mainActivity?: string;
   taxRegime?: string;
   status: string;
   statusDate?: Date;
@@ -66,6 +67,7 @@ export class CompanyDto {
     this.equity = company.equity;
     this.legalNature = company.legalNature;
     this.size = company.size;
+    this.mainActivity = company.mainActivity;
     this.taxRegime = company.taxRegime;
     this.status = company.status;
     this.statusDate = company.statusDate;

@@ -252,7 +252,7 @@ async findAvailable(user: any) {
       deletedAt: null,
       roles: { has: 'LEDGR_USER' },
       // Master Admin vê todas — usuário normal só vê ativas
-      ...(isMasterAdmin ? {} : { status: 'active' }),
+      ...(isMasterAdmin ? {} : { status: { in: ['active', 'ATIVA'] } }),
     },
     select: {
       id:            true,
