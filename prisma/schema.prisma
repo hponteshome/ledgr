@@ -202,6 +202,7 @@ model Company {
   codPlanRef             String?                   @map("cod_plan_ref") @db.VarChar(20)
   hashAnterior           String?                   @map("hash_anterior") @db.VarChar(255)
   tabelasRfbPath         String?                   @map("tabelas_rfb_path") @db.VarChar(500)
+  escritorioContabilId String? @map("escritorio_contabil_id") @db.Uuid
   pettyCashEntries       PettyCashEntry[]
   companyTaxRegimes      CompanyTaxRegime[]
 
@@ -368,6 +369,9 @@ model PersonCompany {
   startDate DateTime? @map("start_date") @db.Date
   endDate   DateTime? @map("end_date") @db.Date
   notes     String?   @map("notes") @db.VarChar
+  qualificacaoCvm   String?  @map("qualificacao_cvm") @db.VarChar(2)
+  assinaEcd         Boolean? @default(false) @map("assina_ecd")
+  assinaEcf         Boolean? @default(false) @map("assina_ecf")
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
 
