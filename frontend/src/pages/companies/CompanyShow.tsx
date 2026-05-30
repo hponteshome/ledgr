@@ -204,6 +204,29 @@ export const CompanyShow: React.FC = () => {
             </table>
           )}
         </Section>
+        <Section title="Preview J930 — Assinantes ECD/ECF" color="border-indigo-500">
+          {qsaLinks.filter((l: any) => l.assinaEcd || l.assinaEcf).length === 0 && (
+            <p className="text-sm text-gray-400 italic">Nenhum assinante definido. Configure na aba Contabil.</p>
+          )}
+          {qsaLinks.filter((l: any) => l.assinaEcd || l.assinaEcf).length > 0 && (
+            <div className="space-y-1">
+              <div className="text-gray-400 mb-2 text-[10px]" style={{fontFamily:"sans-serif"}}>Preview — Registro J930</div>
+              {qsaLinks.filter((l: any) => l.assinaEcd || l.assinaEcf).map((l: any) => {
+                const cpf = (l.person?.cpf || "").replace(/\D/g, "");
+                const nome = (l.person?.fullName || "").toUpperCase();
+                const crc = l.person?.crcNumber ? l.person.crcNumber + (l.person.crcState ? "/" + l.person.crcState : "") : "";
+                const indEcd = l.assinaEcd ? "1" : "0";
+                const indEcf = l.assinaEcf ? "1" : "0";
+                const linha = "|J930|05|" + cpf + "|" + nome + "|" + crc + "|||" + indEcd + "|" + indEcf + "|";
+                return (
+                  <div key={l.id} className="bg-amber-50 border border-amber-200 rounded px-3 py-2 text-xs font-mono text-blue-800 break-all">
+                    {linha}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </Section>
         <Section title="ECD — Escrituracao Contabil Digital" color="border-purple-500">
           <div className="grid grid-cols-3 gap-4">
             <Field label="NIRE" value={company.nire} />

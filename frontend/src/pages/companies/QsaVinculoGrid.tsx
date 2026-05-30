@@ -9,9 +9,9 @@ interface PersonLink {
   assinaEcd?: boolean; assinaEcf?: boolean;
   person: { id: string; fullName: string; cpf: string; };
 }
-interface Props { companyId: string; partners: QsaSocio[]; }
+interface Props { companyId: string; partners: QsaSocio[]; readOnly?: boolean; }
 
-export const QsaVinculoGrid: React.FC<Props> = ({ companyId, partners }) => {
+export const QsaVinculoGrid: React.FC<Props> = ({ companyId, partners, readOnly = false }) => {
   const navigate = useNavigate();
   const [links, setLinks] = useState<PersonLink[]>([]);
   const [saving, setSaving] = useState<string | null>(null);
@@ -79,12 +79,12 @@ export const QsaVinculoGrid: React.FC<Props> = ({ companyId, partners }) => {
               <tr key={i} className="hover:bg-gray-50">
                 <td className="py-2 text-center">
                   {link
-                    ? <input type="checkbox" checked={!!link.assinaEcd} disabled={!!busy} onChange={() => handleToggle(link, 'assinaEcd')} className="w-4 h-4 cursor-pointer" />
+                    ? <input type="checkbox" checked={!!link.assinaEcd} disabled={!!busy || readOnly} onChange={() => handleToggle(link, 'assinaEcd')} className={`w-4 h-4 ${readOnly ? "cursor-default opacity-60" : "cursor-pointer"}`} />
                     : <span className="text-gray-200">—</span>}
                 </td>
                 <td className="py-2 text-center">
                   {link
-                    ? <input type="checkbox" checked={!!link.assinaEcf} disabled={!!busy} onChange={() => handleToggle(link, 'assinaEcf')} className="w-4 h-4 cursor-pointer" />
+                    ? <input type="checkbox" checked={!!link.assinaEcf} disabled={!!busy || readOnly} onChange={() => handleToggle(link, 'assinaEcf')} className={`w-4 h-4 ${readOnly ? "cursor-default opacity-60" : "cursor-pointer"}`} />
                     : <span className="text-gray-200">—</span>}
                 </td>
                 <td className="py-2 font-medium text-gray-800">{socio.nome}</td>
