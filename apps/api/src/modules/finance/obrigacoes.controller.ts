@@ -8,17 +8,27 @@ import { ObrigacoesService } from "./obrigacoes.service";
 export class ObrigacoesController {
   constructor(private readonly svc: ObrigacoesService) {}
 
+  // GET /finance/obrigacoes?competence=2026-05
   @Get()
   findAll(@Request() req: any, @Query("competence") competence?: string) {
     if (competence) return this.svc.findByCompetence(req.companyId, competence);
     return this.svc.findAll(req.companyId);
   }
 
+  // POST /finance/obrigacoes/gerar/:competence
+  // Gera e persiste obrigações baseado no regime tributário cadastrado
+  @Post("gerar/:competence")
+  gerar(@Request() req: any, @Param("competence") competence: string) {
+    return this.svc.gerarObrigacoes(req.companyId, competence);
+  }
+
+  // POST /finance/obrigacoes/sync — sincroniza lista gerada pelo frontend
   @Post("sync")
   sync(@Request() req: any, @Body() body: { items: any[] }) {
     return this.svc.upsertMany(req.companyId, req.user.id, body.items);
   }
 
+  // PATCH /finance/obrigacoes/:code/:competence
   @Patch(":code/:competence")
   updateStatus(
     @Request() req: any,

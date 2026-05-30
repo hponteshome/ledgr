@@ -250,6 +250,7 @@ export function ObrigacoesPage() {
     if (!activeCompany) return;
     setSyncing(true);
     try {
+      await api.post(`/finance/obrigacoes/gerar/${competence}`);
       const r = await api.get(`/finance/obrigacoes?competence=${competence}`);
       const salvos: Record<string, string> = {};
       (r.data as any[]).forEach((o: any) => { salvos[o.code + "|" + o.competence] = o.status; });
@@ -465,5 +466,6 @@ export function ObrigacoesPage() {
     </div>
   );
 }
+
 
 

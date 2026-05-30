@@ -52,6 +52,7 @@ export function ObrigacoesWidget() {
     try {
       const today = new Date();
       const comp = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
+      await api.post(`/finance/obrigacoes/gerar/${comp}`);
       const r = await api.get(`/finance/obrigacoes?competence=${comp}`);
       const data: ObrigItem[] = (r.data as any[])
         .filter(o => o.status !== "DONE")
@@ -154,3 +155,4 @@ export function ObrigacoesWidget() {
     </div>
   );
 }
+
