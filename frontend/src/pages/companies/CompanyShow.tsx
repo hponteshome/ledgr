@@ -26,6 +26,10 @@ export const CompanyShow: React.FC = () => {
   const [company, setCompany] = useState<any>(null);
   const [accConfig, setAccConfig] = useState<any>(null);
   const [qsaLinks, setQsaLinks] = useState<any[]>([]);
+  const [regimes, setRegimes] = useState<any[]>([]);
+  const [showRegimeModal, setShowRegimeModal] = useState(false);
+  const [regimeForm, setRegimeForm] = useState({ dtIni: '', dtFin: '', formaTributacao: '2', periodoApuracaoIRPJ: 'A' });
+  const [savingRegime, setSavingRegime] = useState(false);
   const [history, setHistory] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'geral'|'contabil'|'esocial'|'sped'|'historico'>('geral');
 
@@ -33,6 +37,7 @@ export const CompanyShow: React.FC = () => {
     api.get('/companies/' + id).then(({ data }) => setCompany(data)).catch(() => navigate('/app/companies'));
     api.get('/accounting/config', { headers: { 'x-company-id': id } }).then(({ data }) => setAccConfig(data)).catch(() => {});
     api.get('/persons/links/company/' + id).then(({ data }) => setQsaLinks(data || [])).catch(() => {});
+    api.get('/companies/' + id + '/tax-regimes').then(({ data }) => setRegimes(data || [])).catch(() => {});
     api.get('/companies/' + id + '/history').then(({ data }) => setHistory(data || [])).catch(() => {});
   }, [id]);
 
@@ -190,6 +195,39 @@ export const CompanyShow: React.FC = () => {
       )}
 
       {activeTab === 'sped' && (
+        <>
+        <Section title="Regime Tributario por Exercicio" color="border-green-500">
+          <div className="mb-3 flex justify-end">
+            <button onClick={() => setShowRegimeModal(true)}
+              className="px-3 py-1.5 bg-green-600 text-white text-xs font-bold rounded-lg hover:bg-green-700 transition">
+              + Adicionar Regime
+            </button>
+          </div>
+          {regimes.length === 0 && <p className="text-sm text-gray-400 italic">Nenhum regime cadastrado.</p>}
+          {regimes.length > 0 && (
+            <table className="w-full text-xs">
+              <thead><tr className="border-b border-gray-100 text-gray-400 uppercase">
+                <th className="text-left py-2">Periodo</th>
+                <th className="text-left py-2">Regime</th>
+                <th className="text-left py-2">Apuracao IRPJ</th>
+                <th className="py-2"></th>
+              </tr></thead>
+              <tbody className="divide-y divide-gray-50">
+                {regimes.map((r: any) => (
+                  <tr key={r.id} className="hover:bg-gray-50">
+                    <td className="py-2 font-medium">{new Date(r.dtIni).toLocaleDateString('pt-BR')} — {new Date(r.dtFin).toLocaleDateString('pt-BR')}</td>
+                    <td className="py-2"><span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">{r.formaLabel}</span></td>
+                    <td className="py-2 text-gray-500">{r.periodoApuracaoIRPJ === 'A' ? 'Anual' : 'Trimestral'}</td>
+                    <td className="py-2 text-right">
+                      <button onClick={() => api.delete('/companies/' + id + '/tax-regimes/' + r.id).then(() => api.get('/companies/' + id + '/tax-regimes').then(({ data }) => setRegimes(data || [])))}
+                        className="text-red-400 hover:text-red-600 text-xs">Remover</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </Section>
         <Section title="ECD — Escrituracao Contabil Digital" color="border-purple-500">
           <div className="grid grid-cols-3 gap-4">
             <Field label="NIRE" value={company.nire} />
@@ -203,6 +241,7 @@ export const CompanyShow: React.FC = () => {
             <div className="col-span-3"><Field label="Caminho Tabelas RFB" value={company.tabelasRfbPath} /></div>
           </div>
         </Section>
+        </>
       )}
 
       {activeTab === 'historico' && (
@@ -240,6 +279,71 @@ export const CompanyShow: React.FC = () => {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {showRegimeModal && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6">
+            <h2 className="text-base font-bold text-gray-800 mb-4">Cadastrar Regime Tributario</h2>
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="text-xs font-bold text-gray-400 uppercase block mb-1">Data Inicio</label>
+                <input type="date" value={regimeForm.dtIni}
+                  onChange={e => setRegimeForm(p => ({...p, dtIni: e.target.value}))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-400 uppercase block mb-1">Data Fim</label>
+                <input type="date" value={regimeForm.dtFin}
+                  onChange={e => setRegimeForm(p => ({...p, dtFin: e.target.value}))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-400 uppercase block mb-1">Forma de Tributacao</label>
+                <select value={regimeForm.formaTributacao}
+                  onChange={e => setRegimeForm(p => ({...p, formaTributacao: e.target.value}))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
+                  <option value="1">1 - Lucro Real</option>
+                  <option value="2">2 - Lucro Presumido</option>
+                  <option value="3">3 - Simples Nacional</option>
+                  <option value="4">4 - Imune / Isenta</option>
+                  <option value="8">8 - MEI</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-400 uppercase block mb-1">Periodo Apuracao IRPJ</label>
+                <select value={regimeForm.periodoApuracaoIRPJ}
+                  onChange={e => setRegimeForm(p => ({...p, periodoApuracaoIRPJ: e.target.value}))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
+                  <option value="A">A - Anual</option>
+                  <option value="T">T - Trimestral</option>
+                </select>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setShowRegimeModal(false)} type="button"
+                className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700">Cancelar</button>
+              <button
+                disabled={savingRegime || !regimeForm.dtIni || !regimeForm.dtFin}
+                onClick={async () => {
+                  setSavingRegime(true);
+                  try {
+                    await api.post('/companies/' + id + '/tax-regimes', regimeForm);
+                    const { data } = await api.get('/companies/' + id + '/tax-regimes');
+                    setRegimes(data || []);
+                    setShowRegimeModal(false);
+                    setRegimeForm({ dtIni: '', dtFin: '', formaTributacao: '2', periodoApuracaoIRPJ: 'A' });
+                  } catch(e: any) {
+                    alert(e?.response?.data?.message || 'Erro ao salvar.');
+                  }
+                  setSavingRegime(false);
+                }}
+                className="px-5 py-2 bg-green-600 text-white text-sm font-bold rounded-lg hover:bg-green-700 disabled:opacity-50">
+                {savingRegime ? 'Salvando...' : 'Salvar'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
