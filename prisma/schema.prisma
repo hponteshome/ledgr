@@ -70,6 +70,7 @@ model User {
   updatedApEntries  ApEntry[]                 @relation("UpdatedApEntries")
   accountingConfigs CompanyAccountingConfig[] @relation("AccountingConfigCreator")
   fiscalObligationsDone FiscalObligation[] @relation("ObrigacaoDoneBy")
+  companyHistories      CompanyHistory[]    @relation("CompanyHistoryChangedBy")
   maskConfigs       CompanyMaskConfig[]       @relation("MaskConfigCreator")
 
   @@map("users")
@@ -206,6 +207,7 @@ model Company {
   escritorioContabilId String? @map("escritorio_contabil_id") @db.Uuid
   pettyCashEntries       PettyCashEntry[]
   fiscalObligations      FiscalObligation[]
+  history                CompanyHistory[]
   companyTaxRegimes      CompanyTaxRegime[]
   @@map("companies")
 }
@@ -3037,4 +3039,25 @@ model FiscalObligation {
   @@index([companyId, dueDate])
   @@index([companyId, status])
   @@map("fiscal_obligations")
+}
+
+// =============================================================================
+// HISTORICO CADASTRAL DE EMPRESAS
+// =============================================================================
+
+model CompanyHistory {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId   String    @map("company_id") @db.Uuid
+  source      String    @map("source") @db.VarChar(20)
+  changedById String    @map("changed_by_id") @db.Uuid
+  changedAt   DateTime  @default(now()) @map("changed_at") @db.Timestamp(6)
+  changes     Json      @map("changes") @db.Json
+  appliedAt   DateTime? @map("applied_at") @db.Timestamp(6)
+  notes       String?   @map("notes") @db.Text
+
+  company   Company @relation(fields: [companyId], references: [id])
+  changedBy User    @relation("CompanyHistoryChangedBy", fields: [changedById], references: [id])
+
+  @@index([companyId, changedAt])
+  @@map("company_history")
 }
