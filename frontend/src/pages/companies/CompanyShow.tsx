@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { FiEdit2 } from 'react-icons/fi';
 import api from '../../services/api';
+import { FiClock, FiCheckCircle, FiAlertTriangle } from 'react-icons/fi';
 
 const L = ({ children }: { children: React.ReactNode }) => (
   <span className="text-[9px] font-black text-gray-400 uppercase tracking-tighter block mb-0.5">{children}</span>
@@ -25,12 +26,14 @@ export const CompanyShow: React.FC = () => {
   const [company, setCompany] = useState<any>(null);
   const [accConfig, setAccConfig] = useState<any>(null);
   const [qsaLinks, setQsaLinks] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<'geral'|'contabil'|'esocial'|'sped'>('geral');
+  const [history, setHistory] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState<'geral'|'contabil'|'esocial'|'sped'|'historico'>('geral');
 
   useEffect(() => {
     api.get('/companies/' + id).then(({ data }) => setCompany(data)).catch(() => navigate('/app/companies'));
     api.get('/accounting/config', { headers: { 'x-company-id': id } }).then(({ data }) => setAccConfig(data)).catch(() => {});
     api.get('/persons/links/company/' + id).then(({ data }) => setQsaLinks(data || [])).catch(() => {});
+    api.get('/companies/' + id + '/history').then(({ data }) => setHistory(data || [])).catch(() => {});
   }, [id]);
 
   if (!company) return <div className="p-8 text-gray-400 text-sm">Carregando...</div>;
@@ -40,6 +43,7 @@ export const CompanyShow: React.FC = () => {
     { key: 'contabil', label: 'Contabil' },
     { key: 'esocial', label: 'eSocial' },
     { key: 'sped', label: 'SPED/ECD' },
+    { key: 'historico', label: 'Historico' },
   ] as const;
 
   return (
@@ -199,6 +203,44 @@ export const CompanyShow: React.FC = () => {
             <div className="col-span-3"><Field label="Caminho Tabelas RFB" value={company.tabelasRfbPath} /></div>
           </div>
         </Section>
+      )}
+
+      {activeTab === 'historico' && (
+        <div className="space-y-4">
+          {history.length === 0 && (
+            <div className="bg-white border border-gray-100 rounded-xl p-8 text-center text-gray-400 text-sm">
+              Nenhuma alteracao registrada.
+            </div>
+          )}
+          {history.map((h: any) => {
+            const isRfb = h.source === 'RFB_SYNC';
+            const changes: any[] = Array.isArray(h.changes) ? h.changes : [];
+            return (
+              <div key={h.id} className="bg-white border border-gray-100 rounded-xl overflow-hidden">
+                <div className="flex items-center justify-between px-5 py-3 border-b border-gray-50" style={{ background: isRfb ? '#EFF6FF' : '#F5F3FF' }}>
+                  <div className="flex items-center gap-2">
+                    <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 10px', borderRadius: 20, background: isRfb ? '#DBEAFE' : '#EDE9FE', color: isRfb ? '#1D4ED8' : '#6D28D9' }}>
+                      {isRfb ? 'Sincronizacao RFB' : 'Edicao Manual'}
+                    </span>
+                    <span className="text-xs text-gray-500">por {h.changedBy?.fullName || h.changedBy?.email || 'Sistema'}</span>
+                  </div>
+                  <div className="text-xs text-gray-400">
+                    {new Date(h.changedAt).toLocaleString('pt-BR')}
+                  </div>
+                </div>
+                <div className="px-5 py-3 divide-y divide-gray-50">
+                  {changes.map((c: any, idx: number) => (
+                    <div key={idx} className="py-2 grid grid-cols-3 gap-4 text-xs">
+                      <div className="font-semibold text-gray-500 uppercase tracking-wide">{c.label}</div>
+                      <div className="text-red-500">{c.oldValue || '—'}</div>
+                      <div className="text-emerald-600 font-medium">{c.newValue || '—'}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       )}
     </div>
   );

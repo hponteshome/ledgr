@@ -5,6 +5,7 @@ import { useSearchParams } from 'react-router-dom';
 import api from '../../services/api';
 import { toast } from 'react-toastify';
 import SearchRFBButton from '../../components/SearchRFBButton';
+import { RfbComparePanel } from '../../components/RfbComparePanel';
 import { ContabilTab } from './ContabilTab';
 
 const inputCls = 'w-full p-2.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400';
@@ -137,9 +138,10 @@ export const CompanyEdit: React.FC = () => {
             </h1>
           </div>
           <div className="flex gap-3 items-center">
-            <SearchRFBButton
+            <RfbComparePanel
+              companyId={id || ''}
               cnpj={formData.taxId || ''}
-              onDadosRecebidos={handleRFBData}
+              onApplied={() => api.get(`/companies/${id}`).then(({ data }) => setFormData(data))}
             />
             <button type="button" onClick={() => navigate(-1)}
               className="px-4 py-2 text-gray-400 font-bold text-xs uppercase hover:text-red-500 transition">
@@ -325,3 +327,4 @@ export const CompanyEdit: React.FC = () => {
     </div>
   );
 };
+
