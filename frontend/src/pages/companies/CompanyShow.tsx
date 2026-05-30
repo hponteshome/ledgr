@@ -224,6 +224,17 @@ export const CompanyShow: React.FC = () => {
                   </div>
                 );
               })}
+              {accConfig?.accountantCpf && (() => {
+                const cpf = (accConfig.accountantCpf || "").replace(/\D/g, "");
+                const nome = (accConfig.accountantName || "").toUpperCase();
+                const crc = accConfig.accountantCrc ? accConfig.accountantCrc + (accConfig.accountantCrcState ? "/" + accConfig.accountantCrcState : "") : "";
+                const linha = "|J930|63|" + cpf + "|" + nome + "|" + crc + "|||0|0|";
+                return (
+                  <div className="bg-amber-50 border border-amber-200 rounded px-3 py-2 text-xs font-mono text-blue-800 break-all">
+                    {linha}
+                  </div>
+                );
+              })()}
             </div>
           )}
         </Section>
