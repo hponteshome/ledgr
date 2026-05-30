@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { FiEdit2 } from 'react-icons/fi';
 import api from '../../services/api';
+import { QsaVinculoGrid } from './QsaVinculoGrid';
 import { FiClock, FiCheckCircle, FiAlertTriangle } from 'react-icons/fi';
 
 const L = ({ children }: { children: React.ReactNode }) => (
@@ -160,32 +161,7 @@ export const CompanyShow: React.FC = () => {
         </div>
       )}
           {company.partners && company.partners.length > 0 && (
-            <Section title="QSA — Responsabilidades SPED" color="border-indigo-500">
-              <table className="w-full text-sm">
-                <thead><tr className="text-xs text-gray-400 uppercase border-b border-gray-100">
-                  <th className="text-left py-2">Nome</th>
-                  <th className="text-left py-2">Qualificacao</th>
-                  <th className="text-center py-2">Assina ECD</th>
-                  <th className="text-center py-2">Assina ECF</th>
-                </tr></thead>
-                <tbody className="divide-y divide-gray-50">
-                  {company.partners.map((s: any, idx: number) => {
-                    const link = qsaLinks.find((l: any) => {
-                      const digits = (s.cpfCnpj || "").replace(/\*/g,"").replace(/\D/g,"");
-                      return digits.length >= 4 && l.person?.cpf?.replace(/\D/g,"").includes(digits);
-                    });
-                    return (
-                      <tr key={idx} className="hover:bg-gray-50">
-                        <td className="py-2 font-medium">{s.nome}</td>
-                        <td className="py-2 text-xs text-gray-500">{s.qualificacao}</td>
-                        <td className="py-2 text-center">{link?.assinaEcd ? "✓" : "—"}</td>
-                        <td className="py-2 text-center">{link?.assinaEcf ? "✓" : "—"}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </Section>
+            <QsaVinculoGrid companyId={id!} partners={company.partners} />
           )}
 
       {activeTab === 'esocial' && (
