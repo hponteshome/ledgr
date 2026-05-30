@@ -8,6 +8,7 @@ import {
   FiBarChart2, FiAlertCircle,
 } from 'react-icons/fi';
 import api from '../services/api';
+import { ObrigacoesWidget } from '../components/ObrigacoesWidget';
 import { useCompany } from '../contexts/CompanyContext';
 
 interface DashKpi {
@@ -397,6 +398,9 @@ export const DashboardPage: React.FC = () => {
         </div>
       </div>
 
+      {/* WIDGET OBRIGAÇÕES */}
+      <ObrigacoesWidget />
+
       {/* PAINEIS INFERIORES */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
 
@@ -468,3 +472,4 @@ export const DashboardPage: React.FC = () => {
 };
 
 export default DashboardPage;
+
