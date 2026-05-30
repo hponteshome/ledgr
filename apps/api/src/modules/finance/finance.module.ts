@@ -10,6 +10,8 @@ import { PrismaModule } from '@/prisma/prisma.module';
 import { ProvisaoController } from './provisao.controller';
 import { ProvisaoService } from './provisao.service';
 import { FechamentoController } from './fechamento.controller';
+import { ObrigacoesController } from './obrigacoes.controller';
+import { ObrigacoesService } from './obrigacoes.service';
 import { FechamentoService } from './fechamento.service';
 import { AccountsReceivableController } from './accounts-receivable.controller';
 import { AccountsReceivableService } from './accounts-receivable.service';
@@ -20,9 +22,9 @@ import { PettyCashService } from './petty-cash.service';
 
 @Module({
   imports: [PrismaModule],
-  controllers: [FinanceController, ProvisaoController, FechamentoController, AccountsReceivableController, CashflowController, PettyCashController],
-  providers: [FinanceService, IntegrationService, AgendaService, ProvisaoService, FechamentoService, AccountsReceivableService, CashflowService, PettyCashService],
-  exports: [FinanceService, AgendaService, IntegrationService, ProvisaoService, FechamentoService, AccountsReceivableService],
+  controllers: [FinanceController, ProvisaoController, FechamentoController, ObrigacoesController, AccountsReceivableController, CashflowController, PettyCashController],
+  providers: [FinanceService, IntegrationService, AgendaService, ProvisaoService, FechamentoService, ObrigacoesService, AccountsReceivableService, CashflowService, PettyCashService],
+  exports: [FinanceService, AgendaService, IntegrationService, ProvisaoService, FechamentoService, ObrigacoesService, AccountsReceivableService],
 })
 export class FinanceModule {}
 
@@ -37,3 +39,4 @@ export class FinanceModule {}
 //     FinanceModule,   // <-- adicionar aqui
 //   ],
 // })
+

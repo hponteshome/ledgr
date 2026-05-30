@@ -1,6 +1,7 @@
 // frontend/src/pages/finance/FechamentoPage.tsx
 import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
+import { useCompany } from '../../contexts/CompanyContext';
 import Swal from 'sweetalert2';
 
 const fmtBRL = (v: any) => Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -166,6 +167,30 @@ function ReabrirModal({ competencia, onClose, onSaved }: { competencia: string; 
 }
 
 export default function FechamentoPage() {
+  const { companies, activeCompany, selectCompany } = useCompany();
+  const [visaoGeral, setVisaoGeral] = useState(true);
+  const [statusEmpresas, setStatusEmpresas] = useState<Record<string, any>>({});
+  const [loadingEmpresas, setLoadingEmpresas] = useState(false);
+
+  const loadStatusEmpresas = async (comp: string) => {
+    setLoadingEmpresas(true);
+    const results: Record<string, any> = {};
+    await Promise.all(
+      companies.map(async (emp) => {
+        try {
+          const r = await api.get('/finance/fechamento/' + comp, {
+            headers: { 'x-company-id': emp.id },
+          });
+          results[emp.id] = r.data;
+        } catch {
+          results[emp.id] = null;
+        }
+      })
+    );
+    setStatusEmpresas(results);
+    setLoadingEmpresas(false);
+  };
+
   const [competencia, setCompetencia] = useState(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -207,6 +232,7 @@ export default function FechamentoPage() {
   };
 
   useEffect(() => { loadFechamento(); }, [competencia]);
+  useEffect(() => { if (visaoGeral && companies.length > 0) loadStatusEmpresas(competencia); }, [visaoGeral, competencia, companies]);
   useEffect(() => { if (tab === 'historico') loadHistorico(); }, [tab]);
 
   const calcular = async () => {
@@ -330,18 +356,98 @@ export default function FechamentoPage() {
 
   const tabStyle = (t: string) => ({ height: 30, border: `0.5px solid ${tab === t ? '#111' : '#D1D5DB'}`, borderRadius: 6, padding: '0 14px', fontSize: 12, cursor: 'pointer', background: tab === t ? '#111' : '#fff', color: tab === t ? '#fff' : '#374151' });
 
+  const STATUS_COR: Record<string, {bg:string;color:string;border:string}> = {
+    ABERTO:         { bg: "#F9FAFB", color: "#6B7280", border: "#E5E7EB" },
+    EM_FECHAMENTO:  { bg: "#FEFCE8", color: "#854D0E", border: "#FDE68A" },
+    FECHADO_PREVIO: { bg: "#FFF7ED", color: "#C2410C", border: "#FED7AA" },
+    FECHADO:        { bg: "#F0FDF4", color: "#15803D", border: "#86EFAC" },
+    REABERTO:       { bg: "#FFF7ED", color: "#C2410C", border: "#FED7AA" },
+  };
+
   return (
     <div style={S.page}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
         <span style={S.badge}>◆ Finance</span>
         <span style={S.h1}>Fechamento Mensal</span>
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
-          <button style={tabStyle('atual')} onClick={() => setTab('atual')}>Competência atual</button>
-          <button style={tabStyle('historico')} onClick={() => setTab('historico')}>Histórico</button>
+        <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+          {!visaoGeral && <button style={tabStyle("atual")} onClick={() => setTab("atual")}>Competência atual</button>}
+          {!visaoGeral && <button style={tabStyle("historico")} onClick={() => setTab("historico")}>Histórico</button>}
+          <button style={{ ...S.btn, background: visaoGeral ? "#111" : "#fff", color: visaoGeral ? "#fff" : "#374151" }}
+            onClick={() => setVisaoGeral(v => !v)}>
+            {visaoGeral ? "⊞ Visão Geral" : "← Voltar"}
+          </button>
         </div>
       </div>
 
-      {tab === 'atual' && (
+      {/* ── VISÃO GERAL ── */}
+      {visaoGeral && (
+        <div>
+          <div style={{ ...S.card, marginBottom: 16 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+              <div>
+                <label style={{ fontSize: 10, textTransform: "uppercase", color: "#6B7280", display: "block", marginBottom: 3 }}>Competência</label>
+                <input style={{ ...S.input, width: 160 }} type="month" value={competencia}
+                  onChange={e => e.target.value && setCompetencia(e.target.value)} />
+              </div>
+              <div style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
+                {loadingEmpresas && <span style={{ fontSize: 12, color: "#9CA3AF" }}>Carregando...</span>}
+                <button style={S.btn} onClick={() => loadStatusEmpresas(competencia)}>⟳ Atualizar</button>
+              </div>
+            </div>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
+            {companies.map(emp => {
+              const dado = statusEmpresas[emp.id];
+              const status = dado?.status ?? "ABERTO";
+              const st = STATUS_FECHAMENTO[status] ?? STATUS_FECHAMENTO.ABERTO;
+              const cor = STATUS_COR[status] ?? STATUS_COR.ABERTO;
+              const total = dado?.itens?.length ?? 0;
+              const conferidosEmp = dado?.itens?.filter((i: any) => ["CONFERIDO","GERADO"].includes(i.status)).length ?? 0;
+              const pendentesEmp = dado?.itens?.filter((i: any) => i.status === "PENDENTE").length ?? 0;
+              const progresso = total > 0 ? Math.round((conferidosEmp / total) * 100) : 0;
+              const isAtiva = activeCompany?.id === emp.id;
+              return (
+                <div key={emp.id}
+                  onClick={() => { selectCompany(emp); setVisaoGeral(false); setTab("atual"); }}
+                  style={{ background: "#fff", border: `1.5px solid ${isAtiva ? "#6366F1" : cor.border}`, borderRadius: 10, padding: "16px 18px", cursor: "pointer", boxShadow: isAtiva ? "0 0 0 3px #EEF2FF" : "0 1px 3px rgba(0,0,0,.04)" }}
+                  onMouseEnter={e => (e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,.08)")}
+                  onMouseLeave={e => (e.currentTarget.style.boxShadow = isAtiva ? "0 0 0 3px #EEF2FF" : "0 1px 3px rgba(0,0,0,.04)")}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "#111" }}>{emp.tradeName || emp.legalName}</div>
+                      <div style={{ fontSize: 10, color: "#9CA3AF", marginTop: 2 }}>{emp.taxId}</div>
+                    </div>
+                    <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 20, background: cor.bg, color: cor.color, whiteSpace: "nowrap" }}>
+                      {st.icon} {st.label}
+                    </span>
+                  </div>
+                  {total > 0 && (
+                    <>
+                      <div style={{ height: 4, background: "#F3F4F6", borderRadius: 4, marginBottom: 8, overflow: "hidden" }}>
+                        <div style={{ height: "100%", width: `${progresso}%`, background: status === "FECHADO" ? "#22C55E" : "#6366F1", borderRadius: 4 }} />
+                      </div>
+                      <div style={{ display: "flex", gap: 12, fontSize: 11, color: "#6B7280" }}>
+                        <span>📋 {total} itens</span>
+                        <span style={{ color: "#15803D" }}>✓ {conferidosEmp} conf.</span>
+                        {pendentesEmp > 0 && <span style={{ color: "#854D0E" }}>⏳ {pendentesEmp} pend.</span>}
+                      </div>
+                    </>
+                  )}
+                  {total === 0 && <div style={{ fontSize: 11, color: "#D1D5DB", fontStyle: "italic" }}>Sem itens calculados</div>}
+                  <div style={{ marginTop: 12, paddingTop: 10, borderTop: "0.5px solid #F3F4F6", fontSize: 11, color: "#9CA3AF", display: "flex", justifyContent: "space-between" }}>
+                    <span>{dado?.fechadoEm ? "🔒 " + new Date(dado.fechadoEm).toLocaleDateString("pt-BR") : "Não fechado"}</span>
+                    <span style={{ color: "#6366F1", fontWeight: 500 }}>Abrir →</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {!visaoGeral && (
+      <>
+      {tab === "atual" && (
         <>
           {/* Controles */}
           <div style={S.card}>
@@ -566,6 +672,8 @@ export default function FechamentoPage() {
           onClose={() => setShowReabrir(false)}
           onSaved={() => { setShowReabrir(false); loadFechamento(); }}
         />
+      )}
+      </>
       )}
     </div>
   );

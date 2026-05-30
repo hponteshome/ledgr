@@ -69,6 +69,7 @@ model User {
   createdApEntries  ApEntry[]                 @relation("CreatedApEntries")
   updatedApEntries  ApEntry[]                 @relation("UpdatedApEntries")
   accountingConfigs CompanyAccountingConfig[] @relation("AccountingConfigCreator")
+  fiscalObligationsDone FiscalObligation[] @relation("ObrigacaoDoneBy")
   maskConfigs       CompanyMaskConfig[]       @relation("MaskConfigCreator")
 
   @@map("users")
@@ -204,8 +205,8 @@ model Company {
   tabelasRfbPath         String?                   @map("tabelas_rfb_path") @db.VarChar(500)
   escritorioContabilId String? @map("escritorio_contabil_id") @db.Uuid
   pettyCashEntries       PettyCashEntry[]
+  fiscalObligations      FiscalObligation[]
   companyTaxRegimes      CompanyTaxRegime[]
-
   @@map("companies")
 }
 
@@ -3000,4 +3001,40 @@ model AccountingViewMapping {
   @@index([viewId])
   @@index([accountId])
   @@map("accounting_view_mappings")
+}
+
+// =============================================================================
+// OBRIGAÇÕES FISCAIS
+// =============================================================================
+
+enum FiscalObligationStatus {
+  PENDING
+  IN_PROGRESS
+  DONE
+  OVERDUE
+}
+
+/// Obrigações fiscais e acessórias por empresa/competência.
+/// Geradas automaticamente pelo sistema com base no regime tributário.
+/// Competência mensal: YYYY-MM. Competência anual: YYYY.
+model FiscalObligation {
+  id          String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId   String                 @map("company_id") @db.Uuid
+  code        String                 @map("code") @db.VarChar(30)
+  competence  String                 @map("competence") @db.VarChar(7)
+  dueDate     DateTime               @map("due_date") @db.Date
+  status      FiscalObligationStatus @default(PENDING) @map("status")
+  notes       String?                @map("notes") @db.Text
+  doneAt      DateTime?              @map("done_at") @db.Timestamp(6)
+  doneById    String?                @map("done_by_id") @db.Uuid
+  createdAt   DateTime               @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt   DateTime               @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  company  Company @relation(fields: [companyId], references: [id])
+  doneBy   User?   @relation("ObrigacaoDoneBy", fields: [doneById], references: [id])
+
+  @@unique([companyId, code, competence])
+  @@index([companyId, dueDate])
+  @@index([companyId, status])
+  @@map("fiscal_obligations")
 }

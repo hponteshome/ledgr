@@ -66,6 +66,7 @@ import RendaFixaPage from '../pages/accounting/investments/RendaFixaPage';
 import CdiTabelaPage from '../pages/accounting/investments/CdiTabelaPage';
 import { IndicadoresPage } from '../pages/sistema/IndicadoresPage';
 import { CalendarioPage } from '../pages/sistema/CalendarioPage';
+import { ObrigacoesPage } from '../pages/sistema/ObrigacoesPage';
 import { TabelasLegaisPage } from '../pages/sistema/TabelasLegaisPage';
 import ShareholdersPage from '../pages/corporate/shareholders/ShareholdersPage';
 import { RepositorioPage } from '../pages/documentos/RepositorioPage';
@@ -108,6 +109,7 @@ export const AppRoutes = () => {
                 <Route path="app/accounting/investimentos/cdi" element={<ProtectedRoute><CdiTabelaPage /></ProtectedRoute>} />
                 <Route path="app/sistema/indicadores" element={<ProtectedRoute><IndicadoresPage /></ProtectedRoute>} />
                 <Route path="app/sistema/calendario" element={<ProtectedRoute><CalendarioPage /></ProtectedRoute>} />
+                <Route path="app/sistema/obrigacoes" element={<ProtectedRoute><ObrigacoesPage /></ProtectedRoute>} />
                 <Route path="app/sistema/tabelas" element={<ProtectedRoute><TabelasLegaisPage /></ProtectedRoute>} />
                 <Route path="app/finance/fechamento" element={<ProtectedRoute><FechamentoPage /></ProtectedRoute>} />
                 <Route path="app/finance/petty-cash" element={<ProtectedRoute><PettyCashPage /></ProtectedRoute>} />
@@ -220,6 +222,7 @@ export const AppRoutes = () => {
         </Routes>
     );
 };
+
 
 
 

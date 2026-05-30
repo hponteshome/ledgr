@@ -4,7 +4,7 @@ import {
   FiHome, FiBriefcase, FiUsers, FiDollarSign, FiFileText, FiMenu,
   FiChevronLeft, FiChevronDown, FiChevronRight, FiActivity, FiSettings,
   FiFolder, FiBook, FiPenTool, FiClipboard, FiShield, FiLayers,
-  FiUserCheck, FiUpload, FiDatabase, FiPieChart, FiCalendar,
+  FiUserCheck, FiUpload, FiDatabase, FiPieChart, FiCalendar, FiCheckCircle,
   FiServer, FiEdit2, FiEdit3, FiPackage, FiTool, FiTruck, FiTrendingUp,
   FiAlertCircle, FiTrendingDown, FiLogOut, FiBarChart2, FiArchive, FiBookOpen, FiCpu, FiRepeat, FiLock} from 'react-icons/fi';
 import { useCompany } from '../contexts/CompanyContext';
@@ -113,6 +113,7 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
       surface: '#F9FAFB',
       children: [
         { path: '/app/sistema/calendario', label: 'Calendario de Feriados', icon: FiCalendar },
+        { path: '/app/sistema/obrigacoes', label: 'Obrigacoes Fiscais', icon: FiCheckCircle },
         { path: '/app/sistema/indicadores', label: 'Indicadores Economicos', icon: FiBarChart2 },
         { path: '/app/sistema/tabelas', label: 'Tabelas Legais', icon: FiBook },
         { path: '/app/system/backup', label: 'Backup e Restauração', icon: FiDatabase },
@@ -374,6 +375,11 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
     </>
   );
 };
+
+
+
+
+
 
 
 
