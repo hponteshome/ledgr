@@ -66,6 +66,7 @@ interface FormData {
   cpf: string;
   fullName: string;
   nickname: string;
+  occupation: string;
   motherName: string;
   fatherName: string;
   // Dados pessoais
@@ -131,7 +132,7 @@ interface CompanyLink {
 }
 
 const EMPTY: FormData = {
-  cpf: '', fullName: '', nickname: '',
+  cpf: '', fullName: '', nickname: '', occupation: '',
   motherName: '', fatherName: '',
   birthDate: '', birthCity: '', birthState: '', birthCountry: 'Brasil', dependents: [],
   nationality: '',
@@ -162,7 +163,7 @@ const fmtPhone = (v: string) => {
   return d.replace(/(\d{2})(\d{5})(\d{0,4})/, '($1) $2-$3').trimEnd();
 };
 
-const fmtCep = (v: string) => v.replace(/\D/g, '').slice(0, 8);
+const fmtCep = (v: string) => { const d = v.replace(/\D/g,'').slice(0,8); return d.length === 8 ? d.replace(/(\d{5})(\d{3})/, d.slice(0,5) + '-' + d.slice(5)) : d; };
 
 // ── Helpers de payload - converte strings vazias em undefined ──
 function toPayload(form: FormData): Record<string, any> {
@@ -282,6 +283,7 @@ export const PersonForm: React.FC = () => {
           cpf: data.cpf ?? '',
           fullName: data.fullName ?? '',
           nickname: data.nickname ?? '',
+          occupation: data.occupation ?? '',
           motherName: data.motherName ?? '',
           fatherName: data.fatherName ?? '',
           birthDate: data.birthDate ? data.birthDate.slice(0, 10) : '',
@@ -608,7 +610,7 @@ export const PersonForm: React.FC = () => {
               <Field label="CPF" required>
                 <input
                   type="text"
-                  value={form.cpf}
+                  value={fmtCpf(form.cpf)}
                   onChange={e => { set('cpf', fmtCpf(e.target.value)); setCpfError(''); }}
                   placeholder="000.000.000-00"
                   maxLength={14}
@@ -629,11 +631,16 @@ export const PersonForm: React.FC = () => {
               </div>
             </Grid>
 
-            <Grid cols={2}>
+            <Grid cols={3}>
               <Field label="Nome Social / Apelido">
                 <input type="text" value={form.nickname}
                   onChange={e => set('nickname', e.target.value)}
                   placeholder="Como é conhecido(a)" className={inputCls} />
+              </Field>
+              <Field label="Profissão">
+                <input type="text" value={form.occupation}
+                  onChange={e => set('occupation', e.target.value)}
+                  placeholder="Ex: Contador, Advogado, Engenheiro…" className={inputCls} />
               </Field>
               <Field label="Nacionalidade">
                 <input type="text" value={form.nationality}
@@ -916,12 +923,12 @@ export const PersonForm: React.FC = () => {
                   placeholder="email@exemplo.com" className={inputCls} />
               </Field>
               <Field label="Telefone / WhatsApp">
-                <input type="text" value={form.phone1}
+                <input type="text" value={fmtPhone(form.phone1)}
                   onChange={e => set('phone1', fmtPhone(e.target.value))}
                   placeholder="(00) 99999-9999" className={inputCls} />
               </Field>
               <Field label="Telefone 2">
-                <input type="text" value={form.phone2}
+                <input type="text" value={fmtPhone(form.phone2)}
                   onChange={e => set('phone2', fmtPhone(e.target.value))}
                   placeholder="(00) 99999-9999" className={inputCls} />
               </Field>
@@ -935,7 +942,7 @@ export const PersonForm: React.FC = () => {
                 <Field label="CEP">
                   <input
                     type="text"
-                    value={form.zipCode}
+                    value={fmtCep(form.zipCode)}
                     onChange={e => {
                       const v = fmtCep(e.target.value);
                       set('zipCode', v);
@@ -1292,5 +1299,4 @@ export const PersonForm: React.FC = () => {
     </div >
   );
 };
-
 

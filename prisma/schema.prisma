@@ -302,6 +302,7 @@ model Person {
   rgIssuer      String?   @map("rg_issuer") @db.VarChar
   rgIssueDate   DateTime? @map("rg_issue_date") @db.Date
   cnh           String?   @map("cnh") @db.VarChar
+  occupation    String?   @map("occupation") @db.VarChar
   passport      String?   @map("passport") @db.VarChar
   tituloEleitor String?   @map("titulo_eleitor") @db.VarChar
 

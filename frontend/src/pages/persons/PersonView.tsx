@@ -31,6 +31,25 @@ const fmtDate = (v?: string | null) => {
   if (!v) return '—';
   try { return new Date(v).toLocaleDateString('pt-BR'); } catch { return v; }
 };
+const fmtCpf = (v?: string | null) => {
+  if (!v) return "—";
+  const d = v.replace(/\D/g,"");
+  if (d.length === 11) return d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
+  return v;
+};
+const fmtPhone = (v?: string | null) => {
+  if (!v) return "—";
+  const d = v.replace(/\D/g,"");
+  if (d.length === 11) return d.replace(/(\d{2})(\d{5})(\d{4})/, "($1) $2-$3");
+  if (d.length === 10) return d.replace(/(\d{2})(\d{4})(\d{4})/, "($1) $2-$3");
+  return v;
+};
+const fmtCep = (v?: string | null) => {
+  if (!v) return "—";
+  const d = v.replace(/\D/g,"");
+  if (d.length === 8) return d.replace(/(\d{5})(\d{3})/, "$1-$2");
+  return v;
+};
 
 // ── Sub-componentes ───────────────────────────────────────────
 function Section({ icon, title, children }: {
@@ -166,14 +185,15 @@ export const PersonView: React.FC = () => {
         {/* 1. Identificação Civil */}
         <Section icon={<FiUser size={16} />} title="Identificação Civil">
           <Grid cols={3}>
-            <Row label="CPF" value={person.cpf} mono />
+            <Row label="CPF" value={fmtCpf(person.cpf)} mono />
             <div className="sm:col-span-2">
               <Row label="Nome Completo" value={person.fullName} />
             </div>
           </Grid>
           <div className="mt-5">
-            <Grid cols={2}>
+            <Grid cols={3}>
               <Row label="Nome Social / Apelido" value={person.nickname} />
+              <Row label="Profissão" value={person.occupation} />
               <Row label="Nacionalidade" value={person.nationality} />
             </Grid>
           </div>
@@ -205,7 +225,7 @@ export const PersonView: React.FC = () => {
               <Grid cols={3}>
                 <Row label="Regime de Bens" value={person.matrimonialRegime ? REGIME_LABEL[person.matrimonialRegime] : undefined} />
                 <Row label="Nome do Cônjuge" value={person.spouseName} />
-                <Row label="CPF do Cônjuge" value={person.spouseCpf} mono />
+                <Row label="CPF do Cônjuge" value={fmtCpf(person.spouseCpf)} mono />
               </Grid>
             </div>
           )}
@@ -249,15 +269,15 @@ export const PersonView: React.FC = () => {
         <Section icon={<FiPhone size={16} />} title="Contato">
           <Grid cols={3}>
             <Row label="E-mail" value={person.email} />
-            <Row label="Telefone / WhatsApp" value={person.phone1} />
-            <Row label="Telefone 2" value={person.phone2} />
+            <Row label="Telefone / WhatsApp" value={fmtPhone(person.phone1)} />
+            <Row label="Telefone 2" value={fmtPhone(person.phone2)} />
           </Grid>
         </Section>
 
         {/* 5. Endereço */}
         <Section icon={<FiMapPin size={16} />} title="Endereço">
           <Grid cols={3}>
-            <Row label="CEP" value={person.zipCode} mono />
+            <Row label="CEP" value={fmtCep(person.zipCode)} mono />
             <div className="sm:col-span-2">
               <Row label="Logradouro" value={
                 [person.street, person.number, person.complement].filter(Boolean).join(', ') || undefined
