@@ -1307,6 +1307,7 @@ model FixedAsset {
   depreciationLogs AssetDepreciationLog[]
   appraisals       AssetAppraisal[]
   history          AssetHistory[]
+  arEntries        ArEntry[]      @relation("ArEntryAsset")
 
   @@unique([companyId, internalCode])
   @@index([companyId, status])
@@ -1878,6 +1879,7 @@ model ArEntry {
   customerCnpjCpf String? @map("customer_cnpj_cpf") @db.VarChar(18)
 
   // Vínculos
+  fixedAssetId     String? @map("fixed_asset_id") @db.Uuid
   propertyId       String? @map("property_id") @db.Uuid
   fiscalDocumentId String? @map("fiscal_document_id") @db.Uuid
   journalEntryId   String? @map("journal_entry_id") @db.Uuid
@@ -1894,8 +1896,9 @@ model ArEntry {
   deletedAt   DateTime? @map("deleted_at") @db.Timestamp(6)
 
   company  Company     @relation(fields: [companyId], references: [id])
-  customer Person?     @relation("ArEntryCustomer", fields: [customerId], references: [id])
-  property Property?   @relation("ArEntryProperty", fields: [propertyId], references: [id])
+  customer    Person?     @relation("ArEntryCustomer", fields: [customerId], references: [id])
+  property    Property?   @relation("ArEntryProperty", fields: [propertyId], references: [id])
+  fixedAsset  FixedAsset? @relation("ArEntryAsset", fields: [fixedAssetId], references: [id])
   payments ARPayment[]
 
   @@index([companyId])

@@ -23,7 +23,7 @@ const ORIGIN_LABEL: Record<string, string> = {
 
 type Tab = 'titulos' | 'aging';
 
-interface ReceiveDto { amount: string; receivedAt: string; paymentMethod: string; receiptRef: string; notes: string; }
+interface ReceiveDto { amount: string; receivedAt: string; paymentMethod: string; receiptRef: string; notes: string; receivingAccountId: string; nfNumero: string; }
 
 export default function ContasAReceberPage() {
   const [tab, setTab]           = useState<Tab>('titulos');
@@ -38,9 +38,10 @@ export default function ContasAReceberPage() {
   const [showNewModal, setShowNewModal] = useState(false);
   const [selected, setSelected]         = useState<any>(null);
   const [filters, setFilters]   = useState({ status: '', origin: '', from: '', to: '' });
-  const [receiveDto, setReceiveDto] = useState<ReceiveDto>({ amount: '', receivedAt: new Date().toISOString().slice(0,10), paymentMethod: 'PIX', receiptRef: '', notes: '' });
-  const [newDto, setNewDto] = useState({ title: '', origin: 'ALUGUEL', dueDate: '', amount: '', customerName: '', customerCnpjCpf: '', propertyId: '', notes: '', competenceMonth: '' });
-  const [properties, setProperties] = useState<any[]>([]);
+  const [receiveDto, setReceiveDto] = useState<ReceiveDto>({ amount: '', receivedAt: new Date().toISOString().slice(0,10), paymentMethod: 'PIX', receiptRef: '', notes: '', receivingAccountId: '', nfNumero: '' });
+  const [newDto, setNewDto] = useState({ title: '', origin: 'ALUGUEL', dueDate: '', amount: '', customerName: '', customerCnpjCpf: '', fixedAssetId: '', notes: '', competenceMonth: '' });
+  const [fixedAssets, setFixedAssets] = useState<any[]>([]);
+  const [accounts, setAccounts] = useState<any[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -66,26 +67,37 @@ export default function ContasAReceberPage() {
     } catch { }
   }, []);
 
-  const loadProperties = useCallback(async () => {
+  const loadFixedAssets = useCallback(async () => {
     try {
-      const { data } = await api.get('/assets/properties');
-      setProperties(data ?? []);
+      const { data } = await api.get('/assets', { params: { group: 'REAL_ESTATE', status: 'ACTIVE' } });
+      setFixedAssets(data?.data ?? data ?? []);
     } catch { }
   }, []);
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => { if (tab === 'aging') loadAging(); }, [tab, loadAging]);
-  useEffect(() => { loadProperties(); }, [loadProperties]);
+  useEffect(() => { loadFixedAssets(); }, [loadFixedAssets]);
+  useEffect(() => {
+    api.get('/accounting/chart-of-accounts', { params: { isAnalytic: true } })
+      .then(r => setAccounts((r.data?.data ?? r.data ?? []).filter((a: any) => ['ASSET','LIABILITY'].includes(a.type))))
+      .catch(() => {});
+  }, []);
 
   async function handleReceive() {
     if (!selected) return;
+    if (selected.origin === 'ALUGUEL' && !receiveDto.nfNumero.trim()) {
+      alert('Para recebimentos de aluguel, o número da NF é obrigatório.');
+      return;
+    }
     try {
       await api.post(`/finance/ar/${selected.id}/receive`, {
         amount:        parseFloat(receiveDto.amount.replace(',','.')),
         receivedAt:    receiveDto.receivedAt,
         paymentMethod: receiveDto.paymentMethod,
         receiptRef:    receiveDto.receiptRef || null,
-        notes:         receiveDto.notes || null,
+        notes:          receiveDto.notes || null,
+        receivingAccountId: receiveDto.receivingAccountId || null,
+        nfNumero:           receiveDto.nfNumero || null,
       });
       setShowModal(false);
       setRefreshKey(k => k+1);
@@ -97,11 +109,11 @@ export default function ContasAReceberPage() {
       await api.post('/finance/ar', {
         ...newDto,
         amount: parseFloat(newDto.amount.replace(',','.')),
-        propertyId: newDto.propertyId || null,
+        fixedAssetId: newDto.fixedAssetId || null,
       });
       setShowNewModal(false);
       setRefreshKey(k => k+1);
-      setNewDto({ title: '', origin: 'ALUGUEL', dueDate: '', amount: '', customerName: '', customerCnpjCpf: '', propertyId: '', notes: '', competenceMonth: '' });
+      setNewDto({ title: '', origin: 'ALUGUEL', dueDate: '', amount: '', customerName: '', customerCnpjCpf: '', fixedAssetId: '', notes: '', competenceMonth: '' });
     } catch (e: any) { alert(e?.response?.data?.message ?? 'Erro ao criar conta a receber'); }
   }
 
@@ -203,7 +215,8 @@ export default function ContasAReceberPage() {
                     <td style={S.td}><span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: '#F3F4F6', color: '#374151' }}>{ORIGIN_LABEL[e.origin] ?? e.origin}</span></td>
                     <td style={S.td}>
                       <div>{e.customerName ?? e.customer?.fullName ?? '—'}</div>
-                      {e.property && <div style={{ fontSize: 11, color: '#9CA3AF' }}>🏠 {e.property.street}, {e.property.number} — {e.property.city}</div>}
+                      {e.fixedAsset && <div style={{ fontSize: 11, color: '#9CA3AF' }}>🏠 {e.fixedAsset.internalCode}{e.fixedAsset.city ? ' · ' + e.fixedAsset.city : ''}</div>}
+                      {!e.fixedAsset && e.property && <div style={{ fontSize: 11, color: '#9CA3AF' }}>🏠 {e.property.street}, {e.property.number} — {e.property.city}</div>}
                     </td>
                     <td style={{ ...S.td, color: overdue ? '#B91C1C' : '#374151', fontWeight: overdue ? 600 : 400 }}>{fmtDate(e.dueDate)}</td>
                     <td style={{ ...S.td, fontFamily: 'monospace' }}>{fmtBRL(e.amount)}</td>
@@ -269,6 +282,19 @@ export default function ContasAReceberPage() {
                   {['PIX','TED','DOC','BOLETO','CHEQUE','DINHEIRO','TRANSFERENCIA','OUTROS'].map(m => <option key={m} value={m}>{m}</option>)}
                 </select>
               </div>
+              {selected?.origin === 'ALUGUEL' && (
+                <div>
+                  <label style={S.label}>Número da NF <span style={{color:'#EF4444'}}>*</span></label>
+                  <input type="text" value={receiveDto.nfNumero} onChange={e => setReceiveDto(d => ({...d, nfNumero: e.target.value}))} style={S.input} placeholder="Ex: 000123" />
+                </div>
+              )}
+              <div>
+                <label style={S.label}>Conta Contábil (Débito)</label>
+                <select value={receiveDto.receivingAccountId} onChange={e => setReceiveDto(d => ({...d, receivingAccountId: e.target.value}))} style={S.input}>
+                  <option value="">— Sem lançamento contábil —</option>
+                  {accounts.map((a: any) => <option key={a.id} value={a.id}>{a.code} — {a.name}</option>)}
+                </select>
+              </div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 20 }}>
               <button onClick={() => setShowModal(false)} style={{ padding: '8px 16px', borderRadius: 8, border: '0.5px solid #E5E7EB', background: '#fff', cursor: 'pointer', fontSize: 13 }}>Cancelar</button>
@@ -315,10 +341,10 @@ export default function ContasAReceberPage() {
                 <input value={newDto.customerCnpjCpf} onChange={e => setNewDto(d => ({...d, customerCnpjCpf: e.target.value}))} style={S.input} />
               </div>
               <div style={{ gridColumn: '1/-1' }}>
-                <label style={S.label}>Imóvel</label>
-                <select value={newDto.propertyId} onChange={e => setNewDto(d => ({...d, propertyId: e.target.value}))} style={S.input}>
-                  <option value="">Selecione o imóvel...</option>
-                  {properties.map((p: any) => <option key={p.id} value={p.id}>{p.street}, {p.number} — {p.city}/{p.state}</option>)}
+                <label style={S.label}>Imóvel (Ativo Imobilizado)</label>
+                <select value={newDto.fixedAssetId} onChange={e => setNewDto(d => ({...d, fixedAssetId: e.target.value}))} style={S.input}>
+                  <option value="">— Sem vínculo com imóvel —</option>
+                  {fixedAssets.map((a: any) => <option key={a.id} value={a.id}>{a.internalCode} — {a.description}{a.city ? ' · ' + a.city : ''}</option>)}
                 </select>
               </div>
               <div style={{ gridColumn: '1/-1' }}>

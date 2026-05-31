@@ -25,6 +25,7 @@ export class AccountsReceivableService {
         propertyId:      dto.propertyId ?? null,
         fiscalDocumentId: dto.fiscalDocumentId ?? null,
         revenueAccountId: dto.revenueAccountId ?? null,
+        fixedAssetId:    dto.fixedAssetId ?? null,
         notes:           dto.notes ?? null,
         createdById:     userId,
       },
@@ -32,6 +33,8 @@ export class AccountsReceivableService {
   }
 
   async findAll(companyId: string, filters: any) {
+    // Atualizar status OVERDUE automaticamente a cada listagem
+    await this.markOverdue(companyId);
     const where: any = { companyId, deletedAt: null };
     if (filters.status)     where.status = filters.status;
     if (filters.origin)     where.origin = filters.origin;
@@ -49,7 +52,8 @@ export class AccountsReceivableService {
         orderBy: { dueDate: 'asc' },
         include: {
           customer: { select: { id: true, fullName: true, cpf: true } },
-          property: { select: { id: true, street: true, number: true, city: true } },
+          property:   { select: { id: true, street: true, number: true, city: true } },
+          fixedAsset: { select: { id: true, internalCode: true, description: true, city: true, street: true } },
           payments: true,
         },
       }),
@@ -67,8 +71,9 @@ export class AccountsReceivableService {
     const entry = await this.prisma.arEntry.findFirst({
       where: { id, companyId, deletedAt: null },
       include: {
-        customer: true,
-        property: true,
+        customer:   true,
+        property:   true,
+        fixedAsset: true,
         payments: { orderBy: { receivedAt: 'desc' } },
       },
     });
@@ -89,6 +94,7 @@ export class AccountsReceivableService {
         customerCnpjCpf: dto.customerCnpjCpf,
         customerId:      dto.customerId,
         propertyId:      dto.propertyId,
+        fixedAssetId:    dto.fixedAssetId,
         notes:           dto.notes,
         updatedById:     userId,
       },
@@ -121,6 +127,26 @@ export class AccountsReceivableService {
         },
       });
 
+      // Integração contábil: D Caixa/Banco / C Receita (se revenueAccountId configurado)
+      const receivingAccountId = dto.receivingAccountId ?? null;
+      if (receivingAccountId && entry.revenueAccountId) {
+        await tx.journalEntry.create({
+          data: {
+            companyId,
+            date:         new Date(dto.receivedAt),
+            description:  Recebimento: ,
+            sourceModule: 'FINANCE',
+            createdById:  userId,
+            items: {
+              create: [
+                { accountId: receivingAccountId,   value: amount, type: 'DEBIT'  },
+                { accountId: entry.revenueAccountId, value: amount, type: 'CREDIT' },
+              ],
+            },
+          },
+        });
+      }
+
       return tx.arEntry.update({
         where: { id },
         data: {
@@ -128,8 +154,24 @@ export class AccountsReceivableService {
           status:         isFullyReceived ? 'RECEIVED' : 'PARTIAL',
           receivedAt:     isFullyReceived ? new Date(dto.receivedAt) : null,
           updatedById:    userId,
+          ...(dto.nfNumero ? { documentNumber: dto.nfNumero } : {}),
         },
       });
+    });
+  }
+
+  // Marca títulos vencidos automaticamente
+  async markOverdue(companyId: string) {
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+    return this.prisma.arEntry.updateMany({
+      where: {
+        companyId,
+        deletedAt: null,
+        status: { in: ['OPEN', 'PARTIAL'] },
+        dueDate: { lt: today },
+      },
+      data: { status: 'OVERDUE' },
     });
   }
 
