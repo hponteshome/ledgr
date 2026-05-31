@@ -217,13 +217,13 @@ export const CompanyShow: React.FC = () => {
             );
             return null;
           })()}
-          {qsaLinks.filter((l: any) => l.assinaEcd || l.assinaEcf).length === 0 && (
+          {qsaLinks.filter((l: any) => l.assinaEcd).length === 0 && (
             <p className="text-sm text-gray-400 italic">Nenhum assinante definido. Configure na aba Contabil.</p>
           )}
-          {qsaLinks.filter((l: any) => l.assinaEcd || l.assinaEcf).length > 0 && (
+          {qsaLinks.filter((l: any) => l.assinaEcd).length > 0 && (
             <div className="space-y-1">
               <div className="text-gray-400 mb-2 text-[10px]" style={{fontFamily:"sans-serif"}}>Preview — Registro J930</div>
-              {qsaLinks.filter((l: any) => l.assinaEcd || l.assinaEcf).map((l: any) => {
+              {qsaLinks.filter((l: any) => l.assinaEcd).map((l: any) => {
                 const cpf = (l.person?.cpf || "").replace(/\D/g, "");
                 const nome = (l.person?.fullName || "").toUpperCase();
                 const indResp = l.assinaEcd ? "S" : "N";
