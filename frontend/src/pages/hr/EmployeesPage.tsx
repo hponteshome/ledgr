@@ -24,6 +24,17 @@ export const EmployeesPage: React.FC = () => {
 
   useEffect(() => { load(); }, []);
 
+  async function downloadS2200(id: string, name: string) {
+    try {
+      const { data } = await api.get(`/hr/esocial/s2200/${id}`, { responseType: 'text' });
+      const blob = new Blob([data], { type: 'application/xml' });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href = url; a.download = `S-2200-${name.replace(/\s+/g,'-')}.xml`; a.click();
+      URL.revokeObjectURL(url);
+    } catch (e: any) { alert('Erro ao gerar S-2200: ' + (e?.response?.data?.message ?? e?.message ?? String(e))); }
+  }
+
   return (
     <div className="max-w-6xl mx-auto p-6">
       {/* Header */}
@@ -59,7 +70,7 @@ export const EmployeesPage: React.FC = () => {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50">
-                {['Nome', 'CPF', 'Função', 'Admissão', 'Salário', 'Situação'].map(h => (
+                {['Nome', 'CPF', 'Função', 'Admissão', 'Salário', 'Situação', 'eSocial'].map(h => (
                   <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
                 ))}
               </tr>
@@ -79,6 +90,9 @@ export const EmployeesPage: React.FC = () => {
                   </td>
                   <td className="px-4 py-3 font-mono text-xs text-gray-600">{fmtCpf(e.taxId)}</td>
                   <td className="px-4 py-3 text-gray-600">{e.role}</td>
+                  <td className="px-4 py-3">
+                    <button onClick={() => downloadS2200(e.id, e.fullName)} className="text-xs px-2 py-1 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 font-medium">S-2200 XML</button>
+                  </td>
                   <td className="px-4 py-3 text-gray-600">{fmtDate(e.hireDate)}</td>
                   <td className="px-4 py-3 text-gray-600">{fmtSalary(e.salary)}</td>
                   <td className="px-4 py-3">
