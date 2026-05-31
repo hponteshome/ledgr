@@ -2790,6 +2790,8 @@ model CompanyAccountingConfig {
   escritorioEmail    String? @map("escritorio_email") @db.VarChar
   escritorioTelefone String? @map("escritorio_telefone") @db.VarChar
   accountantCpf      String? @map("accountant_cpf") @db.VarChar(14)
+  accountantEmail    String? @map("accountant_email") @db.VarChar
+  accountantPhone    String? @map("accountant_phone") @db.VarChar(20)
 
   // Configuracao contabil
   moeda         String? @default("BRL") @map("moeda") @db.VarChar(3)

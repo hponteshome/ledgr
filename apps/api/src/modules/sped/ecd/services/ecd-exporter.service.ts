@@ -431,8 +431,8 @@ export class EcdExporterService {
       const crcUf  = accConfig.accountantCrcState || (company.state||"SP");
       const cpfContador = (accConfig.accountantCpf||"").replace(/\D/g,"");
       const crcFull = crcVal + (crcUf ? "/"+crcUf : "");
-      const emailContador = accConfig.escritorioEmail || "contato@escritorio.com.br";
-      const foneContador = accConfig.escritorioTelefone || "00000000000";
+      const emailContador = accConfig.accountantEmail || accConfig.escritorioEmail || "contato@escritorio.com.br";
+      const foneContador = accConfig.accountantPhone || accConfig.escritorioTelefone || "00000000000";
       const crcFormatado = crcUf + "/" + new Date().getFullYear() + "/" + crcVal;
       add(P+"J930"+P+(accConfig.accountantName||"")+P+cpfContador+P+"Contador"+P+"900"+P+crcVal+P+emailContador+P+foneContador+P+crcUf+P+crcFormatado+P+P+"N"+P);
     }

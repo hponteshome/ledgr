@@ -80,6 +80,8 @@ export const ContabilTab: React.FC<Props> = ({ companyId, labelCls, inputCls, pa
           <F label="CRC" field="accountantCrc" placeholder="1SP999999/O-1" />
           <F label="UF CRC" field="accountantCrcState" placeholder="SP" />
           <F label="Função" field="accountantRole" placeholder="Contador" />
+          <F label="E-mail" field="accountantEmail" placeholder="contador@email.com" />
+          <F label="Telefone" field="accountantPhone" placeholder="41999999999" />
         </div>
       </div>
 

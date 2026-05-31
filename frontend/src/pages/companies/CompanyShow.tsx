@@ -149,6 +149,8 @@ export const CompanyShow: React.FC = () => {
               <Field label="CRC" value={accConfig?.accountantCrc} />
               <Field label="UF CRC" value={accConfig?.accountantCrcState} />
               <Field label="Funcao" value={accConfig?.accountantRole} />
+              <Field label="E-mail" value={accConfig?.accountantEmail} />
+              <Field label="Telefone" value={accConfig?.accountantPhone} />
             </div>
           </Section>
           <Section title="Representante Legal" color="border-purple-500">
@@ -205,6 +207,16 @@ export const CompanyShow: React.FC = () => {
           )}
         </Section>
         <Section title="Preview J930 — Assinantes ECD/ECF" color="border-indigo-500">
+          {(() => {
+            const responsaveis = qsaLinks.filter((l: any) => l.assinaEcd);
+            if (responsaveis.length > 1) return (
+              <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700 font-medium">
+                <span>&#9888;</span>
+                {responsaveis.length} signatarios marcados como ECD. Apenas 1 pode ser responsavel legal (IND_RESP_LEGAL=S). Desmarque os demais na aba Contabil.
+              </div>
+            );
+            return null;
+          })()}
           {qsaLinks.filter((l: any) => l.assinaEcd || l.assinaEcf).length === 0 && (
             <p className="text-sm text-gray-400 italic">Nenhum assinante definido. Configure na aba Contabil.</p>
           )}
