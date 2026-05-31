@@ -144,55 +144,64 @@ export class AccountingViewsService {
             "231": "2.03.01", // Capital Social
             "232": "2.03.06", // Reservas
             "233": "2.03.07", // Lucros/Prejuizos Acumulados
+                "151": "1.02.03.01", // Imobilizado
+                "152": "1.02.03.01", // Imobilizado
+                "491": "2.03.07", // Resultado do Exercicio
           };
 
           const drePrefixMap: Record<string, string> = {
-            "311": "3.01", // Receita Bruta
-            "312": "3.02", // Deducoes
-            "313": "3.03", // Custo
-            "411": "3.04", // Despesas Operacionais
-            "412": "3.04", // Despesas Operacionais
-            "413": "3.04", // Despesas Operacionais
-            "421": "3.06.01", // Resultado Financeiro
-            "422": "3.06.01", // Resultado Financeiro
-            "423": "3.06.02", // Resultado Equivalencia
-            "431": "3.06.01", // Despesas Financeiras
-            "441": "3.08.01", // IR/CSLL
+            "311": "3.01.01.01.01.06", // Receita Prestacao Servicos
+            "312": "3.01.01.01.02.09", // Deducoes Impostos Servicos
+            "313": "3.01.01.03.01.03", // Custo dos Servicos
+            "321": "3.01.01.05.01.05", // Receitas Financeiras
+            "411": "3.01.01.07.01.02", // Despesas Pessoal
+            "412": "3.01.01.07.01.02", // Despesas Comerciais
+            "413": "3.01.01.07.01.16", // Despesas Administrativas
+            "421": "3.01.01.07.01.02", // Despesas Gerais
+            "422": "3.01.01.07.01.02", // Despesas Comerciais
+            "423": "3.01.01.09.01.08", // Despesas Financeiras
+            "431": "3.02.01.01.01.02", // IRPJ
+            "441": "3.02.01.01.01.01", // CSLL
+          "491": "3.11"
           };
 
           const prefixMap = view.tipo === "BP" ? bpPrefixMap : drePrefixMap;
 
           const suggestions: { accountId: string; aglutinationCode: string }[] = [];
 
+          const bpTypes = new Set(["ASSET","LIABILITY","EQUITY"]);
+          const dreTypes = new Set(["REVENUE","EXPENSE"]);
+          const allowedTypes = view.tipo === "BP" ? bpTypes : dreTypes;
           for (const acc of accounts) {
-            const code = (acc as any).reducedCode || acc.code;
+            if (!allowedTypes.has(acc.type)) continue;
+            const code = acc.code;
             const prefix3 = code.replace(/\D/g, "").substring(0, 3);
             const prefix4 = code.replace(/\D/g, "").substring(0, 4);
 
-            // 1. Tentar match semantico por nome
-            const accWords = norm(acc.name).split(" ").filter(w => w.length > 3);
+            // 1. Prefixo do codigo contabil (prioritario)
             let bestCode = "";
-            let bestScore = -1;
-            for (const rfb of rfbLeaves) {
-              const rfbWords = norm(rfb.descricao).split(" ").filter(w => w.length > 3);
-              const exact = accWords.filter(w => rfbWords.includes(w)).length;
-              const partial = rfbWords.some(w => accWords.some(a => a.includes(w) || w.includes(a))) ? 0.5 : 0;
-              const score = exact + partial;
-              if (score > bestScore) { bestScore = score; bestCode = rfb.codigo; }
+            const fromPrefix = prefixMap[prefix4] ?? prefixMap[prefix3];
+            if (fromPrefix && rfbCodes.some(c => c.codigo === fromPrefix)) {
+              bestCode = fromPrefix;
             }
 
-            // 2. Se match semantico fraco, usar prefixo do codigo contabil
-            if (bestScore < 1) {
-              const fromPrefix = prefixMap[prefix4] ?? prefixMap[prefix3];
-              if (fromPrefix && rfbCodes.some(c => c.codigo === fromPrefix)) {
-                bestCode = fromPrefix;
+            // 2. Fallback: match semantico por nome (apenas se prefixo nao encontrado)
+            if (!bestCode) {
+              const accWords = norm(acc.name).split(" ").filter(w => w.length > 3);
+              let bestScore = -1;
+              for (const rfb of rfbLeaves) {
+                const rfbWords = norm(rfb.descricao).split(" ").filter(w => w.length > 3);
+                const exact = accWords.filter(w => rfbWords.includes(w)).length;
+                const partial = rfbWords.some(w => accWords.some(a => a.includes(w) || w.includes(a))) ? 0.5 : 0;
+                const score = exact + partial;
+                if (score > bestScore) { bestScore = score; bestCode = rfb.codigo; }
               }
+              if (bestScore < 1) bestCode = "";
             }
 
             if (bestCode) suggestions.push({ accountId: acc.id, aglutinationCode: bestCode });
           }
 
-          return { suggestions, total: suggestions.length };
           return { suggestions, total: suggestions.length };
         }
 
@@ -211,8 +220,11 @@ export class AccountingViewsService {
           const mappingMap = new Map(mappings.map(m => [m.accountId, m]));
           const accountById = new Map(allAccounts.map(a => [a.id, a]));
 
-          // Separar analiticas e montar grupos pelo pai nivel 5
-          const analytics = allAccounts.filter(a => a.isAnalytic);
+          // Filtrar analiticas por tipo da visao
+          const bpTypes = new Set(["ASSET","LIABILITY","EQUITY"]);
+          const dreTypes = new Set(["REVENUE","EXPENSE"]);
+          const allowedTypes = view.tipo === "BP" ? bpTypes : dreTypes;
+          const analytics = allAccounts.filter(a => a.isAnalytic && allowedTypes.has(a.type));
           const groupMap = new Map<string, { parent: any; children: any[] }>();
 
           for (const acc of analytics) {

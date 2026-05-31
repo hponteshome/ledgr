@@ -52,7 +52,7 @@ export class EcdExporterService {
     // I052 mapeamentos (conta -> codigo aglutinacao)
     const anoBase = periodStart.getUTCFullYear();
     const viewsI052 = await this.prisma.accountingView.findMany({
-      where: { companyId, anoBase, isActive: true },
+      where: { companyId, isActive: true },
       include: { mappings: { select: { accountId: true, aglutinationCode: true } } },
     });
     const i052Map = new Map<string, string>(); // accountId -> aglCode
@@ -61,18 +61,8 @@ export class EcdExporterService {
     }
 
           // i051Map: accountId -> codigo referencial RFB (COD_CTA_REF)
-          const aglCodes = Array.from(new Set(Array.from(i052Map.values())));
-          const rfbRows = aglCodes.length > 0
-            ? await this.prisma.rfbAglutinationCode.findMany({
-                where: { anoBase, codigo: { in: aglCodes } },
-                select: { codigo: true },
-              })
-            : [];
-          const rfbCodigoSet = new Set(rfbRows.map((r: any) => r.codigo));
-          const i051Map = new Map<string, string>();
-          for (const [accountId, aglCode] of i052Map.entries()) {
-            if (rfbCodigoSet.has(aglCode)) i051Map.set(accountId, aglCode);
-          }
+          // Usar diretamente o codigo de aglutinacao como referencia RFB
+          const i051Map = new Map<string, string>(i052Map);
 
     // Lancamentos do periodo
     const entries = await this.prisma.journalEntry.findMany({
@@ -164,7 +154,7 @@ export class EcdExporterService {
     add(P+"C990"+P+"2"+P);
 
     // ── BLOCO I ──────────────────────────────────────────────────────────
-    add(P+"I001"+P+"0"+P);
+    add(P+"I001"+P+(entries.length > 0 ? "0" : "1")+P);
     // |I010|IND_ESC|COD_VER_LC|
     add(P+"I010"+P+bookType+P+layoutVersion+P);
     // |I030|DESC_ESC|NR_LIVRO|NR_ORD|TIPO_LIVRO|QTD_PAG|NOME|NIRE|CNPJ|DT_ARQ|NOM_COM|CIDADE|DT_FIN|
@@ -179,7 +169,7 @@ export class EcdExporterService {
       if (!acc.isAnalytic) continue;
       if (!dreTypes2.has(acc.type.toString())) continue;
       if (!i052Map.has(acc.id)) continue;
-      const rc = (acc as any).reducedCode || acc.code;
+      const rc = acc.code;
       const seq = String(dreSeq).padStart(3, "0");
       dreCodeMap.set(acc.id, ("DRE_" + seq + "_DO0_" + rc).padEnd(30, " "));
       dreSeq++;
@@ -209,8 +199,8 @@ export class EcdExporterService {
       const natCode    = this.typeToNat(acc.type.toString());
       const indCta     = acc.isAnalytic ? "A" : "S";
       const parentCode = acc.parentId ? (codeById.get(acc.parentId) ?? "") : "";
-      const reducedCode = (acc as any).reducedCode || acc.code;
-      if (!reducedCode || reducedCode === "000000") continue; // skip contas sem codigo valido
+      const reducedCode = acc.code;
+      if (!reducedCode) continue;
       // |I050|DT_ALT|COD_NAT|IND_CTA|NIVEL|COD_CTA|COD_CTA_SUP|NOME_CTA|
       add(P+"I050"+P+dtAlt+P+natCode+P+indCta+P+acc.level+P+reducedCode+P+parentCode+P+acc.name+P);
           if (acc.isAnalytic) {
@@ -254,7 +244,7 @@ export class EcdExporterService {
         const sldFin = sldIni + mv.deb - mv.cre;
         const dcIni  = sldIni >= 0 ? "D" : "C";
         const dcFin  = sldFin >= 0 ? "D" : "C";
-        const reducedCode = (acc as any).reducedCode || acc.code;
+        const reducedCode = acc.code;
         // |I155|COD_CTA|COD_CTA_REF|VL_SLD_INI|IND_DC_INI|VL_DEB|VL_CRED|VL_SLD_FIN|IND_DC_FIN|
         add(P+"I155"+P+reducedCode+P+P+this.fmtDec(Math.abs(sldIni))+P+dcIni+P+this.fmtDec(mv.deb)+P+this.fmtDec(mv.cre)+P+this.fmtDec(Math.abs(sldFin))+P+dcFin+P);
         saldoCorrente.set(aid, sldFin);
@@ -275,7 +265,7 @@ export class EcdExporterService {
       add(P+"I200"+P+numLcto+P+this.fmtDate(dt)+P+this.fmtDec(totalDeb)+P+"N"+P+P);
       for (const item of entry.items) {
         const sign    = item.type === "DEBIT" ? "D" : "C";
-        const codCta  = item.account.reducedCode || item.account.code;
+        const codCta  = item.account.code;
         // |I250|COD_CTA|VL_DC|IND_DC|NUM_ARQ|COD_HIST|DSC_HIST|COD_PART|NR_DOC|
         add(P+"I250"+P+codCta+P+P+this.fmtDec(Number(item.value))+P+sign+P+"0"+P+"1"+P+hist+P+P);
       }
@@ -284,13 +274,15 @@ export class EcdExporterService {
         // I350/I355 — saldos de contas de resultado antes do encerramento
         const dreTypes = new Set(["REVENUE","EXPENSE"]);
         // Fallback: se dreMap vazio (dados via ECD import), usar saldoFinalMap
-        const dreAccounts = accounts.filter(a => {
+        // I350 apenas se ha lancamentos de encerramento reais
+        const hasEncerramento = entries.some(e =>
+          e.description?.toLowerCase().includes("encerr") ||
+          e.description?.toLowerCase().includes("zeramento")
+        );
+        const dreAccounts = (hasEncerramento ? accounts : []).filter(a => {
           if (!a.isAnalytic || !dreTypes.has(a.type.toString())) return false;
           const mv = dreMap.get(a.id);
-          if (mv) { const s = mv.cre - mv.deb; return s !== 0; }
-          // fallback account_balance
-          const s = saldoFinalMap.get(a.id) ?? 0;
-          return s !== 0;
+          return mv ? (mv.cre - mv.deb) !== 0 : false;
         });
         if (dreAccounts.length > 0) {
           add(P+"I350"+P+dtFin+P);
@@ -308,7 +300,7 @@ export class EcdExporterService {
             }
             if (saldo === 0) continue;
             const dc = saldo >= 0 ? "C" : "D";
-            const reducedCode = (acc as any).reducedCode || acc.code;
+            const reducedCode = acc.code;
             add(P+"I355"+P+reducedCode+P+P+this.fmtDec(Math.abs(saldo))+P+dc+P);
           }
         }
@@ -391,23 +383,32 @@ export class EcdExporterService {
     }
     for (const l of j100Lines) add(l);
 
-    // J150 — DRE usando codigos do I052 (gabarito Kipstone)
-    // COD_AGL=DRE_NNN_DO0_codCta pad30, COD_AGL_SUP=totalizador pad30, IND_ENCERR sequencial
+    // J150 — DRE usando codigos do I052
+    const rfbDRE = await this.prisma.rfbAglutinationCode.findMany({ where: { leiaute: 9, anoBase, tipo: "DRE" }, orderBy: { ordem: "asc" } });
+    const rfbDREMap = new Map(rfbDRE.map(r => [r.codigo, r]));
     const TITULO_DRE = "DRE_119_TITULO_LUCRO_PREJUIZO".padEnd(30, " ");
     let indEncerr = 0;
     let totalDREVal = 0;
-    const j150Lines: string[] = [];
+    const j150Agg = new Map<string, { val: number; nome: string }>();
     for (const acc of accounts) {
       if (!acc.isAnalytic) continue;
       if (!dreTypes.has(acc.type.toString())) continue;
       const aglCode152 = i052Map.get(acc.id);
       if (!aglCode152) continue;
       const mv152 = dreRollup.get(acc.id) ?? { deb: 0, cre: 0 };
-      const vlOri  = Math.abs(mv152.deb - mv152.cre);
-      const dc152  = "D"; // J150 IND_DC sempre D para linhas de detalhe
+      const vlOri = mv152.deb - mv152.cre; // mesmo sentido do I155
+      const cur = j150Agg.get(aglCode152) ?? { val: 0, nome: rfbDREMap.get(aglCode152)?.descricao ?? acc.name };
+      j150Agg.set(aglCode152, { val: cur.val + vlOri, nome: cur.nome });
+    }
+    const j150Lines: string[] = [];
+    for (const [aglCode152, agg] of j150Agg) {
+      const vlSigned = agg.val; // positivo=despesa, negativo=receita
+      const vlOri = Math.abs(vlSigned);
+      const dc152 = "D"; // J150 IND_COD_AGL so aceita D ou T
       const dreCode152 = aglCode152.padEnd(30, " ");
-      totalDREVal += (dc152 === "D" ? 1 : -1) * vlOri;
-      j150Lines.push(P+"J150"+P+indEncerr+P+dreCode152+P+dc152+P+"2"+P+TITULO_DRE+P+acc.name+P+this.fmtDec(vlOri)+P+dc152+P+this.fmtDec(vlOri)+P+dc152+P+"D"+P+P);
+      totalDREVal += vlSigned;
+      const dcVal = vlSigned >= 0 ? "D" : "C";
+      j150Lines.push(P+"J150"+P+indEncerr+P+dreCode152+P+dc152+P+"2"+P+TITULO_DRE+P+agg.nome+P+this.fmtDec(Math.abs(vlSigned))+P+dcVal+P+this.fmtDec(Math.abs(vlSigned))+P+dcVal+P+"D"+P+P);
       indEncerr++;
     }
     // Linha totalizadora
