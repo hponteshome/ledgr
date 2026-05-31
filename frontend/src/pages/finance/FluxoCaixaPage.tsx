@@ -19,7 +19,7 @@ export default function FluxoCaixaPage() {
   const [from, setFrom]       = useState(`${year}-01`);
   const [to, setTo]           = useState(`${year}-12`);
   const [propertyId, setPropertyId] = useState('');
-  const [properties, setProperties] = useState<any[]>([]);
+  const [fixedAssets, setFixedAssets] = useState<any[]>([]);
   const [minYear, setMinYear] = useState(2021);
   const [data, setData]       = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -34,7 +34,7 @@ export default function FluxoCaixaPage() {
     setLoading(true);
     try {
       const params: any = { from, to };
-      if (propertyId) params.propertyId = propertyId;
+      if (propertyId) params.fixedAssetId = propertyId;
       const { data: d } = await api.get('/finance/cashflow/summary', { params });
       setData(d);
     } catch { }
@@ -58,7 +58,7 @@ export default function FluxoCaixaPage() {
   }, []);
 
   useEffect(() => {
-    api.get('/assets/properties').then(r => setProperties(r.data ?? [])).catch(() => {});
+    api.get('/assets', { params: { group: 'REAL_ESTATE', status: 'ACTIVE' } }).then(r => setFixedAssets(r.data?.data ?? r.data ?? [])).catch(() => {});
   }, []);
 
   const months: any[] = data?.months ?? [];
@@ -107,7 +107,7 @@ export default function FluxoCaixaPage() {
             <label style={{ fontSize: 11, color: '#9CA3AF', display: 'block', marginBottom: 3 }}>Imóvel</label>
             <select value={propertyId} onChange={e => setPropertyId(e.target.value)} style={{ ...S.input, width: 220 }}>
               <option value="">Todos os imóveis</option>
-              {properties.map((p: any) => <option key={p.id} value={p.id}>{p.street}, {p.number} — {p.city}</option>)}
+              {fixedAssets.map((a: any) => <option key={a.id} value={a.id}>{a.internalCode} — {a.description?.substring(0,40)}</option>)}
             </select>
           </div>
           <div style={{ display: 'flex', gap: 6, marginTop: 18 }}>

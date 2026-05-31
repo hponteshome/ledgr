@@ -24,7 +24,7 @@ export class CashflowService {
   }
 
 
-  async gerencial(companyId: string, fromMonth: string, toMonth: string, propertyId?: string): Promise<CashflowMonth[]> {
+  async gerencial(companyId: string, fromMonth: string, toMonth: string, propertyId?: string, fixedAssetId?: string): Promise<CashflowMonth[]> {
     const from = new Date(`${fromMonth}-01T00:00:00`);
     const to   = new Date(`${toMonth}-01T00:00:00`);
     to.setMonth(to.getMonth() + 1);
@@ -36,7 +36,7 @@ export class CashflowService {
         companyId,
         deletedAt: null,
         dueDate: { gte: from, lt: to },
-        ...(propertyId ? { propertyId } : {}),
+        ...(fixedAssetId ? { fixedAssetId } : propertyId ? { propertyId } : {}),
       },
       include: { payments: true },
     });
@@ -112,8 +112,8 @@ export class CashflowService {
     return result;
   }
 
-  async summary(companyId: string, fromMonth: string, toMonth: string) {
-    const months = await this.gerencial(companyId, fromMonth, toMonth);
+  async summary(companyId: string, fromMonth: string, toMonth: string, fixedAssetId?: string) {
+    const months = await this.gerencial(companyId, fromMonth, toMonth, undefined, fixedAssetId);
     return {
       months,
       totals: {

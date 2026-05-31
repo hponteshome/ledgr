@@ -26,7 +26,7 @@ export class CashflowController {
   @Get('gerencial')
   gerencial(@Req() req: any, @Query() q: any) {
     const { from, to } = this.defaults(q);
-    return this.service.gerencial(req.companyId, from, to, q.propertyId);
+    return this.service.gerencial(req.companyId, from, to, q.propertyId, q.fixedAssetId);
   }
 
   @Get('bancario')
@@ -38,6 +38,6 @@ export class CashflowController {
   @Get('summary')
   summary(@Req() req: any, @Query() q: any) {
     const { from, to } = this.defaults(q);
-    return this.service.summary(req.companyId, from, to);
+    return this.service.summary(req.companyId, from, to, q.fixedAssetId);
   }
 }
