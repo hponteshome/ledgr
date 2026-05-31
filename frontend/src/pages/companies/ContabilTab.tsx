@@ -80,8 +80,21 @@ export const ContabilTab: React.FC<Props> = ({ companyId, labelCls, inputCls, pa
           <F label="CRC" field="accountantCrc" placeholder="1SP999999/O-1" />
           <F label="UF CRC" field="accountantCrcState" placeholder="SP" />
           <F label="Função" field="accountantRole" placeholder="Contador" />
-          <F label="E-mail" field="accountantEmail" placeholder="contador@email.com" />
-          <F label="Telefone" field="accountantPhone" placeholder="41999999999" />
+          <div>
+            <label className={labelCls}>E-mail</label>
+            <input value={config.accountantEmail || ''} onChange={e => setConfig((p: any) => ({...p, accountantEmail: e.target.value}))}
+              placeholder="contador@email.com" className={inputCls} />
+          </div>
+          <div>
+            <label className={labelCls}>Telefone</label>
+            <input value={config.accountantPhone || ''} onChange={e => {
+              const v = e.target.value.replace(/\D/g, '').slice(0, 11);
+              const fmt = v.length > 10
+                ? v.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3')
+                : v.replace(/(\d{2})(\d{4})(\d{0,4})/, '($1) $2-$3');
+              setConfig((p: any) => ({...p, accountantPhone: fmt}));
+            }} placeholder="(41) 99999-9999" className={inputCls} />
+          </div>
         </div>
       </div>
 

@@ -163,7 +163,7 @@ export const CompanyShow: React.FC = () => {
         </div>
       )}
           {company.partners && company.partners.length > 0 && (
-            <QsaVinculoGrid companyId={id!} partners={company.partners} />
+            <QsaVinculoGrid companyId={id!} partners={company.partners} readOnly={true} />
           )}
 
       {activeTab === 'esocial' && (
@@ -226,10 +226,9 @@ export const CompanyShow: React.FC = () => {
               {qsaLinks.filter((l: any) => l.assinaEcd || l.assinaEcf).map((l: any) => {
                 const cpf = (l.person?.cpf || "").replace(/\D/g, "");
                 const nome = (l.person?.fullName || "").toUpperCase();
-                const crc = l.person?.crcNumber ? l.person.crcNumber + (l.person.crcState ? "/" + l.person.crcState : "") : "";
-                const indEcd = l.assinaEcd ? "1" : "0";
-                const indEcf = l.assinaEcf ? "1" : "0";
-                const linha = "|J930|05|" + cpf + "|" + nome + "|" + crc + "|||" + indEcd + "|" + indEcf + "|";
+                const indResp = l.assinaEcd ? "S" : "N";
+                // Layout RFB: |J930|NOME|CPF|QUALIF|COD_ASSIN|CRC|EMAIL|FONE|UF_CRC|NUM_SEQ_CRC|DT_CRC|IND_RESP_LEGAL|
+                const linha = "|J930|" + nome + "|" + cpf + "|Socio-Administrador|205|||||||||" + indResp + "|";
                 return (
                   <div key={l.id} className="bg-amber-50 border border-amber-200 rounded px-3 py-2 text-xs font-mono text-blue-800 break-all">
                     {linha}
@@ -239,8 +238,11 @@ export const CompanyShow: React.FC = () => {
               {accConfig?.accountantCpf && (() => {
                 const cpf = (accConfig.accountantCpf || "").replace(/\D/g, "");
                 const nome = (accConfig.accountantName || "").toUpperCase();
-                const crc = accConfig.accountantCrc ? accConfig.accountantCrc + (accConfig.accountantCrcState ? "/" + accConfig.accountantCrcState : "") : "";
-                const linha = "|J930|63|" + cpf + "|" + nome + "|" + crc + "|||0|0|";
+                const crc = accConfig.accountantCrc || "";
+                const uf = accConfig.accountantCrcState || "";
+                const email = accConfig.accountantEmail || accConfig.escritorioEmail || "";
+                const fone = accConfig.accountantPhone || accConfig.escritorioTelefone || "";
+                const linha = "|J930|" + nome + "|" + cpf + "|Contador|900|" + crc + "|" + email + "|" + fone + "|" + uf + "||||N|";
                 return (
                   <div className="bg-amber-50 border border-amber-200 rounded px-3 py-2 text-xs font-mono text-blue-800 break-all">
                     {linha}

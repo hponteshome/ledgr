@@ -79,12 +79,16 @@ export const QsaVinculoGrid: React.FC<Props> = ({ companyId, partners, readOnly 
               <tr key={i} className="hover:bg-gray-50">
                 <td className="py-2 text-center">
                   {link
-                    ? <input type="checkbox" checked={!!link.assinaEcd} disabled={!!busy || readOnly} onChange={() => handleToggle(link, 'assinaEcd')} className={`w-4 h-4 ${readOnly ? "cursor-default opacity-60" : "cursor-pointer"}`} />
+                    ? (readOnly
+                        ? <span className={link.assinaEcd ? "text-emerald-600 font-bold text-base" : "text-gray-300"} >{link.assinaEcd ? "✓" : "—"}</span>
+                        : <input type="checkbox" checked={!!link.assinaEcd} disabled={!!busy} onChange={() => handleToggle(link, 'assinaEcd')} className="w-4 h-4 cursor-pointer" />)
                     : <span className="text-gray-200">—</span>}
                 </td>
                 <td className="py-2 text-center">
                   {link
-                    ? <input type="checkbox" checked={!!link.assinaEcf} disabled={!!busy || readOnly} onChange={() => handleToggle(link, 'assinaEcf')} className={`w-4 h-4 ${readOnly ? "cursor-default opacity-60" : "cursor-pointer"}`} />
+                    ? (readOnly
+                        ? <span className={link.assinaEcf ? "text-emerald-600 font-bold text-base" : "text-gray-300"} >{link.assinaEcf ? "✓" : "—"}</span>
+                        : <input type="checkbox" checked={!!link.assinaEcf} disabled={!!busy} onChange={() => handleToggle(link, 'assinaEcf')} className="w-4 h-4 cursor-pointer" />)
                     : <span className="text-gray-200">—</span>}
                 </td>
                 <td className="py-2 font-medium text-gray-800">{socio.nome}</td>
