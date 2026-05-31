@@ -420,17 +420,32 @@ export class EcdExporterService {
     // |J900|DESC_ESC|NR_LIVRO|TIPO_LIVRO|NOME|QTD_PAG|DT_INI|DT_FIN|
     add(P+"J900"+P+"TERMO DE ENCERRAMENTO"+P+bookNumber+P+bookNature+P+company.legalName+P+totalPag+P+dtIni+P+dtFin+P);
 
-    // J930 — Signatario (pessoa juridica responsavel)
-    // |J930|NOME|CPF_CNPJ|QUALIF|COD_QUALIF|CRC|UF_CRC|NR_ORD|DT_ENTRAD|DT_SAIDA|TIPO_ASSIN|
-    // J930 linha 1: representante legal (pessoa juridica - e-CNPJ)
-    add(P+"J930"+P+company.legalName+P+cnpj+P+"Pessoa Juridica (e-CNPJ ou e-PJ)"+P+"001"+P+P+P+P+P+P+P+"S"+P);
-    // J930 linha 2: contador responsavel (qualificacao 900) — buscar do CompanyAccountingConfig
+    // J930 — Signatario
+    // Layout RFB: |J930|COD_QUALIF|CPF_CNPJ|NOME|CRC|DT_INI|DT_FIM|IND_RESP|IND_AUD|
+    // J930 linha 1: pessoa juridica responsavel (e-CNPJ) — COD_QUALIF 001
+    add(P+"J930"+P+company.legalName+P+cnpj+P+"Pessoa Juridica (e-CNPJ)"+P+"001"+P+P+P+P+P+P+P+"S"+P);
+    // J930 linha 2: contador responsavel — COD_QUALIF 900
     const accConfig = await this.prisma.companyAccountingConfig.findUnique({ where: { companyId } });
     if (accConfig?.accountantName && accConfig?.accountantCrc) {
       const crcVal = (accConfig.accountantCrc||"").replace(/\D/g,"");
       const crcUf  = accConfig.accountantCrcState || (company.state||"SP");
-      const cpfContador = accConfig.accountantPersonId ? "" : "";
-      add(P+"J930"+P+(accConfig.accountantName||"")+P+cpfContador+P+"Contador"+P+"900"+P+crcVal+P+crcUf+P+P+P+P+P+"S"+P);
+      const cpfContador = (accConfig.accountantCpf||"").replace(/\D/g,"");
+      const crcFull = crcVal + (crcUf ? "/"+crcUf : "");
+      const emailContador = accConfig.escritorioEmail || "contato@escritorio.com.br";
+      const foneContador = accConfig.escritorioTelefone || "00000000000";
+      const crcFormatado = crcUf + "/" + new Date().getFullYear() + "/" + crcVal;
+      add(P+"J930"+P+(accConfig.accountantName||"")+P+cpfContador+P+"Contador"+P+"900"+P+crcVal+P+emailContador+P+foneContador+P+crcUf+P+crcFormatado+P+P+"N"+P);
+    }
+    // J930 linhas 3+: socios/administradores que assinam ECD/ECF
+    const personLinks = await this.prisma.personCompany.findMany({
+      where: { companyId, OR: [{ assinaEcd: true }, { assinaEcf: true }] },
+      include: { person: { select: { fullName: true, cpf: true, crcNumber: true, crcState: true } } },
+    });
+    for (const link of personLinks) {
+      const cpf = (link.person?.cpf||"").replace(/\D/g,"");
+      const nome = link.person?.fullName || "";
+      const crcP = link.person?.crcNumber ? (link.person.crcNumber + (link.person.crcState ? "/"+link.person.crcState : "")) : "";
+      add(P+"J930"+P+nome+P+cpf+P+"Socio-Administrador"+P+"205"+P+P+P+P+P+P+P+"N"+P);
     }
 
     const idxJ001   = lines.findIndex(l => l === P+"J001"+P+"0"+P);
