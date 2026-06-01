@@ -6,6 +6,50 @@ import Swal from 'sweetalert2';
 const fmtBRL = (v: any) => Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmtCPF = (v: string) => v?.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') ?? '';
 
+// ── Preview Modal (GPS / DARF) ────────────────────────────────────────────────
+interface PreviewModalProps {
+  title: string; html: string; pdfUrl: string; pdfFilename: string; onClose: () => void;
+}
+function PreviewModal({ title, html, pdfUrl, pdfFilename, onClose }: PreviewModalProps) {
+  const [downloading, setDownloading] = React.useState(false);
+  async function handleDownload() {
+    setDownloading(true);
+    try {
+      const token = localStorage.getItem('@ledgr:token');
+      const companyId = JSON.parse(localStorage.getItem('@ledgr:activeCompany')||'{}').id;
+      const res = await fetch((import.meta as any).env.VITE_API_URL + pdfUrl, {
+        headers: { Authorization: 'Bearer '+token, ...(companyId?{'x-company-id':companyId}:{}) },
+      });
+      if (!res.ok) throw new Error('Erro ao gerar PDF');
+      const blob = await res.blob();
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = pdfFilename; a.click();
+    } catch { Swal.fire({ icon: 'error', title: 'Erro', text: 'Erro ao gerar PDF' }); }
+    finally { setDownloading(false); }
+  }
+  return (
+    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.6)',zIndex:2000,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:24}}>
+      <div style={{background:'#fff',borderRadius:12,width:'100%',maxWidth:820,display:'flex',flexDirection:'column',maxHeight:'92vh',boxShadow:'0 24px 80px rgba(0,0,0,.25)'}}>
+        <div style={{padding:'14px 20px',borderBottom:'0.5px solid #E5E7EB',display:'flex',justifyContent:'space-between',alignItems:'center',flexShrink:0}}>
+          <h2 style={{fontSize:15,fontWeight:600,margin:0,color:'#111'}}>{title}</h2>
+          <div style={{display:'flex',gap:8}}>
+            <button onClick={handleDownload} disabled={downloading}
+              style={{padding:'7px 18px',borderRadius:8,border:'none',background:'#111',color:'#fff',cursor:'pointer',fontSize:13,fontWeight:500}}>
+              {downloading?'Gerando PDF...':'Baixar PDF'}
+            </button>
+            <button onClick={onClose}
+              style={{padding:'7px 14px',borderRadius:8,border:'0.5px solid #E5E7EB',background:'#fff',color:'#374151',cursor:'pointer',fontSize:13}}>
+              Fechar
+            </button>
+          </div>
+        </div>
+        <div style={{flex:1,overflow:'auto',background:'#F3F4F6',padding:16}}>
+          <iframe srcDoc={html} style={{width:'100%',height:'100%',minHeight:600,border:'none',borderRadius:8,background:'#fff'}} title="preview" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── AccountPicker (reutilizado) ───────────────────────────────────────────────
 interface Account { id: string; code: string; name: string; reducedCode?: string; }
 function AccountPicker({ label, value, onChange, accounts }: {
@@ -237,6 +281,7 @@ export default function ProLaborePage() {
   const [guiasCalculo, setGuiasCalculo] = useState<any>(null);
   const [guiasData, setGuiasData] = useState<any>(null);
   const [guiasLoading, setGuiasLoading] = useState(false);
+  const [preview, setPreview] = useState<{title:string;html:string;pdfUrl:string;pdfFilename:string}|null>(null);
   const [retroFrom, setRetroFrom] = useState('');
   const [retroTo, setRetroTo] = useState('');
   const [retroLoading, setRetroLoading] = useState(false);
@@ -479,6 +524,8 @@ export default function ProLaborePage() {
       )}
 
 
+      {preview && <PreviewModal title={preview.title} html={preview.html} pdfUrl={preview.pdfUrl} pdfFilename={preview.pdfFilename} onClose={()=>setPreview(null)} />}
+
       {guiasData && guiasCalculo && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
           onClick={e => e.target === e.currentTarget && setGuiasData(null)}>
@@ -490,13 +537,14 @@ export default function ProLaborePage() {
             <div style={{ marginBottom: 16 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                 <span style={{ fontSize: 13, fontWeight: 500, color: "#1a1a6e" }}>GPS - Guia da Previdencia Social</span>
-                <button style={{ ...S.btnP, fontSize: 12 }} onClick={async () => {
-                  const r = await api.get('/hr/pro-labore/calculos/' + guiasCalculo.id + '/guias/gps.pdf', { responseType: 'blob' });
-                  const url = URL.createObjectURL(r.data);
-                  const a = document.createElement('a');
-                  a.href = url; a.download = 'GPS-' + guiasCalculo.competencia + '.pdf';
-                  a.click(); URL.revokeObjectURL(url);
-                }}>Download GPS PDF</button>
+                <button style={{ ...S.btnP, fontSize: 12 }} onClick={() => {
+                  setPreview({
+                    title: 'GPS — Pró-labore — ' + guiasCalculo.competencia,
+                    html: guiasData.gpsHtml,
+                    pdfUrl: '/hr/pro-labore/calculos/' + guiasCalculo.id + '/guias/gps.pdf',
+                    pdfFilename: 'GPS-' + guiasCalculo.competencia + '.pdf',
+                  }); setGuiasData(null);
+                }}>Visualizar GPS</button>
               </div>
               <div style={{ border: "1px solid #E5E7EB", borderRadius: 8, overflow: "hidden" }}>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)" }}>
@@ -535,12 +583,13 @@ export default function ProLaborePage() {
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                   <span style={{ fontSize: 13, fontWeight: 500, color: "#006633" }}>DARF - IRRF Codigo 0561</span>
                   <button style={{ ...S.btnP, background: "#006633", fontSize: 12 }} onClick={async () => {
-                    const r = await api.get('/hr/pro-labore/calculos/' + guiasCalculo.id + '/guias/darf.pdf', { responseType: 'blob' });
-                    const url = URL.createObjectURL(r.data);
-                    const a = document.createElement('a');
-                    a.href = url; a.download = 'DARF-' + guiasCalculo.competencia + '.pdf';
-                    a.click(); URL.revokeObjectURL(url);
-                  }}>Download DARF PDF</button>
+                  setPreview({
+                    title: 'DARF IRRF — Pró-labore — ' + guiasCalculo.competencia,
+                    html: guiasData.darfHtml,
+                    pdfUrl: '/hr/pro-labore/calculos/' + guiasCalculo.id + '/guias/darf.pdf',
+                    pdfFilename: 'DARF-' + guiasCalculo.competencia + '.pdf',
+                  }); setGuiasData(null);
+                  }}>Visualizar DARF</button>
                 </div>
                 <div style={{ border: "1px solid #E5E7EB", borderRadius: 8, overflow: "hidden" }}>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)" }}>

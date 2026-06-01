@@ -103,7 +103,7 @@ function htmlRecibo(d: any): string {
     '</div></body></html>';
 }
 
-function htmlGPSFolha(d: any): string {
+function htmlGPSFolha(d: any, titulo = 'Folha de Pagamento CLT - Empregados', codigo = 'Cod. 2100'): string {
   const css = '<style>*{box-sizing:border-box;margin:0;padding:0;font-family:Arial,sans-serif}body{background:#fff;padding:20px}' +
     '.guia{border:2px solid #000;width:720px;margin:0 auto 20px}.hdr{background:#1a1a6e;color:#fff;padding:8px 12px;display:flex;justify-content:space-between;align-items:center}' +
     '.hdr h1{font-size:14px;font-weight:bold}.cod{font-size:20px;font-weight:bold}' +
@@ -120,7 +120,7 @@ function htmlGPSFolha(d: any): string {
     '<td>R$ ' + fmtBRL(l.inssEmp) + '</td><td>R$ ' + fmtBRL(l.inssPat) + '</td><td>R$ ' + fmtBRL(l.rat) + '</td><td>R$ ' + fmtBRL(l.terc) + '</td></tr>'
   ).join('');
   return '<!DOCTYPE html><html><head><meta charset=utf-8>' + css + '</head><body><div class=guia>' +
-    '<div class=hdr><div><h1>GPS - GUIA DA PREVIDENCIA SOCIAL</h1><div style=font-size:10px>Folha de Pagamento CLT - Empregados</div></div><div class=cod>Cod. 2100</div></div>' +
+    '<div class=hdr><div><h1>GPS - GUIA DA PREVIDENCIA SOCIAL</h1><div style=font-size:10px>' + titulo + '</div></div><div class=cod>' + codigo + '</div></div>' +
     '<div class=sec><div class=row>' +
     '<div class=f><label>CNPJ do Empregador</label><span>' + fmtCNPJ(d.cnpj) + '</span></div>' +
     '<div class=f><label>Razao Social</label><span>' + d.empresa + '</span></div>' +
@@ -198,6 +198,8 @@ export class GuiasService {
       include: { funcionarios: { where: { tipoContrato: { in: ['CLT', 'TEMPORARIO'] } }, include: { employee: { select: { fullName: true, taxId: true } } } } },
     });
     const company = await this.prisma.company.findUniqueOrThrow({ where: { id: companyId } });
+    const taxRegimeGPS = (company.taxRegime || '').toLowerCase();
+    const codGPSFolha = taxRegimeGPS.includes('simples') || taxRegimeGPS.includes('mei') ? 'Cod. 2003' : 'Cod. 2100';
     let ie = 0, ip = 0, rat = 0, terc = 0;
     const linhas = folha.funcionarios.map(f => {
       const a=Number(f.valorInss), b=Number(f.valorInssEmpregador), c=Number(f.valorRat), t=Number(f.valorTerceiros);
@@ -259,6 +261,7 @@ export class GuiasService {
       },
     });
     const company = await this.prisma.company.findUniqueOrThrow({ where: { id: companyId } });
+    const codGPSFolha = (company.taxRegime||'').toLowerCase().includes('simples') || (company.taxRegime||'').toLowerCase().includes('mei') ? 'Cod. 2003' : 'Cod. 2100';
     let ie = 0, ip = 0, rat = 0, terc = 0;
     const linhas = folha.funcionarios.map(f => {
       const a=Number(f.valorInss), b=Number(f.valorInssEmpregador), c=Number(f.valorRat), t=Number(f.valorTerceiros);
@@ -268,7 +271,7 @@ export class GuiasService {
     const d = { cnpj: company.taxId, empresa: company.legalName, competencia: folha.competencia,
       inssEmpregado:ie, inssPatronal:ip, rat, terceiros:terc, totalGPS:ie+ip+rat+terc,
       vencimento: vencGPS(folha.competencia), linhas };
-    const pdf = await renderPdf(htmlGPSFolha(d));
+    const pdf = await renderPdf(htmlGPSFolha(d, 'Folha de Pagamento CLT - Empregados', codGPSFolha));
     return { pdf, filename: 'GPS_' + folha.competencia.replace('-','_') + '.pdf' };
   }
 
@@ -297,13 +300,36 @@ export class GuiasService {
     });
     if (!calculo) throw new Error('Calculo nao encontrado');
     const company = await this.prisma.company.findUnique({ where: { id: companyId } });
-    return { dados: {
+    const dados = {
       cpf: calculo.config.person.cpf, nome: calculo.config.person.fullName,
       cnpj: company!.taxId, empresa: company!.legalName, competencia: calculo.competencia,
       inssDiretor: Number(calculo.inssDiretor), inssEmpresa: Number(calculo.inssEmpresa),
       totalGPS: Number(calculo.inssDiretor)+Number(calculo.inssEmpresa),
       irrf: Number(calculo.irrf), vencimento: vencGPS(calculo.competencia),
-    }};
+      vencimentoDARF: vencGPS(calculo.competencia),
+    };
+    // Codigo GPS por regime tributario da empresa
+    const taxRegime = (company!.taxRegime || '').toLowerCase();
+    const codGPS = taxRegime.includes('simples') || taxRegime.includes('mei') ? 'Cod. 2003' : 'Cod. 2100';
+    const tituloGPS = 'Pro-labore de Diretoria';
+    const gpsData = {
+      cnpj: dados.cnpj, empresa: dados.empresa, competencia: dados.competencia,
+      inssEmpregado: dados.inssDiretor, inssPatronal: dados.inssEmpresa, rat: 0, terceiros: 0,
+      totalGPS: dados.totalGPS, vencimento: dados.vencimento,
+      linhas: [{ nome: dados.nome, cpf: dados.cpf, salarioBase: Number(calculo.valorBruto),
+        inssEmp: dados.inssDiretor, inssPat: dados.inssEmpresa, rat: 0, terc: 0 }],
+    };
+    const darfData = {
+      cnpj: dados.cnpj, empresa: dados.empresa, competencia: dados.competencia,
+      totalIrrf: dados.irrf, numFuncsIrrf: dados.irrf > 0 ? 1 : 0, vencimento: dados.vencimentoDARF,
+      linhas: [{ nome: dados.nome, cpf: dados.cpf, baseIrrf: Number(calculo.baseIrrf||0),
+        aliqIrrf: Number(calculo.aliqIrrf||0), irrf: dados.irrf }],
+    };
+    return {
+      dados,
+      gpsHtml: htmlGPSFolha(gpsData, tituloGPS, codGPS),
+      darfHtml: dados.irrf > 0 ? htmlDARFFolha(darfData) : '',
+    };
   }
 
   async gerarGuiasLote(companyId: string, competencia: string): Promise<Buffer> {
