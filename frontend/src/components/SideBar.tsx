@@ -54,6 +54,7 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
         { path: "/app/hr/employees", label: "Funcionários", icon: FiUsers },
         { path: '/app/hr/pro-labore', label: 'Pró-labore', icon: FiDollarSign },
         { path: '/app/hr/informe-rendimentos', label: 'Informe de Rendimentos', icon: FiFileText },
+        { path: '/app/hr/esocial', label: 'eSocial', icon: FiFileText },
       ],
     },
     {
