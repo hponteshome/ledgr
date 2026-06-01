@@ -3559,3 +3559,77 @@ model CompanyHistory {
   @@index([companyId, changedAt])
   @@map("company_history")
 }
+
+// =============================================================================
+// 14 · TABELAS LEGAIS E INDICADORES ECONOMICOS
+// =============================================================================
+
+/// Faixas da tabela INSS por ano de vigencia
+model TabelaInss {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ano         Int      @map("ano")
+  faixaOrdem  Int      @map("faixa_ordem")
+  limiteAte   Decimal  @map("limite_ate") @db.Decimal(15, 2)   // teto da faixa (999999 = sem limite)
+  aliquota    Decimal  @map("aliquota") @db.Decimal(5, 4)      // ex: 0.075
+  deducao     Decimal  @default(0) @map("deducao") @db.Decimal(15, 2)
+  teto        Decimal? @map("teto") @db.Decimal(15, 2)         // teto contributivo do ano
+  salMinimo   Decimal? @map("sal_minimo") @db.Decimal(15, 2)   // salario minimo do ano
+  vigenciaIni DateTime @map("vigencia_ini") @db.Date
+  vigenciaFim DateTime? @map("vigencia_fim") @db.Date
+  observacao  String?  @map("observacao") @db.VarChar(255)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+
+  @@unique([ano, faixaOrdem])
+  @@index([ano])
+  @@map("tabela_inss")
+}
+
+/// Faixas da tabela IRRF por ano de vigencia
+model TabelaIrrf {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ano         Int      @map("ano")
+  faixaOrdem  Int      @map("faixa_ordem")
+  limiteAte   Decimal  @map("limite_ate") @db.Decimal(15, 2)   // 999999 = sem limite
+  aliquota    Decimal  @map("aliquota") @db.Decimal(5, 4)
+  deducao     Decimal  @default(0) @map("deducao") @db.Decimal(15, 2)
+  tipo        String   @default("PROGRESSIVA") @map("tipo") @db.VarChar(20) // PROGRESSIVA | REDUTOR_2026
+  vigenciaIni DateTime @map("vigencia_ini") @db.Date
+  vigenciaFim DateTime? @map("vigencia_fim") @db.Date
+  observacao  String?  @map("observacao") @db.VarChar(255)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+
+  @@unique([ano, tipo, faixaOrdem])
+  @@index([ano])
+  @@map("tabela_irrf")
+}
+
+/// Salario minimo por vigencia
+model SalarioMinimo {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  valor       Decimal  @map("valor") @db.Decimal(15, 2)
+  vigenciaIni DateTime @map("vigencia_ini") @db.Date
+  vigenciaFim DateTime? @map("vigencia_fim") @db.Date
+  lei         String?  @map("lei") @db.VarChar(50)   // ex: Lei 15.270/2025
+  observacao  String?  @map("observacao") @db.VarChar(255)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+
+  @@index([vigenciaIni])
+  @@map("salario_minimo")
+}
+
+/// Serie historica de indicadores economicos (Selic, CDI, IPCA, IGP-M, IGP-DI, INPC, TR)
+model IndicadorEconomico {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  indicador    String   @map("indicador") @db.VarChar(20)  // SELIC | CDI | IPCA | IGPM | IGPDI | INPC | TR
+  competencia  String   @map("competencia") @db.VarChar(7) // AAAA-MM
+  taxaMensal   Decimal  @map("taxa_mensal") @db.Decimal(10, 6)   // % mensal ex: 0.831000
+  taxaAnual    Decimal? @map("taxa_anual") @db.Decimal(10, 6)    // % anual acumulada no ano
+  acum12m      Decimal? @map("acum_12m") @db.Decimal(10, 6)      // acumulado 12 meses
+  fonte        String?  @map("fonte") @db.VarChar(50)    // BCB | IBRE | IBGE
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  @@unique([indicador, competencia])
+  @@index([indicador, competencia])
+  @@map("indicadores_economicos")
+}

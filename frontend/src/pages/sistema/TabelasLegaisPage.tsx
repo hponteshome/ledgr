@@ -1,5 +1,6 @@
 // frontend/src/pages/sistema/TabelasLegaisPage.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import api from '../../services/api';
 
 // ── Dados das tabelas ─────────────────────────────────────────────────────────
 
@@ -124,7 +125,9 @@ const fmtBRL = (v: number) => v.toLocaleString('pt-BR', {minimumFractionDigits:2
 // ── Componente ────────────────────────────────────────────────────────────────
 
 export function TabelasLegaisPage() {
-  const [aba, setAba] = useState<'irpf'|'inss'>('irpf');
+  const [aba, setAba] = useState<'irpf'|'inss'|'salmin'>('irpf');
+  const [salarios, setSalarios] = useState<any[]>([]);
+  const [loadingSal, setLoadingSal] = useState(false);
   const [irpfTab, setIrpfTab] = useState('2026');
   const [inssTab, setInssTab] = useState('2026');
   const [simSalario, setSimSalario] = useState('');
@@ -150,6 +153,12 @@ export function TabelasLegaisPage() {
   const sal = parseFloat(simSalario.replace(/\./g,'').replace(',','.')) || 0;
   const dep = parseInt(simDep) || 0;
   const inssKey = inssTab;
+  useEffect(() => {
+    if (aba !== 'salmin') return;
+    setLoadingSal(true);
+    api.get('/tabelas-legais/salario-minimo').then(r => setSalarios(r.data ?? [])).catch(() => {}).finally(() => setLoadingSal(false));
+  }, [aba]);
+
   const irpfKey = irpfTab;
   const inssVal = calcINSS(sal, inssKey);
   const deducDep = dep * (IRPF_TABELAS[irpfKey]?.deducaoDependente ?? 189.59);
@@ -171,6 +180,7 @@ export function TabelasLegaisPage() {
       <div style={{display:'flex', gap:4, marginBottom:20}}>
         <button style={S.tabBtn(aba==='irpf')} onClick={()=>setAba('irpf')}>Tabela IRPF</button>
         <button style={S.tabBtn(aba==='inss')} onClick={()=>setAba('inss')}>Tabela INSS</button>
+        <button style={S.tabBtn(aba==='salmin')} onClick={()=>setAba('salmin')}>Salario Minimo</button>
         <button style={S.tabBtn(false)} onClick={()=>{}}>Simulador</button>
       </div>
 
@@ -359,6 +369,68 @@ export function TabelasLegaisPage() {
         Tabela IRPF vigente a partir de mai/2025 (Lei 15.191/2025). Reducao 2026: Lei 15.270/2025.
         Tabela INSS atualizada anualmente por decreto federal. Valores para conferencia — nao substitui consulta a contador.
       </div>
+      {aba === 'salmin' && (
+        <div style={{background:'#fff',border:'0.5px solid #E5E7EB',borderRadius:10,overflow:'hidden',marginTop:16}}>
+          <div style={{padding:'12px 16px',borderBottom:'0.5px solid #E5E7EB',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+            <span style={{fontSize:13,fontWeight:500}}>Historico do Salario Minimo Nacional</span>
+            <span style={{fontSize:11,color:'#6B7280'}}>Fonte: MTE / Decretos Federais</span>
+          </div>
+          {loadingSal ? <div style={{padding:40,textAlign:'center',color:'#9CA3AF'}}>Carregando...</div> :
+           salarios.length === 0 ? <div style={{padding:40,textAlign:'center',color:'#9CA3AF',fontSize:13}}>Nenhum dado cadastrado.</div> : (
+            <table style={{width:'100%',borderCollapse:'collapse'}}>
+              <thead><tr>
+                <th style={{background:'#F9FAFB',color:'#6B7280',fontSize:10,fontWeight:600,textTransform:'uppercase' as const,padding:'8px 16px',textAlign:'left' as const,borderBottom:'0.5px solid #E5E7EB'}}>Vigencia Inicial</th>
+                <th style={{background:'#F9FAFB',color:'#6B7280',fontSize:10,fontWeight:600,textTransform:'uppercase' as const,padding:'8px 16px',textAlign:'left' as const,borderBottom:'0.5px solid #E5E7EB'}}>Vigencia Final</th>
+                <th style={{background:'#F9FAFB',color:'#6B7280',fontSize:10,fontWeight:600,textTransform:'uppercase' as const,padding:'8px 16px',textAlign:'right' as const,borderBottom:'0.5px solid #E5E7EB'}}>Valor (R$)</th>
+                <th style={{background:'#F9FAFB',color:'#6B7280',fontSize:10,fontWeight:600,textTransform:'uppercase' as const,padding:'8px 16px',textAlign:'left' as const,borderBottom:'0.5px solid #E5E7EB'}}>Lei / Decreto</th>
+              </tr></thead>
+              <tbody>
+                {salarios.map((s:any,i:number) => (
+                  <tr key={s.id} style={{background:i%2===0?'#fff':'#F9FAFB'}}>
+                    <td style={{padding:'10px 16px',fontSize:13,borderBottom:'0.5px solid #F5F5F5'}}>{new Date(s.vigenciaIni).toLocaleDateString('pt-BR')}</td>
+                    <td style={{padding:'10px 16px',fontSize:13,borderBottom:'0.5px solid #F5F5F5',color:'#6B7280'}}>{s.vigenciaFim ? new Date(s.vigenciaFim).toLocaleDateString('pt-BR') : 'Vigente'}</td>
+                    <td style={{padding:'10px 16px',fontSize:13,borderBottom:'0.5px solid #F5F5F5',textAlign:'right' as const,fontWeight:600,color:'#15803D',fontFamily:'monospace'}}>
+                      {Number(s.valor).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}
+                    </td>
+                    <td style={{padding:'10px 16px',fontSize:12,borderBottom:'0.5px solid #F5F5F5',color:'#6B7280'}}>{s.lei ?? '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
     </div>
   );
+      {aba === 'salmin' && (
+        <div style={{background:'#fff',border:'0.5px solid #E5E7EB',borderRadius:10,overflow:'hidden',marginTop:16}}>
+          <div style={{padding:'12px 16px',borderBottom:'0.5px solid #E5E7EB',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+            <span style={{fontSize:13,fontWeight:500}}>Historico do Salario Minimo Nacional</span>
+            <span style={{fontSize:11,color:'#6B7280'}}>Fonte: MTE / Decretos Federais</span>
+          </div>
+          {loadingSal ? <div style={{padding:40,textAlign:'center',color:'#9CA3AF'}}>Carregando...</div> :
+           salarios.length === 0 ? <div style={{padding:40,textAlign:'center',color:'#9CA3AF',fontSize:13}}>Nenhum dado. Cadastre em Tabelas Legais backend.</div> : (
+            <table style={{width:'100%',borderCollapse:'collapse'}}>
+              <thead><tr>
+                <th style={{background:'#F9FAFB',color:'#6B7280',fontSize:10,fontWeight:600,textTransform:'uppercase' as const,padding:'8px 16px',textAlign:'left' as const,borderBottom:'0.5px solid #E5E7EB'}}>Vigencia Inicial</th>
+                <th style={{background:'#F9FAFB',color:'#6B7280',fontSize:10,fontWeight:600,textTransform:'uppercase' as const,padding:'8px 16px',textAlign:'left' as const,borderBottom:'0.5px solid #E5E7EB'}}>Vigencia Final</th>
+                <th style={{background:'#F9FAFB',color:'#6B7280',fontSize:10,fontWeight:600,textTransform:'uppercase' as const,padding:'8px 16px',textAlign:'right' as const,borderBottom:'0.5px solid #E5E7EB'}}>Valor (R$)</th>
+                <th style={{background:'#F9FAFB',color:'#6B7280',fontSize:10,fontWeight:600,textTransform:'uppercase' as const,padding:'8px 16px',textAlign:'left' as const,borderBottom:'0.5px solid #E5E7EB'}}>Lei / Decreto</th>
+              </tr></thead>
+              <tbody>
+                {salarios.map((s:any,i:number) => (
+                  <tr key={s.id} style={{background:i%2===0?'#fff':'#F9FAFB'}}>
+                    <td style={{padding:'10px 16px',fontSize:13,borderBottom:'0.5px solid #F5F5F5'}}>{new Date(s.vigenciaIni).toLocaleDateString('pt-BR')}</td>
+                    <td style={{padding:'10px 16px',fontSize:13,borderBottom:'0.5px solid #F5F5F5',color:'#6B7280'}}>{s.vigenciaFim ? new Date(s.vigenciaFim).toLocaleDateString('pt-BR') : 'Vigente'}</td>
+                    <td style={{padding:'10px 16px',fontSize:13,borderBottom:'0.5px solid #F5F5F5',textAlign:'right' as const,fontWeight:600,color:'#15803D',fontFamily:'monospace'}}>
+                      {Number(s.valor).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}
+                    </td>
+                    <td style={{padding:'10px 16px',fontSize:12,borderBottom:'0.5px solid #F5F5F5',color:'#6B7280'}}>{s.lei ?? '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
 }
