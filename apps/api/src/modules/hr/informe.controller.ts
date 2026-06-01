@@ -33,6 +33,11 @@ export class InformeController {
     return this.svc.upsert(req.companyId, req.user.id, dto);
   }
 
+  @Post('alimentar-folha')
+  alimentarPorFolha(@Req() req: any, @Body() body: any) {
+    return this.svc.alimentarPorFolha(req.companyId, req.user.id, Number(body.anoCalendario));
+  }
+
   @Delete(':id')
   remove(@Param('id') id: string, @Req() req: any) {
     return this.svc.remove(id, req.companyId);

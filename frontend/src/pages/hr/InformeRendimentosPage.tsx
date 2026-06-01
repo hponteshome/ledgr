@@ -378,6 +378,9 @@ export default function InformeRendimentosPage() {
   const [previewInforme, setPreviewInforme] = useState<any>(null);
   const [anoFiltro, setAnoFiltro] = useState('');
   const anoAtual = new Date().getFullYear();
+  const [showImportFolha, setShowImportFolha] = useState(false);
+  const [importAno, setImportAno] = useState(String(new Date().getFullYear() - 1));
+  const [importLoading, setImportLoading] = useState(false);
 
   const load = async () => {
     try {
@@ -407,6 +410,22 @@ export default function InformeRendimentosPage() {
 
   const fmtVal = (v: any) => Number(v ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
 
+  async function handleImportFolha() {
+    setImportLoading(true);
+    try {
+      const r = await api.post('/hr/informes/alimentar-folha', { anoCalendario: Number(importAno) });
+      if (r.data.aviso) {
+        Swal.fire({ icon: 'info', title: 'Sem dados', text: r.data.aviso });
+      } else {
+        Swal.fire({ icon: 'success', title: 'Concluido', text: r.data.total + ' informe(s) gerado(s)/atualizado(s) para ' + importAno + '.' });
+      }
+      setShowImportFolha(false);
+      load();
+    } catch(e: any) {
+      Swal.fire({ icon: 'error', title: 'Erro', text: e?.response?.data?.message ?? e.message ?? 'Erro ao importar.' });
+    } finally { setImportLoading(false); }
+  }
+
   return (
     <div style={{ padding: 24, maxWidth: 1100, margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
@@ -428,6 +447,7 @@ export default function InformeRendimentosPage() {
               })}
             </select>
           </div>
+          <button style={{ ...S.btn, marginTop: 14 }} onClick={() => setShowImportFolha(true)}>&#8635; Importar da Folha</button>
           <button style={{ ...S.btnP, marginTop: 14 }} onClick={() => setShowModal(true)}>+ Novo Informe</button>
         </div>
       </div>
@@ -483,6 +503,36 @@ export default function InformeRendimentosPage() {
           onSaved={() => { setEditInforme(null); load(); }}
         />
       )}
+      {showImportFolha && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.4)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onClick={e => e.target === e.currentTarget && setShowImportFolha(false)}>
+          <div style={{ background: '#fff', borderRadius: 12, padding: 24, width: 380, boxShadow: '0 20px 60px rgba(0,0,0,.15)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <span style={{ fontSize: 15, fontWeight: 500 }}>Importar da Folha de Pagamento</span>
+              <button style={{ ...S.btn, padding: '0 8px' }} onClick={() => setShowImportFolha(false)}>✕</button>
+            </div>
+            <p style={{ fontSize: 12, color: '#6B7280', marginBottom: 16 }}>
+              Agrega os valores de todas as folhas fechadas do ano selecionado e gera/atualiza os informes de rendimentos dos funcionarios com Person vinculado.
+            </p>
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ fontSize: 10, textTransform: 'uppercase' as const, color: '#6B7280', display: 'block', marginBottom: 4 }}>Ano-Calendario *</label>
+              <select style={{ ...S.input, width: '100%' }} value={importAno} onChange={e => setImportAno(e.target.value)}>
+                {[0, 1, 2, 3, 4].map(i => {
+                  const a = String(anoAtual - i);
+                  return <option key={a} value={a}>{a}</option>;
+                })}
+              </select>
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button style={S.btn} onClick={() => setShowImportFolha(false)}>Cancelar</button>
+              <button style={S.btnP} disabled={importLoading} onClick={handleImportFolha}>
+                {importLoading ? 'Importando...' : 'Importar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {previewInforme && (
         <PreviewModal
           informe={previewInforme}

@@ -224,7 +224,7 @@ export class FolhaService {
     });
   }
 
-  // ── Reabrir folha ────────────────────────────────────────────────────────────
+    // ── Reabrir folha ────────────────────────────────────────────────────────────
   async reabrir(companyId: string, folhaId: string) {
     return this.prisma.folhaMensal.update({
       where: { id: folhaId },
