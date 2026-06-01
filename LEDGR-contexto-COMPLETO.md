@@ -573,3 +573,102 @@ ind_esc_cons = 'N', ind_centralizada = '0', tip_ecd = '0', ind_moeda_func = 'N'
 - `feat(sped): campos ECD no cadastro empresa + form geracao ECD`
 - `feat(qsa): PersonCompany + qualificacaoCvm + assinaEcd + assinaEcf; Company + escritorioContabilId`
 - `feat(sped): preview registro 0000 em tempo real no form ECD`
+
+---
+
+## Atualização — 01/06/2026 (sessão madrugada/manhã)
+
+### ECD — Advocacia Gomes (06.190.032/0001-83)
+- De 2.448 erros PGE → 4 erros (todos contábeis — encerramento não feito)
+- Correções: `ecd-exporter.service.ts` — J150 agregado por COD_AGL, IND_DC correto para receitas, sinal correto (deb-cre)
+- `accounting-views.service.ts` — autoMatch filtro por tipo BP/DRE, prefixos DRE corrigidos
+- Mapeamentos banco corrigidos: ISS/PIS/COFINS → códigos dedução (`3.01.01.01.02.xx`), IRPJ/CSLL → `2.01.01.09.13/14`, Lucros → `2.03.04.01.01`
+- `LEDGR-ECD-Aprendizado.md` — 706 linhas de base de conhecimento ECD commitada no repo
+- Commits: `b41f4bc`
+
+### Finance — Contas a Receber (AR)
+- `markOverdue()` automático chamado no `findAll()` — atualiza títulos vencidos
+- Integração contábil na baixa: gera `JournalEntry` D/C quando `receivingAccountId` + `revenueAccountId` preenchidos
+- `fixedAssetId` adicionado ao `ArEntry` — FK para `fixed_assets` (imóveis reais da LM)
+- Select de imóvel usa `GET /assets?group=REAL_ESTATE&status=ACTIVE` em vez de `properties` (tabela vazia)
+- NF obrigatória para origem `ALUGUEL` — campo no modal de baixa, validação no `handleReceive`
+- 5 títulos de aluguel inseridos via SQL para testes (LM Administração)
+- Commit: `f0199bb`
+
+### Finance — Fluxo de Caixa
+- Filtro de imóvel corrigido: usa `fixedAssetId` em vez de `propertyId`
+- Select carrega `GET /assets?group=REAL_ESTATE&status=ACTIVE`
+- Commit: `6537695`
+
+### RH — eSocial
+- `esocial-s2200.service.ts` — gerador XML S-2200 (admissão) com download por funcionário
+- `esocial-events.service.ts` — S-2205 (alteração contratual), S-2299 (desligamento), S-1200 (remuneração), `listEvents()`
+- `hr.controller.ts` — endpoints `GET /hr/esocial/s2200/:id`, `POST /hr/esocial/s2205/:id`, `POST /hr/esocial/s2299/:id`, `POST /hr/esocial/s1200/:id`, `GET /hr/esocial/eventos`
+- `EsocialPage.tsx` — tela gestão eventos com botões XML coloridos por tipo
+- Rota `/app/hr/esocial` + link sidebar
+- Conflito de nome `s2200` (propriedade vs método) → renomeado para `svc2200`
+- Commit: `ca3bc01`
+
+### RH — Folha de Pagamento (NOVO MÓDULO)
+- Schema: `FolhaMensal`, `FolhaFuncionario`, `FolhaEvento`, `FolhaBeneficio`, `FolhaDissidio`
+- Enums: `TipoContrato` (CLT/TEMPORARIO/ESTAGIARIO/TERCEIRIZADO/POR_OBRA/AUTONOMO), `StatusFolha`, `TipoVerba`, `TipoEventoFolha`, `TipoBeneficio`
+- Tabelas migradas via SQL direto no Docker
+- `folha.service.ts` — INSS progressivo tabela 2026, IRRF 2026 (Lei 15.270/2025 — isenção até R$5.000, redutor gradual até R$7.350), FGTS 8%, INSS patronal 20%+RAT+Sistema S
+- `folha.controller.ts` — CRUD folha, calcular, fechar, reabrir, benefícios, dissídios
+- `FolhaPage.tsx` — lista lateral de folhas + detalhe com KPIs + tabela por funcionário
+- Rota `/app/hr/folha` + link sidebar
+- Commit: `74e60b8`
+
+### RH — Gestão de Funcionários (NOVO)
+- Schema: `EmployeeContractHistory`, `EmployeeOccurrence`, `EmployeeLeave`, `BancoHoras`, `BancoHorasLancamento`
+- Enums: `TipoAlteracaoContratual`, `TipoOcorrencia`, `TipoAfastamento`, `TipoLancamentoBH`
+- `employee.service.ts` expandido: `findOne`, `update`, `desligar`, `listarHistorico`, `addHistorico`, `listarOcorrencias`, `addOcorrencia`, `listarAfastamentos`, `addAfastamento`, `getBancoHoras`, `addLancamentoBH`
+- `employee.controller.ts` — endpoints CRUD + historico + ocorrencias + afastamentos + banco-horas
+- `EmployeeDetailPage.tsx` — ficha completa com abas: Dados, Histórico, Ocorrências, Afastamentos, Banco de Horas
+- Nome do funcionário clicável na listagem → navega para ficha
+- Rota `/app/hr/employees/:id`
+- Commit: `6f2c64d`
+
+### Aprendizados técnicos desta sessão
+- **Tabela IRRF 2026:** Lei 15.270/2025 — isenção total até R$5.000/mês, redutor gradual até R$7.350. Tabela progressiva base mantida. `folha.service.ts` implementa dupla tabela (progressiva + redutora)
+- **Tabelas legais:** hardcoded em `TabelasLegaisPage.tsx` e services. Horizonte: migrar para banco com vigência dinâmica
+- **`fixedAssets` vs `properties`:** imóveis da LM estão em `fixed_assets` (grupo `REAL_ESTATE`), tabela `properties` está vazia. AR e Cashflow corrigidos para usar `fixed_assets`
+- **NestJS conflito de nome:** propriedade e método com mesmo nome `s2200` causa erro TS2300 — renomear propriedade para `svc2200`
+- **PS heredoc com JSX:** `>` e `<` do JSX causam erros no PowerShell. Usar Python com `r"""..."""` para criar arquivos com JSX
+- **Banco de horas em minutos:** sempre armazenar em minutos (INT), não horas decimais. Display: `Math.floor(abs/60)+"h"+min+"min"`
+
+### Novos models no schema (01/06/2026)
+| Model | Tabela | Observação |
+|---|---|---|
+| FolhaMensal | folhas_mensais | StatusFolha; journalEntryId; contas contábeis configuráveis |
+| FolhaFuncionario | folha_funcionarios | Todos os cálculos CLT; @@unique(folhaId,employeeId) |
+| FolhaEvento | folha_eventos | Eventos variáveis por funcionário |
+| FolhaBeneficio | folha_beneficios | Config benefícios por funcionário; descontaFuncionario |
+| FolhaDissidio | folha_dissidios | Histórico dissídios por empresa/categoria |
+| EmployeeContractHistory | employee_contract_history | Promoções, reajustes, mudança função/setor |
+| EmployeeOccurrence | employee_occurrences | Advertências, elogios, suspensões |
+| EmployeeLeave | employee_leaves | Férias, licenças, afastamentos; CID; beneficioINSS |
+| BancoHoras | banco_horas | Saldo em minutos; @@unique(companyId,employeeId) |
+| BancoHorasLancamento | banco_horas_lancamentos | CREDITO/DEBITO/EXPIRACAO/AJUSTE |
+
+### Estado dos módulos — atualizado 01/06/2026
+| Módulo | Status | Observações |
+|---|---|---|
+| RH — Folha de Pagamento | ✅ Funcionando | INSS/IRRF 2026, FGTS, patronal; CLT/Estagiário/Terceirizado |
+| RH — Ficha Funcionário | ✅ Funcionando | Edição, histórico contratual, ocorrências, afastamentos, banco horas |
+| RH — eSocial | ✅ Funcionando | S-2200, S-2205, S-2299, S-1200 XML; tela gestão eventos |
+| RH — Funcionários | ✅ Funcionando | Parser PDF, importação batch, listagem, navegação para ficha |
+| Finance — AR | ✅ Funcionando | OVERDUE auto, NF aluguel obrigatória, fixedAssetId, integração contábil |
+| Finance — Fluxo de Caixa | ✅ Funcionando | Gerencial+Bancário, filtro fixedAsset |
+| ECD Export | ✅ Produção | J150 correto, IND_DC receitas, mapeamentos BP/DRE corretos |
+
+### Pendências após 01/06/2026
+1. Recibo de pagamento PDF (folha)
+2. GPS e DARF gerados pelo fechamento da folha
+3. Integração contábil automática da folha (JournalEntry)
+4. Tabelas IRRF/INSS no banco com vigência dinâmica
+5. ECF — próximo módulo SPED
+6. Conciliação bancária AP
+7. Selic e IGP-M
+8. Transmissão eSocial via webservice RFB
+

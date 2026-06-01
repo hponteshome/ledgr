@@ -134,7 +134,7 @@ export class AccountsReceivableService {
           data: {
             companyId,
             date:         new Date(dto.receivedAt),
-            description:  Recebimento: ,
+            description:  `Recebimento: ${entry.title}`,
             sourceModule: 'FINANCE',
             createdById:  userId,
             items: {
