@@ -84,16 +84,19 @@ export class InformeService {
           });
         }
         const acc = map.get(key)!;
-        const bruto    = Number(ff.totalBruto);
-        const decimo   = Number(ff.decimoTerceiro);
-        const ferias   = Number(ff.ferias) + Number(ff.tercoFerias);
+        const toN = (v: any) => v && typeof v === 'object' && typeof v.toNumber === 'function' ? v.toNumber() : parseFloat(String(v ?? 0));
+        const bruto    = toN(ff.totalBruto);
+        const decimo   = toN(ff.decimoTerceiro);
+        const ferias   = toN(ff.ferias) + toN(ff.tercoFerias);
+        const inss     = toN(ff.valorInss);
+        const irrf     = toN(ff.valorIrrf);
         // rendimentos tributaveis = bruto - decimo - ferias
         const tributavel = bruto - decimo - ferias;
-        acc.q3TotalRendimentos      += tributavel > 0 ? tributavel : bruto;
-        acc.q3ContribPrevidenciaria += Number(ff.valorInss);
-        acc.q3Irrf                  += Number(ff.valorIrrf);
-        acc.q5DecimoTerceiro        += decimo;
-        acc.q4Outros                += ferias;
+        acc.q3TotalRendimentos      = parseFloat((acc.q3TotalRendimentos + (tributavel > 0 ? tributavel : bruto)).toFixed(2));
+        acc.q3ContribPrevidenciaria = parseFloat((acc.q3ContribPrevidenciaria + inss).toFixed(2));
+        acc.q3Irrf                  = parseFloat((acc.q3Irrf + irrf).toFixed(2));
+        acc.q5DecimoTerceiro        = parseFloat((acc.q5DecimoTerceiro + decimo).toFixed(2));
+        acc.q4Outros                = parseFloat((acc.q4Outros + ferias).toFixed(2));
       }
     }
 

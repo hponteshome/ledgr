@@ -30,7 +30,15 @@ const EMPTY: any = {
 
 const parseBR = (v: string) => parseFloat((v || '0').replace(/\./g, '').replace(',', '.')) || 0;
 const fmtBR = (v: any) => {
-  const n = typeof v === 'string' ? parseBR(v) : Number(v || 0);
+  // Decimal do Prisma chega como string no formato americano (ex: "107359.16")
+  // parseBR e para formato brasileiro — usar Number() direto para strings numericas
+  let n: number;
+  if (typeof v === 'string') {
+    // Se tem virgula, e formato BR; se tem so ponto decimal, e formato americano
+    n = v.includes(',') ? parseBR(v) : (parseFloat(v) || 0);
+  } else {
+    n = Number(v || 0);
+  }
   return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
 const fmtCpf = (v: string) => v?.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') ?? v;
