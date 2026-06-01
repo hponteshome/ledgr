@@ -1,5 +1,6 @@
 ﻿// frontend/src/pages/hr/EmployeesPage.tsx
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { FiPlus, FiUser, FiUpload } from 'react-icons/fi';
 import api from '@/services/api';
 import { EmployeeImportModal } from './EmployeeImportModal';
@@ -9,6 +10,7 @@ function fmtCpf(v: string) { return v?.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '
 function fmtSalary(v: any) { return v ? Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—'; }
 
 export const EmployeesPage: React.FC = () => {
+  const nav = useNavigate();
   const [employees, setEmployees] = useState<any[]>([]);
   const [loading, setLoading]     = useState(true);
   const [showImport, setShowImport] = useState(false);
@@ -85,7 +87,7 @@ export const EmployeesPage: React.FC = () => {
                           {e.fullName.split(' ').map((n: string) => n[0]).slice(0, 2).join('')}
                         </span>
                       </div>
-                      <span className="font-medium text-gray-800">{e.fullName}</span>
+                      <span className="font-medium text-gray-800 cursor-pointer hover:text-blue-600" onClick={()=>nav("/app/hr/employees/"+e.id)}>{e.fullName}</span>
                     </div>
                   </td>
                   <td className="px-4 py-3 font-mono text-xs text-gray-600">{fmtCpf(e.taxId)}</td>

@@ -1,5 +1,5 @@
 // apps/api/src/modules/hr/employee.controller.ts
-import { Controller, Post, Get, UseGuards, UseInterceptors, Req, UploadedFile, Body, BadRequestException } from '@nestjs/common';
+import { Controller, Post, Get, Put, Patch, Delete, UseGuards, UseInterceptors, Req, UploadedFile, Body, Param, BadRequestException } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { JwtAuthGuard } from '@/auth/guards/jwt.guard';
@@ -16,6 +16,7 @@ export class EmployeeController {
     private readonly service: EmployeeService,
   ) {}
 
+  // ── Importacao PDF ───────────────────────────────────────────────────────────
   @Post('parse-pdf')
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } }))
   async parsePdf(@UploadedFile() file: Express.Multer.File) {
@@ -42,8 +43,68 @@ export class EmployeeController {
     return results;
   }
 
+  // ── CRUD basico ──────────────────────────────────────────────────────────────
   @Get()
   list(@Req() req: any) {
     return this.service.listByCompany(req.companyId);
+  }
+
+  @Get(':id')
+  findOne(@Req() req: any, @Param('id') id: string) {
+    return this.service.findOne(req.companyId, id);
+  }
+
+  @Put(':id')
+  update(@Req() req: any, @Param('id') id: string, @Body() body: any) {
+    return this.service.update(req.companyId, id, body, req.user.id);
+  }
+
+  @Patch(':id/desligar')
+  desligar(@Req() req: any, @Param('id') id: string, @Body() body: any) {
+    return this.service.desligar(req.companyId, id, body, req.user.id);
+  }
+
+  // ── Historico contratual ─────────────────────────────────────────────────────
+  @Get(':id/historico')
+  historico(@Req() req: any, @Param('id') id: string) {
+    return this.service.listarHistorico(req.companyId, id);
+  }
+
+  @Post(':id/historico')
+  addHistorico(@Req() req: any, @Param('id') id: string, @Body() body: any) {
+    return this.service.addHistorico(req.companyId, id, body, req.user.id);
+  }
+
+  // ── Ocorrencias ──────────────────────────────────────────────────────────────
+  @Get(':id/ocorrencias')
+  ocorrencias(@Req() req: any, @Param('id') id: string) {
+    return this.service.listarOcorrencias(req.companyId, id);
+  }
+
+  @Post(':id/ocorrencias')
+  addOcorrencia(@Req() req: any, @Param('id') id: string, @Body() body: any) {
+    return this.service.addOcorrencia(req.companyId, id, body, req.user.id);
+  }
+
+  // ── Afastamentos ─────────────────────────────────────────────────────────────
+  @Get(':id/afastamentos')
+  afastamentos(@Req() req: any, @Param('id') id: string) {
+    return this.service.listarAfastamentos(req.companyId, id);
+  }
+
+  @Post(':id/afastamentos')
+  addAfastamento(@Req() req: any, @Param('id') id: string, @Body() body: any) {
+    return this.service.addAfastamento(req.companyId, id, body, req.user.id);
+  }
+
+  // ── Banco de horas ───────────────────────────────────────────────────────────
+  @Get(':id/banco-horas')
+  bancoHoras(@Req() req: any, @Param('id') id: string) {
+    return this.service.getBancoHoras(req.companyId, id);
+  }
+
+  @Post(':id/banco-horas')
+  addBancoHoras(@Req() req: any, @Param('id') id: string, @Body() body: any) {
+    return this.service.addLancamentoBH(req.companyId, id, body, req.user.id);
   }
 }

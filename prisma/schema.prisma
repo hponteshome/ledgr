@@ -192,6 +192,12 @@ model Company {
   folhaFuncionarios      FolhaFuncionario[]
   folhaBeneficios        FolhaBeneficio[]
   folhaDissidios         FolhaDissidio[]
+  contratoHistorico      EmployeeContractHistory[]
+  ocorrencias            EmployeeOccurrence[]
+  afastamentos           EmployeeLeave[]
+  bancoHoras             BancoHoras[]
+  bancoHorasLancamentos  BancoHorasLancamento[]
+
   pettyCash              PettyCash[]
   accountingViews        AccountingView[]
   // -- Dados SPED/ECD ----------------------------------------
@@ -615,6 +621,10 @@ model Employee {
   dependents EmployeeDependent[]
   folhas     FolhaFuncionario[]
   beneficios FolhaBeneficio[]
+  contratoHistorico EmployeeContractHistory[]
+  ocorrencias       EmployeeOccurrence[]
+  afastamentos      EmployeeLeave[]
+  bancoHoras        BancoHoras?
 
   @@index([companyId, deletedAt])
   @@index([taxId])
@@ -3319,6 +3329,206 @@ model FolhaDissidio {
 
   @@index([companyId, dataVigencia])
   @@map("folha_dissidios")
+}
+
+
+// =============================================================================
+// 12 · GESTAO DE FUNCIONARIOS — Historico, Ocorrencias, Afastamentos
+// =============================================================================
+
+enum TipoAlteracaoContratual {
+  PROMOCAO
+  REAJUSTE_SALARIAL
+  MUDANCA_FUNCAO
+  MUDANCA_SETOR
+  MUDANCA_CARGA_HORARIA
+  MUDANCA_CONTRATO
+  DISSIDIO
+  OUTROS
+
+  @@map("tipo_alteracao_contratual")
+}
+
+enum TipoOcorrencia {
+  ADVERTENCIA_VERBAL
+  ADVERTENCIA_ESCRITA
+  SUSPENSAO
+  ELOGIO
+  FALTA_INJUSTIFICADA
+  ATRASO_REITERADO
+  OUTROS
+
+  @@map("tipo_ocorrencia")
+}
+
+enum TipoAfastamento {
+  FERIAS
+  LICENCA_MEDICA
+  LICENCA_MATERNIDADE
+  LICENCA_PATERNIDADE
+  ACIDENTE_TRABALHO
+  LICENCA_NAOREL
+  SUSPENSAO_DISCIPLINAR
+  OUTROS
+
+  @@map("tipo_afastamento")
+}
+
+/// Historico de alteracoes contratuais — promoções, reajustes, mudança de função
+model EmployeeContractHistory {
+  id          String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId   String                 @map("company_id") @db.Uuid
+  employeeId  String                 @map("employee_id") @db.Uuid
+  tipo        TipoAlteracaoContratual @map("tipo")
+  dataAlteracao DateTime             @map("data_alteracao") @db.Date
+
+  // Valores antes/depois
+  funcaoAnterior     String?  @map("funcao_anterior") @db.VarChar(255)
+  funcaoNova         String?  @map("funcao_nova") @db.VarChar(255)
+  salarioAnterior    Decimal? @map("salario_anterior") @db.Decimal(15, 2)
+  salarioNovo        Decimal? @map("salario_novo") @db.Decimal(15, 2)
+  percentualReajuste Decimal? @map("percentual_reajuste") @db.Decimal(5, 4)
+  setorAnterior      String?  @map("setor_anterior") @db.VarChar(255)
+  setorNovo          String?  @map("setor_novo") @db.VarChar(255)
+  cargaHorariaAnterior Decimal? @map("carga_horaria_anterior") @db.Decimal(5, 2)
+  cargaHorariaNova   Decimal? @map("carga_horaria_nova") @db.Decimal(5, 2)
+  tipoContratoAnterior String? @map("tipo_contrato_anterior") @db.VarChar(50)
+  tipoContratoNovo   String?  @map("tipo_contrato_novo") @db.VarChar(50)
+
+  motivo         String?   @map("motivo") @db.Text
+  observacao     String?   @map("observacao") @db.Text
+  esocialGerado  Boolean   @default(false) @map("esocial_gerado")
+  dissidioId     String?   @map("dissidio_id") @db.Uuid
+
+  createdById String    @map("created_by_id") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamp(6)
+
+  company  Company  @relation(fields: [companyId], references: [id])
+  employee Employee @relation(fields: [employeeId], references: [id])
+
+  @@index([companyId, employeeId])
+  @@index([employeeId, dataAlteracao])
+  @@map("employee_contract_history")
+}
+
+/// Ocorrencias disciplinares e elogios
+model EmployeeOccurrence {
+  id         String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId  String         @map("company_id") @db.Uuid
+  employeeId String         @map("employee_id") @db.Uuid
+  tipo       TipoOcorrencia @map("tipo")
+  data       DateTime       @map("data") @db.Date
+  motivo     String         @map("motivo") @db.VarChar(500)
+  descricao  String?        @map("descricao") @db.Text
+  testemunha String?        @map("testemunha") @db.VarChar(255)
+  diasSuspensao Int?        @map("dias_suspensao") // para suspensao
+  ciencia    Boolean        @default(false) @map("ciencia") // funcionario assinou
+  cienciaEm  DateTime?      @map("ciencia_em") @db.Timestamp(6)
+  documentoId String?       @map("documento_id") @db.Uuid // PDF da advertencia
+
+  createdById String    @map("created_by_id") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamp(6)
+
+  company  Company  @relation(fields: [companyId], references: [id])
+  employee Employee @relation(fields: [employeeId], references: [id])
+
+  @@index([companyId, employeeId])
+  @@index([employeeId, data])
+  @@map("employee_occurrences")
+}
+
+/// Afastamentos — ferias, licencas, acidentes
+model EmployeeLeave {
+  id         String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId  String          @map("company_id") @db.Uuid
+  employeeId String          @map("employee_id") @db.Uuid
+  tipo       TipoAfastamento @map("tipo")
+  dataInicio DateTime        @map("data_inicio") @db.Date
+  dataFim    DateTime?       @map("data_fim") @db.Date
+  diasTotal  Int?            @map("dias_total")
+  cid        String?         @map("cid") @db.VarChar(10) // CID para afastamentos medicos
+  beneficioINSS Boolean      @default(false) @map("beneficio_inss")
+  nrBeneficioINSS String?    @map("nr_beneficio_inss") @db.VarChar(20)
+  observacao String?         @map("observacao") @db.Text
+  documentoId String?        @map("documento_id") @db.Uuid
+
+  createdById String    @map("created_by_id") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamp(6)
+
+  company  Company  @relation(fields: [companyId], references: [id])
+  employee Employee @relation(fields: [employeeId], references: [id])
+
+  @@index([companyId, employeeId])
+  @@index([employeeId, dataInicio])
+  @@map("employee_leaves")
+}
+
+
+// =============================================================================
+// 13 · BANCO DE HORAS
+// =============================================================================
+
+enum TipoLancamentoBH {
+  CREDITO      // horas extras realizadas
+  DEBITO       // horas compensadas/abonadas
+  EXPIRACAO    // horas expiradas por politica
+  AJUSTE       // ajuste manual
+
+  @@map("tipo_lancamento_bh")
+}
+
+/// Saldo de banco de horas por funcionario
+model BancoHoras {
+  id          String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId   String  @map("company_id") @db.Uuid
+  employeeId  String  @unique @map("employee_id") @db.Uuid
+  saldoMinutos Int    @default(0) @map("saldo_minutos") // saldo em minutos
+  limiteMinutos Int?  @map("limite_minutos") // limite maximo de acumulo (ex: 120h = 7200)
+  validadeMeses Int?  @map("validade_meses") // meses para expirar (ex: 6)
+  ativo        Boolean @default(true) @map("ativo")
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  company    Company             @relation(fields: [companyId], references: [id])
+  employee   Employee            @relation(fields: [employeeId], references: [id])
+  lancamentos BancoHorasLancamento[]
+
+  @@unique([companyId, employeeId])
+  @@index([companyId])
+  @@map("banco_horas")
+}
+
+/// Lancamentos no banco de horas
+model BancoHorasLancamento {
+  id           String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  bancoHorasId String            @map("banco_horas_id") @db.Uuid
+  companyId    String            @map("company_id") @db.Uuid
+  employeeId   String            @map("employee_id") @db.Uuid
+  tipo         TipoLancamentoBH  @map("tipo")
+  data         DateTime          @map("data") @db.Date
+  minutos      Int               @map("minutos") // positivo=credito, negativo=debito
+  saldoApos    Int               @map("saldo_apos") // saldo em minutos apos lancamento
+  competencia  String            @map("competencia") @db.VarChar(7) // AAAA-MM
+  descricao    String?           @map("descricao") @db.VarChar(255)
+  folhaId      String?           @map("folha_id") @db.Uuid // origem folha
+  dataExpiracao DateTime?        @map("data_expiracao") @db.Date
+
+  createdById String   @map("created_by_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+
+  bancoHoras BancoHoras @relation(fields: [bancoHorasId], references: [id])
+  company    Company    @relation(fields: [companyId], references: [id])
+
+  @@index([bancoHorasId])
+  @@index([companyId, employeeId, competencia])
+  @@map("banco_horas_lancamentos")
 }
 
 // =============================================================================

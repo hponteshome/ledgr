@@ -12,13 +12,24 @@ const INSS_FAIXAS = [
 ];
 const INSS_TETO = 7786.02;
 
-// ── Tabelas IRRF 2024/2025 ────────────────────────────────────────────────────
+// ── Tabelas IRRF 2026 (Lei 15.270/2025 — vigente jan/2026) ───────────────────
+// Tabela progressiva base (mantida de 2025)
 const IRRF_FAIXAS = [
-  { ate: 2259.20,  aliq: 0,      deducao: 0 },
-  { ate: 2826.65,  aliq: 0.075,  deducao: 169.44 },
-  { ate: 3751.05,  aliq: 0.15,   deducao: 381.44 },
-  { ate: 4664.68,  aliq: 0.225,  deducao: 662.77 },
-  { ate: Infinity, aliq: 0.275,  deducao: 896.00 },
+  { ate: 2428.80,  aliq: 0,      deducao: 0 },
+  { ate: 2826.65,  aliq: 0.075,  deducao: 182.16 },
+  { ate: 3751.05,  aliq: 0.15,   deducao: 394.16 },
+  { ate: 4664.68,  aliq: 0.225,  deducao: 675.49 },
+  { ate: Infinity, aliq: 0.275,  deducao: 908.74 },
+];
+// Tabela redutora adicional 2026 (isenção ate R$5.000, reducao gradual ate R$7.350)
+const IRRF_REDUTORES = [
+  { ate: 5000.00,  redutor: Infinity }, // isento total
+  { ate: 5500.00,  redutor: 738.46 },
+  { ate: 6000.00,  redutor: 619.23 },
+  { ate: 6500.00,  redutor: 500.00 },
+  { ate: 7000.00,  redutor: 380.77 },
+  { ate: 7350.00,  redutor: 261.54 },
+  { ate: Infinity, redutor: 0 },       // sem reducao acima de R$7.350
 ];
 const DEDUCAO_DEPENDENTE = 189.59;
 
@@ -41,8 +52,12 @@ function calcInss(base: number): { valor: number; aliq: number } {
 function calcIrrf(base: number, numDep: number): { valor: number; aliq: number; deducao: number; baseIrrf: number } {
   const deducaoDep = numDep * DEDUCAO_DEPENDENTE;
   const baseIrrf = Math.max(0, base - deducaoDep);
+  // Calcular pelo progressivo base
   const faixa = IRRF_FAIXAS.find(f => baseIrrf <= f.ate)!;
-  const valor = Math.max(0, Math.round((baseIrrf * faixa.aliq - faixa.deducao) * 100) / 100);
+  const irrfBruto = Math.max(0, baseIrrf * faixa.aliq - faixa.deducao);
+  // Aplicar redutor 2026
+  const red = IRRF_REDUTORES.find(r => baseIrrf <= r.ate)!;
+  const valor = red.redutor === Infinity ? 0 : Math.max(0, Math.round((irrfBruto - red.redutor) * 100) / 100);
   return { valor, aliq: faixa.aliq, deducao: faixa.deducao, baseIrrf };
 }
 

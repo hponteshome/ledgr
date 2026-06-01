@@ -136,4 +136,186 @@ export class EmployeeService {
       orderBy: { fullName: 'asc' },
     });
   }
+
+  // ── findOne ──────────────────────────────────────────────────────────────────
+  async findOne(companyId: string, id: string) {
+    const emp = await this.prisma.employee.findFirst({
+      where: { id, companyId, deletedAt: null },
+      include: {
+        dependents: true,
+        person: { select: { id: true, cpf: true, fullName: true } },
+        contratoHistorico: { where: { deletedAt: null }, orderBy: { dataAlteracao: 'desc' } },
+        ocorrencias: { where: { deletedAt: null }, orderBy: { data: 'desc' } },
+        afastamentos: { where: { deletedAt: null }, orderBy: { dataInicio: 'desc' } },
+        bancoHoras: { include: { lancamentos: { orderBy: { data: 'desc' }, take: 20 } } },
+      },
+    });
+    if (!emp) throw new Error('Funcionario nao encontrado.');
+    return emp;
+  }
+
+  // ── update ───────────────────────────────────────────────────────────────────
+  async update(companyId: string, id: string, dto: any, userId: string) {
+    await this.prisma.employee.findFirstOrThrow({ where: { id, companyId, deletedAt: null } });
+    return this.prisma.employee.update({
+      where: { id },
+      data: {
+        fullName:    dto.fullName,
+        role:        dto.role,
+        salary:      dto.salary ? new (require('@prisma/client').Prisma.Decimal)(dto.salary) : undefined,
+        weeklyHours: dto.weeklyHours ? new (require('@prisma/client').Prisma.Decimal)(dto.weeklyHours) : undefined,
+        department:  dto.department,
+        lotacao:     dto.lotacao,
+        phone:       dto.phone,
+        cellPhone:   dto.cellPhone,
+        street:      dto.street,
+        number:      dto.number,
+        complement:  dto.complement,
+        neighborhood: dto.neighborhood,
+        city:        dto.city,
+        addressState: dto.addressState,
+        zipCode:     dto.zipCode,
+        maritalStatus: dto.maritalStatus,
+        educationLevel: dto.educationLevel,
+        status:      dto.status,
+      },
+    });
+  }
+
+  // ── desligar ─────────────────────────────────────────────────────────────────
+  async desligar(companyId: string, id: string, dto: any, userId: string) {
+    await this.prisma.employee.findFirstOrThrow({ where: { id, companyId, deletedAt: null } });
+    return this.prisma.employee.update({
+      where: { id },
+      data: {
+        status: 'inactive',
+        terminationDate: dto.dataDesligamento ? new Date(dto.dataDesligamento) : new Date(),
+      },
+    });
+  }
+
+  // ── Historico contratual ─────────────────────────────────────────────────────
+  async listarHistorico(companyId: string, employeeId: string) {
+    return this.prisma.employeeContractHistory.findMany({
+      where: { companyId, employeeId, deletedAt: null },
+      orderBy: { dataAlteracao: 'desc' },
+    });
+  }
+
+  async addHistorico(companyId: string, employeeId: string, dto: any, userId: string) {
+    const { Prisma } = require('@prisma/client');
+    return this.prisma.$transaction(async (tx: any) => {
+      const hist = await tx.employeeContractHistory.create({
+        data: {
+          companyId, employeeId,
+          tipo:          dto.tipo,
+          dataAlteracao: new Date(dto.dataAlteracao),
+          funcaoAnterior: dto.funcaoAnterior ?? null,
+          funcaoNova:    dto.funcaoNova ?? null,
+          salarioAnterior: dto.salarioAnterior ? new Prisma.Decimal(dto.salarioAnterior) : null,
+          salarioNovo:   dto.salarioNovo ? new Prisma.Decimal(dto.salarioNovo) : null,
+          percentualReajuste: dto.percentualReajuste ? new Prisma.Decimal(dto.percentualReajuste) : null,
+          setorAnterior: dto.setorAnterior ?? null,
+          setorNovo:     dto.setorNovo ?? null,
+          motivo:        dto.motivo ?? null,
+          observacao:    dto.observacao ?? null,
+          createdById:   userId,
+        },
+      });
+      // Atualizar dados do funcionario se houver alteracao
+      const upd: any = {};
+      if (dto.funcaoNova)    upd.role   = dto.funcaoNova;
+      if (dto.salarioNovo)   upd.salary = new Prisma.Decimal(dto.salarioNovo);
+      if (dto.setorNovo)     upd.department = dto.setorNovo;
+      if (Object.keys(upd).length > 0) {
+        await tx.employee.update({ where: { id: employeeId }, data: upd });
+      }
+      return hist;
+    });
+  }
+
+  // ── Ocorrencias ──────────────────────────────────────────────────────────────
+  async listarOcorrencias(companyId: string, employeeId: string) {
+    return this.prisma.employeeOccurrence.findMany({
+      where: { companyId, employeeId, deletedAt: null },
+      orderBy: { data: 'desc' },
+    });
+  }
+
+  async addOcorrencia(companyId: string, employeeId: string, dto: any, userId: string) {
+    return this.prisma.employeeOccurrence.create({
+      data: {
+        companyId, employeeId,
+        tipo:         dto.tipo,
+        data:         new Date(dto.data),
+        motivo:       dto.motivo,
+        descricao:    dto.descricao ?? null,
+        testemunha:   dto.testemunha ?? null,
+        diasSuspensao: dto.diasSuspensao ?? null,
+        createdById:  userId,
+      },
+    });
+  }
+
+  // ── Afastamentos ─────────────────────────────────────────────────────────────
+  async listarAfastamentos(companyId: string, employeeId: string) {
+    return this.prisma.employeeLeave.findMany({
+      where: { companyId, employeeId, deletedAt: null },
+      orderBy: { dataInicio: 'desc' },
+    });
+  }
+
+  async addAfastamento(companyId: string, employeeId: string, dto: any, userId: string) {
+    return this.prisma.employeeLeave.create({
+      data: {
+        companyId, employeeId,
+        tipo:       dto.tipo,
+        dataInicio: new Date(dto.dataInicio),
+        dataFim:    dto.dataFim ? new Date(dto.dataFim) : null,
+        diasTotal:  dto.diasTotal ?? null,
+        cid:        dto.cid ?? null,
+        beneficioINSS: dto.beneficioINSS ?? false,
+        nrBeneficioINSS: dto.nrBeneficioINSS ?? null,
+        observacao: dto.observacao ?? null,
+        createdById: userId,
+      },
+    });
+  }
+
+  // ── Banco de horas ───────────────────────────────────────────────────────────
+  async getBancoHoras(companyId: string, employeeId: string) {
+    return this.prisma.bancoHoras.findFirst({
+      where: { companyId, employeeId },
+      include: { lancamentos: { orderBy: { data: 'desc' }, take: 30 } },
+    });
+  }
+
+  async addLancamentoBH(companyId: string, employeeId: string, dto: any, userId: string) {
+    return this.prisma.$transaction(async (tx: any) => {
+      let bh = await tx.bancoHoras.findFirst({ where: { companyId, employeeId } });
+      if (!bh) {
+        bh = await tx.bancoHoras.create({ data: { companyId, employeeId, saldoMinutos: 0 } });
+      }
+      const minutos = dto.tipo === 'CREDITO' || dto.tipo === 'AJUSTE'
+        ? Math.abs(dto.minutos)
+        : -Math.abs(dto.minutos);
+      const saldoApos = bh.saldoMinutos + minutos;
+      await tx.bancoHorasLancamento.create({
+        data: {
+          bancoHorasId: bh.id, companyId, employeeId,
+          tipo:        dto.tipo,
+          data:        new Date(dto.data),
+          minutos,
+          saldoApos,
+          competencia: dto.competencia,
+          descricao:   dto.descricao ?? null,
+          createdById: userId,
+        },
+      });
+      return tx.bancoHoras.update({
+        where: { id: bh.id },
+        data: { saldoMinutos: saldoApos },
+      });
+    });
+  }
 }

@@ -59,6 +59,7 @@ import InformeRendimentosPage from '../pages/hr/InformeRendimentosPage';
 import { EmployeesPage } from '../pages/hr/EmployeesPage';
 import EsocialPage from '../pages/hr/EsocialPage';
 import FolhaPage from '../pages/hr/FolhaPage';
+import EmployeeDetailPage from '../pages/hr/EmployeeDetailPage';
 import FechamentoPage from '../pages/finance/FechamentoPage';
 import ContasAReceberPage from '../pages/finance/ContasAReceberPage';
 import ContasAPagarPage from '../pages/finance/ContasAPagarPage';
@@ -125,6 +126,7 @@ export const AppRoutes = () => {
                 <Route path="app/hr/employees" element={<ProtectedRoute><EmployeesPage /></ProtectedRoute>} />
                 <Route path="/app/hr/esocial" element={<ProtectedRoute><EsocialPage /></ProtectedRoute>} />
                 <Route path="/app/hr/folha" element={<ProtectedRoute><FolhaPage /></ProtectedRoute>} />
+                <Route path="/app/hr/employees/:id" element={<ProtectedRoute><EmployeeDetailPage /></ProtectedRoute>} />
                 <Route path="app/accounting/razao" element={<ProtectedRoute><RazaoAnaliticoPage /></ProtectedRoute>} />
 
 
