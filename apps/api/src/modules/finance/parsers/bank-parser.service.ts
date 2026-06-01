@@ -79,7 +79,7 @@ export class BankParserService {
     if (ext === 'ofx' || ext === 'ofc') {
       return this.parseOFX(buffer.toString('utf-8'));
     }
-    if (ext === 'csv') {
+    if (ext === 'csv' || ext === 'txt') {
       return this.parseCSV(buffer.toString('utf-8'));
     }
     if (ext === 'xls' || ext === 'xlsx') {
@@ -487,8 +487,13 @@ export class BankParserService {
     const lines = content.split('\n').map(l => l.trim()).filter(Boolean);
     if (lines.length < 2) throw new BadRequestException('CSV sem dados suficientes.');
 
-    // Separador: ; ou ,
-    const sep = lines[0].includes(';') ? ';' : ',';
+    // Detectar formato LM Administracao (TSV com linha 1 = "Extrato de: Agencia...")
+    if (lines[0].startsWith('Extrato de:') || lines[0].startsWith('Extrato de:')) {
+      return this.parseLMExtrato(lines);
+    }
+
+    // Separador: tab, ; ou ,
+    const sep = lines[0].includes('\t') ? '\t' : lines[0].includes(';') ? ';' : ',';
     const headers = lines[0].split(sep).map(h => normalizeText(h));
 
     // Mapeamento flexível de colunas
@@ -566,6 +571,79 @@ export class BankParserService {
   }
 
   // ── Layout XLS genérico ───────────────────────────────────
+  // ── Parser LM Administracao (TSV banco Bradesco/Itau mapeado) ───────────────
+  // Formato: linha1=cabecalho conta, linha2=headers TSV, linhas3+=dados
+  // Colunas: Data|Lancamento|Dcto.|Credito(R$)|Debito(R$)|Valor|Referencia|Debito|Credito|Historico|Valor
+  private parseLMExtrato(lines: string[]): ParsedStatement {
+    // Extrair agencia/conta da linha 1
+    const header0 = lines[0];
+    const agMatch = header0.match(/Ag[eê]ncia[:\s]+(\d+)/i);
+    const ccMatch = header0.match(/Conta[:\s]+([\d\-]+)/i);
+    const agency  = agMatch ? agMatch[1] : undefined;
+    const account = ccMatch ? ccMatch[1] : undefined;
+
+    // Linha 2 = headers, linhas 3+ = dados
+    const dataLines = lines.slice(2);
+    const transactions: ParsedTransaction[] = [];
+    let periodFrom: Date | null = null;
+    let periodTo:   Date | null = null;
+
+    for (const line of dataLines) {
+      if (!line.trim()) continue;
+      const cols = line.split('\t');
+      if (cols.length < 6) continue;
+
+      const dt = parseDateBR(cols[0]?.trim());
+      if (!dt) continue;
+
+      const desc      = (cols[9] || cols[1] || '').trim(); // Historico ou Lancamento
+      const creditRaw = cols[3]?.trim().replace(/\./g,'').replace(',','.'); // Credito (R$)
+      const debitRaw  = cols[4]?.trim().replace(/\./g,'').replace(',','.'); // Debito (R$)
+      const bankRef   = cols[2]?.trim(); // Dcto.
+
+      const credit = creditRaw ? parseFloat(creditRaw) : 0;
+      const debit  = debitRaw  ? parseFloat(debitRaw)  : 0;
+
+      let amount: number;
+      let type: 'DEBIT' | 'CREDIT';
+
+      if (credit > 0) {
+        amount = credit;
+        type   = 'CREDIT';
+      } else if (debit < 0) {
+        amount = Math.abs(debit);
+        type   = 'DEBIT';
+      } else {
+        continue; // sem valor
+      }
+
+      if (amount === 0) continue;
+
+      const norm = normalizeText(desc);
+      transactions.push({
+        transactionDate: dt,
+        description:     desc,
+        descriptionNorm: norm,
+        amount,
+        type,
+        bankRef: bankRef || undefined,
+      });
+
+      if (!periodFrom || dt < periodFrom) periodFrom = dt;
+      if (!periodTo   || dt > periodTo)   periodTo   = dt;
+    }
+
+    return {
+      bankCode:  'GENERIC',
+      bankName:  'LM Administracao - Extrato Mapeado',
+      agency,
+      account,
+      periodFrom: periodFrom ?? new Date(),
+      periodTo:   periodTo   ?? new Date(),
+      transactions,
+    };
+  }
+
   private parseGenericXLS(rows: any[][]): ParsedStatement {
     // Tenta encontrar linha de cabeçalho com Data + Descrição
     let headerRow = -1;
