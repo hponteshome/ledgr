@@ -301,6 +301,7 @@ export function TabelasLegaisPage() {
         </div>
       )}
 
+      {aba !== 'salmin' && <>
       {/* ── Simulador integrado ── */}
       <div style={S.card}>
         <div style={{fontSize:11, fontWeight:600, textTransform:'uppercase' as const, letterSpacing:'.3px', marginBottom:14, color:'var(--color-text-secondary)'}}>
@@ -364,6 +365,7 @@ export function TabelasLegaisPage() {
         )}
       </div>
 
+      </>}
       <div style={{fontSize:11, color:'var(--color-text-secondary)', lineHeight:1.6}}>
         Fonte: Receita Federal do Brasil (RFB) e Ministerio da Previdencia Social (MPS).
         Tabela IRPF vigente a partir de mai/2025 (Lei 15.191/2025). Reducao 2026: Lei 15.270/2025.
