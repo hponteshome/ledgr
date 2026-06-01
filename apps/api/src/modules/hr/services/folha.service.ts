@@ -212,15 +212,90 @@ export class FolhaService {
   }
 
   // ── Fechar folha ─────────────────────────────────────────────────────────────
-  async fechar(companyId: string, folhaId: string) {
+  async fechar(companyId: string, folhaId: string, userId: string) {
     const folha = await this.prisma.folhaMensal.findFirstOrThrow({
       where: { id: folhaId, companyId, deletedAt: null },
     });
     if (folha.status !== "CALCULADA")
       throw new BadRequestException("Folha precisa estar CALCULADA para ser fechada.");
-    return this.prisma.folhaMensal.update({
-      where: { id: folhaId },
-      data: { status: "FECHADA", fechadoEm: new Date() },
+
+    return this.prisma.$transaction(async (tx) => {
+      let journalEntryId: string | null = null;
+
+      // Buscar config contabil da empresa
+      const cfg = await tx.companyAccountingConfig.findUnique({ where: { companyId } });
+
+      if (cfg?.hrContaSalariosId && cfg?.hrContaSalariosAPagarId &&
+          cfg?.hrContaInssEmpId  && cfg?.hrContaInssPatrDespId &&
+          cfg?.hrContaInssPatrPassId && cfg?.hrContaFgtsDespId && cfg?.hrContaFgtsPassId) {
+
+        const [y, m] = folha.competencia.split('-').map(Number);
+        const dataComp = new Date(Date.UTC(y, m, 0, 12, 0, 0));
+
+        const toD = (v: any) => new Prisma.Decimal(parseFloat(String(v ?? 0)));
+        const totalBruto      = parseFloat(String(folha.totalBruto));
+        const totalInssEmp    = parseFloat(String(folha.totalInssEmpregado));
+        const totalInssPatr   = parseFloat(String(folha.totalInssEmpregador));
+        const totalIrrf       = parseFloat(String(folha.totalIrrf));
+        const totalFgts       = parseFloat(String(folha.totalFgts));
+        const totalSindical   = parseFloat(String(folha.totalSindical));
+        const totalLiquido    = parseFloat(String(folha.totalLiquido));
+
+        const items: any[] = [];
+
+        // 1. Salarios: D Despesa Salarios / C Salarios a Pagar (bruto)
+        if (totalBruto > 0) {
+          items.push({ accountId: cfg.hrContaSalariosId,       value: toD(totalBruto), type: "DEBIT"  });
+          items.push({ accountId: cfg.hrContaSalariosAPagarId, value: toD(totalBruto), type: "CREDIT" });
+        }
+
+        // 2. INSS Empregado: D Salarios a Pagar / C INSS Emp a Recolher
+        if (totalInssEmp > 0) {
+          items.push({ accountId: cfg.hrContaSalariosAPagarId, value: toD(totalInssEmp), type: "DEBIT"  });
+          items.push({ accountId: cfg.hrContaInssEmpId,        value: toD(totalInssEmp), type: "CREDIT" });
+        }
+
+        // 3. IRRF: D Salarios a Pagar / C IRRF a Recolher
+        if (totalIrrf > 0 && cfg.hrContaIrrfId) {
+          items.push({ accountId: cfg.hrContaSalariosAPagarId, value: toD(totalIrrf), type: "DEBIT"  });
+          items.push({ accountId: cfg.hrContaIrrfId,           value: toD(totalIrrf), type: "CREDIT" });
+        }
+
+        // 4. INSS Patronal: D Despesa INSS Patr / C INSS Patr a Recolher
+        if (totalInssPatr > 0) {
+          items.push({ accountId: cfg.hrContaInssPatrDespId, value: toD(totalInssPatr), type: "DEBIT"  });
+          items.push({ accountId: cfg.hrContaInssPatrPassId, value: toD(totalInssPatr), type: "CREDIT" });
+        }
+
+        // 5. FGTS: D Despesa FGTS / C FGTS a Recolher
+        if (totalFgts > 0) {
+          items.push({ accountId: cfg.hrContaFgtsDespId, value: toD(totalFgts), type: "DEBIT"  });
+          items.push({ accountId: cfg.hrContaFgtsPassId, value: toD(totalFgts), type: "CREDIT" });
+        }
+
+        if (items.length > 0) {
+          const je = await tx.journalEntry.create({
+            data: {
+              companyId,
+              date:         dataComp,
+              description:  "Folha de Pagamento — " + folha.competencia,
+              sourceModule: "HR",
+              createdById:  userId,
+              items:        { create: items },
+            },
+          });
+          journalEntryId = je.id;
+        }
+      }
+
+      return tx.folhaMensal.update({
+        where: { id: folhaId },
+        data: {
+          status:    "FECHADA",
+          fechadoEm: new Date(),
+          ...(journalEntryId ? { journalEntryId } : {}),
+        },
+      });
     });
   }
 

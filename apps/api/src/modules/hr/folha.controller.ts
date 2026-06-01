@@ -99,7 +99,7 @@ export class FolhaController {
 
   @Patch(":id/fechar")
   fechar(@Req() req: any, @Param("id") id: string) {
-    return this.service.fechar(req.companyId, id);
+    return this.service.fechar(req.companyId, id, req.user.id);
   }
 
   @Patch(":id/reabrir")

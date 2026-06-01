@@ -2810,6 +2810,16 @@ model CompanyAccountingConfig {
   escritorioTelefone String? @map("escritorio_telefone") @db.VarChar
   accountantCpf      String? @map("accountant_cpf") @db.VarChar(14)
   accountantEmail    String? @map("accountant_email") @db.VarChar
+
+  // Contas contabeis — Folha de Pagamento CLT
+  hrContaSalariosId       String? @map("hr_conta_salarios_id") @db.Uuid        // D Despesa Salarios
+  hrContaSalariosAPagarId String? @map("hr_conta_salarios_a_pagar_id") @db.Uuid // C Salarios a Pagar
+  hrContaInssEmpId        String? @map("hr_conta_inss_emp_id") @db.Uuid        // C INSS Empregado a Recolher
+  hrContaInssPatrDespId   String? @map("hr_conta_inss_patr_desp_id") @db.Uuid  // D Despesa INSS Patronal
+  hrContaInssPatrPassId   String? @map("hr_conta_inss_patr_pass_id") @db.Uuid  // C INSS Patronal a Recolher
+  hrContaIrrfId           String? @map("hr_conta_irrf_id") @db.Uuid            // C IRRF a Recolher
+  hrContaFgtsDespId       String? @map("hr_conta_fgts_desp_id") @db.Uuid       // D Despesa FGTS
+  hrContaFgtsPassId       String? @map("hr_conta_fgts_pass_id") @db.Uuid       // C FGTS a Recolher
   accountantPhone    String? @map("accountant_phone") @db.VarChar(20)
 
   // Configuracao contabil
