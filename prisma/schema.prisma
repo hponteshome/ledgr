@@ -188,6 +188,10 @@ model Company {
   accountingConfigs      CompanyAccountingConfig[]
   informesRendimentos    InformeRendimentos[]
   arEntries              ArEntry[]
+  folhasMensais          FolhaMensal[]
+  folhaFuncionarios      FolhaFuncionario[]
+  folhaBeneficios        FolhaBeneficio[]
+  folhaDissidios         FolhaDissidio[]
   pettyCash              PettyCash[]
   accountingViews        AccountingView[]
   // -- Dados SPED/ECD ----------------------------------------
@@ -609,6 +613,8 @@ model Employee {
   company    Company             @relation(fields: [companyId], references: [id])
   person     Person?             @relation("EmployeePerson", fields: [personId], references: [id])
   dependents EmployeeDependent[]
+  folhas     FolhaFuncionario[]
+  beneficios FolhaBeneficio[]
 
   @@index([companyId, deletedAt])
   @@index([taxId])
@@ -3048,6 +3054,273 @@ model FiscalObligation {
 
 // =============================================================================
 // HISTORICO CADASTRAL DE EMPRESAS
+
+// =============================================================================
+// 11 · FOLHA DE PAGAMENTO
+// =============================================================================
+
+enum TipoContrato {
+  CLT
+  TEMPORARIO
+  ESTAGIARIO
+  TERCEIRIZADO
+  POR_OBRA
+  AUTONOMO
+
+  @@map("tipo_contrato")
+}
+
+enum StatusFolha {
+  ABERTA
+  CALCULADA
+  FECHADA
+  PAGA
+
+  @@map("status_folha")
+}
+
+enum TipoVerba {
+  PROVENTO
+  DESCONTO
+  INFORMATIVO
+
+  @@map("tipo_verba")
+}
+
+enum TipoEventoFolha {
+  HORA_EXTRA_50
+  HORA_EXTRA_100
+  ADICIONAL_NOTURNO
+  FALTA_JUSTIFICADA
+  FALTA_INJUSTIFICADA
+  DSR
+  AFASTAMENTO
+  ADIANTAMENTO
+  FERIAS
+  DECIMO_TERCEIRO
+  BONUS
+  OUTROS
+
+  @@map("tipo_evento_folha")
+}
+
+enum TipoBeneficio {
+  VALE_TRANSPORTE
+  VALE_REFEICAO
+  VALE_ALIMENTACAO
+  PLANO_SAUDE
+  PLANO_ODONTO
+  SEGURO_VIDA
+  OUTROS
+
+  @@map("tipo_beneficio")
+}
+
+/// Cabecalho da folha mensal por empresa/competencia
+model FolhaMensal {
+  id          String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId   String      @map("company_id") @db.Uuid
+  competencia String      @map("competencia") @db.VarChar(7) // AAAA-MM
+  status      StatusFolha @default(ABERTA) @map("status")
+
+  // Totalizadores
+  totalBruto           Decimal @default(0) @map("total_bruto") @db.Decimal(15, 2)
+  totalDescontos       Decimal @default(0) @map("total_descontos") @db.Decimal(15, 2)
+  totalLiquido         Decimal @default(0) @map("total_liquido") @db.Decimal(15, 2)
+  totalFgts            Decimal @default(0) @map("total_fgts") @db.Decimal(15, 2)
+  totalInssEmpregado   Decimal @default(0) @map("total_inss_empregado") @db.Decimal(15, 2)
+  totalInssEmpregador  Decimal @default(0) @map("total_inss_empregador") @db.Decimal(15, 2)
+  totalIrrf            Decimal @default(0) @map("total_irrf") @db.Decimal(15, 2)
+  totalSindical        Decimal @default(0) @map("total_sindical") @db.Decimal(15, 2)
+
+  // Contas contabeis para lancamento automatico
+  contaSalariosId       String? @map("conta_salarios_id") @db.Uuid
+  contaFgtsId           String? @map("conta_fgts_id") @db.Uuid
+  contaInssEmpregadoId  String? @map("conta_inss_empregado_id") @db.Uuid
+  contaInssEmpregadorId String? @map("conta_inss_empregador_id") @db.Uuid
+  contaIrrfId           String? @map("conta_irrf_id") @db.Uuid
+  contaSindicalId       String? @map("conta_sindical_id") @db.Uuid
+  contaFeriasId         String? @map("conta_ferias_id") @db.Uuid
+  contaDecimoId         String? @map("conta_decimo_id") @db.Uuid
+
+  // Integracao
+  journalEntryId String?   @map("journal_entry_id") @db.Uuid
+  geradoEm       DateTime? @map("gerado_em") @db.Timestamp(6)
+  fechadoEm      DateTime? @map("fechado_em") @db.Timestamp(6)
+  pagoEm         DateTime? @map("pago_em") @db.Timestamp(6)
+
+  observacao  String?   @map("observacao") @db.Text
+  createdById String    @map("created_by_id") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamp(6)
+
+  company      Company            @relation(fields: [companyId], references: [id])
+  funcionarios FolhaFuncionario[]
+
+  @@unique([companyId, competencia])
+  @@index([companyId, status])
+  @@map("folhas_mensais")
+}
+
+/// Linha da folha por funcionario — todos os calculos detalhados
+model FolhaFuncionario {
+  id          String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  folhaId     String       @map("folha_id") @db.Uuid
+  employeeId  String       @map("employee_id") @db.Uuid
+  companyId   String       @map("company_id") @db.Uuid
+  tipoContrato TipoContrato @default(CLT) @map("tipo_contrato")
+
+  // ── Proventos ────────────────────────────────────────────────────────────────
+  salarioBase             Decimal @default(0) @map("salario_base") @db.Decimal(15, 2)
+  diasTrabalhados         Int     @default(30) @map("dias_trabalhados")
+  horasExtrasFifty        Decimal @default(0) @map("horas_extras_50") @db.Decimal(8, 2)
+  vrHorasExtrasFifty      Decimal @default(0) @map("vr_horas_extras_50") @db.Decimal(15, 2)
+  horasExtrasHundred      Decimal @default(0) @map("horas_extras_100") @db.Decimal(8, 2)
+  vrHorasExtrasHundred    Decimal @default(0) @map("vr_horas_extras_100") @db.Decimal(15, 2)
+  adicionalNoturno        Decimal @default(0) @map("adicional_noturno") @db.Decimal(15, 2)
+  adicionalPericulosidade Decimal @default(0) @map("adicional_periculosidade") @db.Decimal(15, 2)
+  adicionalInsalubridade  Decimal @default(0) @map("adicional_insalubridade") @db.Decimal(15, 2)
+  ferias                  Decimal @default(0) @map("ferias") @db.Decimal(15, 2)
+  tercoFerias             Decimal @default(0) @map("terco_ferias") @db.Decimal(15, 2)
+  decimoTerceiro          Decimal @default(0) @map("decimo_terceiro") @db.Decimal(15, 2)
+  adiantamento            Decimal @default(0) @map("adiantamento") @db.Decimal(15, 2)
+  outrosProventos         Decimal @default(0) @map("outros_proventos") @db.Decimal(15, 2)
+  totalBruto              Decimal @default(0) @map("total_bruto") @db.Decimal(15, 2)
+
+  // ── INSS Empregado ───────────────────────────────────────────────────────────
+  baseInss    Decimal @default(0) @map("base_inss") @db.Decimal(15, 2)
+  aliqInss    Decimal @default(0) @map("aliq_inss") @db.Decimal(5, 4)
+  valorInss   Decimal @default(0) @map("valor_inss") @db.Decimal(15, 2)
+
+  // ── INSS Patronal ────────────────────────────────────────────────────────────
+  aliqInssEmpregador  Decimal @default(0) @map("aliq_inss_empregador") @db.Decimal(5, 4)
+  valorInssEmpregador Decimal @default(0) @map("valor_inss_empregador") @db.Decimal(15, 2)
+  aliqRat             Decimal @default(0) @map("aliq_rat") @db.Decimal(5, 4) // RAT ajustado
+  valorRat            Decimal @default(0) @map("valor_rat") @db.Decimal(15, 2)
+  aliqTerceiros       Decimal @default(0) @map("aliq_terceiros") @db.Decimal(5, 4) // Sistema S
+  valorTerceiros      Decimal @default(0) @map("valor_terceiros") @db.Decimal(15, 2)
+
+  // ── IRRF ────────────────────────────────────────────────────────────────────
+  baseIrrf           Decimal @default(0) @map("base_irrf") @db.Decimal(15, 2)
+  deducaoDependentes Decimal @default(0) @map("deducao_dependentes") @db.Decimal(15, 2)
+  numDependentes     Int     @default(0) @map("num_dependentes")
+  aliqIrrf           Decimal @default(0) @map("aliq_irrf") @db.Decimal(5, 4)
+  deducaoIrrf        Decimal @default(0) @map("deducao_irrf") @db.Decimal(15, 2)
+  valorIrrf          Decimal @default(0) @map("valor_irrf") @db.Decimal(15, 2)
+
+  // ── FGTS ────────────────────────────────────────────────────────────────────
+  baseFgts  Decimal @default(0) @map("base_fgts") @db.Decimal(15, 2)
+  aliqFgts  Decimal @default(8) @map("aliq_fgts") @db.Decimal(5, 4) // 8% CLT, 2% estagiario
+  valorFgts Decimal @default(0) @map("valor_fgts") @db.Decimal(15, 2)
+
+  // ── Sindical ─────────────────────────────────────────────────────────────────
+  baseSindical      Decimal @default(0) @map("base_sindical") @db.Decimal(15, 2)
+  aliqSindical      Decimal @default(0) @map("aliq_sindical") @db.Decimal(5, 4)
+  valorSindical     Decimal @default(0) @map("valor_sindical") @db.Decimal(15, 2)
+  mesRecolhSindical String? @map("mes_recolh_sindical") @db.VarChar(7) // AAAA-MM
+
+  // ── Dissidio ─────────────────────────────────────────────────────────────────
+  percentualDissidio   Decimal?  @map("percentual_dissidio") @db.Decimal(5, 4)
+  dataVigenciaDissidio DateTime? @map("data_vigencia_dissidio") @db.Date
+  salarioAnterior      Decimal?  @map("salario_anterior") @db.Decimal(15, 2)
+
+  // ── Beneficios ───────────────────────────────────────────────────────────────
+  vrValeTransporte Decimal @default(0) @map("vr_vale_transporte") @db.Decimal(15, 2)
+  vrValeRefeicao   Decimal @default(0) @map("vr_vale_refeicao") @db.Decimal(15, 2)
+  vrValeAlimentacao Decimal @default(0) @map("vr_vale_alimentacao") @db.Decimal(15, 2)
+  vrPlanoSaude     Decimal @default(0) @map("vr_plano_saude") @db.Decimal(15, 2)
+  vrPlanoOdonto    Decimal @default(0) @map("vr_plano_odonto") @db.Decimal(15, 2)
+  vrSeguroVida     Decimal @default(0) @map("vr_seguro_vida") @db.Decimal(15, 2)
+  vrOutrosDescontos Decimal @default(0) @map("vr_outros_descontos") @db.Decimal(15, 2)
+
+  // ── Totais ───────────────────────────────────────────────────────────────────
+  totalDescontos Decimal @default(0) @map("total_descontos") @db.Decimal(15, 2)
+  totalLiquido   Decimal @default(0) @map("total_liquido") @db.Decimal(15, 2)
+
+  // ── Integracao ───────────────────────────────────────────────────────────────
+  journalEntryId String?   @map("journal_entry_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  folha    FolhaMensal     @relation(fields: [folhaId], references: [id])
+  employee Employee        @relation(fields: [employeeId], references: [id])
+  company  Company         @relation(fields: [companyId], references: [id])
+  eventos  FolhaEvento[]
+
+  @@unique([folhaId, employeeId])
+  @@index([companyId, folhaId])
+  @@index([employeeId])
+  @@map("folha_funcionarios")
+}
+
+/// Eventos variaveis por funcionario na folha (horas extras, faltas, adiantamentos)
+model FolhaEvento {
+  id                String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  folhaFuncionarioId String         @map("folha_funcionario_id") @db.Uuid
+  companyId         String          @map("company_id") @db.Uuid
+  tipo              TipoEventoFolha @map("tipo")
+  descricao         String?         @map("descricao") @db.VarChar(255)
+  quantidade        Decimal?        @map("quantidade") @db.Decimal(8, 2) // horas, dias
+  valor             Decimal         @map("valor") @db.Decimal(15, 2)
+  tipoVerba         TipoVerba       @default(PROVENTO) @map("tipo_verba")
+  competencia       String          @map("competencia") @db.VarChar(7)
+  createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamp(6)
+
+  folhaFuncionario FolhaFuncionario @relation(fields: [folhaFuncionarioId], references: [id])
+
+  @@index([folhaFuncionarioId])
+  @@index([companyId, competencia])
+  @@map("folha_eventos")
+}
+
+/// Beneficios configurados por funcionario — reutilizados entre folhas
+model FolhaBeneficio {
+  id            String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId     String       @map("company_id") @db.Uuid
+  employeeId    String       @map("employee_id") @db.Uuid
+  tipo          TipoBeneficio @map("tipo")
+  descricao     String?      @map("descricao") @db.VarChar(255)
+  valor         Decimal      @map("valor") @db.Decimal(15, 2)
+  descontaFuncionario Boolean @default(true) @map("desconta_funcionario")
+  percentualDesconto  Decimal? @map("percentual_desconto") @db.Decimal(5, 4) // se desconto proporcional
+  competenciaIni String    @map("competencia_ini") @db.VarChar(7)
+  competenciaFim String?   @map("competencia_fim") @db.VarChar(7)
+  ativo          Boolean   @default(true) @map("ativo")
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamp(6)
+
+  company  Company  @relation(fields: [companyId], references: [id])
+  employee Employee @relation(fields: [employeeId], references: [id])
+
+  @@index([companyId, employeeId])
+  @@index([employeeId, ativo])
+  @@map("folha_beneficios")
+}
+
+/// Historico de dissidios e reajustes salariais por empresa/categoria
+model FolhaDissidio {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId        String   @map("company_id") @db.Uuid
+  sindicato        String   @map("sindicato") @db.VarChar(255)
+  categoriaProf    String   @map("categoria_prof") @db.VarChar(255)
+  percentual       Decimal  @map("percentual") @db.Decimal(5, 4) // ex: 0.0550 = 5,5%
+  dataVigencia     DateTime @map("data_vigencia") @db.Date
+  dataHomologacao  DateTime? @map("data_homologacao") @db.Date
+  pisoSalarial     Decimal? @map("piso_salarial") @db.Decimal(15, 2)
+  observacao       String?  @map("observacao") @db.Text
+  createdById      String   @map("created_by_id") @db.Uuid
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  deletedAt        DateTime? @map("deleted_at") @db.Timestamp(6)
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@index([companyId, dataVigencia])
+  @@map("folha_dissidios")
+}
+
 // =============================================================================
 
 model CompanyHistory {

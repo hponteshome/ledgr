@@ -11,12 +11,14 @@ import { EmployeeController } from './employee.controller';
 import { EmployeePdfParserService } from './services/employee-pdf-parser.service';
 import { EmployeeService } from './services/employee.service';
 import { HrController } from './hr.controller';
+import { FolhaController } from './folha.controller';
+import { FolhaService } from './services/folha.service';
 import { EsocialS2200Service } from './services/esocial-s2200.service';
 import { EsocialEventsService } from './services/esocial-events.service';
 @Module({
   imports: [PrismaModule],
-  controllers: [ProLaboreController, InformeController, EmployeeController, HrController],
-  providers: [ProLaboreService, GuiasService, InformeService, InformePdfService, EmployeePdfParserService, EmployeeService, EsocialS2200Service, EsocialEventsService],
-  exports: [ProLaboreService, GuiasService, InformeService, EmployeeService, EsocialS2200Service, EsocialEventsService],
+  controllers: [ProLaboreController, InformeController, EmployeeController, HrController, FolhaController],
+  providers: [ProLaboreService, GuiasService, InformeService, InformePdfService, EmployeePdfParserService, EmployeeService, EsocialS2200Service, EsocialEventsService, FolhaService],
+  exports: [ProLaboreService, GuiasService, InformeService, EmployeeService, EsocialS2200Service, EsocialEventsService, FolhaService],
 })
 export class HrModule {}
