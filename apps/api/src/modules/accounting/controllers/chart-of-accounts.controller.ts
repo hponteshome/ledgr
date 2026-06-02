@@ -16,6 +16,7 @@ import {
   ParseUUIDPipe
 } from '@nestjs/common';
 import { ChartOfAccountsService } from '../services/chart-of-accounts.service';
+import { PrismaService } from '../../../prisma/prisma.service';
 import { JwtAuthGuard } from '../../../auth/guards/jwt.guard';
 import { CompanyGuard } from '../../../multi-company/multi-company.guard';
 import { Company } from '../../../multi-company/company.decorator';
@@ -32,7 +33,10 @@ import {
 @Controller('chart-of-accounts')
 @UseGuards(JwtAuthGuard, CompanyGuard)
 export class ChartOfAccountsController {
-  constructor(private readonly service: ChartOfAccountsService) {}
+  constructor(
+    private readonly service: ChartOfAccountsService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   // ── Listar contas com filtros ─────────────────────────────────
   @Get()
@@ -158,4 +162,30 @@ async getAccountBalance(
 }
 
 
+
+  @Patch(':id/deducibilidade')
+  async setDeducibilidade(
+    @Company() companyId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { dedutibilidade: string; percDeducao?: number; lalurTipoAjuste?: string; lalurDescricao?: string },
+  ) {
+    return this.prisma.chartOfAccounts.update({
+      where: { id },
+      data: {
+        dedutibilidade: body.dedutibilidade,
+        percDeducao: body.percDeducao != null ? body.percDeducao : undefined,
+        lalurTipoAjuste: body.lalurTipoAjuste ?? undefined,
+        lalurDescricao: body.lalurDescricao ?? undefined,
+      },
+    });
+  }
+
+  @Get('deducibilidade/nao-dedutiveis')
+  async getNaoDedutiveis(@Company() companyId: string) {
+    return this.prisma.chartOfAccounts.findMany({
+      where: { companyId, isAnalytic: true, dedutibilidade: { in: ['NAO_DEDUTIVEL','PARCIALMENTE_DEDUTIVEL'] } },
+      select: { id:true, code:true, name:true, dedutibilidade:true, percDeducao:true, lalurTipoAjuste:true, lalurDescricao:true },
+      orderBy: { code: 'asc' },
+    });
+  }
 }

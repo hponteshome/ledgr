@@ -71,6 +71,7 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
         { path: '/app/finance/provisoes', label: 'Provisões Recorrentes', icon: FiRepeat },
         { path: '/app/finance/fechamento', label: 'Fechamento Mensal', icon: FiLock },
         { path: '/app/finance/apuracao', label: 'Apuração de Impostos', icon: FiPercent },
+        { path: '/app/finance/lalur-config', label: 'Config. Dedutibilidade', icon: FiSettings },
       ],
     },
     {

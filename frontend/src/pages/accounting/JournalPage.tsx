@@ -26,6 +26,7 @@ interface JournalEntry {
     id: string; date: string; description: string;
     reference?: string; sourceModule: string;
     items: JournalItem[]; createdAt: string;
+    dedutibilidade?: string; percDeducao?: number; lalurObservacao?: string;
 }
 interface JournalResponse {
     total: number; page: number; pages: number; entries: JournalEntry[];
@@ -117,6 +118,12 @@ const EditModal: React.FC<{ entry: JournalEntry; onClose: () => void; onSaved: (
         type: i.type,
     })));
     const [sourceModules, setSourceModules] = useState<{ value: string; label: string }[]>([]);
+    const [dedutibilidade, setDedutibilidade] = useState<string>(entry.dedutibilidade ?? '');
+    const [percDeducao, setPercDeducao] = useState<number>(entry.percDeducao ? Number(entry.percDeducao) : 100);
+    const [lalurObservacao, setLalurObservacao] = useState<string>(entry.lalurObservacao ?? '');
+
+    // Verificar se lancamento tem itens de despesa
+    const temDespesa = items.some(i => i.type === 'DEBIT' && i.accountId);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
 
@@ -139,6 +146,9 @@ const EditModal: React.FC<{ entry: JournalEntry; onClose: () => void; onSaved: (
             await api.put('/accounting/journal/' + entry.id, {
                 date, description,
                 items: items.map(i => ({ accountId: i.accountId, value: i.value, type: i.type })),
+                dedutibilidade: dedutibilidade || undefined,
+                percDeducao: percDeducao !== 100 ? percDeducao : undefined,
+                lalurObservacao: lalurObservacao || undefined,
             });
             onSaved();
         } catch (e: any) { setError(e?.response?.data?.message ?? 'Erro ao salvar'); }
@@ -166,6 +176,44 @@ const EditModal: React.FC<{ entry: JournalEntry; onClose: () => void; onSaved: (
                         <input type="text" value={description} onChange={e => setDescription(e.target.value)}
                             className="h-8 border border-gray-200 rounded-lg px-3 text-sm w-full focus:outline-none focus:ring-2 focus:ring-blue-500" />
                     </div>
+                </div>
+
+                {/* Painel Dedutibilidade Fiscal */}
+                <div style={{ background:'#F5F3FF', border:'0.5px solid #DDD6FE', borderRadius:8, padding:'10px 14px', marginBottom:12 }}>
+                  <div style={{ fontSize:10, fontWeight:600, textTransform:'uppercase', color:'#7C3AED', marginBottom:8, letterSpacing:'.3px' }}>
+                    Tratamento Fiscal (LALUR) — opcional
+                  </div>
+                  <div style={{ display:'flex', gap:10, alignItems:'center', flexWrap:'wrap' }}>
+                    <div>
+                      <label style={{ fontSize:10, color:'#555', display:'block', marginBottom:3 }}>Dedutibilidade</label>
+                      <select value={dedutibilidade}
+                        onChange={e => setDedutibilidade(e.target.value)}
+                        style={{ height:28, border:'0.5px solid #DDD6FE', borderRadius:6, padding:'0 8px', fontSize:12, background:'#fff', color:'#111', outline:'none' }}>
+                        <option value="">Herdar da conta</option>
+                        <option value="DEDUTIVEL">Dedutível (100%)</option>
+                        <option value="PARCIALMENTE_DEDUTIVEL">Parcialmente Dedutível</option>
+                        <option value="NAO_DEDUTIVEL">Não Dedutível</option>
+                      </select>
+                    </div>
+                    {dedutibilidade === 'PARCIALMENTE_DEDUTIVEL' && (
+                      <div>
+                        <label style={{ fontSize:10, color:'#555', display:'block', marginBottom:3 }}>% Dedutível</label>
+                        <input type="number" min={0} max={100} value={percDeducao}
+                          onChange={e => setPercDeducao(Number(e.target.value))}
+                          style={{ height:28, border:'0.5px solid #DDD6FE', borderRadius:6, padding:'0 8px', fontSize:12, width:80, outline:'none' }} />
+                      </div>
+                    )}
+                    <div style={{ flex:1, minWidth:200 }}>
+                      <label style={{ fontSize:10, color:'#555', display:'block', marginBottom:3 }}>Observação LALUR</label>
+                      <input type="text" value={lalurObservacao}
+                        onChange={e => setLalurObservacao(e.target.value)}
+                        placeholder="Ex: Multa não dedutível conforme art. 41 Lei 8981/95"
+                        style={{ height:28, border:'0.5px solid #DDD6FE', borderRadius:6, padding:'0 8px', fontSize:12, width:'100%', outline:'none' }} />
+                    </div>
+                  </div>
+                  <div style={{ fontSize:10, color:'#7C3AED', marginTop:6 }}>
+                    Deixe em branco para herdar a configuração da conta contábil.
+                  </div>
                 </div>
 
                 <div style={{ overflowY: 'auto', maxHeight: '50vh' }}>
@@ -263,6 +311,11 @@ const JournalPage: React.FC = () => {
     const [repeatHist, setRepeatHist] = useState(false);
     const [repeatComplement, setRepeatComplement] = useState(false);
 
+    // ── Estado fiscal (LALUR) ──────────────────────────────────
+    const [fDedutibilidade, setFDedutibilidade] = useState('');
+    const [fPercDeducao, setFPercDeducao] = useState(100);
+    const [fLalurObs, setFLalurObs] = useState('');
+
     const [sourceModules, setSourceModules] = useState<{ value: string; label: string }[]>([]);
     const [saving, setSaving] = useState(false);
     const [formError, setFormError] = useState('');
@@ -283,6 +336,42 @@ const JournalPage: React.FC = () => {
     // Modal "conta não encontrada"
     const [newAccountCode, setNewAccountCode] = useState('');
     const [showNewAccountModal, setShowNewAccountModal] = useState(false);
+
+    // ── Autocomplete de contas ────────────────────────────────
+    const [debitSuggestions, setDebitSuggestions] = useState<Account[]>([]);
+    const [creditSuggestions, setCreditSuggestions] = useState<Account[]>([]);
+    const [debitShowDrop, setDebitShowDrop] = useState(false);
+    const [creditShowDrop, setCreditShowDrop] = useState(false);
+    const searchTimeout = useRef<any>(null);
+
+    const searchAccounts = async (term: string, side: 'debit' | 'credit') => {
+        if (!term || term.length < 2) {
+            if (side === 'debit') { setDebitSuggestions([]); setDebitShowDrop(false); }
+            else { setCreditSuggestions([]); setCreditShowDrop(false); }
+            return;
+        }
+        // Se parece codigo numerico, usar lookup direto
+        if (/^[\d.]+$/.test(term)) return;
+        clearTimeout(searchTimeout.current);
+        searchTimeout.current = setTimeout(async () => {
+            try {
+                const r = await api.get('/chart-of-accounts', { params: { search: term, onlyAnalytic: true, limit: 10 } });
+                const items = r.data?.items ?? r.data ?? [];
+                if (side === 'debit') { setDebitSuggestions(items); setDebitShowDrop(items.length > 0); }
+                else { setCreditSuggestions(items); setCreditShowDrop(items.length > 0); }
+            } catch {}
+        }, 300);
+    };
+
+    const selectAccount = (acc: Account, side: 'debit' | 'credit') => {
+        if (side === 'debit') {
+            setFDebitCode(acc.code); setFDebitName(acc.name); setFDebitId(acc.id);
+            setDebitSuggestions([]); setDebitShowDrop(false);
+        } else {
+            setFCreditCode(acc.code); setFCreditName(acc.name); setFCreditId(acc.id);
+            setCreditSuggestions([]); setCreditShowDrop(false);
+        }
+    };
 
     // Ref para foco automático após gravar
     const debitInputRef = useRef<HTMLInputElement>(null);
@@ -380,6 +469,9 @@ const JournalPage: React.FC = () => {
                 reference: fHistCode || undefined,
                 type: fType,
                 items,
+                dedutibilidade: fDedutibilidade || undefined,
+                percDeducao: fDedutibilidade === 'PARCIALMENTE_DEDUTIVEL' ? fPercDeducao : undefined,
+                lalurObservacao: fLalurObs || undefined,
             });
             setFormSuccess('Lançamento gravado com sucesso.');
             setTimeout(() => setFormSuccess(''), 3000);
@@ -391,6 +483,7 @@ const JournalPage: React.FC = () => {
             if (!repeatValue) setFValue('');
             if (!repeatHist) { setFHistCode(''); setFHistName(''); }
             if (!repeatComplement) setFComplement('');
+            setFDedutibilidade(''); setFPercDeducao(100); setFLalurObs('');
 
             loadEntries(); loadTotals();
         } catch (e: any) {
@@ -572,12 +665,25 @@ const JournalPage: React.FC = () => {
                                 <input
                                     ref={debitInputRef}
                                     type="text" value={fDebitCode}
-                                    onChange={e => { setFDebitCode(e.target.value); setFDebitName(''); setFDebitId(''); }}
-                                    onBlur={() => lookupAccount(fDebitCode, 'debit')}
+                                    onChange={e => { setFDebitCode(e.target.value); setFDebitName(''); setFDebitId(''); searchAccounts(e.target.value, 'debit'); }}
+                                    onBlur={() => { setTimeout(() => setDebitShowDrop(false), 200); if (/^[\d.]+$/.test(fDebitCode)) lookupAccount(fDebitCode, 'debit'); }}
                                     onKeyDown={e => e.key === 'Enter' && lookupAccount(fDebitCode, 'debit')}
                                     placeholder="Ex: 1.1.1"
                                     className="h-8 border border-gray-200 rounded-lg px-3 text-sm w-28 focus:outline-none focus:ring-2 focus:ring-blue-500" />
                                 {lookupLoading === 'debit' && <FiLoader size={11} className="animate-spin absolute right-2 top-2.5 text-blue-400" />}
+                                {debitShowDrop && debitSuggestions.length > 0 && (
+                                    <div style={{ position:'absolute', top:'100%', left:0, zIndex:100, background:'#fff', border:'1px solid #e5e7eb', borderRadius:8, boxShadow:'0 4px 16px rgba(0,0,0,0.10)', minWidth:320, maxHeight:220, overflowY:'auto', marginTop:2 }}>
+                                        {debitSuggestions.map(acc => (
+                                            <div key={acc.id} onMouseDown={() => selectAccount(acc, 'debit')}
+                                                style={{ padding:'7px 12px', cursor:'pointer', fontSize:12, display:'flex', gap:8, alignItems:'center', borderBottom:'0.5px solid #f3f4f6' }}
+                                                onMouseEnter={e => (e.currentTarget.style.background='#EFF6FF')}
+                                                onMouseLeave={e => (e.currentTarget.style.background='#fff')}>
+                                                <span style={{ fontFamily:'monospace', fontSize:11, color:'#6B7280', minWidth:100 }}>{acc.code}</span>
+                                                <span style={{ color:'#111' }}>{acc.name}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                             <input type="text" value={fDebitName} readOnly placeholder="Nome da conta"
                                 className={`h-8 border rounded-lg px-3 text-sm w-52 ${fDebitId ? 'border-green-200 bg-green-50 text-green-800' : 'border-gray-100 bg-gray-50 text-gray-400'}`} />
@@ -592,12 +698,25 @@ const JournalPage: React.FC = () => {
                         <div className="flex gap-1.5">
                             <div className="relative">
                                 <input type="text" value={fCreditCode}
-                                    onChange={e => { setFCreditCode(e.target.value); setFCreditName(''); setFCreditId(''); }}
-                                    onBlur={() => lookupAccount(fCreditCode, 'credit')}
+                                    onChange={e => { setFCreditCode(e.target.value); setFCreditName(''); setFCreditId(''); searchAccounts(e.target.value, 'credit'); }}
+                                    onBlur={() => { setTimeout(() => setCreditShowDrop(false), 200); if (/^[\d.]+$/.test(fCreditCode)) lookupAccount(fCreditCode, 'credit'); }}
                                     onKeyDown={e => e.key === 'Enter' && lookupAccount(fCreditCode, 'credit')}
                                     placeholder="Ex: 2.1.1"
                                     className="h-8 border border-gray-200 rounded-lg px-3 text-sm w-28 focus:outline-none focus:ring-2 focus:ring-blue-500" />
                                 {lookupLoading === 'credit' && <FiLoader size={11} className="animate-spin absolute right-2 top-2.5 text-blue-400" />}
+                                {creditShowDrop && creditSuggestions.length > 0 && (
+                                    <div style={{ position:'absolute', top:'100%', left:0, zIndex:100, background:'#fff', border:'1px solid #e5e7eb', borderRadius:8, boxShadow:'0 4px 16px rgba(0,0,0,0.10)', minWidth:320, maxHeight:220, overflowY:'auto', marginTop:2 }}>
+                                        {creditSuggestions.map(acc => (
+                                            <div key={acc.id} onMouseDown={() => selectAccount(acc, 'credit')}
+                                                style={{ padding:'7px 12px', cursor:'pointer', fontSize:12, display:'flex', gap:8, alignItems:'center', borderBottom:'0.5px solid #f3f4f6' }}
+                                                onMouseEnter={e => (e.currentTarget.style.background='#EFF6FF')}
+                                                onMouseLeave={e => (e.currentTarget.style.background='#fff')}>
+                                                <span style={{ fontFamily:'monospace', fontSize:11, color:'#6B7280', minWidth:100 }}>{acc.code}</span>
+                                                <span style={{ color:'#111' }}>{acc.name}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                             <input type="text" value={fCreditName} readOnly placeholder="Nome da conta"
                                 className={`h-8 border rounded-lg px-3 text-sm w-52 ${fCreditId ? 'border-green-200 bg-green-50 text-green-800' : 'border-gray-100 bg-gray-50 text-gray-400'}`} />
@@ -622,6 +741,33 @@ const JournalPage: React.FC = () => {
                         placeholder="Descrição livre do lançamento..."
                         className="w-full h-8 border border-gray-200 rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
+
+                {/* Painel Fiscal LALUR */}
+                {(fDebitId || fCreditId) && (
+                  <div style={{ background:'#F5F3FF', border:'0.5px solid #DDD6FE', borderRadius:8, padding:'8px 14px', display:'flex', gap:10, alignItems:'center', flexWrap:'wrap' }}>
+                    <span style={{ fontSize:10, fontWeight:600, textTransform:'uppercase', color:'#7C3AED', letterSpacing:'.3px', whiteSpace:'nowrap' }}>Fiscal / LALUR:</span>
+                    <select value={fDedutibilidade} onChange={e=>setFDedutibilidade(e.target.value)}
+                      style={{ height:28, border:'0.5px solid #DDD6FE', borderRadius:6, padding:'0 8px', fontSize:12, background:'#fff', color:'#111', outline:'none' }}>
+                      <option value="">Herdar da conta</option>
+                      <option value="DEDUTIVEL">Dedutível</option>
+                      <option value="PARCIALMENTE_DEDUTIVEL">Parcialmente Dedutível</option>
+                      <option value="NAO_DEDUTIVEL">Não Dedutível</option>
+                    </select>
+                    {fDedutibilidade === 'PARCIALMENTE_DEDUTIVEL' && (
+                      <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+                        <span style={{ fontSize:11, color:'#7C3AED' }}>% Dedutível:</span>
+                        <input type="number" min={0} max={100} value={fPercDeducao}
+                          onChange={e=>setFPercDeducao(Number(e.target.value))}
+                          style={{ height:28, width:70, border:'0.5px solid #DDD6FE', borderRadius:6, padding:'0 8px', fontSize:12, outline:'none' }} />
+                      </div>
+                    )}
+                    {fDedutibilidade && fDedutibilidade !== 'DEDUTIVEL' && (
+                      <input type="text" value={fLalurObs} onChange={e=>setFLalurObs(e.target.value)}
+                        placeholder="Observação LALUR (ex: Multa não dedutível art. 41)"
+                        style={{ flex:1, minWidth:220, height:28, border:'0.5px solid #DDD6FE', borderRadius:6, padding:'0 8px', fontSize:12, outline:'none' }} />
+                    )}
+                  </div>
+                )}
 
                 {/* Repetir ao gravar */}
                 <div className="flex flex-wrap items-center gap-4 px-3 py-2 bg-gray-50 rounded-lg border border-gray-200">
@@ -858,7 +1004,6 @@ const JournalPage: React.FC = () => {
 };
 
 export default JournalPage;
-
 
 
 

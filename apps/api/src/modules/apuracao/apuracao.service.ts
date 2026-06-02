@@ -226,6 +226,87 @@ export class ApuracaoService {
     return this.prisma.lalurItem.deleteMany({ where: { id, companyId } });
   }
 
+
+  // ── Sugerir itens LALUR a partir de contas marcadas ──────────────────────
+  async sugerirLalur(companyId: string, competencia: string) {
+    const [ano, mes] = competencia.split('-').map(Number);
+    const ini = new Date(ano, mes - 1, 1);
+    const fim = new Date(ano, mes, 0, 23, 59, 59);
+
+    // Buscar contas com deducibilidade configurada (nao totalmente dedutiveis)
+    const contas = await this.prisma.chartOfAccounts.findMany({
+      where: {
+        companyId,
+        isAnalytic: true,
+        type: 'EXPENSE' as any,
+        dedutibilidade: { in: ['NAO_DEDUTIVEL', 'PARCIALMENTE_DEDUTIVEL'] },
+      },
+      select: {
+        id: true, code: true, name: true,
+        dedutibilidade: true, percDeducao: true,
+        lalurTipoAjuste: true, lalurDescricao: true,
+      },
+    });
+
+    if (!contas.length) return { sugestoes: [], message: 'Nenhuma conta configurada como nao-dedutivel.' };
+
+    // Buscar saldos do periodo
+    const saldos = await this.prisma.journalEntryItem.groupBy({
+      by: ['accountId'],
+      where: {
+        journalEntry: { companyId, date: { gte: ini, lte: fim } },
+        account: { id: { in: contas.map(c => c.id) } },
+      },
+      _sum: { value: true },
+    });
+
+    const saldoMap = new Map(saldos.map(s => [s.accountId, Number(s._sum.value ?? 0)]));
+
+    const sugestoes = contas
+      .map(conta => {
+        const saldoTotal = saldoMap.get(conta.id) ?? 0;
+        if (saldoTotal <= 0) return null;
+        const percNaoDedu = conta.dedutibilidade === 'NAO_DEDUTIVEL'
+          ? 100
+          : 100 - Number(conta.percDeducao ?? 100);
+        const valorAjuste = saldoTotal * (percNaoDedu / 100);
+        if (valorAjuste <= 0) return null;
+        return {
+          accountId: conta.id,
+          code: conta.code,
+          name: conta.name,
+          dedutibilidade: conta.dedutibilidade,
+          percDeducao: Number(conta.percDeducao ?? 100),
+          percNaoDedu,
+          saldoTotal,
+          valorAjuste: Math.round(valorAjuste * 100) / 100,
+          tipo: conta.lalurTipoAjuste ?? 'ADICAO',
+          imposto: 'AMBOS',
+          descricao: conta.lalurDescricao ?? ('Adicao: ' + conta.name + ' (nao dedutivel)'),
+        };
+      })
+      .filter(Boolean);
+
+    return { sugestoes, total: sugestoes.reduce((s, i) => s + (i?.valorAjuste ?? 0), 0) };
+  }
+
+  // ── Aplicar sugestoes LALUR em lote ───────────────────────────────────────
+  async aplicarSugestoes(companyId: string, competencia: string, sugestoes: any[], userId: string) {
+    const resultados = [];
+    for (const s of sugestoes) {
+      const item = await this.addLalurItem(companyId, competencia, {
+        tipo: s.tipo,
+        imposto: s.imposto,
+        descricao: s.descricao,
+        valor: s.valorAjuste,
+        contaId: s.accountId,
+        observacao: 'Sugerido automaticamente - ' + s.dedutibilidade + ' ' + s.percNaoDedu + '% nao dedutivel',
+      }, userId);
+      resultados.push(item);
+    }
+    return resultados;
+  }
+
   // ── Gerar DARF HTML ────────────────────────────────────────────────────────
   async gerarDarfHtml(companyId: string, competencia: string, tipo: string): Promise<{ html: string }> {
     const company = await this.prisma.company.findUniqueOrThrow({ where: { id: companyId } });

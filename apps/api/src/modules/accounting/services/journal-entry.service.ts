@@ -292,9 +292,12 @@ account: { select: { id: true, code: true, name: true, type: true, nature: true,
     return this.prisma.journalEntry.update({
       where: { id },
       data: {
-        date:        new Date(dto.date),
-        description: dto.description,
-        reference:   dto.reference || null,
+        date:           new Date(dto.date),
+        description:    dto.description,
+        reference:      dto.reference || null,
+        dedutibilidade: (dto as any).dedutibilidade ?? null,
+        percDeducao:    (dto as any).percDeducao != null ? new (require('@prisma/client').Prisma.Decimal)((dto as any).percDeducao) : null,
+        lalurObservacao:(dto as any).lalurObservacao ?? null,
         items: {
           create: resolvedItems.map(i => ({
             accountId: i.accountId,

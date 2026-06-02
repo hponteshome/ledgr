@@ -48,6 +48,16 @@ export class ApuracaoController {
     return this.svc.addLalurItem(req.companyId, comp, dto, req.user.id);
   }
 
+  @Get('lalur/:comp/sugerir')
+  sugerirLalur(@Req() req: any, @Param('comp') comp: string) {
+    return this.svc.sugerirLalur(req.companyId, comp);
+  }
+
+  @Post('lalur/:comp/aplicar-sugestoes')
+  aplicarSugestoes(@Req() req: any, @Param('comp') comp: string, @Body() body: any) {
+    return this.svc.aplicarSugestoes(req.companyId, comp, body.sugestoes, req.user.id);
+  }
+
   @Get('darf/:comp/:tipo/preview')
   darfPreview(@Req() req: any, @Param('comp') comp: string, @Param('tipo') tipo: string) {
     return this.svc.gerarDarfHtml(req.companyId, comp, tipo);

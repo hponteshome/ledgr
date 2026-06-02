@@ -993,6 +993,17 @@ model ChartOfAccounts {
 
   @@unique([companyId, code])
   @@index([companyId, type])
+
+  // ── Deducibilidade Fiscal (LALUR/LACS) ──────────────────────────────────
+  /// Indica se despesas desta conta sao total ou parcialmente nao-dedutiveis
+  dedutibilidade        String?   @default("DEDUTIVEL") @map("dedutibilidade") @db.VarChar(20)
+  // DEDUTIVEL | NAO_DEDUTIVEL | PARCIALMENTE_DEDUTIVEL
+  percDeducao           Decimal?  @default(100) @map("perc_deducao") @db.Decimal(5,2)
+  // 0-100: percentual dedutivel. Ex: 50 = apenas 50% dedutivel
+  lalurTipoAjuste       String?   @map("lalur_tipo_ajuste") @db.VarChar(20)
+  // ADICAO | EXCLUSAO — tipo de ajuste no LALUR quando nao dedutivel
+  lalurDescricao        String?   @map("lalur_descricao") @db.VarChar(255)
+  // Descricao padrao para o item LALUR gerado automaticamente
   lalurItens           LalurItem[]
   @@map("chart_of_accounts")
 }
@@ -1041,6 +1052,13 @@ model JournalEntry {
 
   apEntries ApEntry[]
 
+
+  // ── Dedutibilidade Fiscal (LALUR) — override por lancamento ──────────
+  /// Sobrescreve a regra da conta para este lancamento especifico
+  /// null = herda da conta | DEDUTIVEL | NAO_DEDUTIVEL | PARCIALMENTE_DEDUTIVEL
+  dedutibilidade     String?  @map("dedutibilidade") @db.VarChar(20)
+  percDeducao        Decimal? @map("perc_deducao") @db.Decimal(5,2)
+  lalurObservacao    String?  @map("lalur_observacao") @db.VarChar(255)
   @@index([companyId, date])
   @@map("journal_entries")
 }
