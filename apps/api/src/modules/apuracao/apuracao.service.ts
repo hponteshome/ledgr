@@ -226,6 +226,105 @@ export class ApuracaoService {
     return this.prisma.lalurItem.deleteMany({ where: { id, companyId } });
   }
 
+  // ── Gerar DARF HTML ────────────────────────────────────────────────────────
+  async gerarDarfHtml(companyId: string, competencia: string, tipo: string): Promise<{ html: string }> {
+    const company = await this.prisma.company.findUniqueOrThrow({ where: { id: companyId } });
+    const apuracao = await this.prisma.apuracaoImpostos.findFirst({
+      where: { companyId, competencia, tipo: tipo as any },
+    });
+    if (!apuracao) throw new Error('Apuracao nao encontrada para ' + competencia + ' / ' + tipo);
+
+    const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const fmtCNPJ = (v: string) => (v||'').replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+    const fmtComp = (c: string) => { const [y,m]=c.split('-'); return m+'/'+y; };
+    const venc = (comp: string) => {
+      const [y,m] = comp.split('-').map(Number);
+      const d = m === 12 ? new Date(y+1,0,25) : new Date(y,m,25);
+      return d.toLocaleDateString('pt-BR');
+    };
+
+    const css = '<style>*{box-sizing:border-box;margin:0;padding:0;font-family:Arial,sans-serif}body{background:#fff;padding:20px}' +
+      '.guia{border:2px solid #000;width:720px;margin:0 auto}' +
+      '.hdr{background:#004080;color:#fff;padding:8px 12px;display:flex;justify-content:space-between;align-items:center}' +
+      '.hdr h1{font-size:13px;font-weight:bold}.cod{font-size:22px;font-weight:bold;letter-spacing:2px}' +
+      '.sec{border-bottom:1px solid #000;padding:8px 12px}' +
+      '.row{display:grid;gap:8px;margin-top:6px}' +
+      '.f label{font-size:9px;text-transform:uppercase;color:#555;display:block}.f span{font-size:12px;font-weight:bold}' +
+      '.tot{background:#f0f0f0;padding:10px 12px;display:flex;justify-content:space-between;align-items:center}' +
+      '.tot label{font-size:10px;text-transform:uppercase;color:#555}' +
+      '.tot span{font-size:20px;font-weight:bold;color:#004080}' +
+      '.foot{padding:6px 10px;font-size:9px;color:#555;text-align:center}' +
+      '.sep{border-top:2px dashed #000;margin:16px 0;padding-top:16px}' +
+      '</style>';
+
+    let html = '<!DOCTYPE html><html><head><meta charset=utf-8>' + css + '</head><body>';
+
+    const renderDarf = (titulo: string, subtitulo: string, codReceita: string, valor: number) => {
+      if (valor <= 0) return '';
+      return '<div class=guia>' +
+        '<div class=hdr><div><h1>DARF - DOCUMENTO DE ARRECADACAO DE RECEITAS FEDERAIS</h1>' +
+        '<div style=font-size:10px>' + subtitulo + '</div></div><div class=cod>' + codReceita + '</div></div>' +
+        '<div class=sec><div class=row style=grid-template-columns:repeat(3,1fr)>' +
+        '<div class=f><label>CNPJ Contribuinte</label><span>' + fmtCNPJ(company.taxId) + '</span></div>' +
+        '<div class=f><label>Nome Empresarial</label><span>' + company.legalName + '</span></div>' +
+        '<div class=f><label>Periodo de Apuracao</label><span>' + fmtComp(competencia) + '</span></div>' +
+        '</div></div>' +
+        '<div class=sec><div class=row style=grid-template-columns:repeat(4,1fr)>' +
+        '<div class=f><label>Codigo Receita</label><span>' + codReceita + '</span></div>' +
+        '<div class=f><label>Tipo</label><span>' + titulo + '</span></div>' +
+        '<div class=f><label>Regime</label><span>' + (apuracao.regime === 'LUCRO_REAL' ? 'Nao-Cumulativo' : 'Cumulativo') + '</span></div>' +
+        '<div class=f><label>Base de Calculo</label><span>R$ ' + fmtBRL(Number(apuracao.receitaBruta ?? apuracao.baseIrpj ?? 0)) + '</span></div>' +
+        '</div>' +
+        '<div class=row style="grid-template-columns:repeat(3,1fr);margin-top:10px">' +
+        '<div class=f><label>Valor Principal</label><span>R$ ' + fmtBRL(valor) + '</span></div>' +
+        '<div class=f><label>Multa</label><span>R$ 0,00</span></div>' +
+        '<div class=f><label>Juros / Encargos</label><span>R$ 0,00</span></div>' +
+        '</div></div>' +
+        '<div class=tot>' +
+        '<div><label>Vencimento</label><div style=font-size:14px;font-weight:bold>' + venc(competencia) + '</div></div>' +
+        '<div style=text-align:right><label>Valor Total a Recolher</label><div><span>R$ ' + fmtBRL(valor) + '</span></div></div>' +
+        '</div>' +
+        '<div class=foot>Guia gerada pelo LEDGR &mdash; Verificar valores antes do pagamento.</div>' +
+        '</div>';
+    };
+
+    if (tipo === 'PIS_COFINS') {
+      const pis    = Number(apuracao.pisDevido    ?? 0);
+      const cofins = Number(apuracao.cofinsDevido ?? 0);
+      // PIS cod 6912 (nao-cumulativo) ou 8109 (cumulativo)
+      // COFINS cod 5856 (nao-cumulativo) ou 2172 (cumulativo)
+      const codPis    = apuracao.regime === 'LUCRO_REAL' ? '6912' : '8109';
+      const codCofins = apuracao.regime === 'LUCRO_REAL' ? '5856' : '2172';
+      html += renderDarf('PIS', 'PIS sobre Receita', codPis, pis);
+      if (pis > 0 && cofins > 0) html += '<div style="page-break-after:always"></div>';
+      html += renderDarf('COFINS', 'COFINS sobre Receita', codCofins, cofins);
+    } else {
+      const irpj = Number(apuracao.irpjDevido ?? 0);
+      const csll = Number(apuracao.csllDevida ?? 0);
+      // IRPJ cod 2362 (estimativa mensal Lucro Real) / CSLL cod 2484
+      html += renderDarf('IRPJ', 'Imposto de Renda Pessoa Juridica', '2362', irpj);
+      if (irpj > 0 && csll > 0) html += '<div style="page-break-after:always"></div>';
+      html += renderDarf('CSLL', 'Contribuicao Social sobre Lucro Liquido', '2484', csll);
+    }
+
+    html += '</body></html>';
+    return { html };
+  }
+
+  async gerarDarfPdf(companyId: string, competencia: string, tipo: string): Promise<{ pdf: Buffer; filename: string }> {
+    const { html } = await this.gerarDarfHtml(companyId, competencia, tipo);
+    const puppeteer = require('puppeteer');
+    const browser = await puppeteer.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+    try {
+      const page = await browser.newPage();
+      await page.setContent(html, { waitUntil: 'domcontentloaded' });
+      const pdf = Buffer.from(await page.pdf({ format: 'A4', printBackground: true }));
+      return { pdf, filename: 'DARF_' + tipo + '_' + competencia.replace('-','_') + '.pdf' };
+    } finally {
+      await browser.close();
+    }
+  }
+
   // ── Listar apuracoes ───────────────────────────────────────────────────────
   async listar(companyId: string, ano?: string) {
     const where: any = { companyId };

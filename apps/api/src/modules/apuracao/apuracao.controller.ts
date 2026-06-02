@@ -1,5 +1,5 @@
 // apps/api/src/modules/apuracao/apuracao.controller.ts
-import { Controller, Get, Post, Delete, Param, Body, Query, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Param, Body, Query, Req, Res, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '@/auth/guards/jwt.guard';
 import { ApuracaoService } from './apuracao.service';
 
@@ -46,6 +46,18 @@ export class ApuracaoController {
   @Post('lalur/:comp')
   addLalur(@Req() req: any, @Param('comp') comp: string, @Body() dto: any) {
     return this.svc.addLalurItem(req.companyId, comp, dto, req.user.id);
+  }
+
+  @Get('darf/:comp/:tipo/preview')
+  darfPreview(@Req() req: any, @Param('comp') comp: string, @Param('tipo') tipo: string) {
+    return this.svc.gerarDarfHtml(req.companyId, comp, tipo);
+  }
+
+  @Get('darf/:comp/:tipo/pdf')
+  async darfPdf(@Req() req: any, @Param('comp') comp: string, @Param('tipo') tipo: string, @Res() res: any) {
+    const { pdf, filename } = await this.svc.gerarDarfPdf(req.companyId, comp, tipo);
+    res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename=' + filename });
+    res.send(pdf);
   }
 
   @Delete('lalur/:comp/:id')

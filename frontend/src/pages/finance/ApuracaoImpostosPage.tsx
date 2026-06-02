@@ -55,6 +55,24 @@ export default function ApuracaoImpostosPage() {
   const [lalurImposto, setLalurImposto] = useState('AMBOS');
 
   const comp = ano + '-' + mes;
+  const [previewHtml, setPreviewHtml] = useState('');
+  const [previewTitle, setPreviewTitle] = useState('');
+  const [showPreview, setShowPreview] = useState(false);
+
+  async function openDarfPreview(tipo: string) {
+    try {
+      const { data } = await api.get('/apuracao/darf/' + comp + '/' + tipo + '/preview');
+      setPreviewHtml(data.html ?? '');
+      setPreviewTitle('DARF ' + (tipo === 'PIS_COFINS' ? 'PIS/COFINS' : 'IRPJ/CSLL') + ' - ' + comp);
+      setShowPreview(true);
+    } catch (e: any) { alert(e?.response?.data?.message ?? 'Erro ao gerar DARF'); }
+  }
+
+  function downloadDarf(tipo: string) {
+    const token = localStorage.getItem('@ledgr:token');
+    const cid = (window as any).__companyId__ ?? '';
+    window.open('http://localhost:3000/apuracao/darf/' + comp + '/' + tipo + '/pdf', '_blank');
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -136,8 +154,26 @@ export default function ApuracaoImpostosPage() {
   const pisPrev    = Math.max(0, baseCalc * aliqPis - (parseFloat(creditosPis)||0));
   const cofinsPrev = Math.max(0, baseCalc * aliqCofins - (parseFloat(creditosCofins)||0));
 
+  // Modal Preview
+  const PreviewModal = showPreview ? (
+    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', zIndex:1000, display:'flex', flexDirection:'column' }}>
+      <div style={{ background:'#fff', padding:'12px 16px', display:'flex', justifyContent:'space-between', alignItems:'center', borderBottom:'1px solid #ddd' }}>
+        <span style={{ fontWeight:600, fontSize:14 }}>{previewTitle}</span>
+        <div style={{ display:'flex', gap:8 }}>
+          <button style={{ height:30, border:'none', borderRadius:6, padding:'0 14px', fontSize:12, cursor:'pointer', background:'#004080', color:'#fff', fontWeight:500 }}
+            onClick={() => window.open('http://localhost:3000/apuracao/darf/' + comp + '/' + (previewTitle.includes('PIS') ? 'PIS_COFINS' : 'IRPJ_CSLL') + '/pdf','_blank')}>
+            Baixar PDF
+          </button>
+          <button style={{ height:30, border:'0.5px solid #ddd', borderRadius:6, padding:'0 14px', fontSize:12, cursor:'pointer', background:'#fff' }}
+            onClick={() => setShowPreview(false)}>Fechar</button>
+        </div>
+      </div>
+      <iframe srcDoc={previewHtml} style={{ flex:1, border:'none', background:'#f5f5f5' }} />
+    </div>
+  ) : null;
+
   return (
-    <div style={S.page}>
+    <>{PreviewModal}<div style={S.page}>
       {/* Header */}
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:20 }}>
         <div>
@@ -233,7 +269,15 @@ export default function ApuracaoImpostosPage() {
                     <span style={{ ...S.value, fontSize:16, color:'#EA580C' }}>{fmtBR(cofinsPrev)}</span>
                   </div>
                   <div style={{ marginTop:16 }}>
+                    <div style={{ display:'flex', gap:8, marginTop:16 }}>
                     <button style={S.btn()} onClick={calcularPis} disabled={saving}>
+                      {saving ? 'Calculando...' : 'Calcular e Salvar'}
+                    </button>
+                    {pis && <button style={S.btn('#004080')} onClick={()=>openDarfPreview('PIS_COFINS')}>
+                      Ver DARF PIS/COFINS
+                    </button>}
+                  </div>
+                  <button style={{display:'none'}} onClick={calcularPis} disabled={saving}>
                       {saving ? 'Calculando...' : 'Calcular e Salvar'}
                     </button>
                   </div>
@@ -279,10 +323,11 @@ export default function ApuracaoImpostosPage() {
                       <span style={{ ...S.value, fontSize:16, color:'#7C3AED' }}>{fmtBR(Number(irpj.csllDevida))}</span>
                     </div>
                   </> : <div style={{ color:'var(--color-text-secondary)', fontSize:13, padding:16 }}>Clique em "Calcular" para apurar.</div>}
-                  <div style={{ marginTop:16 }}>
+                  <div style={{ display:'flex', gap:8, marginTop:16 }}>
                     <button style={S.btn()} onClick={calcularIrpj} disabled={saving}>
                       {saving ? 'Calculando...' : 'Calcular e Salvar'}
                     </button>
+                    {irpj && <button style={S.btn('#004080')} onClick={()=>openDarfPreview('IRPJ_CSLL')}>Ver DARF IRPJ/CSLL</button>}
                   </div>
                 </div>
               </div>
@@ -371,5 +416,5 @@ export default function ApuracaoImpostosPage() {
         </>
       )}
     </div>
-  );
+  </> );
 }
