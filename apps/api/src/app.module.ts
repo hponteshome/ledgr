@@ -6,6 +6,7 @@ import { ConfigModule } from '@nestjs/config';
 import { APP_INTERCEPTOR } from '@nestjs/core';
 import { HrModule } from './modules/hr/hr.module';
 import { TabelasLegaisModule } from './modules/tabelas-legais/tabelas-legais.module';
+import { ApuracaoModule } from './modules/apuracao/apuracao.module';
 import { RfbModule } from './modules/rfb/rfb.module';
 import { AuthModule } from './auth/auth.module';
 import { CompaniesModule } from './core/companies/company.module';
@@ -44,6 +45,7 @@ import { SignaturesModule } from './modules/signatures/signatures.module';
     RfbModule,
     HrModule,
     TabelasLegaisModule,
+    ApuracaoModule,
     DocumentsModule,
     ContratosModule,
     PersonsModule,

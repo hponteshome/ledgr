@@ -219,6 +219,8 @@ model Company {
   fiscalObligations      FiscalObligation[]
   history                CompanyHistory[]
   companyTaxRegimes      CompanyTaxRegime[]
+  apuracoesImpostos    ApuracaoImpostos[]
+  lalurItens           LalurItem[]
   @@map("companies")
 }
 
@@ -991,6 +993,7 @@ model ChartOfAccounts {
 
   @@unique([companyId, code])
   @@index([companyId, type])
+  lalurItens           LalurItem[]
   @@map("chart_of_accounts")
 }
 
@@ -3632,4 +3635,106 @@ model IndicadorEconomico {
   @@unique([indicador, competencia])
   @@index([indicador, competencia])
   @@map("indicadores_economicos")
+}
+
+// =============================================================================
+// 15 · APURACAO DE IMPOSTOS (PIS/COFINS/CSLL/IRPJ) — LUCRO REAL
+// =============================================================================
+
+enum TipoApuracao {
+  PIS_COFINS
+  IRPJ_CSLL
+}
+
+enum StatusApuracao {
+  RASCUNHO
+  APURADO
+  RECOLHIDO
+}
+
+/// Apuracao mensal/trimestral de impostos por empresa
+/// Suporta Lucro Real, Lucro Presumido e Simples Nacional
+model ApuracaoImpostos {
+  id           String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId    String          @map("company_id") @db.Uuid
+  competencia  String          @map("competencia") @db.VarChar(7)  // AAAA-MM
+  tipo         TipoApuracao    @map("tipo")
+  regime       String          @default("LUCRO_REAL") @map("regime") @db.VarChar(20) // LUCRO_REAL | LUCRO_PRESUMIDO | SIMPLES
+  status       StatusApuracao  @default(RASCUNHO) @map("status")
+
+  // ── PIS/COFINS ──────────────────────────────────────────────
+  // Lucro Real: nao-cumulativo (1,65% / 7,6%)
+  // Lucro Presumido: cumulativo (0,65% / 3%)
+  receitaBruta      Decimal?  @map("receita_bruta") @db.Decimal(15,2)
+  receitaExcluida   Decimal?  @default(0) @map("receita_excluida") @db.Decimal(15,2)  // devoluções, cancelamentos
+  baseCalculoPis    Decimal?  @map("base_calculo_pis") @db.Decimal(15,2)
+  baseCalculoCofins Decimal?  @map("base_calculo_cofins") @db.Decimal(15,2)
+  aliqPis           Decimal?  @map("aliq_pis") @db.Decimal(5,4)    // 0.0165 LR | 0.0065 LP
+  aliqCofins        Decimal?  @map("aliq_cofins") @db.Decimal(5,4) // 0.076 LR | 0.03 LP
+  creditosPis       Decimal?  @default(0) @map("creditos_pis") @db.Decimal(15,2)      // apenas nao-cumulativo
+  creditosCofins    Decimal?  @default(0) @map("creditos_cofins") @db.Decimal(15,2)   // apenas nao-cumulativo
+  pisBruto          Decimal?  @map("pis_bruto") @db.Decimal(15,2)
+  cofinsBruto       Decimal?  @map("cofins_bruto") @db.Decimal(15,2)
+  pisDevido         Decimal?  @map("pis_devido") @db.Decimal(15,2)
+  cofinsDevido      Decimal?  @map("cofins_devido") @db.Decimal(15,2)
+
+  // ── IRPJ/CSLL ──────────────────────────────────────────────
+  // Lucro Real: base = resultado contabil +/- ajustes LALUR
+  // Lucro Presumido: base = receita bruta x percentual presuncao
+  resultadoContabil Decimal?  @map("resultado_contabil") @db.Decimal(15,2)  // LR
+  percPresuncaoIrpj Decimal?  @map("perc_presuncao_irpj") @db.Decimal(5,4)  // LP: 0.32 servicos, 0.08 comercio
+  percPresuncaoCsll Decimal?  @map("perc_presuncao_csll") @db.Decimal(5,4)  // LP: 0.32 servicos, 0.12 comercio
+  basePresumidaIrpj Decimal?  @map("base_presumida_irpj") @db.Decimal(15,2) // LP: receita x perc
+  basePresumidaCsll Decimal?  @map("base_presumida_csll") @db.Decimal(15,2) // LP
+  adicoes           Decimal?  @default(0) @map("adicoes") @db.Decimal(15,2)           // LR
+  exclusoes         Decimal?  @default(0) @map("exclusoes") @db.Decimal(15,2)         // LR
+  compensacoes      Decimal?  @default(0) @map("compensacoes") @db.Decimal(15,2)      // LR
+  lucroReal         Decimal?  @map("lucro_real") @db.Decimal(15,2)                    // LR
+  baseIrpj          Decimal?  @map("base_irpj") @db.Decimal(15,2)
+  baseCsll          Decimal?  @map("base_csll") @db.Decimal(15,2)
+  irpjDevido        Decimal?  @map("irpj_devido") @db.Decimal(15,2)
+  csllDevida        Decimal?  @map("csll_devida") @db.Decimal(15,2)
+  adicionalIrpj     Decimal?  @map("adicional_irpj") @db.Decimal(15,2)               // 10% sobre excedente 20k/mes
+  irpjAntecipadoJan Decimal?  @default(0) @map("irpj_antecipado") @db.Decimal(15,2)  // estimativas mensais LR
+  csllAntecipadaJan Decimal?  @default(0) @map("csll_antecipada") @db.Decimal(15,2)
+
+  // ── ISS (LP e LR) ──────────────────────────────────────────
+  baseIss           Decimal?  @map("base_iss") @db.Decimal(15,2)
+  aliqIss           Decimal?  @map("aliq_iss") @db.Decimal(5,4)
+  issDevido         Decimal?  @map("iss_devido") @db.Decimal(15,2)
+
+  observacao        String?   @map("observacao") @db.Text
+  createdById       String    @map("created_by_id") @db.Uuid
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt         DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  company     Company        @relation(fields: [companyId], references: [id])
+  lalurItens  LalurItem[]
+
+  @@unique([companyId, competencia, tipo])
+  @@index([companyId, competencia])
+  @@map("apuracao_impostos")
+}
+
+/// Itens do LALUR/LACS — adicoes e exclusoes ao lucro real
+model LalurItem {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  apuracaoId    String   @map("apuracao_id") @db.Uuid
+  companyId     String   @map("company_id") @db.Uuid
+  competencia   String   @map("competencia") @db.VarChar(7)
+  tipo          String   @map("tipo") @db.VarChar(20)  // ADICAO | EXCLUSAO | COMPENSACAO
+  imposto       String   @map("imposto") @db.VarChar(10) // IRPJ | CSLL | AMBOS
+  descricao     String   @map("descricao") @db.VarChar(255)
+  valor         Decimal  @map("valor") @db.Decimal(15,2)
+  contaId       String?  @map("conta_id") @db.Uuid
+  observacao    String?  @map("observacao") @db.Text
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+
+  apuracao  ApuracaoImpostos  @relation(fields: [apuracaoId], references: [id], onDelete: Cascade)
+  company   Company           @relation(fields: [companyId], references: [id])
+  conta     ChartOfAccounts?  @relation(fields: [contaId], references: [id])
+
+  @@index([apuracaoId])
+  @@index([companyId, competencia])
+  @@map("lalur_itens")
 }
