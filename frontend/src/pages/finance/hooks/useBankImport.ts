@@ -72,7 +72,7 @@ export function useBankImport() {
 
   const postStatement = useCallback(
     (id: string, groups: any[]) =>
-      req(() => api.post(`/bank-import/statements/${id}/post`, { groups })),
+      req(() => api.post(`/bank-import/statements/confirm`, { statementId: id, groups })),
     [req],
   );
 

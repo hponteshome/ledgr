@@ -95,7 +95,7 @@ export default function BankImportPage() {
 
   const initGroups = (grps: TransactionGroup[]) => {
     const init: typeof drafts = {};
-    grps.forEach(g => { init[g.groupKey] = { accountId: g.suggestedAccountId ?? '', counterAccountId: '', memo: g.memo ?? g.description }; });
+    grps.forEach(g => { init[g.groupKey] = { accountId: (g as any).accountId ?? g.suggestedAccountId ?? '', counterAccountId: (g as any).counterAccountId ?? '', memo: g.memo ?? g.description }; });
     setDrafts(init);
     setGroups(grps);
   };

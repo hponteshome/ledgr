@@ -109,7 +109,7 @@ export class SuggestionService {
         companyId_textPattern_bankCode_type: {
           companyId,
           textPattern: pattern,
-          bankCode:    (bankCode ?? null) as any,
+          bankCode:    (bankCode ?? 'GENERIC') as any,
           type:        type as any,
         },
       },

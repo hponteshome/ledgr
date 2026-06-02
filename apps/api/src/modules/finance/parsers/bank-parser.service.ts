@@ -15,6 +15,8 @@ export interface ParsedTransaction {
   balance?:        number;
   bankRef?:        string;
   agency?:         string;
+  debitCode?:      string;  // codigo da conta debito (plano de contas)
+  creditCode?:     string;  // codigo da conta credito (plano de contas)
 }
 
 export interface ParsedStatement {
@@ -619,6 +621,8 @@ export class BankParserService {
 
       if (amount === 0) continue;
 
+      const debitCode  = cols[7]?.trim() || undefined;  // coluna Debito (cod conta)
+      const creditCode = cols[8]?.trim() || undefined;  // coluna Credito (cod conta)
       const norm = normalizeText(desc);
       transactions.push({
         transactionDate: dt,
@@ -626,7 +630,9 @@ export class BankParserService {
         descriptionNorm: norm,
         amount,
         type,
-        bankRef: bankRef || undefined,
+        bankRef:     bankRef || undefined,
+        debitCode,
+        creditCode,
       });
 
       if (!periodFrom || dt < periodFrom) periodFrom = dt;

@@ -98,6 +98,47 @@ export class BankImportService {
 
     await this.prisma.bankTransaction.createMany({ data: txData });
 
+    // ── Pre-classificar transacoes LM (com debitCode/creditCode do extrato) ──
+    const txsComCodigo = parsed.transactions.filter((t: any) => t.debitCode && t.creditCode);
+    if (txsComCodigo.length > 0) {
+      const codigos = [...new Set([
+        ...txsComCodigo.map((t: any) => String(t.debitCode).trim().padStart(6,'0')),
+        ...txsComCodigo.map((t: any) => String(t.creditCode).trim().padStart(6,'0')),
+      ])];
+      const contas = await this.prisma.chartOfAccounts.findMany({
+        where: { companyId, reducedCode: { in: codigos } },
+        select: { id: true, reducedCode: true },
+      });
+      const contaMap = new Map(contas.map((c: any) => [c.reducedCode, c.id]));
+
+      const txsCriadas = await this.prisma.bankTransaction.findMany({
+        where: { statementId: statement.id },
+        orderBy: { transactionDate: 'asc' },
+        select: { id: true },
+      });
+
+      let preClass = 0;
+      for (let i = 0; i < parsed.transactions.length; i++) {
+        const tx = parsed.transactions[i] as any;
+        if (!tx.debitCode || !tx.creditCode) continue;
+        const debitId  = contaMap.get(String(tx.debitCode).trim().padStart(6,'0'));
+        const creditId = contaMap.get(String(tx.creditCode).trim().padStart(6,'0'));
+        if (!debitId || !creditId) continue;
+        const criada = txsCriadas[i];
+        if (!criada) continue;
+        await this.prisma.bankTransaction.update({
+          where: { id: criada.id },
+          data: {
+            accountId:        tx.type === 'DEBIT' ? debitId  : creditId,
+            counterAccountId: tx.type === 'DEBIT' ? creditId : debitId,
+            status: 'CLASSIFIED' as any,
+          },
+        });
+        preClass++;
+      }
+      console.log(`[LM] Pre-classificadas ${preClass}/${txsComCodigo.length} transacoes`);
+    }
+
     return {
       statementId:  statement.id,
       bankName:     parsed.bankName,
@@ -131,6 +172,8 @@ export class BankImportService {
       suggestionSource:    string | null;
       suggestionConfidence: number | null;
       memo:                string | null;
+      accountId:           string | null;
+      counterAccountId:    string | null;
     }> = {};
 
     for (const tx of transactions) {
@@ -143,10 +186,12 @@ export class BankImportService {
           count:                0,
           totalAmount:          0,
           transactions:         [],
-          suggestedAccountId:   tx.suggestedAccountId,
-          suggestionSource:     tx.suggestionSource,
-          suggestionConfidence: tx.suggestionConfidence,
+          suggestedAccountId:   tx.accountId ?? tx.suggestedAccountId,
+          suggestionSource:     tx.accountId ? 'PRE_CLASSIFIED' : tx.suggestionSource,
+          suggestionConfidence: tx.accountId ? 100 : tx.suggestionConfidence,
           memo:                 tx.memo,
+          accountId:            tx.accountId,
+          counterAccountId:     tx.counterAccountId,
         };
       }
       groups[key].count++;
