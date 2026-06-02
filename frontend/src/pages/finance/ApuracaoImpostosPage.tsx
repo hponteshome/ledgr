@@ -48,6 +48,34 @@ export default function ApuracaoImpostosPage() {
   const [compensacoes, setCompensacoes] = useState('0');
   const [regime, setRegime] = useState('LUCRO_REAL');
 
+  // Sugestoes LALUR
+  const [sugestoes, setSugestoes] = useState<any[]>([]);
+  const [sugestoesLoading, setSugestoesLoading] = useState(false);
+  const [sugestoesSelecionadas, setSugestoesSelecionadas] = useState<Set<number>>(new Set());
+
+  async function carregarSugestoes() {
+    setSugestoesLoading(true);
+    try {
+      const { data } = await api.get('/apuracao/lalur/' + comp + '/sugerir');
+      setSugestoes(data.sugestoes ?? []);
+      setSugestoesSelecionadas(new Set((data.sugestoes ?? []).map((_:any, i:number) => i)));
+    } catch (e: any) { alert(e?.response?.data?.message ?? 'Erro ao buscar sugestoes'); }
+    finally { setSugestoesLoading(false); }
+  }
+
+  async function aplicarSugestoes() {
+    const selecionadas = sugestoes.filter((_,i) => sugestoesSelecionadas.has(i));
+    if (!selecionadas.length) return;
+    setSaving(true);
+    try {
+      await api.post('/apuracao/lalur/' + comp + '/aplicar-sugestoes', { sugestoes: selecionadas });
+      setSugestoes([]);
+      setSugestoesSelecionadas(new Set());
+      await load();
+    } catch (e: any) { alert(e?.response?.data?.message ?? 'Erro ao aplicar'); }
+    finally { setSaving(false); }
+  }
+
   // LALUR
   const [lalurDesc, setLalurDesc] = useState('');
   const [lalurValor, setLalurValor] = useState('');
@@ -337,6 +365,91 @@ export default function ApuracaoImpostosPage() {
           {/* ABA LALUR */}
           {aba === 'lalur' && (
             <div>
+              {/* Painel Sugestoes Automaticas */}
+              <div style={S.card}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+                  <div style={S.secTit}>Sugestões Automáticas — Contas Não Dedutíveis</div>
+                  <button style={S.btn('#7C3AED')} onClick={carregarSugestoes} disabled={sugestoesLoading}>
+                    {sugestoesLoading ? 'Buscando...' : '⚡ Gerar Sugestões'}
+                  </button>
+                </div>
+                {sugestoes.length === 0 && !sugestoesLoading && (
+                  <div style={{ fontSize:12, color:'var(--color-text-secondary)', padding:'12px 0' }}>
+                    Clique em "Gerar Sugestões" para calcular adições/exclusões com base nas contas configuradas como não dedutíveis.
+                  </div>
+                )}
+                {sugestoes.length > 0 && (
+                  <>
+                    <div style={{ overflowX:'auto', border:'0.5px solid var(--color-border-tertiary)', borderRadius:8, marginBottom:12 }}>
+                      <table style={{ width:'100%', borderCollapse:'collapse' }}>
+                        <thead><tr>
+                          <th style={{ ...S.th, width:32 }}>
+                            <input type="checkbox"
+                              checked={sugestoesSelecionadas.size === sugestoes.length}
+                              onChange={e => setSugestoesSelecionadas(e.target.checked ? new Set(sugestoes.map((_,i)=>i)) : new Set())} />
+                          </th>
+                          <th style={S.th}>Conta</th>
+                          <th style={S.th}>Dedutibilidade</th>
+                          <th style={{ ...S.th, textAlign:'right' as const }}>Saldo Período</th>
+                          <th style={{ ...S.th, textAlign:'right' as const }}>% Não Dedutível</th>
+                          <th style={{ ...S.th, textAlign:'right' as const }}>Valor Ajuste</th>
+                          <th style={S.th}>Tipo</th>
+                          <th style={S.th}>Descrição</th>
+                        </tr></thead>
+                        <tbody>
+                          {sugestoes.map((s: any, i: number) => (
+                            <tr key={i} style={{ background: sugestoesSelecionadas.has(i) ? '#F5F3FF' : 'transparent' }}>
+                              <td style={S.td}>
+                                <input type="checkbox" checked={sugestoesSelecionadas.has(i)}
+                                  onChange={e => {
+                                    const ns = new Set(sugestoesSelecionadas);
+                                    e.target.checked ? ns.add(i) : ns.delete(i);
+                                    setSugestoesSelecionadas(ns);
+                                  }} />
+                              </td>
+                              <td style={S.td}>
+                                <div style={{ fontFamily:'monospace', fontSize:11, color:'var(--color-text-secondary)' }}>{s.code}</div>
+                                <div style={{ fontSize:12 }}>{s.name}</div>
+                              </td>
+                              <td style={S.td}>
+                                <span style={S.badge(s.dedutibilidade === 'NAO_DEDUTIVEL' ? '#DC2626' : '#EA580C')}>
+                                  {s.dedutibilidade === 'NAO_DEDUTIVEL' ? 'Não Dedutível' : 'Parcial'}
+                                </span>
+                              </td>
+                              <td style={S.tdR}>{fmtBR(s.saldoTotal)}</td>
+                              <td style={{ ...S.tdR, color:'#DC2626', fontWeight:600 }}>{s.percNaoDedu}%</td>
+                              <td style={{ ...S.tdR, color:'#7C3AED', fontWeight:600 }}>{fmtBR(s.valorAjuste)}</td>
+                              <td style={S.td}>
+                                <span style={S.badge(s.tipo === 'ADICAO' ? '#DC2626' : '#15803D')}>{s.tipo}</span>
+                              </td>
+                              <td style={{ ...S.td, fontSize:11 }}>
+                                <input style={{ ...S.input, fontSize:11 }} value={s.descricao}
+                                  onChange={e => setSugestoes(prev => prev.map((x,j) => j===i ? {...x, descricao:e.target.value} : x))} />
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot><tr>
+                          <td colSpan={5} style={{ ...S.td, fontWeight:600 }}>Total selecionado</td>
+                          <td style={{ ...S.tdR, fontWeight:700, color:'#7C3AED', fontSize:14 }}>
+                            {fmtBR(sugestoes.filter((_,i)=>sugestoesSelecionadas.has(i)).reduce((s:number,x:any)=>s+x.valorAjuste,0))}
+                          </td>
+                          <td colSpan={2} style={S.td}></td>
+                        </tr></tfoot>
+                      </table>
+                    </div>
+                    <div style={{ display:'flex', gap:8 }}>
+                      <button style={S.btn()} onClick={aplicarSugestoes} disabled={saving || sugestoesSelecionadas.size === 0}>
+                        {saving ? 'Aplicando...' : 'Aplicar Selecionados ao LALUR'}
+                      </button>
+                      <button style={S.btnO} onClick={() => { setSugestoes([]); setSugestoesSelecionadas(new Set()); }}>
+                        Cancelar
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+
               <div style={S.card}>
                 <div style={S.secTit}>Adicionar Item ao LALUR/LACS</div>
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 120px 120px 120px auto', gap:10, alignItems:'flex-end' }}>

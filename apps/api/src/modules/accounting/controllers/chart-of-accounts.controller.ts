@@ -173,7 +173,7 @@ async getAccountBalance(
       where: { id },
       data: {
         dedutibilidade: body.dedutibilidade,
-        percDeducao: body.percDeducao != null ? body.percDeducao : undefined,
+        percDeducao: body.percDeducao != null ? new (require('@prisma/client').Prisma.Decimal)(body.percDeducao) : undefined,
         lalurTipoAjuste: body.lalurTipoAjuste ?? undefined,
         lalurDescricao: body.lalurDescricao ?? undefined,
       },
