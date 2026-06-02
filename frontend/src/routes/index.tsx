@@ -61,6 +61,7 @@ import EsocialPage from '../pages/hr/EsocialPage';
 import FolhaPage from '../pages/hr/FolhaPage';
 import EmployeeDetailPage from '../pages/hr/EmployeeDetailPage';
 import FechamentoPage from '../pages/finance/FechamentoPage';
+import ApuracaoImpostosPage from '../pages/finance/ApuracaoImpostosPage';
 import ContasAReceberPage from '../pages/finance/ContasAReceberPage';
 import ContasAPagarPage from '../pages/finance/ContasAPagarPage';
 import FluxoCaixaPage from '../pages/finance/FluxoCaixaPage';
@@ -115,6 +116,7 @@ export const AppRoutes = () => {
                 <Route path="app/sistema/obrigacoes" element={<ProtectedRoute><ObrigacoesPage /></ProtectedRoute>} />
                 <Route path="app/sistema/tabelas" element={<ProtectedRoute><TabelasLegaisPage /></ProtectedRoute>} />
                 <Route path="app/finance/fechamento" element={<ProtectedRoute><FechamentoPage /></ProtectedRoute>} />
+                <Route path="app/finance/apuracao" element={<ProtectedRoute><ApuracaoImpostosPage /></ProtectedRoute>} />
                 <Route path="app/finance/petty-cash" element={<ProtectedRoute><PettyCashPage /></ProtectedRoute>} />
                 <Route path="app/finance/fluxo-caixa" element={<ProtectedRoute><FluxoCaixaPage /></ProtectedRoute>} />
                 <Route path="app/finance/accounts-payable" element={<ProtectedRoute><ContasAPagarPage /></ProtectedRoute>} />

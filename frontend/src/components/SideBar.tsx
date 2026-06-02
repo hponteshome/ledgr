@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   FiHome, FiBriefcase, FiUsers, FiDollarSign, FiFileText, FiMenu,
   FiChevronLeft, FiChevronDown, FiChevronRight, FiActivity, FiSettings,
-  FiFolder, FiBook, FiPenTool, FiClipboard, FiShield, FiLayers,
+  FiFolder, FiBook, FiPenTool, FiClipboard, FiShield, FiPercent, FiLayers,
   FiUserCheck, FiUpload, FiDatabase, FiPieChart, FiCalendar, FiCheckCircle,
   FiServer, FiEdit2, FiEdit3, FiPackage, FiTool, FiTruck, FiTrendingUp,
   FiAlertCircle, FiTrendingDown, FiLogOut, FiBarChart2, FiArchive, FiBookOpen, FiCpu, FiRepeat, FiLock} from 'react-icons/fi';
@@ -70,6 +70,7 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
         { path: '/app/finance/bank-import', label: 'Importação Bancária', icon: FiUpload },
         { path: '/app/finance/provisoes', label: 'Provisões Recorrentes', icon: FiRepeat },
         { path: '/app/finance/fechamento', label: 'Fechamento Mensal', icon: FiLock },
+        { path: '/app/finance/apuracao', label: 'Apuração de Impostos', icon: FiPercent },
       ],
     },
     {
