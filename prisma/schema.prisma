@@ -221,6 +221,7 @@ model Company {
   companyTaxRegimes      CompanyTaxRegime[]
   apuracoesImpostos    ApuracaoImpostos[]
   lalurItens           LalurItem[]
+  efdContribuicoes  EfdContribuicoes[]
   @@map("companies")
 }
 
@@ -3755,4 +3756,28 @@ model LalurItem {
   @@index([apuracaoId])
   @@index([companyId, competencia])
   @@map("lalur_itens")
+}
+// =============================================================================
+// 16 · EFD-CONTRIBUICOES (PIS/COFINS)
+// =============================================================================
+
+/// Cabecalho da EFD-Contribuicoes por empresa/periodo
+model EfdContribuicoes {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId     String   @map("company_id") @db.Uuid
+  periodoInicio DateTime @map("periodo_inicio") @db.Date
+  periodoFim    DateTime @map("periodo_fim") @db.Date
+  regime        String   @map("regime") @db.VarChar(20)   // LUCRO_REAL | LUCRO_PRESUMIDO | SIMPLES
+  incidencia    String   @map("incidencia") @db.VarChar(20) // NAO_CUMULATIVO | CUMULATIVO | AMBOS
+  status        String   @default("RASCUNHO") @map("status") @db.VarChar(20)
+  hashArquivo   String?  @map("hash_arquivo") @db.VarChar(64)
+  createdById   String   @map("created_by_id") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@unique([companyId, periodoInicio, periodoFim])
+  @@index([companyId, periodoInicio])
+  @@map("efd_contribuicoes")
 }

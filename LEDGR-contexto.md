@@ -238,3 +238,33 @@ Tabelas:
 - th: background #F9FAFB, color #6B7280, font-size 11px, uppercase, border-bottom 0.5px #E5E7EB
 - td: color #374151, border-bottom 0.5px #F5F5F5
 - tr hover: background #FAFAFA
+## SESSÃO 02/06/2026 — APURAÇÃO DE IMPOSTOS + LALUR
+
+### Entregáveis
+- Importação extrato LM 2025: 1.160 lançamentos balanceados (jan-dez)
+- DRE LM corrigida: nature = CREDIT nas contas REVENUE
+- Schema: ApuracaoImpostos + LalurItem (LP + LR) + campos dedutibilidade em ChartOfAccounts + JournalEntry
+- Backend: /apuracao/* (PIS/COFINS/IRPJ/CSLL/LALUR/sugerir/aplicar/DARF preview+PDF)
+- Frontend: ApuracaoImpostosPage, LalurConfigPage
+- Apuração 12 meses 2025 LM: PIS R.575,98 | COFINS R.981,78 | IRPJ R.190,76 | CSLL R.588,67
+- DARF PIS (6912) / COFINS (5856) / IRPJ (2362) / CSLL (2484) com preview iframe + PDF
+- Config. Dedutibilidade por conta: DEDUTIVEL | PARCIALMENTE_DEDUTIVEL | NAO_DEDUTIVEL + percDeducao
+- Override por lancamento: campo dedutibilidade/percDeducao/lalurObservacao em JournalEntry
+- Sugestao automatica LALUR: endpoint sugerir-lalur + aplicar-sugestoes
+- Autocomplete contas por nome no formulario de lancamentos
+
+### Pendencias abertas
+- Aplicar sugestoes LALUR e recalcular IRPJ/CSLL com lucro real ajustado
+- Resumo anual consolidado (tabela 12 meses impostos)
+- DARF em lote por periodo
+- Prejuizos acumulados LALUR
+
+### Proxima sessao: ECD e ECF
+- ECD: revisar I051, implementar J100/J150 (Balanco/DRE no Bloco J)
+- ECF: iniciar parser/exportador ECF
+- Validar ECD 2025 LM no PGE
+
+### Dados tecnico
+- Enum PostgreSQL: TipoApuracao, StatusApuracao criados
+- VARCHAR(30) para coluna dedutibilidade (era 20, PARCIALMENTE_DEDUTIVEL tem 22 chars)
+- percDeducao: Decimal(5,2) no schema, number simples no controller

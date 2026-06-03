@@ -20,6 +20,8 @@ import { EcdViewerService } from './ecd/services/ecd-viewer.service';
 import { EcdViewerController } from './ecd/controllers/ecd-viewer.controller';
 
 
+// EFD
+import { EfdModule } from './efd/efd.module';
 // ECF
 import { EcfParserService } from './ecf/services/ecf-parser.service';
 import { EcfValidatorService } from './ecf/services/ecf-validator.service';
@@ -29,6 +31,7 @@ import { EcfController } from './ecf/controllers/ecf.controller';
 @Module({
   imports: [
     PrismaModule,
+    EfdModule,
     MulterModule.register({
       limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
     }),
