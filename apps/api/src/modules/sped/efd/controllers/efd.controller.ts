@@ -31,9 +31,15 @@ export class EfdController {
     });
 
     const filename = `EFD_CONTRIB_${String(month).padStart(2,'0')}${year}.txt`;
+    const company = await this.exporter['prisma'].company.findUnique({
+      where: { id: companyId }, select: { taxId: true },
+    });
+    const cnpjRaiz = (company?.taxId || '').replace(/\D/g,'').slice(0,8);
     res.set({
       'Content-Type':        'text/plain; charset=latin1',
       'Content-Disposition': `attachment; filename="${filename}"`,
+      'X-Company-Cnpj':      cnpjRaiz,
+      'Access-Control-Expose-Headers': 'X-Company-Cnpj',
     });
     res.send(buf);
   }
