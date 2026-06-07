@@ -268,3 +268,61 @@ Tabelas:
 - Enum PostgreSQL: TipoApuracao, StatusApuracao criados
 - VARCHAR(30) para coluna dedutibilidade (era 20, PARCIALMENTE_DEDUTIVEL tem 22 chars)
 - percDeducao: Decimal(5,2) no schema, number simples no controller
+## APRENDIZADO CRÍTICO — SPED Encoding (EFD/ECD/ECF)
+
+### Problema
+Arquivos SPED (EFD, ECD, ECF) devem ser gravados em **ISO-8859-1 (latin1)**.
+O Node.js/NestJS processa strings internamente em UTF-8, causando bytes duplos
+para caracteres acentuados (ç, ã, õ, é, etc.) quando o Buffer é criado com 'latin1'.
+
+### Solução obrigatória em TODOS os exportadores SPED
+1. Criar metodo 
+orm(s: string): string que:
+   - Aplica .normalize('NFD') para decompor diacriticos
+   - Remove combining marks (\u0300-\u036f)
+   - Substitui chars fora latin1 por '?'
+2. Aplicar 	his.norm() em TODOS os campos textuais:
+   - NOME da empresa (0000)
+   - INFO_COMPL (F100, C100, etc.)
+   - Nome do contabilista (0100)
+   - Historico/descricao de lancamentos
+   - Qualquer campo que possa ter texto livre
+
+### Verificacao
+Testar com: ytes.filter(b => b > 127) — deve retornar array vazio.
+Erro tipico no PVA: NullPointerException: Campo.getValor() causado por
+numero incorreto de campos (UTF-8 multibyte corrompe a contagem de pipes).
+
+### Ja implementado
+- EFD-Contribuicoes: norm() aplicado em legalName, accountantName, INFO_COMPL F100
+- ECD: verificar se tem norm() implementado (provavelmente nao — adicionar na ECF)
+## SESSAO 03/06/2026 — EFD-CONTRIBUICOES VALIDACAO PVA
+
+### Status
+- Encoding latin1: CORRIGIDO (norm() aplicado, 0 bytes nao-ASCII)
+- Registro 0000: CORRIGIDO (13 campos, IND_SIT + NR_REC adicionados, IND_NATU_PJ='00')
+- Registro 0110: PARCIALMENTE CORRIGIDO (5 campos mas gerando 6 — verificar)
+- Registro F100: CORRIGIDO (17 campos — verificar se gerou 18 ou 17)
+- Registros M200/M400/M410/M600/M800/M810: PENDENTE — leiaute incorreto
+- Registros 0140/1010: PENDENTE — verificar leiaute
+
+### Pendencia critica
+O PVA 6.1.2 rejeita o arquivo com NullPointerException (campo nao encontrado).
+Antes de corrigir M200/M400/M410/M600/M800/M810 e 0140/1010:
+BAIXAR MANUALMENTE o Guia Pratico EFD-Contribuicoes v1.35 em:
+http://sped.rfb.gov.br/pasta/show/1567
+e consultar as tabelas de leiaute de cada registro antes de alterar.
+
+### Leiaute M200 (parcialmente confirmado pelo VRI)
+- Campo 02: VL_TOT_CONT_NC_PER (soma de M210.VL_CONT_PER nao-cum)
+- Campo 03: VL_TOT_CRED_DESC (soma de M100.VL_CRED_DESC)
+- Campos 04-11: nao confirmados — CONSULTAR GUIA PRATICO
+- M400/M410 sao para receitas ISENTAS/ALIQUOTA ZERO, NAO para receitas tributadas
+- Para receitas tributadas nao-cumulativas usar M210
+
+### Commits da sessao
+- feat(efd): pagina EFD-Contribuicoes + download Gerar EFD
+- fix(efd): encoding latin1 norm() em campos textuais
+- fix(efd): 0000 leiaute correto 13 campos IND_SIT NR_REC IND_NATU_PJ
+- fix(efd): 0110 5 campos IND_APRO_CRED COD_TIPO_CONT
+- fix(efd): F100 17 campos CST_PIS CST_COF corretos
