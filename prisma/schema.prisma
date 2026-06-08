@@ -230,7 +230,7 @@ model CompanyTaxRegime {
   id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   companyId           String   @map("company_id") @db.Uuid
   dtIni               DateTime @map("dt_ini") @db.Date
-  dtFin               DateTime @map("dt_fin") @db.Date
+  dtFin               DateTime? @map("dt_fin") @db.Date
   formaTributacao     String   @map("forma_tributacao") @db.VarChar(1)
   periodoApuracaoIRPJ String?  @map("periodo_apuracao_irpj") @db.VarChar(1)
   qualificacaoPJ      String?  @map("qualificacao_pj") @db.VarChar(2)

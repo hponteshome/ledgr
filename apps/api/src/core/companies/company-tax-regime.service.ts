@@ -17,45 +17,84 @@ export class CompanyTaxRegimeService {
   async findByCompany(companyId: string) {
     const regimes = await this.prisma.companyTaxRegime.findMany({
       where: { companyId },
-      orderBy: { dtIni: "desc" },
+      orderBy: { dtIni: "asc" },
     });
     return regimes.map(r => ({
       ...r,
       formaLabel: FORMA_LABEL[r.formaTributacao] ?? r.formaTributacao,
+      vigente: !r.dtFin || r.dtFin >= new Date(),
     }));
+  }
+
+  // Retorna o regime vigente em uma data especifica
+  async findVigenteNaData(companyId: string, data: Date) {
+    return this.prisma.companyTaxRegime.findFirst({
+      where: {
+        companyId,
+        dtIni: { lte: data },
+        OR: [
+          { dtFin: null },
+          { dtFin: { gte: data } },
+        ],
+      },
+      orderBy: { dtIni: "desc" },
+    });
   }
 
   async create(companyId: string, dto: {
     dtIni: string;
-    dtFin: string;
     formaTributacao: string;
     periodoApuracaoIRPJ?: string;
     qualificacaoPJ?: string;
   }) {
-    // Regra RFB: regime vigora por ano civil completo
     const ini = new Date(dto.dtIni);
-    const fin = new Date(dto.dtFin);
-    if (ini.getFullYear() !== fin.getFullYear()) {
-      throw new BadRequestException("O regime tributario deve ser definido dentro do mesmo ano civil.");
-    }
-    // Verificar sobreposição
-    const overlap = await this.prisma.companyTaxRegime.findFirst({
-      where: {
-        companyId,
-        AND: [
-          { dtIni: { lte: fin } },
-          { dtFin: { gte: ini } },
-        ],
-      },
+    ini.setUTCHours(0,0,0,0);
+
+    // Validar que dtIni >= openingDate da empresa
+    const company = await this.prisma.company.findUnique({
+      where: { id: companyId },
+      select: { openingDate: true, legalName: true },
     });
-    if (overlap) {
-      throw new BadRequestException(`Ja existe um regime cadastrado para o periodo ${overlap.dtIni.toISOString().slice(0,10)} a ${overlap.dtFin.toISOString().slice(0,10)}.`);
+    if (company?.openingDate && ini < company.openingDate) {
+      throw new BadRequestException(
+        `Data de inicio (${ini.toISOString().slice(0,10)}) nao pode ser anterior a data de abertura da empresa (${company.openingDate.toISOString().slice(0,10)}).`
+      );
     }
+
+    // Verificar se ja existe regime com mesma data de inicio
+    const existing = await this.prisma.companyTaxRegime.findFirst({
+      where: { companyId, dtIni: ini },
+    });
+    if (existing) {
+      throw new BadRequestException(`Ja existe um regime com data de inicio ${dto.dtIni}.`);
+    }
+
+    // Fechar regime anterior vigente: dtFin = dtIni - 1 dia
+    // Buscar regime anterior vigente (dtFin IS NULL) via SQL raw
+    // Prisma v7 nao aceita filtro null em DateTime? diretamente
+    const rows = await this.prisma.$queryRaw<any[]>`
+      SELECT * FROM company_tax_regimes
+      WHERE company_id = ${companyId}
+        AND dt_ini < ${ini}
+        AND dt_fin IS NULL
+      ORDER BY dt_ini DESC
+      LIMIT 1
+    `;
+    const regimeAnterior = rows[0] ?? null;
+    if (regimeAnterior) {
+      const dtFinAnterior = new Date(ini);
+      dtFinAnterior.setUTCDate(dtFinAnterior.getUTCDate() - 1);
+      await this.prisma.companyTaxRegime.update({
+        where: { id: regimeAnterior.id },
+        data: { dtFin: dtFinAnterior },
+      });
+    }
+
     return this.prisma.companyTaxRegime.create({
       data: {
-        companyId,
+        company: { connect: { id: companyId } },
         dtIni: ini,
-        dtFin: fin,
+        dtFin: null,
         formaTributacao: dto.formaTributacao,
         periodoApuracaoIRPJ: dto.periodoApuracaoIRPJ ?? null,
         qualificacaoPJ: dto.qualificacaoPJ ?? null,
@@ -64,6 +103,28 @@ export class CompanyTaxRegimeService {
   }
 
   async remove(id: string) {
-    return this.prisma.companyTaxRegime.delete({ where: { id } });
+    // Ao remover, reabrir o regime anterior (dtFin = null)
+    const regime = await this.prisma.companyTaxRegime.findUniqueOrThrow({ where: { id } });
+    await this.prisma.companyTaxRegime.delete({ where: { id } });
+
+    // Se o regime removido nao tinha dtFin, reabrir o anterior
+    if (!regime.dtFin) {
+      const anteriorRows = await this.prisma.$queryRaw<any[]>`
+        SELECT * FROM company_tax_regimes
+        WHERE company_id = ${regime.companyId}
+          AND dt_ini < ${regime.dtIni}
+        ORDER BY dt_ini DESC
+        LIMIT 1
+      `;
+      const anterior = anteriorRows[0] ?? null;
+      if (anterior) {
+        await this.prisma.companyTaxRegime.update({
+          where: { id: anterior.id },
+          data: { dtFin: null },
+        });
+      }
+    }
+
+    return { ok: true };
   }
 }

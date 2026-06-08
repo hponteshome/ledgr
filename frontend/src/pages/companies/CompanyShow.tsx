@@ -29,7 +29,7 @@ export const CompanyShow: React.FC = () => {
   const [qsaLinks, setQsaLinks] = useState<any[]>([]);
   const [regimes, setRegimes] = useState<any[]>([]);
   const [showRegimeModal, setShowRegimeModal] = useState(false);
-  const [regimeForm, setRegimeForm] = useState({ dtIni: '', dtFin: '', formaTributacao: '2', periodoApuracaoIRPJ: 'A' });
+  const [regimeForm, setRegimeForm] = useState({ dtIni: '', formaTributacao: '2', periodoApuracaoIRPJ: 'A' });
   const [savingRegime, setSavingRegime] = useState(false);
   const [history, setHistory] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'geral'|'contabil'|'esocial'|'sped'|'historico'>('geral');
@@ -193,7 +193,7 @@ export const CompanyShow: React.FC = () => {
               <tbody className="divide-y divide-gray-50">
                 {regimes.map((r: any) => (
                   <tr key={r.id} className="hover:bg-gray-50">
-                    <td className="py-2 font-medium">{new Date(r.dtIni).toLocaleDateString('pt-BR')} — {new Date(r.dtFin).toLocaleDateString('pt-BR')}</td>
+                    <td className="py-2 font-medium">{new Date(r.dtIni).toLocaleDateString('pt-BR')} — {r.dtFin ? new Date(r.dtFin).toLocaleDateString('pt-BR') : <span style={{color:'#059669',fontWeight:600}}>Vigente</span>}</td>
                     <td className="py-2"><span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">{r.formaLabel}</span></td>
                     <td className="py-2 text-gray-500">{r.periodoApuracaoIRPJ === 'A' ? 'Anual' : 'Trimestral'}</td>
                     <td className="py-2 text-right">
@@ -314,15 +314,11 @@ export const CompanyShow: React.FC = () => {
               <div>
                 <label className="text-xs font-bold text-gray-400 uppercase block mb-1">Data Inicio</label>
                 <input type="date" value={regimeForm.dtIni}
+                  min={company?.openingDate ? new Date(company.openingDate).toISOString().slice(0,10) : undefined}
                   onChange={e => setRegimeForm(p => ({...p, dtIni: e.target.value}))}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
               </div>
-              <div>
-                <label className="text-xs font-bold text-gray-400 uppercase block mb-1">Data Fim</label>
-                <input type="date" value={regimeForm.dtFin}
-                  onChange={e => setRegimeForm(p => ({...p, dtFin: e.target.value}))}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
-              </div>
+
               <div>
                 <label className="text-xs font-bold text-gray-400 uppercase block mb-1">Forma de Tributacao</label>
                 <select value={regimeForm.formaTributacao}
@@ -349,7 +345,7 @@ export const CompanyShow: React.FC = () => {
               <button onClick={() => setShowRegimeModal(false)} type="button"
                 className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700">Cancelar</button>
               <button
-                disabled={savingRegime || !regimeForm.dtIni || !regimeForm.dtFin}
+                disabled={savingRegime || !regimeForm.dtIni}
                 onClick={async () => {
                   setSavingRegime(true);
                   try {
@@ -357,7 +353,7 @@ export const CompanyShow: React.FC = () => {
                     const { data } = await api.get('/companies/' + id + '/tax-regimes');
                     setRegimes(data || []);
                     setShowRegimeModal(false);
-                    setRegimeForm({ dtIni: '', dtFin: '', formaTributacao: '2', periodoApuracaoIRPJ: 'A' });
+                    setRegimeForm({ dtIni: '', formaTributacao: '2', periodoApuracaoIRPJ: 'A' });
                   } catch(e: any) {
                     alert(e?.response?.data?.message || 'Erro ao salvar.');
                   }

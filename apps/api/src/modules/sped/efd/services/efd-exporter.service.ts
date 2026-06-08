@@ -285,6 +285,73 @@ export class EfdExporterService {
     // ── BLOCO M — Apuracao PIS/COFINS ────────────────────────────────────────────
     add(P+'M001'+P+'0'+P);
 
+    if (incidencia === 'CUMULATIVO') {
+      // ── LP CUMULATIVO: M200 -> M205 -> M400 -> M410 / M600 -> M605 -> M800 -> M810 ──
+      // M200 — Consolidacao PIS cumulativo (campo 09=VL_TOT_CONT_CUM_PER)
+      add(P+'M200'+P
+        +'0,00'+P  // 02 VL_TOT_CONT_NC_PER (nao-cum=zero)
+        +'0,00'+P  // 03 VL_TOT_CRED_DESC
+        +'0,00'+P  // 04 VL_TOT_CRED_DESC_ANT
+        +'0,00'+P  // 05 VL_TOT_CONT_NC_DEV
+        +'0,00'+P  // 06 VL_RET_NC
+        +'0,00'+P  // 07 VL_OUT_DED_NC
+        +'0,00'+P  // 08 VL_CONT_NC_REC
+        +this.fmtDec(pisDevido)+P  // 09 VL_TOT_CONT_CUM_PER (cumulativo aqui!)
+        +'0,00'+P  // 10 VL_RET_CUM
+        +'0,00'+P  // 11 VL_OUT_DED_CUM
+        +this.fmtDec(pisDevido)+P  // 12 VL_CONT_CUM_REC
+        +this.fmtDec(pisDevido)+P  // 13 VL_TOT_CONT_REC
+      );
+      // M205 — Detalhamento PIS cumulativo (campo 12 do M200)
+      if (pisDevido > 0) {
+        add(P+'M205'+P
+          +'12'+P       // NUM_CAMPO: campo 12 do M200 (cumulativo)
+          +'810902'+P   // COD_REC: PIS faturamento cumulativo
+          +this.fmtDec(pisDevido)+P
+        );
+      }
+      // M400 — Receitas PIS cumulativo (isentas/tributadas)
+      add(P+'M400'+P);
+      add(P+'M410'+P
+        +'99'+P                      // NAT_REC: outras receitas
+        +this.fmtDec(receitaBase)+P  // VL_REC
+        +P                           // COD_CTA
+        +P                           // DESC_COMPL
+      );
+      // M600 — Consolidacao COFINS cumulativo
+      add(P+'M600'+P
+        +'0,00'+P
+        +'0,00'+P
+        +'0,00'+P
+        +'0,00'+P
+        +'0,00'+P
+        +'0,00'+P
+        +'0,00'+P
+        +this.fmtDec(cofinsDevido)+P  // 09 VL_TOT_CONT_CUM_PER
+        +'0,00'+P
+        +'0,00'+P
+        +this.fmtDec(cofinsDevido)+P  // 12 VL_CONT_CUM_REC
+        +this.fmtDec(cofinsDevido)+P  // 13 VL_TOT_CONT_REC
+      );
+      // M605 — Detalhamento COFINS cumulativo
+      if (cofinsDevido > 0) {
+        add(P+'M605'+P
+          +'12'+P
+          +'217201'+P   // COD_REC: COFINS faturamento cumulativo
+          +this.fmtDec(cofinsDevido)+P
+        );
+      }
+      // M800 — Receitas COFINS cumulativo
+      add(P+'M800'+P);
+      add(P+'M810'+P
+        +'99'+P
+        +this.fmtDec(receitaBase)+P
+        +P
+        +P
+      );
+    } else {
+    // ── LR NAO-CUMULATIVO: M200 -> M210 -> M600 -> M610 ─────────────────────
+
     // M200 — Consolidacao PIS (13 campos) — pai do M210
     // |M200|VL_TOT_CONT_NC_PER|VL_TOT_CRED_DESC|VL_TOT_CRED_DESC_ANT|VL_TOT_CONT_NC_DEV|
     //       VL_RET_NC|VL_OUT_DED_NC|VL_CONT_NC_REC|VL_TOT_CONT_CUM_PER|
@@ -382,6 +449,8 @@ export class EfdExporterService {
       +'0,00'+P                                           // 15 VL_CONT_DIFER_ANT
       +this.fmtDec(cofinsDevido)+P                        // 16 VL_CONT_PER
     );
+
+    } // fim else nao-cumulativo
 
     const idxM001 = lines.findIndex(l => l === P+'M001'+P+'0'+P);
     add(P+'M990'+P+(lines.length - idxM001 + 1)+P);
