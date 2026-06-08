@@ -92,7 +92,7 @@ export class EfdController {
     const MESES = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
 
     const zip = new JSZip();
-    const resultados: { mes: string; linhas: number; status: string }[] = [];
+    const resultados: { mes: string; linhas: number; status: string; cnpjRaiz?: string }[] = [];
 
     for (let m = 1; m <= 12; m++) {
       const periodStart = new Date(Date.UTC(year, m - 1, 1));
@@ -102,7 +102,7 @@ export class EfdController {
         const filename = `EFD_${MESES[m-1]}${String(year).slice(-2)}_${cnpjRaiz}.txt`;
         zip.file(filename, buf);
         const linhas = buf.toString('latin1').split('\n').filter(Boolean).length;
-        resultados.push({ mes: `${String(m).padStart(2,'0')}/${year}`, linhas, status: 'OK' });
+        resultados.push({ mes: `${String(m).padStart(2,'0')}/${year}`, linhas, status: 'OK', cnpjRaiz });
       } catch (e: any) {
         resultados.push({ mes: `${String(m).padStart(2,'0')}/${year}`, linhas: 0, status: `ERRO: ${e.message}` });
       }
@@ -115,7 +115,8 @@ export class EfdController {
       'Content-Type': 'application/zip',
       'Content-Disposition': `attachment; filename="${zipName}"`,
       'X-Efd-Resultados': JSON.stringify(resultados),
-      'Access-Control-Expose-Headers': 'X-Efd-Resultados',
+      'X-Company-Cnpj':   cnpjRaiz,
+      'Access-Control-Expose-Headers': 'X-Efd-Resultados, X-Company-Cnpj',
     });
     res.send(zipBuf);
   }

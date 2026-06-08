@@ -54,7 +54,8 @@ export default function EfdPage() {
       const url  = URL.createObjectURL(new Blob([r.data], { type: 'application/zip' }));
       const a    = document.createElement('a');
       a.href     = url;
-      a.download = `EFD_${ano}_${regime === 'LUCRO_REAL' ? 'LR' : 'LP'}.zip`;
+      const cnpjRaizLote = (r.headers['x-company-cnpj'] || '').replace(/\D/g,'').slice(0,8) || '00000000';
+      a.download = `EFD_${ano}_${regime === 'LUCRO_REAL' ? 'LR' : 'LP'}_${cnpjRaizLote}.zip`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
