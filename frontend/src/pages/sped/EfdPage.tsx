@@ -37,6 +37,33 @@ export default function EfdPage() {
     } finally { setLoading(false); }
   }
 
+  // ── Lote anual ────────────────────────────────────────────────────
+  const [loadingLote, setLoadingLote] = useState(false);
+  const [resultadosLote, setResultadosLote] = useState<{mes:string;linhas:number;status:string}[]>([]);
+
+  async function gerarLote() {
+    setLoadingLote(true); setResultadosLote([]); setError('');
+    try {
+      const token = localStorage.getItem('@ledgr:token');
+      const r = await api.get('/sped/efd-contribuicoes/export-lote', {
+        params: { ano, regime, incidencia },
+        responseType: 'blob',
+      });
+      const resultados = JSON.parse(r.headers['x-efd-resultados'] || '[]');
+      setResultadosLote(resultados);
+      const url  = URL.createObjectURL(new Blob([r.data], { type: 'application/zip' }));
+      const a    = document.createElement('a');
+      a.href     = url;
+      a.download = `EFD_${ano}_${regime === 'LUCRO_REAL' ? 'LR' : 'LP'}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      setError(e?.response?.data?.message ?? 'Erro ao gerar lote');
+    } finally { setLoadingLote(false); }
+  }
+
   async function downloadEfd() {
     setLoading(true);
     try {
@@ -134,6 +161,10 @@ export default function EfdPage() {
             style={{ height:32, border:'none', borderRadius:6, padding:'0 16px', fontSize:12, cursor:'pointer', background:'#7C3AED', color:'#fff', fontWeight:500, display:'flex', alignItems:'center', gap:6 }}>
             <FiEye size={13}/> {loading ? 'Gerando...' : 'Pré-visualizar'}
           </button>
+          <button onClick={gerarLote} disabled={loadingLote}
+            style={{ height:32, border:'none', borderRadius:6, padding:'0 16px', fontSize:12, cursor:'pointer', background:'#059669', color:'#fff', fontWeight:500, display:'flex', alignItems:'center', gap:6 }}>
+            <FiDownload size={13}/> {loadingLote ? 'Gerando ZIP...' : `Lote ${ano} (12 meses)`}
+          </button>
           {preview && (
             <button onClick={downloadEfd}
               style={{ height:32, border:'none', borderRadius:6, padding:'0 16px', fontSize:12, cursor:'pointer', background:'#111', color:'#fff', fontWeight:500, display:'flex', alignItems:'center', gap:6 }}>
@@ -147,6 +178,37 @@ export default function EfdPage() {
       {error && (
         <div style={{ background:'#FEF2F2', border:'0.5px solid #FECACA', borderRadius:8, padding:'10px 14px', display:'flex', gap:8, alignItems:'center', color:'#DC2626', fontSize:13 }}>
           <FiAlertCircle size={14}/> {error}
+        </div>
+      )}
+
+      {/* Resultados lote */}
+      {resultadosLote.length > 0 && (
+        <div style={{ background:'#fff', border:'0.5px solid #E5E7EB', borderRadius:10, overflow:'hidden' }}>
+          <div style={{ padding:'10px 16px', background:'#F8FAFC', borderBottom:'0.5px solid #E5E7EB', fontSize:12, fontWeight:600, color:'#374151' }}>
+            Lote {ano} — {resultadosLote.filter(r=>r.status==='OK').length}/12 meses gerados
+          </div>
+          <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
+            <thead>
+              <tr style={{ background:'#F9FAFB' }}>
+                {['Competência','Linhas','Status'].map(h=>(
+                  <th key={h} style={{ padding:'8px 16px', textAlign:'left', color:'#6B7280', fontWeight:500, borderBottom:'0.5px solid #E5E7EB' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {resultadosLote.map((r,i)=>(
+                <tr key={i} style={{ borderBottom:'0.5px solid #F3F4F6' }}>
+                  <td style={{ padding:'7px 16px', fontWeight:500 }}>{r.mes}</td>
+                  <td style={{ padding:'7px 16px', color:'#6B7280' }}>{r.linhas}</td>
+                  <td style={{ padding:'7px 16px' }}>
+                    <span style={{ background: r.status==='OK' ? '#D1FAE5' : '#FEE2E2', color: r.status==='OK' ? '#065F46' : '#DC2626', padding:'2px 8px', borderRadius:4, fontSize:11, fontWeight:600 }}>
+                      {r.status}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 

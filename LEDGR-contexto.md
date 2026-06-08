@@ -326,3 +326,33 @@ e consultar as tabelas de leiaute de cada registro antes de alterar.
 - fix(efd): 0000 leiaute correto 13 campos IND_SIT NR_REC IND_NATU_PJ
 - fix(efd): 0110 5 campos IND_APRO_CRED COD_TIPO_CONT
 - fix(efd): F100 17 campos CST_PIS CST_COF corretos
+## SESSAO 07/06/2026 — EFD-CONTRIBUICOES VALIDACAO PVA 6.1.2
+
+### Status: APROVADO — 0 erros no PVA 6.1.2
+
+### Correcoes aplicadas
+- 0000: 13 campos, IND_SIT + NR_REC, IND_NATU_PJ=00, getCodVer() dinamico
+- 0110: dinamico por regime (LR=4 dados sem IND_REG_CUM | LP=5 dados com IND_REG_CUM=9)
+- 0140: 9 campos (COD_EST, NOME, CNPJ, UF, IE, COD_MUN, IM, SUFRAMA)
+- 0500: gerado automaticamente com contas REVENUE analiticas da empresa
+- F100: 19 campos, IND_OPER=1, COD_PART vazio, CST=01, COD_CTA referenciado do 0500
+- M200/M600: 13 campos incluindo VL_TOT_CRED_DESC_ANT (campo 04)
+- M205/M605: obrigatorios, COD_REC=691201(PIS) / 585601(COFINS) — DCTF 6 digitos
+- M210/M610: ordem correta (filhos do M200/M600), 16 campos FG >= 2019
+- Bloco 1: vazio (sem processos judiciais)
+- Encoding: norm() em legalName, accountantName, conta.name
+
+### Codigos DCTF confirmados na tabela do PVA
+- PIS nao-cumulativo:   691201
+- PIS cumulativo:       810902
+- COFINS nao-cumulativa: 585601
+- COFINS cumulativa:    217201
+Tabela em: C:\Arquivos de Programas RFB\Programas SPED\EFD-Contribuicoes\recursos\tabelas\SPEDPISCOFINS_VISAO_DCTF*
+
+### Aviso esperado (nao e erro)
+- 0900: prazo de entrega ultrapassado (esperado para periodos retroativos)
+
+### Proxima sessao
+- Gerar 12 meses 2025 LM em lote
+- Testar Lucro Presumido cumulativo
+- EFD em lote (endpoint batch)

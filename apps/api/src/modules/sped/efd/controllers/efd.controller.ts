@@ -1,4 +1,5 @@
 // apps/api/src/modules/sped/efd/controllers/efd.controller.ts
+import JSZip = require('jszip');
 import { Controller, Get, Post, Param, Query, Res, Body, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '@/auth/guards/jwt.guard';
 import { CompanyGuard } from '@/multi-company/multi-company.guard';
@@ -72,5 +73,50 @@ export class EfdController {
       incidencia:  incidencia || 'NAO_CUMULATIVO',
       preview:     lines.slice(0, 50),  // primeiras 50 linhas
     };
+  }
+  @Get('export-lote')
+  async exportLote(
+    @Company() companyId: string,
+    @Query('ano') ano: string,
+    @Query('regime') regime: string,
+    @Query('incidencia') incidencia: string,
+    @Res() res: any,
+  ) {
+    const year = parseInt(ano || String(new Date().getFullYear()));
+    const company = await this.exporter['prisma'].company.findUnique({
+      where: { id: companyId }, select: { taxId: true },
+    });
+    const cnpjRaiz = (company?.taxId || '').replace(/\D/g,'').slice(0,8);
+    const reg = regime     || 'LUCRO_REAL';
+    const inc = incidencia || 'NAO_CUMULATIVO';
+    const MESES = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+
+    const zip = new JSZip();
+    const resultados: { mes: string; linhas: number; status: string }[] = [];
+
+    for (let m = 1; m <= 12; m++) {
+      const periodStart = new Date(Date.UTC(year, m - 1, 1));
+      const periodEnd   = new Date(Date.UTC(year, m, 0));
+      try {
+        const buf = await this.exporter.export({ companyId, periodStart, periodEnd, regime: reg, incidencia: inc });
+        const filename = `EFD_${MESES[m-1]}${String(year).slice(-2)}_${cnpjRaiz}.txt`;
+        zip.file(filename, buf);
+        const linhas = buf.toString('latin1').split('\n').filter(Boolean).length;
+        resultados.push({ mes: `${String(m).padStart(2,'0')}/${year}`, linhas, status: 'OK' });
+      } catch (e: any) {
+        resultados.push({ mes: `${String(m).padStart(2,'0')}/${year}`, linhas: 0, status: `ERRO: ${e.message}` });
+      }
+    }
+
+    const zipBuf = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
+    const zipName = `EFD_${year}_${cnpjRaiz}.zip`;
+
+    res.set({
+      'Content-Type': 'application/zip',
+      'Content-Disposition': `attachment; filename="${zipName}"`,
+      'X-Efd-Resultados': JSON.stringify(resultados),
+      'Access-Control-Expose-Headers': 'X-Efd-Resultados',
+    });
+    res.send(zipBuf);
   }
 }
