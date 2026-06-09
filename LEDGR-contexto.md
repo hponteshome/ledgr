@@ -356,3 +356,43 @@ Tabela em: C:\Arquivos de Programas RFB\Programas SPED\EFD-Contribuicoes\recurso
 - Gerar 12 meses 2025 LM em lote
 - Testar Lucro Presumido cumulativo
 - EFD em lote (endpoint batch)
+## SESSAO 08/06/2026 — EFD LP + REGIME TRIBUTARIO
+
+### EFD-Contribuicoes — Correcoes leiaute v1.35
+- 0110: 5 campos, dinamico LR/LP (IND_REG_CUM apenas para LP)
+- 0140: 9 campos corretos
+- 0500: contas REVENUE analiticas da empresa (obrigatorio FG >= nov/2017 LR)
+- F100: 19 campos, IND_OPER=1, COD_PART vazio, CST=01, COD_CTA referenciado
+- M200/M600: 13 campos incl. VL_TOT_CRED_DESC_ANT
+- M205/M605: obrigatorios, COD_REC=691201(PIS) / 585601(COFINS) DCTF 6 digitos
+- M210/M610: ordem correta pai->filho, 16 campos FG >= 2019
+- Bloco 1: vazio sem processos judiciais
+- EFD LM (LR nao-cumulativo): 0 erros PVA 6.1.2
+
+### EFD Lote Anual
+- Endpoint GET /sped/efd-contribuicoes/export-lote?ano=2025
+- ZIP 12 meses, nome EFD_ano_regime_cnpjraiz.zip
+- Tabela status por competencia no frontend
+- LM 2025: 12/12 meses OK
+
+### Regime Tributario — company_tax_regimes
+- dtFin nullable (sem data fim = vigente)
+- Fechar regime anterior automaticamente ao criar novo (dtFin = dtIni_novo - 1 dia)
+- Reabrir regime anterior ao remover o mais recente
+- Validacao: dtIni >= openingDate da empresa
+- Frontend: pre-preenche dtIni com openingDate quando primeiro regime
+- Frontend: exibe 'Vigente' quando dtFin nulo
+- Prisma v7: filtro null em DateTime usa queryRaw SQL
+
+### Aprendizado critico Prisma v7
+- dtFin: null no where -> PrismaClientValidationError
+- dtFin: { equals: null } -> PrismaClientValidationError  
+- Solucao: this.prisma.queryRaw com SQL IS NULL
+- dtFin null no create/update: schema.prisma deve ter DateTime? (com ?)
+- npx prisma generate obrigatorio apos cada alteracao de schema
+
+### Proxima sessao
+- EFD LP: bloco M cumulativo (M200 campo 09, sem M210/M610, com M400/M410/M800/M810)
+- EFD: integrar regime da empresa automaticamente (sem parametro manual)
+- ECD: Bloco J (J100/J150 Balanco/DRE)
+- ECF: iniciar exportador

@@ -67,16 +67,37 @@ export class EfdExporterService {
 
   // ── Exportar ─────────────────────────────────────────────────────────
   async export(options: EfdExportOptions): Promise<Buffer> {
-    const {
-      companyId, periodStart, periodEnd,
-      regime     = 'LUCRO_REAL',
-      incidencia = 'NAO_CUMULATIVO',
-    } = options;
+    const { companyId, periodStart, periodEnd } = options;
 
     const company = await this.prisma.company.findUniqueOrThrow({
       where: { id: companyId },
       select: { taxId:true, legalName:true, state:true, city:true, codMun:true },
     });
+
+    // Buscar regime tributario vigente na data do periodo — se nao informado nos options
+    if (!options.regime || !options.incidencia) {
+      const regimeRows = await this.prisma.$queryRaw<any[]>`
+        SELECT forma_tributacao FROM company_tax_regimes
+        WHERE company_id = ${companyId}
+          AND dt_ini <= ${periodStart}
+          AND (dt_fin IS NULL OR dt_fin >= ${periodEnd})
+        ORDER BY dt_ini DESC
+        LIMIT 1
+      `;
+      this.logger.log(`Regime query: companyId=${companyId} periodStart=${periodStart.toISOString()} rows=${regimeRows.length} forma=${regimeRows[0]?.forma_tributacao}`);
+      if (regimeRows.length > 0) {
+        const forma = regimeRows[0].forma_tributacao;
+        // forma: '1'=LR '2'=LP '3'=Simples '8'=MEI
+        if (!options.regime) {
+          options.regime = forma === '1' ? 'LUCRO_REAL' : 'LUCRO_PRESUMIDO';
+        }
+        if (!options.incidencia) {
+          options.incidencia = forma === '1' ? 'NAO_CUMULATIVO' : 'CUMULATIVO';
+        }
+      }
+    }
+    const regime     = options.regime     ?? 'LUCRO_REAL';
+    const incidencia = options.incidencia ?? 'NAO_CUMULATIVO';
 
     const cnpj  = company.taxId.replace(/\D/g,'');
     const dtIni = this.fmtDate(periodStart);
@@ -99,9 +120,22 @@ export class EfdExporterService {
 
     const pisAliq    = incidencia === 'NAO_CUMULATIVO' ? 1.65 : 0.65;
     const cofinsAliq = incidencia === 'NAO_CUMULATIVO' ? 7.60 : 3.00;
-    const receitaBase   = Number(apuracao?.receitaBruta   ?? 0);
-    const pisDevido     = Number(apuracao?.pisDevido      ?? receitaBase * pisAliq    / 100);
-    const cofinsDevido  = Number(apuracao?.cofinsDevido   ?? receitaBase * cofinsAliq / 100);
+    // Buscar receita bruta do periodo diretamente dos lancamentos contabeis
+    const receitaRowsBase = await this.prisma.journalEntryItem.aggregate({
+      where: {
+        journalEntry: { companyId, date: { gte: periodStart, lte: periodEnd } },
+        account: { type: 'REVENUE' as any },
+      },
+      _sum: { value: true },
+    });
+    const receitaBaseApuracao = Number(apuracao?.receitaBruta ?? 0);
+    const receitaBaseJournal  = Math.abs(Number(receitaRowsBase._sum.value ?? 0));
+    const receitaBase   = receitaBaseApuracao > 0 ? receitaBaseApuracao : receitaBaseJournal;
+    const pisDevido     = Number(apuracao?.pisDevido     ?? receitaBase * pisAliq    / 100);
+    const cofinsDevido  = Number(apuracao?.cofinsDevido  ?? receitaBase * cofinsAliq / 100);
+    // Valores arredondados para 2 casas (evitar M205/M605 com valor 0,00)
+    const pisDevidoRnd    = Math.round(pisDevido    * 100) / 100;
+    const cofinsDevidoRnd = Math.round(cofinsDevido * 100) / 100;
     const creditosPis   = Number(apuracao?.creditosPis    ?? 0);
     const creditosCofins= Number(apuracao?.creditosCofins ?? 0);
 
@@ -160,7 +194,21 @@ export class EfdExporterService {
       const crcCont = accConfig.accountantCrc||'';
       const emailCont = accConfig.accountantEmail || accConfig.escritorioEmail || '';
       const foneCont  = accConfig.accountantPhone || accConfig.escritorioTelefone || '';
-      add(P+'0100'+P+this.norm(accConfig.accountantName||'')+P+cpfCont+P+cnpj+P+crcCont+P+(company.city||'')+P+P+emailCont+P+foneCont+P);
+      add(P+'0100'+P
+        +this.norm(accConfig.accountantName||'')+P  // 02 NOME
+        +cpfCont+P                                   // 03 CPF
+        +crcCont+P                                   // 04 CRC
+        +P                                           // 05 CNPJ escritorio (vazio)
+        +P                                           // 06 CEP (vazio)
+        +P                                           // 07 END (vazio)
+        +P                                           // 08 NUM (vazio)
+        +P                                           // 09 COMPL (vazio)
+        +P                                           // 10 BAIRRO (vazio)
+        +foneCont+P                                  // 11 FONE
+        +P                                           // 12 FAX (vazio)
+        +emailCont+P                                 // 13 EMAIL
+        +P                                           // 14 COD_MUN (vazio)
+      );
     }
     // 0110 — Regimes tributarios
     // COD_INC_TRIB: 1=LucroReal 2=LucroPresumido 3=Arbitrado
@@ -254,16 +302,16 @@ export class EfdExporterService {
       // IND_OPER=1: receita auferida tributada (CST 01, 02, 03 ou 05)
       // CST 01: operacao tributavel a aliquota basica nao-cumulativa
       add(P+'F100'+P
-        +'1'+P                                    // 02 IND_OPER: 1=Receita tributada
+        +'1'+P                                    // 02 IND_OPER: 1=Receita tributada (LR e LP)
         +P                                        // 03 COD_PART: vazio para receitas
         +P                                        // 04 COD_ITEM: vazio
         +dtFin+P                                  // 05 DT_OPER
         +this.fmtDec(val)+P                       // 06 VL_OPER
-        +'01'+P                                   // 07 CST_PIS: 01=tributavel nao-cum
+        +'01'+P                                   // 07 CST_PIS: 01=tributavel (LR e LP)
         +this.fmtDec(pisBc)+P                     // 08 VL_BC_PIS
         +pisAliq.toFixed(4).replace('.',',')+P    // 09 ALIQ_PIS (ex: 1,6500)
         +this.fmtDec(pisCr)+P                     // 10 VL_PIS
-        +'01'+P                                   // 11 CST_COFINS: 01=tributavel nao-cum
+        +'01'+P                                   // 11 CST_COFINS: 01=tributavel (LR e LP)
         +this.fmtDec(cofinsBc)+P                  // 12 VL_BC_COFINS
         +cofinsAliq.toFixed(4).replace('.',',')+P // 13 ALIQ_COFINS (ex: 7,6000)
         +this.fmtDec(cofinsCr)+P                  // 14 VL_COFINS
@@ -286,69 +334,95 @@ export class EfdExporterService {
     add(P+'M001'+P+'0'+P);
 
     if (incidencia === 'CUMULATIVO') {
-      // ── LP CUMULATIVO: M200 -> M205 -> M400 -> M410 / M600 -> M605 -> M800 -> M810 ──
-      // M200 — Consolidacao PIS cumulativo (campo 09=VL_TOT_CONT_CUM_PER)
+      // ── LP CUMULATIVO: M200 -> M210 -> M205 / M600 -> M610 -> M605 ──
+      // COD_CONT=51: contribuicao cumulativa a aliquota basica (CST=01, ALIQ=0,65%/3,00%)
+      // M200 — Consolidacao PIS
       add(P+'M200'+P
-        +'0,00'+P  // 02 VL_TOT_CONT_NC_PER (nao-cum=zero)
-        +'0,00'+P  // 03 VL_TOT_CRED_DESC
-        +'0,00'+P  // 04 VL_TOT_CRED_DESC_ANT
-        +'0,00'+P  // 05 VL_TOT_CONT_NC_DEV
-        +'0,00'+P  // 06 VL_RET_NC
-        +'0,00'+P  // 07 VL_OUT_DED_NC
-        +'0,00'+P  // 08 VL_CONT_NC_REC
-        +this.fmtDec(pisDevido)+P  // 09 VL_TOT_CONT_CUM_PER (cumulativo aqui!)
-        +'0,00'+P  // 10 VL_RET_CUM
-        +'0,00'+P  // 11 VL_OUT_DED_CUM
-        +this.fmtDec(pisDevido)+P  // 12 VL_CONT_CUM_REC
-        +this.fmtDec(pisDevido)+P  // 13 VL_TOT_CONT_REC
+        +'0,00'+P                        // 02 VL_TOT_CONT_NC_PER
+        +'0,00'+P                        // 03 VL_TOT_CRED_DESC
+        +'0,00'+P                        // 04 VL_TOT_CRED_DESC_ANT
+        +'0,00'+P                        // 05 VL_TOT_CONT_NC_DEV
+        +'0,00'+P                        // 06 VL_RET_NC
+        +'0,00'+P                        // 07 VL_OUT_DED_NC
+        +'0,00'+P                        // 08 VL_CONT_NC_REC
+        +this.fmtDec(pisDevidoRnd)+P        // 09 VL_TOT_CONT_CUM_PER
+        +'0,00'+P                        // 10 VL_RET_CUM
+        +'0,00'+P                        // 11 VL_OUT_DED_CUM
+        +this.fmtDec(pisDevidoRnd)+P        // 12 VL_CONT_CUM_REC
+        +this.fmtDec(pisDevidoRnd)+P        // 13 VL_TOT_CONT_REC
       );
-      // M205 — Detalhamento PIS cumulativo (campo 12 do M200)
-      if (pisDevido > 0) {
+      // M205 — nivel 3 do M200, antes do M210 (so quando pisDevido arredondado > 0)
+      if (pisDevidoRnd > 0) {
         add(P+'M205'+P
-          +'12'+P       // NUM_CAMPO: campo 12 do M200 (cumulativo)
-          +'810902'+P   // COD_REC: PIS faturamento cumulativo
-          +this.fmtDec(pisDevido)+P
+          +'12'+P                        // 02 NUM_CAMPO: 12=VL_CONT_CUM_REC do M200
+          +'810902'+P                    // 03 COD_REC: PIS cumulativo DCTF
+          +this.fmtDec(pisDevidoRnd)+P      // 04 VL_DEBITO
         );
       }
-      // M400 — Receitas PIS cumulativo (isentas/tributadas)
-      add(P+'M400'+P);
-      add(P+'M410'+P
-        +'99'+P                      // NAT_REC: outras receitas
-        +this.fmtDec(receitaBase)+P  // VL_REC
-        +P                           // COD_CTA
-        +P                           // DESC_COMPL
+      // M210 pos-2019: 16 campos — nivel 3 do M200
+      // REG|COD_CONT|VL_REC_BRT|VL_BC_CONT|VL_AJUS_ACRES_BC|VL_AJUS_REDUC_BC|VL_BC_CONT_AJUS|ALIQ_PIS|QUANT_BC|ALIQ_QUANT|VL_CONT_APUR|VL_AJUS_ACRES|VL_AJUS_REDUC|VL_CONT_DIFER|VL_CONT_DIFER_ANT|VL_CONT_PER
+      add(P+'M210'+P
+        +'51'+P                          // 02 COD_CONT: 51=cumulativo aliquota basica
+        +this.fmtDec(receitaBase)+P      // 03 VL_REC_BRT
+        +this.fmtDec(receitaBase)+P      // 04 VL_BC_CONT (antes ajustes)
+        +'0,00'+P                        // 05 VL_AJUS_ACRES_BC_PIS (sem ajuste)
+        +'0,00'+P                        // 06 VL_AJUS_REDUC_BC_PIS (sem ajuste)
+        +this.fmtDec(receitaBase)+P      // 07 VL_BC_CONT_AJUS = campo04+05-06
+        +'0,6500'+P                      // 08 ALIQ_PIS (0,65%)
+        +P                               // 09 QUANT_BC_PIS (vazio para aliquota percentual)
+        +P                               // 10 ALIQ_PIS_QUANT (vazio para aliquota percentual)
+        +this.fmtDec(pisDevidoRnd)+P        // 11 VL_CONT_APUR
+        +'0,00'+P                        // 12 VL_AJUS_ACRES
+        +'0,00'+P                        // 13 VL_AJUS_REDUC
+        +'0,00'+P                        // 14 VL_CONT_DIFER
+        +'0,00'+P                        // 15 VL_CONT_DIFER_ANT
+        +this.fmtDec(pisDevidoRnd)+P        // 16 VL_CONT_PER
       );
-      // M600 — Consolidacao COFINS cumulativo
+      // M205 ja gerado antes do M210
+      // M600 — Consolidacao COFINS
       add(P+'M600'+P
-        +'0,00'+P
-        +'0,00'+P
-        +'0,00'+P
-        +'0,00'+P
-        +'0,00'+P
-        +'0,00'+P
-        +'0,00'+P
-        +this.fmtDec(cofinsDevido)+P  // 09 VL_TOT_CONT_CUM_PER
-        +'0,00'+P
-        +'0,00'+P
-        +this.fmtDec(cofinsDevido)+P  // 12 VL_CONT_CUM_REC
-        +this.fmtDec(cofinsDevido)+P  // 13 VL_TOT_CONT_REC
+        +'0,00'+P                        // 02 VL_TOT_CONT_NC_PER
+        +'0,00'+P                        // 03 VL_TOT_CRED_DESC
+        +'0,00'+P                        // 04 VL_TOT_CRED_DESC_ANT
+        +'0,00'+P                        // 05 VL_TOT_CONT_NC_DEV
+        +'0,00'+P                        // 06 VL_RET_NC
+        +'0,00'+P                        // 07 VL_OUT_DED_NC
+        +'0,00'+P                        // 08 VL_CONT_NC_REC
+        +this.fmtDec(cofinsDevidoRnd)+P     // 09 VL_TOT_CONT_CUM_PER
+        +'0,00'+P                        // 10 VL_RET_CUM
+        +'0,00'+P                        // 11 VL_OUT_DED_CUM
+        +this.fmtDec(cofinsDevidoRnd)+P     // 12 VL_CONT_CUM_REC
+        +this.fmtDec(cofinsDevidoRnd)+P     // 13 VL_TOT_CONT_REC
       );
-      // M605 — Detalhamento COFINS cumulativo
-      if (cofinsDevido > 0) {
+      // M605 — nivel 3 do M600, antes do M610 (so quando cofinsDevido arredondado > 0)
+      if (cofinsDevidoRnd > 0) {
         add(P+'M605'+P
-          +'12'+P
-          +'217201'+P   // COD_REC: COFINS faturamento cumulativo
-          +this.fmtDec(cofinsDevido)+P
+          +'12'+P                        // 02 NUM_CAMPO: 12=VL_CONT_CUM_REC do M600
+          +'217201'+P                    // 03 COD_REC: COFINS cumulativa DCTF
+          +this.fmtDec(cofinsDevidoRnd)+P   // 04 VL_DEBITO
         );
       }
-      // M800 — Receitas COFINS cumulativo
-      add(P+'M800'+P);
-      add(P+'M810'+P
-        +'99'+P
-        +this.fmtDec(receitaBase)+P
-        +P
-        +P
+      // M610 pos-2019: 16 campos — nivel 3 do M600
+      // REG|COD_CONT|VL_REC_BRT|VL_BC_CONT|VL_AJUS_ACRES_BC|VL_AJUS_REDUC_BC|VL_BC_CONT_AJUS|ALIQ_COFINS|QUANT_BC|ALIQ_QUANT|VL_CONT_APUR|VL_AJUS_ACRES|VL_AJUS_REDUC|VL_CONT_DIFER|VL_CONT_DIFER_ANT|VL_CONT_PER
+      add(P+'M610'+P
+        +'51'+P                          // 02 COD_CONT: 51=cumulativo aliquota basica
+        +this.fmtDec(receitaBase)+P      // 03 VL_REC_BRT
+        +this.fmtDec(receitaBase)+P      // 04 VL_BC_CONT (antes ajustes)
+        +'0,00'+P                        // 05 VL_AJUS_ACRES_BC_COFINS (sem ajuste)
+        +'0,00'+P                        // 06 VL_AJUS_REDUC_BC_COFINS (sem ajuste)
+        +this.fmtDec(receitaBase)+P      // 07 VL_BC_CONT_AJUS = campo04+05-06
+        +'3,0000'+P                      // 08 ALIQ_COFINS (3,00%)
+        +P                               // 09 QUANT_BC_COFINS (vazio)
+        +P                               // 10 ALIQ_COFINS_QUANT (vazio)
+        +this.fmtDec(cofinsDevidoRnd)+P     // 11 VL_CONT_APUR
+        +'0,00'+P                        // 12 VL_AJUS_ACRES
+        +'0,00'+P                        // 13 VL_AJUS_REDUC
+        +'0,00'+P                        // 14 VL_CONT_DIFER
+        +'0,00'+P                        // 15 VL_CONT_DIFER_ANT
+        +this.fmtDec(cofinsDevidoRnd)+P     // 16 VL_CONT_PER
       );
+      // M605 ja gerado antes do M610
+      // M400/M800 omitidos: apenas para receitas isentas/nao tributadas (CST 04/06/07/08/09)
     } else {
     // ── LR NAO-CUMULATIVO: M200 -> M210 -> M600 -> M610 ─────────────────────
 
