@@ -176,7 +176,7 @@ export class EcdController {
       throw new BadRequestException('Informe periodStart e periodEnd (YYYY-MM-DD).');
     }
 
-    const content = await this.exporter.export({
+    const result = await this.exporter.export({
       companyId,
       periodStart: new Date(periodStart),
       periodEnd:   new Date(periodEnd),
@@ -196,7 +196,11 @@ export class EcdController {
 
     res.setHeader('Content-Type', 'text/plain; charset=iso-8859-1');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    res.end(content);
+    if (result.warnings?.length) {
+      res.setHeader('X-Ecd-Warnings', JSON.stringify(result.warnings));
+      res.setHeader('Access-Control-Expose-Headers', 'X-Ecd-Warnings');
+    }
+    res.end(result.buffer);
   }
 
   // ── GET /sped/ecd/imports — histórico de importações ─────────

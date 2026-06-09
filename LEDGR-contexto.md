@@ -396,3 +396,27 @@ Tabela em: C:\Arquivos de Programas RFB\Programas SPED\EFD-Contribuicoes\recurso
 - EFD: integrar regime da empresa automaticamente (sem parametro manual)
 - ECD: Bloco J (J100/J150 Balanco/DRE)
 - ECF: iniciar exportador
+## SESSAO 09/06/2026 — EFD LP + REGIME AUTOMATICO
+
+### EFD-Contribuicoes LP (Lucro Presumido Cumulativo) — 0 erros PVA 6.1.2
+- Regime automatico via queryRaw: busca company_tax_regimes por periodo
+- 0110: COD_INC_TRIB=2, IND_REG_CUM=9 para LP
+- F100: CST=01 para LP e LR (tributavel aliquota basica)
+- M200/M600: 13 campos, campo09=VL_TOT_CONT_CUM_PER
+- M205/M605: nivel 3 do M200/M600, antes do M210/M610, so quando valor > 0
+- M210/M610: leiaute pos-2019 com 16 campos (3 novos: VL_AJUS_ACRES_BC, VL_AJUS_REDUC_BC, VL_BC_CONT_AJUS)
+- M400/M800: omitidos para LP com CST=01 (so para receitas isentas CST 04/06/07/08/09)
+- pisDevidoRnd/cofinsDevidoRnd: valores arredondados para evitar M205/M605 com 0,00
+- 0100: corrigido para 14 campos (faltavam CNPJ,CEP,END,NUM,COMPL,BAIRRO,FAX,COD_MUN)
+- Guia PDF renomeado para C:\\Temp\\Guia_EFD_Contrib_1.35.pdf para facilitar acesso
+
+### Aprendizados criticos
+- M210/M610 tem leiaute diferente pre/pos 2019: pos-2019 tem 16 campos
+- M205/M605 sao nivel 3 do M200/M600 (nao do M210/M610)
+- M205/M605 so gerar quando valor arredondado > 0
+- M400/M800 exigem CST_PIS/CST_COFINS — omitir quando nao ha receitas isentas
+- Prisma v7: dtFin DateTime? exige schema com ? e  para filtro IS NULL
+
+### Proxima sessao
+- ECD Bloco J (J100/J150 Balanco Patrimonial e DRE)
+- ECF exportador
