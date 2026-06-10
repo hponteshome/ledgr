@@ -38,6 +38,7 @@ import BalancesPage from '../pages/accounting/BalancesPage';
 import TrialBalanceView from '../pages/accounting/TrialBalanceView';
 import EcdValidationPage from '../pages/accounting/EcdValidationPage';
 import EcdPage from '../pages/sped/EcdPage';
+import EcdPreValidatePage from '../pages/sped/EcdPreValidatePage';
 import EcfPage from '../pages/sped/EcfPage';
 import EfdPage from '../pages/sped/EfdPage';
 import { EcdViewerPage } from '../pages/sped/EcdViewerPage';
@@ -136,6 +137,7 @@ export const AppRoutes = () => {
 
 
                 {/* SPED */}
+                <Route path="app/sped/ecd/pre-validate" element={<ProtectedRoute><EcdPreValidatePage /></ProtectedRoute>} />
                 <Route path="app/sped/ecd" element={<ProtectedRoute><EcdPage /></ProtectedRoute>} />
                 <Route path="app/sped/ecf" element={<ProtectedRoute><EcfPage /></ProtectedRoute>} />
                 <Route path="app/sped/efd" element={<ProtectedRoute><EfdPage /></ProtectedRoute>} />

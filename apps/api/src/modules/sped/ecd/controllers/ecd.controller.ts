@@ -151,10 +151,7 @@ export class EcdController {
   ) {
     const companyId = req.headers['x-company-id'];
     if (!periodStart || !periodEnd) throw new BadRequestException('Informe periodStart e periodEnd (YYYY-MM-DD).');
-    const results = await this.preValidator.validate(companyId, new Date(periodStart), new Date(periodEnd));
-    const errors   = results.filter(r => r.type === 'error');
-    const warnings = results.filter(r => r.type === 'warning');
-    return { canGenerate: errors.length === 0, errors, warnings };
+    return this.preValidator.validate(companyId, periodStart, periodEnd);
   }
 
   @Get('export')
