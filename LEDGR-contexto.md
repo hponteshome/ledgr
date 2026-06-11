@@ -420,3 +420,30 @@ Tabela em: C:\Arquivos de Programas RFB\Programas SPED\EFD-Contribuicoes\recurso
 ### Proxima sessao
 - ECD Bloco J (J100/J150 Balanco Patrimonial e DRE)
 - ECF exportador
+
+## SESSAO 09/06/2026 — ECD Bloco J + EFD LP
+
+### EFD-Contribuicoes LP (Lucro Presumido Cumulativo) — 0 erros PVA 6.1.2 ✅
+- Regime automatico via company_tax_regimes
+- M210/M610 leiaute pos-2019: 16 campos
+- M205/M605: nivel 3 do M200/M600, antes do M210/M610
+- pisDevidoRnd/cofinsDevidoRnd para evitar M205/M605 com 0,00
+- 0100 corrigido para 14 campos
+- Controller ECD: retorna { buffer, warnings } com X-Ecd-Warnings header
+
+### ECD Bloco J — WIP
+- DC correto: saldo = deb-cre, positivo=D, negativo=C (vale para ativo e passivo)
+- IND_GRP_BAL: sempre pelo primeiro digito do COD_AGL (1=A, 2=P)
+- Codigos no I052 nunca emitidos como T (movidos para D)
+- Orphan T removidos quando pai e D
+- PENDENTE: pre-validacao no frontend antes de gerar ECD
+  - Bloquear geracao se mapeamento de Visoes Contabeis incompleto
+  - Codigos com pai ausente no J100 = erro de mapeamento do usuario
+  - Avisos obrigatorios: contador, signatarios, regime tributario, NIRE
+
+### Aprendizados criticos ECD Bloco J
+- Codigo que consta no I052 = detalhe (D), nunca totalizador (T)
+- Totalizador (T) so valido se tiver filhos emitidos no J100
+- Pai de detalhe deve ser T — se pai nao existe no J100, erro de mapeamento
+- Desbalancamento BP = problema de dados/mapeamento, nao de codigo
+- Warnings devem ser expostos via header X-Ecd-Warnings na API

@@ -77,7 +77,7 @@ import { ObrigacoesPage } from '../pages/sistema/ObrigacoesPage';
 import { TabelasLegaisPage } from '../pages/sistema/TabelasLegaisPage';
 import ShareholdersPage from '../pages/corporate/shareholders/ShareholdersPage';
 import { RepositorioPage } from '../pages/documentos/RepositorioPage';
-import VisoesContabeisPage from '../pages/VisoesContabeisPage';
+import VisoesContabeisPage from '../pages/sped/VisoesContabeisPage';
 
 
 ///////////////////////////////////////

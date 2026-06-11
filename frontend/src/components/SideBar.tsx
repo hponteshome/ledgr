@@ -128,6 +128,7 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
       path: '/app/sped', icon: FiDatabase, label: 'SPED',
       children: [
         { path: '/app/sped/ecd', label: 'ECD — Escrituração Contábil', icon: FiDatabase },
+        { path: '/app/sped/ecd/pre-validate', label: 'ECD — Pré-Validação', icon: FiDatabase },
         { path: '/app/sped/ecd/History', label: 'ECD — Histórico de Importações', icon: FiDatabase },
         { path: '/app/sped/ecf', label: 'ECF — Escrituração Fiscal', icon: FiFileText },
         { path: '/app/sped/efd', label: 'EFD-Contribuições', icon: FiFileText },

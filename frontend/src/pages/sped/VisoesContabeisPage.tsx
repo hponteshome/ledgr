@@ -1,6 +1,6 @@
 // VisoesContabeisPage.tsx — frontend/src/pages/VisoesContabeisPage.tsx
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import api from '../services/api';
+import api from '../../services/api';
 import Swal from 'sweetalert2';
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
