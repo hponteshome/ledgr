@@ -35,7 +35,7 @@ export class EcdPreValidateService {
     const checks: PreValidateCheck[] = [];
     const ps = new Date(periodStart + "T00:00:00.000Z");
     const pe = new Date(periodEnd + "T23:59:59.999Z");
-    const year = ps.getUTCFullYear();
+    const year = parseInt(periodStart.substring(0, 4), 10);
 
     const company = await this.prisma.company.findUnique({ where: { id: companyId } });
 
@@ -257,7 +257,7 @@ export class EcdPreValidateService {
       }
     }
 
-    const validQualif = ["001", "203", "204", "205", "801", "900", "999"];
+    const validQualif = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"];
     const signers = await this.prisma.personCompany.findMany({
       where: { companyId, assinaEcd: true },
       include: { person: { select: { fullName: true, cpf: true } } },
@@ -271,7 +271,7 @@ export class EcdPreValidateService {
         action: "Acesse o cadastro da empresa > aba Contabil e configure os signatarios com Assina ECD = true.",
       });
     } else {
-      const hasAccountant = signers.some((s) => s.qualificacaoCvm === "900");
+      const hasAccountant = signers.some((s) => s.qualificacaoCvm === "10");
       if (!hasAccountant) {
         checks.push({
           id: "C11b", level: "ERROR",
