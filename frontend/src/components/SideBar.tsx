@@ -84,7 +84,7 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
         { path: '/app/accounting/investimentos/renda-fixa', label: 'Renda Fixa', icon: FiTrendingUp },
         { path: '/app/accounting/investimentos/simulador', label: 'Simulador CDB', icon: FiActivity },
         { path: '/app/accounting/balance-comparison', label: 'Comparativo de Saldos', icon: FiActivity },
-        { path: '/app/accounting/visoes-contabeis', label: 'Visões Contábeis (I052)', icon: FiCpu },
+
         {
           path: '/app/accounting/relatorios',
           label: 'Relatorios',
@@ -128,6 +128,7 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
       path: '/app/sped', icon: FiDatabase, label: 'SPED',
       children: [
         { path: '/app/sped/ecd', label: 'ECD — Escrituração Contábil', icon: FiDatabase },
+        { path: '/app/accounting/visoes-contabeis', label: 'Visões Contábeis (I052)', icon: FiCpu },
         { path: '/app/sped/ecd/pre-validate', label: 'ECD — Pré-Validação', icon: FiDatabase },
         { path: '/app/sped/ecd/History', label: 'ECD — Histórico de Importações', icon: FiDatabase },
         { path: '/app/sped/ecf', label: 'ECF — Escrituração Fiscal', icon: FiFileText },
