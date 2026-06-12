@@ -96,114 +96,94 @@ export class AccountingViewsService {
     );
     return this.prisma.$transaction(ops);
   }
+  async autoMatch(viewId: string, companyId: string, leiaute: number, anoBase: number) {
+    const view = await this.prisma.accountingView.findUnique({ where: { id: viewId } });
+    if (!view) throw new NotFoundException("Visao nao encontrada");
 
-        async autoMatch(viewId: string, companyId: string, leiaute: number, anoBase: number) {
-          const view = await this.prisma.accountingView.findUnique({ where: { id: viewId } });
-          if (!view) throw new NotFoundException("Visao nao encontrada");
-          const accounts = await this.prisma.chartOfAccounts.findMany({
-            where: { companyId, isAnalytic: true, deletedAt: null },
-            orderBy: { code: "asc" },
-          });
-          const rfbCodes = await this.prisma.rfbAglutinationCode.findMany({
-            where: { leiaute, anoBase, tipo: view.tipo },
-            orderBy: { ordem: "asc" },
-          });
+    const bpTypes = new Set(["ASSET", "LIABILITY", "EQUITY"]);
+    const dreTypes = new Set(["REVENUE", "EXPENSE"]);
+    const allowedTypes = view.tipo === "BP" ? bpTypes : dreTypes;
 
-          const norm = (s: string) => s.toLowerCase()
-            .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-            .replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
+    const accounts = await this.prisma.chartOfAccounts.findMany({
+      where: { companyId, isAnalytic: true, deletedAt: null },
+      orderBy: { code: "asc" },
+    });
 
-          const codigosComFilho = new Set(rfbCodes.filter(c => c.codigoPai).map(c => c.codigoPai as string));
-          const rfbLeaves = rfbCodes.filter(c => !codigosComFilho.has(c.codigo));
+    const rfbCodes = await this.prisma.rfbAglutinationCode.findMany({
+      where: { leiaute, anoBase, tipo: view.tipo },
+      orderBy: { ordem: "asc" },
+    });
 
-          // Mapa prefixo do codigo contabil -> codigo RFB (BP)
-          // Baseado nos 3-4 primeiros digitos do codigo da conta
-          const bpPrefixMap: Record<string, string> = {
-            "111": "1.01.01", // Disponivel -> Caixa e Equivalentes
-            "112": "1.01.01", // Caixa
-            "113": "1.01.02", // Aplicacoes Financeiras CP
-            "114": "1.01.02", // Aplicacoes Financeiras CP
-            "115": "1.01.03", // Contas a Receber
-            "116": "1.01.03", // Clientes
-            "117": "1.01.06", // Tributos a Recuperar
-            "118": "1.01.08", // Outros Ativos Circulantes
-            "119": "1.01.08", // Outros Ativos Circulantes
-            "121": "1.02.01", // Realizavel LP
-            "122": "1.02.02.01", // Participacoes Societarias
-            "123": "1.02.02.01", // Participacoes Societarias
-            "124": "1.02.02.01", // Participacoes Societarias
-            "125": "1.02.03.01", // Imobilizado em Operacao
-            "126": "1.02.03.01", // Imobilizado em Operacao
-            "127": "1.02.04.01", // Intangiveis
-            "221": "2.01.01", // Fornecedores CP
-            "222": "2.01.02", // Emprestimos CP
-            "223": "2.01.05", // Obrigacoes Fiscais CP
-            "224": "2.01.05", // Tributos CP
-            "225": "2.01.05", // Outras Obrigacoes CP
-            "226": "2.01.05", // Outras Obrigacoes CP
-            "231": "2.03.01", // Capital Social
-            "232": "2.03.06", // Reservas
-            "233": "2.03.07", // Lucros/Prejuizos Acumulados
-                "151": "1.02.03.01", // Imobilizado
-                "152": "1.02.03.01", // Imobilizado
-                "491": "2.03.07", // Resultado do Exercicio
-          };
+    const norm = (s: string) => s.toLowerCase()
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
 
-          const drePrefixMap: Record<string, string> = {
-            "311": "3.01.01.01.01.06", // Receita Prestacao Servicos
-            "312": "3.01.01.01.02.09", // Deducoes Impostos Servicos
-            "313": "3.01.01.03.01.03", // Custo dos Servicos
-            "321": "3.01.01.05.01.05", // Receitas Financeiras
-            "411": "3.01.01.07.01.02", // Despesas Pessoal
-            "412": "3.01.01.07.01.02", // Despesas Comerciais
-            "413": "3.01.01.07.01.16", // Despesas Administrativas
-            "421": "3.01.01.07.01.02", // Despesas Gerais
-            "422": "3.01.01.07.01.02", // Despesas Comerciais
-            "423": "3.01.01.09.01.08", // Despesas Financeiras
-            "431": "3.02.01.01.01.02", // IRPJ
-            "441": "3.02.01.01.01.01", // CSLL
-          "491": "3.11"
-          };
+    const codigosComFilho = new Set(rfbCodes.filter(c => c.codigoPai).map(c => c.codigoPai as string));
+    const rfbLeaves = rfbCodes.filter(c => !codigosComFilho.has(c.codigo));
 
-          const prefixMap = view.tipo === "BP" ? bpPrefixMap : drePrefixMap;
+    const bpPrefixMap: Record<string, string> = {
+      "111": "1.01.01.01.01", "112": "1.01.01.01.01",
+      "113": "1.01.01.02.01", "114": "1.01.01.02.01",
+      "115": "1.01.02.01.01", "116": "1.01.02.01.01",
+      "117": "1.01.07.01.01", "118": "1.01.07.01.01",
+      "119": "1.01.09.01.90",
+      "121": "1.02.01.01.01",
+      "122": "1.02.02.01.01", "123": "1.02.02.01.01", "124": "1.02.02.01.01",
+      "125": "1.02.03.01.01", "126": "1.02.03.01.01",
+      "127": "1.02.04.01.01",
+      "151": "1.02.03.01.01", "152": "1.02.03.01.01",
+      "221": "2.01.01.01.01",
+      "222": "2.01.02.01.01",
+      "223": "2.01.05.01.01", "224": "2.01.05.01.01",
+      "225": "2.01.09.01.90", "226": "2.01.09.01.90",
+      "231": "2.03.01.01.01",
+      "232": "2.03.02.01.99",
+      "233": "2.03.04.01.01",
+      "491": "2.03.04.01.01",
+    };
 
-          const suggestions: { accountId: string; aglutinationCode: string }[] = [];
+    const drePrefixMap: Record<string, string> = {
+      "311": "3.01.01.01.01.06",
+      "312": "3.01.01.01.02.09",
+      "313": "3.01.01.03.01.03",
+      "321": "3.01.01.05.01.05", "322": "3.01.01.05.01.05", "323": "3.01.01.05.01.05",
+      "411": "3.01.01.07.01.02", "412": "3.01.01.07.01.02",
+      "413": "3.01.01.07.01.16",
+      "421": "3.01.01.07.01.16", "422": "3.01.01.07.01.02",
+      "423": "3.01.01.09.01.08",
+      "431": "3.02.01.01.01.02",
+      "432": "3.02.01.01.01.01",
+    };
 
-          const bpTypes = new Set(["ASSET","LIABILITY","EQUITY"]);
-          const dreTypes = new Set(["REVENUE","EXPENSE"]);
-          const allowedTypes = view.tipo === "BP" ? bpTypes : dreTypes;
-          for (const acc of accounts) {
-            if (!allowedTypes.has(acc.type)) continue;
-            const code = acc.code;
-            const prefix3 = code.replace(/\D/g, "").substring(0, 3);
-            const prefix4 = code.replace(/\D/g, "").substring(0, 4);
+    const prefixMap = view.tipo === "BP" ? bpPrefixMap : drePrefixMap;
+    const suggestions: { accountId: string; aglutinationCode: string }[] = [];
 
-            // 1. Prefixo do codigo contabil (prioritario)
-            let bestCode = "";
-            const fromPrefix = prefixMap[prefix4] ?? prefixMap[prefix3];
-            if (fromPrefix && rfbCodes.some(c => c.codigo === fromPrefix)) {
-              bestCode = fromPrefix;
-            }
-
-            // 2. Fallback: match semantico por nome (apenas se prefixo nao encontrado)
-            if (!bestCode) {
-              const accWords = norm(acc.name).split(" ").filter(w => w.length > 3);
-              let bestScore = -1;
-              for (const rfb of rfbLeaves) {
-                const rfbWords = norm(rfb.descricao).split(" ").filter(w => w.length > 3);
-                const exact = accWords.filter(w => rfbWords.includes(w)).length;
-                const partial = rfbWords.some(w => accWords.some(a => a.includes(w) || w.includes(a))) ? 0.5 : 0;
-                const score = exact + partial;
-                if (score > bestScore) { bestScore = score; bestCode = rfb.codigo; }
-              }
-              if (bestScore < 1) bestCode = "";
-            }
-
-            if (bestCode) suggestions.push({ accountId: acc.id, aglutinationCode: bestCode });
-          }
-
-          return { suggestions, total: suggestions.length };
+    for (const acc of accounts) {
+      if (!allowedTypes.has(acc.type)) continue;
+      const digits = acc.code.replace(/\D/g, "");
+      const prefix3 = digits.substring(0, 3);
+      const prefix4 = digits.substring(0, 4);
+      let bestCode = "";
+      const fromPrefix = prefixMap[prefix4] ?? prefixMap[prefix3];
+      if (fromPrefix && rfbLeaves.some(c => c.codigo === fromPrefix)) {
+        bestCode = fromPrefix;
+      }
+      if (!bestCode) {
+        const accWords = norm(acc.name).split(" ").filter(w => w.length > 3);
+        let bestScore = -1;
+        for (const rfb of rfbLeaves) {
+          const rfbWords = norm(rfb.descricao).split(" ").filter(w => w.length > 3);
+          const exact = accWords.filter(w => rfbWords.includes(w)).length;
+          const partial = rfbWords.some(w => accWords.some(a => a.includes(w) || w.includes(a))) ? 0.5 : 0;
+          const score = exact + partial;
+          if (score > bestScore) { bestScore = score; bestCode = rfb.codigo; }
         }
+        if (bestScore < 1) bestCode = "";
+      }
+      if (bestCode) suggestions.push({ accountId: acc.id, aglutinationCode: bestCode });
+    }
+    return { suggestions, total: suggestions.length };
+  }
 
         async findMappingsGrouped(viewId: string) {
           const view = await this.prisma.accountingView.findUnique({ where: { id: viewId } });
