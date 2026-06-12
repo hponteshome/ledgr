@@ -447,3 +447,36 @@ Tabela em: C:\Arquivos de Programas RFB\Programas SPED\EFD-Contribuicoes\recurso
 - Pai de detalhe deve ser T — se pai nao existe no J100, erro de mapeamento
 - Desbalancamento BP = problema de dados/mapeamento, nao de codigo
 - Warnings devem ser expostos via header X-Ecd-Warnings na API
+
+---
+## Sessão 11/06/2026 — ECD Pré-Validação + Vínculos Societários
+
+### ECD Pré-Validação (ENTREGUE)
+- `ecd-pre-validate.service.ts` — 13 checks (C1-C13, W1-W2, I1-I3)
+- `EcdPreValidatePage.tsx` — UI com cards expansíveis por nível (ERROR/WARNING/INFO)
+- Endpoint: `GET /sped/ecd/pre-validate?periodStart=&periodEnd=`
+- Sidebar: SPED → ECD — Pré-Validação
+- LM 2024 testado: de 5 erros críticos para 1 residual (mapeamento contábil)
+- `VisoesContabeisPage.tsx` movida para `/pages/sped/`
+
+### Vínculos PersonCompany (ENTREGUE)
+- `QsaVinculoGrid`: botão "Vincular" verifica CPF antes de abrir cadastro
+- Auto-vínculo ao retornar de cadastro via `?vinculado=CPF` na URL
+- `ContabilTab.handleSave`: cria PersonCompany do contador automaticamente ao salvar
+- PJ sócia: exibe "PJ — ver rep. legal" sem botão vincular (correto para SPED)
+
+### PRÓXIMA FEATURE — CompanyShareholder (registrado)
+Modelo dedicado para QSA societário completo (PF e PJ sócias):
+- Nova tabela `company_shareholders` com `shareholderType: PF|PJ`
+- `personId?` para PF, `shareholderCompanyId?` para PJ
+- Campos: qualificacao, dataEntrada, dataRetirada, participacaoPercent, assinaEcd, assinaEcf
+- Migrar QsaVinculoGrid e syncQsaLinks para novo model
+- PersonCompany fica exclusivo para vínculos funcionais (contador, rep. legal, auditor)
+- Base para organograma societário do grupo (feature futura)
+
+### Fixes ECD mapeamentos LM 2024 (via SQL — replicar pelo frontend)
+- Removidos 11 mapeamentos BP com grupo RFB invertido
+- Removidos 24 mapeamentos REVENUE/EXPENSE na visão BP
+- 8 códigos totalizadores atualizados para nível folha
+- Visão DRE 2024 criada (16 mapeamentos automáticos)
+- PersonCompany criado para Jose Rozinei (205) e Helenilto/contador (10)

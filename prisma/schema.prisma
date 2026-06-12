@@ -166,6 +166,8 @@ model Company {
   documents              Document[]
   documentTemplates      DocumentTemplate[]
   personLinks            PersonCompany[]
+  shareholders           CompanyShareholder[] @relation("CompanyShareholders")
+  shareholderOf          CompanyShareholder[] @relation("ShareholderCompany")
   certificates           Certificate[]
   accountBalances        AccountBalance[]
   chartOfAccounts        ChartOfAccounts[]
@@ -364,6 +366,7 @@ model Person {
 
   // ── Relations ─────────────────────────────────────────────
   companyLinks        PersonCompany[]
+  shareholderLinks    CompanyShareholder[]
   proLaboreConfigs    ProLaboreConfig[]
   user                User?
   apEntries           ApEntry[]
@@ -378,6 +381,33 @@ model Person {
 }
 
 /// Vinculo de pessoas fisicas a empresas (socios, procuradores, representantes).
+
+model CompanyShareholder {
+  id                   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId            String    @map("company_id") @db.Uuid
+  shareholderType      String    @map("shareholder_type") @db.VarChar(2)
+  personId             String?   @map("person_id") @db.Uuid
+  shareholderCompanyId String?   @map("shareholder_company_id") @db.Uuid
+  qualificacao         String?   @map("qualificacao") @db.VarChar(100)
+  dataEntrada          DateTime? @map("data_entrada") @db.Date
+  dataRetirada         DateTime? @map("data_retirada") @db.Date
+  participacaoPercent  Decimal?  @map("participacao_percent") @db.Decimal(8, 4)
+  assinaEcd            Boolean   @default(false) @map("assina_ecd")
+  assinaEcf            Boolean   @default(false) @map("assina_ecf")
+  notes                String?   @map("notes") @db.VarChar(500)
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt            DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  company             Company  @relation("CompanyShareholders", fields: [companyId], references: [id], onDelete: Cascade)
+  person              Person?  @relation(fields: [personId], references: [id], onDelete: SetNull)
+  shareholderCompany  Company? @relation("ShareholderCompany", fields: [shareholderCompanyId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([personId])
+  @@index([shareholderCompanyId])
+  @@map("company_shareholders")
+}
+
 model PersonCompany {
   id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   personId  String    @map("person_id") @db.Uuid

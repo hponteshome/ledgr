@@ -7,12 +7,14 @@ import { CompanyTaxRegimeController } from './company-tax-regime.controller';
 import { CompanyTaxRegimeService } from './company-tax-regime.service';
 import { CompanyHistoryService } from './company-history.service';
 import { AuditModule } from '../audit/audit.module';
+import { ShareholderController } from './shareholder.controller';
+import { ShareholderService } from './shareholder.service';
 import { PrismaModule } from '../../prisma/prisma.module';
 
 @Module({
   imports: [PrismaModule, AuditModule, HttpModule],
-  controllers: [CompanyController, CompanyHistoryController, CompanyTaxRegimeController],
-  providers: [CompanyService, CompanyHistoryService, CompanyTaxRegimeService],
-  exports: [CompanyService, CompanyHistoryService, CompanyTaxRegimeService],
+  controllers: [CompanyController, CompanyHistoryController, CompanyTaxRegimeController, ShareholderController],
+  providers: [CompanyService, CompanyHistoryService, CompanyTaxRegimeService, ShareholderService],
+  exports: [CompanyService, CompanyHistoryService, CompanyTaxRegimeService, ShareholderService],
 })
 export class CompaniesModule {}

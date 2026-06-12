@@ -257,40 +257,34 @@ export class EcdPreValidateService {
       }
     }
 
-    const validQualif = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"];
-    const signers = await this.prisma.personCompany.findMany({
-      where: { companyId, assinaEcd: true },
+    // Signatarios ECD — lidos de CompanyShareholder (PF com assinaEcd=true)
+    const shareholders = await this.prisma.companyShareholder.findMany({
+      where: { companyId, assinaEcd: true, shareholderType: "PF" },
       include: { person: { select: { fullName: true, cpf: true } } },
     });
 
-    if (signers.length === 0) {
+    // Tambem verifica PersonCompany para contador (role='contador')
+    const contadorLink = await this.prisma.personCompany.findFirst({
+      where: { companyId, assinaEcd: true, role: "contador" },
+      include: { person: { select: { fullName: true, cpf: true } } },
+    });
+
+    const totalSigners = shareholders.length + (contadorLink ? 1 : 0);
+
+    if (totalSigners === 0) {
       checks.push({
         id: "C11", level: "ERROR",
         title: "Nenhum signatario ECD configurado",
         description: "O J930 requer ao menos um representante legal e um contador marcados como assinantes do ECD.",
         action: "Acesse o cadastro da empresa > aba Contabil e configure os signatarios com Assina ECD = true.",
       });
-    } else {
-      const hasAccountant = signers.some((s) => s.qualificacaoCvm === "10");
-      if (!hasAccountant) {
-        checks.push({
-          id: "C11b", level: "ERROR",
-          title: "Nenhum signatario com qualificacao de Contador (900)",
-          description: "O J930 exige pelo menos um assinante com COD_QUALIF=900 (Contador/Contabilista).",
-          action: "Marque o contador como Assina ECD com qualificacao 900 no cadastro da empresa.",
-        });
-      }
-      const invalidQualif = signers.filter((s) => s.qualificacaoCvm && !validQualif.includes(s.qualificacaoCvm));
-      if (invalidQualif.length > 0) {
-        checks.push({
-          id: "C12", level: "ERROR",
-          title: invalidQualif.length + " signatario(s) com qualificacao invalida",
-          description: "Qualificacoes validas: " + validQualif.join(", ") + ". Codigos 005, 010, 016 nao existem no PGE.",
-          count: invalidQualif.length,
-          details: invalidQualif.map((s) => ({ name: s.person?.fullName, qualificacaoCvm: s.qualificacaoCvm })),
-          action: "Corrija as qualificacoes dos signatarios no cadastro da empresa.",
-        });
-      }
+    } else if (!contadorLink) {
+      checks.push({
+        id: "C11b", level: "ERROR",
+        title: "Nenhum contador (role=contador) configurado como signatario ECD",
+        description: "O J930 exige pelo menos um assinante com qualificacao de Contador (COD_QUALIF=900).",
+        action: "Na aba Contabil da empresa, salve o Contador Responsavel — o vinculo e criado automaticamente.",
+      });
     }
 
     const entryCount = await this.prisma.journalEntry.count({
