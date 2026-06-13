@@ -7,7 +7,7 @@
 //   5. Query journalEntries no backend agora filtra sourceModule: ECD_IMPORT (fix no controller)
 
 import React, { useState, useRef, useEffect } from 'react';
-import { EcdPreValidateModal } from './EcdPreValidateModal';
+import { useSearchParams } from 'react-router-dom';
 import {
     FiUpload, FiDownload, FiCheckCircle, FiAlertCircle,
     FiClock, FiFile, FiTrash2, FiEye, FiAlertTriangle,
@@ -170,7 +170,8 @@ function ProgressBar({ p }: { p: Progress }) {
 // ── Componente Principal ──────────────────────────────────────
 
 const EcdPage: React.FC = () => {
-    const [tab, setTab] = useState<'import' | 'export' | 'history'>('import');
+    const [searchParams] = useSearchParams();
+    const [tab, setTab] = useState<'import' | 'export' | 'history'>(searchParams.get('periodStart') ? 'export' : 'import');
 
     const [file, setFile] = useState<File | null>(null);
     const [validating, setValidating] = useState(false);
@@ -182,10 +183,10 @@ const EcdPage: React.FC = () => {
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const [exportPeriodStart, setExportPeriodStart] = useState(
-        new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0]
+        searchParams.get('periodStart') ?? new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0]
     );
     const [exportPeriodEnd, setExportPeriodEnd] = useState(
-        new Date(new Date().getFullYear(), 11, 31).toISOString().split('T')[0]
+        searchParams.get('periodEnd') ?? new Date(new Date().getFullYear(), 11, 31).toISOString().split('T')[0]
     );
     const [exportBookType, setExportBookType] = useState('G');
     const [exportBookNumber, setExportBookNumber] = useState('1');
@@ -754,11 +755,17 @@ const EcdPage: React.FC = () => {
                                 <option value="TR">TR — Transformação</option>
                             </select>
                         </div>
-                        <div>
-                            <label className="text-xs text-gray-500 block mb-1">Cód. Plano Referencial RFB</label>
-                            <input value={exportCodPlanRef} onChange={e => setExportCodPlanRef(e.target.value)} placeholder="Ex: 60959347"
-                                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                        </div>
+                            <div>
+                                <label className="text-xs text-gray-500 block mb-1">Cód. Plano Referencial RFB</label>
+                                <input value={exportCodPlanRef} onChange={e => setExportCodPlanRef(e.target.value)} placeholder="Ex: 60959347"
+                                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                {exportCodPlanRef && (
+                                    <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                                        <span>⚠️</span>
+                                        <span>Preencher apenas se o plano referencial L100A/L300A estiver completamente mapeado nas Visões Contábeis. Caso contrário o PVA exigirá I051 para todas as contas analíticas e gerará erros em massa.</span>
+                                    </p>
+                                )}
+                            </div>
                         {exportTipEcd === '1' && (
                         <div className="col-span-2">
                             <label className="text-xs text-gray-500 block mb-1">Hash ECD Anterior (obrigatório para retificadora)</label>
@@ -776,10 +783,10 @@ const EcdPage: React.FC = () => {
                     <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-xs text-yellow-700">
                         ⚠️ O arquivo gerado é um rascunho. Valide no <strong>PGE do Sped Contábil</strong> antes de transmitir.
                     </div>
-                    <button onClick={handlePreValidate} disabled={preValidating || exporting}
+                    <button onClick={handleExport} disabled={exporting}
                         className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2 text-sm font-medium">
                         <FiDownload size={16} />
-                        {preValidating ? 'Validando...' : 'Validar e Gerar ECD'}
+                        {exporting ? 'Gerando...' : 'Validar e Gerar ECD'}
                     </button>
                 </div>
             )}
@@ -844,7 +851,7 @@ const EcdPage: React.FC = () => {
                     )}
                 </div>
             )}
-            {showPreValidate && <EcdPreValidateModal result={preValidateResult} onClose={() => setShowPreValidate(false)} onGenerate={handleExport} exporting={exporting} />}
+
         </div>
     );
 };

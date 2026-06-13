@@ -22,7 +22,7 @@ export class EcdExporterService {
   private readonly logger = new Logger(EcdExporterService.name);
   constructor(private prisma: PrismaService) {}
 
-  async export(options: EcdExportOptions): Promise<{ buffer: Buffer; warnings: string[] }> {
+  async export(options: EcdExportOptions): Promise<Buffer> {
     const {
       companyId, periodStart, periodEnd,
       bookNumber = String(periodStart.getUTCFullYear()).slice(-2), bookNature = "Livro Diario Geral",
@@ -137,7 +137,6 @@ export class EcdExporterService {
 
     const months = this.monthRange(periodStart, periodEnd);
     const lines: string[] = [];
-    const warnings: string[] = [];
     const add = (l: string) => lines.push(l);
 
     // ── BLOCO 0 ──────────────────────────────────────────────────────────
@@ -364,67 +363,23 @@ export class EcdExporterService {
       }
     }
     // 4. Emitir na ordem RFB: totalizadores primeiro (por ordem), depois detalhes
-    // Nao emitir totalizador quando o mesmo codigo ja existe como detalhe (evita duplicata)
     const j100Lines: string[] = [];
     // Totalizadores ordenados por ordem RFB
-    // Regra ECD: codigo que consta no I052 NUNCA pode ser T no J100
-    const codigosI052 = new Set<string>([...i052Map.values()]);
-    // Mover para D os codigos que estao no I052
-    for (const [aglCode, t] of [...j100Tot.entries()]) {
-      if (codigosI052.has(aglCode)) {
-        if (!j100Det.has(aglCode)) {
-          const rfbRow = rfbBPMap.get(aglCode);
-          j100Det.set(aglCode, { ini: t.ini, fin: t.fin, nome: rfbRow?.descricao ?? aglCode, indCta: aglCode.startsWith('1') ? 'A' : 'P' });
-        }
-        j100Tot.delete(aglCode);
-      }
-    }
-    // Remover totalizadores cujo pai nao e mais T (seria filho de D, invalido)
-    // Iterar ate estabilizar
-    let removido = true;
-    while (removido) {
-      removido = false;
-      for (const [aglCode] of [...j100Tot.entries()]) {
-        const rfbRow = rfbBPMap.get(aglCode);
-        const paiInfer = aglCode.includes('.') ? aglCode.substring(0, aglCode.lastIndexOf('.')) : '';
-        const pai = rfbRow?.codigoPai ?? paiInfer;
-        // Se o pai existe mas nao e T (foi movido para D ou nao existe no J100) -> remover este T
-        if (pai && !j100Tot.has(pai) && (j100Det.has(pai) || !rfbBPMap.has(pai))) {
-          j100Tot.delete(aglCode);
-          removido = true;
-        }
-      }
-    }
     const totOrdered = rfbBP.filter(r => j100Tot.has(r.codigo));
     for (const r of totOrdered) {
       const t = j100Tot.get(r.codigo)!;
-      const indGrp = r.codigo.startsWith('1') ? 'A' : 'P';
-      // saldo = deb-cre: positivo=D(devedor), negativo=C(credor) — vale para ativo e passivo
       const dcIni = t.ini >= 0 ? "D" : "C";
       const dcFin = t.fin >= 0 ? "D" : "C";
-      j100Lines.push(P+"J100"+P+r.codigo+P+"T"+P+r.nivel+P+(r.codigoPai||"")+P+indGrp+P+r.descricao.substring(0,60)+P+this.fmtDec(Math.abs(t.ini))+P+dcIni+P+this.fmtDec(Math.abs(t.fin))+P+dcFin+P+P);
+      j100Lines.push(P+"J100"+P+r.codigo+P+"T"+P+r.nivel+P+(r.codigoPai||"")+P+t.indCta+P+r.descricao.substring(0,60)+P+this.fmtDec(Math.abs(t.ini))+P+dcIni+P+this.fmtDec(Math.abs(t.fin))+P+dcFin+P+P);
     }
     // Detalhes
     for (const [aglCode, det] of j100Det) {
       const rfbRow = rfbBPMap.get(aglCode);
       const nivel  = rfbRow?.nivel ?? 5;
-      const paiInferido = aglCode.includes('.') ? aglCode.substring(0, aglCode.lastIndexOf('.')) : '';
-      const pai    = rfbRow?.codigoPai ?? paiInferido;
-      // IND_GRP_BAL sempre pelo primeiro digito do COD_AGL
-      const indGrp = aglCode.startsWith('1') ? 'A' : 'P';
-      // saldo = deb-cre: positivo=D(devedor), negativo=C(credor)
+      const pai    = rfbRow?.codigoPai ?? "";
       const dcIni  = det.ini >= 0 ? "D" : "C";
       const dcFin  = det.fin >= 0 ? "D" : "C";
-      j100Lines.push(P+"J100"+P+aglCode+P+"D"+P+nivel+P+pai+P+indGrp+P+det.nome.substring(0,60)+P+this.fmtDec(Math.abs(det.ini))+P+dcIni+P+this.fmtDec(Math.abs(det.fin))+P+dcFin+P+P);
-    }
-    // Aviso de desbalancamento BP — comparar totalizadores raiz
-    const raizAtivo   = j100Tot.get('1');
-    const raizPassivo = j100Tot.get('2');
-    const totalAtivo   = Math.abs(raizAtivo?.fin   ?? 0);
-    const totalPassivo = Math.abs(raizPassivo?.fin  ?? 0);
-    const diffBP = Math.abs(totalAtivo - totalPassivo);
-    if (diffBP > 0.05) {
-      warnings.push(`Balanço Patrimonial desbalanceado: Ativo=${totalAtivo.toFixed(2)} Passivo/PL=${totalPassivo.toFixed(2)} Diferença=${diffBP.toFixed(2)}`);
+      j100Lines.push(P+"J100"+P+aglCode+P+"D"+P+nivel+P+pai+P+det.indCta+P+det.nome.substring(0,60)+P+this.fmtDec(Math.abs(det.ini))+P+dcIni+P+this.fmtDec(Math.abs(det.fin))+P+dcFin+P+P);
     }
     for (const l of j100Lines) add(l);
 
@@ -527,7 +482,7 @@ export class EcdExporterService {
 
     this.logger.log("ECD: " + lines.length + " linhas | " + accounts.length + " contas | " + entries.length + " lancamentos");
     const content = lines.join("\n") + "\n";
-    return { buffer: Buffer.from(content, "latin1"), warnings };
+    return Buffer.from(content, "latin1");
   }
 
   private monthRange(start: Date, end: Date) {
