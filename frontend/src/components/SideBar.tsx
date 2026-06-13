@@ -215,7 +215,7 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
 
   // Filtrar itens do menu pelas permissoes do usuario
   const filteredMenu = useMemo(() => {
-    if (permLoading) return [];
+    if (permLoading) return menuItems; // mostrar tudo enquanto carrega
     return menuItems
       .map(item => {
         if (!item.children) {
@@ -313,7 +313,7 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
         </div>
 
         <nav className="flex-1 py-4 px-3 overflow-y-auto custom-scrollbar">
-          {filteredMenu.map((item) => {
+          {menuItems.map((item) => {
             const active = location.pathname.startsWith(item.path);
             const isExp = expanded.includes(item.path);
 

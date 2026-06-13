@@ -15,8 +15,10 @@ export class SidebarPermissionsController {
   @Get('resolve')
   @SkipCompanyCheck()
   resolve(@Req() req: any) {
-    const userId = req.user?.id;
+    // req.user pode ter id diretamente ou via sub (JWT payload)
+    const userId = req.user?.id ?? req.user?.sub ?? '';
     const companyId = req.headers['x-company-id'] ?? '';
+    if (!userId) return [];
     return this.svc.resolvePermissions(userId, companyId);
   }
 

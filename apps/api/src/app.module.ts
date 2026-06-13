@@ -60,6 +60,7 @@ import { SidebarPermissionsModule } from './modules/sidebar-permissions/sidebar-
     BankImportModule,
     CorporateModule,
     SignaturesModule,
+        SidebarPermissionsModule,
     
   ],
   providers: [

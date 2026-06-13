@@ -12,10 +12,16 @@ export function useSidebarPermissions() {
   const [allowed, setAllowed] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Master Admin: permissoes resolvidas localmente sem chamar API
+  const isMasterAdmin = (user as any)?.permissions?.all === true;
+
   useEffect(() => {
     if (!user) { setAllowed([]); setLoading(false); return; }
 
-    const key = `${user.id}-${activeCompany?.id ?? ''}`;
+    // Master Admin ve tudo — retornar wildcard imediatamente
+    if (isMasterAdmin) { setAllowed(['*']); setLoading(false); return; }
+
+    const key = `${(user as any).id}-${activeCompany?.id ?? ''}`;
     if (cache && cacheKey === key) { setAllowed(cache); setLoading(false); return; }
 
     setLoading(true);
@@ -29,13 +35,12 @@ export function useSidebarPermissions() {
       })
       .catch(() => setAllowed([]))
       .finally(() => setLoading(false));
-  }, [user?.id, activeCompany?.id]);
+  }, [(user as any)?.id, activeCompany?.id, isMasterAdmin]);
 
-  // Invalidar cache (chamar apos salvar permissoes)
   function invalidate() { cache = null; cacheKey = ''; }
 
   function canView(path: string): boolean {
-    // Master admin ja vem com tudo no resolve
+    if (allowed.includes('*')) return true; // Master Admin
     return allowed.includes(path);
   }
 
