@@ -38,7 +38,7 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
   const navigate = useNavigate();
   const { activeCompany } = useCompany();
   const cid = activeCompany?.id ?? '';
-  const { canView, loading: permLoading } = useSidebarPermissions();
+  const { canView, allowed, loading: permLoading } = useSidebarPermissions();
 
   const [showImportModal, setShowImportModal] = useState(false);
   const [expanded, setExpanded] = useState<string[]>([]);
@@ -215,7 +215,8 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
 
   // Filtrar itens do menu pelas permissoes do usuario
   const filteredMenu = useMemo(() => {
-    if (permLoading) return menuItems; // mostrar tudo enquanto carrega
+    // Mostrar tudo se: ainda carregando, sem permissoes resolvidas, ou lista vazia
+    if (permLoading || allowed.length === 0) return menuItems;
     return menuItems
       .map(item => {
         if (!item.children) {

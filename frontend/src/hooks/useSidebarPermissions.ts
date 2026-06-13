@@ -10,7 +10,7 @@ export function useSidebarPermissions() {
   const { user } = useAuth();
   const { activeCompany } = useCompany();
   const [allowed, setAllowed] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   // Master Admin: permissoes resolvidas localmente sem chamar API
   const isMasterAdmin = (user as any)?.permissions?.all === true;
