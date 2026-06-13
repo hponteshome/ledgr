@@ -271,39 +271,29 @@ export class EcdExporterService {
       }
     }
 
-        // I350/I355 — saldos de contas de resultado antes do encerramento
-        const dreTypes = new Set(["REVENUE","EXPENSE"]);
-        // Fallback: se dreMap vazio (dados via ECD import), usar saldoFinalMap
-        // I350 apenas se ha lancamentos de encerramento reais
-        const hasEncerramento = entries.some(e =>
-          e.description?.toLowerCase().includes("encerr") ||
-          e.description?.toLowerCase().includes("zeramento")
-        );
-        const dreAccounts = (hasEncerramento ? accounts : []).filter(a => {
-          if (!a.isAnalytic || !dreTypes.has(a.type.toString())) return false;
-          const mv = dreMap.get(a.id);
-          return mv ? (mv.cre - mv.deb) !== 0 : false;
-        });
-        if (dreAccounts.length > 0) {
-          add(P+"I350"+P+dtFin+P);
-          for (const acc of dreAccounts) {
-            const mv = dreMap.get(acc.id);
-            let saldo: number;
-            if (mv) {
-              saldo = mv.cre - mv.deb;
-            } else {
-              // fallback: saldo via account_balance (ECD import)
-              const bal = saldoFinalMap.get(acc.id) ?? 0;
-              // account_balance: positivo=devedor, negativo=credor
-              // I355 saldo = liquido (cre - deb); inverter sinal
-              saldo = -bal;
+            // I350/I355 — saldos de contas de resultado antes do encerramento
+            // I350 obrigatorio sempre (PGE exige DT_RES = DT_EX_SOCIAL do I030)
+            const dreTypes = new Set(["REVENUE","EXPENSE"]);
+            const dreAccounts = accounts.filter(a => {
+              if (!a.isAnalytic || !dreTypes.has(a.type.toString())) return false;
+              const mv = dreMap.get(a.id);
+              return mv ? (mv.cre - mv.deb) !== 0 : false;
+            });
+            add(P+"I350"+P+dtFin+P);
+            for (const acc of dreAccounts) {
+              const mv = dreMap.get(acc.id);
+              let saldo: number;
+              if (mv) {
+                saldo = mv.cre - mv.deb;
+              } else {
+                const bal = saldoFinalMap.get(acc.id) ?? 0;
+                saldo = -bal;
+              }
+              if (saldo === 0) continue;
+              const dc = saldo >= 0 ? "C" : "D";
+              const reducedCode = acc.code;
+              add(P+"I355"+P+reducedCode+P+P+this.fmtDec(Math.abs(saldo))+P+dc+P);
             }
-            if (saldo === 0) continue;
-            const dc = saldo >= 0 ? "C" : "D";
-            const reducedCode = acc.code;
-            add(P+"I355"+P+reducedCode+P+P+this.fmtDec(Math.abs(saldo))+P+dc+P);
-          }
-        }
 
     const idxI001   = lines.findIndex(l => l === P+"I001"+P+"0"+P);
     const blocoIQtd = lines.length - idxI001;
