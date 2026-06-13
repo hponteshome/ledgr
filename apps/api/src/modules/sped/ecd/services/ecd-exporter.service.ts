@@ -22,7 +22,7 @@ export class EcdExporterService {
   private readonly logger = new Logger(EcdExporterService.name);
   constructor(private prisma: PrismaService) {}
 
-  async export(options: EcdExportOptions): Promise<Buffer> {
+  async export(options: EcdExportOptions): Promise<{ buffer: Buffer; warnings: string[] }> {
     const {
       companyId, periodStart, periodEnd,
       bookNumber = String(periodStart.getUTCFullYear()).slice(-2), bookNature = "Livro Diario Geral",
@@ -482,7 +482,8 @@ export class EcdExporterService {
 
     this.logger.log("ECD: " + lines.length + " linhas | " + accounts.length + " contas | " + entries.length + " lancamentos");
     const content = lines.join("\n") + "\n";
-    return Buffer.from(content, "latin1");
+    const warnings: string[] = [];
+    return { buffer: Buffer.from(content, "latin1"), warnings };
   }
 
   private monthRange(start: Date, end: Date) {
