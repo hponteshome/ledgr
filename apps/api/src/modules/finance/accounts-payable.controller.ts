@@ -12,7 +12,7 @@ import { FilterAPDto } from './dto/filter-ap.dto';  // 🔴 CORRIGIDO
 import { PayAPDto } from './dto/pay-ap.dto';
 import { BatchPayAPDto } from './dto/batch-pay-ap.dto';  // 🔴 NOVO
 
-@Controller('accounts-payable')
+@Controller('finance/accounts-payable')
 @UseGuards(JwtAuthGuard, CompanyGuard)
 export class AccountsPayableController {
   constructor(private readonly service: AccountsPayableService) {}
