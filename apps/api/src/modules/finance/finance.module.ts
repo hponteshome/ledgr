@@ -19,11 +19,13 @@ import { CashflowController } from './cashflow.controller';
 import { CashflowService } from './cashflow.service';
 import { PettyCashController } from './petty-cash.controller';
 import { PettyCashService } from './petty-cash.service';
+import { AccountsPayableController } from './accounts-payable.controller';
+import { AccountsPayableService } from './accounts-payable.service';
 
 @Module({
   imports: [PrismaModule],
-  controllers: [FinanceController, ProvisaoController, FechamentoController, ObrigacoesController, AccountsReceivableController, CashflowController, PettyCashController],
-  providers: [FinanceService, IntegrationService, AgendaService, ProvisaoService, FechamentoService, ObrigacoesService, AccountsReceivableService, CashflowService, PettyCashService],
+  controllers: [FinanceController, ProvisaoController, FechamentoController, ObrigacoesController, AccountsReceivableController, CashflowController, PettyCashController, AccountsPayableController],
+  providers: [FinanceService, IntegrationService, AgendaService, ProvisaoService, FechamentoService, ObrigacoesService, AccountsReceivableService, CashflowService, PettyCashService, AccountsPayableService],
   exports: [FinanceService, AgendaService, IntegrationService, ProvisaoService, FechamentoService, ObrigacoesService, AccountsReceivableService],
 })
 export class FinanceModule {}
