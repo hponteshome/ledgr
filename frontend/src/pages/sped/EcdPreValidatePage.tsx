@@ -235,7 +235,7 @@ export default function EcdPreValidatePage() {
           {!result.hasErrors && (
             <div className="mt-6 flex justify-end">
               <button
-                onClick={() => navigate("/app/sped/ecd")}
+                onClick={() => navigate(`/app/sped/ecd?periodStart=${periodStart}&periodEnd=${periodEnd}`)}
                 className="flex items-center gap-2 bg-green-600 text-white text-sm font-medium rounded-lg px-5 py-2.5 hover:bg-green-700 transition-colors"
               >
                 <FiCheckCircle size={15} />
