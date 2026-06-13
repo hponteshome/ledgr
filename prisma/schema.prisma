@@ -72,6 +72,7 @@ model User {
   fiscalObligationsDone FiscalObligation[] @relation("ObrigacaoDoneBy")
   companyHistories      CompanyHistory[]    @relation("CompanyHistoryChangedBy")
   maskConfigs       CompanyMaskConfig[]       @relation("MaskConfigCreator")
+  sidebarPermissions UserSidebarPermission[]
 
   @@map("users")
 }
@@ -88,6 +89,7 @@ model Profile {
   deletedAt   DateTime? @map("deleted_at") @db.Timestamp(6)
 
   users User[]
+  sidebarPermissions ProfileSidebarPermission[]
 
   @@map("profiles")
 }
@@ -3789,7 +3791,53 @@ model LalurItem {
 }
 // =============================================================================
 // 16 · EFD-CONTRIBUICOES (PIS/COFINS)
+
 // =============================================================================
+// SIDEBAR PERMISSIONS — Controle granular de acesso ao menu
+// =============================================================================
+
+/// Catalogo de itens do sidebar (populado via seed/admin)
+model SidebarItem {
+  id     String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  path   String @unique @db.VarChar(120)
+  label  String @db.VarChar(100)
+  module String @db.VarChar(50)
+  ordem  Int    @default(0)
+
+  profilePermissions ProfileSidebarPermission[]
+  userPermissions    UserSidebarPermission[]
+
+  @@map("sidebar_items")
+}
+
+/// Permissao base por perfil
+model ProfileSidebarPermission {
+  profileId String @map("profile_id") @db.Uuid
+  itemId    String @map("item_id") @db.Uuid
+  canView   Boolean @default(true) @map("can_view")
+
+  profile Profile     @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  item    SidebarItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@id([profileId, itemId])
+  @@map("profile_sidebar_permissions")
+}
+
+/// Override individual por usuario (pode bloquear ou liberar alem do perfil)
+model UserSidebarPermission {
+  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String  @map("user_id") @db.Uuid
+  itemId    String  @map("item_id") @db.Uuid
+  companyId String? @map("company_id") @db.Uuid
+  canView   Boolean @default(true) @map("can_view")
+
+  user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  item    SidebarItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, itemId, companyId])
+  @@map("user_sidebar_permissions")
+}
+
 
 /// Cabecalho da EFD-Contribuicoes por empresa/periodo
 model EfdContribuicoes {

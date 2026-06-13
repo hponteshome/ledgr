@@ -12,6 +12,7 @@ import { useAuth } from '../contexts/AuthContext';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
 import { ImportBalancesModal } from './accounting/ImportBalancesModal';
+import { useSidebarPermissions } from '../hooks/useSidebarPermissions';
 
 const MySwal = withReactContent(Swal);
 
@@ -37,6 +38,7 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
   const navigate = useNavigate();
   const { activeCompany } = useCompany();
   const cid = activeCompany?.id ?? '';
+  const { canView, loading: permLoading } = useSidebarPermissions();
 
   const [showImportModal, setShowImportModal] = useState(false);
   const [expanded, setExpanded] = useState<string[]>([]);
@@ -122,6 +124,7 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
         { path: '/app/sistema/tabelas', label: 'Tabelas Legais', icon: FiBook },
         { path: '/app/system/backup', label: 'Backup e Restauração', icon: FiDatabase },
         { path: '/app/settings/data-management', label: 'Manutenção de Dados', icon: FiSettings },
+        { path: '/app/sistema/sidebar-permissions', label: 'Permissões de Sidebar', icon: FiLock },
       ],
     },
     {
@@ -210,6 +213,30 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
     { path: '/app/signatures/validate', icon: FiShield, label: 'Validação de Assinatura' },
   ], [cid]);
 
+  // Filtrar itens do menu pelas permissoes do usuario
+  const filteredMenu = useMemo(() => {
+    if (permLoading) return [];
+    return menuItems
+      .map(item => {
+        if (!item.children) {
+          return canView(item.path) ? item : null;
+        }
+        const filteredChildren = item.children
+          .map(child => {
+            if (!child.children) {
+              return canView(child.path) ? child : null;
+            }
+            const filteredGc = child.children.filter(gc => canView(gc.path));
+            if (filteredGc.length === 0 && !canView(child.path)) return null;
+            return { ...child, children: filteredGc };
+          })
+          .filter(Boolean) as typeof item.children;
+        if (filteredChildren.length === 0 && !canView(item.path)) return null;
+        return { ...item, children: filteredChildren };
+      })
+      .filter(Boolean) as typeof menuItems;
+  }, [menuItems, canView, permLoading]);
+
   // Auto-expansão com suporte a 2 níveis
   useEffect(() => {
     {
@@ -286,7 +313,7 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
         </div>
 
         <nav className="flex-1 py-4 px-3 overflow-y-auto custom-scrollbar">
-          {menuItems.map((item) => {
+          {filteredMenu.map((item) => {
             const active = location.pathname.startsWith(item.path);
             const isExp = expanded.includes(item.path);
 
