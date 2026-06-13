@@ -1,6 +1,6 @@
 # LEDGR — Base de Conhecimento ECD (Escrituração Contábil Digital)
 
-> Documento gerado em 31/05/2026 a partir de múltiplas sessões de desenvolvimento e validação.
+> Documento atualizado em 13/06/2026 a partir de múltiplas sessões de desenvolvimento e validação.
 > Base para geração de ECD, ECF e outros regimes SPED.
 
 ---
@@ -36,7 +36,7 @@ Bloco 9  → Encerramento, hashes
 | I030 | Termo de abertura | `DT_EX_SOCIAL` = data de encerramento do exercício — obrigatório quando há Bloco J com DT_FIN no período |
 | I050 | Plano de contas | `COD_CTA` = código real da conta (nunca o reduced_code) |
 | I051 | Referencial RFB | Obrigatório para TODAS as analíticas quando `COD_PLAN_REF` informado no 0000 |
-| I052 | Código de aglutinação | Mapeia conta analítica → código RFB do Bloco J |
+| I052 | Código de aglutinação | Mapeia conta analítica → código de aglutinação do Bloco J |
 | I075 | Histórico padronizado | Mínimo: `|I075|1|Livre|` |
 | I150 | Identificação do período | Cabeçalho para cada mês |
 | I155 | Saldos periódicos | Saldo inicial, movimentação D/C, saldo final por conta analítica |
@@ -108,11 +108,11 @@ if (!reducedCode) continue;
 
 ### 2.3 I350/I355 gerado sem lançamento de encerramento real
 
-**Erro PGE:** "Contas de resultado devem ter saldo zero nos meses de encerramento"
+**Erro PGE:** "Contas de resultado devem ter saldo zero nos meses de encerramento" / "Saldo da conta antes do encerramento não corresponde ao total dos lançamentos de encerramento"
 
-**Causa:** O exporter gerava I350/I355 baseado em saldo nas contas de resultado, mesmo sem lançamento de encerramento no banco.
+**Causa:** Emitir I350 sem lançamentos de zeramento correspondentes. O PGE valida que se I350 existe, as contas de resultado nos I155 do mês devem ter saldo zero — o que só é verdade se houver lançamentos reais de encerramento.
 
-**Regra:** I350 só deve ser gerado quando há lançamentos de encerramento reais (partidas zerando as contas de resultado contra Resultado do Exercício).
+**Regra DEFINITIVA:** I350 só deve ser gerado quando há lançamentos de encerramento reais (partidas zerando as contas de resultado contra Resultado do Exercício). Emitir I350 incondicional gera MAIS erros, não menos.
 
 ```typescript
 const hasEncerramento = entries.some(e =>
@@ -124,7 +124,13 @@ const dreAccounts = (hasEncerramento ? accounts : []).filter(a => {
   const mv = dreMap.get(a.id);
   return mv ? (mv.cre - mv.deb) !== 0 : false;
 });
+if (dreAccounts.length > 0) {
+  add(P+"I350"+P+dtFin+P);
+  // ... I355 por conta
+}
 ```
+
+**⚠️ ATENÇÃO:** Os 2 erros de I350 que persistem (I030 com DT_EX_SOCIAL sem I350 correspondente) são **problema de dados do contador** — a empresa não lançou o encerramento. NÃO resolver no código.
 
 ---
 
@@ -207,294 +213,232 @@ AND r1.leiaute = 9 AND r1.ano_base = 2025 AND r1.tipo = 'BP';
 - `A` = Ativo (códigos RFB começando com `1.`)
 - `P` = Passivo + PL (códigos RFB começando com `2.`)
 
-O `indCta` deve ser determinado pelo **prefixo do COD_AGL**, não pelo tipo da conta:
+**SEMPRE** derivar `IND_GRP_BAL` do primeiro dígito do `COD_AGL`, nunca do tipo da conta:
+
 ```typescript
-const indCta = aglCode.startsWith("1") ? "A" : "P";
+const indGrp = aglCode.startsWith("1") ? "A" : "P";
 ```
 
 ---
 
-### 2.9 J150 — Linhas duplicadas por COD_AGL
+### 2.9 J100 — COD_AGL_SUP vazio nos registros D
 
-**Erro PGE:** "Registro duplicado em relação à chave COD_AGL"
+**Erro PGE:** "Não existe nenhum registro na demonstração com código de aglutinação igual ao código de aglutinação superior sendo validado" / "Somente código de aglutinação de linha totalizadora pode ser código de aglutinação superior" / "Campo obrigatório não preenchido"
 
-**Causa:** O exporter gerava uma linha J150 por conta analítica. O J150 deve ter **uma linha por COD_AGL**, com o saldo agregado de todas as contas mapeadas para aquele código.
+**Causa raiz:** Os `aglutination_code` do `accounting_view_mappings` são códigos do plano L100A (ex: `2.01.01.03`, `2.01.01.07.02`) que **não existem** na tabela `rfb_aglutination_codes` (que contém apenas os códigos de aglutinação curtos como `2.01`). O exporter busca `rfbRow?.codigoPai` e recebe `undefined`, deixando `COD_AGL_SUP` vazio.
 
-**Solução — agregar antes de emitir:**
+**Natureza do erro:** **DADOS DO CONTADOR** — os mapeamentos nas Visões Contábeis precisam usar códigos de aglutinação (ex: `2.01`) e não códigos do plano referencial (ex: `2.01.01.03`). NÃO corrigir no código.
+
+**Distinção fundamental:**
+| Campo | Registro | Fonte | Formato |
+|---|---|---|---|
+| COD_CTA_REF | I051 | Plano referencial L100A/L300A | `1.01.01.02.01` (5 níveis, termina em `.01`) |
+| COD_AGL | I052/J100/J150 | Tabela aglutinação curta | `1.01.08` (3-4 níveis) |
+
+**A tabela `rfb_aglutination_codes` contém APENAS os códigos de aglutinação (I052/J100).** O plano referencial L100A/L300A (732 BP + 213 DRE códigos) NÃO está importado — e deve ser uma tabela separada quando implementado.
+
+---
+
+### 2.10 COD_PLAN_REF no 0000 — Armadilha crítica
+
+**Erro PGE:** "O registro I051 é obrigatório quando existe código do plano de contas referencial informado no registro 0000 (COD_PLAN_REF)" — gerado para TODAS as contas analíticas (centenas de erros)
+
+**Regra ABSOLUTA:** `COD_PLAN_REF` no registro 0000 **só deve ser preenchido** quando:
+1. O plano referencial L100A/L300A está importado na base
+2. TODAS as contas analíticas têm I051 com COD_CTA_REF válido desse plano
+
+**Estado atual do LEDGR:** O plano referencial L100A/L300A **NÃO está importado**. Portanto `COD_PLAN_REF` deve ficar **vazio** no 0000.
+
+**Proteção no backend** (`ecd-exporter.service.ts`):
 ```typescript
-const j150Agg = new Map<string, { val: number; nome: string }>();
-for (const acc of accounts) {
-  const aglCode = i052Map.get(acc.id);
-  if (!aglCode) continue;
-  const mv = dreRollup.get(acc.id) ?? { deb: 0, cre: 0 };
-  const vlOri = mv.deb - mv.cre; // mesmo sentido do I155
-  const cur = j150Agg.get(aglCode) ?? { val: 0, nome: rfbDREMap.get(aglCode)?.descricao ?? acc.name };
-  j150Agg.set(aglCode, { val: cur.val + vlOri, nome: cur.nome });
+// COD_PLAN_REF apenas quando ha mapeamento referencial (i051Map preenchido)
+const codPlanRefFinal = (codPlanRef && i051Map.size > 0) ? codPlanRef : "";
+add(P+"0000"+P+"LECD"+P+...+P+codPlanRefFinal+P+...);
+```
+
+**Proteção no frontend** (`EcdPage.tsx`): Aviso laranja exibido quando o campo é preenchido, alertando que só deve ser usado com mapeamento L100A completo.
+
+**⚠️ NUNCA** preencher `COD_PLAN_REF = 60959347` sem ter o plano referencial mapeado. Isso gera 200+ erros em massa.
+
+---
+
+### 2.11 i051Map — Não copiar i052Map
+
+**Erro anterior:** `const i051Map = new Map<string, string>(i052Map)` — copiava os códigos de aglutinação como se fossem referenciais RFB, gerando I051 com `1.01.08` (aglutinação) em vez de `1.01.01.01.01` (referencial real).
+
+**Regra:** `i051Map` deve ser populado via JOIN entre `AccountingViewMapping.aglutinationCode` e `RfbAglutinationCode` do plano L100A/L300A — que **ainda não está implementado**. Por ora, `i051Map` fica vazio e I051 não é emitido (correto quando COD_PLAN_REF também está vazio).
+
+---
+
+### 2.12 Nome do arquivo gerado
+
+**Formato correto:** `ECD_ANO_CNPJRAIZ.txt` — ex: `ECD_2024_17970759.txt`
+
+**Implementação:** O nome é gerado no **backend** (`ecd.controller.ts`) a partir do CNPJ da empresa buscado do banco — não hardcoded no frontend.
+
+```typescript
+// ecd.controller.ts
+const companyForName = await this.prisma.company.findUnique({
+  where: { id: companyId }, select: { taxId: true }
+});
+const cnpj = companyForName?.taxId?.replace(/\D/g, '') || 'ECD';
+const year = new Date(periodEnd).getFullYear();
+const raiz = cnpj.substring(0, 8);
+const filename = `ECD_${year}_${raiz}.txt`;
+res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+```
+
+**CORS obrigatório:** O header `Content-Disposition` deve estar em `exposedHeaders` no `main.ts`:
+```typescript
+app.enableCors({ exposedHeaders: ['Content-Disposition', 'X-Ecd-Warnings'] });
+```
+
+**Frontend** lê o nome do header da resposta:
+```typescript
+const cd = r.headers['content-disposition'] || '';
+const fnMatch = cd.match(/filename="([^"]+)"/);
+a.download = fnMatch ? fnMatch[1] : `ECD_${year}.txt`;
+```
+
+**⚠️ PROTEGER:** O Chrome renomeia automaticamente para `ECD_2024_17970759 (1).txt` quando já existe arquivo com mesmo nome — isso é comportamento do browser, não bug do LEDGR.
+
+---
+
+### 2.13 Tipo de retorno do exporter
+
+**Assinatura correta** (`ecd-exporter.service.ts`):
+```typescript
+async export(options: EcdExportOptions): Promise<{ buffer: Buffer; warnings: string[] }> {
+  // ...
+  const warnings: string[] = [];
+  return { buffer: Buffer.from(content, "latin1"), warnings };
 }
-// Depois emitir uma linha por entrada do Map
 ```
+
+**⚠️ NUNCA** usar `Promise<Buffer>` — o controller espera `{ buffer, warnings }`.
 
 ---
 
-### 2.10 J150 — IND_DC incorreto para receitas
+## 3. ARQUITETURA DO EXPORTER
 
-**Erro PGE:** "O valor do saldo informado na linha de detalhe da DRE é diferente do resultado calculado"
+### 3.1 Mapas principais
 
-**Causa:** O campo `IND_COD_AGL` do J150 só aceita `D` (detalhe) ou `T` (totalizador) — nunca `C`. O IND_DC dos campos de valor deve refletir o saldo contábil real:
-- EXPENSE (saldo devedor) → `IND_DC = D`, valor positivo
-- REVENUE (saldo credor) → `IND_DC = C`, valor positivo
-- Deduções de receita (saldo devedor em conta de receita) → `IND_DC = D`, valor positivo
+| Mapa | Chave | Valor | Uso |
+|---|---|---|---|
+| `i052Map` | accountId (UUID) | aglutinationCode | I052, J100/J150 |
+| `i051Map` | accountId (UUID) | COD_CTA_REF L100A | I051 (vazio até L100A importado) |
+| `rfbBPMap` | codigo aglutinação | RfbAglutinationCode | J100 totalizadores |
+| `rfbDREMap` | codigo aglutinação | RfbAglutinationCode | J150 |
+| `j100Det` | codigo aglutinação | {ini, fin, nome, indCta} | Detalhes J100 (tipo D) |
+| `j100Tot` | codigo aglutinação | {ini, fin, nome, nivel, pai} | Totalizadores J100 (tipo T) |
+
+### 3.2 Regra D/T no J100
+
+- Códigos presentes no `i052Map` (contas mapeadas) → sempre tipo **D** (detalhe)
+- Códigos ancestrais calculados → tipo **T** (totalizador)
+- **NUNCA** emitir como T um código que consta no I052
 
 ```typescript
-const dcVal = vlSigned >= 0 ? "D" : "C";
-j150Lines.push(
-  P+"J150"+P+indEncerr+P+dreCode+P+"D"+P+"2"+P+TITULO_DRE+P+
-  nome+P+fmtDec(Math.abs(vlSigned))+P+dcVal+P+
-  fmtDec(Math.abs(vlSigned))+P+dcVal+P+"D"+P+P
-);
+const codigosI052 = new Set<string>([...i052Map.values()]);
+for (const [aglCode, t] of [...j100Tot.entries()]) {
+  if (codigosI052.has(aglCode)) {
+    // Mover para D
+    j100Det.set(aglCode, { ... });
+    j100Tot.delete(aglCode);
+  }
+}
+```
+
+### 3.3 IND_GRP_BAL
+
+Sempre derivado do **primeiro dígito do COD_AGL**:
+```typescript
+const indGrp = r.codigo.startsWith("1") ? "A" : "P";
+```
+
+### 3.4 DC dos saldos
+
+```typescript
+// saldo = deb - cre (positivo = devedor = D, negativo = credor = C)
+const dcIni = saldoIniVal >= 0 ? "D" : "C";
+const dcFin = saldoFin >= 0 ? "D" : "C";
 ```
 
 ---
 
-### 2.11 J900 — NR_LIVRO diferente do I030
-
-**Erro PGE:** "Número da ordem deverá ser igual ao informado no Registro I030"
-
-**Causa:** O `NR_LIVRO` do J900 deve ser idêntico ao do I030. Ambos devem usar a variável `bookNumber` do parâmetro de geração.
-
----
-
-### 2.12 NR_LIVRO conflitando com escrituração existente no PGE
-
-**Erro PGE (ao importar):** "Esta escrituração já existe na base local do PVA e seu estado não permite importação"
-
-**Causa:** O PGE tem no banco interno uma escrituração com o mesmo CNPJ/período/NR_LIVRO. Soluções:
-1. Usar "Editar Escrituração" no menu antes de reimportar
-2. Excluir a escrituração antiga no PGE
-3. Gerar com NR_LIVRO diferente (ex: 25 em vez de 1)
-
----
-
-### 2.13 I001 vazio quando sem lançamentos
-
-**Erro PGE (ao tentar substituição):** "A importação de arquivos sem o bloco I pressupõe a existência de uma escrituração nas bases do sistema"
-
-**Regra:**
-- `|I001|0|` = bloco I tem conteúdo (há lançamentos)
-- `|I001|1|` = bloco I vazio (sem lançamentos no período)
-
-Quando não há lançamentos, o PGE interpreta o arquivo como **substituição** e procura escrituração anterior. Sem ela, rejeita a importação.
-
----
-
-## 3. PLANO DE CONTAS — Boas Práticas para ECD
-
-### 3.1 reduced_code vs code
-
-- `reduced_code`: atalho de digitação para lançamentos manuais (ex: `001001`, `003001`). **Nunca usar no ECD.**
-- `code`: código contábil real da conta (ex: `11102010001`). **Sempre usar no ECD.**
-
-### 3.2 Dois planos sobrepostos — padrão de importação
-
-Empresas frequentemente têm dois planos no banco após importação de ECD externo:
-- Plano real: `11`, `111`, `11102010001`... (códigos longos sem pontos)
-- Plano importado RFB sintético: `1`, `1.1`, `1.1.1`... (códigos com pontos, `reduced_code = '000000'`)
-
-**Limpeza necessária:**
-```sql
--- Soft-delete plano RFB sintético (reduced_code = '000000')
-UPDATE chart_of_accounts SET deleted_at = NOW()
-WHERE company_id = '...' AND reduced_code = '000000';
-
--- Soft-delete contas pontilhadas (formato antigo)
-UPDATE chart_of_accounts SET deleted_at = NOW()
-WHERE company_id = '...' AND code LIKE '%.%';
-
--- Soft-delete reduced_codes gravados como code (6 dígitos, formato 001001)
-UPDATE chart_of_accounts SET deleted_at = NOW()
-WHERE company_id = '...' AND is_analytic = true
-  AND length(code) <= 6 AND code NOT LIKE '%.%';
-```
-
-### 3.3 Hierarquia após limpeza
-
-Após remover contas duplicadas, verificar que:
-1. Contas raiz (level=1) têm `parent_id = NULL`
-2. Níveis são contínuos: 1→2→3→4→5
-3. Nenhum `parent_id` aponta para conta deletada
-
-### 3.4 Partidas órfãs após limpeza
-
-Quando contas são deletadas, `journal_entry_items` ficam com `account_id` apontando para contas com `deleted_at IS NOT NULL`. Resolver por remap:
-
-```sql
--- Verificar partidas órfãs
-SELECT COUNT(*) FROM journal_entry_items jei
-JOIN chart_of_accounts ca ON ca.id = jei.account_id
-WHERE ca.deleted_at IS NOT NULL;
-
--- Remap por nome + type (mais seguro que só por nome — evita confundir ativo/passivo)
-UPDATE journal_entry_items jei
-SET account_id = (
-  SELECT id FROM chart_of_accounts
-  WHERE company_id = '...' AND deleted_at IS NULL AND is_analytic = true
-    AND name = ca_old.name AND type = ca_old.type
-  ORDER BY length(code) DESC LIMIT 1
-)
-FROM journal_entries je, chart_of_accounts ca_old
-WHERE jei.journal_entry_id = je.id
-  AND je.company_id = '...'
-  AND jei.account_id = ca_old.id
-  AND ca_old.deleted_at IS NOT NULL
-  AND EXISTS (
-    SELECT 1 FROM chart_of_accounts
-    WHERE company_id = '...' AND deleted_at IS NULL AND is_analytic = true
-      AND name = ca_old.name AND type = ca_old.type
-  );
-```
-
-**Atenção:** Contas com mesmo nome em ativo e passivo (ex: mútuo, fornecedor/cliente) — usar `type` como discriminador. Criar novas contas com códigos sequenciais quando não houver correspondência.
-
----
-
-## 4. VISÕES CONTÁBEIS (I051/I052) — Automapping
+## 4. VISÕES CONTÁBEIS (accounting_view_mappings)
 
 ### 4.1 Estrutura
 
 ```
-AccountingView    → visão por empresa (BP ou DRE, por ano)
-  AccountingViewMapping → conta analítica → código RFB
-RfbAglutinationCode → tabela de códigos padronizados RFB
+AccountingView (BP ou DRE, por empresa e ano_base)
+  └── AccountingViewMapping (account_id → aglutination_code)
 ```
 
-### 4.2 Regras do automapping
-
-**Prioridade:** prefixo do código contábil > match semântico por nome
-
-**Filtro por tipo da visão (obrigatório):**
-- BP: filtrar apenas ASSET, LIABILITY, EQUITY
-- DRE: filtrar apenas REVENUE, EXPENSE
-
-**Prefixos BP (leiaute 9, plano padrão brasileiro):**
-| Prefixo conta | COD_AGL RFB | Descrição |
-|---|---|---|
-| 111 | 1.01.01.02.01 | Bancos Conta Movimento |
-| 113 | 1.01.02.02.01 | Duplicatas a Receber |
-| 121 | 1.02.01.01.01 | Realizável LP |
-| 151 | 1.02.03.01.01 | Imobilizado |
-| 211 | 2.01.01.01.01 | Obrigações CP |
-| 221 | 2.02.01.01.01 | Obrigações LP |
-| 231 | 2.03.01.01.01 | Capital Social |
-| 233 | 2.03.04.01.01 | Lucros/Prejuízos Acumulados |
-
-**Prefixos DRE (leiaute 9, prestadora de serviços):**
-| Prefixo conta | COD_AGL RFB | Descrição |
-|---|---|---|
-| 311 | 3.01.01.01.01.06 | Receita Prestação Serviços |
-| 312 | 3.01.01.01.02.09 | Deduções Impostos |
-| 321 | 3.01.01.05.01.05 | Receitas Financeiras |
-| 421 | 3.01.01.07.01.02 | Despesas com Pessoal |
-| 423 | 3.01.01.09.01.08 | Despesas Financeiras |
-| 431 | 3.02.01.01.01.02 | Provisão IRPJ |
-| 441 | 3.02.01.01.01.01 | Provisão CSLL |
-
-### 4.3 Erros comuns de mapeamento
-
-- **ISS, PIS, COFINS** como contas de REVENUE ou EXPENSE com saldo devedor → são **deduções da receita bruta** → COD_AGL correto: `3.01.01.01.02.06` (ISS), `3.01.01.01.02.05` (PIS), `3.01.01.01.02.04` (COFINS)
-- **Provisão IRPJ/CSLL** como LIABILITY → não mapear para `1.01.02.04.xx` (ATIVO) → usar `2.01.01.09.13` / `2.01.01.09.14`
-- **Lucros Distribuídos** como EQUITY → não mapear para `1.02.02.01.40` → usar `2.03.04.01.01`
-
-### 4.4 findMappingsGrouped — filtro por tipo
-
-O endpoint que retorna os grupos para a tela de visões deve filtrar contas por tipo da visão, senão exibe contas de BP na tela DRE e vice-versa:
+### 4.2 Filtro no exporter
 
 ```typescript
-const allowedTypes = view.tipo === "BP" ? bpTypes : dreTypes;
-const analytics = allAccounts.filter(a => a.isAnalytic && allowedTypes.has(a.type));
+const viewsI052 = await this.prisma.accountingView.findMany({
+  where: { companyId, isActive: true }, // SEM filtro de anoBase
+  include: { mappings: { select: { accountId: true, aglutinationCode: true } } },
+});
 ```
+
+**⚠️ NÃO filtrar por `anoBase`** — causa `i052Map` vazio quando a view tem `ano_base` diferente do período da ECD.
+
+### 4.3 Distinção entre planos
+
+| Tabela | Conteúdo | Formato código | Qtd (leiaute 9, 2024) |
+|---|---|---|---|
+| `rfb_aglutination_codes` | Plano de aglutinação (Bloco J) | `1.01.08` | 50 BP + 26 DRE = 76 |
+| *(não importado)* | Plano referencial L100A/L300A (I051) | `1.01.01.02.01` | 732 BP + 213 DRE |
 
 ---
 
-## 5. BLOCO J — Geração do Balanço e DRE
+## 5. VISÕES CONTÁBEIS — ERROS DE MAPEAMENTO (responsabilidade do contador)
 
-### 5.1 J100 — Balanço Patrimonial
+Os erros abaixo são de **dados**, não de código. O código está correto:
 
-**Fluxo correto:**
-1. Buscar todos os `rfb_aglutination_codes` do BP (leiaute, anoBase, tipo='BP')
-2. Para cada conta analítica com `i052Map`, acumular saldo ini/fin por COD_AGL
-3. Propagar saldos para todos os ancestrais na hierarquia RFB (totalizadores)
-4. Emitir totalizadores (T) na ordem RFB, depois detalhes (D)
-
-**IND_CTA:** determinado pelo prefixo do COD_AGL:
-- Começa com `1.` → `A` (Ativo)
-- Começa com `2.` → `P` (Passivo/PL)
-
-**IND_DC:** saldo positivo → `D` (devedor), negativo → `C` (credor)
-
-### 5.2 J150 — DRE
-
-**Fluxo correto:**
-1. Buscar `rfb_aglutination_codes` da DRE
-2. Agregar saldos por COD_AGL (Map → uma entrada por código)
-3. Calcular saldo: `mv.deb - mv.cre` (mesmo sentido do I155)
-4. Emitir uma linha J150 por COD_AGL, com `IND_COD_AGL = "D"` sempre
-5. `IND_DC_INI` e `IND_DC_FIN`: `D` se saldo ≥ 0, `C` se saldo < 0
-
-**J150 linha totalizadora:**
-```
-|J150|N|COD_AGL_TOTALIZADOR|T|1|...|RESULTADO LIQUIDO|VL|DC|VL|DC|D||
-```
-
-### 5.3 Relação J005 ↔ I350
-
-Quando `J005.DT_FIN` está dentro do período da escrituração, o PGE **obriga** a existência de `I350` com `DT_RES = J005.DT_FIN`. Isso significa que toda empresa que gera Bloco J deve ter lançamento de encerramento contábil.
-
-**Empresas sem encerramento:** não gerar Bloco J, ou aceitar os erros do PGE como pendência contábil.
+| Erro PGE | Causa | Ação |
+|---|---|---|
+| J100 COD_AGL_SUP vazio | `aglutination_code` usa código L100A em vez de código de aglutinação | Contador deve corrigir nas Visões Contábeis |
+| BP desbalanceado | Ativo ≠ Passivo+PL | Contador deve lançar encerramento/ajuste |
+| I350 faltando | Empresa não tem lançamento de encerramento | Contador deve lançar zeramento de resultado |
+| J150 valor divergente | Saldo I155 ≠ saldo J150 | Verificar mapeamento DRE nas Visões Contábeis |
 
 ---
 
-## 6. ENCODING E DATAS
+## 6. SALDO INICIAL E PERÍODO
 
-### 6.1 Encoding do arquivo ECD
+### 6.1 Filtro de AccountingView
 
-O arquivo ECD deve ser gerado em **ISO-8859-1** (latin1), não UTF-8. Caracteres especiais (ç, ã, é) devem ser encoding nativo.
+Não filtrar por `anoBase` — o filtro causava `i052Map` vazio:
 
 ```typescript
-// Ao ler/escrever arquivo ECD
-const encoding = 'iso-8859-1';
+// CORRETO — sem anoBase:
+where: { companyId, isActive: true }
+
+// ERRADO — anoBase pode não bater com o período da ECD:
+where: { companyId, isActive: true, anoBase }
 ```
 
-### 6.2 Datas no ECD
+### 6.2 Saldo inicial entre anos (I155 fallback)
 
-Formato: `DDMMAAAA` (sem separadores)
+O registro I155 do primeiro período usa como saldo inicial o saldo final do último período do ano anterior. Quando não há I155 de abertura explícito, buscar via `accountBalance` com `referenceDate < periodStart`.
 
 ```typescript
-private fmtDate(d: Date): string {
-  const dd = String(d.getUTCDate()).padStart(2, "0");
-  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
-  const yyyy = d.getUTCFullYear();
-  return dd + mm + yyyy;
+const i155Rows = await this.prisma.accountBalance.findMany({
+  where: { companyId, referenceDate: { lt: new Date(periodStart) } },
+  orderBy: { referenceDate: "desc" },
+});
+const saldoIni = new Map<string, number>();
+for (const row of i155Rows) {
+  if (!saldoIni.has(row.accountId) && analyticIds.has(row.accountId))
+    saldoIni.set(row.accountId, Number(row.balance));
 }
 ```
 
-### 6.3 Problema de fuso horário no Windows (UTC-3)
-
-Em ambiente Windows (fuso -3), `new Date('2025-01-01')` produz `2025-01-01T03:00:00.000Z` — **3 horas após** a meia-noite UTC onde os registros `@db.Date` estão armazenados.
-
-**Sempre usar helpers UTC:**
-```typescript
-private toUTC(dateStr: string): Date {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  return new Date(Date.UTC(y, m - 1, d));
-}
-
-private toUTCEnd(dateStr: string): Date {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  return new Date(Date.UTC(y, m - 1, d, 23, 59, 59, 999));
-}
-```
-
-### 6.4 Datas no formato ECD (fmtDate)
+### 6.3 Datas UTC
 
 Usar sempre `.getUTC*()` para evitar desvio de fuso:
 ```typescript
@@ -548,7 +492,7 @@ Usar sempre `.getUTC*()` para evitar desvio de fuso:
 
 **Observação:** Contas de EXPENSE com saldo devedor no I155 aparecem no J150 com `IND_DC = D` e valor positivo. Contas de REVENUE com saldo credor aparecem com `IND_DC = C` e valor positivo.
 
-### 8.2 Holding / Participações
+### 8.2 Holding / Participações (ex: LM Administração)
 
 - Investimentos → `1.02.02.01.xx` (Participações Permanentes)
 - Mútuos Ativo → `1.02.01.xx` (Realizável LP)
@@ -560,6 +504,13 @@ Usar sempre `.getUTC*()` para evitar desvio de fuso:
 - Campo `NIRE` vazio (OAB não tem NIRE)
 - `indNireVal = "0"` quando `registerOrg` contém "OAB"
 - Plano de contas específico sem conta de estoque/ICMS
+
+### 8.4 Lucro Real vs Lucro Presumido
+
+- Ambos usam o mesmo plano de aglutinação (rfb_aglutination_codes)
+- O plano referencial L100A (quando implementado) é o mesmo para ambos
+- A diferença está nas contas DRE obrigatórias e no leiaute ECF associado
+- `forma_tributacao` na tabela `company_tax_regimes` ('L'=Lucro Real, 'P'=Lucro Presumido)
 
 ---
 
@@ -573,28 +524,11 @@ Usar sempre `.getUTC*()` para evitar desvio de fuso:
 | BALANCES_ONLY | I050 + I155 (sem I200/I250) | Importar plano + saldos; não reportar "0 lançamentos" como erro |
 | STATEMENTS_ONLY | I200/I250 sem I155 | Importar apenas lançamentos |
 
-### 9.2 Saldo inicial entre anos (I155 fallback)
-
-O registro I155 do primeiro período do ano seguinte usa como saldo inicial o saldo final do último período do ano anterior. Quando não há I155 de abertura explícito, buscar via `accountBalance` com `referenceDate < periodStart`.
-
-```typescript
-// Fallback para saldo inicial via account_balance
-const i155Rows = await this.prisma.accountBalance.findMany({
-  where: { companyId, referenceDate: { lt: new Date(periodStart) } },
-  orderBy: { referenceDate: "desc" },
-});
-const saldoIni = new Map<string, number>();
-for (const row of i155Rows) {
-  if (!saldoIni.has(row.accountId) && analyticIds.has(row.accountId))
-    saldoIni.set(row.accountId, Number(row.balance));
-}
-```
-
-### 9.3 openingBalance — data correta
+### 9.2 Saldo inicial entre anos
 
 O `openingBalance` importado do I155 deve ser salvo com `referenceDate = periodStart - 1 dia` (dia anterior ao início do período), para que seja encontrado como saldo anterior no próximo período.
 
-### 9.4 Planos incompatíveis entre anos
+### 9.3 Planos incompatíveis entre anos
 
 Planos de contas de anos diferentes podem ter codificações estruturalmente incompatíveis (não apenas formatação diferente). Requer mapeamento configurável pelo usuário, não hardcoded.
 
@@ -606,51 +540,54 @@ Planos de contas de anos diferentes podem ter codificações estruturalmente inc
 
 1. ✅ Plano de contas limpo (sem reduced_codes como code, sem hierarquia quebrada)
 2. ✅ Todas as partidas apontando para contas ativas (sem órfãs)
-3. ✅ Visões contábeis BP e DRE configuradas com códigos RFB folha (nível 5 ou 6)
+3. ✅ Visões contábeis BP e DRE configuradas com códigos de aglutinação folha (nível 4-5)
 4. ✅ Lançamento de encerramento lançado (se empresa fez encerramento)
 5. ✅ Cadastro da empresa com: CNPJ, UF, CRC do contador, assinantes
+6. ✅ Campo `COD_PLAN_REF` vazio no formulário de geração (até L100A ser importado)
 
 ### 10.2 Sequência de geração
 
-1. Gerar ECD pelo frontend (endpoint `/sped/ecd/export`)
-2. Salvar arquivo `.TXT` em Downloads
-3. Abrir PGE (Sped Contábil)
-4. Excluir escrituração anterior do CNPJ (se existir)
-5. Importar o novo arquivo
-6. Validar
-7. Analisar relatório de erros
-8. Corrigir e repetir
+1. Executar pré-validação (`/app/sped/ecd/pre-validate`) — corrigir erros críticos
+2. Gerar ECD pelo frontend (endpoint `/sped/ecd/export`) — SEM preencher COD_PLAN_REF
+3. Salvar arquivo `ECD_ANO_CNPJRAIZ.txt` em Downloads
+4. Abrir PGE (Sped Contábil)
+5. Excluir escrituração anterior do CNPJ (se existir)
+6. Importar o novo arquivo
+7. Validar
+8. Analisar relatório de erros
 
 ### 10.3 Interpretação de erros do PGE
 
 | Tipo de erro | Natureza | Ação |
 |---|---|---|
 | I050 conta inválida | Técnico | Corrigir exporter ou plano de contas |
-| I051 obrigatório | Técnico | Configurar COD_PLAN_REF e visões contábeis |
+| I051 obrigatório (em massa) | **COD_PLAN_REF preenchido sem L100A** | Deixar COD_PLAN_REF vazio |
 | I051 natureza divergente | Mapeamento | Corrigir COD_AGL no accounting_view_mappings |
 | I052 totalizador | Mapeamento | Usar código folha (nível máximo) |
+| J100 COD_AGL_SUP vazio | Mapeamento (dados) | Contador corrigir Visões Contábeis |
 | J100 IND_GRP_BAL | Mapeamento | Corrigir contas mapeadas para grupo errado |
 | J150 duplicado | Técnico | Agregar por COD_AGL no exporter |
 | J150 saldo divergente | Mapeamento/Técnico | Verificar sinal e agregação |
 | I350 faltando | Contábil | Lançar encerramento ou remover Bloco J |
+| I355 saldo não zero | **I350 emitido sem encerramento real** | NÃO emitir I350 sem lançamento real |
 | BP desequilibrado | Contábil | Lançar encerramento (transferir resultado para PL) |
 | Assinatura contador | Não técnico | Configurar J930 com CRC/CPF do contador |
 | NR_LIVRO conflito | Operacional | Excluir escrituração anterior no PGE |
 
 ---
 
-## 11. TABELA RFB — Leiaute 9 (2025)
+## 11. TABELA RFB — Leiaute 9
 
 ### 11.1 Estrutura
 
 ```sql
 rfb_aglutination_codes:
   leiaute  INT      -- ex: 9
-  ano_base INT      -- ex: 2025
+  ano_base INT      -- ex: 2024 ou 2025
   tipo     VARCHAR  -- 'BP' ou 'DRE'
-  codigo   VARCHAR  -- ex: '1.01.01.02.01'
+  codigo   VARCHAR  -- ex: '1.01.08'
   descricao VARCHAR
-  nivel    INT      -- 1 a 6
+  nivel    INT      -- 1 a 5 (BP) ou 1 a 6 (DRE)
   codigo_pai VARCHAR
   ordem    INT
 ```
@@ -662,9 +599,15 @@ POST /sped/visoes/rfb-codes/import
 Body: { codes: [...] }  -- array de objetos com os campos acima
 ```
 
-Os JSONs RFB para leiaute 9 (2024 e 2025) BP e DRE devem ser importados antes de usar as visões contábeis.
+### 11.3 Contagem por ano (leiaute 9)
 
-### 11.3 Nível máximo por grupo (leiaute 9, 2025)
+| Tipo | 2024 | 2025 |
+|---|---|---|
+| BP | 50 | 50 |
+| DRE | 26 | 26 |
+| **Total** | **76** | **76** |
+
+### 11.4 Nível máximo por grupo (leiaute 9)
 
 | Grupo | Tipo | Nível máximo |
 |---|---|---|
@@ -681,9 +624,9 @@ Os JSONs RFB para leiaute 9 (2024 e 2025) BP e DRE devem ser importados antes de
 
 ## 12. ARMADILHAS FREQUENTES
 
-1. **NestJS watch não recompila:** Matar processo (Stop-Process) e reiniciar `npm run start:dev`. O dist antigo pode estar em uso por horas sem recompilar alterações.
+1. **NestJS watch não recompila:** Matar processo e reiniciar `npm run start:dev`. O dist antigo pode estar em uso por horas sem recompilar alterações. Sempre confirmar compilação antes de gerar arquivo.
 
-2. **PGE com cache interno:** Ao reimportar o mesmo CNPJ/período, o PGE usa dados do banco interno. Sempre excluir a escrituração anterior antes de reimportar.
+2. **PGE com cache interno:** Ao reimportar o mesmo CNPJ/período, o PGE usa dados do banco interno. **Sempre excluir a escrituração anterior** antes de reimportar.
 
 3. **`(acc as any).reducedCode`:** Antipadrão — o `reducedCode` não deve ser usado para COD_CTA, apenas como atalho de tela.
 
@@ -700,6 +643,36 @@ Os JSONs RFB para leiaute 9 (2024 e 2025) BP e DRE devem ser importados antes de
 9. **J930 COD_QUALIF inválido:** Códigos `005`, `010`, `016` não existem no PGE. Usar apenas os listados na seção 7.1.
 
 10. **I001 = 1 quando sem lançamentos + tentativa de substituição:** O PGE interpreta como substituição e rejeita sem escrituração anterior. Sempre excluir e reimportar do zero.
+
+11. **COD_PLAN_REF preenchido no frontend:** O campo aceita digitação livre. Se o usuário digitar `60959347` sem ter o plano L100A importado, gera 200+ erros I051 em massa. O backend tem proteção (`codPlanRefFinal`) mas o frontend exibe aviso laranja.
+
+12. **Restaurar exporter via git show:** Ao restaurar `ecd-exporter.service.ts` de um commit anterior, a assinatura do método pode ser `Promise<Buffer>` em vez de `Promise<{ buffer: Buffer; warnings: string[] }>`. Sempre verificar e corrigir a assinatura após restauração.
+
+13. **Edições incrementais por índice de linha:** Edições múltiplas por índice de linha corrompem o arquivo quando o número de linhas muda entre edições. Preferir reescrita de blocos completos via Python `lines[a:b] = [new_block]`.
+
+14. **I350 incondicional gera mais erros:** Emitir I350 sempre (sem lançamento de encerramento) gera 25+ erros "contas de resultado devem ter saldo zero" e "saldo não corresponde". **Nunca emitir I350 sem lançamentos reais de zeramento.**
+
+---
+
+## 13. ESTADO ATUAL (13/06/2026) — LM 2024
+
+**Resultado após sessão de correção:**
+- 307 erros → **41 erros residuais**
+- Todos os 41 erros são de **dados/mapeamento** (responsabilidade do contador)
+- Código do exporter está **estável e correto**
+
+**Erros residuais classificados:**
+
+| Qtd | Erro | Tipo | Responsável |
+|---|---|---|---|
+| 2 | I350 faltando (DT_EX_SOCIAL sem encerramento) | Dados | Contador: lançar zeramento |
+| 3 | BP desbalanceado (Ativo ≠ Passivo+PL) | Dados | Contador: lançar ajuste |
+| 36 | J100 COD_AGL_SUP vazio (códigos L100A no mapeamento) | Mapeamento | Contador: corrigir Visões Contábeis usando códigos de aglutinação |
+
+**Commits desta sessão:**
+- `45ac30a` — restaurar exporter + assinatura Promise<{buffer,warnings}> + aviso COD_PLAN_REF frontend
+- `919f88f` — EcdPreValidatePage ajustes
+- `d667970` — I350 apenas com lançamentos encerramento reais
 
 ---
 
