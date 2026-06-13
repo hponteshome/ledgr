@@ -299,7 +299,10 @@ export class AccountsPayableService {
     const where: Prisma.AccountsPayableWhereInput = { companyId, deletedAt: null };
 
     // APStatus usa string literals — cast direto via any
-    if (filters.status)          where.status          = filters.status as any;
+        if (filters.status) {
+          const statuses = filters.status.split(',').map((s: string) => s.trim());
+          where.status = statuses.length === 1 ? statuses[0] as any : { in: statuses } as any;
+        }
     if (filters.origin)          where.origin          = filters.origin;
     if (filters.competenceMonth) where.competenceMonth = filters.competenceMonth;
     if (filters.categoryTag)     where.categoryTag     = filters.categoryTag;
