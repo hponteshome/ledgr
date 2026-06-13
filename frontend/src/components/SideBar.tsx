@@ -313,7 +313,7 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
         </div>
 
         <nav className="flex-1 py-4 px-3 overflow-y-auto custom-scrollbar">
-          {menuItems.map((item) => {
+          {filteredMenu.map((item) => {
             const active = location.pathname.startsWith(item.path);
             const isExp = expanded.includes(item.path);
 
