@@ -1,6 +1,6 @@
 // src/routes/index.tsx
 import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { LedgrHome } from '../pages/LedgrHome';
 import DashboardPage from '../pages/DashboardPage';
@@ -13,6 +13,7 @@ import { UserList } from '../pages/users/UserList';
 import { UserForm } from '../pages/users/UserForm';
 import { ProfileForm } from '../pages/users/ProfileForm';
 import { useAuth } from '../contexts/AuthContext';
+import { useSidebarPermissions } from '../hooks/useSidebarPermissions';
 import { CompanyShow } from '../pages/companies/CompanyShow';
 import { CompanyEdit } from '../pages/companies/CompanyEdit';
 import { ProfileList } from '../pages/users/ProfileList';
@@ -82,11 +83,33 @@ import VisoesContabeisPage from '../pages/sped/VisoesContabeisPage';
 
 
 ///////////////////////////////////////
+const AccessDenied = () => (
+    <div className="flex flex-col items-center justify-center h-[60vh] text-center px-4">
+        <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+            <span className="text-2xl font-black text-gray-400">!</span>
+        </div>
+        <h2 className="text-xl font-bold text-gray-700">Acesso Restrito</h2>
+        <p className="text-gray-500 mt-2 max-w-md">
+            Seu perfil nao tem permissao para acessar esta area. Se voce acredita que isso e um erro, contate o administrador do sistema.
+        </p>
+    </div>
+);
+
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     const { user, loading } = useAuth();
+    const location = useLocation();
+    const { allowed, loading: permLoading, canView } = useSidebarPermissions();
     if (loading) return null; // ou um spinner: <div className="flex items-center justify-center h-screen"><FiLoader className="animate-spin" size={32} /></div>
 
     if (!user) return <Navigate to="/" replace />;
+
+    if (permLoading) return null;
+
+    const isMaster = allowed.includes('*');
+    if (!isMaster && allowed.length > 0 && !canView(location.pathname)) {
+        return <AccessDenied />;
+    }
+
     return <>{children}</>;
 };
 

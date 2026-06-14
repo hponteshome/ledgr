@@ -41,7 +41,8 @@ export function useSidebarPermissions() {
 
   function canView(path: string): boolean {
     if (allowed.includes('*')) return true; // Master Admin
-    return allowed.includes(path);
+    // Match exato ou prefixo de secao (ex: /app/users/edit/:id cai sob /app/users)
+    return allowed.some(p => path === p || path.startsWith(p + '/'));
   }
 
   return { allowed, loading, canView, invalidate };
