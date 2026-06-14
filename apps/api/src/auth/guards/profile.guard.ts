@@ -45,6 +45,19 @@ export class ProfileGuard implements CanActivate {
       return true;
     }
 
+    const genericFallback: Record<string, string> = {
+      '_view': 'read',
+      '_list': 'read',
+      '_create': 'write',
+      '_edit': 'write',
+      '_update': 'write',
+      '_delete': 'delete',
+    };
+    const matchedSuffix = Object.keys(genericFallback).find(s => requiredPermission.endsWith(s));
+    if (matchedSuffix && permissions[genericFallback[matchedSuffix]] === true) {
+      return true;
+    }
+
     throw new ForbiddenException(
       'Você não tem permissão para executar esta ação.'
     );

@@ -66,7 +66,7 @@ async findByDocument(document: string) {
         nickname: data.nickname,
         email: data.email,
         phone1: data.phoneNumber,
-        level: data.level,
+        level: data.level !== undefined ? Number(data.level) : undefined,
         isActive: data.isActive,
         profileId: data.profileId,
         status: data.status,

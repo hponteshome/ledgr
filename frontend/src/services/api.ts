@@ -1,5 +1,6 @@
 // src/services/api.ts - VERSÃO CORRIGIDA
 import axios from 'axios';
+import toast from 'react-hot-toast';
 
 const api = axios.create({
   baseURL: 'http://localhost:3000',
@@ -66,6 +67,12 @@ api.interceptors.response.use(
         window.location.href = '/login';
       }
     }
+
+    if (error.response?.status === 403) {
+      const msg = error.response?.data?.message || 'Acao nao permitida para o seu perfil.';
+      toast.error(msg);
+    }
+
     return Promise.reject(error);
   }
 );

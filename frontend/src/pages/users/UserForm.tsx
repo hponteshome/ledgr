@@ -66,7 +66,7 @@ export const UserForm: React.FC = () => {
           phone: u.phone1 || u.phone || u.cellphone || '',
           document: u.document || '',
           documentType: 'CPF',
-          level: u.level || '',
+          level: String(u.level ?? ''),
           password: '',
           profileId: u.profile?.id || '',
           status: u.status || 'active',
@@ -97,7 +97,7 @@ export const UserForm: React.FC = () => {
           email: u.email || '',
           phone: u.phone || u.phone1 || u.cellphone || '',
           nickname: u.nickname || '',
-          level: u.level || '',
+          level: String(u.level ?? ''),
           document: cleanDoc,
           profileId: u.profile?.id || prev.profileId,
         }));
@@ -114,7 +114,7 @@ export const UserForm: React.FC = () => {
           email: p.email || p.contactEmail || '',
           phone: p.phone1 || p.cellphone || p.phone || '',
           document: cleanDoc,
-          level: p.name || '',
+          level: '0',
           nickname: p.nickname || '',
         }));
         setFeedback({ type: 'info', message: 'Pessoa encontrada no cadastro base. Dados importados.' });
@@ -271,6 +271,7 @@ export const UserForm: React.FC = () => {
               <label className="block text-[10px] font-black text-gray-400 uppercase mb-1">E-mail Corporativo</label>
               <input
                 type="email"
+                autoComplete="off"
                 className={`w-full px-4 py-2.5 border rounded-xl outline-none transition-all ${isPersonDataReadOnly
                   ? 'bg-gray-50 text-gray-400 cursor-not-allowed border-gray-200'
                   : 'bg-white border-gray-200 focus:ring-2 focus:ring-blue-500'
@@ -304,6 +305,7 @@ export const UserForm: React.FC = () => {
                 className="w-full px-4 py-2.5 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
                 value={formData.nickname}
                 onChange={(e) => setFormData(prev => ({ ...prev, nickname: e.target.value }))}
+                autoComplete="off"
                 required
               />
             </div>
@@ -338,6 +340,7 @@ export const UserForm: React.FC = () => {
                 className="w-full px-4 py-2.5 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
                 value={formData.password}
                 onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+                autoComplete="new-password"
                 required={!isEditing}
                 placeholder={isEditing ? '••••••••' : ''}
               />
