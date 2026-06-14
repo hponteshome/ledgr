@@ -10,6 +10,7 @@ import {
 import api from '../services/api';
 import { ObrigacoesWidget } from '../components/ObrigacoesWidget';
 import { useCompany } from '../contexts/CompanyContext';
+import { useSidebarPermissions } from '../hooks/useSidebarPermissions';
 
 interface DashKpi {
   apTotal: number; apCount: number;
@@ -177,6 +178,12 @@ const ApRow: React.FC<{ item: ApItem; isLast: boolean; onClick: () => void }> = 
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const { activeCompany } = useCompany();
+  const { allowed, loading: permLoading, canView } = useSidebarPermissions();
+
+  // Mesmo fallback do SideBar.tsx: enquanto carrega ou sem permissoes
+  // configuradas (allowed vazio), mostra tudo. So filtra quando o perfil
+  // tiver permissoes explicitas (allowed nao-vazio e sem '*').
+  const show = (path: string) => permLoading || allowed.length === 0 || canView(path);
 
   const activeMonth = useMemo((): string => {
     const n = new Date();
@@ -302,20 +309,25 @@ export const DashboardPage: React.FC = () => {
       <SectionTitle>Indicadores do mes</SectionTitle>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 8 }}>
 
+        {show('/app/finance/accounts-payable') && (
         <KpiCard accent="#0369A1" icon={<FiTrendingDown size={12} color="#0369A1" />}
           label="Contas a pagar"
           value={kpi ? BRL(kpi.apTotal) : '—'}
           sub={kpi ? kpi.apCount + ' titulo' + (kpi.apCount !== 1 ? 's' : '') + ' em aberto' : 'Carregando...'}
           linkColor="#0369A1" linkText="Ver contas a pagar"
           onClick={() => navigate('/app/finance/accounts-payable')} />
+        )}
 
+        {show('/app/finance/contas-receber') && (
         <KpiCard accent="#059669" icon={<FiTrendingUp size={12} color="#059669" />}
           label="Contas a receber"
           value={kpi ? BRL(kpi.arTotal) : '—'}
           sub={kpi ? kpi.arCount + ' titulo' + (kpi.arCount !== 1 ? 's' : '') + ' em aberto' : 'Carregando...'}
           linkColor="#059669" linkText="Ver contas a receber"
           onClick={() => navigate('/app/finance/contas-receber')} />
+        )}
 
+        {show('/app/finance/fiscal-documents') && (
         <KpiCard accent="#DC2626"
           label="NFs pendentes"
           icon={<><FiFileText size={12} color="#DC2626" />{kpi && kpi.nfPending > 0 && <span style={{ ...pill('#FEE2E2','#991B1B'), fontSize: 10, marginLeft: 4 }}>!</span>}</>}
@@ -323,31 +335,40 @@ export const DashboardPage: React.FC = () => {
           sub="Sem integracao contabil"
           linkColor="#DC2626" linkText="Ver documentos fiscais"
           onClick={() => navigate('/app/finance/fiscal-documents')} />
+        )}
 
+        {show('/app/accounting/journal') && (
         <KpiCard accent="#2563EB" icon={<FiBook size={12} color="#2563EB" />}
           label="Lancamentos contabeis"
           value={kpi ? kpi.journalCount : '—'}
           sub={monthLabel}
           linkColor="#2563EB" linkText="Ver lancamentos"
           onClick={() => navigate('/app/accounting/journal')} />
+        )}
 
+        {show('/app/finance/fechamento') && (
         <KpiCard accent="#7C3AED" icon={<FiLock size={12} color="#7C3AED" />}
           label="Fechamento mensal"
           value={<span style={{ ...pill(chip.bg, chip.color), fontSize: 13 }}>{chip.label}</span>}
           sub={kpi?.fechamentoCompetencia ? (() => { const [fy, fm] = (kpi.fechamentoCompetencia ?? activeMonth).split('-'); return months[parseInt(fm) - 1] + ' / ' + fy; })() : monthLabel}
           linkColor="#7C3AED" linkText="Ir para fechamento"
           onClick={() => navigate('/app/finance/fechamento')} />
+        )}
 
+        {show('/app/arquivo') && (
         <KpiCard accent="#0891B2" icon={<FiCheckSquare size={12} color="#0891B2" />}
           label="Aguard. assinatura"
           value={kpi ? kpi.docsAguardando : '—'}
           sub="Societario — ClickSign"
           linkColor="#0891B2" linkText="Ver arquivo societario"
           onClick={() => navigate('/app/arquivo/societario')} />
+        )}
 
       </div>
 
       {/* AGENDA */}
+      {show('/app/finance/agenda') && (
+      <>
       <SectionTitle>Agenda contabil, fiscal e financeira — proximos 60 dias</SectionTitle>
       <div style={{ background: '#fff', border: '0.5px solid #E5E7EB', borderRadius: 10, overflow: 'hidden', marginBottom: 8 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1rem', background: '#F9FAFB', borderBottom: '0.5px solid #E5E7EB' }}>
@@ -397,11 +418,14 @@ export const DashboardPage: React.FC = () => {
           <FiCalendar size={13} /> Ver agenda financeira completa
         </div>
       </div>
+      </>
+      )}
 
       {/* WIDGET OBRIGAÇÕES */}
-      <ObrigacoesWidget />
+      {show('/app/sistema/obrigacoes') && <ObrigacoesWidget />}
 
       {/* PAINEIS INFERIORES */}
+      {(show('/app/finance/accounts-payable') || show('/app/finance/contas-receber')) && (
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
 
         <div style={{ background: '#fff', border: '0.5px solid #E5E7EB', borderRadius: 10, overflow: 'hidden' }}>
@@ -432,7 +456,9 @@ export const DashboardPage: React.FC = () => {
               <FiBarChart2 size={14} color="#0369A1" /> Aging — posicao atual
             </div>
             <div style={{ display: 'flex', gap: 6 }}>
-              {(['ap', 'ar'] as const).map(t => (
+              {(['ap', 'ar'] as const)
+                .filter(t => t === 'ap' ? show('/app/finance/accounts-payable') : show('/app/finance/contas-receber'))
+                .map(t => (
                 <button key={t} onClick={() => setAgingTab(t)}
                   style={{ padding: '2px 10px', borderRadius: 9999, fontSize: 11, fontWeight: 500, cursor: 'pointer', border: '0.5px solid', background: agingTab === t ? '#EFF6FF' : '#F9FAFB', borderColor: agingTab === t ? '#BFDBFE' : '#E5E7EB', color: agingTab === t ? '#1D4ED8' : '#6B7280' }}>
                   {t === 'ap' ? 'A Pagar' : 'A Receber'}
@@ -467,6 +493,7 @@ export const DashboardPage: React.FC = () => {
         </div>
 
       </div>
+      )}
     </div>
   );
 };

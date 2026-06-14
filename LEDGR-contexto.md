@@ -630,3 +630,52 @@ where.status = statuses.length === 1 ? statuses[0] as any : { in: statuses } as 
 - EFD-Contribuições no sidebar (hoje disabled: true)
 - Sidebar: testar filtro com usuário não-Master-Admin
 
+
+
+---
+
+### Dashboard - Por perfil implementado (14/06/2026)
+
+**Mudanca:** DashboardPage.tsx agora usa useSidebarPermissions() (mesmo hook do SideBar.tsx).
+
+  const show = (path: string) => permLoading || allowed.length === 0 || canView(path);
+
+Fallback identico ao SideBar: enquanto allowed vier vazio (hoje profile_sidebar_permissions
+tem 0 linhas, todo perfil nao-Master-Admin recebe allowed=[]), show() retorna true pra tudo -
+ou seja, NENHUMA mudanca visual hoje. A filtragem real entra em vigor automaticamente quando
+profile_sidebar_permissions for configurado por perfil (tela /app/sistema/sidebar-permissions).
+
+**Mapeamento widget -> path:**
+
+  KPI Contas a pagar              -> /app/finance/accounts-payable
+  KPI Contas a receber             -> /app/finance/contas-receber
+  KPI NFs pendentes                -> /app/finance/fiscal-documents
+  KPI Lancamentos contabeis         -> /app/accounting/journal
+  KPI Fechamento mensal             -> /app/finance/fechamento
+  KPI Aguard. assinatura            -> /app/arquivo (rota real: /app/arquivo/societario,
+                                        nao existe em sidebar_items, usado o path pai)
+  Agenda (cronograma)               -> /app/finance/agenda
+  ObrigacoesWidget                   -> /app/sistema/obrigacoes
+  Paineis inferiores (7 dias+Aging) -> AP e/ou AR (qualquer um libera o painel)
+  Abas do Aging (A Pagar/Receber)   -> filtradas individualmente por path
+
+tsc --noEmit: sem erros em DashboardPage.tsx.
+
+Obs: grid de KPIs e fixo em repeat(3, 1fr) - quando a filtragem real entrar em vigor com
+menos de 6 cards, vai sobrar espaco vazio na ultima linha (cosmetico, ajustar se incomodar).
+
+---
+
+### Pendencias atualizadas (14/06/2026)
+
+**Prioritarias:**
+- Configurar profile_sidebar_permissions para Operador/Visualizador (dados/admin via
+  /app/sistema/sidebar-permissions, nao codigo) - so assim o "por perfil" do Dashboard
+  fica visivel na pratica
+- LedgrHome.tsx (deslogado) - ainda nao avaliado (outra metade da pendencia original
+  "dashboards logado + deslogado")
+
+**Backlog:**
+- Avaliar buildStaticAgenda (linhas 51-83 do DashboardPage.tsx) - agenda fiscal hardcoded
+  com datas genericas, possivelmente redundante com ObrigacoesWidget (que ja cobre
+  obrigacoes reais via /finance/obrigacoes)
