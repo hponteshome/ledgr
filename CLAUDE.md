@@ -167,9 +167,17 @@ de usar.
 ## 9. Seguranca
 
 - .env (raiz) contem: DATABASE_URL, JWT_SECRET, JWT_EXPIRES_IN, BACKUP_MASTER_KEY,
-  credenciais ClickSign (CLICKSIGN_*) e Gov.br OAuth2 (GOVBR_*), FRONTEND_URL. Nunca commitar.
-- ATENCAO: infra/docker/ledgrmasterkey *.txt parece conter uma chave em texto puro dentro
-  do repo - avaliar remocao/rotacao e adicionar ao .gitignore.
+  LEDGR_MASTER_KEY (AES-256-GCM, certificados - Fase 1.1), credenciais ClickSign
+  (CLICKSIGN_*) e Gov.br OAuth2 (GOVBR_*), FRONTEND_URL. Nunca commitar.
+- .gitignore reforcado (14/06/2026): *masterkey*, *.pem, *.p12, *.pfx adicionados para
+  evitar reincidencia.
+- RESOLVIDO (14/06/2026): infra/docker/ledgrmasterkey <64-hex>.txt (valor de
+  LEDGR_MASTER_KEY gerado no setup da Fase 1.1, nunca configurado em .env, sem dados
+  dependentes - tabela certificates vazia, modulo nao registrado) foi removido do working
+  tree E de todo o historico git (filter-branch, 182 commits reescritos, force-push).
+  Nova LEDGR_MASTER_KEY gerada e adicionada ao .env local.
+- Backup pre-reescrita (historia antiga com o arquivo sensivel) preservado em
+  D:\\Projetos\\Ledgr-backup-mirror-20260614-114707 - apagar/proteger apos confirmacao final.
 
 ## 10. Recursos de referencia
 
