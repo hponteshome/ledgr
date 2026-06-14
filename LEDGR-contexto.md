@@ -679,3 +679,40 @@ menos de 6 cards, vai sobrar espaco vazio na ultima linha (cosmetico, ajustar se
 - Avaliar buildStaticAgenda (linhas 51-83 do DashboardPage.tsx) - agenda fiscal hardcoded
   com datas genericas, possivelmente redundante com ObrigacoesWidget (que ja cobre
   obrigacoes reais via /finance/obrigacoes)
+
+---
+
+## Sessao 2026-06-14 (cont.) - Testes de usuario por perfil + RBAC real (ProfileGuard)
+
+### Concluido
+- Fix users.service.ts updateUser: "level: data.level" (string do form) causava PrismaClientValidationError (500) ao salvar usuario via UserForm. Corrigido p/ "Number(data.level)" com fallback undefined (preserva changeStatus/deactivate que nao enviam level).
+- Fix UserForm.tsx: campo Email com autoComplete="off" (Chrome estava autopreenchendo o email do Visualizador Teste com "ver@ledgr.com" ao salvar, quebrando o login - 401).
+- Email do usuario Visualizador Teste corrigido no banco: "ver@ledgr.com" -> "visualizador.teste@ledgr.local".
+- Confirmado: login + Dashboard "por perfil" funcionam para Visualizador Teste (acesso total - profile_sidebar_permissions ainda vazia, fallback libera tudo).
+- Descoberto: users.controller.ts e profiles.controller.ts JA tinham @UseGuards(JwtAuthGuard, ProfileGuard) + @RequirePermission('users_view'|'users_edit'|'users_delete'|'profiles_edit'|'profiles_delete'), mas profiles.permissions usa chaves genericas {read,write,delete} -> mismatch fazia QUALQUER acao de perfis nao-master (Operador/Visualizador) retornar 403, inclusive GET /users.
+- Fix profile.guard.ts: fallback - se a permissao especifica (ex: 'users_edit') nao existe no perfil, cai pra generica via sufixo (_view/_list->read, _create/_edit/_update->write, _delete->delete). Ativa RBAC real p/ Usuarios/Perfis sem afetar Master (permissions.all===true continua bypassando tudo).
+- Fix api.ts: interceptor de resposta agora trata 403, mostra toast com error.response.data.message (fallback "Acao nao permitida para o seu perfil.").
+- Validado: Visualizador Teste (read:true,write:false,delete:false) -> GET /users lista normal (fallback read), PATCH /users/:id -> 403 + toast + banner inline com mensagem real do backend "Voce nao tem permissao para executar esta acao.".
+- Commit a013900 (pushed): users.service.ts, profile.guard.ts, UserForm.tsx, api.ts.
+- Fase 1 frontend: useSidebarPermissions.ts canView() agora aceita prefixo de secao (/app/users/edit/:id cai sob /app/users). routes/index.tsx ProtectedRoute checa canView(location.pathname) e renderiza novo componente AccessDenied ("Acesso Restrito") quando allowed.length>0 && !isMaster && !canView(path). Validado com tsc --noEmit (0 erros novos; 116 pre-existentes em 43 outros arquivos, nao relacionados).
+- COMMIT/PUSH do Fase 1 (useSidebarPermissions.ts + routes/index.tsx) NAO CONFIRMADO nesta sessao - verificar/rodar no inicio da proxima.
+
+### Pendente / Proxima sessao
+- Confirmar git status / commit+push do Fase 1 (frontend/src/hooks/useSidebarPermissions.ts, frontend/src/routes/index.tsx) se ainda pendente.
+- profile_sidebar_permissions continua VAZIA -> tela AccessDenied e ocultamento real (SideBar/Dashboard) nunca foram exercitados de fato. Configurar via Sistema > Permissoes de Sidebar > Por Perfil (ex: restringir Visualizador de /app/finance/accounts-payable) e validar em conjunto: SideBar esconde item, Dashboard esconde card, ProtectedRoute mostra "Acesso Restrito" em navegacao direta, toast 403 se o modulo tb tiver guard de API.
+- Testar Operador Teste (operador.teste@ledgr.local / Operador@123, read:true+write:true+delete:false): deve EDITAR usuarios mas DELETE deve dar 403.
+- Achado: PATCH /persons/:id -> 500 PrismaClientValidationError "Unknown argument document" em persons.service.ts:171 (Person nao tem campo "document" no schema, provavelmente deveria ser so "cpf"). Nao corrigido.
+- Achado: rotas app/users/edit/:id e app/profiles/edit/:id em routes/index.tsx nao estao dentro de <ProtectedRoute>.
+- Achado (nao corrigido): users.service.ts updateUser nao persiste "password", e usa data.phoneNumber mas o frontend envia data.phone (telefone nunca e salvo).
+- Achado (nao corrigido): ProfileList.tsx tem prop invalida max-Width (warning React); varios inputs sem autocomplete.
+- ProfileGuard so cobre Users/Profiles. Finance/Accounting/SPED/HR/Assets etc continuam SEM guard de perfil (Fase 3, fora desta sessao).
+
+### Aprendizados novos
+- Scripts Python via heredoc Pwsh + Out-File -Encoding utf8: \uXXXX dentro de raw string r"""...""" NAO e interpretado como Unicode (fica literal) -> old/new com mensagens acentuadas via \uXXXX falham silenciosamente (count()==0). Usar caractere acentuado real direto na raw string, OU evitar acento em strings de match/novas (texto de usuario em PT-BR sem acento quando envolver match).
+- Blocos "old" multi-linha com LINHA VAZIA no meio sao ponto comum de falha (count()==0) mesmo com texto visualmente identico. Preferir ancoras curtas sem linha vazia/acento; dividir edits grandes em 2+ replaces ao redor da linha vazia.
+- Padrao de fallback no ProfileGuard (_view/_list->read, _create/_edit/_update->write, _delete->delete) e reaproveitavel quando novos modulos ganharem @RequirePermission(...) - perfis simples {read,write,delete} (Operador/Visualizador) funcionam automaticamente sem chave especifica no JSON.
+- canView(path) com prefixo: novo item em sidebar_items ja cobre automaticamente sub-rotas (/edit/:id, /new, etc.) sem cadastro extra.
+
+### Usuarios de teste (recap)
+- Visualizador Teste: visualizador.teste@ledgr.local / Visualizador@123 (email corrigido nesta sessao), profile Visualizador (read:true,write:false,delete:false), id fb6d4847-9498-4adc-a92e-ba7a79d6294f.
+- Operador Teste: operador.teste@ledgr.local / Operador@123, profile Operador (read:true,write:true,delete:false), id 06dca0e7-44ae-41aa-92b3-903c4af63cfa.
