@@ -8,3 +8,9 @@ uploads/
 prisma/migrations/
 
 project_files/revisao_completa*.txt
+
+# Seguranca - nunca commitar chaves/segredos
+*masterkey*
+*.pem
+*.p12
+*.pfx

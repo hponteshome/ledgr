@@ -480,3 +480,153 @@ Modelo dedicado para QSA societário completo (PF e PJ sócias):
 - 8 códigos totalizadores atualizados para nível folha
 - Visão DRE 2024 criada (16 mapeamentos automáticos)
 - PersonCompany criado para Jose Rozinei (205) e Helenilto/contador (10)
+
+
+---
+
+## Sessão 12-13/06/2026 — ECD Geração Final + Pendências Gerais
+
+### ECD — Estado atual (13/06/2026)
+
+**Resultado:** 307 erros → 41 erros residuais (todos de dados/mapeamento do contador)
+
+**Commits desta sessão:**
+- `45ac30a` — restaurar exporter b41f4bc + assinatura Promise<{buffer,warnings}> + aviso COD_PLAN_REF frontend
+- `919f88f` — EcdPreValidatePage ajustes
+- `d667970` — I350 apenas com lancamentos encerramento reais
+- `3ae5737` — fix assets terreno Cotia
+- `6009a28` — sidebar permissoes 3 camadas
+- `356b549` — filtro visual sidebar funcional
+- `536b59b` — AccountsPayableController registrado no FinanceModule
+- `745878f` — tabelas legais migradas para banco
+- `0f8c828` — AP status multi-valor + prefixo finance/accounts-payable
+
+**Erros residuais ECD LM 2024 (dados — não código):**
+- 2 erros I350: empresa não tem lançamento de encerramento/zeramento
+- 3 erros BP desbalanceado: Ativo ≠ Passivo+PL
+- 36 erros J100 COD_AGL_SUP vazio: mapeamentos usam códigos L100A em vez de códigos de aglutinação
+
+**Aprendizados críticos ECD (não regredir):**
+
+1. **COD_PLAN_REF no 0000** — NUNCA preencher sem plano referencial L100A/L300A completo no banco.
+   Proteção no backend: `codPlanRefFinal = (codPlanRef && i051Map.size > 0) ? codPlanRef : ""`
+   Proteção no frontend: aviso laranja quando campo preenchido
+
+2. **i051Map NUNCA copiar i052Map** — são planos diferentes:
+   - i052Map: códigos de aglutinação curtos (ex: `1.01.08`) → tabela `rfb_aglutination_codes`
+   - i051Map: códigos referenciais L100A (ex: `1.01.01.02.01`) → NÃO importado ainda
+
+3. **I350 condicional** — emitir APENAS quando há lançamentos reais de encerramento.
+   Emitir I350 incondicional gera +50 erros "saldo deve ser zero nos meses de encerramento"
+
+4. **Assinatura do exporter** — `Promise<{ buffer: Buffer; warnings: string[] }>` NUNCA `Promise<Buffer>`
+   Controller espera `result.buffer` e `result.warnings`
+
+5. **Nome do arquivo** — `ECD_ANO_CNPJRAIZ.txt` gerado no backend via CNPJ do banco.
+   CORS: `Content-Disposition` deve estar em `exposedHeaders` no main.ts
+
+6. **i052Map sem filtro de anoBase** — NUNCA filtrar por anoBase na query de AccountingView.
+   Causa i052Map vazio quando view.ano_base ≠ período da ECD.
+
+7. **Restaurar exporter via git show** — sempre verificar assinatura do método após restauração.
+
+**Tabela rfb_aglutination_codes (leiaute 9, 2024):**
+- 50 BP + 26 DRE = 76 códigos de AGLUTINAÇÃO (Bloco J)
+- Plano referencial L100A/L300A (732+213 códigos) NÃO está importado
+
+---
+
+### Sidebar Permissões — Implementado 13/06/2026
+
+**Arquitetura 3 camadas:**
+1. Perfil (`profile_sidebar_permissions`) — base por grupo
+2. Usuário (`user_sidebar_permissions`) — override individual
+3. Empresa (`companyId` nullable) — restrição por empresa
+
+**Tabelas criadas:**
+- `sidebar_items` — 40 itens do menu (seed aplicado)
+- `profile_sidebar_permissions` — permissão base por perfil
+- `user_sidebar_permissions` — override individual com companyId opcional
+
+**Backend:** `SidebarPermissionsModule` registrado no `AppModule`
+- `GET /sidebar-permissions/resolve` — retorna paths permitidos para usuário/empresa ativa
+- Master Admin (`permissions.all = true`) recebe `['*']` sem consultar banco
+
+**Frontend:**
+- Hook `useSidebarPermissions.ts` — wildcard `['*']` para Master Admin (local, sem API call)
+- `SideBar.tsx` — `filteredMenu` com fallback `menuItems` quando `allowed.length === 0`
+- Desestruturar `allowed` do hook: `const { canView, allowed, loading } = useSidebarPermissions()`
+- Página gestão: `/app/sistema/sidebar-permissions`
+
+**Armadilha:** Race condition — `user` é null no primeiro render.
+Solução: `if (permLoading || allowed.length === 0) return menuItems`
+
+---
+
+### Tabelas Legais — Migração completa para banco (13/06/2026)
+
+**Antes:** dados hardcoded em `TabelasLegaisPage.tsx` (379 linhas)
+**Depois:** consumindo `GET /tabelas-legais/irrf`, `/inss`, `/salario-minimo`
+
+**Dados no banco:**
+- `tabela_irrf`: 14 anos (2013-2026), tipos PROGRESSIVA e REDUTOR
+- `tabela_inss`: 14 anos (2013-2026), faixas progressivas
+- `salario_minimo`: 17 registros históricos
+
+**Estrutura IRRF 2026:** 5 faixas PROGRESSIVA + 7 faixas REDUTOR (Lei 15.270/2025)
+- Redutor: até R$5.000 isento, até R$7.350 redutor decrescente, acima sem redução
+
+**Simulador:** dinâmico, calcula calcIRPF e calcINSS com dados do banco
+
+---
+
+### Ativo Imobilizado — Correção terreno Cotia (13/06/2026)
+
+**Problema:** Lote em Cotia com `non_depreciable = false` e `useful_life_months = 480`
+**Correção:**
+```sql
+UPDATE fixed_assets SET non_depreciable = true, useful_life_months = 0
+WHERE company_id = 'f00af1b1...' AND description ILIKE '%cotia%';
+DELETE FROM asset_depreciation_logs WHERE asset_id = (SELECT id FROM fixed_assets WHERE description ILIKE '%cotia%');
+UPDATE fixed_assets SET accumulated_depreciation = 0 WHERE description ILIKE '%cotia%';
+```
+55 logs de depreciação indevidos removidos.
+
+**Outros ativos pendentes análise do contador:**
+- Casa em Guarujá: 480 meses OK (construção deprecia)
+- Lote Piraquara: lote+construção juntos — contador deve avaliar separação
+
+---
+
+### Finance — Contas a Pagar (13/06/2026)
+
+**Problema:** `AccountsPayableController` não estava no `FinanceModule`
+**Correção:** registrado em `finance.module.ts`
+
+**Prefixo:** `@Controller('finance/accounts-payable')` — rota: `/finance/accounts-payable`
+
+**Status multi-valor:** Dashboard envia `status=OPEN,OVERDUE` como string.
+`buildWhere` corrigido com split:
+```typescript
+const statuses = filters.status.split(',').map(s => s.trim());
+where.status = statuses.length === 1 ? statuses[0] as any : { in: statuses } as any;
+```
+
+---
+
+### Pendências atualizadas
+
+**Prioritárias:**
+- ECD LM 2024: reimportar para gerar saldo anterior 2023-12-31
+- Visões Contábeis LM: corrigir mapeamentos (códigos L100A → códigos de aglutinação)
+- ECD plano referencial L100A/L300A: importar 732+213 códigos
+- Dashboard: reconstruir com dados reais por perfil (pendência original)
+
+**Backlog:**
+- ECF parser completo
+- Lançamentos depreciação automáticos no backfill
+- Cron job mensal de depreciação
+- eSocial eventos completos
+- EFD-Contribuições no sidebar (hoje disabled: true)
+- Sidebar: testar filtro com usuário não-Master-Admin
+
