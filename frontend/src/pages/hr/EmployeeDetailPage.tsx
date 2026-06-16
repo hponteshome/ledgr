@@ -28,6 +28,10 @@ export default function EmployeeDetailPage() {
   const [showOco, setShowOco]     = useState(false);
   const [showAfas, setShowAfas]   = useState(false);
   const [showBH, setShowBH]       = useState(false);
+  const [showRescisao, setShowRescisao] = useState(false);
+  const [rescisaoDto, setRescisaoDto] = useState({motivo:"SEM_JUSTA_CAUSA",tipoAvisoPrevio:"INDENIZADO",dataAviso:"",dataAfastamento:"",feriasVencidas:false,feriasVencidasDobro:false,saldoFgtsContaInformado:"",outrosProventos:"",outrosDescontos:"",observacao:""});
+  const [rescisaoPreview, setRescisaoPreview] = useState<any>(null);
+  const [calculando, setCalculando] = useState(false);
 
   // Formularios
   const [editDto, setEditDto]   = useState<any>({});
@@ -85,6 +89,37 @@ export default function EmployeeDetailPage() {
     catch(e:any){ alert(e?.response?.data?.message??"Erro"); } finally{setSaving(false);}
   }
 
+  async function calcularRescisao() {
+    setCalculando(true);
+    try {
+      const {data} = await api.post("/hr/employees/"+id+"/rescisao/calcular", {
+        ...rescisaoDto,
+        saldoFgtsContaInformado: parseFloat(rescisaoDto.saldoFgtsContaInformado)||0,
+        outrosProventos: parseFloat(rescisaoDto.outrosProventos)||0,
+        outrosDescontos: parseFloat(rescisaoDto.outrosDescontos)||0,
+      });
+      setRescisaoPreview(data);
+    } catch(e:any){ alert(e?.response?.data?.message??"Erro ao calcular rescisao"); }
+    finally{ setCalculando(false); }
+  }
+
+  async function confirmarRescisao() {
+    if(!window.confirm("ATENCAO: Esta acao registrara a rescisao definitivamente e alterara o status do funcionario para DESLIGADO. Confirmar?")) return;
+    setSaving(true);
+    try {
+      await api.post("/hr/employees/"+id+"/rescisao", {
+        ...rescisaoDto,
+        saldoFgtsContaInformado: parseFloat(rescisaoDto.saldoFgtsContaInformado)||0,
+        outrosProventos: parseFloat(rescisaoDto.outrosProventos)||0,
+        outrosDescontos: parseFloat(rescisaoDto.outrosDescontos)||0,
+      });
+      setShowRescisao(false); setRescisaoPreview(null);
+      alert("Rescisao registrada! Funcionario desligado.");
+      load();
+    } catch(e:any){ alert(e?.response?.data?.message??"Erro ao confirmar rescisao"); }
+    finally{ setSaving(false); }
+  }
+
   if(loading) return <div style={{padding:60,textAlign:"center",color:"#9CA3AF"}}>Carregando...</div>;
   if(!emp)    return <div style={{padding:60,textAlign:"center",color:"#EF4444"}}>Funcionario nao encontrado.</div>;
 
@@ -105,6 +140,8 @@ export default function EmployeeDetailPage() {
           <div style={{display:"flex",gap:8}}>
             <button onClick={()=>setShowEdit(true)} style={S.btn(AC)}>Editar</button>
             <button onClick={()=>setShowHist(true)} style={S.btn("#7C3AED")}>+ Alteracao Contratual</button>
+            {emp.status==="active"&&<button onClick={()=>{setRescisaoPreview(null);setShowRescisao(true);}} style={{...S.btn("#DC2626"),display:"flex",alignItems:"center",gap:6}}><span>&#9888;</span> Rescindir Contrato</button>}
+            {emp.status==="terminated"&&<span style={{fontSize:12,padding:"6px 12px",borderRadius:8,background:"#FEE2E2",color:"#B91C1C",fontWeight:600}}>&#9940; Desligado em {fmtDate(emp.terminationDate)}</span>}
           </div>
         </div>
         {/* Tabs */}
@@ -393,6 +430,176 @@ export default function EmployeeDetailPage() {
           </div>
         </div></div>
       )}
+      {/* Modal Rescisao CLT */}
+      {showRescisao && (
+        <div style={ov}><div style={{background:"#fff",borderRadius:14,width:740,maxHeight:"92vh",overflowY:"auto",boxShadow:"0 20px 60px rgba(0,0,0,.2)"}}>
+          {/* Header vermelho */}
+          <div style={{background:"#DC2626",borderRadius:"14px 14px 0 0",padding:"16px 24px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <div>
+              <div style={{fontSize:15,fontWeight:700,color:"#fff"}}>&#9888; Rescisao de Contrato CLT — TRCT</div>
+              <div style={{fontSize:12,color:"rgba(255,255,255,0.85)",marginTop:3}}>{emp.fullName} &middot; Admissao: {fmtDate(emp.hireDate)} &middot; {fmtBRL(emp.salary)}/mes</div>
+            </div>
+            <button onClick={()=>{setShowRescisao(false);setRescisaoPreview(null);}} style={{background:"rgba(255,255,255,0.2)",border:"none",color:"#fff",cursor:"pointer",fontSize:18,borderRadius:6,padding:"2px 8px",lineHeight:1}}>&#10005;</button>
+          </div>
+
+          <div style={{padding:24,display:"grid",gap:16}}>
+
+            {/* Parametros */}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+              <div>
+                <label style={S.lbl}>Motivo da Rescisao *</label>
+                <select value={rescisaoDto.motivo} onChange={e=>setRescisaoDto(d=>({...d,motivo:e.target.value}))} style={S.inp}>
+                  <option value="SEM_JUSTA_CAUSA">Sem Justa Causa (Empregador)</option>
+                  <option value="PEDIDO_DEMISSAO">Pedido de Demissao</option>
+                  <option value="ACORDO_484A">Acordo Mutuo (Art. 484-A)</option>
+                  <option value="JUSTA_CAUSA">Justa Causa</option>
+                  <option value="TERMINO_CONTRATO_DETERMINADO">Termino Contrato Determinado</option>
+                  <option value="RESCISAO_INDIRETA">Rescisao Indireta</option>
+                </select>
+              </div>
+              <div>
+                <label style={S.lbl}>Tipo de Aviso Previo *</label>
+                <select value={rescisaoDto.tipoAvisoPrevio} onChange={e=>setRescisaoDto(d=>({...d,tipoAvisoPrevio:e.target.value}))} style={S.inp}>
+                  <option value="INDENIZADO">Indenizado (nao vai trabalhar)</option>
+                  <option value="TRABALHADO">Trabalhado (cumpre todos os dias)</option>
+                  <option value="TRABALHADO_PARCIAL">Trabalhado parcial + indenizado (misto)</option>
+                  <option value="DISPENSADO">Dispensado pelo empregador</option>
+                  <option value="NAO_CUMPRIDO">Nao cumprido (desconto funcionario)</option>
+                  <option value="NAO_SE_APLICA">Nao se aplica</option>
+                </select>
+              </div>
+              <div>
+                <label style={S.lbl}>Data do Comunicado do Aviso *</label>
+                <input type="date" value={rescisaoDto.dataAviso} onChange={e=>setRescisaoDto(d=>({...d,dataAviso:e.target.value}))} style={S.inp}/>
+              </div>
+              <div>
+                <label style={S.lbl}>Data de Afastamento (ultimo dia trabalhado) *</label>
+                <input type="date" value={rescisaoDto.dataAfastamento} onChange={e=>setRescisaoDto(d=>({...d,dataAfastamento:e.target.value}))} style={S.inp}/>
+              </div>
+              <div>
+                <label style={S.lbl}>Saldo FGTS Conta Vinculada (R$)</label>
+                <input type="number" step="0.01" placeholder="0,00 — preencher apos extrato FGTS Digital" value={rescisaoDto.saldoFgtsContaInformado} onChange={e=>setRescisaoDto(d=>({...d,saldoFgtsContaInformado:e.target.value}))} style={S.inp}/>
+              </div>
+              <div style={{display:"flex",flexDirection:"column",justifyContent:"center",gap:8,paddingTop:8}}>
+                <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",fontSize:13}}>
+                  <input type="checkbox" checked={rescisaoDto.feriasVencidas} onChange={e=>setRescisaoDto(d=>({...d,feriasVencidas:e.target.checked}))}/>
+                  Ha ferias vencidas (periodo anterior nao gozado)
+                </label>
+                {rescisaoDto.feriasVencidas && (
+                  <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",fontSize:13,color:"#B91C1C"}}>
+                    <input type="checkbox" checked={rescisaoDto.feriasVencidasDobro} onChange={e=>setRescisaoDto(d=>({...d,feriasVencidasDobro:e.target.checked}))}/>
+                    Em dobro (vencidas ha +12 meses — art. 137 CLT)
+                  </label>
+                )}
+              </div>
+            </div>
+
+            {/* Extras */}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 2fr",gap:12}}>
+              <div><label style={S.lbl}>Outros Proventos (R$)</label>
+                <input type="number" step="0.01" value={rescisaoDto.outrosProventos} onChange={e=>setRescisaoDto(d=>({...d,outrosProventos:e.target.value}))} style={S.inp} placeholder="0,00"/></div>
+              <div><label style={S.lbl}>Outros Descontos (R$)</label>
+                <input type="number" step="0.01" value={rescisaoDto.outrosDescontos} onChange={e=>setRescisaoDto(d=>({...d,outrosDescontos:e.target.value}))} style={S.inp} placeholder="0,00"/></div>
+              <div><label style={S.lbl}>Observacao</label>
+                <input value={rescisaoDto.observacao} onChange={e=>setRescisaoDto(d=>({...d,observacao:e.target.value}))} style={S.inp} placeholder="Observacao geral sobre a rescisao"/></div>
+            </div>
+
+            {/* Botao calcular */}
+            <div style={{display:"flex",justifyContent:"center"}}>
+              <button onClick={calcularRescisao} disabled={calculando||!rescisaoDto.dataAviso||!rescisaoDto.dataAfastamento} style={{...S.btn("#0891B2"),padding:"10px 40px",fontSize:14,fontWeight:700,opacity:(calculando||!rescisaoDto.dataAviso||!rescisaoDto.dataAfastamento)?0.5:1}}>
+                {calculando?"Calculando TRCT...":"Calcular TRCT"}
+              </button>
+            </div>
+
+            {/* Preview TRCT */}
+            {rescisaoPreview && (
+              <div style={{border:"1px solid #E5E7EB",borderRadius:12,overflow:"hidden"}}>
+                <div style={{background:"#F0F9FF",padding:"8px 16px",borderBottom:"1px solid #BAE6FD",fontSize:12,color:"#0369A1",display:"flex",gap:16}}>
+                  <span>Aviso: <strong>{rescisaoPreview.parametros.diasAvisoPrevio}d total</strong>
+                    {rescisaoPreview.parametros.diasAvisoTrabalhados>0&&<span style={{color:"#374151"}}> ({rescisaoPreview.parametros.diasAvisoTrabalhados}d trabalhados + {rescisaoPreview.parametros.diasAvisoIndenizados}d indenizados)</span>}
+                  </span>
+                  <span>Projecao fim: <strong>{fmtDate(rescisaoPreview.parametros.dataProjecaoFim)}</strong></span>
+                  <span>Dep. IRRF: <strong>{rescisaoPreview.parametros.numDependentes}</strong></span>
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr"}}>
+
+                  {/* Proventos */}
+                  <div style={{borderRight:"1px solid #E5E7EB"}}>
+                    <div style={{padding:"8px 14px",background:"#F9FAFB",fontSize:10,fontWeight:700,color:"#374151",textTransform:"uppercase" as const,borderBottom:"1px solid #E5E7EB",letterSpacing:0.5}}>Proventos</div>
+                    {([
+                      ["Saldo Salario ("+rescisaoPreview.proventos.saldoSalarioDias+"d)",rescisaoPreview.proventos.saldoSalarioValor,"#15803D"],
+                      ["Aviso Previo Indenizado",rescisaoPreview.proventos.avisoPrevioValor,"#15803D"],
+                      ["13o Prop. ("+rescisaoPreview.proventos.decimoTerceiroMeses+"/12)",rescisaoPreview.proventos.decimoTerceiroValor,"#15803D"],
+                      ...(rescisaoPreview.proventos.feriasVencidas?[["Ferias Vencidas",rescisaoPreview.proventos.feriasVencidasValor,"#15803D"],["1/3 Ferias Vencidas",rescisaoPreview.proventos.feriasVencidasTerco,"#15803D"]]:[]),
+                      ["Ferias Prop. ("+rescisaoPreview.proventos.feriasPropMeses+"/12)",rescisaoPreview.proventos.feriasPropValor,"#15803D"],
+                      ["1/3 Ferias Proporcionais",rescisaoPreview.proventos.feriasPropTerco,"#15803D"],
+                      ...(rescisaoPreview.proventos.outrosProventos>0?[["Outros Proventos",rescisaoPreview.proventos.outrosProventos,"#15803D"]]:[]),
+                    ] as [string,number,string][]).map(([l,v,c])=>(
+                      <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"6px 14px",borderBottom:"0.5px solid #F5F5F5",fontSize:12}}>
+                        <span style={{color:"#374151"}}>{l}</span><span style={{fontFamily:"monospace",color:c,fontWeight:v>0?600:400}}>{fmtBRL(v)}</span>
+                      </div>
+                    ))}
+                    <div style={{display:"flex",justifyContent:"space-between",padding:"10px 14px",background:"#F0FDF4",fontSize:13,fontWeight:700,borderTop:"1px solid #BBF7D0"}}>
+                      <span>Total Proventos</span><span style={{fontFamily:"monospace",color:"#15803D"}}>{fmtBRL(rescisaoPreview.proventos.totalProventos)}</span>
+                    </div>
+                  </div>
+
+                  {/* Descontos */}
+                  <div style={{borderRight:"1px solid #E5E7EB"}}>
+                    <div style={{padding:"8px 14px",background:"#F9FAFB",fontSize:10,fontWeight:700,color:"#374151",textTransform:"uppercase" as const,borderBottom:"1px solid #E5E7EB",letterSpacing:0.5}}>Descontos</div>
+                    {([
+                      ["INSS (base "+fmtBRL(rescisaoPreview.descontos.baseInss)+")",rescisaoPreview.descontos.valorInss],
+                      ["IRRF (base "+fmtBRL(rescisaoPreview.descontos.baseIrrf)+")",rescisaoPreview.descontos.valorIrrf],
+                      ...(rescisaoPreview.descontos.outrosDescontos>0?[["Outros Descontos",rescisaoPreview.descontos.outrosDescontos]]:[]),
+                    ] as [string,number][]).map(([l,v])=>(
+                      <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"6px 14px",borderBottom:"0.5px solid #F5F5F5",fontSize:12}}>
+                        <span style={{color:"#374151"}}>{l}</span><span style={{fontFamily:"monospace",color:"#DC2626",fontWeight:v>0?600:400}}>{fmtBRL(v)}</span>
+                      </div>
+                    ))}
+                    <div style={{display:"flex",justifyContent:"space-between",padding:"10px 14px",background:"#FFF1F2",fontSize:13,fontWeight:700,borderTop:"1px solid #FECDD3"}}>
+                      <span>Total Descontos</span><span style={{fontFamily:"monospace",color:"#DC2626"}}>{fmtBRL(rescisaoPreview.descontos.totalDescontos)}</span>
+                    </div>
+                  </div>
+
+                  {/* FGTS + Liquido */}
+                  <div>
+                    <div style={{padding:"8px 14px",background:"#F9FAFB",fontSize:10,fontWeight:700,color:"#374151",textTransform:"uppercase" as const,borderBottom:"1px solid #E5E7EB",letterSpacing:0.5}}>FGTS (Informativo)</div>
+                    {([
+                      ["Base calculo FGTS",rescisaoPreview.fgts.baseFgtsMes,"#B45309"],
+                      ["Deposito mes (8%)",rescisaoPreview.fgts.fgtsSobreVerbas,"#B45309"],
+                      ["Saldo conta vinculada",rescisaoPreview.fgts.saldoFgtsContaInformado,"#6B7280"],
+                      ["Multa 40%",rescisaoPreview.fgts.multaFgtsValor,"#B45309"],
+                    ] as [string,number,string][]).map(([l,v,c])=>(
+                      <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"6px 14px",borderBottom:"0.5px solid #F5F5F5",fontSize:12}}>
+                        <span style={{color:"#374151"}}>{l}</span>
+                        <span style={{fontFamily:"monospace",color:v>0?c:"#9CA3AF"}}>{v>0?fmtBRL(v):"informar saldo"}</span>
+                      </div>
+                    ))}
+                    <div style={{padding:"8px 14px",background:"#F0F9FF",borderTop:"1px solid #BAE6FD",fontSize:10,fontWeight:700,color:"#0369A1",textTransform:"uppercase" as const,letterSpacing:0.5}}>Liquido TRCT a Pagar</div>
+                    <div style={{display:"flex",justifyContent:"center",alignItems:"center",padding:"16px 14px",fontSize:24,fontWeight:800,color:"#0891B2",fontFamily:"monospace"}}>
+                      {fmtBRL(rescisaoPreview.totalLiquido)}
+                    </div>
+                  </div>
+
+                </div>
+                <div style={{padding:"8px 16px",background:"#FFFBEB",borderTop:"1px solid #FDE68A",fontSize:11,color:"#92400E"}}>
+                  &#9432; INSS e IRRF incidem apenas sobre Saldo de Salario e 13o. Ferias e Aviso Indenizado sao verbas indenizatorias — isentas. Multa FGTS sera calculada apos informar saldo da conta vinculada.
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div style={{padding:"12px 24px",borderTop:"1px solid #E5E7EB",display:"flex",justifyContent:"space-between",alignItems:"center",background:"#FAFAFA",borderRadius:"0 0 14px 14px"}}>
+            <span style={{fontSize:12,color:"#9CA3AF"}}>Rescisao sem justa causa · Aviso indenizado · Lei 12.506/2011 · IRRF Lei 15.270/2025</span>
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={()=>{setShowRescisao(false);setRescisaoPreview(null);}} style={S.btn("#fff","#374151")}>Cancelar</button>
+              {rescisaoPreview&&<button onClick={confirmarRescisao} disabled={saving} style={{...S.btn("#DC2626"),padding:"8px 24px",fontWeight:700}}>{saving?"Registrando...":"Confirmar Rescisao"}</button>}
+            </div>
+          </div>
+        </div></div>
+      )}
+
     </div>
   );
 }

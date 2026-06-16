@@ -162,8 +162,8 @@ export class EmployeeService {
       data: {
         fullName:    dto.fullName,
         role:        dto.role,
-        salary:      dto.salary ? new (require('@prisma/client').Prisma.Decimal)(dto.salary) : undefined,
-        weeklyHours: dto.weeklyHours ? new (require('@prisma/client').Prisma.Decimal)(dto.weeklyHours) : undefined,
+        salary:      dto.salary ? new (require('@prisma/client').Prisma.Decimal)(String(dto.salary).replace(',','.')) : undefined,
+        weeklyHours: dto.weeklyHours ? new (require('@prisma/client').Prisma.Decimal)(String(dto.weeklyHours).replace(',','.')) : undefined,
         department:  dto.department,
         lotacao:     dto.lotacao,
         phone:       dto.phone,

@@ -201,6 +201,7 @@ model Company {
   afastamentos           EmployeeLeave[]
   bancoHoras             BancoHoras[]
   bancoHorasLancamentos  BancoHorasLancamento[]
+  employeeTerminations  EmployeeTermination[]
 
   pettyCash              PettyCash[]
   accountingViews        AccountingView[]
@@ -660,6 +661,7 @@ model Employee {
   ocorrencias       EmployeeOccurrence[]
   afastamentos      EmployeeLeave[]
   bancoHoras        BancoHoras?
+  terminations      EmployeeTermination[]
 
   @@index([companyId, deletedAt])
   @@index([taxId])
@@ -3533,6 +3535,138 @@ model EmployeeLeave {
   @@map("employee_leaves")
 }
 
+
+// =============================================================================
+// 12.1 . RESCISAO DE CONTRATO CLT (TRCT)
+// =============================================================================
+
+enum MotivoRescisao {
+  SEM_JUSTA_CAUSA
+  PEDIDO_DEMISSAO
+  ACORDO_484A
+  JUSTA_CAUSA
+  TERMINO_CONTRATO_DETERMINADO
+  RESCISAO_INDIRETA
+  APOSENTADORIA
+  FALECIMENTO
+  OUTROS
+
+  @@map("motivo_rescisao")
+}
+
+enum TipoAvisoPrevio {
+  INDENIZADO
+  TRABALHADO
+  TRABALHADO_PARCIAL
+  DISPENSADO
+  NAO_CUMPRIDO
+  NAO_SE_APLICA
+
+  @@map("tipo_aviso_previo")
+}
+
+enum StatusRescisao {
+  CALCULADA
+  HOMOLOGADA
+  PAGA
+  CANCELADA
+
+  @@map("status_rescisao")
+}
+
+/// Rescisao de contrato CLT - Termo de Rescisao do Contrato de Trabalho (TRCT)
+model EmployeeTermination {
+  id         String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId  String @map("company_id") @db.Uuid
+  employeeId String @map("employee_id") @db.Uuid
+
+  // Parametros do desligamento
+  motivo          MotivoRescisao  @map("motivo")
+  tipoAvisoPrevio TipoAvisoPrevio @map("tipo_aviso_previo")
+  dataAfastamento DateTime        @map("data_afastamento") @db.Date
+  dataAviso       DateTime        @map("data_aviso") @db.Date
+  dataProjecaoFim DateTime?       @map("data_projecao_fim") @db.Date
+  diasAvisoPrevio      Int     @default(0) @map("dias_aviso_previo")
+  diasAvisoTrabalhados Int     @default(0) @map("dias_aviso_trabalhados")
+  diasAvisoIndenizados Int     @default(0) @map("dias_aviso_indenizados")
+
+  // Snapshot do funcionario no momento do calculo
+  salarioBase    Decimal  @map("salario_base") @db.Decimal(15, 2)
+  numDependentes Int      @default(0) @map("num_dependentes")
+  admissaoData   DateTime @map("admissao_data") @db.Date
+
+  // Saldo de salario
+  saldoSalarioDias  Int     @default(0) @map("saldo_salario_dias")
+  saldoSalarioValor Decimal @default(0) @map("saldo_salario_valor") @db.Decimal(15, 2)
+
+  // Aviso previo indenizado
+  avisoPrevioValor Decimal @default(0) @map("aviso_previo_valor") @db.Decimal(15, 2)
+
+  // 13o salario proporcional
+  decimoTerceiroMeses Int     @default(0) @map("decimo_terceiro_meses")
+  decimoTerceiroValor Decimal @default(0) @map("decimo_terceiro_valor") @db.Decimal(15, 2)
+
+  // Ferias vencidas
+  feriasVencidas       Boolean   @default(false) @map("ferias_vencidas")
+  feriasVencidasInicio DateTime? @map("ferias_vencidas_inicio") @db.Date
+  feriasVencidasFim    DateTime? @map("ferias_vencidas_fim") @db.Date
+  feriasVencidasDobro  Boolean   @default(false) @map("ferias_vencidas_dobro")
+  feriasVencidasValor  Decimal   @default(0) @map("ferias_vencidas_valor") @db.Decimal(15, 2)
+  feriasVencidasTerco  Decimal   @default(0) @map("ferias_vencidas_terco") @db.Decimal(15, 2)
+
+  // Ferias proporcionais
+  feriasPropMeses Int     @default(0) @map("ferias_prop_meses")
+  feriasPropValor Decimal @default(0) @map("ferias_prop_valor") @db.Decimal(15, 2)
+  feriasPropTerco Decimal @default(0) @map("ferias_prop_terco") @db.Decimal(15, 2)
+
+  // Totais de proventos
+  totalProventos Decimal @default(0) @map("total_proventos") @db.Decimal(15, 2)
+
+  // INSS sobre verbas rescisorias
+  baseInss  Decimal @default(0) @map("base_inss") @db.Decimal(15, 2)
+  aliqInss  Decimal @default(0) @map("aliq_inss") @db.Decimal(5, 4)
+  valorInss Decimal @default(0) @map("valor_inss") @db.Decimal(15, 2)
+
+  // IRRF sobre verbas rescisorias
+  baseIrrf    Decimal @default(0) @map("base_irrf") @db.Decimal(15, 2)
+  deducaoIrrf Decimal @default(0) @map("deducao_irrf") @db.Decimal(15, 2)
+  aliqIrrf    Decimal @default(0) @map("aliq_irrf") @db.Decimal(5, 4)
+  valorIrrf   Decimal @default(0) @map("valor_irrf") @db.Decimal(15, 2)
+
+  // FGTS
+  baseFgtsMes             Decimal @default(0) @map("base_fgts_mes") @db.Decimal(15, 2)
+  fgtsSobreVerbas         Decimal @default(0) @map("fgts_sobre_verbas") @db.Decimal(15, 2)
+  saldoFgtsContaInformado Decimal @default(0) @map("saldo_fgts_conta_informado") @db.Decimal(15, 2)
+  multaFgtsPercentual     Decimal @default(0) @map("multa_fgts_percentual") @db.Decimal(5, 4)
+  multaFgtsValor          Decimal @default(0) @map("multa_fgts_valor") @db.Decimal(15, 2)
+
+  // Outros lancamentos manuais
+  outrosProventos  Decimal @default(0) @map("outros_proventos") @db.Decimal(15, 2)
+  outrosDescontos  Decimal @default(0) @map("outros_descontos") @db.Decimal(15, 2)
+  observacaoOutros String? @map("observacao_outros") @db.VarChar(255)
+
+  // Totais finais
+  totalDescontos Decimal @default(0) @map("total_descontos") @db.Decimal(15, 2)
+  totalLiquido   Decimal @default(0) @map("total_liquido") @db.Decimal(15, 2)
+
+  // Controle
+  status         StatusRescisao @default(CALCULADA) @map("status")
+  observacao     String?        @map("observacao") @db.Text
+  journalEntryId String?        @map("journal_entry_id") @db.Uuid
+  homologadoEm   DateTime?      @map("homologado_em") @db.Timestamp(6)
+  pagoEm         DateTime?      @map("pago_em") @db.Timestamp(6)
+
+  createdById String    @map("created_by_id") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamp(6)
+
+  company  Company  @relation(fields: [companyId], references: [id])
+  employee Employee @relation(fields: [employeeId], references: [id])
+
+  @@index([companyId, employeeId])
+  @@map("employee_terminations")
+}
 
 // =============================================================================
 // 13 · BANCO DE HORAS
