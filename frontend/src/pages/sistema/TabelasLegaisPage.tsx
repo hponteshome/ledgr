@@ -77,7 +77,7 @@ export function TabelasLegaisPage() {
 
   const [editInssForm, setEditInssForm] = useState<{
     ano: number; vigenciaIni: string; teto: string; salMinimo: string; faixas: InssFaixaForm[];
-  }>({ ano: 2026, vigenciaIni: '', teto: '', salMinimo: '', faixas: [{limiteAte:'',aliquota:'7.5'},{limiteAte:'',aliquota:'9'},{limiteAte:'',aliquota:'12'},{limiteAte:'',aliquota:'14'}] });
+  }>({ ano: 2026, vigenciaIni: '', teto: '', salMinimo: '', faixas: [{ limiteAte: '', aliquota: '7.5' }, { limiteAte: '', aliquota: '9' }, { limiteAte: '', aliquota: '12' }, { limiteAte: '', aliquota: '14' }] });
 
   const [editIrrfForm, setEditIrrfForm] = useState<{
     ano: number; vigenciaIni: string; faixas: IrrfFaixaForm[]; redutores: IrrfRedutorForm[];
@@ -102,8 +102,8 @@ export function TabelasLegaisPage() {
   useEffect(() => { load(); }, [load]);
 
   // Helpers calculo simulador
-  const irpfTab   = irrfData.find(d => d.ano === irpfAno) ?? null;
-  const inssTab   = inssData.find(d => d.ano === inssAno) ?? null;
+  const irpfTab = irrfData.find(d => d.ano === irpfAno) ?? null;
+  const inssTab = inssData.find(d => d.ano === inssAno) ?? null;
   const simIrpfTab = irrfData.find(d => d.ano === simAno) ?? null;
   const simInssTab = inssData.find(d => d.ano === simAno) ?? null;
   const sal = parseBR(simSalario);
@@ -140,7 +140,7 @@ export function TabelasLegaisPage() {
         faixas: tab.faixas.map(f => ({ limiteAte: String(Number(f.limiteAte)), aliquota: String(Math.round(Number(f.aliquota) * 10000) / 100) })),
       });
     } else {
-      setEditInssForm({ ano, vigenciaIni: ano + '-01-01', teto: '', salMinimo: '', faixas: [{limiteAte:'',aliquota:'7.5'},{limiteAte:'',aliquota:'9'},{limiteAte:'',aliquota:'12'},{limiteAte:'',aliquota:'14'}] });
+      setEditInssForm({ ano, vigenciaIni: ano + '-01-01', teto: '', salMinimo: '', faixas: [{ limiteAte: '', aliquota: '7.5' }, { limiteAte: '', aliquota: '9' }, { limiteAte: '', aliquota: '12' }, { limiteAte: '', aliquota: '14' }] });
     }
     setShowEditInss(true);
   }
@@ -172,7 +172,7 @@ export function TabelasLegaisPage() {
         redutores: tab.redutores.map(r => ({ limiteAte: String(Number(r.limiteAte)), redutor: Number(r.redutor) >= 999998 ? '' : String(Number(r.redutor)) })),
       });
     } else {
-      setEditIrrfForm({ ano, vigenciaIni: ano + '-01-01', faixas: [{limiteAte:'999999',aliquota:'0',deducao:'0'}], redutores: [] });
+      setEditIrrfForm({ ano, vigenciaIni: ano + '-01-01', faixas: [{ limiteAte: '999999', aliquota: '0', deducao: '0' }], redutores: [] });
     }
     setShowEditIrrf(true);
   }
@@ -221,32 +221,32 @@ export function TabelasLegaisPage() {
   const anos = [...new Set([...irrfData.map(d => d.ano), ...inssData.map(d => d.ano)])].sort((a, b) => b - a);
 
   const S = {
-    page:  { padding: '24px 0', fontFamily: 'var(--font-sans,system-ui)', fontSize: 14, color: 'var(--color-text-primary)' } as React.CSSProperties,
+    page: { padding: '24px 0', fontFamily: 'var(--font-sans,system-ui)', fontSize: 14, color: 'var(--color-text-primary)' } as React.CSSProperties,
     badge: { display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 20, background: '#F9FAFB', color: '#374151' } as React.CSSProperties,
-    card:  { background: '#fff', border: '0.5px solid #E5E7EB', borderRadius: 10, overflow: 'hidden', marginBottom: 16 } as React.CSSProperties,
-    th:    { background: '#F9FAFB', color: '#6B7280', fontSize: 10, fontWeight: 500, textTransform: 'uppercase' as const, letterSpacing: '.3px', padding: '8px 12px', textAlign: 'left' as const, borderBottom: '0.5px solid #E5E7EB' } as React.CSSProperties,
-    thR:   { background: '#F9FAFB', color: '#6B7280', fontSize: 10, fontWeight: 500, textTransform: 'uppercase' as const, letterSpacing: '.3px', padding: '8px 12px', textAlign: 'right' as const, borderBottom: '0.5px solid #E5E7EB' } as React.CSSProperties,
-    td:    { padding: '8px 12px', borderBottom: '0.5px solid #E5E7EB', fontSize: 13 } as React.CSSProperties,
-    tdR:   { padding: '8px 12px', textAlign: 'right' as const, borderBottom: '0.5px solid #E5E7EB', fontSize: 13 } as React.CSSProperties,
+    card: { background: '#fff', border: '0.5px solid #E5E7EB', borderRadius: 10, overflow: 'hidden', marginBottom: 16 } as React.CSSProperties,
+    th: { background: '#F9FAFB', color: '#6B7280', fontSize: 10, fontWeight: 500, textTransform: 'uppercase' as const, letterSpacing: '.3px', padding: '8px 12px', textAlign: 'left' as const, borderBottom: '0.5px solid #E5E7EB' } as React.CSSProperties,
+    thR: { background: '#F9FAFB', color: '#6B7280', fontSize: 10, fontWeight: 500, textTransform: 'uppercase' as const, letterSpacing: '.3px', padding: '8px 12px', textAlign: 'right' as const, borderBottom: '0.5px solid #E5E7EB' } as React.CSSProperties,
+    td: { padding: '8px 12px', borderBottom: '0.5px solid #E5E7EB', fontSize: 13 } as React.CSSProperties,
+    tdR: { padding: '8px 12px', textAlign: 'right' as const, borderBottom: '0.5px solid #E5E7EB', fontSize: 13 } as React.CSSProperties,
     input: { height: 32, border: '0.5px solid #D1D5DB', borderRadius: 6, padding: '0 9px', fontSize: 13, background: '#fff', width: '100%', outline: 'none', boxSizing: 'border-box' as const } as React.CSSProperties,
     label: { fontSize: 10, textTransform: 'uppercase' as const, letterSpacing: '.3px', color: '#6B7280', display: 'block', marginBottom: 4 },
-    tabBtn:  (active: boolean) => ({ height: 30, border: '0.5px solid ' + (active ? '#111' : '#E5E7EB'), borderRadius: 6, padding: '0 14px', fontSize: 12, cursor: 'pointer', background: active ? '#111' : '#fff', color: active ? '#fff' : '#6B7280' } as React.CSSProperties),
-    anoBtn:  (active: boolean) => ({ height: 26, border: '0.5px solid ' + (active ? '#2563EB' : '#E5E7EB'), borderRadius: 6, padding: '0 10px', fontSize: 11, cursor: 'pointer', background: active ? '#EFF6FF' : '#fff', color: active ? '#2563EB' : '#6B7280', fontWeight: active ? 600 : 400 } as React.CSSProperties),
+    tabBtn: (active: boolean) => ({ height: 30, border: '0.5px solid ' + (active ? '#111' : '#E5E7EB'), borderRadius: 6, padding: '0 14px', fontSize: 12, cursor: 'pointer', background: active ? '#111' : '#fff', color: active ? '#fff' : '#6B7280' } as React.CSSProperties),
+    anoBtn: (active: boolean) => ({ height: 26, border: '0.5px solid ' + (active ? '#2563EB' : '#E5E7EB'), borderRadius: 6, padding: '0 10px', fontSize: 11, cursor: 'pointer', background: active ? '#EFF6FF' : '#fff', color: active ? '#2563EB' : '#6B7280', fontWeight: active ? 600 : 400 } as React.CSSProperties),
     editBtn: { height: 26, border: '0.5px solid #0891B2', borderRadius: 6, padding: '0 10px', fontSize: 11, cursor: 'pointer', background: '#ECFEFF', color: '#0891B2', fontWeight: 600 } as React.CSSProperties,
-    newBtn:  { height: 26, border: 'none', borderRadius: 6, padding: '0 12px', fontSize: 11, cursor: 'pointer', background: '#0891B2', color: '#fff', fontWeight: 600 } as React.CSSProperties,
+    newBtn: { height: 26, border: 'none', borderRadius: 6, padding: '0 12px', fontSize: 11, cursor: 'pointer', background: '#0891B2', color: '#fff', fontWeight: 600 } as React.CSSProperties,
   };
 
   // Estilos modal
-  const ov  = { position: 'fixed' as const, inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 };
-  const mb  = (w = 600) => ({ background: '#fff', borderRadius: 14, width: w, maxHeight: '90vh', overflowY: 'auto' as const, boxShadow: '0 20px 60px rgba(0,0,0,.18)' });
-  const mh  = { background: '#0891B2', borderRadius: '14px 14px 0 0', padding: '14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' };
+  const ov = { position: 'fixed' as const, inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 };
+  const mb = (w = 600) => ({ background: '#fff', borderRadius: 14, width: w, maxHeight: '90vh', overflowY: 'auto' as const, boxShadow: '0 20px 60px rgba(0,0,0,.18)' });
+  const mh = { background: '#0891B2', borderRadius: '14px 14px 0 0', padding: '14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' };
   const mb2 = { padding: 20 };
-  const mf  = { padding: '12px 20px', borderTop: '0.5px solid #E5E7EB', display: 'flex', justifyContent: 'flex-end', gap: 8, background: '#FAFAFA', borderRadius: '0 0 14px 14px' };
+  const mf = { padding: '12px 20px', borderTop: '0.5px solid #E5E7EB', display: 'flex', justifyContent: 'flex-end', gap: 8, background: '#FAFAFA', borderRadius: '0 0 14px 14px' };
   const inp = S.input;
   const lbl = S.label;
   const cancelBtn = { height: 32, border: '0.5px solid #E5E7EB', borderRadius: 8, padding: '0 16px', fontSize: 13, cursor: 'pointer', background: '#fff', color: '#374151' } as React.CSSProperties;
-  const saveBtn   = { height: 32, border: 'none', borderRadius: 8, padding: '0 20px', fontSize: 13, cursor: 'pointer', background: '#0891B2', color: '#fff', fontWeight: 600 } as React.CSSProperties;
-  const thinp     = { ...inp, width: '100%', height: 30, fontSize: 12, padding: '0 6px' };
+  const saveBtn = { height: 32, border: 'none', borderRadius: 8, padding: '0 20px', fontSize: 13, cursor: 'pointer', background: '#0891B2', color: '#fff', fontWeight: 600 } as React.CSSProperties;
+  const thinp = { ...inp, width: '100%', height: 30, fontSize: 12, padding: '0 6px' };
   const thInputRO = { ...thinp, background: '#FFFBEB', color: '#92400E', fontWeight: 600 };
 
   return (
@@ -258,9 +258,9 @@ export function TabelasLegaisPage() {
       </div>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
-        <button style={S.tabBtn(aba === 'irpf')}   onClick={() => setAba('irpf')}>Tabela IRPF</button>
-        <button style={S.tabBtn(aba === 'inss')}   onClick={() => setAba('inss')}>Tabela INSS</button>
-        <button style={S.tabBtn(aba === 'salmin')} onClick={() => setAba('salmin')}>Sal\u00e1rio M\u00ednimo</button>
+        <button style={S.tabBtn(aba === 'irpf')} onClick={() => setAba('irpf')}>Tabela IRPF</button>
+        <button style={S.tabBtn(aba === 'inss')} onClick={() => setAba('inss')}>Tabela INSS</button>
+        <button style={S.tabBtn(aba === 'salmin')} onClick={() => setAba('salmin')}>Salário Mínimo</button>
       </div>
 
       {/* ─── IRPF ─── */}
@@ -269,8 +269,8 @@ export function TabelasLegaisPage() {
           <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
             {irrfData.map(d => <button key={d.ano} style={S.anoBtn(irpfAno === d.ano)} onClick={() => setIrpfAno(d.ano)}>{d.ano}</button>)}
             <div style={{ marginLeft: 8, display: 'flex', gap: 6 }}>
-              <button style={S.editBtn} onClick={() => openEditIrrf(irpfAno)}>\u270e Editar {irpfAno}</button>
-              <button style={S.newBtn}  onClick={() => { setEditIrrfForm({ ano: new Date().getFullYear(), vigenciaIni: new Date().getFullYear()+'-01-01', faixas:[{limiteAte:'999999',aliquota:'0',deducao:'0'}], redutores:[] }); setShowEditIrrf(true); }}>+ Novo Ano</button>
+              <button style={S.editBtn} onClick={() => openEditIrrf(irpfAno)}> Editar {irpfAno}</button>
+              <button style={S.newBtn} onClick={() => { setEditIrrfForm({ ano: new Date().getFullYear(), vigenciaIni: new Date().getFullYear() + '-01-01', faixas: [{ limiteAte: '999999', aliquota: '0', deducao: '0' }], redutores: [] }); setShowEditIrrf(true); }}>+ Novo Ano</button>
             </div>
           </div>
           {irpfTab && (
@@ -283,14 +283,14 @@ export function TabelasLegaisPage() {
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead><tr>
                     <th style={S.th}>Base de C\u00e1lculo</th>
-                    <th style={S.thR}>Al\u00edquota</th>
+                    <th style={S.thR}>Alíquota</th>
                     <th style={S.thR}>Parcela a Deduzir</th>
                   </tr></thead>
                   <tbody>
                     {irpfTab.faixas.map((f, i) => (
                       <tr key={i}>
-                        <td style={S.td}>{f.limiteAte >= 999998 ? 'Acima de R$ ' + fmtBRL(irpfTab.faixas[i-1]?.limiteAte ?? 0) : 'At\u00e9 R$ ' + fmtBRL(f.limiteAte)}</td>
-                        <td style={S.tdR}>{fmtPct(Number(f.aliquota)*100)}</td>
+                        <td style={S.td}>{f.limiteAte >= 999998 ? 'Acima de R$ ' + fmtBRL(irpfTab.faixas[i - 1]?.limiteAte ?? 0) : 'Até R$ ' + fmtBRL(f.limiteAte)}</td>
+                        <td style={S.tdR}>{fmtPct(Number(f.aliquota) * 100)}</td>
                         <td style={S.tdR}>R$ {fmtBRL(f.deducao)}</td>
                       </tr>
                     ))}
@@ -302,7 +302,7 @@ export function TabelasLegaisPage() {
                   <div style={{ padding: '10px 12px', borderBottom: '0.5px solid #E5E7EB', fontSize: 12, fontWeight: 500 }}>Redutor Progressivo (Lei 15.270/2025)</div>
                   <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <thead><tr>
-                      <th style={S.th}>Renda Bruta at\u00e9</th>
+                      <th style={S.th}>Renda Bruta até</th>
                       <th style={S.thR}>Desconto Simplificado</th>
                     </tr></thead>
                     <tbody>
@@ -336,7 +336,7 @@ export function TabelasLegaisPage() {
                 <div><div style={lbl}>INSS</div><div style={{ fontWeight: 600, color: '#DC2626' }}>R$ {fmtBRL(inssVal)}</div></div>
                 <div><div style={lbl}>Base IRRF</div><div style={{ fontWeight: 600 }}>R$ {fmtBRL(baseIR)}</div></div>
                 <div><div style={lbl}>IRRF</div><div style={{ fontWeight: 600, color: '#DC2626' }}>R$ {fmtBRL(irVal)}</div></div>
-                <div><div style={lbl}>L\u00edquido</div><div style={{ fontWeight: 600, color: '#16A34A' }}>R$ {fmtBRL(liquido)}</div></div>
+                <div><div style={lbl}>Líquido</div><div style={{ fontWeight: 600, color: '#16A34A' }}>R$ {fmtBRL(liquido)}</div></div>
               </div>
             )}
           </div>
@@ -349,27 +349,27 @@ export function TabelasLegaisPage() {
           <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
             {inssData.map(d => <button key={d.ano} style={S.anoBtn(inssAno === d.ano)} onClick={() => setInssAno(d.ano)}>{d.ano}</button>)}
             <div style={{ marginLeft: 8, display: 'flex', gap: 6 }}>
-              <button style={S.editBtn} onClick={() => openEditInss(inssAno)}>\u270e Editar {inssAno}</button>
-              <button style={S.newBtn}  onClick={() => { setEditInssForm({ ano: new Date().getFullYear(), vigenciaIni: new Date().getFullYear()+'-01-01', teto:'', salMinimo:'', faixas:[{limiteAte:'',aliquota:'7.5'},{limiteAte:'',aliquota:'9'},{limiteAte:'',aliquota:'12'},{limiteAte:'',aliquota:'14'}] }); setShowEditInss(true); }}>+ Novo Ano</button>
+              <button style={S.editBtn} onClick={() => openEditInss(inssAno)}> Editar {inssAno}</button>
+              <button style={S.newBtn} onClick={() => { setEditInssForm({ ano: new Date().getFullYear(), vigenciaIni: new Date().getFullYear() + '-01-01', teto: '', salMinimo: '', faixas: [{ limiteAte: '', aliquota: '7.5' }, { limiteAte: '', aliquota: '9' }, { limiteAte: '', aliquota: '12' }, { limiteAte: '', aliquota: '14' }] }); setShowEditInss(true); }}>+ Novo Ano</button>
             </div>
           </div>
           {inssTab && (
             <>
               <div style={{ fontSize: 12, color: '#6B7280', marginBottom: 12 }}>
-                Vig\u00eancia: {fmtDate(inssTab.vigenciaIni)} | Teto: R$ {fmtBRL(Number(inssTab.teto))} | Sal. M\u00ednimo: R$ {fmtBRL(Number(inssTab.salMinimo))}
+                Vig\u00eancia: {fmtDate(inssTab.vigenciaIni)} | Teto: R$ {fmtBRL(Number(inssTab.teto))} | Sal. Mínimo: R$ {fmtBRL(Number(inssTab.salMinimo))}
               </div>
               <div style={S.card}>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead><tr>
                     <th style={S.th}>Faixa Salarial</th>
-                    <th style={S.thR}>Al\u00edquota</th>
-                    <th style={S.thR}>Dedu\u00e7\u00e3o (simplif.)</th>
+                    <th style={S.thR}>Alíquota</th>
+                    <th style={S.thR}>Dedução (simplif.)</th>
                   </tr></thead>
                   <tbody>
                     {inssTab.faixas.map((f, i) => (
                       <tr key={i}>
-                        <td style={S.td}>{i === 0 ? 'At\u00e9 R$ ' : 'De R$ ' + fmtBRL(Number(inssTab.faixas[i-1]?.limiteAte ?? 0)) + ' at\u00e9 R$ '}{fmtBRL(Number(f.limiteAte))}</td>
-                        <td style={S.tdR}>{fmtPct(Number(f.aliquota)*100)}</td>
+                        <td style={S.td}>{i === 0 ? 'Até R$ ' : 'De R$ ' + fmtBRL(Number(inssTab.faixas[i - 1]?.limiteAte ?? 0)) + ' até R$ '}{fmtBRL(Number(f.limiteAte))}</td>
+                        <td style={S.tdR}>{fmtPct(Number(f.aliquota) * 100)}</td>
                         <td style={S.tdR}>R$ {fmtBRL(Number(f.deducao))}</td>
                       </tr>
                     ))}
@@ -385,7 +385,7 @@ export function TabelasLegaisPage() {
       {aba === 'salmin' && (
         <div style={S.card}>
           <div style={{ padding: '10px 12px', borderBottom: '0.5px solid #E5E7EB', fontSize: 12, fontWeight: 500, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span>Hist\u00f3rico do Sal\u00e1rio M\u00ednimo Nacional</span>
+            <span>Hist\u00f3rico do Salário Mínimo Nacional</span>
             <button style={S.newBtn} onClick={() => openEditSalMin(null)}>+ Novo Registro</button>
           </div>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -393,7 +393,7 @@ export function TabelasLegaisPage() {
               <th style={S.th}>Vig\u00eancia</th>
               <th style={S.thR}>Valor</th>
               <th style={S.th}>Lei / Decreto</th>
-              <th style={S.th}>A\u00e7\u00f5es</th>
+              <th style={S.th}>Ações</th>
             </tr></thead>
             <tbody>
               {salData.map(s => (
@@ -421,51 +421,51 @@ export function TabelasLegaisPage() {
           <div style={ov}><div style={mb(660)}>
             <div style={mh}>
               <span style={{ color: '#fff', fontWeight: 700, fontSize: 15 }}>Tabela INSS — Ano {editInssForm.ano}</span>
-              <button onClick={() => setShowEditInss(false)} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', borderRadius: 6, padding: '2px 8px', cursor: 'pointer', fontSize: 16 }}>\u00d7</button>
+              <button onClick={() => setShowEditInss(false)} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', borderRadius: 6, padding: '2px 8px', cursor: 'pointer', fontSize: 16 }}>×</button>
             </div>
             <div style={mb2}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12, marginBottom: 18 }}>
                 <div>
                   <span style={lbl}>Ano</span>
-                  <input type="number" value={editInssForm.ano} onChange={e => setEditInssForm(f => ({...f, ano: parseInt(e.target.value)||f.ano}))} style={inp}/>
+                  <input type="number" value={editInssForm.ano} onChange={e => setEditInssForm(f => ({ ...f, ano: parseInt(e.target.value) || f.ano }))} style={inp} />
                 </div>
                 <div>
-                  <span style={lbl}>Vig\u00eancia In\u00edcio</span>
-                  <input type="date" value={editInssForm.vigenciaIni} onChange={e => setEditInssForm(f => ({...f, vigenciaIni: e.target.value}))} style={inp}/>
+                  <span style={lbl}>Vig\u00eancia Início</span>
+                  <input type="date" value={editInssForm.vigenciaIni} onChange={e => setEditInssForm(f => ({ ...f, vigenciaIni: e.target.value }))} style={inp} />
                 </div>
                 <div>
                   <span style={lbl}>Teto (R$)</span>
-                  <input value={editInssForm.teto} onChange={e => setEditInssForm(f => ({...f, teto: e.target.value}))} style={inp} placeholder="Ex: 8475.55"/>
+                  <input value={editInssForm.teto} onChange={e => setEditInssForm(f => ({ ...f, teto: e.target.value }))} style={inp} placeholder="Ex: 8475.55" />
                 </div>
                 <div>
-                  <span style={lbl}>Sal\u00e1rio M\u00ednimo (R$)</span>
-                  <input value={editInssForm.salMinimo} onChange={e => setEditInssForm(f => ({...f, salMinimo: e.target.value}))} style={inp} placeholder="Ex: 1621.00"/>
+                  <span style={lbl}>Salário Mínimo (R$)</span>
+                  <input value={editInssForm.salMinimo} onChange={e => setEditInssForm(f => ({ ...f, salMinimo: e.target.value }))} style={inp} placeholder="Ex: 1621.00" />
                 </div>
               </div>
 
-              <div style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', marginBottom: 8, letterSpacing: 0.5 }}>Faixas de Contribui\u00e7\u00e3o</div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', marginBottom: 8, letterSpacing: 0.5 }}>Faixas de Contribuiçãoo</div>
               <table style={{ width: '100%', borderCollapse: 'collapse', border: '0.5px solid #E5E7EB', borderRadius: 8, overflow: 'hidden' }}>
                 <thead>
                   <tr style={{ background: '#F9FAFB' }}>
                     <th style={{ ...S.th, width: 60 }}>Faixa</th>
-                    <th style={S.th}>Limite At\u00e9 (R$)</th>
-                    <th style={S.th}>Al\u00edquota (%)</th>
-                    <th style={{ ...S.th, background: '#FFFBEB', color: '#92400E' }}>Dedu\u00e7\u00e3o (auto)</th>
+                    <th style={S.th}>Limite Até (R$)</th>
+                    <th style={S.th}>Alíquota (%)</th>
+                    <th style={{ ...S.th, background: '#FFFBEB', color: '#92400E' }}>Dedução (auto)</th>
                   </tr>
                 </thead>
                 <tbody>
                   {editInssForm.faixas.map((f, i) => (
                     <tr key={i}>
-                      <td style={{ ...S.td, textAlign: 'center', fontWeight: 600, color: '#6B7280', fontSize: 12 }}>{i+1}</td>
-                      <td style={S.td}><input value={f.limiteAte} onChange={e => setEditInssForm(fm => ({...fm, faixas: fm.faixas.map((x,j)=>j===i?{...x,limiteAte:e.target.value}:x)}))} style={thinp} placeholder="0.00"/></td>
-                      <td style={S.td}><input value={f.aliquota} onChange={e => setEditInssForm(fm => ({...fm, faixas: fm.faixas.map((x,j)=>j===i?{...x,aliquota:e.target.value}:x)}))} style={thinp} placeholder="7.5"/></td>
-                      <td style={{ ...S.td, background: '#FFFBEB' }}><input value={fmtBRL(ded[i])} readOnly style={{ ...thInputRO, textAlign: 'right' as const }}/></td>
+                      <td style={{ ...S.td, textAlign: 'center', fontWeight: 600, color: '#6B7280', fontSize: 12 }}>{i + 1}</td>
+                      <td style={S.td}><input value={f.limiteAte} onChange={e => setEditInssForm(fm => ({ ...fm, faixas: fm.faixas.map((x, j) => j === i ? { ...x, limiteAte: e.target.value } : x) }))} style={thinp} placeholder="0.00" /></td>
+                      <td style={S.td}><input value={f.aliquota} onChange={e => setEditInssForm(fm => ({ ...fm, faixas: fm.faixas.map((x, j) => j === i ? { ...x, aliquota: e.target.value } : x) }))} style={thinp} placeholder="7.5" /></td>
+                      <td style={{ ...S.td, background: '#FFFBEB' }}><input value={fmtBRL(ded[i])} readOnly style={{ ...thInputRO, textAlign: 'right' as const }} /></td>
                     </tr>
                   ))}
                 </tbody>
               </table>
               <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 6 }}>
-                \u24d8 Dedu\u00e7\u00e3o calculada automaticamente a partir dos limites e al\u00edquotas.
+                ⓘ Dedução calculada automaticamente a partir dos limites e alíquotas.
               </div>
             </div>
             <div style={mf}>
@@ -481,59 +481,59 @@ export function TabelasLegaisPage() {
         <div style={ov}><div style={mb(700)}>
           <div style={mh}>
             <span style={{ color: '#fff', fontWeight: 700, fontSize: 15 }}>Tabela IRRF — Ano {editIrrfForm.ano}</span>
-            <button onClick={() => setShowEditIrrf(false)} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', borderRadius: 6, padding: '2px 8px', cursor: 'pointer', fontSize: 16 }}>\u00d7</button>
+            <button onClick={() => setShowEditIrrf(false)} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', borderRadius: 6, padding: '2px 8px', cursor: 'pointer', fontSize: 16 }}>×</button>
           </div>
           <div style={mb2}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 18 }}>
               <div>
                 <span style={lbl}>Ano</span>
-                <input type="number" value={editIrrfForm.ano} onChange={e => setEditIrrfForm(f=>({...f,ano:parseInt(e.target.value)||f.ano}))} style={inp}/>
+                <input type="number" value={editIrrfForm.ano} onChange={e => setEditIrrfForm(f => ({ ...f, ano: parseInt(e.target.value) || f.ano }))} style={inp} />
               </div>
               <div>
-                <span style={lbl}>Vig\u00eancia In\u00edcio</span>
-                <input type="date" value={editIrrfForm.vigenciaIni} onChange={e => setEditIrrfForm(f=>({...f,vigenciaIni:e.target.value}))} style={inp}/>
+                <span style={lbl}>Vig\u00eancia Início</span>
+                <input type="date" value={editIrrfForm.vigenciaIni} onChange={e => setEditIrrfForm(f => ({ ...f, vigenciaIni: e.target.value }))} style={inp} />
               </div>
             </div>
 
             <div style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', marginBottom: 8, letterSpacing: 0.5 }}>Tabela Progressiva</div>
             <table style={{ width: '100%', borderCollapse: 'collapse', border: '0.5px solid #E5E7EB', borderRadius: 8, overflow: 'hidden', marginBottom: 16 }}>
               <thead><tr style={{ background: '#F9FAFB' }}>
-                <th style={S.th}>Limite At\u00e9 (R$) — 999999 = \u00faltima faixa</th>
-                <th style={S.th}>Al\u00edquota (%)</th>
-                <th style={S.th}>Dedu\u00e7\u00e3o (R$)</th>
+                <th style={S.th}>Limite Até (R$) — 999999 = \u00faltima faixa</th>
+                <th style={S.th}>Alíquota (%)</th>
+                <th style={S.th}>Dedução (R$)</th>
                 <th style={{ ...S.th, width: 40 }}></th>
               </tr></thead>
               <tbody>
                 {editIrrfForm.faixas.map((f, i) => (
                   <tr key={i}>
-                    <td style={S.td}><input value={f.limiteAte} onChange={e => setEditIrrfForm(fm=>({...fm,faixas:fm.faixas.map((x,j)=>j===i?{...x,limiteAte:e.target.value}:x)}))} style={thinp}/></td>
-                    <td style={S.td}><input value={f.aliquota} onChange={e => setEditIrrfForm(fm=>({...fm,faixas:fm.faixas.map((x,j)=>j===i?{...x,aliquota:e.target.value}:x)}))} style={thinp}/></td>
-                    <td style={S.td}><input value={f.deducao}  onChange={e => setEditIrrfForm(fm=>({...fm,faixas:fm.faixas.map((x,j)=>j===i?{...x,deducao:e.target.value}:x)}))}  style={thinp}/></td>
-                    <td style={S.td}><button onClick={()=>setEditIrrfForm(fm=>({...fm,faixas:fm.faixas.filter((_,j)=>j!==i)}))} style={{fontSize:14,color:'#DC2626',background:'none',border:'none',cursor:'pointer'}}>\u00d7</button></td>
+                    <td style={S.td}><input value={f.limiteAte} onChange={e => setEditIrrfForm(fm => ({ ...fm, faixas: fm.faixas.map((x, j) => j === i ? { ...x, limiteAte: e.target.value } : x) }))} style={thinp} /></td>
+                    <td style={S.td}><input value={f.aliquota} onChange={e => setEditIrrfForm(fm => ({ ...fm, faixas: fm.faixas.map((x, j) => j === i ? { ...x, aliquota: e.target.value } : x) }))} style={thinp} /></td>
+                    <td style={S.td}><input value={f.deducao} onChange={e => setEditIrrfForm(fm => ({ ...fm, faixas: fm.faixas.map((x, j) => j === i ? { ...x, deducao: e.target.value } : x) }))} style={thinp} /></td>
+                    <td style={S.td}><button onClick={() => setEditIrrfForm(fm => ({ ...fm, faixas: fm.faixas.filter((_, j) => j !== i) }))} style={{ fontSize: 14, color: '#DC2626', background: 'none', border: 'none', cursor: 'pointer' }}>×</button></td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            <button onClick={()=>setEditIrrfForm(f=>({...f,faixas:[...f.faixas,{limiteAte:'999999',aliquota:'27.5',deducao:'0'}]}))} style={{ fontSize: 11, padding: '4px 10px', border: '0.5px solid #0891B2', borderRadius: 6, background: '#ECFEFF', color: '#0891B2', cursor: 'pointer', marginBottom: 20 }}>+ Adicionar Faixa</button>
+            <button onClick={() => setEditIrrfForm(f => ({ ...f, faixas: [...f.faixas, { limiteAte: '999999', aliquota: '27.5', deducao: '0' }] }))} style={{ fontSize: 11, padding: '4px 10px', border: '0.5px solid #0891B2', borderRadius: 6, background: '#ECFEFF', color: '#0891B2', cursor: 'pointer', marginBottom: 20 }}>+ Adicionar Faixa</button>
 
             <div style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', marginBottom: 8, letterSpacing: 0.5 }}>Redutor Progressivo (Lei 15.270/2025) — em branco = sem redutor</div>
             <table style={{ width: '100%', borderCollapse: 'collapse', border: '0.5px solid #E5E7EB', borderRadius: 8, overflow: 'hidden', marginBottom: 8 }}>
               <thead><tr style={{ background: '#F9FAFB' }}>
-                <th style={S.th}>Renda Bruta At\u00e9 (R$)</th>
-                <th style={S.th}>Dedu\u00e7\u00e3o (R$) — vazio = isento total</th>
+                <th style={S.th}>Renda Bruta Até (R$)</th>
+                <th style={S.th}>Dedução (R$) — vazio = isento total</th>
                 <th style={{ ...S.th, width: 40 }}></th>
               </tr></thead>
               <tbody>
                 {editIrrfForm.redutores.map((r, i) => (
                   <tr key={i}>
-                    <td style={S.td}><input value={r.limiteAte} onChange={e=>setEditIrrfForm(fm=>({...fm,redutores:fm.redutores.map((x,j)=>j===i?{...x,limiteAte:e.target.value}:x)}))} style={thinp}/></td>
-                    <td style={S.td}><input value={r.redutor}   onChange={e=>setEditIrrfForm(fm=>({...fm,redutores:fm.redutores.map((x,j)=>j===i?{...x,redutor:e.target.value}:x)}))}   style={thinp} placeholder="vazio = isento"/></td>
-                    <td style={S.td}><button onClick={()=>setEditIrrfForm(fm=>({...fm,redutores:fm.redutores.filter((_,j)=>j!==i)}))} style={{fontSize:14,color:'#DC2626',background:'none',border:'none',cursor:'pointer'}}>\u00d7</button></td>
+                    <td style={S.td}><input value={r.limiteAte} onChange={e => setEditIrrfForm(fm => ({ ...fm, redutores: fm.redutores.map((x, j) => j === i ? { ...x, limiteAte: e.target.value } : x) }))} style={thinp} /></td>
+                    <td style={S.td}><input value={r.redutor} onChange={e => setEditIrrfForm(fm => ({ ...fm, redutores: fm.redutores.map((x, j) => j === i ? { ...x, redutor: e.target.value } : x) }))} style={thinp} placeholder="vazio = isento" /></td>
+                    <td style={S.td}><button onClick={() => setEditIrrfForm(fm => ({ ...fm, redutores: fm.redutores.filter((_, j) => j !== i) }))} style={{ fontSize: 14, color: '#DC2626', background: 'none', border: 'none', cursor: 'pointer' }}>×</button></td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            <button onClick={()=>setEditIrrfForm(f=>({...f,redutores:[...f.redutores,{limiteAte:'',redutor:''}]}))} style={{ fontSize: 11, padding: '4px 10px', border: '0.5px solid #0891B2', borderRadius: 6, background: '#ECFEFF', color: '#0891B2', cursor: 'pointer' }}>+ Adicionar Faixa de Redutor</button>
+            <button onClick={() => setEditIrrfForm(f => ({ ...f, redutores: [...f.redutores, { limiteAte: '', redutor: '' }] }))} style={{ fontSize: 11, padding: '4px 10px', border: '0.5px solid #0891B2', borderRadius: 6, background: '#ECFEFF', color: '#0891B2', cursor: 'pointer' }}>+ Adicionar Faixa de Redutor</button>
           </div>
           <div style={mf}>
             <button onClick={() => setShowEditIrrf(false)} style={cancelBtn}>Cancelar</button>
@@ -546,36 +546,36 @@ export function TabelasLegaisPage() {
       {showEditSalMin && (
         <div style={ov}><div style={mb(480)}>
           <div style={mh}>
-            <span style={{ color: '#fff', fontWeight: 700, fontSize: 15 }}>{editSalMinForm.id ? 'Editar' : 'Novo'} Sal\u00e1rio M\u00ednimo</span>
-            <button onClick={() => setShowEditSalMin(null)} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', borderRadius: 6, padding: '2px 8px', cursor: 'pointer', fontSize: 16 }}>\u00d7</button>
+            <span style={{ color: '#fff', fontWeight: 700, fontSize: 15 }}>{editSalMinForm.id ? 'Editar' : 'Novo'} Salário Mínimo</span>
+            <button onClick={() => setShowEditSalMin(null)} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', borderRadius: 6, padding: '2px 8px', cursor: 'pointer', fontSize: 16 }}>×</button>
           </div>
           <div style={mb2}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
               <div style={{ gridColumn: 'span 2' }}>
                 <span style={lbl}>Valor (R$) *</span>
-                <input value={editSalMinForm.valor} onChange={e=>setEditSalMinForm(f=>({...f,valor:e.target.value}))} style={inp} placeholder="Ex: 1621.00"/>
+                <input value={editSalMinForm.valor} onChange={e => setEditSalMinForm(f => ({ ...f, valor: e.target.value }))} style={inp} placeholder="Ex: 1621.00" />
               </div>
               <div>
-                <span style={lbl}>Vig\u00eancia In\u00edcio *</span>
-                <input type="date" value={editSalMinForm.vigenciaIni} onChange={e=>setEditSalMinForm(f=>({...f,vigenciaIni:e.target.value}))} style={inp}/>
+                <span style={lbl}>Vig\u00eancia Início *</span>
+                <input type="date" value={editSalMinForm.vigenciaIni} onChange={e => setEditSalMinForm(f => ({ ...f, vigenciaIni: e.target.value }))} style={inp} />
               </div>
               <div>
                 <span style={lbl}>Vig\u00eancia Fim (opcional)</span>
-                <input type="date" value={editSalMinForm.vigenciaFim} onChange={e=>setEditSalMinForm(f=>({...f,vigenciaFim:e.target.value}))} style={inp}/>
+                <input type="date" value={editSalMinForm.vigenciaFim} onChange={e => setEditSalMinForm(f => ({ ...f, vigenciaFim: e.target.value }))} style={inp} />
               </div>
               <div style={{ gridColumn: 'span 2' }}>
                 <span style={lbl}>Lei / Decreto</span>
-                <input value={editSalMinForm.lei} onChange={e=>setEditSalMinForm(f=>({...f,lei:e.target.value}))} style={inp} placeholder="Ex: Lei 15.270/2025"/>
+                <input value={editSalMinForm.lei} onChange={e => setEditSalMinForm(f => ({ ...f, lei: e.target.value }))} style={inp} placeholder="Ex: Lei 15.270/2025" />
               </div>
               <div style={{ gridColumn: 'span 2' }}>
-                <span style={lbl}>Observa\u00e7\u00e3o</span>
-                <input value={editSalMinForm.observacao} onChange={e=>setEditSalMinForm(f=>({...f,observacao:e.target.value}))} style={inp}/>
+                <span style={lbl}>Observaçãoo</span>
+                <input value={editSalMinForm.observacao} onChange={e => setEditSalMinForm(f => ({ ...f, observacao: e.target.value }))} style={inp} />
               </div>
             </div>
           </div>
           <div style={mf}>
             <button onClick={() => setShowEditSalMin(null)} style={cancelBtn}>Cancelar</button>
-            <button onClick={saveSalMin} disabled={saving||!editSalMinForm.valor||!editSalMinForm.vigenciaIni} style={{ ...saveBtn, opacity: (!editSalMinForm.valor||!editSalMinForm.vigenciaIni)?0.5:1 }}>{saving ? 'Salvando...' : 'Salvar'}</button>
+            <button onClick={saveSalMin} disabled={saving || !editSalMinForm.valor || !editSalMinForm.vigenciaIni} style={{ ...saveBtn, opacity: (!editSalMinForm.valor || !editSalMinForm.vigenciaIni) ? 0.5 : 1 }}>{saving ? 'Salvando...' : 'Salvar'}</button>
           </div>
         </div></div>
       )}
