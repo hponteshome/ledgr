@@ -141,7 +141,7 @@ async findByLogin(login: string) {
           fullName: data.fullName,
           phone1: data.phoneNumber,
           status: 'active',
-          level: data.level,
+          level: Number(data.level),
           isActive: true,
           isEmailConfirmed: false,
           isDocumentConfirmed: false,

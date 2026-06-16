@@ -167,7 +167,7 @@ async findByCpf(cpf: string) {
       if (conflict) throw new ConflictException(`CPF ${dto.document} já cadastrado em outra pessoa.`);
     }
 
-    const { otherRegistrations: otherRegs, birthDate: bd, rgIssueDate: rgd, ...restDto } = dto;
+    const { otherRegistrations: otherRegs, birthDate: bd, rgIssueDate: rgd, document: _document, ...restDto } = dto;
     return this.prisma.person.update({
       where: { id },
       data: {
@@ -177,6 +177,8 @@ async findByCpf(cpf: string) {
         otherRegistrations: otherRegs
           ? (otherRegs as unknown as Prisma.InputJsonValue)
           : undefined,
+        maritalStatus:      (dto.maritalStatus as any) === '' ? null : (dto.maritalStatus as any),
+        matrimonialRegime:  (dto.matrimonialRegime as any) === '' ? null : (dto.matrimonialRegime as any),
         updatedAt: new Date(),
       },
     });
