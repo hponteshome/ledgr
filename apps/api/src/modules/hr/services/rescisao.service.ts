@@ -163,6 +163,14 @@ export class RescisaoService {
     return { valor, aliq: Number(faixa.aliquota) };
   }
 
+  // Lei 15.270/2025 - formula continua aplicada sobre a base de calculo do IRRF
+  // Ref: Art. 3-A Lei 9.250/95, alterado pela Lei 15.270/2025
+  private calcRedutorLei15270(baseCalculo: number): number {
+    if (baseCalculo <= 5000) return 9999;   // isento total (max(0, irrf-9999)=0)
+    if (baseCalculo > 7350)  return 0;      // acima do teto: sem redutor
+    return Math.max(0, 978.62 - 0.133145 * baseCalculo);
+  }
+
   private calcularIrpfProgressivo(base: number, tabela: { limiteAte: any; aliquota: any; deducao: any }[]): { valor: number; aliq: number; deducao: number } {
     if (base <= 0 || tabela.length === 0) return { valor: 0, aliq: 0, deducao: 0 };
     const faixa = tabela.find(f => base <= Number(f.limiteAte)) ?? tabela[tabela.length - 1];
@@ -277,18 +285,20 @@ export class RescisaoService {
     const valorInss = round2(inssSaldo.valor + inss13.valor);
     const baseInss = round2(saldoSalarioValor + decimoTerceiroValor);
 
-    // IRRF (tabela progressiva + redutor Lei 15.270/2025)
-    const { progressiva, redutor } = await this.getTabelaIrrf(dataAfastamento.getUTCFullYear());
+    // IRRF (tabela progressiva + redutor continuo Lei 15.270/2025)
+    // Formula: Redutor = 978,62 - 0,133145 x base_calculo (aplicado sobre a base, nao sobre bruto)
+    const { progressiva } = await this.getTabelaIrrf(dataAfastamento.getUTCFullYear());
     const deducaoDep = round2(numDependentes * DEDUCAO_DEPENDENTE_IRRF);
-    const redutorValor = this.calcularRedutor(salarioBase, redutor);
 
     const baseIrrfSaldo = Math.max(0, round2(saldoSalarioValor - inssSaldo.valor - deducaoDep));
-    const irpfSaldo = this.calcularIrpfProgressivo(baseIrrfSaldo, progressiva);
-    const irpfFinalSaldo = Math.max(0, round2(irpfSaldo.valor - redutorValor));
+    const irpfSaldo     = this.calcularIrpfProgressivo(baseIrrfSaldo, progressiva);
+    const redutorSaldo  = this.calcRedutorLei15270(baseIrrfSaldo);
+    const irpfFinalSaldo = Math.max(0, round2(irpfSaldo.valor - redutorSaldo));
 
-    const baseIrrf13 = Math.max(0, round2(decimoTerceiroValor - inss13.valor - deducaoDep));
-    const irpf13 = this.calcularIrpfProgressivo(baseIrrf13, progressiva);
-    const irpfFinal13 = Math.max(0, round2(irpf13.valor - redutorValor));
+    const baseIrrf13    = Math.max(0, round2(decimoTerceiroValor - inss13.valor - deducaoDep));
+    const irpf13        = this.calcularIrpfProgressivo(baseIrrf13, progressiva);
+    const redutorDecimo = this.calcRedutorLei15270(baseIrrf13);
+    const irpfFinal13   = Math.max(0, round2(irpf13.valor - redutorDecimo));
 
     const valorIrrf = round2(irpfFinalSaldo + irpfFinal13);
     const baseIrrf = round2(baseIrrfSaldo + baseIrrf13);
@@ -353,8 +363,8 @@ export class RescisaoService {
         inss13:     { base: decimoTerceiroValor,  valor: inss13.valor,    aliq: inss13.aliq   },
         valorInss,
         // IRRF separado por competencia
-        irrfRemun:  { base: baseIrrfSaldo, valor: irpfFinalSaldo, aliq: irpfSaldo.aliq, deducao: redutorValor },
-        irrf13:     { base: baseIrrf13,    valor: irpfFinal13,    aliq: irpf13.aliq,    deducao: redutorValor },
+        irrfRemun:  { base: baseIrrfSaldo, valor: irpfFinalSaldo, aliq: irpfSaldo.aliq, deducao: Math.min(redutorSaldo,  irpfSaldo.valor)  },
+        irrf13:     { base: baseIrrf13,    valor: irpfFinal13,    aliq: irpf13.aliq,    deducao: Math.min(redutorDecimo, irpf13.valor) },
         valorIrrf,
         // Legado (soma) mantido para persistencia
         baseInss,

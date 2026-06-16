@@ -13,21 +13,17 @@ function calcIRPF(base: number, tab: IrrfAno | null): number {
   if (!tab) return 0;
   let ir = 0;
   for (const f of tab.faixas) {
-    if (f.limiteAte >= 999998 || base <= f.limiteAte) {
+    if (Number(f.limiteAte) >= 999998 || base <= f.limiteAte) {
       ir = base * Number(f.aliquota) - Number(f.deducao);
       break;
     }
   }
   ir = Math.max(0, ir);
+  // Aplica redutor Lei 15.270/2025 via formula continua (quando tabela tem redutores cadastrados)
   if (tab.redutores.length > 0) {
-    for (const r of tab.redutores) {
-      if (base <= Number(r.limiteAte)) {
-        const red = Number(r.redutor);
-        if (red >= 999998) return 0;
-        return Math.max(0, ir - red);
-      }
-    }
-    return ir;
+    if (base <= 5000) return 0;
+    if (base <= 7350) return Math.max(0, ir - Math.max(0, 978.62 - 0.133145 * base));
+    return ir; // acima de 7350: sem redutor
   }
   return ir;
 }
@@ -47,8 +43,8 @@ function calcINSS(salario: number, tab: InssAno | null): number {
   return total;
 }
 
-const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const fmtPct = (v: number) => Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) + '%';
+const fmtBRL = (v: any) => Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmtPct = (v: any) => Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) + '%';
 const fmtDate = (s: string) => { if (!s) return ''; const d = new Date(s.substring(0, 10) + 'T12:00:00'); return isNaN(d.getTime()) ? '' : d.toLocaleDateString('pt-BR', { month: '2-digit', year: 'numeric' }); };
 const parseBR = (v: string) => parseFloat(String(v).replace(/\./g, '').replace(',', '.')) || 0;
 
@@ -221,7 +217,7 @@ export function TabelasLegaisPage() {
   const anos = [...new Set([...irrfData.map(d => d.ano), ...inssData.map(d => d.ano)])].sort((a, b) => b - a);
 
   const S = {
-    page: { padding: '24px 0', fontFamily: 'var(--font-sans,system-ui)', fontSize: 14, color: 'var(--color-text-primary)' } as React.CSSProperties,
+    page: { padding: '24px 0', fontFamily: 'var(--font-sans,system-ui)', fontSize: 14, color: 'var(--color-text-primary)', maxWidth: '620px' } as React.CSSProperties,
     badge: { display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 20, background: '#F9FAFB', color: '#374151' } as React.CSSProperties,
     card: { background: '#fff', border: '0.5px solid #E5E7EB', borderRadius: 10, overflow: 'hidden', marginBottom: 16 } as React.CSSProperties,
     th: { background: '#F9FAFB', color: '#6B7280', fontSize: 10, fontWeight: 500, textTransform: 'uppercase' as const, letterSpacing: '.3px', padding: '8px 12px', textAlign: 'left' as const, borderBottom: '0.5px solid #E5E7EB' } as React.CSSProperties,
@@ -252,7 +248,7 @@ export function TabelasLegaisPage() {
   return (
     <div style={S.page}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
-        <span style={S.badge}>\u2699 Sistema</span>
+        <span style={S.badge}>⚙ Sistema</span>
         <span style={{ fontSize: 15, fontWeight: 500 }}>Tabelas Legais</span>
         {loading && <span style={{ fontSize: 11, color: '#9CA3AF' }}>Carregando...</span>}
       </div>
@@ -276,20 +272,20 @@ export function TabelasLegaisPage() {
           {irpfTab && (
             <>
               <div style={{ fontSize: 12, color: '#6B7280', marginBottom: 12 }}>
-                Vig\u00eancia: {fmtDate(irpfTab.vigenciaIni)} em diante
+                Vigência: {fmtDate(irpfTab.vigenciaIni)} em diante
               </div>
               <div style={S.card}>
                 <div style={{ padding: '10px 12px', borderBottom: '0.5px solid #E5E7EB', fontSize: 12, fontWeight: 500 }}>Tabela Progressiva</div>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead><tr>
-                    <th style={S.th}>Base de C\u00e1lculo</th>
+                    <th style={S.th}>Base de Cálculo</th>
                     <th style={S.thR}>Alíquota</th>
                     <th style={S.thR}>Parcela a Deduzir</th>
                   </tr></thead>
                   <tbody>
                     {irpfTab.faixas.map((f, i) => (
                       <tr key={i}>
-                        <td style={S.td}>{f.limiteAte >= 999998 ? 'Acima de R$ ' + fmtBRL(irpfTab.faixas[i - 1]?.limiteAte ?? 0) : 'Até R$ ' + fmtBRL(f.limiteAte)}</td>
+                        <td style={S.td}>{Number(f.limiteAte) >= 999998 ? 'Acima de R$ ' + fmtBRL(irpfTab.faixas[i - 1]?.limiteAte ?? 0) : 'Até R$ ' + fmtBRL(f.limiteAte)}</td>
                         <td style={S.tdR}>{fmtPct(Number(f.aliquota) * 100)}</td>
                         <td style={S.tdR}>R$ {fmtBRL(f.deducao)}</td>
                       </tr>
@@ -308,8 +304,8 @@ export function TabelasLegaisPage() {
                     <tbody>
                       {irpfTab.redutores.map((r, i) => (
                         <tr key={i}>
-                          <td style={S.td}>{r.limiteAte >= 999998 ? 'Acima de R$ 7.350,00' : 'R$ ' + fmtBRL(r.limiteAte)}</td>
-                          <td style={S.tdR}>{r.redutor >= 999998 ? 'Isento' : 'R$ ' + fmtBRL(r.redutor)}</td>
+                          <td style={S.td}>{Number(r.limiteAte) >= 999998 ? 'Acima de R$ 7.350,00' : 'R$ ' + fmtBRL(r.limiteAte)}</td>
+                          <td style={S.tdR}>{Number(r.redutor) >= 999998 ? 'Isento' : 'R$ ' + fmtBRL(r.redutor)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -322,7 +318,7 @@ export function TabelasLegaisPage() {
             <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 14 }}>Simulador de IRRF</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 14 }}>
               <div><span style={lbl}>Ano base</span><select value={simAno} onChange={e => setSimAno(Number(e.target.value))} style={{ ...S.input }}>{anos.map(a => <option key={a} value={a}>{a}</option>)}</select></div>
-              <div><span style={lbl}>Sal\u00e1rio Bruto (R$)</span><input value={simSalario} onChange={e => setSimSalario(e.target.value)} style={S.input} placeholder="Ex: 5.000,00" /></div>
+              <div><span style={lbl}>Salário Bruto (R$)</span><input value={simSalario} onChange={e => setSimSalario(e.target.value)} style={S.input} placeholder="Ex: 5.000,00" /></div>
               <div><span style={lbl}>Dependentes</span><input type="number" value={simDep} onChange={e => setSimDep(e.target.value)} style={S.input} min={0} /></div>
               <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: 'pointer' }}>
@@ -356,7 +352,7 @@ export function TabelasLegaisPage() {
           {inssTab && (
             <>
               <div style={{ fontSize: 12, color: '#6B7280', marginBottom: 12 }}>
-                Vig\u00eancia: {fmtDate(inssTab.vigenciaIni)} | Teto: R$ {fmtBRL(Number(inssTab.teto))} | Sal. Mínimo: R$ {fmtBRL(Number(inssTab.salMinimo))}
+                Vigência: {fmtDate(inssTab.vigenciaIni)} | Teto: R$ {fmtBRL(Number(inssTab.teto))} | Sal. Mínimo: R$ {fmtBRL(Number(inssTab.salMinimo))}
               </div>
               <div style={S.card}>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -385,12 +381,12 @@ export function TabelasLegaisPage() {
       {aba === 'salmin' && (
         <div style={S.card}>
           <div style={{ padding: '10px 12px', borderBottom: '0.5px solid #E5E7EB', fontSize: 12, fontWeight: 500, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span>Hist\u00f3rico do Salário Mínimo Nacional</span>
+            <span>Histórico do Salário Mínimo Nacional</span>
             <button style={S.newBtn} onClick={() => openEditSalMin(null)}>+ Novo Registro</button>
           </div>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead><tr>
-              <th style={S.th}>Vig\u00eancia</th>
+              <th style={S.th}>Vigência</th>
               <th style={S.thR}>Valor</th>
               <th style={S.th}>Lei / Decreto</th>
               <th style={S.th}>Ações</th>
@@ -400,7 +396,7 @@ export function TabelasLegaisPage() {
                 <tr key={s.id}>
                   <td style={S.td}>{fmtDate(s.vigenciaIni)}{s.vigenciaFim ? ' a ' + fmtDate(s.vigenciaFim) : ' em diante'}</td>
                   <td style={S.tdR}>R$ {fmtBRL(Number(s.valor))}</td>
-                  <td style={S.td}>{s.lei ?? '\u2014'}</td>
+                  <td style={S.td}>{s.lei ?? '—'}</td>
                   <td style={S.td}>
                     <div style={{ display: 'flex', gap: 6 }}>
                       <button onClick={() => openEditSalMin(s.id)} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 5, border: '0.5px solid #0891B2', background: '#ECFEFF', color: '#0891B2', cursor: 'pointer' }}>Editar</button>
@@ -430,7 +426,7 @@ export function TabelasLegaisPage() {
                   <input type="number" value={editInssForm.ano} onChange={e => setEditInssForm(f => ({ ...f, ano: parseInt(e.target.value) || f.ano }))} style={inp} />
                 </div>
                 <div>
-                  <span style={lbl}>Vig\u00eancia Início</span>
+                  <span style={lbl}>Vigência Início</span>
                   <input type="date" value={editInssForm.vigenciaIni} onChange={e => setEditInssForm(f => ({ ...f, vigenciaIni: e.target.value }))} style={inp} />
                 </div>
                 <div>
@@ -490,7 +486,7 @@ export function TabelasLegaisPage() {
                 <input type="number" value={editIrrfForm.ano} onChange={e => setEditIrrfForm(f => ({ ...f, ano: parseInt(e.target.value) || f.ano }))} style={inp} />
               </div>
               <div>
-                <span style={lbl}>Vig\u00eancia Início</span>
+                <span style={lbl}>Vigência Início</span>
                 <input type="date" value={editIrrfForm.vigenciaIni} onChange={e => setEditIrrfForm(f => ({ ...f, vigenciaIni: e.target.value }))} style={inp} />
               </div>
             </div>
@@ -556,11 +552,11 @@ export function TabelasLegaisPage() {
                 <input value={editSalMinForm.valor} onChange={e => setEditSalMinForm(f => ({ ...f, valor: e.target.value }))} style={inp} placeholder="Ex: 1621.00" />
               </div>
               <div>
-                <span style={lbl}>Vig\u00eancia Início *</span>
+                <span style={lbl}>Vigência Início *</span>
                 <input type="date" value={editSalMinForm.vigenciaIni} onChange={e => setEditSalMinForm(f => ({ ...f, vigenciaIni: e.target.value }))} style={inp} />
               </div>
               <div>
-                <span style={lbl}>Vig\u00eancia Fim (opcional)</span>
+                <span style={lbl}>Vigência Fim (opcional)</span>
                 <input type="date" value={editSalMinForm.vigenciaFim} onChange={e => setEditSalMinForm(f => ({ ...f, vigenciaFim: e.target.value }))} style={inp} />
               </div>
               <div style={{ gridColumn: 'span 2' }}>
