@@ -348,13 +348,20 @@ export class RescisaoService {
         totalProventos,
       },
       descontos: {
+        // INSS separado por competencia
+        inssRemun:  { base: saldoSalarioValor,   valor: inssSaldo.valor, aliq: inssSaldo.aliq },
+        inss13:     { base: decimoTerceiroValor,  valor: inss13.valor,    aliq: inss13.aliq   },
+        valorInss,
+        // IRRF separado por competencia
+        irrfRemun:  { base: baseIrrfSaldo, valor: irpfFinalSaldo, aliq: irpfSaldo.aliq, deducao: redutorValor },
+        irrf13:     { base: baseIrrf13,    valor: irpfFinal13,    aliq: irpf13.aliq,    deducao: redutorValor },
+        valorIrrf,
+        // Legado (soma) mantido para persistencia
         baseInss,
         aliqInss: inssSaldo.aliq,
-        valorInss,
         baseIrrf,
         deducaoIrrf: redutorValor,
         aliqIrrf: irpfSaldo.aliq,
-        valorIrrf,
         outrosDescontos: outrosDescontosCalc,
         observacaoOutros: observacaoOutrosCalc,
         totalDescontos,

@@ -548,12 +548,15 @@ export default function EmployeeDetailPage() {
                   <div style={{borderRight:"1px solid #E5E7EB"}}>
                     <div style={{padding:"8px 14px",background:"#F9FAFB",fontSize:10,fontWeight:700,color:"#374151",textTransform:"uppercase" as const,borderBottom:"1px solid #E5E7EB",letterSpacing:0.5}}>Descontos</div>
                     {([
-                      ["INSS (base "+fmtBRL(rescisaoPreview.descontos.baseInss)+")",rescisaoPreview.descontos.valorInss],
-                      ["IRRF (base "+fmtBRL(rescisaoPreview.descontos.baseIrrf)+")",rescisaoPreview.descontos.valorIrrf],
+                      ["INSS Remuneracao (base "+fmtBRL(rescisaoPreview.descontos.inssRemun.base)+")", rescisaoPreview.descontos.inssRemun.valor],
+                      ["INSS 13º Salario (base "+fmtBRL(rescisaoPreview.descontos.inss13.base)+")", rescisaoPreview.descontos.inss13.valor],
+                      ["IRRF Remuneracao (base "+fmtBRL(rescisaoPreview.descontos.irrfRemun.base)+")", rescisaoPreview.descontos.irrfRemun.valor],
+                      ["IRRF 13º Salario (base "+fmtBRL(rescisaoPreview.descontos.irrf13.base)+")", rescisaoPreview.descontos.irrf13.valor],
                       ...(rescisaoPreview.descontos.outrosDescontos>0?[["Outros Descontos",rescisaoPreview.descontos.outrosDescontos]]:[]),
                     ] as [string,number][]).map(([l,v])=>(
                       <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"6px 14px",borderBottom:"0.5px solid #F5F5F5",fontSize:12}}>
-                        <span style={{color:"#374151"}}>{l}</span><span style={{fontFamily:"monospace",color:"#DC2626",fontWeight:v>0?600:400}}>{fmtBRL(v)}</span>
+                        <span style={{color:"#374151"}}>{l}</span>
+                        <span style={{fontFamily:"monospace",color:v>0?"#DC2626":"#9CA3AF",fontWeight:v>0?600:400}}>{v>0?fmtBRL(v):"isento"}</span>
                       </div>
                     ))}
                     <div style={{display:"flex",justifyContent:"space-between",padding:"10px 14px",background:"#FFF1F2",fontSize:13,fontWeight:700,borderTop:"1px solid #FECDD3"}}>
