@@ -70,6 +70,7 @@ export class UsersController {
   }
 
   @Post()
+  @RequirePermission('users_create')
   async create(@Body() dto: CreateUserDto) {
     return this.usersService.create(dto);
   }
