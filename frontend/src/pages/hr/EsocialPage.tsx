@@ -24,7 +24,7 @@ export default function EsocialPage() {
   const [sel, setSel]         = useState<any>(null);
   const [modal, setModal]     = useState<"s2205"|"s2299"|"s1200"|null>(null);
   const [s2205, setS2205] = useState({dtAlteracao:"",novaFuncao:"",novoSalario:"",cargaHoraria:""});
-  const [s2299, setS2299] = useState({dtDeslig:"",mtvDeslig:"01",pensao:false});
+  const [s2299, setS2299] = useState({dtDeslig:"",mtvDeslig:"01",pensao:false,tpAmb:"2"});
   const [s1200, setS1200] = useState({perApur:new Date().toISOString().slice(0,7),vrBcCp:""});
 
   const load = useCallback(async()=>{
@@ -58,7 +58,8 @@ export default function EsocialPage() {
   async function dl2299() {
     if(!sel||!s2299.dtDeslig) return;
     try {
-      dlXml(await getXml("/hr/esocial/s2299/"+sel.id,"POST",s2299),`S-2299-${sel.fullName.replace(/\s+/g,"-")}.xml`);
+      const s2299body={...s2299,pensaoAlimenticia:s2299.pensao};
+      dlXml(await getXml("/hr/esocial/s2299/"+sel.id,"POST",s2299body),`S-2299-${sel.fullName.replace(/\s+/g,"-")}.xml`);
       setModal(null);
     } catch { Swal.fire("Erro","Falha S-2299","error"); }
   }
@@ -146,7 +147,13 @@ export default function EsocialPage() {
           </div>
           <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginTop:20}}>
             <button onClick={()=>setModal(null)} style={{padding:"8px 16px",borderRadius:8,border:"0.5px solid #E5E7EB",background:"#fff",cursor:"pointer",fontSize:13}}>Cancelar</button>
-            <button onClick={dl2299} disabled={!s2299.dtDeslig} style={{padding:"8px 18px",borderRadius:8,border:"none",background:"#B91C1C",color:"#fff",cursor:"pointer",fontSize:13,fontWeight:500}}>Gerar XML</button>
+            <div style={{display:"flex",gap:8,alignItems:"center",marginTop:4}}>
+              <select value={s2299.tpAmb} onChange={e=>setS2299(d=>({...d,tpAmb:e.target.value}))} style={{...S.inp,width:"auto",fontSize:12,color:s2299.tpAmb==="1"?"#B91C1C":"#0369A1",fontWeight:600}}>
+                <option value="2">Prod. Restrita (testes)</option>
+                <option value="1">⚠ Produção Real</option>
+              </select>
+              <button onClick={dl2299} disabled={!s2299.dtDeslig} style={{padding:"8px 18px",borderRadius:8,border:"none",background:s2299.tpAmb==="1"?"#B91C1C":"#374151",color:"#fff",cursor:"pointer",fontSize:13,fontWeight:500}}>Gerar XML</button>
+            </div>
           </div>
         </div></div>
       )}

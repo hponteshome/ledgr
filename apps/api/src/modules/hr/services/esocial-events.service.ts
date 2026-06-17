@@ -197,7 +197,7 @@ export class EsocialEventsService {
     parts.push(`    <ideEvento>`);
     parts.push(`      <indRetif>1</indRetif>`);
     parts.push(`      <perApur>${params.perApur}</perApur>`);
-    parts.push(`      <tpAmb>2</tpAmb><procEmi>1</procEmi><verProc>1.0.0</verProc>`);
+    parts.push(`      <tpAmb>${params.tpAmb ?? '2'}</tpAmb><procEmi>1</procEmi><verProc>1.0.0</verProc>`);
     parts.push(`    </ideEvento>`);
     parts.push(`    <ideEmpregador><tpInsc>1</tpInsc><nrInsc>${cnpj}</nrInsc></ideEmpregador>`);
     parts.push(`    <ideVinculo>`);
