@@ -12,6 +12,7 @@ import { AuthModule } from './auth/auth.module';
 import { CompaniesModule } from './core/companies/company.module';
 import { UsersModule } from './core/users/users.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { CertificatesModule } from './core/certificates/certificates.module';
 import { CompanyInterceptor } from './multi-company/company.interceptor';
 import { AuditModule } from './core/audit/audit.module';
 import { DocumentsModule } from './core/documents/documents.module';
@@ -39,6 +40,7 @@ import { SidebarPermissionsModule } from './modules/sidebar-permissions/sidebar-
       envFilePath: join(process.cwd(), '../../.env'),
     }),
     PrismaModule,
+    CertificatesModule,
     UsersModule,
     AuthModule,
     CompaniesModule,
