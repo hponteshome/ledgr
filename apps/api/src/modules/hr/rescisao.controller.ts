@@ -30,14 +30,14 @@ export class RescisaoController {
   atualizarStatus(@Param('employeeId') employeeId: string, @Param('id') id: string, @Body() body: any, @Request() req: any) {
     return this.svc.atualizarStatus(req.companyId, id, body.status);
   }
-  @Get(':employeeId/trct/html')
+  @Get('trct/html')
   async trctHtml(@Param('employeeId') employeeId: string, @Request() req: any, @Res() res: Response) {
     const html = await this.pdf.generateTRCTHtml(req.companyId, employeeId);
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     return res.send(html);
   }
 
-  @Get(':employeeId/trct/pdf')
+  @Get('trct/pdf')
   async trctPdf(@Param('employeeId') employeeId: string, @Request() req: any, @Res() res: Response) {
     const buf = await this.pdf.generateTRCTPdf(req.companyId, employeeId);
     res.setHeader('Content-Type', 'application/pdf');
@@ -45,14 +45,14 @@ export class RescisaoController {
     return res.send(buf);
   }
 
-  @Get(':employeeId/seguro-desemprego/html')
+  @Get('seguro-desemprego/html')
   async sdHtml(@Param('employeeId') employeeId: string, @Request() req: any, @Res() res: Response) {
     const html = await this.pdf.generateSDHtml(req.companyId, employeeId);
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     return res.send(html);
   }
 
-  @Get(':employeeId/seguro-desemprego/pdf')
+  @Get('seguro-desemprego/pdf')
   async sdPdf(@Param('employeeId') employeeId: string, @Request() req: any, @Res() res: Response) {
     const buf = await this.pdf.generateSDPdf(req.companyId, employeeId);
     res.setHeader('Content-Type', 'application/pdf');
