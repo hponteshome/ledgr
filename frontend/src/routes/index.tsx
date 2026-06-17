@@ -79,6 +79,7 @@ import { TabelasLegaisPage } from '../pages/sistema/TabelasLegaisPage';
 import SidebarPermissionsPage from '../pages/sistema/SidebarPermissionsPage';
 import ShareholdersPage from '../pages/corporate/shareholders/ShareholdersPage';
 import { RepositorioPage } from '../pages/documentos/RepositorioPage';
+import { CertificatesPage } from '../pages/certificates/CertificatesPage';
 import VisoesContabeisPage from '../pages/sped/VisoesContabeisPage';
 
 
@@ -210,7 +211,7 @@ export const AppRoutes = () => {
                 {/* Documentos */}
                 <Route path="app/documents" element={<ProtectedRoute><DocumentsList /></ProtectedRoute>} />
                 <Route path="app/documents/signatures" element={<ProtectedRoute><SignatureList /></ProtectedRoute>} />
-                <Route path="app/documents/signatures/certificates" element={<ProtectedRoute><CertificateManager /></ProtectedRoute>} />
+                <Route path="app/documents/signatures/certificates" element={<ProtectedRoute><CertificatesPage /></ProtectedRoute>} />
                 <Route path="app/documents/signatures/request" element={<ProtectedRoute><SignatureRequest /></ProtectedRoute>} />
                 <Route path="app/signatures/validate" element={<ProtectedRoute><SignatureValidatePage /></ProtectedRoute>} />
                 {/* Repositório de Documentos */}
