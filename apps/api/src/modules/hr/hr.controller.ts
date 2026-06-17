@@ -5,6 +5,7 @@ import { JwtAuthGuard } from '@/auth/guards/jwt.guard';
 import { CompanyInterceptor } from '@/multi-company/company.interceptor';
 import { EsocialS2200Service } from './services/esocial-s2200.service';
 import { EsocialEventsService } from './services/esocial-events.service';
+import { EsocialTransmissionService } from './services/esocial-transmission.service';
 
 @UseGuards(JwtAuthGuard)
 @UseInterceptors(CompanyInterceptor)
@@ -13,6 +14,7 @@ export class HrController {
   constructor(
     private readonly svc2200: EsocialS2200Service,
     private readonly events: EsocialEventsService,
+    private readonly transmission: EsocialTransmissionService,
   ) {}
 
   // ── S-2200 Admissao ──────────────────────────────────────────────────────────
@@ -69,5 +71,19 @@ export class HrController {
   @Get('esocial/eventos')
   listEvents(@Req() req: any) {
     return this.events.listEvents(req.companyId);
+  }
+
+  @Post('esocial/transmitir/s2299/:employeeId')
+  async transmitirS2299(
+    @Req() req: any,
+    @Param('employeeId') employeeId: string,
+    @Body('tpAmb') tpAmb: string,
+  ) {
+    return this.transmission.transmitirS2299(req.companyId, employeeId, (tpAmb === '1' ? '1' : '2'));
+  }
+
+  @Get('esocial/transmissoes')
+  listarTransmissoes(@Req() req: any) {
+    return this.transmission.listarEventos(req.companyId);
   }
 }
