@@ -57,7 +57,7 @@ const UsageBadge = ({ usage }: { usage: string[] }) => (
 
 // ── Componente principal ─────────────────────────────────────────
 export const CertificatesPage: React.FC = () => {
-  const { empresa } = useCompany();
+  const { activeCompany: empresa } = useCompany();
   const navigate = useNavigate();
   const [certs, setCerts] = useState<Certificate[]>([]);
   const [loading, setLoading] = useState(true);
