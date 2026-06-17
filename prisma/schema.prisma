@@ -171,6 +171,7 @@ model Company {
   shareholders           CompanyShareholder[] @relation("CompanyShareholders")
   shareholderOf          CompanyShareholder[] @relation("ShareholderCompany")
   certificates           Certificate[]
+  esocialEvents  EsocialEvent[]
   accountBalances        AccountBalance[]
   chartOfAccounts        ChartOfAccounts[]
   journalEntries         JournalEntry[]
