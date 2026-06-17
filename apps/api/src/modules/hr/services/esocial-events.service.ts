@@ -151,6 +151,7 @@ export class EsocialEventsService {
     dtProjFimAPI?: string;
     pensaoAlimenticia?: boolean;
     indAviso?: string;
+    tpAmb?: '1'|'2';
   }): Promise<string> {
     const company = await this.prisma.company.findFirstOrThrow({ where: { id: companyId } });
     const emp     = await this.prisma.employee.findFirstOrThrow({ where: { id: employeeId, companyId, deletedAt: null } });
