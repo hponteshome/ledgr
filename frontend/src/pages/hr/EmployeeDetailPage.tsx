@@ -32,6 +32,7 @@ export default function EmployeeDetailPage() {
   const [rescisaoDto, setRescisaoDto] = useState({motivo:"SEM_JUSTA_CAUSA",tipoAvisoPrevio:"INDENIZADO",dataAviso:"",dataAfastamento:"",feriasVencidas:false,feriasVencidasDobro:false,saldoFgtsContaInformado:"",outrosProventos:"",outrosDescontos:"",observacao:""});
   const [rescisaoPreview, setRescisaoPreview] = useState<any>(null);
   const [calculando, setCalculando] = useState(false);
+  const [s2299Amb, setS2299Amb] = useState<'1'|'2'>('2');
 
   // Formularios
   const [editDto, setEditDto]   = useState<any>({});
@@ -120,6 +121,15 @@ export default function EmployeeDetailPage() {
     finally{ setSaving(false); }
   }
 
+  async function downloadS2299() {
+    try {
+      const res = await api.get('/hr/esocial/s2299/'+id+'?tpAmb='+s2299Amb, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/xml' }));
+      const a = document.createElement('a'); a.href = url; a.download = 'S-2299-'+id+'.xml';
+      document.body.appendChild(a); a.click(); a.remove(); window.URL.revokeObjectURL(url);
+    } catch(e:any){ alert(e?.response?.data?.message??'Erro ao gerar S-2299. Confirme a rescisao primeiro.'); }
+  }
+
   if(loading) return <div style={{padding:60,textAlign:"center",color:"#9CA3AF"}}>Carregando...</div>;
   if(!emp)    return <div style={{padding:60,textAlign:"center",color:"#EF4444"}}>Funcionario nao encontrado.</div>;
 
@@ -141,7 +151,14 @@ export default function EmployeeDetailPage() {
             <button onClick={()=>setShowEdit(true)} style={S.btn(AC)}>Editar</button>
             <button onClick={()=>setShowHist(true)} style={S.btn("#7C3AED")}>+ Alteracao Contratual</button>
             {emp.status==="active"&&<button onClick={()=>{setRescisaoPreview(null);setShowRescisao(true);}} style={{...S.btn("#DC2626"),display:"flex",alignItems:"center",gap:6}}><span>&#9888;</span> Rescindir Contrato</button>}
-            {emp.status==="terminated"&&<span style={{fontSize:12,padding:"6px 12px",borderRadius:8,background:"#FEE2E2",color:"#B91C1C",fontWeight:600}}>&#9940; Desligado em {fmtDate(emp.terminationDate)}</span>}
+            {emp.status==="terminated"&&<div style={{display:"flex",gap:6,alignItems:"center"}}>
+              <span style={{fontSize:12,padding:"6px 12px",borderRadius:8,background:"#FEE2E2",color:"#B91C1C",fontWeight:600}}>&#9940; Desligado em {fmtDate(emp.terminationDate)}</span>
+              <select value={s2299Amb} onChange={e=>setS2299Amb(e.target.value as '1'|'2')} style={{fontSize:11,border:"1px solid #0891B2",borderRadius:6,padding:"4px 6px",color:"#0369A1",background:"#F0F9FF",cursor:"pointer"}}>
+                <option value="2">Prod. Restrita</option>
+                <option value="1">&#9888; Produção Real</option>
+              </select>
+              <button onClick={downloadS2299} style={{fontSize:12,padding:"6px 14px",borderRadius:8,border:"1px solid #0891B2",background:"#ECFEFF",color:"#0891B2",fontWeight:600,cursor:"pointer"}}>&#8615; S-2299 XML</button>
+            </div>}
           </div>
         </div>
         {/* Tabs */}

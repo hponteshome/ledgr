@@ -1,5 +1,5 @@
 // apps/api/src/modules/hr/hr.controller.ts
-import { Controller, Get, Post, Param, Body, Res, UseGuards, UseInterceptors, Req } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, Res, Query, UseGuards, UseInterceptors, Req } from '@nestjs/common';
 import { Response } from 'express';
 import { JwtAuthGuard } from '@/auth/guards/jwt.guard';
 import { CompanyInterceptor } from '@/multi-company/company.interceptor';
@@ -39,6 +39,15 @@ export class HrController {
   }
 
   // ── S-2299 Desligamento ──────────────────────────────────────────────────────
+  @Get('esocial/s2299/:employeeId')
+  async s2299auto(@Req() req: any, @Param('employeeId') id: string, @Query('tpAmb') tpAmb: string, @Res() res: Response) {
+    const amb = (tpAmb === '1') ? '1' : '2';
+    const xml = await this.events.generateS2299FromTermination(req.companyId, id, amb as '1'|'2');
+    res.setHeader('Content-Type', 'application/xml');
+    res.setHeader('Content-Disposition', `attachment; filename="S-2299-${id}.xml"`);
+    return res.send(xml);
+  }
+
   @Post('esocial/s2299/:employeeId')
   async s2299(@Req() req: any, @Param('employeeId') id: string, @Body() body: any, @Res() res: Response) {
     const xml = await this.events.generateS2299(req.companyId, id, body);
