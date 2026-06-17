@@ -94,6 +94,10 @@ export const CertificatesPage: React.FC = () => {
   // ── Alertas no topo ──────────────────────────────────────────
   const alertas = ativos.filter(c => c.expiryStatus !== 'valid');
 
+  if (!empresa) return (
+    <div style={{padding:60,textAlign:'center',color:'#9CA3AF',fontFamily:'system-ui'}}>Carregando empresa...</div>
+  );
+
   return (
     <div className="p-6 bg-[#F8F9FC] min-h-screen font-sans">
       <div className="max-w-5xl mx-auto space-y-6">
@@ -115,9 +119,9 @@ export const CertificatesPage: React.FC = () => {
                          bg-white rounded-xl hover:bg-gray-50 text-xs font-bold transition">
               <FiRefreshCw size={13} /> Atualizar
             </button>
-            <button onClick={() => setShowImport(true)}
+            <button onClick={() => setShowImport(true)} disabled={!empresa}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white
-                         rounded-xl hover:bg-blue-700 text-xs font-bold transition shadow">
+                         rounded-xl hover:bg-blue-700 disabled:opacity-50 text-xs font-bold transition shadow">
               <FiPlus size={14} /> Importar Certificado
             </button>
           </div>
@@ -248,9 +252,9 @@ export const CertificatesPage: React.FC = () => {
       </div>
 
       {/* Modal de importação */}
-      {showImport && (
+      {showImport && empresa && (
         <CertificateImportModal
-          companyId={empresa!.id}
+          companyId={empresa.id}
           onClose={() => setShowImport(false)}
           onSuccess={() => { setShowImport(false); load(); }}
         />
