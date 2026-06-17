@@ -3993,3 +3993,26 @@ model EfdContribuicoes {
   @@index([companyId, periodoInicio])
   @@map("efd_contribuicoes")
 }
+
+/// Eventos eSocial transmitidos — rastreamento completo por evento.
+model EsocialEvent {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId     String    @map("company_id") @db.Uuid
+  employeeId    String?   @map("employee_id") @db.Uuid
+  tipo          String    @map("tipo") @db.VarChar(10)
+  tpAmb         String    @map("tp_amb") @db.VarChar(1)
+  xmlGerado     String    @map("xml_gerado") @db.Text
+  xmlAssinado   String?   @map("xml_assinado") @db.Text
+  nrRec         String?   @map("nr_rec") @db.VarChar(50)
+  status        String    @default("PENDENTE") @map("status") @db.VarChar(20)
+  erros         Json?     @map("erros") @db.Json
+  transmitidoEm DateTime? @map("transmitido_em") @db.Timestamp(6)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@index([companyId, tipo])
+  @@index([status])
+  @@map("esocial_events")
+}
