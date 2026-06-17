@@ -21,8 +21,8 @@ export interface TransmissionResult {
 
 // URLs do webservice eSocial
 const URLS = {
-  '1': 'https://webservices.producao.esocial.gov.br/services/SenderSynchronousService',
-  '2': 'https://webservices.producaorestrita.esocial.gov.br/services/SenderSynchronousService',
+  '1': 'https://webservices.esocial.gov.br/servicos/empregador/enviarloteeventos/WsEnviarLoteEventos.svc',
+  '2': 'https://webservices.producaorestrita.esocial.gov.br/servicos/empregador/enviarloteeventos/WsEnviarLoteEventos.svc',
 };
 
 @Injectable()
@@ -112,7 +112,7 @@ export class EsocialTransmissionService {
       const response = await axios.post(url, soapBody, {
         headers: {
           'Content-Type': 'text/xml; charset=utf-8',
-          'SOAPAction': '',
+          'SOAPAction': 'http://www.esocial.gov.br/servicos/empregador/lote/eventos/envio/sincrono/v1_1_0/IWsEnviarLoteEventos/EnviarLoteEventos',
         },
         httpsAgent: new https.Agent({ rejectUnauthorized: true }),
         timeout: 30_000,
@@ -233,7 +233,7 @@ export class EsocialTransmissionService {
     xmlGerado: string, xmlAssinado: string | null, nrRec: string | null,
     status: string, erros: any,
   ) {
-    return (this.prisma as any).esocialEvent.create({
+    return this.prisma.esocialEvent.create({
       data: {
         companyId, employeeId: employeeId ?? null,
         tipo, tpAmb, xmlGerado, xmlAssinado, nrRec, status,
@@ -245,7 +245,7 @@ export class EsocialTransmissionService {
 
   // ── Listar eventos por empresa ────────────────────────────────────────────
   async listarEventos(companyId: string, tipo?: string) {
-    return (this.prisma as any).esocialEvent.findMany({
+    return this.prisma.esocialEvent.findMany({
       where: { companyId, ...(tipo ? { tipo } : {}) },
       orderBy: { createdAt: 'desc' },
       take: 50,
