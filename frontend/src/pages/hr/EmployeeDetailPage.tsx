@@ -126,8 +126,12 @@ export default function EmployeeDetailPage() {
       const res = await api.get(url, { responseType: 'blob' });
       const ct  = res.headers['content-type'] ?? '';
       if (ct.includes('html')) {
-        const win = window.open('', '_blank');
-        if (win) { win.document.write(new TextDecoder().decode(await (res.data as Blob).arrayBuffer())); win.document.close(); }
+        const html = new TextDecoder().decode(await (res.data as Blob).arrayBuffer());
+        const blob = new Blob([html], { type: 'text/html' });
+        const url  = window.URL.createObjectURL(blob);
+        const win  = window.open(url, '_blank');
+        setTimeout(() => window.URL.revokeObjectURL(url), 5000);
+        if (!win) { const a=document.createElement('a');a.href=url;a.download=filename;a.click(); }
       } else {
         const u = window.URL.createObjectURL(new Blob([res.data]));
         const a = document.createElement('a'); a.href=u; a.download=filename;
@@ -173,9 +177,9 @@ export default function EmployeeDetailPage() {
                 <option value="1">&#9888; Produção Real</option>
               </select>
               <button onClick={downloadS2299} style={{fontSize:12,padding:"6px 14px",borderRadius:8,border:"1px solid #0891B2",background:"#ECFEFF",color:"#0891B2",fontWeight:600,cursor:"pointer"}}>&#8615; S-2299 XML</button>
-              <button onClick={()=>window.open('/api/hr/employees/'+id+'/rescisao/trct/html','_blank')} style={{fontSize:12,padding:"6px 10px",borderRadius:8,border:"1px solid #7C3AED",background:"#F5F3FF",color:"#7C3AED",fontWeight:600,cursor:"pointer"}}>&#128438; TRCT</button>
+              <button onClick={()=>downloadDoc('/hr/employees/'+id+'/rescisao/trct/html','TRCT-'+id+'.html')} style={{fontSize:12,padding:"6px 10px",borderRadius:8,border:"1px solid #7C3AED",background:"#F5F3FF",color:"#7C3AED",fontWeight:600,cursor:"pointer"}}>&#128438; TRCT</button>
               <button onClick={()=>downloadDoc('/hr/employees/'+id+'/rescisao/trct/pdf','TRCT-'+id+'.pdf')} style={{fontSize:12,padding:"6px 10px",borderRadius:8,border:"1px solid #7C3AED",background:"#7C3AED",color:"#fff",fontWeight:600,cursor:"pointer"}}>&#8615; PDF</button>
-              <button onClick={()=>window.open('/api/hr/employees/'+id+'/rescisao/seguro-desemprego/html','_blank')} style={{fontSize:12,padding:"6px 10px",borderRadius:8,border:"1px solid #EA580C",background:"#FFF7ED",color:"#EA580C",fontWeight:600,cursor:"pointer"}}>&#128438; SD</button>
+              <button onClick={()=>downloadDoc('/hr/employees/'+id+'/rescisao/seguro-desemprego/html','SD-'+id+'.html')} style={{fontSize:12,padding:"6px 10px",borderRadius:8,border:"1px solid #EA580C",background:"#FFF7ED",color:"#EA580C",fontWeight:600,cursor:"pointer"}}>&#128438; SD</button>
               <button onClick={()=>downloadDoc('/hr/employees/'+id+'/rescisao/seguro-desemprego/pdf','SD-'+id+'.pdf')} style={{fontSize:12,padding:"6px 10px",borderRadius:8,border:"1px solid #EA580C",background:"#EA580C",color:"#fff",fontWeight:600,cursor:"pointer"}}>&#8615; PDF</button>
             </div>}
           </div>
