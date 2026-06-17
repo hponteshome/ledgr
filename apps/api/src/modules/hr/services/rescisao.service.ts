@@ -370,7 +370,7 @@ export class RescisaoService {
         baseInss,
         aliqInss: inssSaldo.aliq,
         baseIrrf,
-        deducaoIrrf: redutorValor,
+        deducaoIrrf: Math.min(redutorSaldo, irpfSaldo.valor),
         aliqIrrf: irpfSaldo.aliq,
         outrosDescontos: outrosDescontosCalc,
         observacaoOutros: observacaoOutrosCalc,
