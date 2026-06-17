@@ -125,6 +125,7 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
         { path: '/app/system/backup', label: 'Backup e Restauração', icon: FiDatabase },
         { path: '/app/settings/data-management', label: 'Manutenção de Dados', icon: FiSettings },
         { path: '/app/sistema/sidebar-permissions', label: 'Permissões de Sidebar', icon: FiLock },
+        { path: '/app/documents/signatures/certificates', label: 'Certificados Digitais', icon: FiShield },
       ],
     },
     {
