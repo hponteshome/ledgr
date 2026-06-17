@@ -161,7 +161,7 @@ export class EsocialEventsService {
     parts.push('<?xml version="1.0" encoding="UTF-8"?>');
     parts.push('<eSocial xmlns="http://www.esocial.gov.br/schema/evt/evtDeslig/v03_01_00_00">');
     parts.push(`  <evtDeslig Id="${id}">`);
-    parts.push('    <ideEvento><indRetif>1</indRetif><tpAmb>2</tpAmb><procEmi>1</procEmi><verProc>1.0.0</verProc></ideEvento>');
+    parts.push(`    <ideEvento><indRetif>1</indRetif><tpAmb>${params.tpAmb ?? '2'}</tpAmb><procEmi>1</procEmi><verProc>1.0.0</verProc></ideEvento>`);
     parts.push(`    <ideEmpregador><tpInsc>1</tpInsc><nrInsc>${cnpj}</nrInsc></ideEmpregador>`);
     parts.push('    <ideVinculo>');
     parts.push(`      <cpfTrab>${this.digits(emp.taxId)}</cpfTrab>`);
@@ -197,7 +197,7 @@ export class EsocialEventsService {
     parts.push(`    <ideEvento>`);
     parts.push(`      <indRetif>1</indRetif>`);
     parts.push(`      <perApur>${params.perApur}</perApur>`);
-    parts.push(`      <tpAmb>${params.tpAmb ?? '2'}</tpAmb><procEmi>1</procEmi><verProc>1.0.0</verProc>`);
+    parts.push('      <tpAmb>2</tpAmb><procEmi>1</procEmi><verProc>1.0.0</verProc>');
     parts.push(`    </ideEvento>`);
     parts.push(`    <ideEmpregador><tpInsc>1</tpInsc><nrInsc>${cnpj}</nrInsc></ideEmpregador>`);
     parts.push(`    <ideVinculo>`);
