@@ -33,6 +33,8 @@ export default function EmployeeDetailPage() {
   const [rescisaoPreview, setRescisaoPreview] = useState<any>(null);
   const [calculando, setCalculando] = useState(false);
   const [s2299Amb, setS2299Amb] = useState<'1'|'2'>('2');
+  const [transmitindo, setTransmitindo] = useState(false);
+  const [ultimaTransmissao, setUltimaTransmissao] = useState<{nrRec?:string;status?:string;erro?:string}|null>(null);
 
   // Formularios
   const [editDto, setEditDto]   = useState<any>({});
@@ -140,6 +142,21 @@ export default function EmployeeDetailPage() {
     } catch(e:any){ alert(e?.response?.data?.message??'Erro ao gerar documento. Confirme a rescisao primeiro.'); }
   }
 
+  async function transmitirS2299() {
+    if (!confirm(s2299Amb==='1'
+      ? 'ATENCAO: Transmissao em PRODUCAO REAL para o eSocial. Continuar?'
+      : 'Transmitir S-2299 em Producao Restrita (testes)?')) return;
+    setTransmitindo(true); setUltimaTransmissao(null);
+    try {
+      const res = await api.post('/hr/esocial/transmitir/s2299/'+id, { tpAmb: s2299Amb });
+      const d = res.data;
+      setUltimaTransmissao({ nrRec: d.nrRec, status: d.status,
+        erro: d.erros ? JSON.stringify(d.erros).slice(0,120) : undefined });
+    } catch(e:any) {
+      setUltimaTransmissao({ status:'ERRO', erro: e?.response?.data?.message ?? e.message });
+    } finally { setTransmitindo(false); }
+  }
+
   async function downloadS2299() {
     try {
       const res = await api.get('/hr/esocial/s2299/'+id+'?tpAmb='+s2299Amb, { responseType: 'blob' });
@@ -177,6 +194,18 @@ export default function EmployeeDetailPage() {
                 <option value="1">&#9888; Produção Real</option>
               </select>
               <button onClick={downloadS2299} style={{fontSize:12,padding:"6px 14px",borderRadius:8,border:"1px solid #0891B2",background:"#ECFEFF",color:"#0891B2",fontWeight:600,cursor:"pointer"}}>&#8615; S-2299 XML</button>
+              <button onClick={transmitirS2299} disabled={transmitindo} style={{fontSize:12,padding:"6px 14px",borderRadius:8,border:"none",background:s2299Amb==="1"?"#B91C1C":"#0369A1",color:"#fff",fontWeight:600,cursor:"pointer",opacity:transmitindo?0.6:1}}>
+                {transmitindo ? "Transmitindo..." : "[TX] Transmitir eSocial"}
+              </button>
+              {ultimaTransmissao&&(
+                <span style={{fontSize:11,padding:"4px 8px",borderRadius:6,
+                  background:ultimaTransmissao.status==="TRANSMITIDO"?"#DCFCE7":"#FEE2E2",
+                  color:ultimaTransmissao.status==="TRANSMITIDO"?"#15803D":"#B91C1C",fontWeight:600}}>
+                  {ultimaTransmissao.status==="TRANSMITIDO"
+                    ? "Recibo: "+ultimaTransmissao.nrRec
+                    : "ERRO: "+(ultimaTransmissao.erro??ultimaTransmissao.status)}
+                </span>
+              )}
               <button onClick={()=>downloadDoc('/hr/employees/'+id+'/rescisao/trct/html','TRCT-'+id+'.html')} style={{fontSize:12,padding:"6px 10px",borderRadius:8,border:"1px solid #7C3AED",background:"#F5F3FF",color:"#7C3AED",fontWeight:600,cursor:"pointer"}}>&#128438; TRCT</button>
               <button onClick={()=>downloadDoc('/hr/employees/'+id+'/rescisao/trct/pdf','TRCT-'+id+'.pdf')} style={{fontSize:12,padding:"6px 10px",borderRadius:8,border:"1px solid #7C3AED",background:"#7C3AED",color:"#fff",fontWeight:600,cursor:"pointer"}}>&#8615; PDF</button>
               <button onClick={()=>downloadDoc('/hr/employees/'+id+'/rescisao/seguro-desemprego/html','SD-'+id+'.html')} style={{fontSize:12,padding:"6px 10px",borderRadius:8,border:"1px solid #EA580C",background:"#FFF7ED",color:"#EA580C",fontWeight:600,cursor:"pointer"}}>&#128438; SD</button>
