@@ -210,6 +210,7 @@ export const AppRoutes = () => {
                 {/* Documentos */}
                 <Route path="app/documents" element={<ProtectedRoute><DocumentsList /></ProtectedRoute>} />
                 <Route path="app/documents/signatures" element={<ProtectedRoute><SignatureList /></ProtectedRoute>} />
+                <Route path="app/documents/signatures/certificates" element={<ProtectedRoute><CertificateManager /></ProtectedRoute>} />
                 <Route path="app/documents/signatures/request" element={<ProtectedRoute><SignatureRequest /></ProtectedRoute>} />
                 <Route path="app/signatures/validate" element={<ProtectedRoute><SignatureValidatePage /></ProtectedRoute>} />
                 {/* Repositório de Documentos */}
