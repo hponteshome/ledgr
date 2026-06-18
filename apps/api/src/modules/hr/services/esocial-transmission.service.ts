@@ -80,6 +80,31 @@ export class EsocialTransmissionService {
     return this.transmitirEvento(companyId, employeeId, 'S-2230', xmlEvento, idMatch[1], tpAmb);
   }
 
+
+  async transmitirS2240(companyId: string, employeeId: string, params: any): Promise<TransmissionResult> {
+    const tpAmb = (params.tpAmb === '1') ? '1' : '2' as '1'|'2';
+    const xml   = await this.events.generateS2240(companyId, employeeId, { ...params, tpAmb });
+    const m     = xml.match(/evtCondicaoAmb\s+Id="([^"]+)"/);
+    if (!m) throw new Error('Id S-2240 nao encontrado.');
+    return this.transmitirEvento(companyId, employeeId, 'S-2240', xml, m[1], tpAmb);
+  }
+
+  async transmitirS2210(companyId: string, employeeId: string, params: any): Promise<TransmissionResult> {
+    const tpAmb = (params.tpAmb === '1') ? '1' : '2' as '1'|'2';
+    const xml   = await this.events.generateS2210(companyId, employeeId, { ...params, tpAmb });
+    const m     = xml.match(/evtCAT\s+Id="([^"]+)"/);
+    if (!m) throw new Error('Id S-2210 nao encontrado.');
+    return this.transmitirEvento(companyId, employeeId, 'S-2210', xml, m[1], tpAmb);
+  }
+
+  async transmitirS1210(companyId: string, employeeId: string, params: any): Promise<TransmissionResult> {
+    const tpAmb = (params.tpAmb === '1') ? '1' : '2' as '1'|'2';
+    const xml   = await this.events.generateS1210(companyId, employeeId, { ...params, tpAmb });
+    const m     = xml.match(/evtPgtos\s+Id="([^"]+)"/);
+    if (!m) throw new Error('Id S-1210 nao encontrado.');
+    return this.transmitirEvento(companyId, employeeId, 'S-1210', xml, m[1], tpAmb);
+  }
+
   // ── Transmite S-1299 Fechamento de Eventos Periodicos ────────────────────────
   async transmitirS1299(
     companyId: string,

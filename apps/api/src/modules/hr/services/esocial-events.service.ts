@@ -312,6 +312,148 @@ export class EsocialEventsService {
     return parts.join('\n');
   }
 
+
+  // ── S-2240 Condicoes Ambientais do Trabalho (NR-15/NR-16) ───────────────────
+  // condAmb: 1=Normal, 2=Insalubre, 3=Perigoso
+  // localAmb: 1=No estabelecimento, 2=Em outro estabelecimento
+  async generateS2240(companyId: string, employeeId: string, params: {
+    dscSetor:    string;
+    condAmb:     '1'|'2'|'3';
+    dscAtivDes:  string;
+    utilizEpc:   'S'|'N';
+    utilizEpi:   'S'|'N';
+    tpAmb?:      '1'|'2';
+  }): Promise<string> {
+    const company = await this.prisma.company.findFirstOrThrow({ where: { id: companyId } });
+    const emp     = await this.prisma.employee.findFirstOrThrow({ where: { id: employeeId, companyId, deletedAt: null } });
+    const cnpj    = this.digits(company.taxId);
+    const id      = this.evtId(cnpj, '00240');
+    const tpAmb   = params.tpAmb ?? '2';
+    const parts: string[] = [];
+    parts.push('<?xml version="1.0" encoding="UTF-8"?>');
+    parts.push('<eSocial xmlns="http://www.esocial.gov.br/schema/evt/evtCondicaoAmb/v03_00_00_00">');
+    parts.push(`  <evtCondicaoAmb Id="${id}">`);
+    parts.push(`    <ideEvento><indRetif>1</indRetif><tpAmb>${tpAmb}</tpAmb><procEmi>1</procEmi><verProc>1.0.0</verProc></ideEvento>`);
+    parts.push(`    <ideEmpregador><tpInsc>1</tpInsc><nrInsc>${cnpj}</nrInsc></ideEmpregador>`);
+    parts.push('    <ideVinculo>');
+    parts.push(`      <cpfTrab>${this.digits(emp.taxId)}</cpfTrab>`);
+    parts.push(`      <matricula>${this.esc(emp.registrationNumber ?? emp.taxId)}</matricula>`);
+    parts.push('    </ideVinculo>');
+    parts.push('    <infoCondicaoAmb>');
+    parts.push('      <localAmb>1</localAmb>');
+    parts.push(`      <dscSetor>${this.esc(params.dscSetor)}</dscSetor>`);
+    parts.push('      <tpInsc>1</tpInsc>');
+    parts.push(`      <nrInsc>${cnpj}</nrInsc>`);
+    parts.push(`      <condAmb>${params.condAmb}</condAmb>`);
+    parts.push(`      <dscAtivDes>${this.esc(params.dscAtivDes)}</dscAtivDes>`);
+    parts.push('      <epcEpi>');
+    parts.push(`        <utilizEpc>${params.utilizEpc}</utilizEpc>`);
+    parts.push(`        <utilizEpi>${params.utilizEpi}</utilizEpi>`);
+    parts.push('      </epcEpi>');
+    parts.push('    </infoCondicaoAmb>');
+    parts.push('  </evtCondicaoAmb>');
+    parts.push('</eSocial>');
+    return parts.join('\n');
+  }
+
+  // ── S-2210 Comunicacao de Acidente de Trabalho (CAT) ────────────────────────
+  // tpAcid: 1=Tipico, 2=Trajeto, 3=Doenca Ocupacional
+  // tpCat:  1=Inicial, 2=Reabertura, 3=Comunicacao de Obito
+  async generateS2210(companyId: string, employeeId: string, params: {
+    dtAcid:      string;  // YYYY-MM-DD
+    hrAcid:      string;  // HH:MM
+    tpAcid:      '1'|'2'|'3';
+    tpCat:       '1'|'2'|'3';
+    dscLoc:      string;
+    codCID:      string;
+    dscLesao:    string;
+    descricao:   string;
+    dtAtend:     string;
+    nmMedico:    string;
+    nrOC:        string;  // CRM
+    ufCRM:       string;
+    tpAmb?:      '1'|'2';
+  }): Promise<string> {
+    const company = await this.prisma.company.findFirstOrThrow({ where: { id: companyId } });
+    const emp     = await this.prisma.employee.findFirstOrThrow({ where: { id: employeeId, companyId, deletedAt: null } });
+    const cnpj    = this.digits(company.taxId);
+    const id      = this.evtId(cnpj, '00210');
+    const tpAmb   = params.tpAmb ?? '2';
+    const parts: string[] = [];
+    parts.push('<?xml version="1.0" encoding="UTF-8"?>');
+    parts.push('<eSocial xmlns="http://www.esocial.gov.br/schema/evt/evtCAT/v03_00_00_00">');
+    parts.push(`  <evtCAT Id="${id}">`);
+    parts.push(`    <ideEvento><indRetif>1</indRetif><tpAmb>${tpAmb}</tpAmb><procEmi>1</procEmi><verProc>1.0.0</verProc></ideEvento>`);
+    parts.push(`    <ideEmpregador><tpInsc>1</tpInsc><nrInsc>${cnpj}</nrInsc></ideEmpregador>`);
+    parts.push('    <ideVinculo>');
+    parts.push(`      <cpfTrab>${this.digits(emp.taxId)}</cpfTrab>`);
+    parts.push(`      <matricula>${this.esc(emp.registrationNumber ?? emp.taxId)}</matricula>`);
+    parts.push('    </ideVinculo>');
+    parts.push('    <cat>');
+    parts.push(`      <dtAcid>${params.dtAcid}</dtAcid>`);
+    parts.push(`      <tpAcid>${params.tpAcid}</tpAcid>`);
+    parts.push(`      <hrAcid>${params.hrAcid}</hrAcid>`);
+    parts.push(`      <tpCat>${params.tpCat}</tpCat>`);
+    parts.push(`      <dscLoc>${this.esc(params.dscLoc)}</dscLoc>`);
+    parts.push(`      <codCID>${this.esc(params.codCID)}</codCID>`);
+    parts.push(`      <descricao>${this.esc(params.descricao)}</descricao>`);
+    parts.push('      <atestado>');
+    parts.push(`        <dtAtendimento>${params.dtAtend}</dtAtendimento>`);
+    parts.push('        <indInternacao>N</indInternacao>');
+    parts.push('        <durTrat>0</durTrat>');
+    parts.push('        <indAfast>N</indAfast>');
+    parts.push(`        <dscLesao>${this.esc(params.dscLesao)}</dscLesao>`);
+    parts.push(`        <codCID>${this.esc(params.codCID)}</codCID>`);
+    parts.push(`        <diagProvavel>${this.esc(params.dscLesao)}</diagProvavel>`);
+    parts.push(`        <nmMedico>${this.esc(params.nmMedico)}</nmMedico>`);
+    parts.push(`        <nrOC>${this.esc(params.nrOC)}</nrOC>`);
+    parts.push(`        <ufCRM>${this.esc(params.ufCRM)}</ufCRM>`);
+    parts.push('      </atestado>');
+    parts.push('    </cat>');
+    parts.push('  </evtCAT>');
+    parts.push('</eSocial>');
+    return parts.join('\n');
+  }
+
+  // ── S-1210 Pagamento de Rendimentos do Trabalho ──────────────────────────────
+  // tpPgto: 1=Normal, 2=13o salario, 3=Ferias, 4=PLR, 5=Rescisao
+  async generateS1210(companyId: string, employeeId: string, params: {
+    perApur:  string;  // YYYY-MM
+    dtPgto:   string;  // YYYY-MM-DD
+    tpPgto:   '1'|'2'|'3'|'4'|'5';
+    tpAmb?:   '1'|'2';
+  }): Promise<string> {
+    const company = await this.prisma.company.findFirstOrThrow({ where: { id: companyId } });
+    const emp     = await this.prisma.employee.findFirstOrThrow({ where: { id: employeeId, companyId, deletedAt: null } });
+    const cnpj    = this.digits(company.taxId);
+    const id      = this.evtId(cnpj, '00210');
+    const tpAmb   = params.tpAmb ?? '2';
+    const parts: string[] = [];
+    parts.push('<?xml version="1.0" encoding="UTF-8"?>');
+    parts.push('<eSocial xmlns="http://www.esocial.gov.br/schema/evt/evtPgtos/v02_00_00_00">');
+    parts.push(`  <evtPgtos Id="${id}">`);
+    parts.push('    <ideEvento>');
+    parts.push('      <indRetif>1</indRetif>');
+    parts.push(`      <perApur>${params.perApur}</perApur>`);
+    parts.push(`      <tpAmb>${tpAmb}</tpAmb>`);
+    parts.push('      <procEmi>1</procEmi>');
+    parts.push('      <verProc>1.0.0</verProc>');
+    parts.push('    </ideEvento>');
+    parts.push(`    <ideEmpregador><tpInsc>1</tpInsc><nrInsc>${cnpj}</nrInsc></ideEmpregador>`);
+    parts.push('    <ideVinculo>');
+    parts.push(`      <cpfBenef>${this.digits(emp.taxId)}</cpfBenef>`);
+    parts.push(`      <matricula>${this.esc(emp.registrationNumber ?? emp.taxId)}</matricula>`);
+    parts.push('    </ideVinculo>');
+    parts.push('    <dmDev>');
+    parts.push('      <ideDmDev>1</ideDmDev>');
+    parts.push(`      <dtPgto>${params.dtPgto}</dtPgto>`);
+    parts.push(`      <tpPgto>${params.tpPgto}</tpPgto>`);
+    parts.push('    </dmDev>');
+    parts.push('  </evtPgtos>');
+    parts.push('</eSocial>');
+    return parts.join('\n');
+  }
+
   // ── Listar eventos disponiveis por funcionario ───────────────────────────────
   async listEvents(companyId: string) {
     const employees = await this.prisma.employee.findMany({

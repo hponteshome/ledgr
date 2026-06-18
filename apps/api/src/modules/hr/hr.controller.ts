@@ -105,6 +105,42 @@ export class HrController {
     return this.transmission.transmitirS2230(req.companyId, employeeId, { ...body, tpAmb });
   }
 
+  @Post('esocial/transmitir/s2240/:employeeId')
+  async txS2240(@Req() req: any, @Param('employeeId') id: string, @Body() body: any) {
+    return this.transmission.transmitirS2240(req.companyId, id, body);
+  }
+  @Post('esocial/s2240/:employeeId')
+  async xmlS2240(@Req() req: any, @Param('employeeId') id: string, @Body() body: any, @Res() res: Response) {
+    const xml = await this.events.generateS2240(req.companyId, id, body);
+    res.setHeader('Content-Type','application/xml');
+    res.setHeader('Content-Disposition',`attachment; filename="S-2240-${id}.xml"`);
+    return res.send(xml);
+  }
+
+  @Post('esocial/transmitir/s2210/:employeeId')
+  async txS2210(@Req() req: any, @Param('employeeId') id: string, @Body() body: any) {
+    return this.transmission.transmitirS2210(req.companyId, id, body);
+  }
+  @Post('esocial/s2210/:employeeId')
+  async xmlS2210(@Req() req: any, @Param('employeeId') id: string, @Body() body: any, @Res() res: Response) {
+    const xml = await this.events.generateS2210(req.companyId, id, body);
+    res.setHeader('Content-Type','application/xml');
+    res.setHeader('Content-Disposition',`attachment; filename="S-2210-${id}.xml"`);
+    return res.send(xml);
+  }
+
+  @Post('esocial/transmitir/s1210/:employeeId')
+  async txS1210(@Req() req: any, @Param('employeeId') id: string, @Body() body: any) {
+    return this.transmission.transmitirS1210(req.companyId, id, body);
+  }
+  @Post('esocial/s1210/:employeeId')
+  async xmlS1210(@Req() req: any, @Param('employeeId') id: string, @Body() body: any, @Res() res: Response) {
+    const xml = await this.events.generateS1210(req.companyId, id, body);
+    res.setHeader('Content-Type','application/xml');
+    res.setHeader('Content-Disposition',`attachment; filename="S-1210-${id}.xml"`);
+    return res.send(xml);
+  }
+
   @Post('esocial/transmitir/s1299')
   async transmitirS1299(
     @Req() req: any,

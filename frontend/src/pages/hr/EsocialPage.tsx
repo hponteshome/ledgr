@@ -28,6 +28,9 @@ export default function EsocialPage() {
   const [s1200, setS1200] = useState({perApur:new Date().toISOString().slice(0,7),vrBcCp:""});
   const [s1299, setS1299] = useState({perApur:new Date().toISOString().slice(0,7),tpAmb:"2"});
   const [s2230, setS2230] = useState({dtIniAfast:"",codMotAfast:"17",dtTermAfast:"",tpAmb:"2"});
+  const [s2240, setS2240] = useState({dscSetor:"",condAmb:"1",dscAtivDes:"",utilizEpc:"S",utilizEpi:"N",tpAmb:"2"});
+  const [s2210, setS2210] = useState({dtAcid:"",hrAcid:"08:00",tpAcid:"1",tpCat:"1",dscLoc:"",codCID:"",dscLesao:"",descricao:"",dtAtend:"",nmMedico:"",nrOC:"",ufCRM:"PR",tpAmb:"2"});
+  const [s1210, setS1210] = useState({perApur:new Date().toISOString().slice(0,7),dtPgto:"",tpPgto:"1",tpAmb:"2"});
   const [s1299Status, setS1299Status] = useState<{nrRec?:string;status?:string;erro?:string}|null>(null);
   const [s1299Loading, setS1299Loading] = useState(false);
 
@@ -112,6 +115,19 @@ export default function EsocialPage() {
     } catch(e:any) { Swal.fire("Erro","Falha S-2230: "+(e?.response?.data?.message??e.message),"error"); }
   }
 
+  async function actEvent(tipo: string, url: string, body: any, setter: any) {
+    if (!sel) return;
+    try {
+      if (tipo==="TX") {
+        const res = await api.post(url+sel.id, body);
+        Swal.fire("Transmitido","Recibo: "+(res.data.nrRec??"Pendente"),"success");
+      } else {
+        dlXml(await getXml(url+sel.id,"POST",body),`${tipo}-${sel.fullName.replace(/\s+/g,"-")}.xml`);
+      }
+      setModal(null);
+    } catch(e:any) { Swal.fire("Erro",`Falha ${tipo}: `+(e?.response?.data?.message??e.message),"error"); }
+  }
+
   async function dl1200() {
     if(!sel||!s1200.perApur||!s1200.vrBcCp) return;
     try {
@@ -169,7 +185,7 @@ export default function EsocialPage() {
 
         {loading ? <div style={{textAlign:"center",padding:60,color:"#9CA3AF"}}>Carregando...</div> : (
           <table style={{width:"100%",borderCollapse:"collapse"}}>
-            <thead><tr>{["Funcionario","CPF","Funcao","Admissao","Salario","S-2200","S-2205","S-1200","S-2299","S-2230"].map(h=>(
+            <thead><tr>{["Funcionario","CPF","Funcao","Admissao","Salario","S-2200","S-2205","S-1200","S-2299","S-2230","S-2240","S-2210","S-1210"].map(h=>(
               <th key={h} style={S.th}>{h}</th>
             ))}</tr></thead>
             <tbody>{emps.map(e=>(
@@ -184,6 +200,9 @@ export default function EsocialPage() {
                 <td style={S.td}><button style={S.btn("#7C3AED")} onClick={()=>{setSel(e);setS1200(s=>({...s,vrBcCp:String(e.salary)}));setModal("s1200");}}>XML</button></td>
                 <td style={S.td}><button style={S.btn("#B91C1C")} onClick={()=>{setSel(e);setModal("s2299");}}>XML</button></td>
                 <td style={S.td}><button style={S.btn("#0891B2")} onClick={()=>{setSel(e);setModal("s2230");}}>Afastar</button></td>
+                <td style={S.td}><button style={S.btn("#0D9488")} onClick={()=>{setSel(e);setModal("s2240");}}>NR</button></td>
+                <td style={S.td}><button style={S.btn("#DC2626")} onClick={()=>{setSel(e);setModal("s2210");}}>CAT</button></td>
+                <td style={S.td}><button style={S.btn("#7C3AED")} onClick={()=>{setSel(e);setModal("s1210");}}>Pgto</button></td>
               </tr>
             ))}</tbody>
           </table>
@@ -237,6 +256,117 @@ export default function EsocialPage() {
             <button onClick={()=>setModal(null)} style={{padding:"8px 16px",borderRadius:8,border:"0.5px solid #E5E7EB",background:"#fff",cursor:"pointer",fontSize:13}}>Cancelar</button>
             <button onClick={dlS2230} disabled={!s2230.dtIniAfast} style={{padding:"8px 18px",borderRadius:8,border:"none",background:"#7C3AED",color:"#fff",cursor:"pointer",fontSize:13,fontWeight:500}}>Gerar XML</button>
             <button onClick={transmitirS2230} disabled={!s2230.dtIniAfast} style={{padding:"8px 18px",borderRadius:8,border:"none",background:s2230.tpAmb==="1"?"#B91C1C":"#0369A1",color:"#fff",cursor:"pointer",fontSize:13,fontWeight:500}}>[TX] Transmitir</button>
+          </div>
+        </div></div>
+      )}
+
+      {modal==="s2240"&&sel&&(
+        <div style={ov}><div style={{...cd,width:520}}>
+          <h2 style={{fontSize:16,fontWeight:600,margin:"0 0 4px"}}>S-2240 - Condicoes Ambientais (NR-15/NR-16)</h2>
+          <p style={{fontSize:13,color:"#6B7280",margin:"0 0 16px"}}>{sel.fullName}</p>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+            <div><label style={S.lbl}>Setor *</label><input value={s2240.dscSetor} onChange={e=>setS2240(d=>({...d,dscSetor:e.target.value}))} style={S.inp} placeholder="Ex: Producao, Administrativo"/></div>
+            <div><label style={S.lbl}>Condicao *</label>
+              <select value={s2240.condAmb} onChange={e=>setS2240(d=>({...d,condAmb:e.target.value}))} style={S.inp}>
+                <option value="1">1 - Normal</option>
+                <option value="2">2 - Insalubre (NR-15)</option>
+                <option value="3">3 - Perigoso (NR-16)</option>
+              </select>
+            </div>
+            <div style={{gridColumn:"1/-1"}}><label style={S.lbl}>Atividade desenvolvida *</label><input value={s2240.dscAtivDes} onChange={e=>setS2240(d=>({...d,dscAtivDes:e.target.value}))} style={S.inp} placeholder="Descricao da atividade"/></div>
+            <div><label style={S.lbl}>Usa EPC?</label>
+              <select value={s2240.utilizEpc} onChange={e=>setS2240(d=>({...d,utilizEpc:e.target.value}))} style={S.inp}>
+                <option value="S">Sim</option><option value="N">Nao</option>
+              </select>
+            </div>
+            <div><label style={S.lbl}>Usa EPI?</label>
+              <select value={s2240.utilizEpi} onChange={e=>setS2240(d=>({...d,utilizEpi:e.target.value}))} style={S.inp}>
+                <option value="N">Nao</option><option value="S">Sim</option>
+              </select>
+            </div>
+            <div><label style={S.lbl}>Ambiente</label>
+              <select value={s2240.tpAmb} onChange={e=>setS2240(d=>({...d,tpAmb:e.target.value}))} style={{...S.inp,color:s2240.tpAmb==="1"?"#B91C1C":"#0369A1",fontWeight:600}}>
+                <option value="2">Producao Restrita</option><option value="1">Producao Real</option>
+              </select>
+            </div>
+          </div>
+          <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginTop:16}}>
+            <button onClick={()=>setModal(null)} style={{padding:"8px 16px",borderRadius:8,border:"0.5px solid #E5E7EB",background:"#fff",cursor:"pointer",fontSize:13}}>Cancelar</button>
+            <button onClick={()=>actEvent("S-2240","/hr/esocial/s2240/",s2240,setS2240)} disabled={!s2240.dscSetor||!s2240.dscAtivDes} style={{padding:"8px 16px",borderRadius:8,border:"none",background:"#0D9488",color:"#fff",cursor:"pointer",fontSize:13,fontWeight:500}}>Gerar XML</button>
+            <button onClick={()=>actEvent("TX","/hr/esocial/transmitir/s2240/",s2240,setS2240)} disabled={!s2240.dscSetor||!s2240.dscAtivDes} style={{padding:"8px 16px",borderRadius:8,border:"none",background:s2240.tpAmb==="1"?"#B91C1C":"#0369A1",color:"#fff",cursor:"pointer",fontSize:13,fontWeight:500}}>[TX] Transmitir</button>
+          </div>
+        </div></div>
+      )}
+
+      {modal==="s2210"&&sel&&(
+        <div style={ov}><div style={{...cd,width:580}}>
+          <h2 style={{fontSize:16,fontWeight:600,margin:"0 0 4px"}}>S-2210 - CAT (Acidente de Trabalho)</h2>
+          <p style={{fontSize:13,color:"#6B7280",margin:"0 0 16px"}}>{sel.fullName}</p>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+            <div><label style={S.lbl}>Data do Acidente *</label><input type="date" value={s2210.dtAcid} onChange={e=>setS2210(d=>({...d,dtAcid:e.target.value}))} style={S.inp}/></div>
+            <div><label style={S.lbl}>Hora</label><input type="time" value={s2210.hrAcid} onChange={e=>setS2210(d=>({...d,hrAcid:e.target.value}))} style={S.inp}/></div>
+            <div><label style={S.lbl}>Tipo de Acidente</label>
+              <select value={s2210.tpAcid} onChange={e=>setS2210(d=>({...d,tpAcid:e.target.value}))} style={S.inp}>
+                <option value="1">1 - Tipico</option><option value="2">2 - Trajeto</option><option value="3">3 - Doenca Ocupacional</option>
+              </select>
+            </div>
+            <div><label style={S.lbl}>Tipo CAT</label>
+              <select value={s2210.tpCat} onChange={e=>setS2210(d=>({...d,tpCat:e.target.value}))} style={S.inp}>
+                <option value="1">1 - Inicial</option><option value="2">2 - Reabertura</option><option value="3">3 - Obito</option>
+              </select>
+            </div>
+            <div><label style={S.lbl}>CID *</label><input value={s2210.codCID} onChange={e=>setS2210(d=>({...d,codCID:e.target.value.toUpperCase()}))} style={S.inp} placeholder="Ex: S60.0"/></div>
+            <div><label style={S.lbl}>Data Atendimento *</label><input type="date" value={s2210.dtAtend} onChange={e=>setS2210(d=>({...d,dtAtend:e.target.value}))} style={S.inp}/></div>
+            <div style={{gridColumn:"1/-1"}}><label style={S.lbl}>Local do Acidente *</label><input value={s2210.dscLoc} onChange={e=>setS2210(d=>({...d,dscLoc:e.target.value}))} style={S.inp} placeholder="Ex: Almoxarifado, estrada PR-151"/></div>
+            <div style={{gridColumn:"1/-1"}}><label style={S.lbl}>Descricao da Lesao *</label><input value={s2210.dscLesao} onChange={e=>setS2210(d=>({...d,dscLesao:e.target.value}))} style={S.inp} placeholder="Ex: Fratura de falange"/></div>
+            <div style={{gridColumn:"1/-1"}}><label style={S.lbl}>Descricao do Acidente *</label><input value={s2210.descricao} onChange={e=>setS2210(d=>({...d,descricao:e.target.value}))} style={S.inp} placeholder="Como ocorreu o acidente"/></div>
+            <div style={{gridColumn:"1/-1"}}><label style={S.lbl}>Medico / CRM / UF</label>
+              <div style={{display:"flex",gap:6}}>
+                <input value={s2210.nmMedico} onChange={e=>setS2210(d=>({...d,nmMedico:e.target.value}))} style={{...S.inp,flex:2}} placeholder="Nome do medico"/>
+                <input value={s2210.nrOC} onChange={e=>setS2210(d=>({...d,nrOC:e.target.value}))} style={{...S.inp,flex:1}} placeholder="CRM"/>
+                <input value={s2210.ufCRM} onChange={e=>setS2210(d=>({...d,ufCRM:e.target.value.toUpperCase().slice(0,2)}))} style={{...S.inp,width:50,flex:0}} placeholder="UF"/>
+              </div>
+            </div>
+            <div><label style={S.lbl}>Ambiente</label>
+              <select value={s2210.tpAmb} onChange={e=>setS2210(d=>({...d,tpAmb:e.target.value}))} style={{...S.inp,color:s2210.tpAmb==="1"?"#B91C1C":"#0369A1",fontWeight:600}}>
+                <option value="2">Producao Restrita</option><option value="1">Producao Real</option>
+              </select>
+            </div>
+          </div>
+          <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginTop:16}}>
+            <button onClick={()=>setModal(null)} style={{padding:"8px 16px",borderRadius:8,border:"0.5px solid #E5E7EB",background:"#fff",cursor:"pointer",fontSize:13}}>Cancelar</button>
+            <button onClick={()=>actEvent("S-2210","/hr/esocial/s2210/",s2210,setS2210)} disabled={!s2210.dtAcid||!s2210.codCID} style={{padding:"8px 16px",borderRadius:8,border:"none",background:"#DC2626",color:"#fff",cursor:"pointer",fontSize:13,fontWeight:500}}>Gerar XML</button>
+            <button onClick={()=>actEvent("TX","/hr/esocial/transmitir/s2210/",s2210,setS2210)} disabled={!s2210.dtAcid||!s2210.codCID} style={{padding:"8px 16px",borderRadius:8,border:"none",background:s2210.tpAmb==="1"?"#B91C1C":"#0369A1",color:"#fff",cursor:"pointer",fontSize:13,fontWeight:500}}>[TX] Transmitir</button>
+          </div>
+        </div></div>
+      )}
+
+      {modal==="s1210"&&sel&&(
+        <div style={ov}><div style={cd}>
+          <h2 style={{fontSize:16,fontWeight:600,margin:"0 0 4px"}}>S-1210 - Pagamento de Rendimentos</h2>
+          <p style={{fontSize:13,color:"#6B7280",margin:"0 0 16px"}}>{sel.fullName}</p>
+          <div style={{display:"grid",gap:12}}>
+            <div><label style={S.lbl}>Competencia *</label><input type="month" value={s1210.perApur} onChange={e=>setS1210(d=>({...d,perApur:e.target.value}))} style={S.inp}/></div>
+            <div><label style={S.lbl}>Data do Pagamento *</label><input type="date" value={s1210.dtPgto} onChange={e=>setS1210(d=>({...d,dtPgto:e.target.value}))} style={S.inp}/></div>
+            <div><label style={S.lbl}>Tipo de Pagamento</label>
+              <select value={s1210.tpPgto} onChange={e=>setS1210(d=>({...d,tpPgto:e.target.value}))} style={S.inp}>
+                <option value="1">1 - Mensal (normal)</option>
+                <option value="2">2 - 13o Salario</option>
+                <option value="3">3 - Ferias</option>
+                <option value="4">4 - PLR</option>
+                <option value="5">5 - Rescisao</option>
+              </select>
+            </div>
+            <div><label style={S.lbl}>Ambiente</label>
+              <select value={s1210.tpAmb} onChange={e=>setS1210(d=>({...d,tpAmb:e.target.value}))} style={{...S.inp,color:s1210.tpAmb==="1"?"#B91C1C":"#0369A1",fontWeight:600}}>
+                <option value="2">Producao Restrita</option><option value="1">Producao Real</option>
+              </select>
+            </div>
+          </div>
+          <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginTop:20}}>
+            <button onClick={()=>setModal(null)} style={{padding:"8px 16px",borderRadius:8,border:"0.5px solid #E5E7EB",background:"#fff",cursor:"pointer",fontSize:13}}>Cancelar</button>
+            <button onClick={()=>actEvent("S-1210","/hr/esocial/s1210/",s1210,setS1210)} disabled={!s1210.perApur||!s1210.dtPgto} style={{padding:"8px 16px",borderRadius:8,border:"none",background:"#7C3AED",color:"#fff",cursor:"pointer",fontSize:13,fontWeight:500}}>Gerar XML</button>
+            <button onClick={()=>actEvent("TX","/hr/esocial/transmitir/s1210/",s1210,setS1210)} disabled={!s1210.perApur||!s1210.dtPgto} style={{padding:"8px 16px",borderRadius:8,border:"none",background:s1210.tpAmb==="1"?"#B91C1C":"#0369A1",color:"#fff",cursor:"pointer",fontSize:13,fontWeight:500}}>[TX] Transmitir</button>
           </div>
         </div></div>
       )}
