@@ -96,7 +96,13 @@ export class EsocialTransmissionService {
     // 5. Montar SOAP envelope
     const company = await this.prisma.company.findFirstOrThrow({ where: { id: companyId } });
     const cnpj = (company.taxId ?? '').replace(/\D/g, '');
-    const soapBody = this.buildSoapEnvelope(xmlAssinado, cnpj, tpAmb);
+    // Extrai CPF do subject do certificado (formato CN=NOME:CPF11DIGITOS,...)
+    const certInfo = await (this.prisma as any).certificate.findFirst({
+      where: { id: cert.id }, select: { subject: true }
+    });
+    const cpfMatch = certInfo?.subject?.match(/:([0-9]{11})/);
+    const cpfTransmissor = cpfMatch ? cpfMatch[1] : undefined;
+    const soapBody = this.buildSoapEnvelope(xmlAssinado, cnpj, tpAmb, cpfTransmissor);
 
     // 6. Transmitir
     let nrRec: string | null = null;
@@ -187,7 +193,10 @@ export class EsocialTransmissionService {
   }
 
   // ── SOAP Envelope ─────────────────────────────────────────────────────────
-  private buildSoapEnvelope(xmlAssinado: string, cnpj: string, tpAmb: string): string {
+  private buildSoapEnvelope(xmlAssinado: string, cnpj: string, tpAmb: string, cpfTransmissor?: string): string {
+    // ideTransmissor: responsavel legal usa CPF (tpInsc=2); procurador tb usa CPF
+    const tpInscTx  = cpfTransmissor ? '2' : '1';
+    const nrInscTx  = cpfTransmissor ? cpfTransmissor : cnpj;
     return `<?xml version="1.0" encoding="UTF-8"?>
 <soapenv:Envelope
   xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
@@ -203,8 +212,8 @@ export class EsocialTransmissionService {
               <nrInsc>${cnpj}</nrInsc>
             </ideEmpregador>
             <ideTransmissor>
-              <tpInsc>1</tpInsc>
-              <nrInsc>${cnpj}</nrInsc>
+              <tpInsc>${tpInscTx}</tpInsc>
+              <nrInsc>${nrInscTx}</nrInsc>
             </ideTransmissor>
             <eventos>
               <evento Id="ev001">
