@@ -59,6 +59,14 @@ export class HrController {
   }
 
   // ── S-1200 Remuneracao ───────────────────────────────────────────────────────
+  @Post('esocial/s2230/:employeeId')
+  async s2230xml(@Req() req: any, @Param('employeeId') id: string, @Body() body: any, @Res() res: Response) {
+    const xml = await this.events.generateS2230(req.companyId, id, body);
+    res.setHeader('Content-Type', 'application/xml');
+    res.setHeader('Content-Disposition', `attachment; filename="S-2230-${id}.xml"`);
+    return res.send(xml);
+  }
+
   @Post('esocial/s1200/:employeeId')
   async s1200(@Req() req: any, @Param('employeeId') id: string, @Body() body: any, @Res() res: Response) {
     const xml = await this.events.generateS1200(req.companyId, id, body);
@@ -71,6 +79,30 @@ export class HrController {
   @Get('esocial/eventos')
   listEvents(@Req() req: any) {
     return this.events.listEvents(req.companyId);
+  }
+
+  @Post('esocial/transmitir/s1200/:employeeId')
+  async transmitirS1200(
+    @Req() req: any,
+    @Param('employeeId') employeeId: string,
+    @Body() body: any,
+  ) {
+    const tpAmb = body.tpAmb === '1' ? '1' : '2';
+    return this.transmission.transmitirS1200(req.companyId, employeeId, {
+      perApur: body.perApur,
+      vrBcCpMensal: parseFloat(String(body.vrBcCp ?? body.vrBcCpMensal ?? 0).replace(',','.')),
+      tpAmb,
+    });
+  }
+
+  @Post('esocial/transmitir/s2230/:employeeId')
+  async transmitirS2230(
+    @Req() req: any,
+    @Param('employeeId') employeeId: string,
+    @Body() body: any,
+  ) {
+    const tpAmb = body.tpAmb === '1' ? '1' : '2';
+    return this.transmission.transmitirS2230(req.companyId, employeeId, { ...body, tpAmb });
   }
 
   @Post('esocial/transmitir/s1299')

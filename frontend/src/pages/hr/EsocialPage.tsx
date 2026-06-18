@@ -27,6 +27,7 @@ export default function EsocialPage() {
   const [s2299, setS2299] = useState({dtDeslig:"",mtvDeslig:"01",pensao:false,tpAmb:"2"});
   const [s1200, setS1200] = useState({perApur:new Date().toISOString().slice(0,7),vrBcCp:""});
   const [s1299, setS1299] = useState({perApur:new Date().toISOString().slice(0,7),tpAmb:"2"});
+  const [s2230, setS2230] = useState({dtIniAfast:"",codMotAfast:"17",dtTermAfast:"",tpAmb:"2"});
   const [s1299Status, setS1299Status] = useState<{nrRec?:string;status?:string;erro?:string}|null>(null);
   const [s1299Loading, setS1299Loading] = useState(false);
 
@@ -80,6 +81,35 @@ export default function EsocialPage() {
     } catch(e:any) {
       setS1299Status({ status:"ERRO", erro: e?.response?.data?.message ?? e.message });
     } finally { setS1299Loading(false); }
+  }
+
+  async function transmitirS1200() {
+    if(!sel||!s1200.perApur||!s1200.vrBcCp) return;
+    try {
+      const b={perApur:s1200.perApur,vrBcCp:s1200.vrBcCp,tpAmb:s2299.tpAmb};
+      const res = await api.post("/hr/esocial/transmitir/s1200/"+sel.id, b);
+      Swal.fire("S-1200 Transmitido","Recibo: "+(res.data.nrRec??"Pendente"),"success");
+      setModal(null);
+    } catch(e:any) { Swal.fire("Erro","Falha S-1200: "+(e?.response?.data?.message??e.message),"error"); }
+  }
+
+  async function dlS2230() {
+    if(!sel||!s2230.dtIniAfast) return;
+    try {
+      const b={...s2230};
+      dlXml(await getXml("/hr/esocial/s2230/"+sel.id,"POST",b),`S-2230-${sel.fullName.replace(/\s+/g,"-")}.xml`);
+      setModal(null);
+    } catch { Swal.fire("Erro","Falha S-2230","error"); }
+  }
+
+  async function transmitirS2230() {
+    if(!sel||!s2230.dtIniAfast) return;
+    if(!confirm("Transmitir S-2230 Afastamento de "+sel.fullName+"?")) return;
+    try {
+      const res = await api.post("/hr/esocial/transmitir/s2230/"+sel.id, s2230);
+      Swal.fire("S-2230 Transmitido","Recibo: "+(res.data.nrRec??"Pendente"),"success");
+      setModal(null);
+    } catch(e:any) { Swal.fire("Erro","Falha S-2230: "+(e?.response?.data?.message??e.message),"error"); }
   }
 
   async function dl1200() {
@@ -139,7 +169,7 @@ export default function EsocialPage() {
 
         {loading ? <div style={{textAlign:"center",padding:60,color:"#9CA3AF"}}>Carregando...</div> : (
           <table style={{width:"100%",borderCollapse:"collapse"}}>
-            <thead><tr>{["Funcionario","CPF","Funcao","Admissao","Salario","S-2200","S-2205","S-1200","S-2299"].map(h=>(
+            <thead><tr>{["Funcionario","CPF","Funcao","Admissao","Salario","S-2200","S-2205","S-1200","S-2299","S-2230"].map(h=>(
               <th key={h} style={S.th}>{h}</th>
             ))}</tr></thead>
             <tbody>{emps.map(e=>(
@@ -153,6 +183,7 @@ export default function EsocialPage() {
                 <td style={S.td}><button style={S.btn("#0369A1")} onClick={()=>{setSel(e);setModal("s2205");}}>XML</button></td>
                 <td style={S.td}><button style={S.btn("#7C3AED")} onClick={()=>{setSel(e);setS1200(s=>({...s,vrBcCp:String(e.salary)}));setModal("s1200");}}>XML</button></td>
                 <td style={S.td}><button style={S.btn("#B91C1C")} onClick={()=>{setSel(e);setModal("s2299");}}>XML</button></td>
+                <td style={S.td}><button style={S.btn("#0891B2")} onClick={()=>{setSel(e);setModal("s2230");}}>Afastar</button></td>
               </tr>
             ))}</tbody>
           </table>
@@ -172,6 +203,40 @@ export default function EsocialPage() {
           <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginTop:20}}>
             <button onClick={()=>setModal(null)} style={{padding:"8px 16px",borderRadius:8,border:"0.5px solid #E5E7EB",background:"#fff",cursor:"pointer",fontSize:13}}>Cancelar</button>
             <button onClick={dl2205} disabled={!s2205.dtAlteracao} style={{padding:"8px 18px",borderRadius:8,border:"none",background:AC,color:"#fff",cursor:"pointer",fontSize:13,fontWeight:500}}>Gerar XML</button>
+          </div>
+        </div></div>
+      )}
+
+      {modal==="s2230"&&sel&&(
+        <div style={ov}><div style={cd}>
+          <h2 style={{fontSize:16,fontWeight:600,margin:"0 0 4px"}}>S-2230 - Afastamento Temporario</h2>
+          <p style={{fontSize:13,color:"#6B7280",margin:"0 0 16px"}}>{sel.fullName}</p>
+          <div style={{display:"grid",gap:12}}>
+            <div><label style={S.lbl}>Inicio do Afastamento *</label><input type="date" value={s2230.dtIniAfast} onChange={e=>setS2230(d=>({...d,dtIniAfast:e.target.value}))} style={S.inp}/></div>
+            <div><label style={S.lbl}>Motivo *</label>
+              <select value={s2230.codMotAfast} onChange={e=>setS2230(d=>({...d,codMotAfast:e.target.value}))} style={S.inp}>
+                <option value="17">17 - Ferias</option>
+                <option value="01">01 - Acidente de Trabalho</option>
+                <option value="02">02 - Doenca / Afastamento INSS</option>
+                <option value="06">06 - Licenca Maternidade</option>
+                <option value="10">10 - Licenca Paternidade</option>
+                <option value="19">19 - Licenca sem Vencimento</option>
+                <option value="31">31 - Mandato Eleitoral</option>
+                <option value="99">99 - Outros</option>
+              </select>
+            </div>
+            <div><label style={S.lbl}>Termino (opcional — para ferias)</label><input type="date" value={s2230.dtTermAfast} onChange={e=>setS2230(d=>({...d,dtTermAfast:e.target.value}))} style={S.inp}/></div>
+            <div><label style={S.lbl}>Ambiente</label>
+              <select value={s2230.tpAmb} onChange={e=>setS2230(d=>({...d,tpAmb:e.target.value}))} style={{...S.inp,color:s2230.tpAmb==="1"?"#B91C1C":"#0369A1",fontWeight:600}}>
+                <option value="2">Producao Restrita</option>
+                <option value="1">Producao Real</option>
+              </select>
+            </div>
+          </div>
+          <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginTop:20}}>
+            <button onClick={()=>setModal(null)} style={{padding:"8px 16px",borderRadius:8,border:"0.5px solid #E5E7EB",background:"#fff",cursor:"pointer",fontSize:13}}>Cancelar</button>
+            <button onClick={dlS2230} disabled={!s2230.dtIniAfast} style={{padding:"8px 18px",borderRadius:8,border:"none",background:"#7C3AED",color:"#fff",cursor:"pointer",fontSize:13,fontWeight:500}}>Gerar XML</button>
+            <button onClick={transmitirS2230} disabled={!s2230.dtIniAfast} style={{padding:"8px 18px",borderRadius:8,border:"none",background:s2230.tpAmb==="1"?"#B91C1C":"#0369A1",color:"#fff",cursor:"pointer",fontSize:13,fontWeight:500}}>[TX] Transmitir</button>
           </div>
         </div></div>
       )}
@@ -216,6 +281,7 @@ export default function EsocialPage() {
           <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginTop:20}}>
             <button onClick={()=>setModal(null)} style={{padding:"8px 16px",borderRadius:8,border:"0.5px solid #E5E7EB",background:"#fff",cursor:"pointer",fontSize:13}}>Cancelar</button>
             <button onClick={dl1200} disabled={!s1200.perApur||!s1200.vrBcCp} style={{padding:"8px 18px",borderRadius:8,border:"none",background:"#7C3AED",color:"#fff",cursor:"pointer",fontSize:13,fontWeight:500}}>Gerar XML</button>
+            <button onClick={transmitirS1200} disabled={!s1200.perApur||!s1200.vrBcCp} style={{padding:"8px 18px",borderRadius:8,border:"none",background:"#0369A1",color:"#fff",cursor:"pointer",fontSize:13,fontWeight:500}}>[TX] Transmitir</button>
           </div>
         </div></div>
       )}

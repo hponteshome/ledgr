@@ -262,6 +262,56 @@ export class EsocialEventsService {
     return parts.join('\n');
   }
 
+
+  // ── S-2230 Afastamento Temporario ───────────────────────────────────────────
+  // codMotAfast: 01=Acidente trabalho, 02=Doenca, 06=Lic.Maternidade,
+  //   10=Lic.Paternidade, 17=Ferias, 19=Lic.Sem Vencimento, 99=Outros
+  async generateS2230(companyId: string, employeeId: string, params: {
+    dtIniAfast: string;
+    codMotAfast: string;
+    dtTermAfast?: string;
+    tpAmb?: '1'|'2';
+  }): Promise<string> {
+    const company = await this.prisma.company.findFirstOrThrow({ where: { id: companyId } });
+    const emp     = await this.prisma.employee.findFirstOrThrow({ where: { id: employeeId, companyId, deletedAt: null } });
+    const cnpj    = this.digits(company.taxId);
+    const id      = this.evtId(cnpj, '00230');
+    const tpAmb   = params.tpAmb ?? '2';
+
+    const parts: string[] = [];
+    parts.push('<?xml version="1.0" encoding="UTF-8"?>');
+    parts.push('<eSocial xmlns="http://www.esocial.gov.br/schema/evt/evtAfastTemp/v03_00_00_00">');
+    parts.push(`  <evtAfastTemp Id="${id}">`);
+    parts.push('    <ideEvento>');
+    parts.push('      <indRetif>1</indRetif>');
+    parts.push(`      <tpAmb>${tpAmb}</tpAmb>`);
+    parts.push('      <procEmi>1</procEmi>');
+    parts.push('      <verProc>1.0.0</verProc>');
+    parts.push('    </ideEvento>');
+    parts.push('    <ideEmpregador>');
+    parts.push('      <tpInsc>1</tpInsc>');
+    parts.push(`      <nrInsc>${cnpj}</nrInsc>`);
+    parts.push('    </ideEmpregador>');
+    parts.push('    <ideVinculo>');
+    parts.push(`      <cpfTrab>${this.digits(emp.taxId)}</cpfTrab>`);
+    parts.push(`      <matricula>${this.esc(emp.registrationNumber ?? emp.taxId)}</matricula>`);
+    parts.push('    </ideVinculo>');
+    parts.push('    <infoAfastamento>');
+    parts.push('      <iniAfastamento>');
+    parts.push(`        <dtIniAfast>${params.dtIniAfast}</dtIniAfast>`);
+    parts.push(`        <codMotAfast>${params.codMotAfast}</codMotAfast>`);
+    parts.push('      </iniAfastamento>');
+    if (params.dtTermAfast) {
+      parts.push('      <fimAfastamento>');
+      parts.push(`        <dtTermAfast>${params.dtTermAfast}</dtTermAfast>`);
+      parts.push('      </fimAfastamento>');
+    }
+    parts.push('    </infoAfastamento>');
+    parts.push('  </evtAfastTemp>');
+    parts.push('</eSocial>');
+    return parts.join('\n');
+  }
+
   // ── Listar eventos disponiveis por funcionario ───────────────────────────────
   async listEvents(companyId: string) {
     const employees = await this.prisma.employee.findMany({

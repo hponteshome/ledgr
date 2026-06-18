@@ -53,6 +53,33 @@ export class EsocialTransmissionService {
   }
 
 
+
+  // ── Transmite S-1200 Remuneracao Mensal ──────────────────────────────────────
+  async transmitirS1200(
+    companyId:  string,
+    employeeId: string,
+    params: { perApur: string; vrBcCpMensal: number; tpAmb?: '1'|'2' },
+  ): Promise<TransmissionResult> {
+    const tpAmb   = params.tpAmb ?? '2';
+    const xmlEvento = await this.events.generateS1200(companyId, employeeId, { ...params });
+    const idMatch   = xmlEvento.match(/evtRemun\s+Id="([^"]+)"/);
+    if (!idMatch) throw new Error('Id do evento S-1200 nao encontrado.');
+    return this.transmitirEvento(companyId, employeeId, 'S-1200', xmlEvento, idMatch[1], tpAmb);
+  }
+
+  // ── Transmite S-2230 Afastamento Temporario ───────────────────────────────────
+  async transmitirS2230(
+    companyId:  string,
+    employeeId: string,
+    params: { dtIniAfast: string; codMotAfast: string; dtTermAfast?: string; tpAmb?: '1'|'2' },
+  ): Promise<TransmissionResult> {
+    const tpAmb   = params.tpAmb ?? '2';
+    const xmlEvento = await this.events.generateS2230(companyId, employeeId, { ...params, tpAmb });
+    const idMatch   = xmlEvento.match(/evtAfastTemp\s+Id="([^"]+)"/);
+    if (!idMatch) throw new Error('Id do evento S-2230 nao encontrado.');
+    return this.transmitirEvento(companyId, employeeId, 'S-2230', xmlEvento, idMatch[1], tpAmb);
+  }
+
   // ── Transmite S-1299 Fechamento de Eventos Periodicos ────────────────────────
   async transmitirS1299(
     companyId: string,
