@@ -52,6 +52,20 @@ export class EsocialTransmissionService {
     return this.transmitirEvento(companyId, employeeId, 'S-2299', xmlEvento, evtId, tpAmb);
   }
 
+
+  // ── Transmite S-1299 Fechamento de Eventos Periodicos ────────────────────────
+  async transmitirS1299(
+    companyId: string,
+    perApur:   string,
+    tpAmb:     '1' | '2' = '2',
+  ): Promise<TransmissionResult> {
+    const xmlEvento = await this.events.generateS1299(companyId, perApur, tpAmb);
+    const idMatch   = xmlEvento.match(/evtFechaEvtsPer\s+Id="([^"]+)"/);
+    if (!idMatch) throw new Error('Id do evento S-1299 nao encontrado no XML.');
+    const evtId = idMatch[1];
+    return this.transmitirEvento(companyId, undefined, 'S-1299', xmlEvento, evtId, tpAmb);
+  }
+
   // ── Metodo generico de transmissao ─────────────────────────────────────────
   async transmitirEvento(
     companyId:  string,

@@ -180,6 +180,39 @@ export class EsocialEventsService {
     return parts.join('\n');
   }
 
+
+  // ── S-1299 Fechamento de Eventos Periodicos ──────────────────────────────────
+  async generateS1299(companyId: string, perApur: string, tpAmb: '1'|'2' = '2'): Promise<string> {
+    const company = await this.prisma.company.findFirstOrThrow({ where: { id: companyId } });
+    const cnpj    = this.digits(company.taxId);
+    const id      = this.evtId(cnpj, '00099');
+    const now     = new Date();
+    const dtFech  = `${now.getUTCFullYear()}-${String(now.getUTCMonth()+1).padStart(2,'0')}-${String(now.getUTCDate()).padStart(2,'0')}`;
+
+    const parts: string[] = [];
+    parts.push('<?xml version="1.0" encoding="UTF-8"?>');
+    parts.push('<eSocial xmlns="http://www.esocial.gov.br/schema/evt/evtFechaEvtsPer/v01_01_00_00">');
+    parts.push(`  <evtFechaEvtsPer Id="${id}">`);
+    parts.push('    <ideEvento>');
+    parts.push('      <indRetif>1</indRetif>');
+    parts.push(`      <perApur>${perApur}</perApur>`);
+    parts.push(`      <tpAmb>${tpAmb}</tpAmb>`);
+    parts.push('      <procEmi>1</procEmi>');
+    parts.push('      <verProc>1.0.0</verProc>');
+    parts.push('    </ideEvento>');
+    parts.push('    <ideEmpregador>');
+    parts.push('      <tpInsc>1</tpInsc>');
+    parts.push(`      <nrInsc>${cnpj}</nrInsc>`);
+    parts.push('    </ideEmpregador>');
+    parts.push('    <infoFech>');
+    parts.push(`      <dtFech>${dtFech}</dtFech>`);
+    parts.push('      <indApuracao>1</indApuracao>');
+    parts.push('    </infoFech>');
+    parts.push('  </evtFechaEvtsPer>');
+    parts.push('</eSocial>');
+    return parts.join('\n');
+  }
+
   // ── S-1200 Remuneracao Mensal ────────────────────────────────────────────────
   async generateS1200(companyId: string, employeeId: string, params: {
     perApur: string; // YYYY-MM

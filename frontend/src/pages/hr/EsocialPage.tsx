@@ -26,6 +26,9 @@ export default function EsocialPage() {
   const [s2205, setS2205] = useState({dtAlteracao:"",novaFuncao:"",novoSalario:"",cargaHoraria:""});
   const [s2299, setS2299] = useState({dtDeslig:"",mtvDeslig:"01",pensao:false,tpAmb:"2"});
   const [s1200, setS1200] = useState({perApur:new Date().toISOString().slice(0,7),vrBcCp:""});
+  const [s1299, setS1299] = useState({perApur:new Date().toISOString().slice(0,7),tpAmb:"2"});
+  const [s1299Status, setS1299Status] = useState<{nrRec?:string;status?:string;erro?:string}|null>(null);
+  const [s1299Loading, setS1299Loading] = useState(false);
 
   const load = useCallback(async()=>{
     setLoading(true);
@@ -63,6 +66,22 @@ export default function EsocialPage() {
       setModal(null);
     } catch { Swal.fire("Erro","Falha S-2299","error"); }
   }
+  async function transmitirS1299() {
+    if (!s1299.perApur) return;
+    if (!confirm(s1299.tpAmb==="1"
+      ? "ATENCAO: Transmissao em PRODUCAO REAL — S-1299 fecha o periodo "+s1299.perApur+". Continuar?"
+      : "Transmitir S-1299 (Fechamento) para "+s1299.perApur+" em Producao Restrita?")) return;
+    setS1299Loading(true); setS1299Status(null);
+    try {
+      const res = await api.post("/hr/esocial/transmitir/s1299", { perApur: s1299.perApur, tpAmb: s1299.tpAmb });
+      const d = res.data;
+      setS1299Status({ nrRec: d.nrRec, status: d.status,
+        erro: d.erros ? JSON.stringify(d.erros).slice(0,120) : undefined });
+    } catch(e:any) {
+      setS1299Status({ status:"ERRO", erro: e?.response?.data?.message ?? e.message });
+    } finally { setS1299Loading(false); }
+  }
+
   async function dl1200() {
     if(!sel||!s1200.perApur||!s1200.vrBcCp) return;
     try {
@@ -87,9 +106,37 @@ export default function EsocialPage() {
       <div style={{background:"#fff",borderBottom:"0.5px solid #E5E7EB",padding:"14px 24px",flexShrink:0}}>
         <span style={{fontSize:11,fontWeight:600,color:AC}}>&#9670; RH</span>
         <h1 style={{fontSize:18,fontWeight:600,color:"#111",margin:"2px 0 0"}}>Eventos eSocial</h1>
-        <p style={{fontSize:12,color:"#9CA3AF",margin:"4px 0 0"}}>Gere os XMLs S-2200, S-2205, S-1200 e S-2299 por funcionario</p>
+        <p style={{fontSize:12,color:"#9CA3AF",margin:"4px 0 0"}}>Gere os XMLs S-2200, S-2205, S-1200, S-2299 e S-1299 (fechamento)</p>
       </div>
       <div style={{flex:1,overflow:"auto",padding:"16px 24px"}}>
+        {/* ── S-1299 Fechamento ─────────────────────────────────── */}
+        <div style={{background:"#fff",border:"0.5px solid #E5E7EB",borderRadius:12,padding:"14px 20px",marginBottom:16,display:"flex",gap:16,alignItems:"center",flexWrap:"wrap" as const}}>
+          <div>
+            <div style={{fontSize:12,fontWeight:700,color:"#374151",marginBottom:2}}>S-1299 — Fechamento de Eventos Periódicos</div>
+            <div style={{fontSize:11,color:"#9CA3AF"}}>Transmita após todos os S-1200 do mês</div>
+          </div>
+          <input type="month" value={s1299.perApur} onChange={e=>setS1299(d=>({...d,perApur:e.target.value}))}
+            style={{border:"0.5px solid #E5E7EB",borderRadius:6,padding:"5px 10px",fontSize:13,outline:"none"}}/>
+          <select value={s1299.tpAmb} onChange={e=>setS1299(d=>({...d,tpAmb:e.target.value}))}
+            style={{border:"0.5px solid #E5E7EB",borderRadius:6,padding:"5px 10px",fontSize:12,color:s1299.tpAmb==="1"?"#B91C1C":"#0369A1",fontWeight:600,outline:"none"}}>
+            <option value="2">Prod. Restrita</option>
+            <option value="1">Producao Real</option>
+          </select>
+          <button onClick={transmitirS1299} disabled={s1299Loading||!s1299.perApur}
+            style={{padding:"6px 16px",borderRadius:8,border:"none",
+              background:s1299.tpAmb==="1"?"#B91C1C":"#0369A1",
+              color:"#fff",fontWeight:600,fontSize:13,cursor:"pointer",opacity:s1299Loading?0.6:1}}>
+            {s1299Loading?"Transmitindo...":"[TX] S-1299 Fechar Periodo"}
+          </button>
+          {s1299Status&&(
+            <span style={{fontSize:11,padding:"4px 10px",borderRadius:6,fontWeight:600,
+              background:s1299Status.status==="TRANSMITIDO"?"#DCFCE7":"#FEE2E2",
+              color:s1299Status.status==="TRANSMITIDO"?"#15803D":"#B91C1C"}}>
+              {s1299Status.status==="TRANSMITIDO"?"Recibo: "+s1299Status.nrRec:"ERRO: "+(s1299Status.erro??s1299Status.status)}
+            </span>
+          )}
+        </div>
+
         {loading ? <div style={{textAlign:"center",padding:60,color:"#9CA3AF"}}>Carregando...</div> : (
           <table style={{width:"100%",borderCollapse:"collapse"}}>
             <thead><tr>{["Funcionario","CPF","Funcao","Admissao","Salario","S-2200","S-2205","S-1200","S-2299"].map(h=>(

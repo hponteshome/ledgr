@@ -73,6 +73,15 @@ export class HrController {
     return this.events.listEvents(req.companyId);
   }
 
+  @Post('esocial/transmitir/s1299')
+  async transmitirS1299(
+    @Req() req: any,
+    @Body('perApur') perApur: string,
+    @Body('tpAmb') tpAmb: string,
+  ) {
+    return this.transmission.transmitirS1299(req.companyId, perApur, (tpAmb === '1' ? '1' : '2'));
+  }
+
   @Post('esocial/transmitir/s2299/:employeeId')
   async transmitirS2299(
     @Req() req: any,
