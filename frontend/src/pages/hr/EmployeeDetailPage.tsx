@@ -340,11 +340,14 @@ export default function EmployeeDetailPage() {
               <button onClick={()=>setShowBH(true)} style={S.btn(AC)}>+ Lancamento</button>
             </div>
             <table style={{width:"100%",borderCollapse:"collapse",background:"#fff",borderRadius:10,overflow:"hidden",border:"0.5px solid #E5E7EB"}}>
-              <thead><tr>{["Data","Tipo","Minutos","Saldo Apos","Competencia","Descricao"].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
+              <thead><tr>{["Data","Tipo","Tipo Hora","Min.Orig","Mult","Minutos","Saldo Apos","Competencia","Descricao"].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
               <tbody>{(bh?.lancamentos??[]).map((l:any)=>(
                 <tr key={l.id}>
                   <td style={S.td}>{fmtDate(l.data)}</td>
                   <td style={S.td}><span style={{fontSize:11,padding:"2px 8px",borderRadius:20,background:l.minutos>0?"#DCFCE7":"#FEE2E2",color:l.minutos>0?"#15803D":"#B91C1C"}}>{l.tipo}</span></td>
+                  <td style={{...S.td,fontSize:11,color:"#6B7280"}}>{l.tipoHora?.replace("FDS_","")??"-"}</td>
+                  <td style={{...S.td,fontFamily:"monospace",fontSize:11}}>{l.minutosOriginais??"-"}</td>
+                  <td style={{...S.td,fontFamily:"monospace",fontSize:11}}>{l.multiplicador?`x${Number(l.multiplicador).toFixed(2)}`:"-"}</td>
                   <td style={{...S.td,fontFamily:"monospace",color:l.minutos>0?"#15803D":"#B91C1C"}}>{fmtMin(l.minutos)}</td>
                   <td style={{...S.td,fontFamily:"monospace"}}>{fmtMin(l.saldoApos)}</td>
                   <td style={S.td}>{l.competencia}</td>
@@ -487,8 +490,21 @@ export default function EmployeeDetailPage() {
               </div>
               <div><label style={S.lbl}>Data *</label><input type="date" value={bhDto.data} onChange={e=>setBhDto(d=>({...d,data:e.target.value}))} style={S.inp}/></div>
             </div>
+            {bhDto.tipo==="CREDITO" && (
+              <div><label style={S.lbl}>Tipo de Hora</label>
+                <select value={bhDto.tipoHora} onChange={e=>setBhDto(d=>({...d,tipoHora:e.target.value}))} style={S.inp}>
+                  <option value="DIURNA">Diurna (HE 50%)</option>
+                  <option value="NOTURNA">Noturna (HE 50% + 20% adicional)</option>
+                  <option value="FDS_SABADO">Sabado (HE 50%)</option>
+                  <option value="FDS_DOMINGO">Domingo (HE 100%)</option>
+                  <option value="FERIADO">Feriado (HE 100%)</option>
+                </select>
+              </div>
+            )}
             <div style={S.row}>
-              <div><label style={S.lbl}>Minutos *</label><input type="number" value={bhDto.minutos} onChange={e=>setBhDto(d=>({...d,minutos:e.target.value}))} style={S.inp} placeholder="Ex: 120 = 2h"/></div>
+              <div><label style={S.lbl}>{bhDto.tipo==="CREDITO"?"Minutos Brutos *":"Minutos *"}</label>
+                <input type="number" value={bhDto.minutosOriginais} onChange={e=>setBhDto(d=>({...d,minutosOriginais:e.target.value}))} style={S.inp} placeholder="Ex: 120 = 2h"/>
+              </div>
               <div><label style={S.lbl}>Competencia *</label><input type="month" value={bhDto.competencia} onChange={e=>setBhDto(d=>({...d,competencia:e.target.value}))} style={S.inp}/></div>
             </div>
             <div><label style={S.lbl}>Descricao</label><input value={bhDto.descricao} onChange={e=>setBhDto(d=>({...d,descricao:e.target.value}))} style={S.inp}/></div>

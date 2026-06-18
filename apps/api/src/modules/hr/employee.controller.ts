@@ -1,3 +1,4 @@
+import { BancoHorasService } from './services/banco-horas.service';
 // apps/api/src/modules/hr/employee.controller.ts
 import { Controller, Post, Get, Put, Patch, Delete, UseGuards, UseInterceptors, Req, UploadedFile, Body, Param, BadRequestException } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -12,8 +13,9 @@ import { EmployeeService } from './services/employee.service';
 @Controller('hr/employees')
 export class EmployeeController {
   constructor(
-    private readonly parser:  EmployeePdfParserService,
-    private readonly service: EmployeeService,
+    private readonly parser:    EmployeePdfParserService,
+    private readonly service:   EmployeeService,
+    private readonly bhService: BancoHorasService,
   ) {}
 
   // ── Importacao PDF ───────────────────────────────────────────────────────────
@@ -100,7 +102,27 @@ export class EmployeeController {
   // ── Banco de horas ───────────────────────────────────────────────────────────
   @Get(':id/banco-horas')
   bancoHoras(@Req() req: any, @Param('id') id: string) {
-    return this.service.getBancoHoras(req.companyId, id);
+    return this.bhService.getSaldo(req.companyId, id);
+  }
+  @Get('banco-horas/relatorio')
+  bhRelatorio(@Req() req: any) {
+    return this.bhService.getRelatorio(req.companyId);
+  }
+  @Post(':id/banco-horas/creditar')
+  bhCreditar(@Req() req: any, @Param('id') id: string, @Body() body: any) {
+    return this.bhService.creditar(req.companyId, id, body, req.user.id);
+  }
+  @Post(':id/banco-horas/debitar')
+  bhDebitar(@Req() req: any, @Param('id') id: string, @Body() body: any) {
+    return this.bhService.debitar(req.companyId, id, body, req.user.id);
+  }
+  @Post(':id/banco-horas/ajustar')
+  bhAjustar(@Req() req: any, @Param('id') id: string, @Body() body: any) {
+    return this.bhService.ajustar(req.companyId, id, body, req.user.id);
+  }
+  @Post(':id/banco-horas/configurar')
+  bhConfigurar(@Req() req: any, @Param('id') id: string, @Body() body: any) {
+    return this.bhService.configurar(req.companyId, id, body);
   }
 
   @Post(':id/banco-horas')

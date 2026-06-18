@@ -20,10 +20,13 @@ import { TrctPdfService } from './services/trct-pdf.service';
 import { RescisaoService } from './services/rescisao.service';
 import { EsocialTransmissionService } from './services/esocial-transmission.service';
 import { CertificatesModule } from '../../core/certificates/certificates.module';
+import { BancoHorasService } from './services/banco-horas.service';
+import { FeriasService } from './services/ferias.service';
+import { FeriasController } from './ferias.controller';
 @Module({
   imports: [PrismaModule, CertificatesModule],
-  controllers: [ProLaboreController, InformeController, EmployeeController, HrController, FolhaController, RescisaoController],
-  providers: [ProLaboreService, GuiasService, InformeService, InformePdfService, EmployeePdfParserService, EmployeeService, EsocialS2200Service, EsocialEventsService, FolhaService, RescisaoService, TrctPdfService, EsocialTransmissionService],
-  exports: [ProLaboreService, GuiasService, InformeService, EmployeeService, EsocialS2200Service, EsocialEventsService, FolhaService, RescisaoService, TrctPdfService, EsocialTransmissionService],
+  controllers: [ProLaboreController, InformeController, EmployeeController, HrController, FolhaController, RescisaoController, FeriasController],
+  providers: [ProLaboreService, GuiasService, InformeService, InformePdfService, EmployeePdfParserService, EmployeeService, EsocialS2200Service, EsocialEventsService, FolhaService, RescisaoService, TrctPdfService, EsocialTransmissionService, BancoHorasService, FeriasService],
+  exports: [ProLaboreService, GuiasService, InformeService, EmployeeService, EsocialS2200Service, EsocialEventsService, FolhaService, RescisaoService, TrctPdfService, EsocialTransmissionService, BancoHorasService, FeriasService],
 })
 export class HrModule {}
