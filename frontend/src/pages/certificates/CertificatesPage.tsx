@@ -56,6 +56,15 @@ const UsageBadge = ({ usage }: { usage: string[] }) => (
 );
 
 // ── Componente principal ─────────────────────────────────────────
+// Detecta se e-CPF (pessoa fisica) ou e-CNPJ (pessoa juridica) pelo subject
+function certKind(subject: string): 'e-CPF' | 'e-CNPJ' | null {
+  const cpf  = subject.match(/:([0-9]{11})(?:[,\s]|$)/);
+  const cnpj = subject.match(/:([0-9]{14})(?:[,\s]|$)/);
+  if (cnpj) return 'e-CNPJ';
+  if (cpf)  return 'e-CPF';
+  return null;
+}
+
 export const CertificatesPage: React.FC = () => {
   const { activeCompany: empresa } = useCompany();
   const navigate = useNavigate();
@@ -194,6 +203,15 @@ export const CertificatesPage: React.FC = () => {
                           {cert.type}
                         </span>
                         <UsageBadge usage={cert.usage} />
+                        {certKind(cert.subject) && (
+                          <span className={`text-[9px] font-black px-2 py-0.5 rounded uppercase ${
+                            certKind(cert.subject) === 'e-CPF'
+                              ? 'bg-green-100 text-green-700'
+                              : 'bg-orange-100 text-orange-700'
+                          }`}>
+                            {certKind(cert.subject) === 'e-CPF' ? 'e-CPF · Pessoa Física' : 'e-CNPJ · Pessoa Jurídica'}
+                          </span>
+                        )}
                         <span className={`text-[9px] font-black px-2 py-0.5 rounded uppercase flex items-center gap-1 ${cfg.bg} ${cfg.text}`}>
                           <cfg.Icon size={10} /> {cfg.label}
                         </span>
