@@ -667,7 +667,6 @@ model Employee {
   ocorrencias       EmployeeOccurrence[]
   afastamentos      EmployeeLeave[]
   bancoHoras        BancoHoras?
-  esocialEvents       EsocialEvent[]
   periodosFerias      PeriodoAquisitivoFerias[]
   programacoesFerias  ProgramacaoFerias[]
   decimoTerceiro      DecimoTerceiro[]
