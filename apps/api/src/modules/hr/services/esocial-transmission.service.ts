@@ -105,6 +105,38 @@ export class EsocialTransmissionService {
     return this.transmitirEvento(companyId, employeeId, 'S-1210', xml, m[1], tpAmb);
   }
 
+
+  async transmitirS2190(cid: string, eid: string, p: any) {
+    const t = p.tpAmb==='1'?'1':'2' as '1'|'2';
+    const x = await this.events.generateS2190(cid, eid, {...p,tpAmb:t});
+    const m = x.match(/evtAdmissaoPreliminar\s+Id="([^"]+)"/);
+    return this.transmitirEvento(cid,eid,'S-2190',x,m![1],t);
+  }
+  async transmitirS1202(cid: string, eid: string, p: any) {
+    const t = p.tpAmb==='1'?'1':'2' as '1'|'2';
+    const x = await this.events.generateS1202(cid,eid,{...p,vrBcCp:parseFloat(String(p.vrBcCp).replace(',','.'))});
+    const m = x.match(/evtRemuneracao\s+Id="([^"]+)"/);
+    return this.transmitirEvento(cid,eid,'S-1202',x,m![1],t);
+  }
+  async transmitirS2220(cid: string, eid: string, p: any) {
+    const t = p.tpAmb==='1'?'1':'2' as '1'|'2';
+    const x = await this.events.generateS2220(cid,eid,{...p,tpAmb:t});
+    const m = x.match(/evtMonit\s+Id="([^"]+)"/);
+    return this.transmitirEvento(cid,eid,'S-2220',x,m![1],t);
+  }
+  async transmitirS1070(cid: string, p: any) {
+    const t = p.tpAmb==='1'?'1':'2' as '1'|'2';
+    const x = await this.events.generateS1070(cid,{...p,tpAmb:t});
+    const m = x.match(/evtTabProcesso\s+Id="([^"]+)"/);
+    return this.transmitirEvento(cid,undefined,'S-1070',x,m![1],t);
+  }
+  async transmitirS2298(cid: string, eid: string, p: any) {
+    const t = p.tpAmb==='1'?'1':'2' as '1'|'2';
+    const x = await this.events.generateS2298(cid,eid,{...p,tpAmb:t});
+    const m = x.match(/evtReintegr\s+Id="([^"]+)"/);
+    return this.transmitirEvento(cid,eid,'S-2298',x,m![1],t);
+  }
+
   // ── Transmite S-1299 Fechamento de Eventos Periodicos ────────────────────────
   async transmitirS1299(
     companyId: string,

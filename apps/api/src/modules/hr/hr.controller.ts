@@ -141,6 +141,22 @@ export class HrController {
     return res.send(xml);
   }
 
+  // S-2190
+  @Post('esocial/s2190/:eid') async xmlS2190(@Req() r:any,@Param('eid') id:string,@Body() b:any,@Res() res:Response){const x=await this.events.generateS2190(r.companyId,id,b);res.setHeader('Content-Type','application/xml');res.setHeader('Content-Disposition',`attachment; filename="S-2190-${id}.xml"`);return res.send(x);}
+  @Post('esocial/transmitir/s2190/:eid') async txS2190(@Req() r:any,@Param('eid') id:string,@Body() b:any){return this.transmission.transmitirS2190(r.companyId,id,b);}
+  // S-1202
+  @Post('esocial/s1202/:eid') async xmlS1202(@Req() r:any,@Param('eid') id:string,@Body() b:any,@Res() res:Response){const x=await this.events.generateS1202(r.companyId,id,b);res.setHeader('Content-Type','application/xml');res.setHeader('Content-Disposition',`attachment; filename="S-1202-${id}.xml"`);return res.send(x);}
+  @Post('esocial/transmitir/s1202/:eid') async txS1202(@Req() r:any,@Param('eid') id:string,@Body() b:any){return this.transmission.transmitirS1202(r.companyId,id,b);}
+  // S-2220
+  @Post('esocial/s2220/:eid') async xmlS2220(@Req() r:any,@Param('eid') id:string,@Body() b:any,@Res() res:Response){const x=await this.events.generateS2220(r.companyId,id,b);res.setHeader('Content-Type','application/xml');res.setHeader('Content-Disposition',`attachment; filename="S-2220-${id}.xml"`);return res.send(x);}
+  @Post('esocial/transmitir/s2220/:eid') async txS2220(@Req() r:any,@Param('eid') id:string,@Body() b:any){return this.transmission.transmitirS2220(r.companyId,id,b);}
+  // S-1070 (empresa)
+  @Post('esocial/s1070') async xmlS1070(@Req() r:any,@Body() b:any,@Res() res:Response){const x=await this.events.generateS1070(r.companyId,b);res.setHeader('Content-Type','application/xml');res.setHeader('Content-Disposition','attachment; filename="S-1070.xml"');return res.send(x);}
+  @Post('esocial/transmitir/s1070') async txS1070(@Req() r:any,@Body() b:any){return this.transmission.transmitirS1070(r.companyId,b);}
+  // S-2298
+  @Post('esocial/s2298/:eid') async xmlS2298(@Req() r:any,@Param('eid') id:string,@Body() b:any,@Res() res:Response){const x=await this.events.generateS2298(r.companyId,id,b);res.setHeader('Content-Type','application/xml');res.setHeader('Content-Disposition',`attachment; filename="S-2298-${id}.xml"`);return res.send(x);}
+  @Post('esocial/transmitir/s2298/:eid') async txS2298(@Req() r:any,@Param('eid') id:string,@Body() b:any){return this.transmission.transmitirS2298(r.companyId,id,b);}
+
   @Post('esocial/transmitir/s1299')
   async transmitirS1299(
     @Req() req: any,

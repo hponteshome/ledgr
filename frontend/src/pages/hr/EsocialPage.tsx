@@ -31,6 +31,11 @@ export default function EsocialPage() {
   const [s2240, setS2240] = useState({dscSetor:"",condAmb:"1",dscAtivDes:"",utilizEpc:"S",utilizEpi:"N",tpAmb:"2"});
   const [s2210, setS2210] = useState({dtAcid:"",hrAcid:"08:00",tpAcid:"1",tpCat:"1",dscLoc:"",codCID:"",dscLesao:"",descricao:"",dtAtend:"",nmMedico:"",nrOC:"",ufCRM:"PR",tpAmb:"2"});
   const [s1210, setS1210] = useState({perApur:new Date().toISOString().slice(0,7),dtPgto:"",tpPgto:"1",tpAmb:"2"});
+  const [s2190, setS2190] = useState({dtAdm:"",codCateg:"01",tpContr:"1",tpAmb:"2"});
+  const [s1202, setS1202] = useState({perApur:new Date().toISOString().slice(0,7),vrBcCp:"",codCateg:"701",tpAmb:"2"});
+  const [s2220, setS2220] = useState({dtAso:"",resAso:"1",tpAso:"0",nmMedico:"",nrCRM:"",ufCRM:"PR",tpAmb:"2"});
+  const [s1070, setS1070] = useState({tpProc:"1",nrProc:"",origem:"1",obsSusp:"",tpAmb:"2"});
+  const [s2298, setS2298] = useState({dtReintegr:"",motivo:"1",tpAmb:"2"});
   const [s1299Status, setS1299Status] = useState<{nrRec?:string;status?:string;erro?:string}|null>(null);
   const [s1299Loading, setS1299Loading] = useState(false);
 
@@ -155,6 +160,22 @@ export default function EsocialPage() {
         <p style={{fontSize:12,color:"#9CA3AF",margin:"4px 0 0"}}>Gere os XMLs S-2200, S-2205, S-1200, S-2299 e S-1299 (fechamento)</p>
       </div>
       <div style={{flex:1,overflow:"auto",padding:"16px 24px"}}>
+        {/* ── S-1070 Processos Administrativos/Judiciais ─── */}
+        <div style={{background:"#fff",border:"0.5px solid #E5E7EB",borderRadius:12,padding:"14px 20px",marginBottom:10,display:"flex",gap:12,alignItems:"center",flexWrap:"wrap" as const}}>
+          <div><div style={{fontSize:12,fontWeight:700,color:"#374151"}}>S-1070 — Processo Adm./Judicial</div></div>
+          <select value={s1070.tpProc} onChange={e=>setS1070(d=>({...d,tpProc:e.target.value}))} style={{border:"0.5px solid #E5E7EB",borderRadius:6,padding:"5px 8px",fontSize:12,outline:"none"}}>
+            <option value="1">Administrativo</option>
+            <option value="2">Judicial</option>
+          </select>
+          <input value={s1070.nrProc} onChange={e=>setS1070(d=>({...d,nrProc:e.target.value}))} placeholder="Numero do processo" style={{border:"0.5px solid #E5E7EB",borderRadius:6,padding:"5px 10px",fontSize:12,outline:"none",width:200}}/>
+          <input value={s1070.obsSusp} onChange={e=>setS1070(d=>({...d,obsSusp:e.target.value}))} placeholder="Descricao / objeto" style={{border:"0.5px solid #E5E7EB",borderRadius:6,padding:"5px 10px",fontSize:12,outline:"none",flex:1}}/>
+          <select value={s1070.tpAmb} onChange={e=>setS1070(d=>({...d,tpAmb:e.target.value}))} style={{border:"0.5px solid #E5E7EB",borderRadius:6,padding:"5px 8px",fontSize:12,color:s1070.tpAmb==="1"?"#B91C1C":"#0369A1",fontWeight:600,outline:"none"}}>
+            <option value="2">Prod. Restrita</option><option value="1">Producao Real</option>
+          </select>
+          <button onClick={()=>actEvent("S-1070","/hr/esocial/s1070",s1070,setS1070)} disabled={!s1070.nrProc} style={{padding:"6px 12px",borderRadius:8,border:"none",background:"#F59E0B",color:"#fff",fontWeight:600,fontSize:12,cursor:"pointer"}}>Gerar XML</button>
+          <button onClick={async()=>{if(!s1070.nrProc)return;try{const r=await api.post("/hr/esocial/transmitir/s1070",s1070);Swal.fire("S-1070","Recibo: "+(r.data.nrRec??"Pendente"),"success");}catch(e:any){Swal.fire("Erro",e?.response?.data?.message??"Falha S-1070","error");}}} disabled={!s1070.nrProc} style={{padding:"6px 12px",borderRadius:8,border:"none",background:s1070.tpAmb==="1"?"#B91C1C":"#0369A1",color:"#fff",fontWeight:600,fontSize:12,cursor:"pointer"}}>[TX] Transmitir</button>
+        </div>
+
         {/* ── S-1299 Fechamento ─────────────────────────────────── */}
         <div style={{background:"#fff",border:"0.5px solid #E5E7EB",borderRadius:12,padding:"14px 20px",marginBottom:16,display:"flex",gap:16,alignItems:"center",flexWrap:"wrap" as const}}>
           <div>
@@ -185,7 +206,7 @@ export default function EsocialPage() {
 
         {loading ? <div style={{textAlign:"center",padding:60,color:"#9CA3AF"}}>Carregando...</div> : (
           <table style={{width:"100%",borderCollapse:"collapse"}}>
-            <thead><tr>{["Funcionario","CPF","Funcao","Admissao","Salario","S-2200","S-2205","S-1200","S-2299","S-2230","S-2240","S-2210","S-1210"].map(h=>(
+            <thead><tr>{["Funcionario","CPF","Funcao","Admissao","Salario","S-2200","S-2205","S-1200","S-2299","S-2230","S-2240","S-2210","S-1210","S-2190","S-1202","S-2220","S-2298"].map(h=>(
               <th key={h} style={S.th}>{h}</th>
             ))}</tr></thead>
             <tbody>{emps.map(e=>(
@@ -203,6 +224,10 @@ export default function EsocialPage() {
                 <td style={S.td}><button style={S.btn("#0D9488")} onClick={()=>{setSel(e);setModal("s2240");}}>NR</button></td>
                 <td style={S.td}><button style={S.btn("#DC2626")} onClick={()=>{setSel(e);setModal("s2210");}}>CAT</button></td>
                 <td style={S.td}><button style={S.btn("#7C3AED")} onClick={()=>{setSel(e);setModal("s1210");}}>Pgto</button></td>
+                <td style={S.td}><button style={S.btn("#15803D")} onClick={()=>{setSel(e);setModal("s2190");}}>Prelim</button></td>
+                <td style={S.td}><button style={S.btn("#9333EA")} onClick={()=>{setSel(e);setModal("s1202");}}>Pro-lab</button></td>
+                <td style={S.td}><button style={S.btn("#0891B2")} onClick={()=>{setSel(e);setModal("s2220");}}>ASO</button></td>
+                <td style={S.td}><button style={S.btn("#F59E0B")} onClick={()=>{setSel(e);setModal("s2298");}}>Reintegr</button></td>
               </tr>
             ))}</tbody>
           </table>
@@ -256,6 +281,135 @@ export default function EsocialPage() {
             <button onClick={()=>setModal(null)} style={{padding:"8px 16px",borderRadius:8,border:"0.5px solid #E5E7EB",background:"#fff",cursor:"pointer",fontSize:13}}>Cancelar</button>
             <button onClick={dlS2230} disabled={!s2230.dtIniAfast} style={{padding:"8px 18px",borderRadius:8,border:"none",background:"#7C3AED",color:"#fff",cursor:"pointer",fontSize:13,fontWeight:500}}>Gerar XML</button>
             <button onClick={transmitirS2230} disabled={!s2230.dtIniAfast} style={{padding:"8px 18px",borderRadius:8,border:"none",background:s2230.tpAmb==="1"?"#B91C1C":"#0369A1",color:"#fff",cursor:"pointer",fontSize:13,fontWeight:500}}>[TX] Transmitir</button>
+          </div>
+        </div></div>
+      )}
+
+      {modal==="s2190"&&sel&&(
+        <div style={ov}><div style={cd}>
+          <h2 style={{fontSize:16,fontWeight:600,margin:"0 0 4px"}}>S-2190 - Admissao Preliminar</h2>
+          <p style={{fontSize:13,color:"#6B7280",margin:"0 0 16px"}}>{sel.fullName}</p>
+          <div style={{display:"grid",gap:12}}>
+            <div><label style={S.lbl}>Data de Admissao *</label><input type="date" value={s2190.dtAdm} onChange={e=>setS2190(d=>({...d,dtAdm:e.target.value}))} style={S.inp}/></div>
+            <div><label style={S.lbl}>Categoria</label>
+              <select value={s2190.codCateg} onChange={e=>setS2190(d=>({...d,codCateg:e.target.value}))} style={S.inp}>
+                <option value="01">01 - Empregado CLT</option>
+                <option value="10">10 - Trabalhador Temporario</option>
+                <option value="35">35 - Aprendiz</option>
+                <option value="65">65 - Domestico</option>
+              </select>
+            </div>
+            <div><label style={S.lbl}>Tipo Contrato</label>
+              <select value={s2190.tpContr} onChange={e=>setS2190(d=>({...d,tpContr:e.target.value}))} style={S.inp}>
+                <option value="1">1 - Prazo Indeterminado</option>
+                <option value="2">2 - Prazo Determinado</option>
+              </select>
+            </div>
+            <div><label style={S.lbl}>Ambiente</label>
+              <select value={s2190.tpAmb} onChange={e=>setS2190(d=>({...d,tpAmb:e.target.value}))} style={{...S.inp,color:s2190.tpAmb==="1"?"#B91C1C":"#0369A1",fontWeight:600}}>
+                <option value="2">Producao Restrita</option><option value="1">Producao Real</option>
+              </select>
+            </div>
+          </div>
+          <p style={{fontSize:11,color:"#9CA3AF",margin:"8px 0 0"}}>Obs: S-2200 completo deve ser enviado em ate 30 dias apos o inicio do trabalho.</p>
+          <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginTop:12}}>
+            <button onClick={()=>setModal(null)} style={{padding:"8px 16px",borderRadius:8,border:"0.5px solid #E5E7EB",background:"#fff",cursor:"pointer",fontSize:13}}>Cancelar</button>
+            <button onClick={()=>actEvent("S-2190","/hr/esocial/s2190/",s2190,setS2190)} disabled={!s2190.dtAdm} style={{padding:"8px 16px",borderRadius:8,border:"none",background:"#15803D",color:"#fff",cursor:"pointer",fontSize:13,fontWeight:500}}>Gerar XML</button>
+            <button onClick={()=>actEvent("TX","/hr/esocial/transmitir/s2190/",s2190,setS2190)} disabled={!s2190.dtAdm} style={{padding:"8px 16px",borderRadius:8,border:"none",background:s2190.tpAmb==="1"?"#B91C1C":"#0369A1",color:"#fff",cursor:"pointer",fontSize:13,fontWeight:500}}>[TX] Transmitir</button>
+          </div>
+        </div></div>
+      )}
+
+      {modal==="s1202"&&sel&&(
+        <div style={ov}><div style={cd}>
+          <h2 style={{fontSize:16,fontWeight:600,margin:"0 0 4px"}}>S-1202 - Remuneracao Sem Vinculo (Pro-labore/Autonomo)</h2>
+          <p style={{fontSize:13,color:"#6B7280",margin:"0 0 16px"}}>{sel.fullName}</p>
+          <div style={{display:"grid",gap:12}}>
+            <div><label style={S.lbl}>Competencia *</label><input type="month" value={s1202.perApur} onChange={e=>setS1202(d=>({...d,perApur:e.target.value}))} style={S.inp}/></div>
+            <div><label style={S.lbl}>Valor Base INSS (R$) *</label><input value={s1202.vrBcCp} onChange={e=>setS1202(d=>({...d,vrBcCp:e.target.value}))} style={S.inp} placeholder="0,00"/></div>
+            <div><label style={S.lbl}>Categoria</label>
+              <select value={s1202.codCateg} onChange={e=>setS1202(d=>({...d,codCateg:e.target.value}))} style={S.inp}>
+                <option value="701">701 - Contrib. Individual (Pro-labore)</option>
+                <option value="711">711 - Autonomo</option>
+                <option value="722">722 - Diretor Sem Vinculo</option>
+              </select>
+            </div>
+            <div><label style={S.lbl}>Ambiente</label>
+              <select value={s1202.tpAmb} onChange={e=>setS1202(d=>({...d,tpAmb:e.target.value}))} style={{...S.inp,color:s1202.tpAmb==="1"?"#B91C1C":"#0369A1",fontWeight:600}}>
+                <option value="2">Producao Restrita</option><option value="1">Producao Real</option>
+              </select>
+            </div>
+          </div>
+          <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginTop:20}}>
+            <button onClick={()=>setModal(null)} style={{padding:"8px 16px",borderRadius:8,border:"0.5px solid #E5E7EB",background:"#fff",cursor:"pointer",fontSize:13}}>Cancelar</button>
+            <button onClick={()=>actEvent("S-1202","/hr/esocial/s1202/",s1202,setS1202)} disabled={!s1202.perApur||!s1202.vrBcCp} style={{padding:"8px 16px",borderRadius:8,border:"none",background:"#9333EA",color:"#fff",cursor:"pointer",fontSize:13,fontWeight:500}}>Gerar XML</button>
+            <button onClick={()=>actEvent("TX","/hr/esocial/transmitir/s1202/",s1202,setS1202)} disabled={!s1202.perApur||!s1202.vrBcCp} style={{padding:"8px 16px",borderRadius:8,border:"none",background:s1202.tpAmb==="1"?"#B91C1C":"#0369A1",color:"#fff",cursor:"pointer",fontSize:13,fontWeight:500}}>[TX] Transmitir</button>
+          </div>
+        </div></div>
+      )}
+
+      {modal==="s2220"&&sel&&(
+        <div style={ov}><div style={{...cd,width:520}}>
+          <h2 style={{fontSize:16,fontWeight:600,margin:"0 0 4px"}}>S-2220 - ASO / Monitoramento Saude</h2>
+          <p style={{fontSize:13,color:"#6B7280",margin:"0 0 16px"}}>{sel.fullName}</p>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+            <div><label style={S.lbl}>Data do ASO *</label><input type="date" value={s2220.dtAso} onChange={e=>setS2220(d=>({...d,dtAso:e.target.value}))} style={S.inp}/></div>
+            <div><label style={S.lbl}>Resultado</label>
+              <select value={s2220.resAso} onChange={e=>setS2220(d=>({...d,resAso:e.target.value}))} style={S.inp}>
+                <option value="1">1 - Apto</option>
+                <option value="2">2 - Inapto Temporario</option>
+                <option value="3">3 - Inapto Permanente</option>
+              </select>
+            </div>
+            <div><label style={S.lbl}>Tipo de Exame</label>
+              <select value={s2220.tpAso} onChange={e=>setS2220(d=>({...d,tpAso:e.target.value}))} style={S.inp}>
+                <option value="0">0 - Admissional</option>
+                <option value="1">1 - Periodico</option>
+                <option value="2">2 - Retorno ao Trabalho</option>
+                <option value="3">3 - Mudanca de Risco</option>
+                <option value="9">9 - Demissional</option>
+              </select>
+            </div>
+            <div><label style={S.lbl}>CRM Medico</label><input value={s2220.nrCRM} onChange={e=>setS2220(d=>({...d,nrCRM:e.target.value}))} style={S.inp} placeholder="Numero CRM"/></div>
+            <div style={{gridColumn:"1/-1"}}><label style={S.lbl}>Nome do Medico *</label><input value={s2220.nmMedico} onChange={e=>setS2220(d=>({...d,nmMedico:e.target.value}))} style={S.inp} placeholder="Nome completo"/></div>
+            <div><label style={S.lbl}>UF CRM</label><input value={s2220.ufCRM} onChange={e=>setS2220(d=>({...d,ufCRM:e.target.value.toUpperCase().slice(0,2)}))} style={S.inp} placeholder="PR"/></div>
+            <div><label style={S.lbl}>Ambiente</label>
+              <select value={s2220.tpAmb} onChange={e=>setS2220(d=>({...d,tpAmb:e.target.value}))} style={{...S.inp,color:s2220.tpAmb==="1"?"#B91C1C":"#0369A1",fontWeight:600}}>
+                <option value="2">Producao Restrita</option><option value="1">Producao Real</option>
+              </select>
+            </div>
+          </div>
+          <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginTop:16}}>
+            <button onClick={()=>setModal(null)} style={{padding:"8px 16px",borderRadius:8,border:"0.5px solid #E5E7EB",background:"#fff",cursor:"pointer",fontSize:13}}>Cancelar</button>
+            <button onClick={()=>actEvent("S-2220","/hr/esocial/s2220/",s2220,setS2220)} disabled={!s2220.dtAso||!s2220.nmMedico} style={{padding:"8px 16px",borderRadius:8,border:"none",background:"#0891B2",color:"#fff",cursor:"pointer",fontSize:13,fontWeight:500}}>Gerar XML</button>
+            <button onClick={()=>actEvent("TX","/hr/esocial/transmitir/s2220/",s2220,setS2220)} disabled={!s2220.dtAso||!s2220.nmMedico} style={{padding:"8px 16px",borderRadius:8,border:"none",background:s2220.tpAmb==="1"?"#B91C1C":"#0369A1",color:"#fff",cursor:"pointer",fontSize:13,fontWeight:500}}>[TX] Transmitir</button>
+          </div>
+        </div></div>
+      )}
+
+      {modal==="s2298"&&sel&&(
+        <div style={ov}><div style={cd}>
+          <h2 style={{fontSize:16,fontWeight:600,margin:"0 0 4px"}}>S-2298 - Reintegracao</h2>
+          <p style={{fontSize:13,color:"#6B7280",margin:"0 0 16px"}}>{sel.fullName}</p>
+          <div style={{display:"grid",gap:12}}>
+            <div><label style={S.lbl}>Data da Reintegracao *</label><input type="date" value={s2298.dtReintegr} onChange={e=>setS2298(d=>({...d,dtReintegr:e.target.value}))} style={S.inp}/></div>
+            <div><label style={S.lbl}>Motivo</label>
+              <select value={s2298.motivo} onChange={e=>setS2298(d=>({...d,motivo:e.target.value}))} style={S.inp}>
+                <option value="1">1 - Reintegracao Judicial</option>
+                <option value="2">2 - Conversao Suspensao em Rescisao</option>
+                <option value="3">3 - Outros</option>
+              </select>
+            </div>
+            <div><label style={S.lbl}>Ambiente</label>
+              <select value={s2298.tpAmb} onChange={e=>setS2298(d=>({...d,tpAmb:e.target.value}))} style={{...S.inp,color:s2298.tpAmb==="1"?"#B91C1C":"#0369A1",fontWeight:600}}>
+                <option value="2">Producao Restrita</option><option value="1">Producao Real</option>
+              </select>
+            </div>
+          </div>
+          <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginTop:20}}>
+            <button onClick={()=>setModal(null)} style={{padding:"8px 16px",borderRadius:8,border:"0.5px solid #E5E7EB",background:"#fff",cursor:"pointer",fontSize:13}}>Cancelar</button>
+            <button onClick={()=>actEvent("S-2298","/hr/esocial/s2298/",s2298,setS2298)} disabled={!s2298.dtReintegr} style={{padding:"8px 16px",borderRadius:8,border:"none",background:"#F59E0B",color:"#fff",cursor:"pointer",fontSize:13,fontWeight:500}}>Gerar XML</button>
+            <button onClick={()=>actEvent("TX","/hr/esocial/transmitir/s2298/",s2298,setS2298)} disabled={!s2298.dtReintegr} style={{padding:"8px 16px",borderRadius:8,border:"none",background:s2298.tpAmb==="1"?"#B91C1C":"#0369A1",color:"#fff",cursor:"pointer",fontSize:13,fontWeight:500}}>[TX] Transmitir</button>
           </div>
         </div></div>
       )}
