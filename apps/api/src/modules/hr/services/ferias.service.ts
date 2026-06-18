@@ -14,6 +14,13 @@ export class FeriasService {
     const emp = await this.prisma.employee.findFirstOrThrow({
       where: { id: employeeId, companyId, deletedAt: null },
     });
+    // Rejeita funcionarios com rescisao registrada
+    const term = await this.prisma.employeeTermination.findFirst({
+      where: { employeeId, companyId },
+    });
+    if (term) throw new BadRequestException(
+      'Funcionario possui rescisao registrada — nao e possivel inicializar periodos de ferias.'
+    );
     const admissao   = new Date(emp.hireDate);
     const hoje       = new Date();
     const periodos   = [];
