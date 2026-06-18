@@ -157,6 +157,7 @@ export const AppRoutes = () => {
                 <Route path="app/hr/informe-rendimentos" element={<ProtectedRoute><InformeRendimentosPage /></ProtectedRoute>} />
                 <Route path="app/hr/employees" element={<ProtectedRoute><EmployeesPage /></ProtectedRoute>} />
                 <Route path="/app/hr/esocial" element={<ProtectedRoute><EsocialPage /></ProtectedRoute>} />
+                <Route path="/app/hr/ferias" element={<ProtectedRoute><FeriasPage /></ProtectedRoute>} />
                 <Route path="/app/hr/folha" element={<ProtectedRoute><FolhaPage /></ProtectedRoute>} />
                 <Route path="/app/hr/employees/:id" element={<ProtectedRoute><EmployeeDetailPage /></ProtectedRoute>} />
                 <Route path="app/accounting/razao" element={<ProtectedRoute><RazaoAnaliticoPage /></ProtectedRoute>} />
