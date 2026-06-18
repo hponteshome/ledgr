@@ -61,6 +61,7 @@ import ProLaborePage from '../pages/hr/ProLabore';
 import InformeRendimentosPage from '../pages/hr/InformeRendimentosPage';
 import { EmployeesPage } from '../pages/hr/EmployeesPage';
 import EsocialPage from '../pages/hr/EsocialPage';
+import FeriasPage from '../pages/hr/FeriasPage';
 import FolhaPage from '../pages/hr/FolhaPage';
 import EmployeeDetailPage from '../pages/hr/EmployeeDetailPage';
 import FechamentoPage from '../pages/finance/FechamentoPage';
