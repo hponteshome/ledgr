@@ -17,6 +17,11 @@ export class FeriasController {
     return this.svc.listarFuncionariosAtivos(req.companyId);
   }
 
+  @Get('funcionarios')
+  funcionariosAtivos(@Req() req: any) {
+    return this.svc.listarFuncionariosAtivos(req.companyId);
+  }
+
   @Post('periodos/:employeeId/inicializar')
   inicializar(@Req() req: any, @Param('employeeId') eid: string) {
     return this.svc.inicializarPeriodos(req.companyId, eid, req.user.id);

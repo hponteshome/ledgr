@@ -22,6 +22,21 @@ export class FeriasService {
     return emps.filter((e: any) => !idsComRescisao.has(e.id));
   }
 
+
+  // Funcionarios ativos sem rescisao — para gestao de ferias
+  async listarFuncionariosAtivos(companyId: string) {
+    const comRescisao = await this.prisma.employeeTermination.findMany({
+      where: { companyId },
+      select: { employeeId: true },
+    });
+    const idsComRescisao = new Set(comRescisao.map((t: any) => t.employeeId));
+    const emps = await this.prisma.employee.findMany({
+      where: { companyId, deletedAt: null },
+      orderBy: { fullName: 'asc' },
+    });
+    return emps.filter((e: any) => !idsComRescisao.has(e.id));
+  }
+
   // ── Periodo Aquisitivo ────────────────────────────────────────────────────
 
   // Inicializa todos os periodos aquisitivos a partir da data de admissao
