@@ -36,12 +36,8 @@ export const FeriasPage: React.FC = () => {
   const cd = {background:'#fff',borderRadius:14,width:580,padding:24,maxHeight:'90vh',overflowY:'auto' as const,boxShadow:'0 20px 60px rgba(0,0,0,.15)'};
 
   const loadEmps = useCallback(async () => {
-    const r = await api.get('/hr/employees');
-    // Exclui demissionarios (com rescisao registrada)
-    const empList = r.data.filter((e:any)=>!e.deletedAt);
-    const termsR = await api.get('/hr/employees/terminations/list').catch(()=>({data:[]}));
-    const terminatedIds = new Set((termsR.data||[]).map((t:any)=>t.employeeId));
-    setEmps(empList.filter((e:any)=>!terminatedIds.has(e.id)));
+    const r = await api.get('/hr/ferias/funcionarios');
+    setEmps(r.data);
   }, []);
 
   const loadPeriodos = useCallback(async (empId: string) => {
