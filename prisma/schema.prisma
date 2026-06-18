@@ -171,7 +171,12 @@ model Company {
   shareholders           CompanyShareholder[] @relation("CompanyShareholders")
   shareholderOf          CompanyShareholder[] @relation("ShareholderCompany")
   certificates           Certificate[]
-  esocialEvents  EsocialEvent[]
+  esocialEvents       EsocialEvent[]
+  periodosFerias      PeriodoAquisitivoFerias[]
+  programacoesFerias  ProgramacaoFerias[]
+  decimoTerceiro      DecimoTerceiro[]
+  raisDeclaracoes     RaisDeclaracao[]
+  raisVinculos        RaisVinculo[]
   accountBalances        AccountBalance[]
   chartOfAccounts        ChartOfAccounts[]
   journalEntries         JournalEntry[]
@@ -662,6 +667,11 @@ model Employee {
   ocorrencias       EmployeeOccurrence[]
   afastamentos      EmployeeLeave[]
   bancoHoras        BancoHoras?
+  esocialEvents       EsocialEvent[]
+  periodosFerias      PeriodoAquisitivoFerias[]
+  programacoesFerias  ProgramacaoFerias[]
+  decimoTerceiro      DecimoTerceiro[]
+  raisVinculos        RaisVinculo[]
   terminations      EmployeeTermination[]
 
   @@index([companyId, deletedAt])
@@ -3673,6 +3683,46 @@ model EmployeeTermination {
 // 13 · BANCO DE HORAS
 // =============================================================================
 
+/// Classificacao do tipo de hora para banco de horas e adicional
+
+/// Status do periodo aquisitivo de ferias
+enum StatusPeriodoFerias {
+  ABERTO        // em curso
+  DISPONIVEL    // periodo aquisitivo completo, pode programar
+  PROGRAMADO    // ferias agendadas (parcial ou total)
+  GOZADO        // ferias totalmente gozadas
+  VENCIDO       // periodo concessivo expirado — dobro devido
+  @@map("status_periodo_ferias")
+}
+
+/// Status da programacao de ferias
+enum StatusProgramacaoFerias {
+  AGENDADA      // aprovada mas ainda nao iniciada
+  AVISO_EMITIDO // aviso de ferias emitido (30 dias antes)
+  PAGO          // pagamento realizado (3 dias antes do inicio)
+  EM_GOZO       // funcionario em ferias
+  CONCLUIDA     // ferias concluidas
+  CANCELADA     // canceladas
+  @@map("status_programacao_ferias")
+}
+
+/// Status do calculo de decimo terceiro
+enum StatusDecimoTerceiro {
+  CALCULADO     // calculado, aguarda pagamento parcelas
+  PRIMEIRA_PAGA // 1a parcela paga (novembro)
+  QUITADO       // 2a parcela paga — encerrado
+  @@map("status_decimo_terceiro")
+}
+
+enum TipoHoraBH {
+  DIURNA          // hora diurna (entre 5h e 22h)
+  NOTURNA         // hora noturna (entre 22h e 5h) — adicional 20%
+  FDS_SABADO      // sabado (CLT: 50% ou conforme CCT)
+  FDS_DOMINGO     // domingo (CLT: 100%)
+  FERIADO         // feriado nacional/municipal (100%)
+  @@map("tipo_hora_bh")
+}
+
 enum TipoLancamentoBH {
   CREDITO      // horas extras realizadas
   DEBITO       // horas compensadas/abonadas
@@ -3691,6 +3741,12 @@ model BancoHoras {
   limiteMinutos Int?  @map("limite_minutos") // limite maximo de acumulo (ex: 120h = 7200)
   validadeMeses Int?  @map("validade_meses") // meses para expirar (ex: 6)
   ativo        Boolean @default(true) @map("ativo")
+
+  // Multiplicadores conforme CCT (podem ser sobrescritos por empresa)
+  multNoturno   Decimal @default(1.20) @map("mult_noturno") @db.Decimal(4, 2)   // 20% adicional noturno
+  multSabado    Decimal @default(1.50) @map("mult_sabado") @db.Decimal(4, 2)    // 50% FDS sabado
+  multDomingo   Decimal @default(2.00) @map("mult_domingo") @db.Decimal(4, 2)   // 100% domingo
+  multFeriado   Decimal @default(2.00) @map("mult_feriado") @db.Decimal(4, 2)   // 100% feriado
 
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
@@ -3711,6 +3767,9 @@ model BancoHorasLancamento {
   companyId    String            @map("company_id") @db.Uuid
   employeeId   String            @map("employee_id") @db.Uuid
   tipo         TipoLancamentoBH  @map("tipo")
+  tipoHora     TipoHoraBH        @default(DIURNA) @map("tipo_hora")
+  multiplicador Decimal           @default(1.50) @map("multiplicador") @db.Decimal(4, 2) // 1.50=50%, 2.00=100%
+  minutosOriginais Int            @map("minutos_originais") // horas brutas antes do multiplicador
   data         DateTime          @map("data") @db.Date
   minutos      Int               @map("minutos") // positivo=credito, negativo=debito
   saldoApos    Int               @map("saldo_apos") // saldo em minutos apos lancamento
@@ -3993,6 +4052,160 @@ model EfdContribuicoes {
   @@unique([companyId, periodoInicio, periodoFim])
   @@index([companyId, periodoInicio])
   @@map("efd_contribuicoes")
+}
+
+
+/// Controle do periodo aquisitivo de ferias por funcionario (CLT art. 130)
+model PeriodoAquisitivoFerias {
+  id              String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId       String              @map("company_id") @db.Uuid
+  employeeId      String              @map("employee_id") @db.Uuid
+  anoAquisitivo   Int                 @map("ano_aquisitivo") // ano de inicio do periodo
+  dataInicioPer   DateTime            @map("data_inicio_per") @db.Date  // inicio aquisitivo
+  dataFimPer      DateTime            @map("data_fim_per") @db.Date     // fim aquisitivo (12 meses)
+  dataInicioConc  DateTime            @map("data_inicio_conc") @db.Date // inicio concessivo
+  dataFimConc     DateTime            @map("data_fim_conc") @db.Date    // limite para gozar
+  diasDireito     Int                 @default(30) @map("dias_direito") // 30 ou proporcional
+  diasGozados     Int                 @default(0) @map("dias_gozados")
+  diasSaldo       Int                 @default(30) @map("dias_saldo")
+  status          StatusPeriodoFerias @default(ABERTO) @map("status")
+  observacao      String?             @map("observacao") @db.Text
+  createdById     String              @map("created_by_id") @db.Uuid
+  createdAt       DateTime            @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt       DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  company      Company              @relation(fields: [companyId], references: [id])
+  employee     Employee             @relation(fields: [employeeId], references: [id])
+  programacoes ProgramacaoFerias[]
+
+  @@unique([companyId, employeeId, anoAquisitivo])
+  @@index([companyId, employeeId])
+  @@index([status])
+  @@map("periodos_aquisitivos_ferias")
+}
+
+/// Programacao (agendamento) de ferias — pode ser fracionado em ate 3 partes
+model ProgramacaoFerias {
+  id                  String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId           String                    @map("company_id") @db.Uuid
+  employeeId          String                    @map("employee_id") @db.Uuid
+  periodoAquisitivoId String                    @map("periodo_aquisitivo_id") @db.Uuid
+  parcela             Int                       @default(1) @map("parcela") // 1, 2 ou 3
+  dataInicio          DateTime                  @map("data_inicio") @db.Date
+  dataFim             DateTime                  @map("data_fim") @db.Date
+  diasFerias          Int                       @map("dias_ferias")
+  diasAbono           Int                       @default(0) @map("dias_abono") // venda de ate 10 dias
+  dataAviso           DateTime?                 @map("data_aviso") @db.Date   // emissao aviso 30 dias antes
+  dataPagamento       DateTime?                 @map("data_pagamento") @db.Date // pagamento 3 dias antes
+
+  // Valores calculados
+  salarioBase         Decimal                   @default(0) @map("salario_base") @db.Decimal(15, 2)
+  valorFerias         Decimal                   @default(0) @map("valor_ferias") @db.Decimal(15, 2)
+  valorTerco          Decimal                   @default(0) @map("valor_terco") @db.Decimal(15, 2)
+  valorAbono          Decimal                   @default(0) @map("valor_abono") @db.Decimal(15, 2)
+  totalBruto          Decimal                   @default(0) @map("total_bruto") @db.Decimal(15, 2)
+  valorInss           Decimal                   @default(0) @map("valor_inss") @db.Decimal(15, 2)
+  valorIrrf           Decimal                   @default(0) @map("valor_irrf") @db.Decimal(15, 2)
+  totalLiquido        Decimal                   @default(0) @map("total_liquido") @db.Decimal(15, 2)
+
+  status              StatusProgramacaoFerias   @default(AGENDADA) @map("status")
+  reciboEmitidoEm     DateTime?                 @map("recibo_emitido_em") @db.Timestamp(6)
+  observacao          String?                   @map("observacao") @db.Text
+  createdById         String                    @map("created_by_id") @db.Uuid
+  createdAt           DateTime                  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt           DateTime                  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  company          Company                 @relation(fields: [companyId], references: [id])
+  employee         Employee                @relation(fields: [employeeId], references: [id])
+  periodoAquisitivo PeriodoAquisitivoFerias @relation(fields: [periodoAquisitivoId], references: [id])
+
+  @@index([companyId, employeeId])
+  @@index([dataInicio])
+  @@index([status])
+  @@map("programacoes_ferias")
+}
+
+/// Calculo do 13o salario por funcionario/ano
+model DecimoTerceiro {
+  id                   String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId            String              @map("company_id") @db.Uuid
+  employeeId           String              @map("employee_id") @db.Uuid
+  ano                  Int                 @map("ano")
+  mesesTrabalhados     Int                 @map("meses_trabalhados") // 1-12
+  salarioBase          Decimal             @map("salario_base") @db.Decimal(15, 2)
+  mediaVariavel        Decimal             @default(0) @map("media_variavel") @db.Decimal(15, 2) // medias HE/adicional
+  valorBruto           Decimal             @default(0) @map("valor_bruto") @db.Decimal(15, 2)    // salario*meses/12
+
+  // 1a Parcela — paga ate 30 de novembro (50% do bruto, sem desconto)
+  primeiraParcelaValor Decimal             @default(0) @map("primeira_parcela_valor") @db.Decimal(15, 2)
+  primeiraParcelaPagoEm DateTime?          @map("primeira_parcela_pago_em") @db.Date
+
+  // 2a Parcela — paga ate 20 de dezembro
+  segundaParcelaValor  Decimal             @default(0) @map("segunda_parcela_valor") @db.Decimal(15, 2)
+  valorInss            Decimal             @default(0) @map("valor_inss") @db.Decimal(15, 2)
+  valorIrrf            Decimal             @default(0) @map("valor_irrf") @db.Decimal(15, 2)
+  segundaParcelaLiquido Decimal            @default(0) @map("segunda_parcela_liquido") @db.Decimal(15, 2)
+  segundaParcelaPagoEm DateTime?           @map("segunda_parcela_pago_em") @db.Date
+
+  status               StatusDecimoTerceiro @default(CALCULADO) @map("status")
+  observacao           String?              @map("observacao") @db.Text
+  createdById          String               @map("created_by_id") @db.Uuid
+  createdAt            DateTime             @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt            DateTime             @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  company   Company  @relation(fields: [companyId], references: [id])
+  employee  Employee @relation(fields: [employeeId], references: [id])
+
+  @@unique([companyId, employeeId, ano])
+  @@index([companyId, ano])
+  @@map("decimo_terceiro")
+}
+
+/// RAIS — Relatorio Anual de Informacoes Sociais por empresa/ano
+model RaisDeclaracao {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId   String    @map("company_id") @db.Uuid
+  anoBase     Int       @map("ano_base")
+  status      String    @default("RASCUNHO") @map("status") @db.VarChar(20)
+  totalVinculos Int     @default(0) @map("total_vinculos")
+  totalMassaSalarial Decimal @default(0) @map("total_massa_salarial") @db.Decimal(15, 2)
+  dataEnvio   DateTime? @map("data_envio") @db.Timestamp(6)
+  protocoloRais String? @map("protocolo_rais") @db.VarChar(50)
+  observacao  String?   @map("observacao") @db.Text
+  createdById String    @map("created_by_id") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  company  Company            @relation(fields: [companyId], references: [id])
+  vinculos RaisVinculo[]
+
+  @@unique([companyId, anoBase])
+  @@map("rais_declaracoes")
+}
+
+/// RAIS — Linha por funcionario/vinculo
+model RaisVinculo {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  raisId          String    @map("rais_id") @db.Uuid
+  companyId       String    @map("company_id") @db.Uuid
+  employeeId      String    @map("employee_id") @db.Uuid
+  dataAdmissao    DateTime  @map("data_admissao") @db.Date
+  dataDesligamento DateTime? @map("data_desligamento") @db.Date
+  mesesTrabalhados Int      @default(12) @map("meses_trabalhados")
+  salarioMesRef   Decimal   @default(0) @map("salario_mes_ref") @db.Decimal(15, 2) // dezembro
+  totalRemuneracao Decimal  @default(0) @map("total_remuneracao") @db.Decimal(15, 2)
+  horasSemanais   Int       @default(44) @map("horas_semanais")
+  cbo             String?   @map("cbo") @db.VarChar(10)
+  cnae            String?   @map("cnae") @db.VarChar(10)
+  causaDesligamento String? @map("causa_desligamento") @db.VarChar(5)
+
+  rais     RaisDeclaracao @relation(fields: [raisId], references: [id])
+  company  Company        @relation(fields: [companyId], references: [id])
+  employee Employee       @relation(fields: [employeeId], references: [id])
+
+  @@unique([raisId, employeeId])
+  @@index([raisId])
+  @@map("rais_vinculos")
 }
 
 /// Eventos eSocial transmitidos — rastreamento completo por evento.
