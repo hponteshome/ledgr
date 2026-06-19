@@ -1,7 +1,6 @@
 // frontend/src/pages/sistema/CalendarioPage.tsx
 import React, { useState, useEffect, useMemo } from 'react';
 import api from '../../services/api';
-import { useAuth } from '../../contexts/AuthContext';
 
 const toYMD = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -56,17 +55,6 @@ export function CalendarioPage() {
     date:'', name:'', type:'MUNICIPAL', state:'', city:'', recurring:false
   });
 
-  const { user } = useAuth() as any;
-  // Checa permissao master — permissions.all ou profileName
-  const isMaster = user?.permissions?.all === true
-    || (user as any)?.profileName === 'Administrador Master'
-    || (() => {
-      try {
-        const stored = JSON.parse(localStorage.getItem('@ledgr:user') ?? '{}');
-        return stored?.permissions?.all === true
-          || stored?.profileName === 'Administrador Master';
-      } catch { return false; }
-    })();
 
   const load = async () => {
     setLoading(true);
@@ -224,7 +212,7 @@ export function CalendarioPage() {
             fontSize:14,fontWeight:700,textAlign:'center',outline:'none'}}/>
         <button onClick={next} style={{width:26,height:26,border:'1px solid #E5E7EB',
           borderRadius:6,background:'#fff',cursor:'pointer',fontSize:16}}>›</button>
-        {isMaster && holidays.some((_:any)=>true) && (
+        {holidays.some((_:any)=>true) && (
           <span style={{fontSize:11,color:'#9A3412',background:'#FFF7ED',
             padding:'3px 8px',borderRadius:6,border:'1px dashed #F97316'}}>
             💡 Clique nas pontes sugeridas para confirmar
@@ -238,7 +226,7 @@ export function CalendarioPage() {
             color:'#fff',cursor:'pointer',fontSize:12,fontWeight:600,opacity:loading?0.6:1}}>
           {loading ? 'Aguarde...' : ('⬇ Gerar Calendário ' + year)}
         </button>
-        {isMaster && <>
+        {<>
           <button onClick={()=>{setForm(f=>({...f,type:'MUNICIPAL'}));setModal('feriado');}}
             style={{padding:'5px 12px',border:'1px solid #E5E7EB',borderRadius:6,
               background:'#fff',cursor:'pointer',fontSize:12,fontWeight:600}}>+ Feriado</button>
@@ -293,23 +281,23 @@ export function CalendarioPage() {
                 {evs.slice(0,3).map((ev,i)=>(
                   <div key={i}
                     onClick={()=>{
-                      if (isMaster && ev.isSugg) {
+                      if (ev.isSugg) {
                         setPendYMD(ymd); setPendTip(ev.tip); setModal('confirm');
                       }
                     }}
                     onMouseEnter={e=>{
                       const rc=(e.target as HTMLElement).getBoundingClientRect();
                       setTip({x:rc.left,y:rc.top-32,
-                        t:ev.tip+(ev.isSugg&&isMaster?' — clique para confirmar':'')});
+                        t:ev.tip+(ev.isSugg?' — clique para confirmar':'')});
                     }}
                     onMouseLeave={()=>setTip(null)}
                     style={{fontSize:10,fontWeight:600,padding:'1px 4px',borderRadius:3,
                       background:ev.bg,color:ev.fg,marginBottom:2,
                       overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis',
-                      cursor:ev.isSugg&&isMaster?'pointer':'default',
-                      outline:ev.isSugg&&isMaster?'1.5px dashed #9A3412':'none',
+                      cursor:ev.isSugg?'pointer':'default',
+                      outline:ev.isSugg?'1.5px dashed #9A3412':'none',
                       outlineOffset:1}}>
-                    {ev.isSugg && isMaster ? '🌉 ✓ Confirmar ponte' : ev.label}
+                    {ev.isSugg ? '🌉 ✓ Confirmar ponte' : ev.label}
                   </div>
                 ))}
                 {evs.length>3&&<div style={{fontSize:9,color:'#9CA3AF'}}>+{evs.length-3}</div>}
