@@ -90,9 +90,11 @@ export function CalendarioPage() {
   };
 
   const confirmarPonte = async () => {
+    // Extrai nome limpo do feriado: 'Ponte sugerida — Corpus Christi cai na quinta' -> 'Corpus Christi'
+    const descricao = pendTip.replace(/Ponte sugerida\s*[—-]\s*/,'').replace(/\s*cai na.*$/,'').trim() || 'Ponte';
     try {
       await api.post('/hr/recesso', {
-        tipo:'PONTE', descricao: pendTip || 'Ponte',
+        tipo:'PONTE', descricao: `Ponte — ${descricao}`,
         dataInicio: pendYMD, dataFim: pendYMD,
       });
       setModal(null); load();
@@ -224,7 +226,10 @@ export function CalendarioPage() {
         <button onClick={importar} disabled={loading}
           style={{padding:'5px 14px',border:'none',borderRadius:6,background:'#6C63FF',
             color:'#fff',cursor:'pointer',fontSize:12,fontWeight:600,opacity:loading?0.6:1}}>
-          {loading ? 'Aguarde...' : ('⬇ Gerar Calendário ' + year)}
+          {loading ? 'Aguarde...' : <>
+            ⬇ Gerar Calendário <b style={{background:'rgba(255,255,255,0.25)',
+              padding:'0 5px',borderRadius:3}}>{year}</b>
+          </>}
         </button>
         {<>
           <button onClick={()=>{setForm(f=>({...f,type:'MUNICIPAL'}));setModal('feriado');}}
