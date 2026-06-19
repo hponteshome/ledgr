@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
-  FiHome, FiBriefcase, FiUsers, FiDollarSign, FiFileText, FiMenu,
+  FiHome, FiBriefcase, FiUsers, FiFileText, FiMenu,
   FiChevronLeft, FiChevronDown, FiChevronRight, FiActivity, FiSettings,
   FiFolder, FiBook, FiPenTool, FiClipboard, FiShield, FiPercent, FiLayers,
   FiUserCheck, FiUpload, FiDatabase, FiPieChart, FiCalendar, FiCheckCircle,
@@ -54,25 +54,25 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
       path: '/app/hr', icon: FiUsers, label: 'RH',
       children: [
         { path: "/app/hr/employees", label: "Funcionários", icon: FiUsers },
-        { path: '/app/hr/pro-labore', label: 'Pró-labore', icon: FiDollarSign },
+        { path: '/app/hr/pro-labore', label: 'Pró-labore', icon: FiTrendingDown },
         { path: '/app/hr/informe-rendimentos', label: 'Informe de Rendimentos', icon: FiFileText },
         { path: '/app/hr/esocial', label: 'eSocial', icon: FiFileText },
         { path: '/app/hr/ferias', label: 'Férias', icon: FiCalendar },
         { path: '/app/hr/recesso', label: 'Recessos & Pontes', icon: FiRepeat },
-        { path: '/app/hr/decimo-terceiro', label: '13º Salário', icon: FiDollarSign },
+        { path: '/app/hr/decimo-terceiro', label: '13º Salário', icon: FiTrendingDown },
         { path: '/app/hr/rais', label: 'RAIS', icon: FiFileText },
-        { path: '/app/hr/dctfweb', label: 'DCTFWeb', icon: FiSend },
-        { path: '/app/hr/folha', label: 'Folha de Pagamento', icon: FiDollarSign },
+        { path: '/app/hr/dctfweb', label: 'DCTFWeb', icon: FiCpu },
+        { path: '/app/hr/folha', label: 'Folha de Pagamento', icon: FiTrendingDown },
       ],
     },
     {
-      path: '/app/finance', icon: FiDollarSign, label: 'Finance',
+      path: '/app/finance', icon: label: 'Finance',
       children: [
         { path: '/app/finance/fiscal-documents', label: 'Documentos Fiscais', icon: FiFileText },
         { path: '/app/finance/accounts-payable', label: 'Contas a Pagar', icon: FiTrendingDown },
         { path: '/app/finance/contas-receber', label: 'Contas a Receber', icon: FiTrendingUp },
         { path: '/app/finance/fluxo-caixa', label: 'Fluxo de Caixa', icon: FiActivity },
-        { path: '/app/finance/petty-cash', label: 'Fundo Fixo', icon: FiDollarSign },
+        { path: '/app/finance/petty-cash', label: 'Fundo Fixo', icon: FiTrendingDown },
         { path: '/app/finance/agenda', label: 'Agenda Financeira', icon: FiCalendar },
         { path: '/app/finance/bank-import', label: 'Importação Bancária', icon: FiUpload },
         { path: '/app/finance/provisoes', label: 'Provisões Recorrentes', icon: FiRepeat },
