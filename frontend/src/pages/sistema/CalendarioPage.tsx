@@ -212,6 +212,12 @@ export function CalendarioPage() {
         </span>
         <button onClick={next} style={{width:26,height:26,border:'1px solid #E5E7EB',
           borderRadius:6,background:'#fff',cursor:'pointer',fontSize:16}}>›</button>
+        {isMaster && holidays.some((_:any)=>true) && (
+          <span style={{fontSize:11,color:'#9A3412',background:'#FFF7ED',
+            padding:'3px 8px',borderRadius:6,border:'1px dashed #F97316'}}>
+            💡 Clique nas pontes sugeridas para confirmar
+          </span>
+        )}
         <button onClick={()=>{setMonth(now.getMonth());setYear(now.getFullYear());}}
           style={{padding:'4px 10px',border:'1px solid #E5E7EB',borderRadius:6,
             background:'#fff',cursor:'pointer',fontSize:12}}>Hoje</button>
@@ -288,8 +294,10 @@ export function CalendarioPage() {
                     style={{fontSize:10,fontWeight:600,padding:'1px 4px',borderRadius:3,
                       background:ev.bg,color:ev.fg,marginBottom:2,
                       overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis',
-                      cursor:ev.isSugg&&isMaster?'pointer':'default'}}>
-                    {ev.label}
+                      cursor:ev.isSugg&&isMaster?'pointer':'default',
+                      outline:ev.isSugg&&isMaster?'1.5px dashed #9A3412':'none',
+                      outlineOffset:1}}>
+                    {ev.isSugg && isMaster ? '🌉 ✓ Confirmar ponte' : ev.label}
                   </div>
                 ))}
                 {evs.length>3&&<div style={{fontSize:9,color:'#9CA3AF'}}>+{evs.length-3}</div>}
