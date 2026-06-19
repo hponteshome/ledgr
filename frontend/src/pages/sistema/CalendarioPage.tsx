@@ -57,8 +57,16 @@ export function CalendarioPage() {
   });
 
   const { user } = useAuth() as any;
+  // Checa permissao master — permissions.all ou profileName
   const isMaster = user?.permissions?.all === true
-    || user?.profileName === 'Administrador Master';
+    || (user as any)?.profileName === 'Administrador Master'
+    || (() => {
+      try {
+        const stored = JSON.parse(localStorage.getItem('@ledgr:user') ?? '{}');
+        return stored?.permissions?.all === true
+          || stored?.profileName === 'Administrador Master';
+      } catch { return false; }
+    })();
 
   const load = async () => {
     setLoading(true);
@@ -207,9 +215,13 @@ export function CalendarioPage() {
         <span style={{fontSize:11,fontWeight:700,color:'#6C63FF'}}>◆ SISTEMA</span>
         <button onClick={prev} style={{width:26,height:26,border:'1px solid #E5E7EB',
           borderRadius:6,background:'#fff',cursor:'pointer',fontSize:16}}>‹</button>
-        <span style={{fontSize:16,fontWeight:700,minWidth:180,textAlign:'center'}}>
-          {MESES[month]} {year}
+        <span style={{fontSize:16,fontWeight:700,minWidth:140,textAlign:'center'}}>
+          {MESES[month]}
         </span>
+        <input type='number' min={2020} max={2035} value={year}
+          onChange={e=>setYear(parseInt(e.target.value)||year)}
+          style={{width:68,border:'1px solid #E5E7EB',borderRadius:6,padding:'4px 8px',
+            fontSize:14,fontWeight:700,textAlign:'center',outline:'none'}}/>
         <button onClick={next} style={{width:26,height:26,border:'1px solid #E5E7EB',
           borderRadius:6,background:'#fff',cursor:'pointer',fontSize:16}}>›</button>
         {isMaster && holidays.some((_:any)=>true) && (
@@ -224,7 +236,7 @@ export function CalendarioPage() {
         <button onClick={importar} disabled={loading}
           style={{padding:'5px 14px',border:'none',borderRadius:6,background:'#6C63FF',
             color:'#fff',cursor:'pointer',fontSize:12,fontWeight:600,opacity:loading?0.6:1}}>
-          {loading ? 'Aguarde...' : `⬇ Gerar Calendário ${year}`}
+          {loading ? 'Aguarde...' : ('⬇ Gerar Calendário ' + year)}
         </button>
         {isMaster && <>
           <button onClick={()=>{setForm(f=>({...f,type:'MUNICIPAL'}));setModal('feriado');}}
