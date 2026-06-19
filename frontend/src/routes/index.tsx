@@ -63,6 +63,9 @@ import { EmployeesPage } from '../pages/hr/EmployeesPage';
 import EsocialPage from '../pages/hr/EsocialPage';
 import FeriasPage from '../pages/hr/FeriasPage';
 import RecessoPage from '../pages/hr/RecessoPage';
+import DecimoTerceiroPage from '../pages/hr/DecimoTerceiroPage';
+import RaisPage from '../pages/hr/RaisPage';
+import DctfWebPage from '../pages/hr/DctfWebPage';
 import FolhaPage from '../pages/hr/FolhaPage';
 import EmployeeDetailPage from '../pages/hr/EmployeeDetailPage';
 import FechamentoPage from '../pages/finance/FechamentoPage';
@@ -161,6 +164,9 @@ export const AppRoutes = () => {
                 <Route path="/app/hr/esocial" element={<ProtectedRoute><EsocialPage /></ProtectedRoute>} />
                 <Route path="/app/hr/ferias" element={<ProtectedRoute><FeriasPage /></ProtectedRoute>} />
                 <Route path="/app/hr/recesso" element={<ProtectedRoute><RecessoPage /></ProtectedRoute>} />
+                <Route path="/app/hr/decimo-terceiro" element={<ProtectedRoute><DecimoTerceiroPage /></ProtectedRoute>} />
+                <Route path="/app/hr/rais" element={<ProtectedRoute><RaisPage /></ProtectedRoute>} />
+                <Route path="/app/hr/dctfweb" element={<ProtectedRoute><DctfWebPage /></ProtectedRoute>} />
                 <Route path="/app/hr/folha" element={<ProtectedRoute><FolhaPage /></ProtectedRoute>} />
                 <Route path="/app/hr/employees/:id" element={<ProtectedRoute><EmployeeDetailPage /></ProtectedRoute>} />
                 <Route path="app/accounting/razao" element={<ProtectedRoute><RazaoAnaliticoPage /></ProtectedRoute>} />
