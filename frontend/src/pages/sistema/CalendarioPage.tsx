@@ -217,14 +217,15 @@ export function CalendarioPage() {
         <button onClick={()=>{setMonth(now.getMonth());setYear(now.getFullYear());}}
           style={{padding:'4px 10px',border:'1px solid #E5E7EB',borderRadius:6,
             background:'#fff',cursor:'pointer',fontSize:12}}>Hoje</button>
-        <button onClick={importar} disabled={loading}
-          style={{padding:'5px 14px',border:'none',borderRadius:6,background:'#6C63FF',
-            color:'#fff',cursor:'pointer',fontSize:12,fontWeight:600,opacity:loading?0.6:1}}>
-          {loading ? 'Aguarde...' : <>
+        {holidays.length === 0 && !loading && (
+          <button onClick={importar}
+            style={{padding:'5px 14px',border:'none',borderRadius:6,background:'#6C63FF',
+              color:'#fff',cursor:'pointer',fontSize:12,fontWeight:600}}>
             ⬇ Gerar Calendário <b style={{background:'rgba(255,255,255,0.25)',
               padding:'0 5px',borderRadius:3}}>{year}</b>
-          </>}
-        </button>
+          </button>
+        )}
+        {loading && <span style={{fontSize:12,color:'#9CA3AF',fontStyle:'italic'}}>Carregando...</span>}
         {<>
           <button onClick={()=>{setForm(f=>({...f,type:'MUNICIPAL'}));setModal('feriado');}}
             style={{padding:'5px 12px',border:'1px solid #E5E7EB',borderRadius:6,
