@@ -54,6 +54,30 @@ export class AuthService {
     });
     return { status:'PENDENTE', pendingFlags, message:'Cadastro recebido. Aguarde aprovacao.' };
   }
+    });
+    let pendingFlags = 'OK';
+    let personId: string | undefined;
+    if (!person) {
+      pendingFlags = 'CPF_NAO_ENCONTRADO';
+    } else {
+      personId = person.id;
+      const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+      if (norm(dto.fullName).split(' ')[0] !== norm(person.fullName ?? '').split(' ')[0])
+        pendingFlags = 'DIVERGENCIA_NOME';
+    }
+    const hash = await bcrypt.hash(dto.password, 10);
+    await this.prisma.user.create({
+      data: {
+        document: cleanCpf, documentType: 'CPF',
+        email: dto.email.toLowerCase(), passwordHash: hash,
+        fullName: dto.fullName, phone1: dto.phone,
+        status: 'PENDENTE', isActive: false, level: 0,
+        requestedAt: new Date(), pendingFlags,
+        ...(personId ? { personId } : {}),
+      },
+    });
+    return { status:'PENDENTE', pendingFlags, message:'Cadastro recebido. Aguarde aprovacao.' };
+  }
 
   async validateUser(email: string, password: string): Promise<any> {
     const user = await this.usersService.findByEmail(email.toLowerCase());
