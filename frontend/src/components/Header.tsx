@@ -400,6 +400,11 @@ export const Header: React.FC<{ sidebarOpen: boolean }> = ({ sidebarOpen }) => {
                   {isLoggingIn ? '...' : 'Sign In'}
                 </button>
               </div>
+              <div style={{textAlign:'center',fontSize:11,marginTop:4}}>
+                <a href='/register' style={{color:'#6C63FF',fontWeight:600,textDecoration:'none',fontSize:11}}>
+                  Cadastrar-se
+                </a>
+              </div>
             </form>
           )}
 
