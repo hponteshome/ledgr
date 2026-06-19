@@ -124,7 +124,8 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 export const AppRoutes = () => {
     return (
         <Routes>
-            <Route path="/" element={<Layout />}>
+            <Route path="/register" element={<Register />} />
+        <Route path="/" element={<Layout />}>
                 <Route index element={<LedgrHome />} />
                 <Route path="app" element={<Navigate to="/app/dashboard" replace />} />
 
