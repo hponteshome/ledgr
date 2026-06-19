@@ -747,3 +747,30 @@ menos de 6 cards, vai sobrar espaco vazio na ultima linha (cosmetico, ajustar se
 4. Logica de escolha do periodo: usa o periodo aquisitivo mais antigo disponivel (DISPONIVEL) ou o atual (ABERTO se nao ha outro)
 5. Frontend: pagina de Recesso Coletivo com calendario e aplicacao em lote
 
+
+## Sessao 2026-06-19 — HR Completo + Calendario + Recessos
+
+### Entregue nesta sessao
+- BancoHorasService completo com TipoHoraBH (DIURNA/NOTURNA/FDS_SABADO/FDS_DOMINGO/FERIADO) e multiplicadores configuráveis por CCT
+- FeriasService: inicializarPeriodos, calcularFerias (INSS progressivo + IRRF Lei 15.270), agendar (3 parcelas), aviso PDF, recibo PDF
+- FeriasPage: funcionários ativos (filtra demissionários), períodos aquisitivos, agendamento com prévia do cálculo
+- RecessoService: criar, preview, aplicar em lote, ZIP recibos
+- RecessoPage: criar RECESSO_COLETIVO e PONTE, preview saldo por funcionário, aplicar em lote
+- CalendarioPage: grid mensal visual, feriados + pontes sugeridas automáticas (qui→sex, ter→seg), recessos, férias, confirmar ponte com 1 clique, + Feriado/+ Ponte, localidade UF+município
+- DecimoTerceiroService: cálculo proporcional CLT (meses>=15 dias), 1a parcela (nov), 2a parcela (dez) INSS+IRRF, recibos PDF
+- RaisService: geração declaração anual, vínculos por empregado, registro protocolo
+- DctfWebService: consolidação mensal CP (INSS emp+patronal+RAT+Terceiros+PL) + IRRF, total DARF
+
+### Commits desta sessao
+- dcaef17: fix duplicatas ferias.controller/service
+- d5ed524: RecessoColetivo schema+migration+service+controller
+- cb7f1c0: RecessoPage frontend
+- 08dd9fb: CalendarioPage visual com pontes sugeridas
+- 8d51955: 13o + RAIS + DCTFWeb backend
+- 3d9f120: DecimoTerceiroPage + RaisPage + DctfWebPage + rotas
+- 98e3328: fix sidebar Finance icon
+
+### Pendentes restantes
+- Confirmar rescisao Raquel com saldo FGTS real + transmitir S-2299 Producao Real (aguarda cadastro KPL no eSocial)
+- Reimport ECD LM (saldo abertura 31/12/2023)
+- Dashboard rebuild com dados reais
