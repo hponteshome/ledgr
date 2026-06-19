@@ -214,12 +214,6 @@ export function CalendarioPage() {
             fontSize:14,fontWeight:700,textAlign:'center',outline:'none'}}/>
         <button onClick={next} style={{width:26,height:26,border:'1px solid #E5E7EB',
           borderRadius:6,background:'#fff',cursor:'pointer',fontSize:16}}>›</button>
-        {holidays.some((_:any)=>true) && (
-          <span style={{fontSize:11,color:'#9A3412',background:'#FFF7ED',
-            padding:'3px 8px',borderRadius:6,border:'1px dashed #F97316'}}>
-            💡 Clique nas pontes sugeridas para confirmar
-          </span>
-        )}
         <button onClick={()=>{setMonth(now.getMonth());setYear(now.getFullYear());}}
           style={{padding:'4px 10px',border:'1px solid #E5E7EB',borderRadius:6,
             background:'#fff',cursor:'pointer',fontSize:12}}>Hoje</button>
