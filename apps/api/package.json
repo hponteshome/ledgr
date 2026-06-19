@@ -20,6 +20,8 @@
     "@nestjs/schedule": "^6.1.1",
     "@peculiar/x509": "^1.14.3",
     "@prisma/client": "^5.0.0",
+    "@types/archiver": "^8.0.0",
+    "archiver": "^8.0.0",
     "axios": "^1.13.6",
     "bcryptjs": "^3.0.3",
     "docx": "^9.6.0",

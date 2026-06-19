@@ -176,6 +176,7 @@ model Company {
   programacoesFerias  ProgramacaoFerias[]
   decimoTerceiro      DecimoTerceiro[]
   raisDeclaracoes     RaisDeclaracao[]
+  recessos            RecessoColetivo[]
   raisVinculos        RaisVinculo[]
   accountBalances        AccountBalance[]
   chartOfAccounts        ChartOfAccounts[]
@@ -3685,6 +3686,20 @@ model EmployeeTermination {
 /// Classificacao do tipo de hora para banco de horas e adicional
 
 /// Status do periodo aquisitivo de ferias
+
+enum TipoRecesso {
+  RECESSO_COLETIVO  // recesso de fim de ano
+  PONTE             // ponte entre feriado e fim de semana
+  @@map("tipo_recesso")
+}
+
+enum StatusRecesso {
+  PLANEJADO   // criado, nao aplicado ainda
+  APLICADO    // ferias geradas para todos os funcionarios
+  CANCELADO
+  @@map("status_recesso")
+}
+
 enum StatusPeriodoFerias {
   ABERTO        // em curso
   DISPONIVEL    // periodo aquisitivo completo, pode programar
@@ -4107,6 +4122,7 @@ model ProgramacaoFerias {
   valorIrrf           Decimal                   @default(0) @map("valor_irrf") @db.Decimal(15, 2)
   totalLiquido        Decimal                   @default(0) @map("total_liquido") @db.Decimal(15, 2)
 
+  recessoId           String?                   @map("recesso_id") @db.Uuid
   status              StatusProgramacaoFerias   @default(AGENDADA) @map("status")
   reciboEmitidoEm     DateTime?                 @map("recibo_emitido_em") @db.Timestamp(6)
   observacao          String?                   @map("observacao") @db.Text
@@ -4117,6 +4133,7 @@ model ProgramacaoFerias {
   company          Company                 @relation(fields: [companyId], references: [id])
   employee         Employee                @relation(fields: [employeeId], references: [id])
   periodoAquisitivo PeriodoAquisitivoFerias @relation(fields: [periodoAquisitivoId], references: [id])
+  recesso           RecessoColetivo?         @relation(fields: [recessoId], references: [id])
 
   @@index([companyId, employeeId])
   @@index([dataInicio])
@@ -4205,6 +4222,32 @@ model RaisVinculo {
   @@unique([raisId, employeeId])
   @@index([raisId])
   @@map("rais_vinculos")
+}
+
+
+/// Recesso coletivo / ponte de feriado — aplicacao em lote para todos os funcionarios
+model RecessoColetivo {
+  id               String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId        String        @map("company_id") @db.Uuid
+  tipo             TipoRecesso   @map("tipo")
+  descricao        String        @map("descricao") @db.VarChar(200)
+  dataInicio       DateTime      @map("data_inicio") @db.Date
+  dataFim          DateTime      @map("data_fim") @db.Date
+  diasUteis        Int           @map("dias_uteis")
+  status           StatusRecesso @default(PLANEJADO) @map("status")
+  totalFuncionarios Int          @default(0) @map("total_funcionarios")
+  aplicadoEm       DateTime?     @map("aplicado_em") @db.Timestamp(6)
+  observacao       String?       @map("observacao") @db.Text
+  createdById      String        @map("created_by_id") @db.Uuid
+  createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt        DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  company       Company             @relation(fields: [companyId], references: [id])
+  programacoes  ProgramacaoFerias[]
+
+  @@index([companyId, status])
+  @@index([dataInicio])
+  @@map("recessos_coletivos")
 }
 
 /// Eventos eSocial transmitidos — rastreamento completo por evento.
