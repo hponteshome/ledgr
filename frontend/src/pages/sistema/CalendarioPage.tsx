@@ -1,6 +1,7 @@
 // frontend/src/pages/sistema/CalendarioPage.tsx
 import React, { useState, useEffect, useMemo } from 'react';
 import api from '../../services/api';
+import { useAuth } from '../../contexts/AuthContext';
 
 const toYMD = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -28,6 +29,14 @@ export function CalendarioPage() {
   const [ferias,  setFerias]  = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [tip,     setTip]     = useState<{x:number,y:number,t:string}|null>(null);
+  const [modal,   setModal]   = useState<'feriado'|'ponte'|'confirm-ponte'|null>(null);
+  const [pendPonte, setPendPonte] = useState<{label:string,date:string}|null>(null);
+  const [form, setForm] = useState({
+    date:'', name:'', type:'MUNICIPAL', state:'', city:'', recurring:false
+  });
+  const { user } = useAuth();
+  const isMaster = (user as any)?.permissions?.all === true
+    || (user as any)?.profileName === 'Administrador Master';
 
   const load = async () => {
     setLoading(true);
@@ -50,6 +59,40 @@ export function CalendarioPage() {
   };
 
   useEffect(() => { load(); }, [year]);
+
+  const confirmarPonte = async () => {
+    if (!pendPonte) return;
+    try {
+      await api.post('/hr/recesso', {
+        tipo: 'PONTE', descricao: pendPonte.label,
+        dataInicio: pendPonte.date, dataFim: pendPonte.date,
+      });
+      setModal(null); setPendPonte(null); load();
+    } catch(e:any) { alert('Erro: ' + (e?.response?.data?.message ?? e.message)); }
+  };
+
+  const salvarFeriado = async () => {
+    if (!form.date || !form.name) return;
+    try {
+      await api.post('/calendar/holidays', form);
+      setModal(null);
+      setForm({date:'',name:'',type:'MUNICIPAL',state:'',city:'',recurring:false});
+      load();
+    } catch(e:any) { alert('Erro: ' + (e?.response?.data?.message ?? e.message)); }
+  };
+
+  const salvarPonte = async () => {
+    if (!form.date || !form.name) return;
+    try {
+      await api.post('/hr/recesso', {
+        tipo: 'PONTE', descricao: form.name,
+        dataInicio: form.date, dataFim: form.date,
+      });
+      setModal(null);
+      setForm({date:'',name:'',type:'MUNICIPAL',state:'',city:'',recurring:false});
+      load();
+    } catch(e:any) { alert('Erro: ' + (e?.response?.data?.message ?? e.message)); }
+  };
 
   const importar = async () => {
     setLoading(true);
@@ -179,6 +222,14 @@ export function CalendarioPage() {
         <button onClick={()=>{setMonth(now.getMonth());setYear(now.getFullYear());}}
           style={{padding:'4px 10px',border:'1px solid #E5E7EB',borderRadius:6,
             background:'#fff',cursor:'pointer',fontSize:12}}>Hoje</button>
+        {isMaster && (<>
+          <button onClick={()=>{setForm(f=>({...f,type:'MUNICIPAL'}));setModal('feriado');}}
+            style={{padding:'5px 12px',border:'1px solid #E5E7EB',borderRadius:6,
+              background:'#fff',cursor:'pointer',fontSize:12,fontWeight:600}}>+ Feriado</button>
+          <button onClick={()=>{setForm(f=>({...f,type:'PONTE'}));setModal('ponte');}}
+            style={{padding:'5px 12px',border:'1px solid #E5E7EB',borderRadius:6,
+              background:'#FFF7ED',color:'#C2410C',cursor:'pointer',fontSize:12,fontWeight:600}}>+ Ponte</button>
+        </>)}
         <button onClick={importar} disabled={loading}
           style={{padding:'5px 14px',border:'none',borderRadius:6,
             background:'#6C63FF',color:'#fff',cursor:'pointer',fontSize:12,fontWeight:600,
@@ -231,9 +282,16 @@ export function CalendarioPage() {
                 </div>
                 {evs.slice(0,3).map((ev,i)=>(
                   <div key={i} title={ev.tip}
+                    onClick={()=>{
+                      if (isMaster && ev.tip.includes("Ponte sugerida")) {
+                        setPendPonte({label:ev.tip,date:ymd});
+                        setModal("confirm-ponte");
+                      }
+                    }}
                     onMouseEnter={e=>{
                       const r=(e.target as HTMLElement).getBoundingClientRect();
-                      setTip({x:r.left,y:r.top-32,t:ev.tip});
+                      setTip({x:r.left,y:r.top-32,t:ev.tip
+                        +(ev.tip.includes("sugerida")&&isMaster?" — clique para confirmar":"")});
                     }}
                     onMouseLeave={()=>setTip(null)}
                     style={{fontSize:10,fontWeight:600,padding:'1px 4px',borderRadius:3,
@@ -248,6 +306,132 @@ export function CalendarioPage() {
           })}
         </div>
       </div>
+
+      {/* Modal confirmar ponte */}
+      {modal==='confirm-ponte' && pendPonte && (
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.4)',display:'flex',
+          alignItems:'center',justifyContent:'center',zIndex:1000}}>
+          <div style={{background:'#fff',borderRadius:14,width:420,padding:24,
+            boxShadow:'0 20px 60px rgba(0,0,0,.2)'}}>
+            <h3 style={{margin:'0 0 8px',fontSize:16,fontWeight:700}}>Confirmar Ponte</h3>
+            <p style={{fontSize:13,color:'#6B7280',margin:'0 0 16px'}}>
+              {pendPonte.label}<br/>
+              Data: <b>{new Date(pendPonte.date+'T12:00:00').toLocaleDateString('pt-BR')}</b>
+            </p>
+            <p style={{fontSize:12,color:'#374151',background:'#FFF7ED',borderRadius:8,
+              padding:'10px 12px',margin:'0 0 16px'}}>
+              Ao confirmar, a ponte será registrada como Recesso Coletivo e poderá ser
+              aplicada para todos os funcionários em <b>RH → Recessos & Pontes</b>.
+            </p>
+            <div style={{display:'flex',justifyContent:'flex-end',gap:8}}>
+              <button onClick={()=>{setModal(null);setPendPonte(null);}}
+                style={{padding:'7px 16px',borderRadius:8,border:'1px solid #E5E7EB',
+                  background:'#fff',cursor:'pointer',fontSize:13}}>Cancelar</button>
+              <button onClick={confirmarPonte}
+                style={{padding:'7px 18px',borderRadius:8,border:'none',
+                  background:'#F97316',color:'#fff',cursor:'pointer',fontSize:13,fontWeight:600}}>
+                ✓ Confirmar Ponte
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {% /* Modal feriado */ %}
+      {(modal==='feriado'||modal==='ponte') && (
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.4)',display:'flex',
+          alignItems:'center',justifyContent:'center',zIndex:1000}}>
+          <div style={{background:'#fff',borderRadius:14,width:500,padding:24,
+            boxShadow:'0 20px 60px rgba(0,0,0,.2)'}}>
+            <h3 style={{margin:'0 0 16px',fontSize:16,fontWeight:700}}>
+              {modal==='ponte' ? '🌉 Registrar Ponte' : '📅 Adicionar Feriado'}
+            </h3>
+            <div style={{display:'grid',gap:12}}>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+                <div><label style={{fontSize:11,fontWeight:600,color:'#6B7280',
+                  textTransform:'uppercase',display:'block',marginBottom:4}}>Data *</label>
+                  <input type='date' value={form.date}
+                    onChange={e=>setForm(f=>({...f,date:e.target.value}))}
+                    style={{width:'100%',border:'1px solid #E5E7EB',borderRadius:6,
+                      padding:'6px 10px',fontSize:13,outline:'none'}}/>
+                </div>
+                {modal==='feriado' && (
+                  <div><label style={{fontSize:11,fontWeight:600,color:'#6B7280',
+                    textTransform:'uppercase',display:'block',marginBottom:4}}>Tipo</label>
+                    <select value={form.type}
+                      onChange={e=>setForm(f=>({...f,type:e.target.value}))}
+                      style={{width:'100%',border:'1px solid #E5E7EB',borderRadius:6,
+                        padding:'6px 10px',fontSize:13,outline:'none'}}>
+                      <option value='NACIONAL'>Nacional</option>
+                      <option value='ESTADUAL'>Estadual</option>
+                      <option value='MUNICIPAL'>Municipal</option>
+                      <option value='FACULTATIVO'>Facultativo</option>
+                    </select>
+                  </div>
+                )}
+              </div>
+              <div><label style={{fontSize:11,fontWeight:600,color:'#6B7280',
+                textTransform:'uppercase',display:'block',marginBottom:4}}>Nome *</label>
+                <input type='text' value={form.name}
+                  onChange={e=>setForm(f=>({...f,name:e.target.value}))}
+                  placeholder={modal==='ponte'?'Ex: Ponte Corpus Christi':'Ex: Aniversário de Curitiba'}
+                  style={{width:'100%',border:'1px solid #E5E7EB',borderRadius:6,
+                    padding:'6px 10px',fontSize:13,outline:'none',boxSizing:'border-box' as const}}/>
+              </div>
+              {/* Localidade — aparece para Estadual e Municipal */}
+              {modal==='feriado' && ['ESTADUAL','MUNICIPAL'].includes(form.type) && (
+                <div>
+                  <label style={{fontSize:11,fontWeight:600,color:'#6B7280',
+                    textTransform:'uppercase',display:'block',marginBottom:4}}>Localidade</label>
+                  <div style={{display:'grid',
+                    gridTemplateColumns:form.type==='MUNICIPAL'?'120px 1fr':'1fr',gap:8}}>
+                    <select value={form.state}
+                      onChange={e=>setForm(f=>({...f,state:e.target.value}))}
+                      style={{border:'1px solid #E5E7EB',borderRadius:6,
+                        padding:'6px 10px',fontSize:13,outline:'none'}}>
+                      <option value=''>UF</option>
+                      {['AC','AL','AM','AP','BA','CE','DF','ES','GO','MA','MG','MS','MT','PA','PB','PE','PI','PR','RJ','RN','RO','RR','RS','SC','SE','SP','TO'].map((uf:string)=>(
+                        <option key={uf} value={uf}>{uf}</option>
+                      ))}}
+                    </select>
+                    {form.type==='MUNICIPAL' && (
+                      <input type='text' value={form.city}
+                        onChange={e=>setForm(f=>({...f,city:e.target.value}))}
+                        placeholder='Nome do município'
+                        style={{border:'1px solid #E5E7EB',borderRadius:6,
+                          padding:'6px 10px',fontSize:13,outline:'none'}}/>
+                    )}
+                  </div>
+                  <div style={{fontSize:11,color:'#9CA3AF',marginTop:4}}>
+                    {form.type==='ESTADUAL'
+                      ? 'Aparecerá para empresas no estado selecionado'
+                      : 'Aparecerá para empresas no município selecionado'}
+                  </div>
+                </div>
+              )}
+              {modal==='feriado' && (
+                <label style={{display:'flex',alignItems:'center',gap:8,fontSize:13,cursor:'pointer'}}>
+                  <input type='checkbox' checked={form.recurring}
+                    onChange={e=>setForm(f=>({...f,recurring:e.target.checked}))}/>
+                  Recorrente (repete todo ano)
+                </label>
+              )}
+            </div>
+            <div style={{display:'flex',justifyContent:'flex-end',gap:8,marginTop:20}}>
+              <button onClick={()=>setModal(null)}
+                style={{padding:'7px 16px',borderRadius:8,border:'1px solid #E5E7EB',
+                  background:'#fff',cursor:'pointer',fontSize:13}}>Cancelar</button>
+              <button onClick={modal==='ponte'?salvarPonte:salvarFeriado}
+                disabled={!form.date||!form.name}
+                style={{padding:'7px 18px',borderRadius:8,border:'none',
+                  background:modal==='ponte'?'#F97316':'#6C63FF',
+                  color:'#fff',cursor:'pointer',fontSize:13,fontWeight:600}}>
+                {modal==='ponte' ? 'Registrar Ponte' : 'Salvar Feriado'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {tip && (
         <div style={{position:'fixed',top:tip.y,left:tip.x,background:'rgba(0,0,0,.85)',
