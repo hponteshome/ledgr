@@ -716,3 +716,34 @@ menos de 6 cards, vai sobrar espaco vazio na ultima linha (cosmetico, ajustar se
 ### Usuarios de teste (recap)
 - Visualizador Teste: visualizador.teste@ledgr.local / Visualizador@123 (email corrigido nesta sessao), profile Visualizador (read:true,write:false,delete:false), id fb6d4847-9498-4adc-a92e-ba7a79d6294f.
 - Operador Teste: operador.teste@ledgr.local / Operador@123, profile Operador (read:true,write:true,delete:false), id 06dca0e7-44ae-41aa-92b3-903c4af63cfa.
+
+## Sessao 2026-06-18 — HR/eSocial Completo
+
+### Entregue nesta sessao
+- eSocial 100% completo: S-2190, S-1202, S-2220, S-1070, S-2298, S-2240, S-2210, S-1210, S-1200 TX, S-1299, S-2230, S-2299, S-2200, S-2205
+- Certificados: badge e-CPF/e-CNPJ automatico pelo subject
+- Schema HR: TipoHoraBH, BancoHoras (mult noturno/FDS/feriado), PeriodoAquisitivoFerias, ProgramacaoFerias, DecimoTerceiro, RaisDeclaracao, RaisVinculo
+- BancoHorasService completo: creditar (com tipo hora + multiplicador automatico), debitar, ajustar, configurar
+- FeriasService: inicializarPeriodos, calcularFerias (INSS progressivo + IRRF Lei 15.270), agendar (ate 3 parcelas), aviso PDF, recibo PDF
+- FeriasController: endpoints completos incluindo /hr/ferias/funcionarios (filtra demissionarios via Prisma)
+- FeriasPage: lista funcionarios ativos, periodos aquisitivos com status, agendamento com preview do calculo, Aviso/Recibo PDF
+
+### Pendente HR
+- 13o Salario (DecimoTerceiroService + pagina)
+- RAIS (RaisService + pagina)
+- DCTFWeb (espelho mensal)
+
+### PROXIMO: Recesso Coletivo + Pontes de Feriado
+**Regra KPL:** pontes de feriados prolongados sao compensadas com ferias; recesso coletivo no fim de ano liquida o saldo.
+
+**O que precisar implementar:**
+1. Verificar model Holiday existente no schema (campos a confirmar)
+2. Model RecessoColetivo — define periodo de recesso para empresa inteira (ex: 23/12 a 02/01)
+   - Campos: companyId, dataInicio, dataFim, diasUteis, descricao, tipo (RECESSO|PONTE)
+3. Service RecessoService:
+   - criarRecesso(companyId, dto) — cria o recesso
+   - aplicarParaTodos(recessoId) — gera ProgramacaoFerias para TODOS os funcionarios ativos debitando o periodo aquisitivo disponivel
+   - gerarReciboLote(recessoId) — gera todos os recibos em ZIP
+4. Logica de escolha do periodo: usa o periodo aquisitivo mais antigo disponivel (DISPONIVEL) ou o atual (ABERTO se nao ha outro)
+5. Frontend: pagina de Recesso Coletivo com calendario e aplicacao em lote
+
