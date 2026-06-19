@@ -58,7 +58,7 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
         { path: '/app/hr/informe-rendimentos', label: 'Informe de Rendimentos', icon: FiFileText },
         { path: '/app/hr/esocial', label: 'eSocial', icon: FiFileText },
         { path: '/app/hr/ferias', label: 'Férias', icon: FiCalendar },
-        { path: '/app/hr/recesso', label: 'Recessos & Pontes', icon: FiSunrise },
+        { path: '/app/hr/recesso', label: 'Recessos & Pontes', icon: FiUmbrella },
         { path: '/app/hr/folha', label: 'Folha de Pagamento', icon: FiDollarSign },
       ],
     },
