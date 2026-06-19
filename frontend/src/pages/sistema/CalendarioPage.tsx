@@ -2,43 +2,48 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import api from '../../services/api';
 
-const fmtYMD = (d: Date) => {
-  const y = d.getFullYear();
-  const m = String(d.getMonth()+1).padStart(2,'0');
-  const day = String(d.getDate()).padStart(2,'0');
-  return `${y}-${m}-${day}`;
-};
+const toYMD = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const parseDate = (s: any): Date => new Date(String(s).slice(0,10) + 'T12:00:00');
+const fmtBR = (s: any) => parseDate(s).toLocaleDateString('pt-BR');
+
 const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
                'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-const DIAS_SEMANA = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+const SEMANA = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
 
-interface DayEvent {
-  label:  string;
-  color:  string;
-  bg:     string;
-  tipo:   string;
-  full?:  string;  // tooltip
-}
+const TYPE_COLOR: Record<string,{bg:string,fg:string}> = {
+  NACIONAL:    {bg:'#1D4ED8',fg:'#fff'},
+  ESTADUAL:    {bg:'#15803D',fg:'#fff'},
+  MUNICIPAL:   {bg:'#854D0E',fg:'#fff'},
+  FACULTATIVO: {bg:'#6B7280',fg:'#fff'},
+  JUDAICO:     {bg:'#7E22CE',fg:'#fff'},
+};
 
 export function CalendarioPage() {
   const now = new Date();
-  const [year,  setYear]  = useState(now.getFullYear());
-  const [month, setMonth] = useState(now.getMonth()); // 0-indexed
-  const [holidays,  setHolidays]  = useState<any[]>([]);
-  const [recessos,  setRecessos]  = useState<any[]>([]);
-  const [ferias,    setFerias]    = useState<any[]>([]);
-  const [loading,   setLoading]   = useState(false);
-  const [tooltip,   setTooltip]   = useState<{x:number,y:number,text:string}|null>(null);
+  const [year,    setYear]    = useState(now.getFullYear());
+  const [month,   setMonth]   = useState(now.getMonth());
+  const [holidays,setHolidays]= useState<any[]>([]);
+  const [recessos,setRecessos]= useState<any[]>([]);
+  const [ferias,  setFerias]  = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [tip,     setTip]     = useState<{x:number,y:number,t:string}|null>(null);
 
   const load = async () => {
     setLoading(true);
     try {
-      const [h, r, f] = await Promise.all([
-        api.get('/calendar/holidays', { params: { year } }),
-        api.get('/hr/recesso').catch(() => ({ data: [] })),
-        api.get('/hr/ferias/programacoes').catch(() => ({ data: [] })),
+      const [h,r,f] = await Promise.all([
+        api.get('/calendar/holidays', { params:{ year } }),
+        api.get('/hr/recesso').catch(()=>({data:[]})),
+        api.get('/hr/ferias/programacoes').catch(()=>({data:[]})),
       ]);
-      setHolidays(h.data ?? []);
+      // Deduplica feriados pelo par data+tipo
+      const seen = new Set<string>();
+      const deduped = (h.data ?? []).filter((x:any) => {
+        const k = String(x.date).slice(0,10) + '|' + x.type + '|' + x.name;
+        return seen.has(k) ? false : (seen.add(k), true);
+      });
+      setHolidays(deduped);
       setRecessos(r.data ?? []);
       setFerias(f.data ?? []);
     } finally { setLoading(false); }
@@ -46,80 +51,85 @@ export function CalendarioPage() {
 
   useEffect(() => { load(); }, [year]);
 
-  // ── Monta mapa de eventos por dia ───────────────────────────────────────
-  const eventMap = useMemo<Record<string, DayEvent[]>>(() => {
-    const map: Record<string, DayEvent[]> = {};
-    const add = (ymd: string, ev: DayEvent) => {
-      if (!map[ymd]) map[ymd] = [];
-      map[ymd].push(ev);
+  const importar = async () => {
+    setLoading(true);
+    try {
+      const r = await api.post('/calendar/holidays/import/' + year);
+      alert(`Importados ${r.data.imported ?? 0} feriados de ${year}`);
+      await load();
+    } catch(e:any) {
+      alert('Erro: ' + (e?.response?.data?.message ?? e.message));
+      setLoading(false);
+    }
+  };
+
+  // ── Mapa de eventos por dia ──────────────────────────────────────────────
+  const evMap = useMemo(() => {
+    const map: Record<string, {label:string,bg:string,fg:string,tip:string}[]> = {};
+    const add = (ymd:string, ev:{label:string,bg:string,fg:string,tip:string}) => {
+      (map[ymd] = map[ymd] ?? []).push(ev);
     };
 
-    // Feriados
-    holidays.forEach((h: any) => {
-      const d = new Date(h.date + 'T12:00:00Z');
-      const ymd = fmtYMD(d);
-      const dow = d.getDay();
-      const colors: Record<string,{bg:string,color:string}> = {
-        NACIONAL:    {bg:'#1D4ED8',color:'#fff'},
-        ESTADUAL:    {bg:'#15803D',color:'#fff'},
-        MUNICIPAL:   {bg:'#854D0E',color:'#fff'},
-        FACULTATIVO: {bg:'#6B7280',color:'#fff'},
-        JUDAICO:     {bg:'#7E22CE',color:'#fff'},
-      };
-      const c = colors[h.type] ?? {bg:'#374151',color:'#fff'};
-      add(ymd, { label: h.name, bg: c.bg, color: c.color, tipo: 'feriado',
-                 full: `${h.name} (${h.type})` });
+    // Dias cobertos por recessos (para nao duplicar sugestao)
+    const recessoDays = new Set<string>();
+    recessos.forEach((r:any) => {
+      const cur = parseDate(r.dataInicio);
+      const fim = parseDate(r.dataFim);
+      while (cur <= fim) { recessoDays.add(toYMD(cur)); cur.setDate(cur.getDate()+1); }
+    });
 
-      // Sugere ponte automaticamente
+    // Feriados + pontes sugeridas
+    holidays.forEach((h:any) => {
+      const d   = parseDate(h.date);
+      const ymd = toYMD(d);
+      const dow = d.getDay();
+      const c   = TYPE_COLOR[h.type] ?? {bg:'#374151',fg:'#fff'};
+      add(ymd, { label: h.name, bg: c.bg, fg: c.fg, tip: `${h.name} — ${h.type}` });
+
       if (['NACIONAL','ESTADUAL','FACULTATIVO'].includes(h.type)) {
-        if (dow === 4) { // quinta → sexta
+        if (dow === 4) {           // Quinta -> ponte na Sexta
           const fri = new Date(d); fri.setDate(fri.getDate()+1);
-          add(fmtYMD(fri), { label:'🌉 Ponte sugerida', bg:'#FED7AA', color:'#9A3412',
-            tipo:'ponte-sugerida', full:`Ponte sugerida após ${h.name}` });
+          const fYMD = toYMD(fri);
+          if (!recessoDays.has(fYMD)) {
+            add(fYMD, { label:'🌉 Ponte sugerida', bg:'#FED7AA', fg:'#9A3412',
+              tip:`Ponte sugerida (${h.name} cai na quinta)` });
+          }
         }
-        if (dow === 2) { // terça → segunda
+        if (dow === 2) {           // Terca -> ponte na Segunda
           const mon = new Date(d); mon.setDate(mon.getDate()-1);
-          add(fmtYMD(mon), { label:'🌉 Ponte sugerida', bg:'#FED7AA', color:'#9A3412',
-            tipo:'ponte-sugerida', full:`Ponte sugerida antes de ${h.name}` });
+          const mYMD = toYMD(mon);
+          if (!recessoDays.has(mYMD)) {
+            add(mYMD, { label:'🌉 Ponte sugerida', bg:'#FED7AA', fg:'#9A3412',
+              tip:`Ponte sugerida (${h.name} cai na terça)` });
+          }
         }
       }
     });
 
-    // Recessos e Pontes (por periodo)
-    recessos.forEach((r: any) => {
-      const ini = new Date(r.dataInicio + 'T12:00:00Z');
-      const fim = new Date(r.dataFim   + 'T12:00:00Z');
-      const cur = new Date(ini);
+    // Recessos e pontes registrados
+    recessos.forEach((r:any) => {
+      const cur = parseDate(r.dataInicio);
+      const fim = parseDate(r.dataFim);
       const isPonte = r.tipo === 'PONTE';
       while (cur <= fim) {
-        const ymd = fmtYMD(cur);
-        // Remove sugestao de ponte se ja registrada
-        if (map[ymd]) map[ymd] = map[ymd].filter(e => e.tipo !== 'ponte-sugerida');
-        add(ymd, {
+        add(toYMD(cur), {
           label: isPonte ? `🌉 ${r.descricao}` : `🏖️ ${r.descricao}`,
-          bg:    isPonte ? '#F97316' : '#8B5CF6',
-          color: '#fff',
-          tipo:  isPonte ? 'ponte' : 'recesso',
-          full:  `${r.descricao} (${r.status})`,
+          bg:    isPonte ? '#F97316' : '#8B5CF6', fg: '#fff',
+          tip:   `${r.descricao} — ${r.status}`,
         });
         cur.setDate(cur.getDate()+1);
       }
     });
 
-    // Ferias (por periodo)
-    ferias.forEach((f: any) => {
-      const ini = new Date(f.dataInicio + 'T12:00:00Z');
-      const fim = new Date(f.dataFim   + 'T12:00:00Z');
-      const cur = new Date(ini);
-      const nome = f.employee?.fullName?.split(' ')[0] ?? 'Férias';
+    // Ferias
+    ferias.forEach((f:any) => {
+      const cur = parseDate(f.dataInicio);
+      const fim = parseDate(f.dataFim);
+      const nome = (f.employee?.fullName ?? 'Férias').split(' ')[0];
       while (cur <= fim) {
-        const ymd = fmtYMD(cur);
-        add(ymd, {
-          label: `🌴 ${nome}`,
-          bg:    '#059669',
-          color: '#fff',
-          tipo:  'ferias',
-          full:  `Férias: ${f.employee?.fullName} (${f.diasFerias}d)`,
+        add(toYMD(cur), {
+          label: `🌴 ${nome}`, bg: '#059669', fg: '#fff',
+          tip: `Férias: ${f.employee?.fullName} — ${f.diasFerias}d`,
         });
         cur.setDate(cur.getDate()+1);
       }
@@ -128,151 +138,122 @@ export function CalendarioPage() {
     return map;
   }, [holidays, recessos, ferias]);
 
-  // ── Gera os dias do mes no grid ─────────────────────────────────────────
-  const calDays = useMemo(() => {
-    const days: (Date|null)[] = [];
-    const first = new Date(year, month, 1);
-    const last  = new Date(year, month+1, 0);
-    // Preenche dias vazios no inicio (semana comeca domingo)
-    for (let i = 0; i < first.getDay(); i++) days.push(null);
-    for (let d = 1; d <= last.getDate(); d++) days.push(new Date(year, month, d));
-    // Preenche dias vazios no fim
-    while (days.length % 7 !== 0) days.push(null);
-    return days;
+  // ── Grade do mes ─────────────────────────────────────────────────────────
+  const grade = useMemo(() => {
+    const cells: (Date|null)[] = [];
+    const ini = new Date(year, month, 1);
+    const fim = new Date(year, month+1, 0);
+    for (let i=0; i<ini.getDay(); i++) cells.push(null);
+    for (let d=1; d<=fim.getDate(); d++) cells.push(new Date(year,month,d));
+    while (cells.length % 7) cells.push(null);
+    return cells;
   }, [year, month]);
 
-  const prevMonth = () => {
-    if (month === 0) { setMonth(11); setYear(y => y-1); }
-    else setMonth(m => m-1);
-  };
-  const nextMonth = () => {
-    if (month === 11) { setMonth(0); setYear(y => y+1); }
-    else setMonth(m => m+1);
-  };
+  const hoje = toYMD(new Date());
+  const prev = () => month===0 ? (setMonth(11), setYear(y=>y-1)) : setMonth(m=>m-1);
+  const next = () => month===11 ? (setMonth(0),  setYear(y=>y+1)) : setMonth(m=>m+1);
 
-  const isToday = (d: Date) => {
-    const t = new Date();
-    return d.getDate()===t.getDate() && d.getMonth()===t.getMonth() && d.getFullYear()===t.getFullYear();
-  };
+  const LEGENDA = [
+    {bg:'#1D4ED8',label:'Feriado Nacional'},
+    {bg:'#15803D',label:'Estadual'},
+    {bg:'#FED7AA',label:'Ponte Sugerida',fg:'#9A3412'},
+    {bg:'#F97316',label:'Ponte Registrada'},
+    {bg:'#8B5CF6',label:'Recesso'},
+    {bg:'#059669',label:'Férias'},
+  ];
 
   return (
-    <div style={{fontFamily:'var(--font-sans,system-ui)',fontSize:14,color:'#111',
-      display:'flex',flexDirection:'column',height:'100%'}}>
+    <div style={{fontFamily:'system-ui',display:'flex',flexDirection:'column',height:'100%'}}>
 
-      {/* ── Navegacao ─────────────────────────────────────────────────────── */}
-      <div style={{background:'#fff',borderBottom:'0.5px solid #E5E7EB',
-        padding:'12px 24px',display:'flex',alignItems:'center',gap:16,flexShrink:0}}>
-        <span style={{fontSize:11,fontWeight:600,color:'#6C63FF'}}>◆ SISTEMA</span>
-        <button onClick={prevMonth}
-          style={{width:28,height:28,border:'0.5px solid #E5E7EB',borderRadius:6,
-            background:'#fff',cursor:'pointer',fontSize:16}}>‹</button>
-        <h1 style={{fontSize:18,fontWeight:700,color:'#111',margin:0,minWidth:220,textAlign:'center'}}>
+      {/* Barra superior */}
+      <div style={{background:'#fff',borderBottom:'0.5px solid #E5E7EB',padding:'10px 20px',
+        display:'flex',alignItems:'center',gap:10,flexShrink:0,flexWrap:'wrap'}}>
+        <span style={{fontSize:11,fontWeight:700,color:'#6C63FF'}}>◆ SISTEMA</span>
+        <button onClick={prev} style={{width:26,height:26,border:'1px solid #E5E7EB',borderRadius:6,
+          background:'#fff',cursor:'pointer',fontSize:15,lineHeight:1}}>‹</button>
+        <span style={{fontSize:16,fontWeight:700,minWidth:180,textAlign:'center'}}>
           {MESES[month]} {year}
-        </h1>
-        <button onClick={nextMonth}
-          style={{width:28,height:28,border:'0.5px solid #E5E7EB',borderRadius:6,
-            background:'#fff',cursor:'pointer',fontSize:16}}>›</button>
+        </span>
+        <button onClick={next} style={{width:26,height:26,border:'1px solid #E5E7EB',borderRadius:6,
+          background:'#fff',cursor:'pointer',fontSize:15,lineHeight:1}}>›</button>
         <button onClick={()=>{setMonth(now.getMonth());setYear(now.getFullYear());}}
-          style={{padding:'5px 12px',border:'0.5px solid #E5E7EB',borderRadius:6,
+          style={{padding:'4px 10px',border:'1px solid #E5E7EB',borderRadius:6,
             background:'#fff',cursor:'pointer',fontSize:12}}>Hoje</button>
-        {loading && <span style={{fontSize:12,color:'#9CA3AF'}}>Carregando...</span>}
-
+        <button onClick={importar} disabled={loading}
+          style={{padding:'5px 14px',border:'none',borderRadius:6,
+            background:'#6C63FF',color:'#fff',cursor:'pointer',fontSize:12,fontWeight:600,
+            opacity:loading?0.6:1}}>
+          {loading ? 'Aguarde...' : `⬇ Gerar Calendário ${year}`}
+        </button>
         {/* Legenda */}
-        <div style={{marginLeft:'auto',display:'flex',gap:10,alignItems:'center',flexWrap:'wrap'}}>
-          {[
-            {bg:'#1D4ED8',label:'Feriado Nacional'},
-            {bg:'#15803D',label:'Estadual'},
-            {bg:'#F97316',label:'Ponte Registrada'},
-            {bg:'#FED7AA',label:'Ponte Sugerida',color:'#9A3412'},
-            {bg:'#8B5CF6',label:'Recesso'},
-            {bg:'#059669',label:'Férias'},
-          ].map(l=>(
+        <div style={{marginLeft:'auto',display:'flex',gap:10,flexWrap:'wrap'}}>
+          {LEGENDA.map(l=>(
             <span key={l.label} style={{display:'flex',alignItems:'center',gap:4,fontSize:11}}>
-              <span style={{width:10,height:10,borderRadius:2,background:l.bg,display:'inline-block'}}/>
+              <span style={{width:10,height:10,borderRadius:2,background:l.bg,
+                border:l.bg==='#FED7AA'?'1px solid #F97316':'none',display:'inline-block'}}/>
               <span style={{color:'#6B7280'}}>{l.label}</span>
             </span>
           ))}
         </div>
       </div>
 
-      {/* ── Grid do calendario ─────────────────────────────────────────────── */}
-      <div style={{flex:1,overflow:'auto',padding:'0 24px 24px'}}>
-        {/* Cabecalho dos dias da semana */}
+      {/* Grade */}
+      <div style={{flex:1,overflow:'auto',padding:'0 20px 20px'}}>
+        {/* Dias da semana */}
         <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',
-          borderBottom:'0.5px solid #E5E7EB',background:'#F9FAFB'}}>
-          {DIAS_SEMANA.map(d=>(
-            <div key={d} style={{padding:'8px 0',textAlign:'center',fontSize:11,
-              fontWeight:600,color:d==='Dom'?'#EF4444':d==='Sáb'?'#3B82F6':'#6B7280',
-              textTransform:'uppercase',letterSpacing:'.5px'}}>
+          background:'#F9FAFB',borderBottom:'1px solid #E5E7EB'}}>
+          {SEMANA.map((d,i)=>(
+            <div key={d} style={{padding:'8px 0',textAlign:'center',fontSize:11,fontWeight:600,
+              color:i===0?'#EF4444':i===6?'#3B82F6':'#6B7280',textTransform:'uppercase'}}>
               {d}
             </div>
           ))}
         </div>
-
-        {/* Grid de dias */}
         <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',
-          border:'0.5px solid #E5E7EB',borderTop:'none'}}>
-          {calDays.map((d, idx) => {
-            if (!d) return (
-              <div key={`e${idx}`} style={{minHeight:100,background:'#FAFAFA',
-                borderRight:'0.5px solid #F0F0F0',borderBottom:'0.5px solid #F0F0F0'}}/>
-            );
-            const ymd    = fmtYMD(d);
-            const events = eventMap[ymd] ?? [];
-            const dow    = d.getDay();
-            const isWknd = dow===0 || dow===6;
-            const today  = isToday(d);
+          border:'1px solid #E5E7EB',borderTop:'none'}}>
+          {grade.map((d,idx)=> {
+            if (!d) return <div key={`x${idx}`} style={{minHeight:90,background:'#F9FAFB',
+              borderRight:'1px solid #E5E7EB',borderBottom:'1px solid #E5E7EB'}}/>;
+            const ymd  = toYMD(d);
+            const evs  = evMap[ymd] ?? [];
+            const dow  = d.getDay();
+            const isHj = ymd === hoje;
             return (
-              <div key={ymd}
-                style={{minHeight:100,padding:'4px 6px',
-                  borderRight:'0.5px solid #E5E7EB',
-                  borderBottom:'0.5px solid #E5E7EB',
-                  background:today?'#FAFAFF':isWknd?'#FAFAFA':'#fff',
-                  position:'relative'}}>
-                {/* Numero do dia */}
-                <div style={{
-                  width:24,height:24,borderRadius:'50%',display:'flex',
-                  alignItems:'center',justifyContent:'center',marginBottom:3,
-                  background:today?'#6C63FF':'transparent',
-                  color:today?'#fff':isWknd?'#9CA3AF':'#374151',
-                  fontSize:13,fontWeight:today?700:400,
-                }}>
+              <div key={ymd} style={{minHeight:90,padding:'4px 5px',
+                borderRight:'1px solid #E5E7EB',borderBottom:'1px solid #E5E7EB',
+                background: isHj ? '#FAFAFF' : (dow===0||dow===6) ? '#FAFAFA' : '#fff'}}>
+                <div style={{width:22,height:22,borderRadius:'50%',display:'flex',
+                  alignItems:'center',justifyContent:'center',marginBottom:2,
+                  background:isHj?'#6C63FF':'transparent',
+                  color:isHj?'#fff':dow===0?'#EF4444':dow===6?'#3B82F6':'#374151',
+                  fontSize:12,fontWeight:isHj?700:400}}>
                   {d.getDate()}
                 </div>
-                {/* Eventos */}
-                {events.slice(0,3).map((ev,i)=>(
-                  <div key={i}
-                    onMouseEnter={e=>setTooltip({
-                      x:(e.target as HTMLElement).getBoundingClientRect().left,
-                      y:(e.target as HTMLElement).getBoundingClientRect().top-30,
-                      text:ev.full??ev.label
-                    })}
-                    onMouseLeave={()=>setTooltip(null)}
-                    style={{
-                      fontSize:10,fontWeight:600,padding:'1px 5px',borderRadius:3,
-                      background:ev.bg,color:ev.color??'#fff',
-                      marginBottom:2,overflow:'hidden',whiteSpace:'nowrap',
-                      textOverflow:'ellipsis',cursor:'default',
-                    }}>
+                {evs.slice(0,3).map((ev,i)=>(
+                  <div key={i} title={ev.tip}
+                    onMouseEnter={e=>{
+                      const r=(e.target as HTMLElement).getBoundingClientRect();
+                      setTip({x:r.left,y:r.top-32,t:ev.tip});
+                    }}
+                    onMouseLeave={()=>setTip(null)}
+                    style={{fontSize:10,fontWeight:600,padding:'1px 4px',borderRadius:3,
+                      background:ev.bg,color:ev.fg,marginBottom:2,
+                      overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis',cursor:'default'}}>
                     {ev.label}
                   </div>
                 ))}
-                {events.length > 3 && (
-                  <div style={{fontSize:10,color:'#6B7280'}}>+{events.length-3} mais</div>
-                )}
+                {evs.length>3 && <div style={{fontSize:9,color:'#9CA3AF'}}>+{evs.length-3}</div>}
               </div>
             );
           })}
         </div>
       </div>
 
-      {/* Tooltip */}
-      {tooltip && (
-        <div style={{position:'fixed',top:tooltip.y,left:tooltip.x,
-          background:'#111',color:'#fff',fontSize:11,padding:'4px 10px',
-          borderRadius:6,zIndex:9999,pointerEvents:'none',maxWidth:280,
-          boxShadow:'0 4px 12px rgba(0,0,0,.2)'}}>
-          {tooltip.text}
+      {tip && (
+        <div style={{position:'fixed',top:tip.y,left:tip.x,background:'rgba(0,0,0,.85)',
+          color:'#fff',fontSize:11,padding:'4px 10px',borderRadius:6,zIndex:9999,
+          pointerEvents:'none',maxWidth:260}}>
+          {tip.t}
         </div>
       )}
     </div>
