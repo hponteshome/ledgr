@@ -51,6 +51,12 @@ model User {
   level               Int       @default(0) @map("level")
   status              String    @default("active") @map("status") @db.VarChar
   personId            String?   @unique @map("person_id") @db.Uuid
+  // ── Auto-cadastro e aprovacao ──────────────────────────────────────
+  requestedAt         DateTime? @map("requested_at") @db.Timestamp(6)
+  pendingFlags        String?   @map("pending_flags") @db.VarChar(100) // OK|CPF_NAO_ENCONTRADO|DIVERGENCIA_NOME
+  reviewedAt          DateTime? @map("reviewed_at") @db.Timestamp(6)
+  reviewedById        String?   @map("reviewed_by_id") @db.Uuid
+  rejectionReason     String?   @map("rejection_reason") @db.VarChar(500)
   createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
   deletedAt           DateTime? @map("deleted_at") @db.Timestamp(6)

@@ -49,6 +49,65 @@ async findByDocument(document: string) {
 
 
   
+
+  // ── Gestao de usuarios pendentes ───────────────────────────────────────────
+  async listarPendentes() {
+    return this.prisma.user.findMany({
+      where:   { status: 'PENDENTE', deletedAt: null },
+      include: { person: true, profile: true },
+      orderBy: { requestedAt: 'asc' },
+    });
+  }
+
+  async contarPendentes(): Promise<number> {
+    return this.prisma.user.count({ where: { status: 'PENDENTE', deletedAt: null } });
+  }
+
+  async aprovarUsuario(id: string, dto: {
+    profileId: string; level: number; companyIds: string[];
+  }, adminId: string) {
+    const user = await this.prisma.user.findUniqueOrThrow({ where: { id } });
+    await this.prisma.$transaction(async (tx: any) => {
+      await tx.user.update({
+        where: { id },
+        data:  {
+          status:       'active',
+          isActive:     true,
+          profileId:    dto.profileId,
+          level:        dto.level,
+          reviewedAt:   new Date(),
+          reviewedById: adminId,
+        },
+      });
+      // Vincula empresas
+      if (dto.companyIds?.length) {
+        await tx.userCompany.createMany({
+          data: dto.companyIds.map((cid: string) => ({
+            userId:    id,
+            companyId: cid,
+            role:      'LEDGR_USER',
+          })),
+          skipDuplicates: true,
+        });
+      }
+    });
+    return { id, status: 'active', message: 'Usuário aprovado com sucesso.' };
+  }
+
+  async rejeitarUsuario(id: string, motivo: string, adminId: string) {
+    await this.prisma.user.update({
+      where: { id },
+      data:  {
+        status:          'REJEITADO',
+        isActive:        false,
+        reviewedAt:      new Date(),
+        reviewedById:    adminId,
+        rejectionReason: motivo,
+      },
+    });
+    return { id, status: 'REJEITADO' };
+  }
+
   async updateUser(id: string, data: any, adminId: string) {
     const oldUser = await this.prisma.user.findUnique({ 
       where: { id },

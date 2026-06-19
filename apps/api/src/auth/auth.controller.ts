@@ -4,6 +4,7 @@ import {
   Controller,
   Post,
   Get,
+  Body,
   UseGuards,
   Request,
   UnauthorizedException,
@@ -57,5 +58,20 @@ export class AuthController {
   @Get('debug-user/:email')
   async debugUser(@Param('email') email: string) {
     return this.authService.debugUser(email);
+  }
+
+  @Post('register')
+  async register(@Body() body: any) {
+    try {
+      return await this.authService.register({
+        document: body.document,
+        fullName: body.fullName,
+        email:    body.email,
+        phone:    body.phone,
+        password: body.password,
+      });
+    } catch(e: any) {
+      throw new (require('@nestjs/common').BadRequestException)(e.message);
+    }
   }
 }
