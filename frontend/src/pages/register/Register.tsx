@@ -1,182 +1,129 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { FiUser, FiMail, FiLock, FiArrowRight, FiCheckCircle } from 'react-icons/fi';
-import api from '../services/api';
+import { FiUser, FiMail, FiLock, FiPhone, FiFileText, FiArrowRight, FiCheckCircle } from 'react-icons/fi';
+import api from '../../services/api';
 
 export const Register: React.FC = () => {
   const navigate = useNavigate();
+  const [form, setForm] = useState({document:'',fullName:'',email:'',phone:'',password:'',confirm:''});
+  const [loading,  setLoading]  = useState(false);
+  const [error,    setError]    = useState('');
+  const [success,  setSuccess]  = useState('');
 
-  // Form States
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-
-  // UI States
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [isSuccess, setIsSuccess] = useState(false);
-
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-
-    // basic validation
-    if (password !== confirmPassword) {
-      setError('Passwords do not match.');
-      return;
-    }
-
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters long.');
-      return;
-    }
-
-    setIsLoading(true);
-
-    try {
-      // Sends data to the backend (Mapping name to 'nome' if your API still expects PT-BR)
-      await api.post('/auth/register', {
-        nome: name,
-        email,
-        senha: password
-      });
-
-      setIsSuccess(true);
-      console.log('✅ [Register] User created successfully:', email);
-
-      // Redirect to login after a brief delay
-      setTimeout(() => {
-        navigate('/login');
-      }, 3000);
-
-    } catch (err: any) {
-      console.error('❌ [Register] Error:', err.response?.data || err.message);
-      setError(err.response?.data?.message || 'Failed to create account. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
+  const fmtCPF = (v:string) => {
+    const d = v.replace(/\D/g,'').slice(0,11);
+    return d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/,'$1.$2.$3-$4')
+            .replace(/(\d{3})(\d{3})(\d{3})/,'$1.$2.$3')
+            .replace(/(\d{3})(\d{3})/,'$1.$2');
   };
 
-  if (isSuccess) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
-        <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center border border-green-100">
-          <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6">
-            <FiCheckCircle size={40} />
-          </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Account Created!</h2>
-          <p className="text-gray-600 mb-6">
-            Your account has been successfully registered. You are being redirected to the login page...
-          </p>
-          <div className="w-full bg-gray-100 h-1.5 rounded-full overflow-hidden">
-            <div className="bg-green-500 h-full animate-[progress_3s_ease-in-out]" style={{ width: '100%' }}></div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const submit = async(e:React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    if (form.password !== form.confirm) { setError('Senhas não conferem.'); return; }
+    if (form.password.length < 6) { setError('Senha mínima: 6 caracteres.'); return; }
+    const cpf = form.document.replace(/\D/g,'');
+    if (cpf.length !== 11) { setError('CPF inválido.'); return; }
+    setLoading(true);
+    try {
+      const r = await api.post('/auth/register', {
+        document: cpf, fullName: form.fullName,
+        email: form.email, phone: form.phone, password: form.password,
+      });
+      setSuccess(r.data.message || 'Cadastro enviado! Aguarde aprovação do administrador.');
+      setTimeout(() => navigate('/'), 4000);
+    } catch(e:any) {
+      setError(e?.response?.data?.message || 'Erro ao cadastrar. Tente novamente.');
+    } finally { setLoading(false); }
+  };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center p-6">
-      <div className="max-w-md w-full">
+    <div style={{minHeight:'100vh',background:'linear-gradient(135deg,#667eea 0%,#764ba2 100%)',
+      display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
+      <div style={{background:'#fff',borderRadius:16,width:'100%',maxWidth:460,
+        padding:40,boxShadow:'0 20px 60px rgba(0,0,0,0.2)'}}>
+
         {/* Logo */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-black tracking-tighter text-blue-600">LEDGR</h1>
-          <p className="text-gray-500 mt-2 font-medium">Create your management account</p>
+        <div style={{textAlign:'center',marginBottom:28}}>
+          <div style={{fontSize:30,fontWeight:900,color:'#6C63FF',letterSpacing:'-1px'}}>LEDGR</div>
+          <div style={{fontSize:14,color:'#6B7280',marginTop:4}}>Solicitar acesso ao sistema</div>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-xl shadow-blue-900/5 p-8 border border-gray-100">
-          <form onSubmit={handleRegister} className="space-y-5">
-
-            {/* Name Input */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5">Full Name</label>
-              <div className="relative">
-                <FiUser className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                <input
-                  type="text"
-                  required
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
-                  placeholder="John Doe"
-                />
-              </div>
-            </div>
-
-            {/* Email Input */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5">Email Address</label>
-              <div className="relative">
-                <FiMail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
-                  placeholder="name@company.com"
-                />
-              </div>
-            </div>
-
-            {/* Password Input */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5">Password</label>
-              <div className="relative">
-                <FiLock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                <input
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
-                  placeholder="••••••••"
-                />
-              </div>
-            </div>
-
-            {/* Confirm Password Input */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5">Confirm Password</label>
-              <div className="relative">
-                <FiLock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                <input
-                  type="password"
-                  required
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
-                  placeholder="••••••••"
-                />
-              </div>
-            </div>
-
+        {success ? (
+          <div style={{textAlign:'center',padding:'20px 0'}}>
+            <FiCheckCircle size={48} color="#15803D" style={{margin:'0 auto 12px'}}/>
+            <div style={{fontSize:15,fontWeight:600,color:'#15803D',marginBottom:8}}>{success}</div>
+            <div style={{fontSize:13,color:'#6B7280'}}>Redirecionando...</div>
+          </div>
+        ) : (
+          <form onSubmit={submit}>
             {error && (
-              <div className="bg-red-50 border border-red-100 text-red-600 text-sm p-3 rounded-lg font-medium flex items-center gap-2">
-                <span>⚠️</span> {error}
+              <div style={{background:'#FEF2F2',border:'1px solid #FCA5A5',borderRadius:8,
+                padding:'10px 14px',fontSize:13,color:'#DC2626',marginBottom:16}}>
+                {error}
               </div>
             )}
+            <div style={{display:'grid',gap:14}}>
+              {[
+                {icon:<FiFileText/>,label:'CPF *',field:'document',placeholder:'000.000.000-00',
+                  value:fmtCPF(form.document),maxLen:14},
+                {icon:<FiUser/>,label:'Nome Completo *',field:'fullName',
+                  placeholder:'Seu nome completo'},
+                {icon:<FiMail/>,label:'E-mail *',field:'email',type:'email',
+                  placeholder:'seu@email.com'},
+                {icon:<FiPhone/>,label:'Telefone',field:'phone',
+                  placeholder:'(00) 00000-0000'},
+                {icon:<FiLock/>,label:'Senha *',field:'password',type:'password',
+                  placeholder:'Mínimo 6 caracteres'},
+                {icon:<FiLock/>,label:'Confirmar Senha *',field:'confirm',type:'password',
+                  placeholder:'Repita a senha'},
+              ].map(f=>(
+                <div key={f.field}>
+                  <label style={{fontSize:12,fontWeight:600,color:'#374151',
+                    display:'block',marginBottom:4}}>{f.label}</label>
+                  <div style={{position:'relative'}}>
+                    <span style={{position:'absolute',left:12,top:'50%',
+                      transform:'translateY(-50%)',color:'#9CA3AF',fontSize:14}}>
+                      {f.icon}
+                    </span>
+                    <input
+                      type={(f as any).type||'text'}
+                      value={(f as any).value ?? (form as any)[f.field]}
+                      maxLength={(f as any).maxLen}
+                      onChange={e=>setForm(prev=>({...prev,[f.field]:
+                        f.field==='document'?e.target.value.replace(/\D/g,''):e.target.value}))}
+                      placeholder={f.placeholder}
+                      required={f.label.includes('*')}
+                      style={{width:'100%',border:'1px solid #E5E7EB',borderRadius:8,
+                        padding:'10px 14px 10px 36px',fontSize:14,outline:'none',
+                        boxSizing:'border-box'}}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
 
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl shadow-lg shadow-blue-200 transition-all flex items-center justify-center gap-2 disabled:bg-blue-400"
-            >
-              {isLoading ? 'Creating account...' : 'Create Account'}
-              {!isLoading && <FiArrowRight />}
+            <button type="submit" disabled={loading}
+              style={{width:'100%',marginTop:20,padding:'12px',borderRadius:10,border:'none',
+                background:'linear-gradient(135deg,#667eea,#764ba2)',color:'#fff',
+                fontSize:15,fontWeight:700,cursor:'pointer',opacity:loading?0.7:1,
+                display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
+              {loading ? 'Enviando...' : <><span>Solicitar Cadastro</span><FiArrowRight/></>}
             </button>
-          </form>
 
-          <div className="mt-8 text-center pt-6 border-t border-gray-100">
-            <p className="text-gray-500 text-sm">
-              Already have an account?{' '}
-              <Link to="/login" className="text-blue-600 font-bold hover:underline">
-                Sign In
+            <div style={{textAlign:'center',marginTop:16,fontSize:13,color:'#6B7280'}}>
+              Já tem conta?{' '}
+              <Link to="/" style={{color:'#6C63FF',fontWeight:600,textDecoration:'none'}}>
+                Fazer login
               </Link>
-            </p>
-          </div>
+            </div>
+          </form>
+        )}
+
+        <div style={{marginTop:20,padding:'12px 14px',background:'#F9FAFB',borderRadius:8,
+          fontSize:11,color:'#9CA3AF',lineHeight:1.5}}>
+          ℹ️ Seu cadastro será analisado por um administrador. Você será notificado quando aprovado.
+          O CPF será comparado com a base de Pessoas Físicas cadastradas no sistema.
         </div>
       </div>
     </div>
