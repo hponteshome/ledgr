@@ -394,15 +394,17 @@ export const Header: React.FC<{ sidebarOpen: boolean }> = ({ sidebarOpen }) => {
               <div className="flex items-center justify-between">
                 <label className="flex items-center gap-1 text-[10px] text-gray-600 cursor-pointer">
                   <input type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} className="w-3 h-3" />
-                  <span>Remember me</span>
+                  <span>Lembrar-me</span>
                 </label>
                 <button type="submit" disabled={isLoggingIn} className="px-2 py-1 text-[12px] bg-blue-600 text-white rounded-md font-semibold">
-                  {isLoggingIn ? '...' : 'Sign In'}
+                  {isLoggingIn ? '...' : 'Login'}
                 </button>
               </div>
-              <div style={{textAlign:'center',fontSize:11,marginTop:4}}>
-                <a href='/register' style={{color:'#6C63FF',fontWeight:600,textDecoration:'none',fontSize:11}}>
-                  Cadastrar-se
+              <div style={{textAlign:'center',marginTop:4}}>
+                <a href='/register'
+                  className='px-2 py-1 text-[12px] bg-purple-600 text-white rounded-md font-semibold'
+                  style={{textDecoration:'none',display:'inline-block'}}>
+                  Cadastrar
                 </a>
               </div>
             </form>
