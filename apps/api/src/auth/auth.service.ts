@@ -18,17 +18,41 @@ export class AuthService {
     return this.usersService.findByEmail(email);
   }
 
-  async register(registerDto: RegisterDto) {
-    const hashedPassword = await bcrypt.hash(registerDto.password, 10);
-    
-    const user = await this.usersService.create({
-      email: registerDto.email,
-      passwordHash: hashedPassword,
-      fullName: registerDto.fullName,
-    } as any);
+  async register(dto: {
+    document: string; fullName: string; email: string;
+    phone?: string; password: string;
+  }) {
+    const cleanCpf = dto.document.replace(/\D/g,'');
+    const exists = await this.prisma.user.findFirst({
+      where: { OR: [{ document: cleanCpf },{ email: dto.email.toLowerCase() }], deletedAt: null }
+    });
+    if (exists) throw new Error('CPF ou e-mail ja cadastrado.');
 
-    const { passwordHash, ...result } = user; 
-    return result;
+    const person = await this.prisma.person.findFirst({
+      where: { taxId: cleanCpf, deletedAt: null }
+    });
+    let pendingFlags = 'OK';
+    let personId: string | undefined;
+    if (!person) {
+      pendingFlags = 'CPF_NAO_ENCONTRADO';
+    } else {
+      personId = person.id;
+      const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+      if (norm(dto.fullName).split(' ')[0] !== norm(person.fullName ?? '').split(' ')[0])
+        pendingFlags = 'DIVERGENCIA_NOME';
+    }
+    const hash = await bcrypt.hash(dto.password, 10);
+    await this.prisma.user.create({
+      data: {
+        document: cleanCpf, documentType: 'CPF',
+        email: dto.email.toLowerCase(), passwordHash: hash,
+        fullName: dto.fullName, phone1: dto.phone,
+        status: 'PENDENTE', isActive: false, level: 0,
+        requestedAt: new Date(), pendingFlags,
+        ...(personId ? { personId } : {}),
+      },
+    });
+    return { status:'PENDENTE', pendingFlags, message:'Cadastro recebido. Aguarde aprovacao.' };
   }
 
   async validateUser(email: string, password: string): Promise<any> {
