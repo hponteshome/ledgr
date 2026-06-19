@@ -50,6 +50,8 @@ export class AuthController {
       id:       user.id,
       email:    user.email,
       fullName: user.fullName,
+      phone:    user.phone,
+      level:    user.level,
       profile:  user.profile ?? { id: null, permissions: {} },
     };
   }
@@ -64,11 +66,13 @@ export class AuthController {
   async register(@Body() body: any) {
     try {
       return await this.authService.register({
-        document: body.document,
-        fullName: body.fullName,
-        email:    body.email,
-        phone:    body.phone,
-        password: body.password,
+        document:     body.document,
+        documentType: body.documentType,
+        fullName:     body.fullName,
+        email:        body.email,
+        phone:        body.phone,
+        level:        body.level,
+        password:     body.password,
       });
     } catch(e: any) {
       throw new (require('@nestjs/common').BadRequestException)(e.message);

@@ -15,10 +15,30 @@ import { UserPen } from 'lucide-react';
 const DEV_SEED_VERSION = 'seed-v3-bcryptjs';
 const DEV_SEED_STORAGE_KEY = '@ledgr:dev_seed_confirmed';
 
+// ── Badge de usuarios pendentes (polling 60s) ─────────────────────────────
+function usePendentesCount(isMaster: boolean) {
+  const [count, setCount] = React.useState(0);
+  React.useEffect(() => {
+    if (!isMaster) return;
+    const fetch = async () => {
+      try {
+        const r = await api.get('/users/pendentes/count');
+        setCount(typeof r.data === 'number' ? r.data : 0);
+      } catch { /* silencioso */ }
+    };
+    fetch();
+    const t = setInterval(fetch, 60000);
+    return () => clearInterval(t);
+  }, [isMaster]);
+  return count;
+}
+
 export const Header: React.FC<{ sidebarOpen: boolean }> = ({ sidebarOpen }) => {
   const { user, signIn, signOut } = useAuth();
   // Extrai o nome do perfil corretamente (se for objeto, pega o name)
   const profileName = (user as any)?.profile?.name || (user as any)?.profile || 'Usuário';
+  const isMaster = profileName === 'Administrador Master' || (user as any)?.permissions?.all === true;
+  const pendentesCount = usePendentesCount(!!user && isMaster);
   const { companies, activeCompany, selectCompany } = useCompany();
   const [isCompanyOpen, setIsCompanyOpen] = useState(false);
   const [isMonthOpen, setIsMonthOpen] = useState(false);
@@ -383,6 +403,17 @@ export const Header: React.FC<{ sidebarOpen: boolean }> = ({ sidebarOpen }) => {
             </form>
           )}
 
+          {/* Badge pendentes */}
+          {isMaster && pendentesCount > 0 && (
+            <a href='/app/usuarios/pendentes'
+              style={{display:'flex',alignItems:'center',gap:6,padding:'5px 12px',
+                borderRadius:20,background:'#FEF3C7',color:'#92400E',
+                fontSize:12,fontWeight:700,textDecoration:'none',
+                border:'1px solid #FCD34D',marginRight:8,flexShrink:0}}>
+              <FiAlertTriangle size={13}/>
+              {pendentesCount} pendente{pendentesCount > 1 ? 's' : ''}
+            </a>
+          )}
           <div className="flex flex-col items-end text-right border-l border-gray-200 pl-4">
             <p className="text-sm font-bold text-gray-800 leading-tight tabular-nums">
               {getWeekday(currentTime)} - {formatTime(currentTime)}

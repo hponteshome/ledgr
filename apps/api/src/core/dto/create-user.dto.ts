@@ -56,7 +56,7 @@ export class CreateUserDto {
   @IsOptional()
   @IsString()
   @Transform(({ value }) => value?.replace(/\D/g, '')) // Mantém apenas números no telefone
-  phone?: string;
+  phone: string;
 
   @IsOptional()
   @IsBoolean()

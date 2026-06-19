@@ -19,6 +19,9 @@ export class RegisterDto {
 
   @IsEmail({}, { message: 'Invalid email address' })
   email: string;
+
+  @IsNumber({}, { message: 'Invalid phone number' })
+  phone: string;
   
   @IsNumber({}, { message: 'Invalid level address' })
   level: number;
