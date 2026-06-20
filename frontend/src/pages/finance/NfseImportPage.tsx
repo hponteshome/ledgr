@@ -73,11 +73,94 @@ export const NfseImportPage: React.FC = () => {
     } finally { setLoading(false); }
   };
 
+  // ── Busca repositorio SP ──────────────────────────────────────
+  const [certs,    setCerts]    = React.useState<any[]>([]);
+  const [buscaForm,setBuscaForm]= React.useState({certId:'',dtInicio:'',dtFim:'',paginas:'5',hom:false});
+  const [buscando, setBuscando] = React.useState(false);
+  const [buscaRes, setBuscaRes] = React.useState<any>(null);
+  const setBF = (k:string,v:any) => setBuscaForm(f=>({...f,[k]:v}));
+
+  React.useEffect(()=>{
+    api.get('/certificates').then((r:any)=>setCerts((r.data||[]).filter((c:any)=>c.isActive))).catch(()=>{});
+  },[]);
+
+  const buscarSP = async() => {
+    if(!buscaForm.certId){Swal.fire('Atenção','Selecione um certificado.','warning');return;}
+    setBuscando(true); setBuscaRes(null);
+    try{
+      const r = await api.post('/fiscal/nfse-sp/buscar-tomador',{
+        certId: buscaForm.certId,
+        dtInicio: buscaForm.dtInicio||undefined,
+        dtFim:    buscaForm.dtFim||undefined,
+        paginas:  parseInt(buscaForm.paginas)||5,
+        homologacao: buscaForm.hom,
+      });
+      setBuscaRes(r.data);
+      if(r.data.importadas>0)
+        Swal.fire('Concluído!',`${r.data.importadas} nota(s) importada(s) do repositório SP.`,'success');
+      else if(r.data.totalEncontradas===0)
+        Swal.fire('Sem resultados','Nenhuma NFS-e encontrada para o período.','info');
+    }catch(e:any){ Swal.fire('Erro',e?.response?.data?.message||e.message,'error'); }
+    finally{ setBuscando(false); }
+  };
+
   const totalServicos = preview?.items?.reduce((s:number,i:any)=>s+Number(i.valorServicos||0),0)||0;
   const totalIss      = preview?.items?.reduce((s:number,i:any)=>s+Number(i.valorIss||0),0)||0;
   const totalLiquido  = preview?.items?.reduce((s:number,i:any)=>s+Number(i.valorLiquido||0),0)||0;
 
   return (
+      {/* ── Painel Busca Repositório SP ──────────────────────────────── */}
+      <div style={{background:'#EFF6FF',borderBottom:'0.5px solid #BFDBFE',padding:'14px 24px',flexShrink:0}}>
+        <div style={{fontWeight:700,fontSize:13,color:'#1D4ED8',marginBottom:8}}>
+          🏛️ Buscar Notas do Repositório — Prefeitura de São Paulo
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr 1fr auto',gap:8,alignItems:'end'}}>
+          <div>
+            <label style={{fontSize:10,fontWeight:600,color:'#1D4ED8',textTransform:'uppercase',display:'block',marginBottom:3}}>Certificado A1 *</label>
+            <select value={buscaForm.certId} onChange={e=>setBF('certId',e.target.value)}
+              style={{width:'100%',border:'0.5px solid #93C5FD',borderRadius:6,padding:'6px 10px',fontSize:12,outline:'none',background:'#fff'}}>
+              <option value=''>Selecione...</option>
+              {certs.map((c:any)=>(<option key={c.id} value={c.id}>{c.alias}</option>))}
+            </select>
+          </div>
+          <div>
+            <label style={{fontSize:10,fontWeight:600,color:'#1D4ED8',textTransform:'uppercase',display:'block',marginBottom:3}}>Data Início</label>
+            <input type='date' value={buscaForm.dtInicio} onChange={e=>setBF('dtInicio',e.target.value)}
+              style={{width:'100%',border:'0.5px solid #93C5FD',borderRadius:6,padding:'6px 10px',fontSize:12,outline:'none',background:'#fff'}}/>
+          </div>
+          <div>
+            <label style={{fontSize:10,fontWeight:600,color:'#1D4ED8',textTransform:'uppercase',display:'block',marginBottom:3}}>Data Fim</label>
+            <input type='date' value={buscaForm.dtFim} onChange={e=>setBF('dtFim',e.target.value)}
+              style={{width:'100%',border:'0.5px solid #93C5FD',borderRadius:6,padding:'6px 10px',fontSize:12,outline:'none',background:'#fff'}}/>
+          </div>
+          <div>
+            <label style={{fontSize:10,fontWeight:600,color:'#1D4ED8',textTransform:'uppercase',display:'block',marginBottom:3}}>Págs</label>
+            <input type='number' min='1' max='20' value={buscaForm.paginas} onChange={e=>setBF('paginas',e.target.value)}
+              style={{width:'100%',border:'0.5px solid #93C5FD',borderRadius:6,padding:'6px 10px',fontSize:12,outline:'none',background:'#fff',textAlign:'center'}}/>
+          </div>
+          <button onClick={buscarSP} disabled={buscando||!buscaForm.certId}
+            style={{padding:'7px 16px',borderRadius:8,border:'none',background:'#1D4ED8',
+              color:'#fff',cursor:'pointer',fontSize:13,fontWeight:700,whiteSpace:'nowrap',
+              opacity:buscando||!buscaForm.certId?0.6:1}}>
+            {buscando?'Buscando...':'⬇ Buscar Notas'}
+          </button>
+        </div>
+        <label style={{display:'flex',alignItems:'center',gap:6,fontSize:11,cursor:'pointer',color:'#6B7280',marginTop:6}}>
+          <input type='checkbox' checked={buscaForm.hom} onChange={e=>setBF('hom',e.target.checked)}/>
+          Homologação (testes) — usa webservice de homologação da Prefeitura SP
+        </label>
+        {buscaRes&&(
+          <div style={{display:'flex',gap:10,marginTop:8,flexWrap:'wrap'}}>
+            {[{l:'Encontradas',v:buscaRes.totalEncontradas,c:'#1D4ED8'},{l:'Importadas',v:buscaRes.importadas,c:'#15803D'},{l:'Duplicatas',v:buscaRes.duplicatas,c:'#9CA3AF'},{l:'Erros',v:buscaRes.erros?.length||0,c:'#DC2626'}].map(t=>(
+              <div key={t.l} style={{background:'#fff',borderRadius:6,padding:'4px 12px',border:'0.5px solid #BFDBFE',display:'flex',gap:6,alignItems:'center'}}>
+                <span style={{fontSize:10,color:'#6B7280',textTransform:'uppercase',fontWeight:600}}>{t.l}</span>
+                <span style={{fontSize:15,fontWeight:700,color:t.c}}>{t.v}</span>
+              </div>
+            ))}
+            {buscaRes.erros?.map((e:string,i:number)=>(<div key={i} style={{fontSize:11,color:'#DC2626',padding:'3px 8px',background:'#FEF2F2',borderRadius:5}}>⚠ {e.slice(0,80)}</div>))}
+          </div>
+        )}
+      </div>
     <div style={{display:'flex',flexDirection:'column',height:'100%'}}>
       {/* Header */}
       <div style={{background:'#fff',borderBottom:'0.5px solid #E5E7EB',
