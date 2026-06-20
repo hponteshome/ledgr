@@ -55,7 +55,7 @@ export class NfeParserService {
       const transp = inf?.transp ?? {};
 
       const emitCnpj = this.clean(emit?.CNPJ ?? emit?.CPF ?? '');
-      const destCnpj = this.clean(dest?.CNPJ ?? dest?.CPF ?? '');
+      const destinCnpj = this.clean(dest?.CNPJ ?? dest?.CPF ?? '');
 
       let mode: 'ENTRADA'|'SAIDA'|'DESCONHECIDO' = 'DESCONHECIDO';
       if (destCnpj === cnpjClean) mode = 'ENTRADA';
