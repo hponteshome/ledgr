@@ -805,3 +805,34 @@ menos de 6 cards, vai sobrar espaco vazio na ultima linha (cosmetico, ajustar se
 - Reimport ECD LM (saldo abertura 31/12/2023)
 - Dashboard rebuild com dados reais
 - Rescisao Raquel + S-2299 Producao Real
+
+
+## Sessao 2026-06-20 (tarde) — Modulo Fiscal + Sidebar
+
+### Entregue
+- FiscalModule criado do zero (fiscal.module.ts, fiscal.controller.ts)
+- NFS-e SP: nfse-sp-parser.service.ts (ABRASF 2.0, detecta Prestador/Tomador por CNPJ)
+- NFS-e SP: nfse-import.service.ts (preview, import, dedup por numero+CNPJ)
+- NF-e Produtos: nfe-parser.service.ts (SEFAZ nfeProc/NFe, detecta Entrada/Saida)
+- NF-e Produtos: nfe-import.service.ts (preview, import, dedup por chave 44 digitos)
+- Endpoints: POST /fiscal/nfse-sp/preview, /import; POST /fiscal/nfe/preview, /import
+- Endpoints: GET /fiscal/documentos (filtros: tipo, competencia, status, search, paginacao)
+- Endpoints: GET /fiscal/documentos/resumo (KPIs: totalNfs, totalIss, totalPis, totalCofins, pending, integrated)
+- NfseImportPage.tsx: drag-drop, preview tabela, badges Prestador/Tomador, totais, dedup visual
+- NfeImportPage.tsx: drag-drop, preview tabela, badges Entrada/Saida, totais, dedup visual
+- DocumentosFiscaisPage.tsx: hub central, KPIs, filtros, paginacao, botao Integrar -> POST /finance/fiscal-documents/:id/integrate
+- Sidebar reorganizada: secao Fiscal separada do Finance
+  Finance: AP, AR, Fluxo, Fundo Fixo, Agenda, Banco, Provisoes, Fechamento
+  Fiscal: NF-e, NFS-e SP, Documentos Fiscais, Apuracao, Dedutibilidade
+- LedgrHome redesenhada: redireciona usuario logado para /app/dashboard
+- fast-xml-parser instalado no workspace apps/api
+
+### Commits
+- af9a23a: feat(fiscal) hub + NfeImportPage + NfseImportPage + rotas + sidebar
+- f3df657: refactor(sidebar) secao Fiscal separada
+- 392ec18: fix(nfe) destinCnpj shorthand
+
+### Pendentes
+- Testar com XMLs reais de NFS-e SP e NF-e SEFAZ
+- Consulta SEFAZ por chave de acesso (futura)
+- Reimport ECD LM (saldo abertura 31/12/2023)
