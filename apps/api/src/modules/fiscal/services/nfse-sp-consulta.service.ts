@@ -110,23 +110,14 @@ export class NfseSpConsultaService {
     for (let pag = 1; pag <= maxPags; pag++) {
       this.logger.log(`Consultando SP NFS-e tomador ${cnpj} — página ${pag}`);
 
-      // Monta e assina o XML interno
+      // Monta XML da consulta (sem assinatura — autenticacao via mTLS do certificado TLS)
       const consultaXml = this.buildConsultaXml(
         cnpj, pag,
         params.dtInicio ? params.dtInicio.replace(/-/g,'') : undefined,
         params.dtFim    ? params.dtFim.replace(/-/g,'')    : undefined,
       );
 
-      let xmlAssinado: string;
-      try {
-        xmlAssinado = await this.signing.signXml(
-          consultaXml, params.certId, `ConsultaTomador${pag}`
-        );
-      } catch(e: any) {
-        throw new BadRequestException('Falha ao assinar consulta: ' + e.message);
-      }
-
-      const soap = this.buildSoapEnvelope('1', xmlAssinado);
+      const soap = this.buildSoapEnvelope('1', consultaXml);
 
       let respData: string;
       try {
