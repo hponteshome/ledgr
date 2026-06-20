@@ -240,6 +240,8 @@ model Company {
   apuracoesImpostos    ApuracaoImpostos[]
   lalurItens           LalurItem[]
   efdContribuicoes  EfdContribuicoes[]
+  nfseNacionalEmissoes NfseNacionalEmissao[]
+
   @@map("companies")
 }
 
@@ -4254,6 +4256,71 @@ model RecessoColetivo {
   @@index([companyId, status])
   @@index([dataInicio])
   @@map("recessos_coletivos")
+}
+
+/// NFS-e Nacional — Emissoes pelo Emissor Nacional da RFB (DPS -> NFS-e)
+/// Obrigatorio para Simples Nacional a partir de 01/09/2026 (CGSN 189/2026)
+model NfseNacionalEmissao {
+  id           String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId    String  @map("company_id") @db.Uuid
+  certId       String? @map("cert_id") @db.Uuid
+
+  // RPS (Recibo Provisorio de Servicos)
+  numeroRps    Int     @map("numero_rps")
+  serieRps     String  @default("1") @map("serie_rps") @db.VarChar(5)
+
+  // Datas
+  dataEmissao  DateTime @map("data_emissao") @db.Timestamp(6)
+  competencia  String   @map("competencia") @db.Char(7)
+
+  // Prestador / Tomador
+  prestadorCnpj String  @map("prestador_cnpj") @db.VarChar(14)
+  tomadorCnpj   String? @map("tomador_cnpj") @db.VarChar(14)
+  tomadorCpf    String? @map("tomador_cpf")  @db.VarChar(11)
+  tomadorNome   String  @map("tomador_nome") @db.VarChar
+  tomadorEmail  String? @map("tomador_email") @db.VarChar
+  tomadorEnder  String? @map("tomador_endereco") @db.VarChar
+
+  // Servico
+  codigoServico String  @map("codigo_servico") @db.VarChar(10)  // cTribNac ex: "01.07"
+  descricaoServico String @map("descricao_servico") @db.Text
+
+  // Valores
+  valorServico  Decimal @map("valor_servico")  @db.Decimal(15,2)
+  valorDeducoes Decimal @default(0) @map("valor_deducoes") @db.Decimal(15,2)
+  valorIss      Decimal @default(0) @map("valor_iss")      @db.Decimal(15,2)
+  aliquotaIss   Decimal @default(0) @map("aliquota_iss")   @db.Decimal(5,4)
+  issRetido     Boolean @default(false) @map("iss_retido")
+  valorLiquido  Decimal @map("valor_liquido") @db.Decimal(15,2)
+
+  // Municipio de incidencia (IBGE)
+  codigoIbge   String  @default("3550308") @map("codigo_ibge") @db.VarChar(7)
+
+  // Status e retorno RFB
+  ambiente     String  @default("HOMOLOGACAO") @map("ambiente") @db.VarChar(20)
+  status       String  @default("RASCUNHO")    @map("status")   @db.VarChar(20)
+  chaveNfse    String? @map("chave_nfse")    @db.VarChar(50)
+  numeroNfse   String? @map("numero_nfse")   @db.VarChar(20)
+  protocolo    String? @map("protocolo")     @db.VarChar(50)
+  motivoRejeicao String? @map("motivo_rejeicao") @db.Text
+
+  // XMLs
+  xmlDps       String? @map("xml_dps")  @db.Text  // DPS assinado enviado
+  xmlNfse      String? @map("xml_nfse") @db.Text  // NFS-e autorizada retornada
+
+  // Auditoria
+  createdById  String   @map("created_by_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  canceladaEm  DateTime? @map("cancelada_em") @db.Timestamp(6)
+  motivoCanc   String?   @map("motivo_cancelamento") @db.VarChar(255)
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@index([companyId, competencia])
+  @@index([companyId, status])
+  @@index([chaveNfse])
+  @@map("nfse_nacional_emissoes")
 }
 
 /// Eventos eSocial transmitidos — rastreamento completo por evento.

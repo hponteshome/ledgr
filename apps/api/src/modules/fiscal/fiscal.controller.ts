@@ -5,6 +5,7 @@ import { JwtAuthGuard } from '@/auth/guards/jwt.guard';
 import { CompanyInterceptor } from '@/multi-company/company.interceptor';
 import { NfseImportService } from './services/nfse-import.service';
 import { NfeImportService  } from './services/nfe-import.service';
+import { NfseNacionalService } from './services/nfse-nacional.service';
 import { PrismaService } from '../../prisma/prisma.service';
 
 @Controller('fiscal')
@@ -12,9 +13,10 @@ import { PrismaService } from '../../prisma/prisma.service';
 @UseInterceptors(CompanyInterceptor)
 export class FiscalController {
   constructor(
-    private nfse:   NfseImportService,
-    private nfe:    NfeImportService,
-    private prisma: PrismaService,
+    private nfse:    NfseImportService,
+    private nfe:     NfeImportService,
+    private nfseNac: NfseNacionalService,
+    private prisma:  PrismaService,
   ) {}
 
   // ── NFS-e SP ──────────────────────────────────────────────────
@@ -95,5 +97,26 @@ export class FiscalController {
     return { byType, totalNfs, totalIss, totalPis, totalCofins,
       pending: docs.filter(d=>d.integrationStatus==='PENDING').length,
       integrated: docs.filter(d=>d.integrationStatus==='INTEGRATED').length };
+  }
+
+  // ── NFS-e Nacional (Emissor RFB) ─────────────────────────────
+  @Post('nfse-nacional/emitir')
+  emitirNfseNacional(@Req() req: any, @Body() dto: any) {
+    return this.nfseNac.emitir(req.companyId, dto, req.user.id);
+  }
+
+  @Get('nfse-nacional')
+  listarNfseNacional(@Req() req: any, @Query('competencia') c?: string, @Query('status') s?: string) {
+    return this.nfseNac.listar(req.companyId, c, s);
+  }
+
+  @Post('nfse-nacional/:id/reenviar')
+  reenviarNfseNacional(@Req() req: any, @Param('id') id: string) {
+    return this.nfseNac.reenviar(req.companyId, id);
+  }
+
+  @Post('nfse-nacional/:id/cancelar')
+  cancelarNfseNacional(@Req() req: any, @Param('id') id: string, @Body('motivo') motivo: string) {
+    return this.nfseNac.cancelar(req.companyId, id, motivo || 'Cancelada pelo emissor');
   }
 }
