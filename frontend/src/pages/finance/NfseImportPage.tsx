@@ -26,6 +26,27 @@ export const NfseImportPage:React.FC=()=>{
   useEffect(()=>{
     api.get('/certificates').then((r:any)=>setCerts((r.data||[]).filter((c:any)=>c.isActive))).catch(()=>{});
   },[]);
+  const [buscaEForm,setBuscaEForm]=useState({certId:'',dtInicio:'',dtFim:'',paginas:'5',hom:false});
+  const [buscandoE, setBuscandoE]=useState(false);
+  const [buscaERes, setBuscaERes]=useState<any>(null);
+  const setBEF=(k:string,v:any)=>setBuscaEForm(f=>({...f,[k]:v}));
+
+  const buscarEmitidas=async()=>{
+    if(!buscaEForm.certId){Swal.fire('Atenção','Selecione um certificado.','warning');return;}
+    setBuscandoE(true);setBuscaERes(null);
+    try{
+      const r=await api.post('/fiscal/nfse-sp/buscar-emitidas',{
+        certId:buscaEForm.certId,dtInicio:buscaEForm.dtInicio||undefined,
+        dtFim:buscaEForm.dtFim||undefined,paginas:parseInt(buscaEForm.paginas)||5,
+        homologacao:buscaEForm.hom,
+      });
+      setBuscaERes(r.data);
+      if(r.data.importadas>0) Swal.fire('Concluído!',`${r.data.importadas} nota(s) emitidas importadas.`,'success');
+      else if(r.data.totalEncontradas===0) Swal.fire('Sem resultados','Nenhuma NFS-e emitida no período.','info');
+    }catch(e:any){Swal.fire('Erro',e?.response?.data?.message||e.message,'error');}
+    finally{setBuscandoE(false);}
+  };
+
   const buscarSP=async()=>{
     if(!buscaForm.certId){Swal.fire('Atenção','Selecione um certificado.','warning');return;}
     setBuscando(true);setBuscaRes(null);
@@ -128,6 +149,48 @@ export const NfseImportPage:React.FC=()=>{
           <div style={{display:'flex',gap:10,marginTop:8,flexWrap:'wrap'}}>
             {[{l:'Encontradas',v:buscaRes.totalEncontradas,c:'#1D4ED8'},{l:'Importadas',v:buscaRes.importadas,c:'#15803D'},{l:'Duplicatas',v:buscaRes.duplicatas,c:'#9CA3AF'},{l:'Erros',v:buscaRes.erros?.length||0,c:'#DC2626'}].map(t=>(
               <div key={t.l} style={{background:'#fff',borderRadius:6,padding:'4px 12px',border:'0.5px solid #BFDBFE',display:'flex',gap:6,alignItems:'center'}}>
+                <span style={{fontSize:10,color:'#6B7280',textTransform:'uppercase' as const,fontWeight:600}}>{t.l}</span>
+                <span style={{fontSize:15,fontWeight:700,color:t.c}}>{t.v}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── Busca Emitidas SP ───────────────────────────────────────────── */}
+      <div style={{background:'#F0FDF4',borderBottom:'0.5px solid #86EFAC',padding:'12px 24px',flexShrink:0}}>
+        <div style={{fontWeight:700,fontSize:13,color:'#15803D',marginBottom:8}}>🏛️ Buscar NFS-e Emitidas — Prefeitura de São Paulo</div>
+        <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr 1fr auto',gap:8,alignItems:'end'}}>
+          <div><label style={{fontSize:10,fontWeight:600,color:'#15803D',textTransform:'uppercase' as const,display:'block',marginBottom:3}}>Certificado A1 *</label>
+            <select value={buscaEForm.certId} onChange={e=>setBEF('certId',e.target.value)}
+              style={{width:'100%',border:'0.5px solid #86EFAC',borderRadius:6,padding:'6px 10px',fontSize:12,outline:'none',background:'#fff'}}>
+              <option value=''>Selecione...</option>
+              {certs.map((c:any)=>(<option key={c.id} value={c.id}>{c.alias}</option>))}
+            </select></div>
+          <div><label style={{fontSize:10,fontWeight:600,color:'#15803D',textTransform:'uppercase' as const,display:'block',marginBottom:3}}>Data Início</label>
+            <input type='date' value={buscaEForm.dtInicio} onChange={e=>setBEF('dtInicio',e.target.value)}
+              style={{width:'100%',border:'0.5px solid #86EFAC',borderRadius:6,padding:'6px 10px',fontSize:12,outline:'none',background:'#fff'}}/></div>
+          <div><label style={{fontSize:10,fontWeight:600,color:'#15803D',textTransform:'uppercase' as const,display:'block',marginBottom:3}}>Data Fim</label>
+            <input type='date' value={buscaEForm.dtFim} onChange={e=>setBEF('dtFim',e.target.value)}
+              style={{width:'100%',border:'0.5px solid #86EFAC',borderRadius:6,padding:'6px 10px',fontSize:12,outline:'none',background:'#fff'}}/></div>
+          <div><label style={{fontSize:10,fontWeight:600,color:'#15803D',textTransform:'uppercase' as const,display:'block',marginBottom:3}}>Págs</label>
+            <input type='number' min={1} max={20} value={buscaEForm.paginas} onChange={e=>setBEF('paginas',e.target.value)}
+              style={{width:'100%',border:'0.5px solid #86EFAC',borderRadius:6,padding:'6px 10px',fontSize:12,outline:'none',background:'#fff',textAlign:'center'}}/></div>
+          <button onClick={buscarEmitidas} disabled={buscandoE||!buscaEForm.certId}
+            style={{padding:'7px 16px',borderRadius:8,border:'none',background:'#15803D',
+              color:'#fff',cursor:'pointer',fontSize:13,fontWeight:600,whiteSpace:'nowrap' as const,
+              opacity:buscandoE||!buscaEForm.certId?0.6:1}}>
+            {buscandoE?'Buscando...':'⬆ Buscar Emitidas'}
+          </button>
+        </div>
+        <label style={{display:'flex',alignItems:'center',gap:6,fontSize:11,cursor:'pointer',color:'#6B7280',marginTop:6}}>
+          <input type='checkbox' checked={buscaEForm.hom} onChange={e=>setBEF('hom',e.target.checked)}/>
+          Homologação (testes)
+        </label>
+        {buscaERes&&(
+          <div style={{display:'flex',gap:10,marginTop:8,flexWrap:'wrap'}}>
+            {[{l:'Encontradas',v:buscaERes.totalEncontradas,c:'#15803D'},{l:'Importadas',v:buscaERes.importadas,c:'#059669'},{l:'Duplicatas',v:buscaERes.duplicatas,c:'#9CA3AF'},{l:'Erros',v:buscaERes.erros?.length||0,c:'#DC2626'}].map(t=>(
+              <div key={t.l} style={{background:'#fff',borderRadius:6,padding:'4px 12px',border:'0.5px solid #86EFAC',display:'flex',gap:6,alignItems:'center'}}>
                 <span style={{fontSize:10,color:'#6B7280',textTransform:'uppercase' as const,fontWeight:600}}>{t.l}</span>
                 <span style={{fontSize:15,fontWeight:700,color:t.c}}>{t.v}</span>
               </div>

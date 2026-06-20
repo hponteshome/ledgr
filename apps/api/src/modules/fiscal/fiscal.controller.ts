@@ -138,4 +138,20 @@ export class FiscalController {
       userId:      req.user.id,
     });
   }
+
+  @Post('nfse-sp/buscar-emitidas')
+  buscarEmitidasSP(@Req() req: any, @Body() body: any) {
+    const { certId, dtInicio, dtFim, paginas, homologacao } = body ?? {};
+    if (!certId) throw new (require('@nestjs/common').BadRequestException)('certId obrigatorio');
+    return this.spConsulta.consultarEmitidas({
+      companyId:   req.companyId,
+      certId,
+      dtInicio,
+      dtFim,
+      paginas:     Number(paginas ?? 5),
+      homologacao: homologacao === true || homologacao === 'true',
+      importar:    true,
+      userId:      req.user.id,
+    });
+  }
 }
