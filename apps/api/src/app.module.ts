@@ -4,6 +4,7 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_INTERCEPTOR } from '@nestjs/core';
+import { FiscalModule } from './modules/fiscal/fiscal.module';
 import { HrModule } from './modules/hr/hr.module';
 import { TabelasLegaisModule } from './modules/tabelas-legais/tabelas-legais.module';
 import { ApuracaoModule } from './modules/apuracao/apuracao.module';
@@ -47,6 +48,7 @@ import { SidebarPermissionsModule } from './modules/sidebar-permissions/sidebar-
     AuditModule,
     RfbModule,
     HrModule,
+    FiscalModule,
     TabelasLegaisModule,
     ApuracaoModule,
     DocumentsModule,

@@ -68,6 +68,7 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
     {
       path: '/app/finance', icon: FiBarChart2, label: 'Finance',
       children: [
+        { path: '/app/finance/nfse-sp', label: 'NFS-e São Paulo', icon: FiFileText },
         { path: '/app/finance/fiscal-documents', label: 'Documentos Fiscais', icon: FiFileText },
         { path: '/app/finance/accounts-payable', label: 'Contas a Pagar', icon: FiTrendingDown },
         { path: '/app/finance/contas-receber', label: 'Contas a Receber', icon: FiTrendingUp },
