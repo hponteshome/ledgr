@@ -81,6 +81,7 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
     {
       path: '/app/fiscal', icon: FiPercent, label: 'Fiscal',
       children: [
+        { path: '/app/finance/nfse-nacional', label: 'NFS-e Nacional (RFB)', icon: FiCheckCircle },
         { path: '/app/finance/nfe',           label: 'NF-e (Produtos)',          icon: FiPackage },
         { path: '/app/finance/nfse-sp',          label: 'NFS-e São Paulo',         icon: FiUpload },
         { path: '/app/finance/documentos-fiscais', label: 'Documentos Fiscais',     icon: FiFileText },
