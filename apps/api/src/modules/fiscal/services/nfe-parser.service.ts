@@ -58,7 +58,7 @@ export class NfeParserService {
       const destinCnpj = this.clean(dest?.CNPJ ?? dest?.CPF ?? '');
 
       let mode: 'ENTRADA'|'SAIDA'|'DESCONHECIDO' = 'DESCONHECIDO';
-      if (destCnpj === cnpjClean) mode = 'ENTRADA';
+      if (destinCnpj === cnpjClean) mode = 'ENTRADA';
       else if (emitCnpj === cnpjClean) mode = 'SAIDA';
 
       // chave da NF-e: de protNFe ou de infNFe Id
