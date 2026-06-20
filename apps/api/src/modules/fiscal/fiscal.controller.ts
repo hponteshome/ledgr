@@ -6,6 +6,7 @@ import { CompanyInterceptor } from '@/multi-company/company.interceptor';
 import { NfseImportService } from './services/nfse-import.service';
 import { NfeImportService  } from './services/nfe-import.service';
 import { NfseNacionalService } from './services/nfse-nacional.service';
+import { NfseSpConsultaService } from './services/nfse-sp-consulta.service';
 import { PrismaService } from '../../prisma/prisma.service';
 
 @Controller('fiscal')
@@ -16,6 +17,7 @@ export class FiscalController {
     private nfse:    NfseImportService,
     private nfe:     NfeImportService,
     private nfseNac: NfseNacionalService,
+    private spConsulta: NfseSpConsultaService,
     private prisma:  PrismaService,
   ) {}
 
@@ -118,5 +120,28 @@ export class FiscalController {
   @Post('nfse-nacional/:id/cancelar')
   cancelarNfseNacional(@Req() req: any, @Param('id') id: string, @Body('motivo') motivo: string) {
     return this.nfseNac.cancelar(req.companyId, id, motivo || 'Cancelada pelo emissor');
+  }
+
+  // ── Consulta NFS-e SP como Tomador (webservice prefeitura SP) ────────────
+  @Post('nfse-sp/buscar-tomador')
+  buscarTomadorSP(
+    @Req() req: any,
+    @Body('certId')      certId:     string,
+    @Body('dtInicio')    dtInicio?:  string,
+    @Body('dtFim')       dtFim?:     string,
+    @Body('paginas')     paginas?:   number,
+    @Body('homologacao') hom?:       boolean,
+  ) {
+    if (!certId) throw new (require('@nestjs/common').BadRequestException)('certId obrigatório');
+    return this.spConsulta.consultarTomador({
+      companyId:   req.companyId,
+      certId,
+      dtInicio,
+      dtFim,
+      paginas:     paginas ?? 5,
+      homologacao: hom ?? false,
+      importar:    true,
+      userId:      req.user.id,
+    });
   }
 }
