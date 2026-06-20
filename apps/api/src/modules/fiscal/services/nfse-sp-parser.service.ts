@@ -71,12 +71,12 @@ export class NfseSpParserService {
       const tom      = inf?.TomadorServico ?? {};
 
       const prestCnpj = this.getCnpj(prest?.IdentificacaoPrestador ?? prest?.Identificacao);
-      const tomCnpj   = this.getCnpj(tom?.IdentificacaoTomador ?? tom?.Identificacao);
+      const tomadorCnpj = this.getCnpj(tom?.IdentificacaoTomador ?? tom?.Identificacao);
       const cnpjClean = this.clean(companyCnpj);
 
       let mode: 'PRESTADOR' | 'TOMADOR' | 'DESCONHECIDO' = 'DESCONHECIDO';
       if (prestCnpj === cnpjClean) mode = 'PRESTADOR';
-      else if (tomCnpj === cnpjClean) mode = 'TOMADOR';
+      else if (tomadorCnpj === cnpjClean) mode = 'TOMADOR';
 
       const dataEmissao = String(inf?.DataEmissao ?? inf?.Competencia ?? '').slice(0, 10);
       const competencia = dataEmissao.slice(0, 7);
