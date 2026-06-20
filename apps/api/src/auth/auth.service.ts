@@ -19,8 +19,8 @@ export class AuthService {
   }
 
   async register(dto: {
-    document: string; fullName: string; email: string;
-    phone?: string; password: string;
+    document: string; documentType?: string; fullName: string; email: string;
+    phone?: string; level?: number; password: string;
   }) {
     const cleanCpf = dto.document.replace(/\D/g,'');
     const exists = await this.prisma.user.findFirst({
@@ -29,7 +29,7 @@ export class AuthService {
     if (exists) throw new Error('CPF ou e-mail ja cadastrado.');
 
     const person = await this.prisma.person.findFirst({
-      where: { taxId: cleanCpf, deletedAt: null }
+      where: { cpf: cleanCpf, deletedAt: null }
     });
     let pendingFlags = 'OK';
     let personId: string | undefined;
@@ -44,34 +44,10 @@ export class AuthService {
     const hash = await bcrypt.hash(dto.password, 10);
     await this.prisma.user.create({
       data: {
-        document: cleanCpf, documentType: 'CPF',
+        document: cleanCpf, documentType: dto.documentType || 'CPF',
         email: dto.email.toLowerCase(), passwordHash: hash,
         fullName: dto.fullName, phone1: dto.phone,
-        status: 'PENDENTE', isActive: false, level: 0,
-        requestedAt: new Date(), pendingFlags,
-        ...(personId ? { personId } : {}),
-      },
-    });
-    return { status:'PENDENTE', pendingFlags, message:'Cadastro recebido. Aguarde aprovacao.' };
-  }
-    });
-    let pendingFlags = 'OK';
-    let personId: string | undefined;
-    if (!person) {
-      pendingFlags = 'CPF_NAO_ENCONTRADO';
-    } else {
-      personId = person.id;
-      const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
-      if (norm(dto.fullName).split(' ')[0] !== norm(person.fullName ?? '').split(' ')[0])
-        pendingFlags = 'DIVERGENCIA_NOME';
-    }
-    const hash = await bcrypt.hash(dto.password, 10);
-    await this.prisma.user.create({
-      data: {
-        document: cleanCpf, documentType: 'CPF',
-        email: dto.email.toLowerCase(), passwordHash: hash,
-        fullName: dto.fullName, phone1: dto.phone,
-        status: 'PENDENTE', isActive: false, level: 0,
+        status: 'PENDENTE', isActive: false, level: dto.level ?? 0,
         requestedAt: new Date(), pendingFlags,
         ...(personId ? { personId } : {}),
       },
@@ -79,9 +55,9 @@ export class AuthService {
     return { status:'PENDENTE', pendingFlags, message:'Cadastro recebido. Aguarde aprovacao.' };
   }
 
+  
   async validateUser(email: string, password: string): Promise<any> {
     const user = await this.usersService.findByEmail(email.toLowerCase());
-    
     if (!user) {
       return null;
     }

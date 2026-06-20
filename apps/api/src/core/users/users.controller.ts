@@ -75,6 +75,22 @@ export class UsersController {
     return this.usersService.create(dto);
   }
 
+  @Get('pendentes/count')
+  countPendentes() { return this.usersService.contarPendentes(); }
+
+  @Get('pendentes')
+  listPendentes() { return this.usersService.listarPendentes(); }
+
+  @Post(':id/aprovar')
+  aprovar(@Param('id') id: string, @Body() body: any, @Req() req: any) {
+    return this.usersService.aprovarUsuario(id, body, req.user?.id ?? 'system');
+  }
+
+  @Post(':id/rejeitar')
+  rejeitar(@Param('id') id: string, @Body('motivo') motivo: string, @Req() req: any) {
+    return this.usersService.rejeitarUsuario(id, motivo || 'Sem motivo informado', req.user?.id ?? 'system');
+
+
   @Get(':id')
   async findOne(@Param('id') id: string) {
     const found = await this.usersService.findById(id);
@@ -117,21 +133,6 @@ export class UsersController {
   async remove(@Param('id') id: string, @CurrentUser('object') user: any) {
     return this.usersService.remove(id, user.id);
   }
-
-  @Get('pendentes/count')
-  countPendentes() { return this.usersService.contarPendentes(); }
-
-  @Get('pendentes')
-  listPendentes() { return this.usersService.listarPendentes(); }
-
-  @Post(':id/aprovar')
-  aprovar(@Param('id') id: string, @Body() body: any, @Req() req: any) {
-    return this.usersService.aprovarUsuario(id, body, req.user?.id ?? 'system');
-  }
-
-  @Post(':id/rejeitar')
-  rejeitar(@Param('id') id: string, @Body('motivo') motivo: string, @Req() req: any) {
-    return this.usersService.rejeitarUsuario(id, motivo || 'Sem motivo informado', req.user?.id ?? 'system');
   }
 
 }
