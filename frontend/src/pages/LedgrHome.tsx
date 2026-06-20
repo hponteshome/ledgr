@@ -45,30 +45,6 @@ export const LedgrHome: React.FC = () => {
   return (
     <div style={{minHeight:'100vh',background:'#F8FAFC',padding:'24px 40px'}}>
       <div style={{maxWidth:1200,margin:'0 auto'}}>
-
-        {/* Hero */}
-        <div style={{textAlign:'center',padding:'48px 0 32px'}}>
-          <div style={{fontSize:40,fontWeight:900,color:'#6C63FF',letterSpacing:'-2px',marginBottom:8}}>
-            LEDGR
-          </div>
-          <h1 style={{fontSize:28,fontWeight:700,color:'#111',marginBottom:8}}>
-            Sistema de Gestão Empresarial Completo
-          </h1>
-          <p style={{fontSize:16,color:'#6B7280',marginBottom:24}}>
-            Para escritórios de contabilidade, advocacia e administradoras
-          </p>
-          <div style={{display:'flex',gap:12,justifyContent:'center'}}>
-            <a href="/login" style={{padding:'12px 28px',borderRadius:10,background:'#6C63FF',
-              color:'#fff',fontWeight:700,fontSize:15,textDecoration:'none'}}>
-              Acessar o Sistema
-            </a>
-            <a href="/register" style={{padding:'12px 28px',borderRadius:10,
-              border:'2px solid #6C63FF',color:'#6C63FF',fontWeight:700,fontSize:15,textDecoration:'none'}}>
-              Solicitar Acesso
-            </a>
-          </div>
-        </div>
-
         {/* Feature cards */}
         <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:16,marginBottom:32}}>
           {features.map(f=>(
