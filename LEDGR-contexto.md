@@ -774,3 +774,34 @@ menos de 6 cards, vai sobrar espaco vazio na ultima linha (cosmetico, ajustar se
 - Confirmar rescisao Raquel com saldo FGTS real + transmitir S-2299 Producao Real (aguarda cadastro KPL no eSocial)
 - Reimport ECD LM (saldo abertura 31/12/2023)
 - Dashboard rebuild com dados reais
+
+
+## Sessao 2026-06-20 — Calendario + HR Completo + Fluxo Registro
+
+### Calendario de Feriados
+- CalendarioPage visual completo: feriados nacionais/estaduais/municipais, pontes sugeridas automaticas (qui->sex, ter->seg), recessos, ferias
+- Pontes sugeridas clicaveis para Master confirmar como Recesso
+- Botao Gerar Calendario aparece somente para anos sem feriados importados
+- +Feriado com localidade UF+municipio, +Ponte manual
+- Commits: 08dd9fb, 4f76c44, 4c88a21
+
+### HR Completo
+- 13o Salario: calculo proporcional CLT, 1a/2a parcelas, recibos PDF, DecimoTerceiroPage
+- RAIS: declaracao anual, vinculos, protocolo envio, RaisPage
+- DCTFWeb: consolidacao INSS+IRRF mensal, total DARF, DctfWebPage
+- Rotas: /app/hr/decimo-terceiro, /app/hr/rais, /app/hr/dctfweb
+
+### Fluxo Auto-Cadastro de Usuarios
+- Rota publica /register fora do Layout (Register.tsx com CPF+nome+email+telefone+senha)
+- POST /auth/register: cria User status=PENDENTE, compara CPF com Person
+- Flags: OK | CPF_NAO_ENCONTRADO | DIVERGENCIA_NOME
+- Badge pendentes no Header para Master Admin (polling 60s)
+- PendentesPage: lista, comparacao lado a lado, modal aprovacao (perfil+nivel+empresas), rejeicao com motivo
+- Fix critico: GET /users/pendentes movido antes de GET /users/:id no controller
+- Fix critico: auth.service.register usava require('bcrypt') em vez de bcrypt importado
+- Fix critico: metodo rejeitar() sem fechamento de chaves
+
+### Pendentes
+- Reimport ECD LM (saldo abertura 31/12/2023)
+- Dashboard rebuild com dados reais
+- Rescisao Raquel + S-2299 Producao Real
