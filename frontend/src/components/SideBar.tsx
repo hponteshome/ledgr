@@ -81,8 +81,9 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
     {
       path: '/app/fiscal', icon: FiPercent, label: 'Fiscal',
       children: [
+        { path: '/app/finance/nfe',           label: 'NF-e (Produtos)',          icon: FiPackage },
         { path: '/app/finance/nfse-sp',          label: 'NFS-e São Paulo',         icon: FiUpload },
-        { path: '/app/finance/fiscal-documents',  label: 'Documentos Fiscais',      icon: FiFileText },
+        { path: '/app/finance/documentos-fiscais', label: 'Documentos Fiscais',     icon: FiFileText },
         { path: '/app/finance/apuracao',          label: 'Apuração de Impostos',    icon: FiPercent },
         { path: '/app/finance/lalur-config',      label: 'Config. Dedutibilidade',  icon: FiSettings },
       ],
