@@ -73,5 +73,21 @@ export class DashboardService {
       docsAguardando,
     };
   }
-}
 
+  async summary(companyId: string) {
+    const [employees, folhas, decimos] = await Promise.all([
+      this.prisma.employee.count({
+        where: { companyId, deletedAt: null }
+      }).catch(()=>0),
+      this.prisma.folhaMensal.findFirst({
+        where: { companyId },
+        orderBy: { competencia: 'desc' },
+        select: { competencia:true, status:true, totalBruto:true, totalLiquido:true }
+      }).catch(()=>null),
+      this.prisma.decimoTerceiro.count({
+        where: { companyId, status: { not: 'QUITADO' } }
+      }).catch(()=>0),
+    ]);
+    return { employees, folhas, decimosPendentes: decimos };
+  }
+}

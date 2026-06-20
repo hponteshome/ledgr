@@ -10,4 +10,9 @@ export class DashboardController {
   kpi(@Req() req: any, @Query('month') month: string) {
     return this.svc.kpi(req.companyId, month);
   }
+
+  @Get('summary')
+  summary(@Req() req: any) {
+    return this.svc.summary(req.companyId);
+  }
 }

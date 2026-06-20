@@ -1,156 +1,134 @@
-import React from 'react';
-import { FiCalendar, FiTrendingUp, FiBriefcase, FiCheckCircle } from 'react-icons/fi';
+import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { FiCalendar, FiTrendingUp, FiBriefcase, FiCheckCircle, FiUsers, FiFileText } from 'react-icons/fi';
+import { useAuth } from '../contexts/AuthContext';
+import api from '../services/api';
 
 export const LedgrHome: React.FC = () => {
-  return (
-    <div className="min-h-screen bg-[#F8FAFC] p-6 lg:p-10">
-      <div className="max-w-[1600px] mx-auto space-y-8">
+  const { user, loading } = useAuth();
+  const navigate = useNavigate();
+  const [stats, setStats] = useState({ companies: 0, users: 0, obligations: 0 });
 
-        {/* Hero Section */}
-        <div className="text-center">
-          <h1 className="text-4xl font-black text-gray-800 mb-4">
-            Bem-vindo ao LEDGR
-          </h1>
-          <p className="text-lg text-gray-600 mb-2">
+  // Redireciona usuario logado para o dashboard
+  useEffect(() => {
+    if (!loading && user) navigate('/app/dashboard', { replace: true });
+  }, [user, loading, navigate]);
+
+  // Busca stats reais (publicas apos login ou sem empresa)
+  useEffect(() => {
+    if (user) return;
+    // Para usuario nao logado, mostra stats genericas do produto
+  }, [user]);
+
+  if (loading || user) return null;
+
+  const features = [
+    { icon: <FiCalendar size={24}/>, color:'#3B82F6', bg:'#EFF6FF',
+      title:'Agenda Fiscal', desc:'Acompanhe todos os prazos e obrigações fiscais em um só lugar' },
+    { icon: <FiTrendingUp size={24}/>, color:'#10B981', bg:'#F0FDF4',
+      title:'Indicadores', desc:'Análise em tempo real do desempenho de suas empresas' },
+    { icon: <FiBriefcase size={24}/>, color:'#8B5CF6', bg:'#F5F3FF',
+      title:'Multiempresa', desc:'Gerencie múltiplas empresas com facilidade e eficiência' },
+    { icon: <FiCheckCircle size={24}/>, color:'#F59E0B', bg:'#FFFBEB',
+      title:'Compliance', desc:'Total conformidade com SPED, NF-e, NFS-e e demais obrigações' },
+  ];
+
+  const modules = [
+    { label:'Contabilidade', desc:'ECD, Balancetes, Diário, Lançamentos' },
+    { label:'Fiscal / SPED', desc:'ECD, ECF, EFD-Contribuições, PVA' },
+    { label:'RH Completo', desc:'Folha, Férias, 13º, RAIS, DCTFWeb, eSocial' },
+    { label:'Finance', desc:'AP, AR, Fluxo de Caixa, Fechamento' },
+    { label:'Ativo Imobilizado', desc:'Depreciação, Melhorias, Laudos' },
+    { label:'Societário', desc:'Contrato Social, QSA, AGE/AGO, Transferências' },
+  ];
+
+  return (
+    <div style={{minHeight:'100vh',background:'#F8FAFC',padding:'24px 40px'}}>
+      <div style={{maxWidth:1200,margin:'0 auto'}}>
+
+        {/* Hero */}
+        <div style={{textAlign:'center',padding:'48px 0 32px'}}>
+          <div style={{fontSize:40,fontWeight:900,color:'#6C63FF',letterSpacing:'-2px',marginBottom:8}}>
+            LEDGR
+          </div>
+          <h1 style={{fontSize:28,fontWeight:700,color:'#111',marginBottom:8}}>
             Sistema de Gestão Empresarial Completo
-          </p>
-          <p className="text-gray-500">
+          </h1>
+          <p style={{fontSize:16,color:'#6B7280',marginBottom:24}}>
             Para escritórios de contabilidade, advocacia e administradoras
           </p>
-        </div>
-
-        {/* Grid de Features */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-
-          {/* Card 1 - Agenda Fiscal */}
-          <div className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-shadow">
-            <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center mb-4">
-              <FiCalendar size={24} />
-            </div>
-            <h3 className="text-lg font-bold text-gray-900 mb-2">Agenda Fiscal</h3>
-            <p className="text-sm text-gray-600">
-              Acompanhe todos os prazos e obrigações fiscais em um só lugar
-            </p>
-          </div>
-
-          {/* Card 2 - Indicadores */}
-          <div className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-shadow">
-            <div className="w-12 h-12 bg-green-100 text-green-600 rounded-lg flex items-center justify-center mb-4">
-              <FiTrendingUp size={24} />
-            </div>
-            <h3 className="text-lg font-bold text-gray-900 mb-2">Indicadores</h3>
-            <p className="text-sm text-gray-600">
-              Análise em tempo real do desempenho de suas empresas
-            </p>
-          </div>
-
-          {/* Card 3 - Multiempresa */}
-          <div className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-shadow">
-            <div className="w-12 h-12 bg-purple-100 text-purple-600 rounded-lg flex items-center justify-center mb-4">
-              <FiBriefcase size={24} />
-            </div>
-            <h3 className="text-lg font-bold text-gray-900 mb-2">Multiempresa</h3>
-            <p className="text-sm text-gray-600">
-              Gerencie múltiplas empresas com facilidade e eficiência
-            </p>
-          </div>
-
-          {/* Card 4 - Compliance */}
-          <div className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-shadow">
-            <div className="w-12 h-12 bg-orange-100 text-orange-600 rounded-lg flex items-center justify-center mb-4">
-              <FiCheckCircle size={24} />
-            </div>
-            <h3 className="text-lg font-bold text-gray-900 mb-2">Compliance</h3>
-            <p className="text-sm text-gray-600">
-              Total conformidade com SPED, NF-e, NFS-e e demais obrigações
-            </p>
+          <div style={{display:'flex',gap:12,justifyContent:'center'}}>
+            <a href="/login" style={{padding:'12px 28px',borderRadius:10,background:'#6C63FF',
+              color:'#fff',fontWeight:700,fontSize:15,textDecoration:'none'}}>
+              Acessar o Sistema
+            </a>
+            <a href="/register" style={{padding:'12px 28px',borderRadius:10,
+              border:'2px solid #6C63FF',color:'#6C63FF',fontWeight:700,fontSize:15,textDecoration:'none'}}>
+              Solicitar Acesso
+            </a>
           </div>
         </div>
 
-        {/* Agenda Fiscal em Destaque */}
-        <div className="bg-white rounded-xl border border-gray-200 p-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3">
-            <FiCalendar className="text-blue-600" size={28} />
-            Agenda Fiscal - Março 2026
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-
-            {/* Obrigação 1 */}
-            <div className="border border-gray-200 rounded-lg p-4">
-              <div className="flex items-start justify-between mb-2">
-                <span className="text-xs font-semibold text-gray-500">DIA 10</span>
-                <span className="text-xs px-2 py-1 bg-red-100 text-red-700 rounded-full font-semibold">
-                  Próximo
-                </span>
+        {/* Feature cards */}
+        <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:16,marginBottom:32}}>
+          {features.map(f=>(
+            <div key={f.title} style={{background:'#fff',borderRadius:12,border:'1px solid #E5E7EB',
+              padding:24,transition:'box-shadow .2s'}}>
+              <div style={{width:48,height:48,background:f.bg,borderRadius:10,
+                display:'flex',alignItems:'center',justifyContent:'center',color:f.color,marginBottom:12}}>
+                {f.icon}
               </div>
-              <h4 className="font-semibold text-gray-900 mb-1">DCTF Web</h4>
-              <p className="text-xs text-gray-600">
-                Declaração de Débitos e Créditos Tributários Federais
-              </p>
+              <div style={{fontWeight:700,fontSize:15,color:'#111',marginBottom:4}}>{f.title}</div>
+              <div style={{fontSize:13,color:'#6B7280',lineHeight:1.5}}>{f.desc}</div>
             </div>
+          ))}
+        </div>
 
-            {/* Obrigação 2 */}
-            <div className="border border-gray-200 rounded-lg p-4">
-              <div className="flex items-start justify-between mb-2">
-                <span className="text-xs font-semibold text-gray-500">DIA 15</span>
-                <span className="text-xs px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full font-semibold">
-                  Atenção
-                </span>
+        {/* Agenda Fiscal preview */}
+        <div style={{background:'#fff',borderRadius:12,border:'1px solid #E5E7EB',padding:24,marginBottom:32}}>
+          <div style={{fontWeight:700,fontSize:16,color:'#111',marginBottom:4,display:'flex',alignItems:'center',gap:8}}>
+            <FiCalendar color="#6C63FF"/> Agenda Fiscal — {new Date().toLocaleDateString('pt-BR',{month:'long',year:'numeric'})}
+          </div>
+          <p style={{fontSize:13,color:'#9CA3AF',marginBottom:16}}>
+            Faça login para ver os prazos fiscais da sua empresa
+          </p>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+            {[
+              {dia:'Dia 10',label:'DCTF Web',desc:'Declaração de Débitos e Créditos Tributários Federais',badge:'Próximo',bc:'#EFF6FF',bcc:'#1D4ED8'},
+              {dia:'Dia 15',label:'GFIP',desc:'Guia de Recolhimento do FGTS e Informações à Previdência Social',badge:'Atenção',bc:'#FEF3C7',bcc:'#92400E'},
+              {dia:'Dia 20',label:'EFD ICMS/IPI',desc:'Escrituração Fiscal Digital do ICMS e do IPI',badge:'Agendado',bc:'#F0FDF4',bcc:'#15803D'},
+              {dia:'Dia 25',label:'EFD-Contribuições',desc:'Escrituração Fiscal Digital do PIS e da COFINS',badge:'Pendente',bc:'#FEF2F2',bcc:'#DC2626'},
+            ].map(o=>(
+              <div key={o.label} style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',
+                padding:'10px 14px',borderRadius:8,background:'#F9FAFB',border:'0.5px solid #E5E7EB'}}>
+                <div>
+                  <div style={{fontSize:11,color:'#9CA3AF',fontWeight:600}}>{o.dia}</div>
+                  <div style={{fontSize:13,fontWeight:700,color:'#111'}}>{o.label}</div>
+                  <div style={{fontSize:11,color:'#6B7280'}}>{o.desc}</div>
+                </div>
+                <span style={{fontSize:10,padding:'2px 8px',borderRadius:20,fontWeight:600,
+                  background:o.bc,color:o.bcc,whiteSpace:'nowrap'}}>{o.badge}</span>
               </div>
-              <h4 className="font-semibold text-gray-900 mb-1">GFIP</h4>
-              <p className="text-xs text-gray-600">
-                Guia de Recolhimento do FGTS e Informações à Previdência Social
-              </p>
-            </div>
-
-            {/* Obrigação 3 */}
-            <div className="border border-gray-200 rounded-lg p-4">
-              <div className="flex items-start justify-between mb-2">
-                <span className="text-xs font-semibold text-gray-500">DIA 20</span>
-                <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-full font-semibold">
-                  Agendado
-                </span>
-              </div>
-              <h4 className="font-semibold text-gray-900 mb-1">EFD ICMS/IPI</h4>
-              <p className="text-xs text-gray-600">
-                Escrituração Fiscal Digital do ICMS e do IPI
-              </p>
-            </div>
+            ))}
           </div>
         </div>
 
-        {/* Indicadores Gerais */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-
-          {/* Indicador 1 */}
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-sm text-gray-500">Empresas Ativas</span>
-              <FiBriefcase className="text-blue-600" size={20} />
-            </div>
-            <p className="text-3xl font-bold text-gray-900 mb-1">1.247</p>
-            <p className="text-xs text-green-600 font-semibold">+12% vs mês anterior</p>
+        {/* Modulos */}
+        <div style={{background:'#fff',borderRadius:12,border:'1px solid #E5E7EB',padding:24,marginBottom:32}}>
+          <div style={{fontWeight:700,fontSize:16,color:'#111',marginBottom:16}}>Módulos disponíveis</div>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10}}>
+            {modules.map(m=>(
+              <div key={m.label} style={{padding:'12px 16px',borderRadius:8,
+                background:'#F9FAFB',border:'0.5px solid #E5E7EB'}}>
+                <div style={{fontWeight:600,fontSize:13,color:'#374151'}}>{m.label}</div>
+                <div style={{fontSize:12,color:'#9CA3AF',marginTop:2}}>{m.desc}</div>
+              </div>
+            ))}
           </div>
+        </div>
 
-          {/* Indicador 2 */}
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-sm text-gray-500">NF-e Emitidas</span>
-              <FiTrendingUp className="text-green-600" size={20} />
-            </div>
-            <p className="text-3xl font-bold text-gray-900 mb-1">45.892</p>
-            <p className="text-xs text-green-600 font-semibold">+8% vs mês anterior</p>
-          </div>
-
-          {/* Indicador 3 */}
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-sm text-gray-500">Compliance</span>
-              <FiCheckCircle className="text-purple-600" size={20} />
-            </div>
-            <p className="text-3xl font-bold text-gray-900 mb-1">98.5%</p>
-            <p className="text-xs text-green-600 font-semibold">Obrigações em dia</p>
-          </div>
+        <div style={{textAlign:'center',fontSize:12,color:'#9CA3AF',paddingBottom:24}}>
+          LEDGR — Gestão Empresarial Inteligente · Versão 2026
         </div>
       </div>
     </div>
