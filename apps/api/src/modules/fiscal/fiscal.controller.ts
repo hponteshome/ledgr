@@ -124,22 +124,16 @@ export class FiscalController {
 
   // ── Consulta NFS-e SP como Tomador (webservice prefeitura SP) ────────────
   @Post('nfse-sp/buscar-tomador')
-  buscarTomadorSP(
-    @Req() req: any,
-    @Body('certId')      certId:     string,
-    @Body('dtInicio')    dtInicio?:  string,
-    @Body('dtFim')       dtFim?:     string,
-    @Body('paginas')     paginas?:   number,
-    @Body('homologacao') hom?:       boolean,
-  ) {
-    if (!certId) throw new (require('@nestjs/common').BadRequestException)('certId obrigatório');
+  buscarTomadorSP(@Req() req: any, @Body() body: any) {
+    const { certId, dtInicio, dtFim, paginas, homologacao } = body ?? {};
+    if (!certId) throw new (require('@nestjs/common').BadRequestException)('certId obrigatorio');
     return this.spConsulta.consultarTomador({
       companyId:   req.companyId,
       certId,
       dtInicio,
       dtFim,
-      paginas:     paginas ?? 5,
-      homologacao: hom ?? false,
+      paginas:     Number(paginas ?? 5),
+      homologacao: homologacao === true || homologacao === 'true',
       importar:    true,
       userId:      req.user.id,
     });
