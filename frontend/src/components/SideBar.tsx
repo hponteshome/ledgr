@@ -68,8 +68,6 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
     {
       path: '/app/finance', icon: FiBarChart2, label: 'Finance',
       children: [
-        { path: '/app/finance/nfse-sp', label: 'NFS-e São Paulo', icon: FiFileText },
-        { path: '/app/finance/fiscal-documents', label: 'Documentos Fiscais', icon: FiFileText },
         { path: '/app/finance/accounts-payable', label: 'Contas a Pagar', icon: FiTrendingDown },
         { path: '/app/finance/contas-receber', label: 'Contas a Receber', icon: FiTrendingUp },
         { path: '/app/finance/fluxo-caixa', label: 'Fluxo de Caixa', icon: FiActivity },
@@ -78,8 +76,15 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
         { path: '/app/finance/bank-import', label: 'Importação Bancária', icon: FiUpload },
         { path: '/app/finance/provisoes', label: 'Provisões Recorrentes', icon: FiRepeat },
         { path: '/app/finance/fechamento', label: 'Fechamento Mensal', icon: FiLock },
-        { path: '/app/finance/apuracao', label: 'Apuração de Impostos', icon: FiPercent },
-        { path: '/app/finance/lalur-config', label: 'Config. Dedutibilidade', icon: FiSettings },
+      ],
+    },
+    {
+      path: '/app/fiscal', icon: FiPercent, label: 'Fiscal',
+      children: [
+        { path: '/app/finance/nfse-sp',          label: 'NFS-e São Paulo',         icon: FiUpload },
+        { path: '/app/finance/fiscal-documents',  label: 'Documentos Fiscais',      icon: FiFileText },
+        { path: '/app/finance/apuracao',          label: 'Apuração de Impostos',    icon: FiPercent },
+        { path: '/app/finance/lalur-config',      label: 'Config. Dedutibilidade',  icon: FiSettings },
       ],
     },
     {
