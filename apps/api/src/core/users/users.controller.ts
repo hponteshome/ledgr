@@ -89,6 +89,7 @@ export class UsersController {
   @Post(':id/rejeitar')
   rejeitar(@Param('id') id: string, @Body('motivo') motivo: string, @Req() req: any) {
     return this.usersService.rejeitarUsuario(id, motivo || 'Sem motivo informado', req.user?.id ?? 'system');
+  }
 
 
   @Get(':id')
@@ -132,7 +133,6 @@ export class UsersController {
   @RequirePermission('users_delete')
   async remove(@Param('id') id: string, @CurrentUser('object') user: any) {
     return this.usersService.remove(id, user.id);
-  }
   }
 
 }

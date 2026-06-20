@@ -55,7 +55,7 @@ async findByDocument(document: string) {
     return this.prisma.user.findMany({
       where:   { status: 'PENDENTE', deletedAt: null },
       include: { person: true, profile: true },
-      orderBy: { requestedAt: 'asc' },
+      orderBy: { createdAt: 'asc' },
     });
   }
 
