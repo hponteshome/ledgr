@@ -945,3 +945,25 @@ menos de 6 cards, vai sobrar espaco vazio na ultima linha (cosmetico, ajustar se
 - Rescisao Raquel + S-2299 eSocial producao real
 - Apuracao de Impostos com dados reais das notas
 - Teste LEDGR Agent A3 com token fisico
+
+
+## Revisao pendencias 2026-06-21
+
+### Rescisao CLT — CONCLUIDA (tirar da lista)
+- Modal completo em EmployeeDetailPage.tsx
+- Calculo TRCT: saldo salario, aviso previo, 13o prop, ferias, FGTS, multa 40%, INSS, IRRF
+- Confirmar rescisao -> status terminated
+- Download TRCT HTML/PDF + Seguro Desemprego HTML/PDF
+- S-2299 eSocial
+- Confirmado uso real esta semana (rescisao Raquel)
+- Backend: rescisao.controller.ts + rescisao.service.ts + trct-pdf.service.ts
+
+### Dashboard — CONCLUIDO
+- DashboardPage.tsx com dados reais: AP, AR, NFs pendentes, lancamentos, fechamento, docs assinatura
+- /dashboard/kpi + /dashboard/summary
+
+### Pendentes (atualizadas — removidos Dashboard e Rescisao)
+- Simples Nacional NFS-e Nacional — prazo set/2026
+- Reimport ECD LM (saldo abertura 31/12/2023)
+- Apuracao de Impostos com dados reais das notas fiscais
+- Teste LEDGR Agent A3 com token fisico
