@@ -40,6 +40,7 @@ export const Layout: React.FC = () => {
   }
 
   return (
+    <SidebarPermissionsProvider>
     <div className="flex h-screen bg-[#F8FAFC] overflow-hidden">
       <Sidebar open={sidebarOpen} onToggle={() => setSidebarOpen(prev => !prev)} />
       <div

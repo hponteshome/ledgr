@@ -1,5 +1,5 @@
 // frontend/src/contexts/SidebarPermissionsContext.tsx
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import api from '../services/api';
 import { useAuth } from './AuthContext';
 import { useCompany } from './CompanyContext';
@@ -23,35 +23,45 @@ export const SidebarPermissionsProvider: React.FC<{ children: React.ReactNode }>
   const { activeCompany } = useCompany();
   const [allowed, setAllowed] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
-  const [cacheKey, setCacheKey] = useState('');
+  const lastFetchedKey = useRef('');
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const isMasterAdmin = (user as any)?.permissions?.all === true;
+  const isMasterAdmin =
+    (user as any)?.permissions?.all === true ||
+    (user as any)?.profile?.permissions?.all === true;
+  const userId = (user as any)?.id ?? '';
+  const companyId = activeCompany?.id ?? '';
 
-  const fetch = useCallback((key: string) => {
-    if (!user) { setAllowed([]); setLoading(false); return; }
-    if (isMasterAdmin) { setAllowed(['*']); setLoading(false); return; }
+  const doFetch = useCallback((key: string, cId: string) => {
+    lastFetchedKey.current = key;
     setLoading(true);
     api.get('/sidebar-permissions/resolve', {
-      headers: { 'x-company-id': activeCompany?.id ?? '' },
+      headers: { 'x-company-id': cId },
     })
-      .then(r => { setAllowed(r.data); setCacheKey(key); })
+      .then(r => setAllowed(r.data))
       .catch(() => setAllowed([]))
       .finally(() => setLoading(false));
-  }, [user, activeCompany?.id, isMasterAdmin]);
+  }, []);
 
   useEffect(() => {
     if (!user) { setAllowed([]); return; }
     if (isMasterAdmin) { setAllowed(['*']); return; }
-    const key = `${(user as any).id}-${activeCompany?.id ?? ''}`;
-    if (key === cacheKey) return;
-    fetch(key);
-  }, [(user as any)?.id, activeCompany?.id, isMasterAdmin]);
+    // Aguardar empresa ativa estar definida antes de chamar a API
+    if (!companyId) return;
+    const key = `${userId}-${companyId}`;
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
+      if (key === lastFetchedKey.current) return;
+      doFetch(key, companyId);
+    }, 150);
+    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+  }, [userId, companyId, isMasterAdmin, user, doFetch]);
 
   const invalidate = useCallback(() => {
-    setCacheKey('');
-    const key = `${(user as any)?.id}-${activeCompany?.id ?? ''}`;
-    fetch(key);
-  }, [fetch, user, activeCompany?.id]);
+    lastFetchedKey.current = '';
+    const key = `${userId}-${companyId}`;
+    doFetch(key, companyId);
+  }, [doFetch, userId, companyId]);
 
   const canView = useCallback((path: string): boolean => {
     if (allowed.includes('*')) return true;
