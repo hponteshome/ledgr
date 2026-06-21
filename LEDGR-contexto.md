@@ -1106,3 +1106,19 @@ Societario -> Patrimonio -> SPED / Obrigacoes -> Acervo -> Assinaturas -> Admini
 - FiHelpCircle adicionado aos imports fi
 - Fix: import useState duplicado (useHelpState) removido
 - Painel lateral abre com ajuda contextual da pagina atual
+
+## Sessao 2026-06-21 (noite) — Performance sidebar-permissions + fix isMaster
+
+### Item 6 — Migracao SQL sidebar_items CONCLUIDO
+- Removido path obsoleto /app/finance/fiscal-documents
+- Atualizado /app/assets -> /app/assets/maintenances
+- Inseridos 7 paths do modulo Fiscal (/app/fiscal/*)
+- Inseridos 17 paths ausentes: assinaturas, acervo, auditoria, sped/efd, rh, etc
+- Total: 40 -> 63 itens em sidebar_items
+
+### Item 3 — Loop sidebar-permissions/resolve INVESTIGADO
+- Causa raiz: React StrictMode executa effects 2x em dev (nao e bug real)
+- Em producao: 1 chamada por carregamento (confirmado: Total sidebar calls: 1 apos 30s)
+- Fix aplicado: SidebarPermissionsContext com debounce 150ms + guard !companyId
+- Fix isMasterAdmin: ler de user.permissions.all OU user.profile.permissions.all
+- Commit: perf(sidebar-permissions) Context unico + debounce + fix isMasterAdmin
