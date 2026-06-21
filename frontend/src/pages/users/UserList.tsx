@@ -59,6 +59,7 @@ export const UserList: React.FC = () => {
   };
 
   return (
+    <>
     <div className="space-y-6">
       {/* Page Header */}
       <div className="flex justify-between items-center">
@@ -249,5 +250,6 @@ export const UserList: React.FC = () => {
         </div>
       </div>
     )}
+    </>
   );
 };
