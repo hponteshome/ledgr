@@ -1147,3 +1147,15 @@ Societario -> Patrimonio -> SPED / Obrigacoes -> Acervo -> Assinaturas -> Admini
 - Item 6: sidebar_items migrado (40->63 itens, modulo fiscal adicionado)
 - Item 3: SidebarPermissionsContext (1 chamada API, 0 para Master Admin)
 - Item 4: AR ja operacional com dados reais LM
+
+## Sessao 2026-06-21 (noite) — Central de Ajuda completa
+
+### Artigos adicionados ao helpContent.ts (33kb -> 51kb)
+- Societario: Estatuto/Contrato Social, Socios e QSA, Livros e Registros
+- Patrimonio: Cadastro de Bens, Ordens de Servico, Depreciacao
+- SPED / Obrigacoes: ECD, EFD-Contribuicoes, Calendario de Obrigacoes
+- Acervo: introducao ao repositorio historico
+- Assinaturas: Validacao de Assinatura, Certificados Digitais
+- helpSections: 5 novas secoes adicionadas ao indice
+- contextualHelp: 11 novas rotas mapeadas (assets, societario, arquivo, sped, assinaturas)
+- Central de Ajuda agora cobre todos os modulos da sidebar
