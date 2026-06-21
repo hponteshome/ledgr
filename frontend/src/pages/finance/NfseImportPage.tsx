@@ -18,12 +18,21 @@ export const NfseImportPage:React.FC=()=>{
   const [dragOver, setDragOver]=useState(false);
   const inputRef=useRef<HTMLInputElement>(null);
   // Busca repositorio SP
+  const [agentOnline,  setAgentOnline]  = useState<boolean|null>(null);
+  const [certsA3,      setCertsA3]      = useState<any[]>([]);
   const [certs,    setCerts]   =useState<any[]>([]);
+
   const [buscaForm,setBuscaForm]=useState({certId:'',dtInicio:'',dtFim:'',paginas:'5',hom:false});
   const [buscando, setBuscando]=useState(false);
   const [buscaRes, setBuscaRes]=useState<any>(null);
   const setBF=(k:string,v:any)=>setBuscaForm(f=>({...f,[k]:v}));
   useEffect(()=>{
+    // Detecta LEDGR Agent (A3)
+    fetch('http://localhost:7778/health',{signal:AbortSignal.timeout(1500)})
+      .then(r=>r.json()).then(()=>{
+        setAgentOnline(true);
+        fetch('http://localhost:7778/certificates').then(r=>r.json()).then(setCertsA3).catch(()=>{});
+      }).catch(()=>setAgentOnline(false));
     api.get('/certificates').then((r:any)=>setCerts((r.data||[]).filter((c:any)=>c.isActive))).catch(()=>{});
   },[]);
   const [buscaEForm,setBuscaEForm]=useState({certId:'',dtInicio:'',dtFim:'',paginas:'5',hom:false});
@@ -106,8 +115,14 @@ export const NfseImportPage:React.FC=()=>{
       {/* ── Busca Repositório SP ──────────────────────────────────────────── */}
       <div style={{background:'#EFF6FF',borderBottom:'0.5px solid #BFDBFE',
         padding:'12px 24px',flexShrink:0}}>
-        <div style={{fontWeight:700,fontSize:13,color:'#1D4ED8',marginBottom:8}}>
-          🏛️ Buscar Notas do Repositório — Prefeitura de São Paulo
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+          <div style={{fontWeight:700,fontSize:13,color:'#1D4ED8'}}>🏛️ Buscar Notas do Repositório — Prefeitura de São Paulo</div>
+          <div style={{fontSize:11,padding:'3px 10px',borderRadius:20,fontWeight:600,
+            background:agentOnline===true?'#F0FDF4':agentOnline===false?'#FEF2F2':'#F9FAFB',
+            color:agentOnline===true?'#15803D':agentOnline===false?'#DC2626':'#9CA3AF',
+            border:'0.5px solid '+(agentOnline===true?'#86EFAC':agentOnline===false?'#FCA5A5':'#E5E7EB')}}>
+            {agentOnline===true?'✓ LEDGR Agent online — A3 disponível':agentOnline===false?'✗ LEDGR Agent offline — apenas A1':'Verificando agent...'}
+          </div>
         </div>
         <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr 1fr auto',gap:8,alignItems:'end'}}>
           <div>
@@ -165,7 +180,8 @@ export const NfseImportPage:React.FC=()=>{
             <select value={buscaEForm.certId} onChange={e=>setBEF('certId',e.target.value)}
               style={{width:'100%',border:'0.5px solid #86EFAC',borderRadius:6,padding:'6px 10px',fontSize:12,outline:'none',background:'#fff'}}>
               <option value=''>Selecione...</option>
-              {certs.map((c:any)=>(<option key={c.id} value={c.id}>{c.alias}</option>))}
+              {certs.length>0&&<optgroup label='Certificados A1 (servidor)'>{certs.map((c:any)=>(<option key={c.id} value={'a1:'+c.id}>{c.alias}</option>))}</optgroup>}
+              {certsA3.length>0&&<optgroup label='Certificados A3 (token local — via LEDGR Agent)'>{certsA3.map((c:any)=>(<option key={c.thumbprint} value={'a3:'+c.thumbprint}>{c.alias} [{c.keyType}] {c.cnpj||c.cpf||''}</option>))}</optgroup>}
             </select></div>
           <div><label style={{fontSize:10,fontWeight:600,color:'#15803D',textTransform:'uppercase' as const,display:'block',marginBottom:3}}>Data Início</label>
             <input type='date' value={buscaEForm.dtInicio} onChange={e=>setBEF('dtInicio',e.target.value)}
