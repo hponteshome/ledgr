@@ -16,7 +16,7 @@ import PendentesPage from '../pages/users/PendentesPage';
 import { UserForm } from '../pages/users/UserForm';
 import { ProfileForm } from '../pages/users/ProfileForm';
 import { useAuth } from '../contexts/AuthContext';
-import { useSidebarPermissions } from '../hooks/useSidebarPermissions';
+import { useSidebarPermissions } from '../contexts/SidebarPermissionsContext';
 import { CompanyShow } from '../pages/companies/CompanyShow';
 import { CompanyEdit } from '../pages/companies/CompanyEdit';
 import { ProfileList } from '../pages/users/ProfileList';

@@ -13,7 +13,7 @@ import { useAuth } from '../contexts/AuthContext';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
 import { ImportBalancesModal } from './accounting/ImportBalancesModal';
-import { useSidebarPermissions } from '../hooks/useSidebarPermissions';
+import { useSidebarPermissions } from '../contexts/SidebarPermissionsContext';
 import { HelpCenter } from './help/HelpCenter';
 import { contextualHelp } from '../help/helpContent';
 

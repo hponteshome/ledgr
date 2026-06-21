@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import api from '../../services/api';
-import { useSidebarPermissions } from '../../hooks/useSidebarPermissions';
+import { useSidebarPermissions } from '../../contexts/SidebarPermissionsContext';
 
 interface SidebarItem { id: string; path: string; label: string; module: string; ordem: number; }
 interface Profile { id: string; name: string; }

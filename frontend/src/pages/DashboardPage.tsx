@@ -10,7 +10,7 @@ import {
 import api from '../services/api';
 import { ObrigacoesWidget } from '../components/ObrigacoesWidget';
 import { useCompany } from '../contexts/CompanyContext';
-import { useSidebarPermissions } from '../hooks/useSidebarPermissions';
+import { useSidebarPermissions } from '../contexts/SidebarPermissionsContext';
 
 interface DashKpi {
   apTotal: number; apCount: number;
