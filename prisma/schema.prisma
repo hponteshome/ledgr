@@ -80,6 +80,10 @@ model User {
   maskConfigs       CompanyMaskConfig[]       @relation("MaskConfigCreator")
   sidebarPermissions UserSidebarPermission[]
 
+  // -- Chat --
+  chatParticipations  ConversationParticipant[]
+  sentMessages        ChatMessage[]             @relation("SentMessages")
+
   @@map("users")
 }
 
@@ -4344,4 +4348,90 @@ model EsocialEvent {
   @@index([companyId, tipo])
   @@index([status])
   @@map("esocial_events")
+}
+
+// =============================================================================
+// 17 · CHAT INTERNO
+// =============================================================================
+
+/// Conversa direta (1:1) ou grupo entre usuários LEDGR.
+model Conversation {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  type        String    @default("DIRECT") @map("type") @db.VarChar(10) // DIRECT | GROUP
+  name        String?   @map("name") @db.VarChar(120)       // só para grupos
+  companyId   String?   @map("company_id") @db.Uuid          // contexto opcional
+  createdById String    @map("created_by_id") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamp(6)
+
+  participants ConversationParticipant[]
+  messages     ChatMessage[]
+
+  @@index([companyId])
+  @@index([createdById])
+  @@map("conversations")
+}
+
+/// Participantes de uma conversa — vincula User ↔ Conversation.
+model ConversationParticipant {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  conversationId String    @map("conversation_id") @db.Uuid
+  userId         String    @map("user_id") @db.Uuid
+  role           String    @default("MEMBER") @map("role") @db.VarChar(10) // ADMIN | MEMBER
+  lastReadAt     DateTime? @map("last_read_at") @db.Timestamp(6)
+  mutedAt        DateTime? @map("muted_at") @db.Timestamp(6)
+  joinedAt       DateTime  @default(now()) @map("joined_at") @db.Timestamp(6)
+  leftAt         DateTime? @map("left_at") @db.Timestamp(6)
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id])
+
+  @@unique([conversationId, userId])
+  @@index([userId])
+  @@map("conversation_participants")
+}
+
+/// Mensagem individual dentro de uma conversa.
+model ChatMessage {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  conversationId String    @map("conversation_id") @db.Uuid
+  senderId       String    @map("sender_id") @db.Uuid
+  body           String?   @map("body") @db.Text
+  type           String    @default("TEXT") @map("type") @db.VarChar(10) // TEXT | FILE | SYSTEM
+  // Contexto fiscal opcional (NF-e, obrigação, ECD, etc.)
+  contextType    String?   @map("context_type") @db.VarChar(30) // NFE | OBLIGATION | ECD | COMPANY
+  contextId      String?   @map("context_id") @db.Uuid
+  contextLabel   String?   @map("context_label") @db.VarChar(120)
+  // Resposta a outra mensagem
+  replyToId      String?   @map("reply_to_id") @db.Uuid
+  editedAt       DateTime? @map("edited_at") @db.Timestamp(6)
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamp(6)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+
+  conversation Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User          @relation("SentMessages", fields: [senderId], references: [id])
+  replyTo      ChatMessage?  @relation("Replies", fields: [replyToId], references: [id])
+  replies      ChatMessage[] @relation("Replies")
+  attachments  ChatAttachment[]
+
+  @@index([conversationId, createdAt])
+  @@index([senderId])
+  @@map("chat_messages")
+}
+
+/// Arquivo anexado a uma mensagem de chat.
+model ChatAttachment {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  messageId String   @map("message_id") @db.Uuid
+  fileName  String   @map("file_name") @db.VarChar(255)
+  fileSize  Int      @map("file_size")                    // bytes
+  mimeType  String   @map("mime_type") @db.VarChar(100)
+  storagePath String @map("storage_path") @db.VarChar(500)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+
+  message ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
+  @@map("chat_attachments")
 }

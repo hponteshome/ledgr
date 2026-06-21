@@ -31,6 +31,7 @@ import { BankImportModule } from './modules/finance/bank-import.module';
 import { CorporateModule } from './modules/corporate/corporate.module'; 
 import { SignaturesModule } from './modules/signatures/signatures.module';
 import { SidebarPermissionsModule } from './modules/sidebar-permissions/sidebar-permissions.module';
+import { ChatModule } from './chat/chat.module';
 
 
 @Module({
@@ -65,6 +66,7 @@ import { SidebarPermissionsModule } from './modules/sidebar-permissions/sidebar-
     CorporateModule,
     SignaturesModule,
         SidebarPermissionsModule,
+        ChatModule,
     
   ],
   providers: [
