@@ -6,7 +6,7 @@ import {
   FiFolder, FiBook, FiPenTool, FiClipboard, FiShield, FiPercent, FiLayers,
   FiUserCheck, FiUpload, FiDatabase, FiPieChart, FiCalendar, FiCheckCircle,
   FiServer, FiEdit2, FiEdit3, FiPackage, FiTool, FiTruck, FiTrendingUp,
-  FiAlertCircle, FiTrendingDown, FiLogOut, FiBarChart2, FiArchive, FiBookOpen, FiCpu, FiRepeat, FiLock, FiFilePlus,
+  FiAlertCircle, FiTrendingDown, FiLogOut, FiBarChart2, FiArchive, FiBookOpen, FiCpu, FiRepeat, FiLock, FiFilePlus, FiHelpCircle,
 } from 'react-icons/fi';
 import { useCompany } from '../contexts/CompanyContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -14,6 +14,8 @@ import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
 import { ImportBalancesModal } from './accounting/ImportBalancesModal';
 import { useSidebarPermissions } from '../hooks/useSidebarPermissions';
+import { HelpCenter } from './help/HelpCenter';
+import { contextualHelp } from '../help/helpContent';
 
 const MySwal = withReactContent(Swal);
 
@@ -44,6 +46,10 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
 
   const [showImportModal, setShowImportModal] = useState(false);
   const [expanded, setExpanded] = useState<string[]>([]);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const helpSlug = Object.entries(contextualHelp).find(([path]) =>
+    location.pathname.startsWith(path)
+  )?.[1];
 
   const menuItems = useMemo(() => [
 
@@ -432,12 +438,34 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
           })}
         </nav>
 
-        <div className="p-4 border-t-[0.5px] border-gray-100 flex-shrink-0">
-          <button onClick={handleSignOut} title={!open ? 'Sair' : ''} className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all text-red-600 font-bold hover:bg-red-50 ${!open && 'justify-center'}`}>
-            <FiLogOut size={20} />
-            {open && <span className="text-base">Sair</span>}
+        <div className="border-t-[0.5px] border-gray-100 flex-shrink-0">
+          <button
+            onClick={() => setHelpOpen(true)}
+            title={!open ? 'Ajuda' : ''}
+            className={`w-full flex items-center gap-3 px-4 py-3 transition-all text-gray-400 hover:text-gray-700 hover:bg-gray-50 ${!open && 'justify-center'}`}
+          >
+            <FiHelpCircle size={18} />
+            {open && <span className="text-sm">Ajuda & Suporte</span>}
+          </button>
+          <button
+            onClick={handleSignOut}
+            title={!open ? 'Sair' : ''}
+            className={`w-full flex items-center gap-3 px-4 py-3 transition-all text-red-500 hover:bg-red-50 ${!open && 'justify-center'}`}
+          >
+            <FiLogOut size={18} />
+            {open && <span className="text-sm font-medium">Sair</span>}
           </button>
         </div>
+
+        {/* Painel de Ajuda */}
+        {helpOpen && (
+          <>
+            <div className="fixed inset-0 z-50 bg-black/20 backdrop-blur-sm" onClick={() => setHelpOpen(false)} />
+            <div className="fixed right-0 top-0 h-full w-96 max-w-full z-50 bg-white shadow-2xl flex flex-col animate-slide-in-right">
+              <HelpCenter initialSlug={helpSlug} onClose={() => setHelpOpen(false)} />
+            </div>
+          </>
+        )}
       </aside>
 
       {activeCompany && <ImportBalancesModal isOpen={showImportModal} onClose={() => setShowImportModal(false)} companyId={activeCompany.id} />}
