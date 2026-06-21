@@ -1159,3 +1159,36 @@ Societario -> Patrimonio -> SPED / Obrigacoes -> Acervo -> Assinaturas -> Admini
 - helpSections: 5 novas secoes adicionadas ao indice
 - contextualHelp: 11 novas rotas mapeadas (assets, societario, arquivo, sped, assinaturas)
 - Central de Ajuda agora cobre todos os modulos da sidebar
+
+## Agenda proxima sessao — Limpeza e organizacao do repositorio
+
+### Objetivo
+Deixar o monorepo limpo, organizado e documentado antes de avançar em novas features.
+
+### Escopo planejado
+1. Auditoria de arquivos obsoletos:
+   - apps/web/ (1 arquivo orfao DashboardPage.tsx)
+   - src/ (raiz) — accounts-payable.service.ts orfao
+   - libs/ (raiz) — domain/, infrastructure/, shared/ vazios
+   - project_files/ — snapshot espelhado antigo
+   - frontend/src/pages/Dashboard.tsx, Dashboard Mock.tsx e variantes
+   - apps/api/src/auth/xxxxjwt-auth.guard.XXXXXts — arquivo morto
+   - hooks/useSidebarPermissions.ts — substituido pelo Context (pode ser removido ou mantido como re-export)
+
+2. Reorganizacao potencial:
+   - Avaliar se core/ deve mover para modules/ (companies, users, persons, documents, certificates, audit)
+   - Padronizar estrutura de pastas frontend/src/pages/ (algumas em finance/, outras em sistema/, admin/)
+
+3. Documentacao da estrutura:
+   - Atualizar CLAUDE.md secao "Estrutura do monorepo" com mapa detalhado e atualizado
+   - Criar README.md na raiz com visao geral, stack, comandos e estrutura
+   - Documentar convencoes de nomenclatura de arquivos
+
+4. Verificar e limpar:
+   - Imports nao utilizados em arquivos principais
+   - Variaveis de ambiente documentadas (sem valores sensiveis)
+   - Scripts em package.json organizados e documentados
+
+### Regra
+Nao deletar nada sem inspecionar primeiro — sempre confirmar o que e orfao
+antes de remover. Usar git para seguranca (branch de limpeza ou commits atomicos).
