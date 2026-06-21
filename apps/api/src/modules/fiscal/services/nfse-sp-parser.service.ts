@@ -1,3 +1,4 @@
+// apps/api/src/modules/fiscal/services/nfse-sp-parser.service.ts
 import { Injectable } from '@nestjs/common';
 import { XMLParser } from 'fast-xml-parser';
 
@@ -5,14 +6,17 @@ export interface NfseParsed {
   numero:              string;
   codigoVerificacao:   string;
   dataEmissao:         string;
-  competencia:         string;          // YYYY-MM
+  competencia:         string;
   prestadorCnpj:       string;
   prestadorNome:       string;
+  prestadorIm:         string;    // Inscricao Municipal
   tomadorCnpj:         string;
   tomadorNome:         string;
   tomadorEmail?:       string;
   discriminacao:       string;
   itemListaServico:    string;
+  codigoCnae:          string;
+  // Valores principais
   valorServicos:       number;
   valorDeducoes:       number;
   valorPis:            number;
@@ -24,7 +28,17 @@ export interface NfseParsed {
   valorIss:            number;
   aliquotaIss:         number;
   valorLiquido:        number;
-  mode:                'PRESTADOR' | 'TOMADOR' | 'DESCONHECIDO';
+  // v2 — Reforma Tributaria 2026 (IBS/CBS)
+  versaoLayout:        '1' | '2';
+  valorIbs:            number;
+  aliquotaIbs:         number;
+  valorCbs:            number;
+  aliquotaCbs:         number;
+  valorTotalTributos:  number;
+  ibsRetido:           boolean;
+  cbsRetido:           boolean;
+  // Modo
+  mode: 'PRESTADOR' | 'TOMADOR' | 'DESCONHECIDO';
 }
 
 @Injectable()
@@ -34,29 +48,57 @@ export class NfseSpParserService {
     parseTagValue: true,
     parseAttributeValue: true,
     trimValues: true,
-    isArray: (name) => ['CompNfse','Nfse'].includes(name),
+    isArray: (name) => ['CompNfse','Nfse','Rps'].includes(name),
   });
 
-  private clean(cnpj: any): string {
-    return String(cnpj ?? '').replace(/\D/g, '');
-  }
-
-  private num(v: any): number {
-    return parseFloat(String(v ?? '0').replace(',', '.')) || 0;
-  }
+  private clean(v: any): string { return String(v ?? '').replace(/\D/g,''); }
+  private num(v: any): number   { return parseFloat(String(v ?? '0').replace(',','.')) || 0; }
+  private str(v: any): string   { return String(v ?? ''); }
 
   private getCnpj(id: any): string {
-    const cpfCnpj = id?.CpfCnpj ?? id?.cpfCnpj ?? {};
-    return this.clean(cpfCnpj?.Cnpj ?? cpfCnpj?.Cpf ?? '');
+    const cc = id?.CpfCnpj ?? id?.cpfCnpj ?? {};
+    return this.clean(cc?.Cnpj ?? cc?.Cpf ?? '');
+  }
+
+  // Detecta versao do layout pelo atributo Versao ou presenca de campos IBS
+  private detectVersion(inf: any, valores: any): '1'|'2' {
+    if (inf?.['@_versao'] === '2' || inf?.['@_Versao'] === '2') return '2';
+    if (valores?.ValorIBS !== undefined || valores?.valorIbs !== undefined) return '2';
+    if (inf?.TributosReforma !== undefined) return '2';
+    return '1';
+  }
+
+  // Extrai campos IBS/CBS do layout v2
+  private extractIbsCbs(valores: any, tributosReforma: any): {
+    valorIbs: number; aliquotaIbs: number; ibsRetido: boolean;
+    valorCbs: number; aliquotaCbs: number; cbsRetido: boolean;
+    valorTotalTributos: number;
+  } {
+    // v2 pode ter os valores diretamente em Valores ou em TributosReforma
+    const ibs = tributosReforma?.IBS ?? tributosReforma?.Ibs ?? {};
+    const cbs = tributosReforma?.CBS ?? tributosReforma?.Cbs ?? {};
+    return {
+      valorIbs:          this.num(valores?.ValorIBS ?? ibs?.ValorIBS ?? ibs?.Valor),
+      aliquotaIbs:       this.num(valores?.AliquotaIBS ?? ibs?.Aliquota),
+      ibsRetido:         String(ibs?.ISSQNRetido ?? ibs?.Retido ?? '2') === '1',
+      valorCbs:          this.num(valores?.ValorCBS ?? cbs?.ValorCBS ?? cbs?.Valor),
+      aliquotaCbs:       this.num(valores?.AliquotaCBS ?? cbs?.Aliquota),
+      cbsRetido:         String(cbs?.Retido ?? '2') === '1',
+      valorTotalTributos:this.num(valores?.ValorTotalTributos ?? tributosReforma?.ValorTotal),
+    };
   }
 
   parseXml(xml: string, companyCnpj: string): NfseParsed[] {
     const obj = this.parser.parse(xml);
     const results: NfseParsed[] = [];
+    const cnpjClean = this.clean(companyCnpj);
 
-    // Suporta envelope ListaNfse, ConsultarNfseResposta, CompNfse direto
-    const root = obj?.ListaNfse ?? obj?.ConsultarNfseResposta?.ListaNfse
-      ?? obj?.ConsultaNfseResposta?.ListaNfse ?? obj;
+    // Suporta multiplos envelopes SP (v1 e v2)
+    const root = obj?.ListaNfse
+      ?? obj?.ConsultarNfseResposta?.ListaNfse
+      ?? obj?.ConsultaNfseResposta?.ListaNfse
+      ?? obj?.RetornoEnviarLoteRps?.ListaNfse
+      ?? obj;
 
     const comps: any[] = root?.CompNfse ?? (root?.Nfse ? [{ Nfse: root.Nfse }] : []);
 
@@ -65,34 +107,40 @@ export class NfseSpParserService {
       const inf  = nfse?.InfNfse ?? nfse;
       if (!inf) continue;
 
-      const servico  = inf?.Servico ?? inf?.DeclaracaoPrestacaoServico?.InfDeclaracaoPrestacaoServico?.Servico ?? {};
-      const valores  = servico?.Valores ?? {};
-      const prest    = inf?.PrestadorServico ?? {};
-      const tom      = inf?.TomadorServico ?? {};
+      // v2: campos podem estar em DeclaracaoPrestacaoServico
+      const dps     = inf?.DeclaracaoPrestacaoServico?.InfDeclaracaoPrestacaoServico;
+      const servico = inf?.Servico ?? dps?.Servico ?? {};
+      const valores = servico?.Valores ?? {};
+      const tribReforma = servico?.TributosReforma ?? inf?.TributosReforma ?? dps?.TributosReforma;
 
-      const prestCnpj = this.getCnpj(prest?.IdentificacaoPrestador ?? prest?.Identificacao);
-      const tomadorCnpj = this.getCnpj(tom?.IdentificacaoTomador ?? tom?.Identificacao);
-      const cnpjClean = this.clean(companyCnpj);
+      const prest = inf?.PrestadorServico ?? dps?.Prestador ?? {};
+      const tom   = inf?.TomadorServico   ?? dps?.Tomador   ?? {};
 
-      let mode: 'PRESTADOR' | 'TOMADOR' | 'DESCONHECIDO' = 'DESCONHECIDO';
+      const prestCnpj   = this.getCnpj(prest?.IdentificacaoPrestador ?? prest?.Identificacao ?? prest);
+      const tomadorCnpj = this.getCnpj(tom?.IdentificacaoTomador     ?? tom?.Identificacao   ?? tom);
+
+      let mode: 'PRESTADOR'|'TOMADOR'|'DESCONHECIDO' = 'DESCONHECIDO';
       if (prestCnpj === cnpjClean) mode = 'PRESTADOR';
       else if (tomadorCnpj === cnpjClean) mode = 'TOMADOR';
 
-      const dataEmissao = String(inf?.DataEmissao ?? inf?.Competencia ?? '').slice(0, 10);
-      const competencia = dataEmissao.slice(0, 7);
+      const dataEmissao = this.str(inf?.DataEmissao ?? inf?.Competencia ?? dps?.DataEmissao ?? '').slice(0,10);
+      const versaoLayout = this.detectVersion(inf, valores);
+      const ibsCbs = this.extractIbsCbs(valores, tribReforma);
 
       results.push({
-        numero:            String(inf?.Numero ?? ''),
-        codigoVerificacao: String(inf?.CodigoVerificacao ?? inf?.Codigo ?? ''),
+        numero:            this.str(inf?.Numero ?? ''),
+        codigoVerificacao: this.str(inf?.CodigoVerificacao ?? inf?.Codigo ?? ''),
         dataEmissao,
-        competencia,
+        competencia:       dataEmissao.slice(0,7),
         prestadorCnpj:     prestCnpj,
-        prestadorNome:     String(prest?.RazaoSocial ?? prest?.NomeRazaoSocial ?? ''),
+        prestadorNome:     this.str(prest?.RazaoSocial ?? prest?.NomeRazaoSocial ?? ''),
+        prestadorIm:       this.str(prest?.IdentificacaoPrestador?.InscricaoMunicipal ?? prest?.InscricaoMunicipal ?? ''),
         tomadorCnpj,
-        tomadorNome:       String(tom?.RazaoSocial ?? tom?.NomeRazaoSocial ?? ''),
-        tomadorEmail:      String(tom?.Contato?.Email ?? tom?.Email ?? ''),
-        discriminacao:     String(servico?.Discriminacao ?? ''),
-        itemListaServico:  String(servico?.ItemListaServico ?? ''),
+        tomadorNome:       this.str(tom?.RazaoSocial ?? tom?.NomeRazaoSocial ?? ''),
+        tomadorEmail:      this.str(tom?.Contato?.Email ?? tom?.Email ?? ''),
+        discriminacao:     this.str(servico?.Discriminacao ?? ''),
+        itemListaServico:  this.str(servico?.ItemListaServico ?? ''),
+        codigoCnae:        this.str(servico?.CodigoCnae ?? ''),
         valorServicos:     this.num(valores?.ValorServicos),
         valorDeducoes:     this.num(valores?.ValorDeducoes),
         valorPis:          this.num(valores?.ValorPIS),
@@ -104,6 +152,8 @@ export class NfseSpParserService {
         valorIss:          this.num(valores?.ValorISS ?? valores?.ValorISSQN),
         aliquotaIss:       this.num(valores?.Aliquota),
         valorLiquido:      this.num(valores?.ValorLiquidoNfse),
+        versaoLayout,
+        ...ibsCbs,
         mode,
       });
     }

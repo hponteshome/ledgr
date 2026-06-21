@@ -10,6 +10,7 @@ import { NfeParserService } from './services/nfe-parser.service';
 import { NfeImportService } from './services/nfe-import.service';
 import { NfseNacionalService } from './services/nfse-nacional.service';
 import { NfseSpConsultaService } from './services/nfse-sp-consulta.service';
+import { NfseSpEmissaoService } from './services/nfse-sp-emissao.service';
 
 @Module({
   imports: [
@@ -22,7 +23,9 @@ import { NfseSpConsultaService } from './services/nfse-sp-consulta.service';
     NfseSpParserService, NfseImportService,
     NfeParserService,    NfeImportService,
     NfseNacionalService, NfseSpConsultaService,
+    NfseSpEmissaoService,
   ],
-  exports: [NfseImportService, NfeImportService, NfseNacionalService, NfseSpConsultaService],
+  exports: [NfseImportService, NfeImportService, NfseNacionalService,
+    NfseSpConsultaService, NfseSpEmissaoService],
 })
 export class FiscalModule {}

@@ -8,6 +8,7 @@ import { NfseImportService } from './services/nfse-import.service';
 import { NfeImportService  } from './services/nfe-import.service';
 import { NfseNacionalService } from './services/nfse-nacional.service';
 import { NfseSpConsultaService } from './services/nfse-sp-consulta.service';
+import { NfseSpEmissaoService } from './services/nfse-sp-emissao.service';
 import { PrismaService } from '../../prisma/prisma.service';
 
 @Controller('fiscal')
@@ -19,6 +20,7 @@ export class FiscalController {
     private nfe:     NfeImportService,
     private nfseNac: NfseNacionalService,
     private spConsulta: NfseSpConsultaService,
+    private spEmissao: NfseSpEmissaoService,
     private prisma:  PrismaService,
   ) {}
 
@@ -161,5 +163,17 @@ export class FiscalController {
     const xmlNotas: string[] = body?.xmlNotas ?? [];
     if (!xmlNotas.length) throw new (require('@nestjs/common').BadRequestException)('xmlNotas vazio');
     return this.nfse.importFromXmlStrings(xmlNotas, req.companyId, req.user.id);
+  }
+
+  // ── Emissao NFS-e SP (EnvioLoteRPS v1 e v2) ──────────────────────────────
+  @Post('nfse-sp/emitir')
+  emitirNfseSP(@Req() req: any, @Body() dto: any) {
+    return this.spEmissao.emitir(req.companyId, dto, req.user.id);
+  }
+
+  // ── Cancelamento NFS-e SP ─────────────────────────────────────────────────
+  @Post('nfse-sp/cancelar')
+  cancelarNfseSP(@Req() req: any, @Body() body: any) {
+    return this.spEmissao.cancelar(req.companyId, body);
   }
 }
