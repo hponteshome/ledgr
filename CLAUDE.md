@@ -173,6 +173,10 @@ de usar.
 - Commit por grupo logico de funcionalidade, push para main
 - Arquivo corrompido por edicoes incrementais -> reescrita completa em vez de patch continuado
 - Sessao travada num problema especifico: pular e seguir ("vamos pular esta fase")
+- Scripts de append ao contexto/md: sempre incluir a confirmacao (Get-Content -Tail 10
+  ou Select-String) no mesmo bloco PS, logo apos o comando principal. Nao entregar
+  confirmacao separada em bloco distinto.
+
 
 ## 9. Seguranca
 

@@ -983,3 +983,44 @@ menos de 6 cards, vai sobrar espaco vazio na ultima linha (cosmetico, ajustar se
 - Apuracao de Impostos com dados reais das notas fiscais
 - Teste NFS-e Nacional em homologacao RFB
 - Teste LEDGR Agent A3 com token fisico
+
+## Sessao 2026-06-21 (tarde) — Refatoracao Sidebar + Nomenclatura PT-BR
+
+### Entregue
+- SideBar.tsx refatorado completamente (frontend/src/components/SideBar.tsx)
+- PT-BR completo: Finance->Financeiro, Accounting->Contabilidade, HR->Departamento Pessoal,
+  Sign Out->Sair, Dashboard->Visao Geral
+- Paths do Fiscal corrigidos: todos os filhos migrados de /app/finance/ para /app/fiscal/
+  (bug de auto-expansao eliminado — pai /app/fiscal com filhos em /app/finance/ causava
+  highlight errado na sidebar)
+- Reagrupamento Administracao: Empresas, Usuarios, Perfis, Pessoas Fisicas saem do raiz
+  e ficam agrupados no final como ultimo grupo operacional
+- Ativo Imobilizado -> Patrimonio: filho duplicado /app/assets removido, mantém so Manutencoes
+- Arquivo -> Acervo: repositorio historico de documentos finalizados
+- Novo grupo Assinaturas (/app/assinaturas): Validacao de Assinatura + Certificados Digitais
+  (Certificados saem de Administracao e ficam junto ao fluxo de autenticacao)
+- Visoes Contabeis (I052) movida de SPED para Contabilidade (e configuracao contabil, nao SPED)
+- DHO adicionado como sub-item desabilitado em Departamento Pessoal (placeholder futuro)
+- SPED renomeado para SPED / Obrigacoes
+
+### Ordem final dos grupos
+Visao Geral -> Contabilidade -> Financeiro -> Fiscal -> Departamento Pessoal ->
+Societario -> Patrimonio -> SPED / Obrigacoes -> Acervo -> Assinaturas -> Administracao
+
+### Nomenclatura decidida (historico da discussao)
+- Dashboard: descartado -> Visao Geral (padrao ERP brasileiro: SAP, TOTVS, Omie)
+- HR & Folha: descartado -> DHO descartado (estrategico, nao operacional) ->
+  Departamento Pessoal (correto para folha, rescisao, eSocial, GPS/DARF)
+- Ativo Imobilizado -> Patrimonio
+- Arquivo -> Gestao Documental (descartado) -> Gestao e Registros (descartado) ->
+  Acervo (elegante, juridico, unico no mercado BR)
+- Assinaturas separado do Acervo: Acervo = arquivo passivo historico;
+  Assinaturas = processo ativo (validacao, certificados)
+- i18n por IP: descartado — LEDGR e 100% BR, fixar PT-BR; se internacionalizar no futuro
+  usar react-i18next com preferencia no perfil do usuario
+
+### Pendente pos-sidebar
+- Revisar useSidebarPermissions: paths /app/finance/nfse-* mudaram para /app/fiscal/nfse-*
+  verificar se permissoes cadastradas no banco precisam de migracao SQL
+- Atualizar Central de Ajuda (help center) com nomenclatura final
+- Commit: 7996dac (refactor sidebar Acervo + Assinaturas)
