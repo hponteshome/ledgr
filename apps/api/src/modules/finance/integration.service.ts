@@ -273,7 +273,7 @@ export class IntegrationService {
               title:          `${doc.documentType} - ${doc.issuerName}`,
               description:    `NFS-e ${doc.documentNumber ?? 'S/N'} — ${doc.competenceMonth} | Prestador`,
               documentNumber: doc.documentNumber ?? undefined,
-              origin:         'NOTA_FISCAL' as any,
+              origin:         'FISCAL_DOCUMENT',
               issueDate:      doc.issueDate,
               dueDate:        doc.dueDate,
               competenceMonth: doc.competenceMonth,
@@ -303,7 +303,7 @@ export class IntegrationService {
 
           const agendaEvent = await tx.agendaEvent.create({
             data: {
-              companyId, eventType: 'RECEIPT', title: agendaTitle,
+              companyId, eventType: 'OTHER', title: agendaTitle,
               description: `${doc.documentType} nº ${doc.documentNumber ?? 'S/N'} — ${doc.issuerName}`,
               color:   DOC_TYPE_COLOR[doc.documentType],
               dueDate: doc.dueDate, amount: net, isPaid: false,
