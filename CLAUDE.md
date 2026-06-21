@@ -210,6 +210,64 @@ de usar.
 2. Este arquivo (CLAUDE.md) - convencoes e mapa do repo
 3. LEDGR-ECD-Aprendizado (1).md - armadilhas especificas de ECD/SPED
 
+
+## 0. PROTOCOLO DE INICIO DE SESSAO (OBRIGATORIO)
+
+Antes de qualquer acao, ler nesta ordem:
+1. LEDGR-contexto.md - pendencias, ultimas alteracoes, estado atual
+2. CLAUDE.md (este arquivo) - convencoes, mapa do repo, padroes
+3. LEDGR-ECD-Aprendizado (1).md - se a sessao envolver ECD/SPED
+4. prisma/schema.prisma - se a sessao criar/alterar modelos
+5. frontend/src/components/SideBar.tsx - se a sessao alterar menu/rotas
+6. frontend/src/routes/index.tsx - se a sessao criar novas paginas
+
+Nunca solicitar ao usuario informacoes ja disponiveis nesses arquivos.
+Nunca repetir perguntas de sessoes anteriores.
+
+## 12. Padroes de UI - Paginas de Lista
+
+Toda pagina de lista deve ter 3 botoes por linha: Ver (FiEye) + Editar (FiEdit2) + Excluir (FiTrash2)
+Ver: abre modal inline. Excluir: confirmacao Swal + recarrega lista do servidor (loadItems).
+Ja implementado em: UserList.tsx, ProfileList.tsx
+
+## 13. Icones react-icons/fi - Confirmados vs Inexistentes
+
+Existem: FiEye FiEdit2 FiTrash2 FiPlus FiUpload FiDownload FiFileText FiFilePlus
+         FiPackage FiSettings FiPercent FiCheckCircle FiAlertCircle FiLock FiUsers
+         FiShield FiTrendingUp FiTrendingDown FiBarChart2 FiPieChart FiCalendar
+NAO EXISTEM (causam erro): FiSend FiMoney FiReceipt
+
+## 14. Modulo Fiscal - Arquivos e Endpoints
+
+Servicos em apps/api/src/modules/fiscal/services/:
+  nfse-sp-parser.service.ts     Parser ABRASF 2.0 v1+v2 (IBS/CBS NT007/2026)
+  nfse-import.service.ts        Import NFS-e SP + importFromXmlStrings()
+  nfse-sp-consulta.service.ts   Busca repositorio SP (Tomador+Emitidas, SOAP mTLS)
+  nfse-sp-emissao.service.ts    Emissao NFS-e SP EnvioLoteRPS v1+v2 + cancelamento
+  nfse-nacional.service.ts      Emissao NFS-e Nacional RFB (DPS+mTLS) + cancelamento
+  nfe-parser.service.ts         Parser NF-e SEFAZ (Entrada/Saida)
+  nfe-import.service.ts         Import NF-e produtos
+
+Integracao NFS-e->AP/AR (integration.service.ts):
+  TOMADOR (nota recebida) -> cria ApEntry + lancamento Debito Despesa/Credito Fornecedores
+  PRESTADOR (nota emitida) -> cria ArEntry + lancamento Debito Clientes/Credito Receitas
+  Deteccao: campo notes contem TOMADOR ou PRESTADOR
+
+Locacao de Imoveis NT007/2026: codigos 99.03.01, 99.03.02, 99.04.01
+  Redutor 70% (base = 30% do valor). Sem ISS. IBS 0,1% + CBS 0,9% em 2026.
+  Obrigatoriedade plena: 2027.
+
+LEDGR Agent (apps/agent/src/main.ts): porta 7778
+  Acessa Windows Certificate Store via PowerShell/CNG para tokens A3.
+  Iniciar: cd apps/agent && npx tsx src/main.ts
+  Necessario apenas para operacoes com certificado A3 fisico.
+
+## 15. Arquivos Recomendados no Projeto claude.ai
+
+CLAUDE.md, LEDGR-contexto.md, prisma/schema.prisma,
+frontend/src/components/SideBar.tsx, frontend/src/routes/index.tsx,
+frontend/src/components/Layout.tsx, frontend/src/components/Header.tsx
+
 ---
 Manter este arquivo atualizado quando convencoes/arquitetura mudarem. Estado de sessao e
 pendencias ficam em LEDGR-contexto.md (append-only).
