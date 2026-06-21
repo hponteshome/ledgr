@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { FiUsers, FiUserPlus, FiEdit2, FiShield, FiUserCheck, FiEye, FiTrash2 } from 'react-icons/fi';
 import api from '../../services/api';
+import Swal from 'sweetalert2';
 import { UserCard } from '../../components/UserCard';
 
 export const UserList: React.FC = () => {
@@ -34,21 +35,20 @@ export const UserList: React.FC = () => {
   }, [location.state, navigate]);
 
   const handleDelete = async (id: string, nome: string) => {
-    const ok = await (window as any).Swal?.fire({
-      title: `Excluir ${nome || 'este usuário'}?`,
+    const ok = await Swal.fire({
+      title: `Excluir "${nome || 'este usuário'}"?`,
       text: 'Esta ação não pode ser desfeita.',
       icon: 'warning', showCancelButton: true,
       confirmButtonColor: '#DC2626', confirmButtonText: 'Excluir',
       cancelButtonText: 'Cancelar',
     });
-    if (!ok?.isConfirmed) return;
-    if (window.confirm("Are you sure you want to deactivate this user?")) {
-      try {
-        await api.delete(`/users/${id}`);
-        setUsers(users.filter(u => u.id !== id));
-      } catch (error) {
-        alert("Error deleting user.");
-      }
+    if (!ok.isConfirmed) return;
+    try {
+      await api.delete(`/users/${id}`);
+      setUsers(users.filter((u: any) => u.id !== id));
+      Swal.fire('Excluído!', `Usuário ${nome} removido.`, 'success');
+    } catch (error: any) {
+      Swal.fire('Erro', error?.response?.data?.message || 'Falha ao excluir.', 'error');
     }
   };
 
