@@ -154,6 +154,11 @@ de usar.
   ex: `// apps/api/src/modules/fiscal/services/nfse-sp-consulta.service.ts`
   ex: `// frontend/src/pages/finance/NfseImportPage.tsx`
 
+
+- Primeira linha de cada arquivo de codigo: comentario com caminho absoluto completo
+  ex: `// apps/api/src/modules/fiscal/services/nfse-sp-consulta.service.ts`
+  ex: `// frontend/src/pages/finance/NfseImportPage.tsx`
+
 ## 8. Fluxo de trabalho (TDD/PowerShell)
 
 - Tudo entregue como blocos PowerShell para execucao manual. NUNCA usar bash_tool,
