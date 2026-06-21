@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { FiUsers, FiUserPlus, FiEdit2, FiShield, FiUserCheck } from 'react-icons/fi';
+import { FiUsers, FiUserPlus, FiEdit2, FiShield, FiUserCheck, FiEye, FiTrash2 } from 'react-icons/fi';
 import api from '../../services/api';
 import { UserCard } from '../../components/UserCard';
 
