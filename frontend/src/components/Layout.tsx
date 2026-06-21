@@ -7,6 +7,7 @@ import { Header } from './Header';
 import { Sidebar } from './SideBar';
 import { FiLogOut, FiAlertTriangle } from 'react-icons/fi';
 import { Toaster } from 'react-hot-toast';
+import { HelpButton } from './help/HelpButton';
 
 export const Layout: React.FC = () => {
   const { signOut, user } = useAuth();
@@ -81,6 +82,7 @@ export const Layout: React.FC = () => {
           </div>
         </main>
       </div>
+      <HelpButton />
       <Toaster position="top-right" toastOptions={{ duration: 4000 }} />
     </div>
   );
