@@ -78,6 +78,7 @@ import ContasAPagarPage from '../pages/finance/ContasAPagarPage';
 import NfseImportPage from '../pages/finance/NfseImportPage';
 import NfeImportPage from '../pages/finance/NfeImportPage';
 import NfseNacionalPage from '../pages/finance/NfseNacionalPage';
+import NfseSpEmissaoPage from '../pages/finance/NfseSpEmissaoPage';
 import DocumentosFiscaisPage from '../pages/finance/DocumentosFiscaisPage';
 import FluxoCaixaPage from '../pages/finance/FluxoCaixaPage';
 import PettyCashPage from '../pages/finance/PettyCashPage';
@@ -138,6 +139,7 @@ export const AppRoutes = () => {
                 <Route path="app/finance/documentos-fiscais" element={<ProtectedRoute><DocumentosFiscaisPage /></ProtectedRoute>} />
                 <Route path="app/finance/nfse-nacional" element={<ProtectedRoute><NfseNacionalPage /></ProtectedRoute>} />
                 <Route path="app/finance/nfe" element={<ProtectedRoute><NfeImportPage /></ProtectedRoute>} />
+                <Route path="app/finance/nfse-sp-emissao" element={<ProtectedRoute><NfseSpEmissaoPage /></ProtectedRoute>} />
                 <Route path="app/finance/nfse-sp" element={<ProtectedRoute><NfseImportPage /></ProtectedRoute>} />
                 <Route path="app/finance/" element={<ProtectedRoute><FinancePage /></ProtectedRoute>} />
                 <Route path="app/finance/bank-import" element={<ProtectedRoute><BankImport /></ProtectedRoute>} />

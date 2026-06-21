@@ -83,6 +83,7 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
       children: [
         { path: '/app/finance/nfse-nacional', label: 'NFS-e Nacional (RFB)', icon: FiCheckCircle },
         { path: '/app/finance/nfe',           label: 'NF-e (Produtos)',          icon: FiPackage },
+        { path: '/app/finance/nfse-sp-emissao', label: 'Emissão NFS-e SP',      icon: FiSend },
         { path: '/app/finance/nfse-sp',          label: 'NFS-e São Paulo',         icon: FiUpload },
         { path: '/app/finance/documentos-fiscais', label: 'Documentos Fiscais',     icon: FiFileText },
         { path: '/app/finance/apuracao',          label: 'Apuração de Impostos',    icon: FiPercent },
