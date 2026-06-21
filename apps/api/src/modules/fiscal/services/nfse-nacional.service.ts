@@ -186,7 +186,6 @@ export class NfseNacionalService {
         codigoIbge:      cLocIncid,
         ambiente,
         status:          'RASCUNHO',
-                notes: isLocacao ? `Locacao | CIB:${dto.cib||'—'} | redut70:${dto.usarRedutorLocacao!==false} | IBS:${vIBSloc} CBS:${vCBSloc}` : undefined,
         createdById:     userId,
       },
     });
