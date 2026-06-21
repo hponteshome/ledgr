@@ -16,20 +16,30 @@ const STATUS_BADGE:Record<string,{bg:string,c:string,l:string}>={
   CANCELADA:  {bg:'#F9FAFB',c:'#9CA3AF',l:'Cancelada'},
 };
 
-// Codigos mais comuns LC 116 — cTribNac
+// Codigos cTribNac — LC 116/2003 + Reforma Tributaria 2026 (NT 005/2025 e NT 007/2026)
 const CODIGOS_SERVICO = [
-  {v:'01.01',l:'01.01 — Análise e desenvolvimento de sistemas'},
-  {v:'01.02',l:'01.02 — Programação'},
-  {v:'01.03',l:'01.03 — Processamento de dados'},
-  {v:'01.07',l:'01.07 — Suporte técnico em informática'},
-  {v:'04.02',l:'04.02 — Medicina / Assessoria ou consultoria médica'},
-  {v:'06.01',l:'06.01 — Assessoria ou consultoria em geral'},
-  {v:'06.02',l:'06.02 — Análise, exame, pesquisa, coleta, compilação'},
-  {v:'10.01',l:'10.01 — Agenciamento, corretagem ou intermediação'},
-  {v:'17.01',l:'17.01 — Assessoria ou consultoria geral'},
-  {v:'17.02',l:'17.02 — Datilografia, digitação, estenografia'},
-  {v:'17.06',l:'17.06 — Propaganda e publicidade'},
+  // ── Tecnologia da Informacao ─────────────────────────────────
+  {v:'01.01',l:'01.01 — Análise e desenvolvimento de sistemas',g:'TI'},
+  {v:'01.02',l:'01.02 — Programação',g:'TI'},
+  {v:'01.03',l:'01.03 — Processamento de dados e congêneres',g:'TI'},
+  {v:'01.07',l:'01.07 — Suporte técnico em informática',g:'TI'},
+  // ── Saude ───────────────────────────────────────────────────
+  {v:'04.02',l:'04.02 — Medicina / Assessoria ou consultoria médica',g:'Saúde'},
+  // ── Consultoria e Assessoria ─────────────────────────────────
+  {v:'06.01',l:'06.01 — Assessoria ou consultoria em geral',g:'Consultoria'},
+  {v:'06.02',l:'06.02 — Análise, pesquisa, coleta e compilação de dados',g:'Consultoria'},
+  {v:'10.01',l:'10.01 — Agenciamento, corretagem ou intermediação',g:'Intermediação'},
+  {v:'17.01',l:'17.01 — Assessoria ou consultoria',g:'Outros'},
+  {v:'17.02',l:'17.02 — Datilografia, digitação, estenografia',g:'Outros'},
+  {v:'17.06',l:'17.06 — Propaganda e publicidade',g:'Outros'},
+  // ── Locacao de Imoveis — Reforma Tributaria 2026 (NT 007/2026) ──
+  // IBS/CBS: redutor 70%. Nao incide ISS. Emissao via NFS-e Nacional.
+  // Obrigatoria a partir de 2027 (testes simbolicos desde 08/2026)
+  {v:'99.03.01',l:'99.03.01 — Locação de Imóvel Residencial (IBS/CBS — Reforma 2026)',g:'Locação'},
+  {v:'99.03.02',l:'99.03.02 — Locação de Imóvel Não Residencial / Comercial (IBS/CBS — Reforma 2026)',g:'Locação'},
+  {v:'99.04.01',l:'99.04.01 — Locação de Bens Móveis (IBS/CBS — Reforma 2026)',g:'Locação'},
 ];
+const IS_LOCACAO = (cod:string) => cod.startsWith('99.');
 
 const Inp = ({label,required,...p}:any) => (
   <div>
@@ -60,6 +70,8 @@ export const NfseNacionalPage:React.FC = () => {
   const [form,     setForm]    = useState({
     tomadorCnpj:'', tomadorNome:'', tomadorEmail:'',
     codigoServico:'01.07', descricaoServico:'',
+    cib:'', inscricaoImobiliaria:'',
+    usarRedutorLocacao:true,
     valorServico:'', valorDeducoes:'0', aliquotaIss:'2',
     issRetido:false, certId:'', ambiente:'HOMOLOGACAO',
     codigoIbge:'3550308',
@@ -83,9 +95,18 @@ export const NfseNacionalPage:React.FC = () => {
 
   useEffect(()=>{ loadCerts(); loadHistorico(); },[loadCerts,loadHistorico]);
 
-  const vBC     = Math.max(0, Number(form.valorServico)||0 - (Number(form.valorDeducoes)||0));
-  const vISS    = (vBC * (Number(form.aliquotaIss)||0) / 100);
-  const vLiquido= form.issRetido ? vBC - vISS : vBC;
+  const isLocacao = IS_LOCACAO(form.codigoServico);
+  const vServicoNum = Number(form.valorServico)||0;
+  const vDeducoesNum = Number(form.valorDeducoes)||0;
+  const vBC     = Math.max(0, vServicoNum - vDeducoesNum);
+  // Locacao: redutor 70% na base IBS/CBS (NT 007/2026)
+  const vBCLocacao = isLocacao && form.usarRedutorLocacao ? vBC * 0.30 : vBC;
+  // Aliquotas 2026 (fase de testes): CBS 0,9% + IBS 0,1%
+  const aliqIBS2026 = 0.001; const aliqCBS2026 = 0.009;
+  const vIBS2026 = isLocacao ? vBCLocacao * aliqIBS2026 : 0;
+  const vCBS2026 = isLocacao ? vBCLocacao * aliqCBS2026 : 0;
+  const vISS    = isLocacao ? 0 : (vBC * (Number(form.aliquotaIss)||0) / 100);
+  const vLiquido= isLocacao ? vBC - vIBS2026 - vCBS2026 : (form.issRetido ? vBC - vISS : vBC);
 
   const emitir = async(e:React.FormEvent) => {
     e.preventDefault();
@@ -107,7 +128,10 @@ export const NfseNacionalPage:React.FC = () => {
         ...form,
         valorServico:  Number(form.valorServico),
         valorDeducoes: Number(form.valorDeducoes||0),
-        aliquotaIss:   Number(form.aliquotaIss||0),
+        aliquotaIss:   isLocacao ? 0 : Number(form.aliquotaIss||0),
+        cib:           form.cib||undefined,
+        inscricaoImobiliaria: form.inscricaoImobiliaria||undefined,
+        usarRedutorLocacao: form.usarRedutorLocacao,
       });
       if(r.data.status==='AUTORIZADA'){
         Swal.fire('NFS-e Autorizada!',
@@ -179,6 +203,14 @@ export const NfseNacionalPage:React.FC = () => {
         {tab==='emitir'&&(
           <div style={{maxWidth:700}}>
             {/* Alerta ambiente */}
+            {isLocacao&&(
+              <div style={{background:'#F5F3FF',border:'0.5px solid #C4B5FD',borderRadius:8,
+                padding:'10px 14px',fontSize:12,color:'#7C3AED',marginBottom:8}}>
+                🏠 <b>Locação de Imóveis — Reforma Tributária 2026</b><br/>
+                Código NT 007/2026 · Incide IBS+CBS, <b>não incide ISS</b> · Redutor 70% aplicado · Alíquotas simbólicas 2026: IBS 0,1% + CBS 0,9%<br/>
+                <b>Obrigatório:</b> CIB (Cadastro Imobiliário Brasileiro) e Inscrição Imobiliária · Obrigatoriedade plena: 2027
+              </div>
+            )}
             {form.ambiente==='HOMOLOGACAO'&&(
               <div style={{background:'#FEF3C7',border:'0.5px solid #FCD34D',borderRadius:8,
                 padding:'10px 14px',fontSize:12,color:'#92400E',marginBottom:16}}>
@@ -220,6 +252,11 @@ export const NfseNacionalPage:React.FC = () => {
                       onChange={(e:any)=>set('tomadorNome',e.target.value)}/>
                     <Inp label="E-mail" type="email" value={form.tomadorEmail}
                       onChange={(e:any)=>set('tomadorEmail',e.target.value)}/>
+                    {isLocacao&&<Inp label="CIB — Cadastro Imobiliário Brasileiro" value={form.cib}
+                      onChange={(e:any)=>set('cib',e.target.value)}
+                      placeholder="Obrigatório para locação de imóveis (NT 007/2026)"/>}
+                    {isLocacao&&<Inp label="Inscrição Imobiliária" value={form.inscricaoImobiliaria}
+                      onChange={(e:any)=>set('inscricaoImobiliaria',e.target.value)}/>}
                     <Inp label="Cód. IBGE Município" value={form.codigoIbge}
                       onChange={(e:any)=>set('codigoIbge',e.target.value)}
                       placeholder="3550308 = São Paulo"/>
@@ -234,7 +271,13 @@ export const NfseNacionalPage:React.FC = () => {
                   <div style={{display:'grid',gap:10}}>
                     <Sel label="Código do Serviço (LC 116)" required
                       value={form.codigoServico} onChange={(e:any)=>set('codigoServico',e.target.value)}>
-                      {CODIGOS_SERVICO.map(c=><option key={c.v} value={c.v}>{c.l}</option>)}
+                      {['TI','Saúde','Consultoria','Intermediação','Outros','Locação'].map(g=>{
+                        const items=CODIGOS_SERVICO.filter((s:any)=>s.g===g);
+                        if(!items.length) return null;
+                        return(<optgroup key={g} label={g==='Locação'?'🏠 '+g+' — Reforma Tributária 2026 (NT 007)':g}>
+                          {items.map((s:any)=>(<option key={s.v} value={s.v}>{s.l}</option>))}
+                        </optgroup>);
+                      })}
                     </Sel>
                     <div>
                       <label style={{fontSize:11,fontWeight:600,color:'#6B7280',
@@ -262,8 +305,16 @@ export const NfseNacionalPage:React.FC = () => {
                       value={form.valorServico} onChange={(e:any)=>set('valorServico',e.target.value)}/>
                     <Inp label="Deduções (R$)" type="number" step="0.01"
                       value={form.valorDeducoes} onChange={(e:any)=>set('valorDeducoes',e.target.value)}/>
-                    <Inp label="Alíquota ISS (%)" type="number" step="0.01" min="0"
-                      value={form.aliquotaIss} onChange={(e:any)=>set('aliquotaIss',e.target.value)}/>
+                    {!isLocacao&&<Inp label="Alíquota ISS (%)" type="number" step="0.01" min="0"
+                      value={form.aliquotaIss} onChange={(e:any)=>set('aliquotaIss',e.target.value)}/>}
+                    {isLocacao&&(
+                      <div style={{background:'#F5F3FF',borderRadius:6,padding:'8px 12px',fontSize:12}}>
+                        <label style={{display:'flex',alignItems:'center',gap:6,cursor:'pointer'}}>
+                          <input type='checkbox' checked={form.usarRedutorLocacao} onChange={e=>set('usarRedutorLocacao',e.target.checked)}/>
+                          <span><b>Redutor 70%</b> — Base IBS/CBS = 30% do valor (NT 007/2026)</span>
+                        </label>
+                      </div>
+                    )}
                   </div>
                   <div style={{marginTop:10}}>
                     <label style={{display:'flex',alignItems:'center',gap:8,
@@ -283,7 +334,11 @@ export const NfseNacionalPage:React.FC = () => {
                           {l:'Base de Cálculo',v:fmtBRL(vBC),c:'#374151'},
                           {l:'ISS '+(form.issRetido?'(retido)':''),v:fmtBRL(vISS),c:'#F97316'},
                           {l:'Valor Líquido',v:fmtBRL(vLiquido),c:'#15803D'},
-                          {l:'Alíquota',v:form.aliquotaIss+'%',c:'#6B7280'},
+                          ...(isLocacao?[
+                            {l:'Base IBS/CBS (c/ red. 70%)',v:fmtBRL(vBCLocacao),c:'#7C3AED'},
+                            {l:'IBS 0,1% (2026)',v:fmtBRL(vIBS2026),c:'#7C3AED'},
+                            {l:'CBS 0,9% (2026)',v:fmtBRL(vCBS2026),c:'#7C3AED'},
+                          ]:[{l:'Alíquota ISS',v:form.aliquotaIss+'%',c:'#6B7280'}]),
                         ].map(x=>(
                           <div key={x.l}>
                             <div style={{fontSize:10,color:'#9CA3AF',textTransform:'uppercase',fontWeight:600}}>{x.l}</div>
