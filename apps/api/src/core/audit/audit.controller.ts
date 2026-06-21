@@ -1,25 +1,23 @@
-import { Controller } from '@nestjs/common';
-import { EventPattern, MessagePattern, Payload } from '@nestjs/microservices';
-import { AuditService } from './audit.service';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { AuditService, AuditFilter } from './audit.service';
+import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 
-@Controller()
+@UseGuards(JwtAuthGuard)
+@Controller('audit')
 export class AuditController {
   constructor(private readonly auditService: AuditService) {}
 
-  // @EventPattern listens exactly for the event name sent by auditClient.emit
-  @EventPattern('user_updated')
-  async handleUserUpdated(@Payload() data: any) {
-    return this.auditService.register(data);
-  }
-
-  @EventPattern('user_deleted')
-  async handleUserDeleted(@Payload() data: any) {
-    return this.auditService.register(data);
-  }
-
-  // Responds to IAM request to list logs on the Frontend screen
-  @MessagePattern('get_audit_logs')
-  async handleGetLogs() {
-    return await this.auditService.findAll();
+  @Get()
+  findAll(@Query() query: any) {
+    const filters: AuditFilter = {
+      actorId:  query.actorId  || undefined,
+      action:   query.action   || undefined,
+      targetId: query.targetId || undefined,
+      dateFrom: query.dateFrom || undefined,
+      dateTo:   query.dateTo   || undefined,
+      page:     query.page  ? parseInt(query.page)  : 1,
+      limit:    query.limit ? parseInt(query.limit) : 50,
+    };
+    return this.auditService.findAll(filters);
   }
 }

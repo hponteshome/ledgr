@@ -4,6 +4,7 @@ import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { LedgrHome } from '../pages/LedgrHome';
 import DashboardPage from '../pages/DashboardPage';
+import AuditPage from '../pages/admin/AuditPage';
 import FinancePage from '../pages/finance/FinancePage';
 import BankImport from '../pages/finance/BankImportPage';
 import ProvisoesPage from '../pages/finance/ProvisoesPage';
@@ -279,7 +280,8 @@ export const AppRoutes = () => {
 
                 {/* Módulos em desenvolvimento */}
                 <Route path="app/tax" element={<ProtectedRoute><div className="p-8 text-center text-gray-500"><h2>Tax Module</h2><p>Em desenvolvimento</p></div></ProtectedRoute>} />
-                <Route path="app/audit" element={<ProtectedRoute><div className="p-8 text-center text-gray-500"><h2>Audit Module</h2><p>Em desenvolvimento</p></div></ProtectedRoute>} />
+                <Route path="app/audit" element={<ProtectedRoute><AuditPage /></ProtectedRoute>} />
+                <Route path="app/administracao/auditoria" element={<ProtectedRoute><AuditPage /></ProtectedRoute>} />
 
                 {/* Fallback */}
                 <Route path="*" element={<Navigate to="/" replace />} />
