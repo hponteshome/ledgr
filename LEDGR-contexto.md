@@ -1058,3 +1058,13 @@ Societario -> Patrimonio -> SPED / Obrigacoes -> Acervo -> Assinaturas -> Admini
   documents, clicksign, govbr, signature-validator) — dados reais disponiveis
 - action e string livre — sem enum padronizado ainda (melhoria futura)
 - Pendente: testar no browser com dados reais
+
+## Sessao 2026-06-21 (tarde/noite) — fix Auditoria
+
+### Fix
+- audit.controller.ts: import JwtAuthGuard corrigido de
+  '../../auth/jwt-auth.guard' para '../../auth/guards/jwt.guard'
+- Endpoint GET /audit funcionando — 131 registros reais carregados
+- AuditPage.tsx operacional: badges coloridos, actor, alvo, paginacao
+- Sidebar secoes visiveis: OPERACIONAL/EMPRESA/COMPLIANCE/SISTEMA
+- Commit: fix(audit) path JwtAuthGuard
