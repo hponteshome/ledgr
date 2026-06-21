@@ -1024,3 +1024,37 @@ Societario -> Patrimonio -> SPED / Obrigacoes -> Acervo -> Assinaturas -> Admini
   verificar se permissoes cadastradas no banco precisam de migracao SQL
 - Atualizar Central de Ajuda (help center) com nomenclatura final
 - Commit: 7996dac (refactor sidebar Acervo + Assinaturas)
+
+## Sessao 2026-06-21 (tarde/noite) — Auditoria & Logs + Sidebar Secoes
+
+### Sidebar — separadores de secao
+- dividerBefore adicionado na interface MenuItem
+- Secoes: Operacional (Contabilidade/Financeiro/Fiscal/Depto Pessoal),
+  Empresa (Societario/Patrimonio), Compliance (SPED/Acervo/Assinaturas),
+  Sistema (Administracao)
+- Separadores visiveis apenas com sidebar expandida (open && item.dividerBefore)
+- Commit: feat(sidebar) separadores de secao
+
+### Auditoria & Logs — IMPLEMENTADO
+- Backend: audit.service.ts reescrito com findAll(filters) + paginacao
+  Filtros: actorId, action, targetId, dateFrom, dateTo, page, limit
+  Retorna: { data, total, page, pages, limit }
+- Backend: audit.controller.ts reescrito — HTTP REST GET /audit com @UseGuards(JwtAuthGuard)
+  Substituiu padrao microservico (@MessagePattern) por endpoint HTTP convencional
+- AuditModule em apps/api/src/core/audit/ (nao movido para modules/ — core/ ja tem
+  outros modulos de negocio: companies, users, documents; mover seria refatoracao
+  sem ganho imediato)
+- Frontend: AuditPage.tsx em frontend/src/pages/admin/AuditPage.tsx
+  Filtros: acao, actorId, data de/ate
+  Tabela: data/hora, acao (badge colorido por tipo), usuario, alvo, IP
+  Detalhe expansivel: diff JSON before/after (vermelho/verde)
+  Paginacao: anterior/proxima com contador de paginas
+- Rota: /app/administracao/auditoria + /app/audit (alias existente reaproveitado)
+- Sidebar: Auditoria & Logs adicionado em Administracao (primeiro sub-item)
+- Commit: 3c30227
+
+### Observacoes tecnicas
+- AuditLog ja era gravado em 8+ servicos (accounting, AP, fechamento, integration,
+  documents, clicksign, govbr, signature-validator) — dados reais disponiveis
+- action e string livre — sem enum padronizado ainda (melhoria futura)
+- Pendente: testar no browser com dados reais
