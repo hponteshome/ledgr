@@ -27,7 +27,10 @@ export interface EmitirNfseDto {
   aliquotaIss?:      number;    // percentual: 2.0 = 2%
   issRetido?:        boolean;
   codigoIbge?:       string;    // default 3550308 (SP)
-  certId:            string;    // UUID do certificado
+  certId:            string;
+  cib?:                  string;   // Cadastro Imobiliario Brasileiro (locacao)
+  inscricaoImobiliaria?: string;
+  usarRedutorLocacao?:   boolean;
   ambiente?:         'HOMOLOGACAO' | 'PRODUCAO';
 }
 
@@ -142,12 +145,19 @@ export class NfseNacionalService {
     const cLocIncid = dto.codigoIbge ?? '3550308';
     const vServ     = Number(dto.valorServico).toFixed(2);
     const vDed      = Number(dto.valorDeducoes ?? 0).toFixed(2);
-    const pAliq     = Number(dto.aliquotaIss ?? 0) / 100;
+    const isLocacao  = dto.codigoServico?.startsWith('99.');
+    const pAliq     = isLocacao ? 0 : Number(dto.aliquotaIss ?? 0) / 100;
     const vBC       = (Number(vServ) - Number(vDed)).toFixed(2);
-    const vISS      = (Number(vBC) * pAliq).toFixed(2);
-    const vLiq      = dto.issRetido
-      ? (Number(vBC) - Number(vISS)).toFixed(2)
-      : Number(vBC).toFixed(2);
+    const vBCLoc    = isLocacao && dto.usarRedutorLocacao !== false
+      ? (Number(vBC) * 0.30).toFixed(2) : vBC;
+    const vISS      = isLocacao ? '0.00' : (Number(vBC) * pAliq).toFixed(2);
+    const vIBSloc   = isLocacao ? (Number(vBCLoc) * 0.001).toFixed(2) : '0.00';
+    const vCBSloc   = isLocacao ? (Number(vBCLoc) * 0.009).toFixed(2) : '0.00';
+    const vLiq      = isLocacao
+      ? (Number(vBC) - Number(vIBSloc) - Number(vCBSloc)).toFixed(2)
+      : dto.issRetido
+        ? (Number(vBC) - Number(vISS)).toFixed(2)
+        : Number(vBC).toFixed(2);
     const tpRet     = dto.issRetido ? '1' : '2';
     const competencia = dataEmi.slice(0,7);
 
@@ -176,6 +186,7 @@ export class NfseNacionalService {
         codigoIbge:      cLocIncid,
         ambiente,
         status:          'RASCUNHO',
+                notes: isLocacao ? `Locacao | CIB:${dto.cib||'—'} | redut70:${dto.usarRedutorLocacao!==false} | IBS:${vIBSloc} CBS:${vCBSloc}` : undefined,
         createdById:     userId,
       },
     });
