@@ -2,14 +2,17 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { FiShield, FiPlus, FiEdit2, FiLock, FiActivity } from 'react-icons/fi';
+import { FiShield, FiPlus, FiEdit2, FiLock, FiActivity, FiEye, FiTrash2 } from 'react-icons/fi';
 import api from '../../services/api';
+import Swal from 'sweetalert2';
 import { UserCard } from '../../components/UserCard';
 
 export const ProfileList: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [profiles, setProfiles] = useState<any[]>([]);
+  const [profiles,    setProfiles]    = useState<any[]>([]);
+  const [viewProfile, setViewProfile] = useState<any>(null);
+
   const [isLoading, setIsLoading] = useState(true);
 
   const loadProfiles = async () => {
@@ -33,7 +36,26 @@ export const ProfileList: React.FC = () => {
     }
   }, [location.state, navigate]);
 
+  const handleDelete = async (id: string, nome: string) => {
+    const ok = await Swal.fire({
+      title: `Excluir perfil "${nome}"?`,
+      text: 'Usuários vinculados perderão este perfil. Esta ação não pode ser desfeita.',
+      icon: 'warning', showCancelButton: true,
+      confirmButtonColor: '#DC2626', confirmButtonText: 'Excluir',
+      cancelButtonText: 'Cancelar',
+    });
+    if (!ok.isConfirmed) return;
+    try {
+      await api.delete(`/profiles/${id}`);
+      setProfiles(prev => prev.filter((p: any) => p.id !== id));
+      Swal.fire('Excluído!', `Perfil ${nome} removido.`, 'success');
+    } catch (e: any) {
+      Swal.fire('Erro', e?.response?.data?.message || 'Falha ao excluir.', 'error');
+    }
+  };
+
   return (
+    <>
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
@@ -107,13 +129,23 @@ export const ProfileList: React.FC = () => {
                     </div>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <button
-                      onClick={() => navigate(`/app/profiles/edit/${profile.id}`)}
-                      className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-                      title="Edit Profile & Permissions"
-                    >
-                      <FiEdit2 size={18} />
-                    </button>
+                    <div style={{display:"flex",gap:4,justifyContent:"flex-end"}}>
+                      <button onClick={()=>setViewProfile(profile)}
+                        className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                        title="Visualizar perfil">
+                        <FiEye size={18} />
+                      </button>
+                      <button onClick={()=>navigate(`/app/profiles/edit/${profile.id}`)}
+                        className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                        title="Editar perfil e permissões">
+                        <FiEdit2 size={18} />
+                      </button>
+                      <button onClick={()=>handleDelete(profile.id, profile.name)}
+                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                        title="Excluir perfil">
+                        <FiTrash2 size={18} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -128,5 +160,53 @@ export const ProfileList: React.FC = () => {
         )}
       </div>
     </div >
-  );
+
+    {/* Modal Visualizar Perfil */}
+    {viewProfile&&(
+      <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.4)',
+        zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center'}}
+        onClick={()=>setViewProfile(null)}>
+        <div style={{background:'#fff',borderRadius:16,padding:32,minWidth:460,maxWidth:560,
+          boxShadow:'0 20px 60px rgba(0,0,0,0.3)'}} onClick={e=>e.stopPropagation()}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
+            <h2 style={{fontSize:18,fontWeight:700,color:'#111',margin:0}}>Detalhes do Perfil</h2>
+            <button onClick={()=>setViewProfile(null)}
+              style={{border:'none',background:'none',fontSize:20,cursor:'pointer',color:'#9CA3AF'}}>✕</button>
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:16}}>
+            {[
+              {l:'Nome',         v:viewProfile.name||'—'},
+              {l:'Descrição',    v:viewProfile.description||'—'},
+              {l:'Usuários',     v:String(viewProfile._count?.users||viewProfile.users?.length||0)+' vinculados'},
+              {l:'Criado em',    v:viewProfile.createdAt?new Date(viewProfile.createdAt).toLocaleString('pt-BR'):'—'},
+            ].map(f=>(
+              <div key={f.l} style={{background:'#F9FAFB',borderRadius:8,padding:'10px 14px'}}>
+                <div style={{fontSize:10,color:'#9CA3AF',textTransform:'uppercase',fontWeight:600,marginBottom:2}}>{f.l}</div>
+                <div style={{fontSize:13,fontWeight:500,color:'#374151'}}>{f.v}</div>
+              </div>
+            ))}
+          </div>
+          {viewProfile.permissions&&Object.keys(viewProfile.permissions).length>0&&(
+            <div style={{background:'#F9FAFB',borderRadius:8,padding:'12px 14px',marginBottom:16}}>
+              <div style={{fontSize:10,color:'#9CA3AF',textTransform:'uppercase',fontWeight:600,marginBottom:8}}>Permissões</div>
+              <div style={{display:'flex',flexWrap:'wrap',gap:4}}>
+                {Object.keys(viewProfile.permissions).map((p:string)=>(
+                  <span key={p} style={{fontSize:10,padding:'2px 8px',borderRadius:20,
+                    background:'#EFF6FF',color:'#1D4ED8',fontWeight:600}}>{p}</span>
+                ))}
+              </div>
+            </div>
+          )}
+          <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
+            <button onClick={()=>setViewProfile(null)}
+              style={{padding:'8px 20px',borderRadius:8,border:'0.5px solid #E5E7EB',
+                background:'#fff',cursor:'pointer',fontSize:13}}>Fechar</button>
+            <button onClick={()=>{setViewProfile(null);navigate(`/app/profiles/edit/${viewProfile.id}`);}}
+              style={{padding:'8px 20px',borderRadius:8,border:'none',
+                background:'#6C63FF',color:'#fff',cursor:'pointer',fontSize:13,fontWeight:600}}>✏ Editar</button>
+          </div>
+        </div>
+      </div>
+    )}
+  </>);
 };
