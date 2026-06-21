@@ -226,7 +226,9 @@ async findByLogin(login: string) {
 
   async findAll() {
     return this.prisma.user.findMany({
-      include: { profile: true }
+      where: { deletedAt: null, status: { not: 'deleted' } },
+      include: { profile: true },
+      orderBy: { createdAt: 'desc' },
     });
   }
 
