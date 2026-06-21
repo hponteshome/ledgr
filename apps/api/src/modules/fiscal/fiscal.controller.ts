@@ -155,4 +155,11 @@ export class FiscalController {
       userId:      req.user.id,
     });
   }
+
+  @Post('nfse-sp/import-from-xml')
+  importFromXml(@Req() req: any, @Body() body: any) {
+    const xmlNotas: string[] = body?.xmlNotas ?? [];
+    if (!xmlNotas.length) throw new (require('@nestjs/common').BadRequestException)('xmlNotas vazio');
+    return this.nfse.importFromXmlStrings(xmlNotas, req.companyId, req.user.id);
+  }
 }

@@ -21,7 +21,9 @@ export const NfseImportPage:React.FC=()=>{
   // Busca repositorio SP
   const [agentOnline,  setAgentOnline]  = useState<boolean|null>(null);
   const [certsA3,      setCertsA3]      = useState<any[]>([]);
+  const [companyCnpj, setCompanyCnpj] = useState<string>('');
   const [certs,    setCerts]   =useState<any[]>([]);
+
 
   const [buscaForm,setBuscaForm]=useState({certId:'',dtInicio:'',dtFim:'',paginas:'5',hom:false});
   const [buscando, setBuscando]=useState(false);
@@ -35,7 +37,9 @@ export const NfseImportPage:React.FC=()=>{
         fetch('http://localhost:7778/certificates').then(r=>r.json()).then(setCertsA3).catch(()=>{});
       }).catch(()=>setAgentOnline(false));
     api.get('/certificates').then((r:any)=>setCerts((r.data||[]).filter((c:any)=>c.isActive))).catch(()=>{});
+    api.get('/companies/current').then((r:any)=>setCompanyCnpj((r.data?.taxId||'').replace(/\D/g,''))).catch(()=>{});
   },[]);
+
   const [buscaEForm,setBuscaEForm]=useState({certId:'',dtInicio:'',dtFim:'',paginas:'5',hom:false});
   const [buscandoE, setBuscandoE]=useState(false);
   const [buscaERes, setBuscaERes]=useState<any>(null);
@@ -45,14 +49,31 @@ export const NfseImportPage:React.FC=()=>{
     if(!buscaEForm.certId){Swal.fire('Atenção','Selecione um certificado.','warning');return;}
     setBuscandoE(true);setBuscaERes(null);
     try{
-      const r=await api.post('/fiscal/nfse-sp/buscar-emitidas',{
-        certId:buscaEForm.certId,dtInicio:buscaEForm.dtInicio||undefined,
-        dtFim:buscaEForm.dtFim||undefined,paginas:parseInt(buscaEForm.paginas)||5,
-        homologacao:buscaEForm.hom,
-      });
-      setBuscaERes(r.data);
-      if(r.data.importadas>0) Swal.fire('Concluído!',`${r.data.importadas} nota(s) emitidas importadas.`,'success');
-      else if(r.data.totalEncontradas===0) Swal.fire('Sem resultados','Nenhuma NFS-e emitida no período.','info');
+      const isA3E = buscaEForm.certId.startsWith('a3:');
+      const certValE = buscaEForm.certId.replace(/^a[13]:/,'');
+      if(isA3E){
+        if(!companyCnpj){Swal.fire('Atenção','CNPJ da empresa não carregado.','warning');return;}
+        const agE = await fetch('http://localhost:7778/nfse-sp/buscar-emitidas',{
+          method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({thumbprint:certValE,cnpj:companyCnpj,
+            dtInicio:buscaEForm.dtInicio||undefined,dtFim:buscaEForm.dtFim||undefined,
+            paginas:parseInt(buscaEForm.paginas)||5,homologacao:buscaEForm.hom}),
+        }).then(r=>r.json());
+        const impE = await api.post('/fiscal/nfse-sp/import-from-xml',{xmlNotas:agE.xmlNotas||[]});
+        const resE = {...impE.data, totalEncontradas: agE.totalEncontradas, erros: agE.erros};
+        setBuscaERes(resE);
+        if(resE.importadas>0) Swal.fire('Concluído!',`${resE.importadas} nota(s) importada(s) via A3.`,'success');
+        else if(resE.totalEncontradas===0) Swal.fire('Sem resultados','Nenhuma NFS-e emitida encontrada.','info');
+      } else {
+        const r=await api.post('/fiscal/nfse-sp/buscar-emitidas',{
+          certId:certValE,dtInicio:buscaEForm.dtInicio||undefined,
+          dtFim:buscaEForm.dtFim||undefined,paginas:parseInt(buscaEForm.paginas)||5,
+          homologacao:buscaEForm.hom,
+        });
+        setBuscaERes(r.data);
+        if(r.data.importadas>0) Swal.fire('Concluído!',`${r.data.importadas} nota(s) emitidas importadas.`,'success');
+        else if(r.data.totalEncontradas===0) Swal.fire('Sem resultados','Nenhuma NFS-e emitida no período.','info');
+      }
     }catch(e:any){Swal.fire('Erro',e?.response?.data?.message||e.message,'error');}
     finally{setBuscandoE(false);}
   };
@@ -60,17 +81,39 @@ export const NfseImportPage:React.FC=()=>{
   const buscarSP=async()=>{
     if(!buscaForm.certId){Swal.fire('Atenção','Selecione um certificado.','warning');return;}
     setBuscando(true);setBuscaRes(null);
+    const isA3 = buscaForm.certId.startsWith('a3:');
+    const certVal = buscaForm.certId.replace(/^a[13]:/,'');
     try{
-      const r=await api.post('/fiscal/nfse-sp/buscar-tomador',{
-        certId:buscaForm.certId,
-        dtInicio:buscaForm.dtInicio||undefined,
-        dtFim:buscaForm.dtFim||undefined,
-        paginas:parseInt(buscaForm.paginas)||5,
-        homologacao:buscaForm.hom,
-      });
-      setBuscaRes(r.data);
-      if(r.data.importadas>0) Swal.fire('Concluído!',`${r.data.importadas} nota(s) importada(s).`,'success');
-      else if(r.data.totalEncontradas===0) Swal.fire('Sem resultados','Nenhuma NFS-e no período.','info');
+      if(isA3){
+        // A3 — via LEDGR Agent local
+        if(!companyCnpj){Swal.fire('Atenção','CNPJ da empresa não carregado. Recarregue a página.','warning');return;}
+        const agResp = await fetch('http://localhost:7778/nfse-sp/buscar-tomador',{
+          method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({thumbprint:certVal,cnpj:companyCnpj,
+            dtInicio:buscaForm.dtInicio||undefined,dtFim:buscaForm.dtFim||undefined,
+            paginas:parseInt(buscaForm.paginas)||5,homologacao:buscaForm.hom}),
+        }).then(r=>r.json());
+        if(agResp.erros?.length&&!agResp.xmlNotas?.length){
+          Swal.fire('Erro Agent',agResp.erros[0],'error');return;
+        }
+        // Importa XMLs via backend
+        const impResp = await api.post('/fiscal/nfse-sp/import-from-xml',{xmlNotas:agResp.xmlNotas||[]});
+        const res = {...impResp.data, totalEncontradas: agResp.totalEncontradas, erros: agResp.erros};
+        setBuscaRes(res);
+        if(res.importadas>0) Swal.fire('Concluído!',`${res.importadas} nota(s) importada(s) via A3.`,'success');
+        else if(res.totalEncontradas===0) Swal.fire('Sem resultados','Nenhuma NFS-e encontrada.','info');
+        else Swal.fire('Sem novas notas',`${res.duplicatas} duplicata(s) ignorada(s).`,'info');
+      } else {
+        // A1 — via backend direto
+        const r=await api.post('/fiscal/nfse-sp/buscar-tomador',{
+          certId:certVal,dtInicio:buscaForm.dtInicio||undefined,
+          dtFim:buscaForm.dtFim||undefined,paginas:parseInt(buscaForm.paginas)||5,
+          homologacao:buscaForm.hom,
+        });
+        setBuscaRes(r.data);
+        if(r.data.importadas>0) Swal.fire('Concluído!',`${r.data.importadas} nota(s) importada(s).`,'success');
+        else if(r.data.totalEncontradas===0) Swal.fire('Sem resultados','Nenhuma NFS-e no período.','info');
+      }
     }catch(e:any){Swal.fire('Erro',e?.response?.data?.message||e.message,'error');}
     finally{setBuscando(false);}
   };

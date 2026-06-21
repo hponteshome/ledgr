@@ -92,4 +92,49 @@ export class NfseImportService {
     }
     return { created: created.length, skipped: skipped.length, errors, createdList: created };
   }
+  // Importa a partir de strings XML (usado pelo LEDGR Agent com cert A3)
+  async importFromXmlStrings(xmlNotas: string[], companyId: string, userId: string) {
+    const company = await this.prisma.company.findUniqueOrThrow({ where: { id: companyId } });
+    const cnpj = (company.taxId ?? '').replace(/\D/g,'');
+    let importadas = 0, duplicatas = 0;
+    const erros: string[] = [];
+    for (const xml of xmlNotas) {
+      try {
+        const parsed = this.parser.parseXml(xml, cnpj);
+        for (const n of parsed) {
+          const dup = await this.prisma.fiscalDocument.findFirst({
+            where: { companyId, documentNumber: n.numero, issuerCnpj: n.prestadorCnpj },
+          });
+          if (dup) { duplicatas++; continue; }
+          const { Decimal } = await import('@prisma/client/runtime/library');
+          const net = n.valorLiquido || (n.valorServicos - n.valorDeducoes - n.valorIss);
+          await this.prisma.fiscalDocument.create({
+            data: {
+              companyId, documentType: 'NFSE', documentNumber: n.numero,
+              accessKey: (n.codigoVerificacao + '0'.repeat(44)).slice(0,44),
+              issuerCnpj: n.prestadorCnpj, issuerName: n.prestadorNome,
+              issueDate: new Date(n.dataEmissao + 'T12:00:00Z'),
+              dueDate:   new Date(n.dataEmissao + 'T12:00:00Z'),
+              competenceMonth: n.competencia,
+              grossAmount: new Decimal(n.valorServicos),
+              discountAmount: new Decimal(n.valorDeducoes),
+              netAmount: new Decimal(net),
+              pisAmount: new Decimal(n.valorPis),
+              cofinsAmount: new Decimal(n.valorCofins),
+              issAmount: new Decimal(n.valorIss),
+              inssAmount: new Decimal(n.valorInss),
+              irAmount:  new Decimal(n.valorIr),
+              csllAmount: new Decimal(n.valorCsll),
+              integrationStatus: 'PENDING', status: 'RASCUNHO',
+              notes: `Agent A3 | Modo: ${n.mode} | ISS retido: ${n.issRetido?'Sim':'Não'}`,
+              createdById: userId,
+            },
+          });
+          importadas++;
+        }
+      } catch(e: any) { erros.push(e.message?.slice(0,100)); }
+    }
+    return { importadas, duplicatas, erros, total: xmlNotas.length };
+  }
+
 }
