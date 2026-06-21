@@ -37,7 +37,7 @@ export const NfseImportPage:React.FC=()=>{
         fetch('http://localhost:7778/certificates').then(r=>r.json()).then(setCertsA3).catch(()=>{});
       }).catch(()=>setAgentOnline(false));
     api.get('/certificates').then((r:any)=>setCerts((r.data||[]).filter((c:any)=>c.isActive))).catch(()=>{});
-    api.get('/companies/current').then((r:any)=>setCompanyCnpj((r.data?.taxId||'').replace(/\D/g,''))).catch(()=>{});
+    api.get('/companies/me').then((r:any)=>setCompanyCnpj((r.data?.taxId||'').replace(/\D/g,''))).catch(()=>{});
   },[]);
 
   const [buscaEForm,setBuscaEForm]=useState({certId:'',dtInicio:'',dtFim:'',paginas:'5',hom:false});
