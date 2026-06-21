@@ -866,3 +866,55 @@ menos de 6 cards, vai sobrar espaco vazio na ultima linha (cosmetico, ajustar se
 - fdc3679: roteamento A1/A3 completo, /companies/me para CNPJ
 - 938749b: import-from-xml endpoint + importFromXmlStrings
 - 8778990: CLAUDE.md convencao cabecalho
+
+
+## Sessao 2026-06-21 (madrugada) — NFS-e SP Completo + Locacao Imoveis
+
+### Entregue
+- Parser NFS-e SP v2 (Reforma Tributaria 2026):
+  - Interface NfseParsed estendida: versaoLayout, valorIbs, aliquotaIbs, valorCbs, aliquotaCbs, ibsRetido, cbsRetido, valorTotalTributos, prestadorIm, codigoCnae
+  - Auto-detecta v1 vs v2 por atributo Versao ou presenca de campos IBS
+  - Suporta envelopes SP v1 e v2 (RetornoEnviarLoteRps, DPS, CompNfse)
+
+- NfseSpEmissaoService (apps/api/src/modules/fiscal/services/nfse-sp-emissao.service.ts):
+  - buildRpsV1: formato ABRASF 2.0 classico
+  - buildRpsV2: formato Reforma Tributaria 2026 (IBS/CBS campos)
+  - emitir(): assina RPS + Lote, envia SOAP EnviarLoteRps, salva FiscalDocument
+  - cancelar(): assina e envia CancelaNfse, atualiza status
+  - Endpoints: POST /fiscal/nfse-sp/emitir, POST /fiscal/nfse-sp/cancelar
+
+- NfseSpEmissaoPage.tsx:
+  - Formulario completo: cert, ambiente, tomador, servico LC116, valores, ISS
+  - Toggle Layout v2 (IBS/CBS)
+  - Historico com status e botao cancelar
+  - Rota: /app/finance/nfse-sp-emissao | Sidebar: Emissao NFS-e SP (FiFilePlus)
+
+- Locacao de Imoveis — preparacao NT 007/2026:
+  - Codigos 99.03.01 (residencial), 99.03.02 (comercial), 99.04.01 (bens moveis)
+  - Select agrupado por tipo no NfseNacionalPage
+  - Deteccao isLocacao = cod.startsWith('99.')
+  - Redutor 70%: base IBS/CBS = 30% do valor (NT 007/2026)
+  - Aliquotas simbolicas 2026: IBS 0.1% + CBS 0.9%
+  - Campos CIB (Cadastro Imobiliario Brasileiro) e inscricaoImobiliaria
+  - Alerta visual roxo quando codigo de locacao selecionado
+  - ISS sempre zero para codigos 99.xx
+  - service: isLocacao detectado, vBCLoc, vIBSloc, vCBSloc calculados
+  - DTO: cib, inscricaoImobiliaria, usarRedutorLocacao
+
+### Cronograma locacao LM (para referencia)
+- Hoje (2026): nada obrigatorio — SP nao tem codigo ISS para locacao
+- 01/08/2026: emissao com campos IBS/CBS exigida via NFS-e Nacional RFB
+- 2027: obrigatoriedade plena — NFS-e Nacional cod 99.03.xx com CIB
+
+### Status NFS-e SP — completo
+- Import XML manual (ABRASF v1 e v2): OK
+- Busca repositorio SP Tomador (A1 backend + A3 agent): OK
+- Busca repositorio SP Emitidas (A1 backend + A3 agent): OK  
+- Emissao EnvioLoteRPS (v1 + v2): OK
+- Cancelamento CancelaNfse: OK
+- Parser v2 IBS/CBS: OK
+
+### Pendentes
+- Teste LEDGR Agent A3 com token fisico
+- Reimport ECD LM
+- CIB por imovel no modulo Ativo Imobilizado da LM (quando 08/2026 chegar)
