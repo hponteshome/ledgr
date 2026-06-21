@@ -455,6 +455,255 @@ export const helpContent: Record<string, HelpArticle> = {
     related: ['administracao/usuarios', 'administracao/perfis'],
   },
 
+
+  // ── SOCIETÁRIO ────────────────────────────────────────────────────────────
+
+  'societario/estatuto-contrato': {
+    title: 'Estatuto Social e Contrato Social',
+    section: 'Societário',
+    intro: 'O Estatuto Social (para S/A) e o Contrato Social (para Ltda) são os documentos fundamentais da empresa, definindo seu objeto, capital e regras de funcionamento.',
+    content: [
+      { type: 'text', text: 'No LEDGR, esses documentos são gerados automaticamente a partir dos dados cadastrados na empresa — sócios, capital social, objeto social e endereço. Não é necessário digitar o texto do zero.' },
+      { type: 'steps', items: [
+        'Acesse Societário no menu lateral.',
+        'Clique em Estatuto Social ou Contrato Social.',
+        'Revise os dados pré-preenchidos — razão social, CNPJ, sócios, capital.',
+        'Preencha o objeto social da empresa (o que a empresa faz).',
+        'Clique em Gerar Documento.',
+        'O PDF será criado e ficará disponível para download e assinatura.',
+      ]},
+      { type: 'tip', text: 'O documento gerado recebe um código de integridade (hash SHA-256) que garante que ele não foi alterado após a geração. Esse código aparece no rodapé do PDF.' },
+      { type: 'warning', text: 'Para registro na Junta Comercial (JUCESP), o documento precisa ser assinado digitalmente com certificado e-CNPJ (ICP-Brasil). Use o módulo Assinaturas para isso.' },
+    ],
+    related: ['societario/socios', 'societario/livros', 'administracao/certificados'],
+  },
+
+  'societario/socios': {
+    title: 'Sócios e Quadro Societário (QSA)',
+    section: 'Societário',
+    intro: 'O Quadro de Sócios e Administradores (QSA) registra quem são os donos da empresa, suas participações e seus papéis na administração.',
+    content: [
+      { type: 'steps', items: [
+        'Acesse Societário no menu lateral.',
+        'Clique em Apresentação Institucional ou nos dados da empresa.',
+        'Localize a seção Quadro Societário.',
+        'Clique em Adicionar Sócio.',
+        'Preencha CPF/CNPJ, nome, participação (%) e papel (Sócio, Administrador, Diretor).',
+        'Salve. O QSA será atualizado automaticamente nos documentos gerados.',
+      ]},
+      { type: 'tip', text: 'A participação total dos sócios deve somar exatamente 100%. O sistema alertará se houver divergência.' },
+      { type: 'warning', text: 'Alterações no quadro societário precisam ser formalizadas em Ata de Reunião ou Assembleia e registradas na Junta Comercial. O LEDGR gera os documentos mas não faz o protocolo automático.' },
+    ],
+    related: ['societario/estatuto-contrato', 'societario/livros'],
+  },
+
+  'societario/livros': {
+    title: 'Livros e Registros Societários',
+    section: 'Societário',
+    intro: 'Os livros societários registram formalmente os atos da empresa: transferências de cotas/ações, assembleias e reuniões de sócios.',
+    content: [
+      { type: 'list', items: [
+        'Livro de Acionistas e Participações — registro de quem possui cotas ou ações',
+        'Livro de Transferências — histórico de compra e venda de participações',
+        'Atas de AGO/AGE — registros das assembleias gerais ordinárias e extraordinárias',
+        'Livro de Presença — controle de participação nas assembleias',
+      ]},
+      { type: 'text', text: 'Desde setembro de 2025, a JUCESP autentica livros societários exclusivamente em formato digital (PDF/A com assinatura ICP-Brasil). O LEDGR gera os livros nesse formato.' },
+      { type: 'tip', text: 'Livros encerrados ficam arquivados em Acervo → Societário, acessíveis para consulta a qualquer momento.' },
+    ],
+    related: ['societario/estatuto-contrato', 'societario/socios'],
+  },
+
+  // ── PATRIMÔNIO ─────────────────────────────────────────────────────────────
+
+  'patrimonio/cadastro': {
+    title: 'Cadastro de Bens',
+    section: 'Patrimônio',
+    intro: 'O módulo de Patrimônio controla todos os bens da empresa: imóveis, veículos, equipamentos, móveis e outros ativos imobilizados.',
+    content: [
+      { type: 'text', text: 'Cada bem cadastrado tem um código interno, descrição, valor de aquisição, data de compra e vida útil estimada. Essas informações são usadas para calcular a depreciação automaticamente.' },
+      { type: 'steps', items: [
+        'Acesse Patrimônio no menu lateral.',
+        'Clique em Novo Bem (ou acesse Manutenções para ordens de serviço).',
+        'Preencha: código, descrição, grupo (imóvel, veículo, equipamento), valor e data de aquisição.',
+        'Defina a vida útil em meses (ex: 240 meses para imóveis, 60 para veículos).',
+        'Salve. O bem começará a depreciar a partir do mês seguinte.',
+      ]},
+      { type: 'tip', text: 'Terrenos e obras em andamento não depreciam. Marque a opção "Não depreciável" ao cadastrar esses bens.' },
+      { type: 'warning', text: 'Para a empresa LM, os imóveis para locação ficam no grupo REAL_ESTATE. A partir de agosto de 2026, cada imóvel precisará ter o CIB (Cadastro Imobiliário Brasileiro) para emissão de NFS-e de locação.' },
+    ],
+    related: ['patrimonio/manutencoes', 'patrimonio/depreciacao'],
+  },
+
+  'patrimonio/manutencoes': {
+    title: 'Ordens de Serviço e Manutenções',
+    section: 'Patrimônio',
+    intro: 'Registre e acompanhe todas as manutenções realizadas nos bens da empresa: reparos, revisões, retrofits e avaliações.',
+    content: [
+      { type: 'steps', items: [
+        'Acesse Patrimônio → Manutenções.',
+        'Clique em + Nova OS.',
+        'Selecione o bem, defina o título e tipo (preventiva, corretiva, retrofit).',
+        'Informe a data prevista e o valor orçado.',
+        'Salve com status Agendada.',
+        'Ao concluir, atualize o status para Concluída e registre o valor real gasto.',
+      ]},
+      { type: 'table', headers: ['Status', 'Significado'], rows: [
+        ['Agendada', 'Manutenção programada, ainda não iniciada'],
+        ['Em Andamento', 'Manutenção em execução'],
+        ['Concluída', 'Manutenção finalizada e registrada'],
+        ['Cancelada', 'Manutenção cancelada sem execução'],
+      ]},
+      { type: 'tip', text: 'O histórico de manutenções de cada bem fica registrado permanentemente, útil para auditorias e avaliações patrimoniais.' },
+    ],
+    related: ['patrimonio/cadastro'],
+  },
+
+  'patrimonio/depreciacao': {
+    title: 'Depreciação de Bens',
+    section: 'Patrimônio',
+    intro: 'A depreciação registra a perda de valor dos bens ao longo do tempo, impactando o resultado contábil da empresa.',
+    content: [
+      { type: 'text', text: 'O LEDGR calcula a depreciação pelo método linear: o valor do bem é dividido pela vida útil em meses, gerando uma parcela mensal constante.' },
+      { type: 'table', headers: ['Tipo de bem', 'Vida útil típica'], rows: [
+        ['Imóveis (construção)', '480 meses (40 anos)'],
+        ['Veículos', '60 meses (5 anos)'],
+        ['Equipamentos de TI', '60 meses (5 anos)'],
+        ['Móveis e utensílios', '120 meses (10 anos)'],
+        ['Terrenos', 'Não deprecia'],
+      ]},
+      { type: 'tip', text: 'A depreciação é lançada automaticamente no Fechamento Mensal. Confira o item "Depreciação" na checklist do fechamento.' },
+    ],
+    related: ['patrimonio/cadastro', 'financeiro/fechamento-mensal'],
+  },
+
+  // ── SPED / OBRIGAÇÕES ──────────────────────────────────────────────────────
+
+  'sped/ecd': {
+    title: 'ECD — Escrituração Contábil Digital',
+    section: 'SPED / Obrigações',
+    intro: 'A ECD é a obrigação anual de enviar os livros contábeis da empresa à Receita Federal em formato digital. Substitui os livros Diário e Razão em papel.',
+    content: [
+      { type: 'text', text: 'O LEDGR gera o arquivo ECD automaticamente a partir dos lançamentos contábeis do ano. O arquivo segue o leiaute exigido pelo SPED Contábil.' },
+      { type: 'steps', items: [
+        'Certifique-se de que todos os lançamentos do ano estão corretos e o período está fechado.',
+        'Configure as Visões Contábeis (mapeamento das contas para os grupos da Receita Federal).',
+        'Acesse SPED / Obrigações → ECD — Pré-Validação para verificar erros antes de gerar.',
+        'Corrija os erros apontados (dados de cadastro, mapeamento de contas).',
+        'Acesse ECD — Escrituração Contábil e clique em Gerar ECD.',
+        'Baixe o arquivo .txt e valide no programa PVA do SPED Contábil.',
+        'Após validação sem erros críticos, assine e transmita pelo próprio PVA.',
+      ]},
+      { type: 'warning', text: 'Erros de mapeamento (Visões Contábeis) são de responsabilidade do contador — não são bugs do sistema. O LEDGR indica quais contas precisam ser mapeadas.' },
+      { type: 'tip', text: 'O prazo de entrega da ECD é 31 de maio do ano seguinte ao ano-base. Ex: ECD 2025 deve ser entregue até 31/05/2026.' },
+    ],
+    related: ['sped/efd', 'contabilidade/lancamentos', 'contabilidade/relatorios'],
+  },
+
+  'sped/efd': {
+    title: 'EFD-Contribuições (PIS/COFINS)',
+    section: 'SPED / Obrigações',
+    intro: 'A EFD-Contribuições é a obrigação mensal de informar à Receita Federal os valores de PIS e COFINS apurados pela empresa.',
+    content: [
+      { type: 'text', text: 'O LEDGR gera a EFD-Contribuições com base nas notas fiscais importadas e nas configurações do regime tributário da empresa (cumulativo ou não-cumulativo).' },
+      { type: 'steps', items: [
+        'Importe todas as notas fiscais do período (NFS-e e NF-e).',
+        'Acesse SPED / Obrigações → EFD-Contribuições.',
+        'Selecione a competência (mês/ano).',
+        'Clique em Gerar EFD.',
+        'Valide no PVA EFD-Contribuições da Receita Federal.',
+        'Transmita pelo PVA após validação.',
+      ]},
+      { type: 'tip', text: 'Empresas do Simples Nacional não entregam EFD-Contribuições — essa obrigação é exclusiva do Lucro Real e Lucro Presumido.' },
+    ],
+    related: ['sped/ecd', 'fiscal/apuracao'],
+  },
+
+  'sped/obrigacoes': {
+    title: 'Calendário de Obrigações Fiscais',
+    section: 'SPED / Obrigações',
+    intro: 'O LEDGR mantém um calendário automático com todas as obrigações fiscais e trabalhistas da empresa, com alertas de vencimento.',
+    content: [
+      { type: 'list', items: [
+        'FGTS Mensal — até dia 7 do mês seguinte',
+        'GPS INSS (pró-labore) — até dia 20 do mês seguinte',
+        'DARF PIS/COFINS — até dia 25 do mês seguinte',
+        'DAS Simples Nacional — até dia 20 do mês seguinte',
+        'DCTFWeb — mensal, após fechamento da folha',
+        'ECD — anual, até 31 de maio',
+        'ECF — anual, até 31 de julho',
+        'DIRF — anual, até último dia útil de fevereiro',
+        'RAIS — anual, prazo variável (janeiro-março)',
+      ]},
+      { type: 'tip', text: 'O Dashboard mostra as obrigações dos próximos 60 dias com indicador de dias restantes. Obrigações vencidas aparecem em vermelho.' },
+      { type: 'warning', text: 'Os prazos podem ser alterados pela Receita Federal. Sempre confirme as datas no site oficial da RFB antes do pagamento.' },
+    ],
+    related: ['sped/ecd', 'sped/efd', 'dp/esocial'],
+  },
+
+  // ── ACERVO ─────────────────────────────────────────────────────────────────
+
+  'acervo/introducao': {
+    title: 'O que é o Acervo',
+    section: 'Acervo',
+    intro: 'O Acervo é o repositório histórico de documentos finalizados da empresa — contratos assinados, atas, balancetes aprovados, ECDs transmitidos e mais.',
+    content: [
+      { type: 'text', text: 'Diferente dos módulos operacionais (onde você cria e edita documentos), o Acervo guarda documentos já concluídos e com valor jurídico. Os arquivos são imutáveis após serem arquivados.' },
+      { type: 'list', items: [
+        'Acervo Societário — Contratos/Estatutos, Atas assinadas, Procurações, Acordos, Livros encerrados',
+        'Acervo Contábil — Balancetes aprovados, ECDs assinados, Demonstrações Financeiras',
+        'Acervo Fiscal — ECFs assinados, Obrigações acessórias',
+        'Acervo RH / Trabalhista — Contratos de trabalho, Procurações trabalhistas, Acordos coletivos',
+      ]},
+      { type: 'tip', text: 'Use o Acervo para localizar rapidamente documentos históricos em auditorias, due diligences e processos judiciais.' },
+    ],
+    related: ['assinaturas/validacao', 'societario/livros'],
+  },
+
+  // ── ASSINATURAS ────────────────────────────────────────────────────────────
+
+  'assinaturas/validacao': {
+    title: 'Validação de Assinatura Digital',
+    section: 'Assinaturas',
+    intro: 'Verifique se um documento assinado digitalmente é autêntico e não foi alterado após a assinatura.',
+    content: [
+      { type: 'text', text: 'Todo documento gerado pelo LEDGR recebe um código de integridade (hash SHA-256). A validação compara o hash do arquivo com o registrado no sistema — se forem iguais, o documento é íntegro.' },
+      { type: 'steps', items: [
+        'Acesse Assinaturas → Validação de Assinatura.',
+        'Faça upload do arquivo PDF a ser validado.',
+        'O sistema calculará o hash do arquivo e comparará com o registrado.',
+        'Se íntegro: aparecerá "Documento válido" com data e hora da assinatura.',
+        'Se alterado: aparecerá "Documento inválido — hash divergente".',
+      ]},
+      { type: 'tip', text: 'Você também pode validar documentos diretamente pelo serviço gov.br de verificação de assinaturas digitais em validar.iti.gov.br.' },
+      { type: 'warning', text: 'Um documento com assinatura válida mas hash divergente indica que o arquivo foi modificado após a assinatura — isso invalida juridicamente o documento.' },
+    ],
+    related: ['assinaturas/certificados', 'acervo/introducao'],
+  },
+
+  'assinaturas/certificados': {
+    title: 'Certificados Digitais',
+    section: 'Assinaturas',
+    intro: 'Os certificados digitais são obrigatórios para assinar documentos com validade jurídica e transmitir obrigações à Receita Federal.',
+    content: [
+      { type: 'table', headers: ['Tipo', 'Formato', 'Uso principal'], rows: [
+        ['e-CPF A1', 'Arquivo .pfx', 'Assinar documentos como pessoa física'],
+        ['e-CPF A3', 'Token USB', 'Assinar documentos como pessoa física (mais seguro)'],
+        ['e-CNPJ A1', 'Arquivo .pfx', 'Assinar documentos e NFs como empresa'],
+        ['e-CNPJ A3', 'Token USB', 'Assinar documentos e NFs como empresa (mais seguro)'],
+      ]},
+      { type: 'steps', items: [
+        'Para A1: acesse Assinaturas → Certificados Digitais, clique em Adicionar, faça upload do .pfx e informe a senha.',
+        'Para A3: instale o driver do token no Windows e inicie o LEDGR Agent.',
+        'Vincule o certificado à empresa correspondente.',
+        'O certificado ficará disponível para assinar documentos e emitir notas fiscais.',
+      ]},
+      { type: 'warning', text: 'Certificados têm validade de 1 ou 3 anos. O LEDGR alertará quando o certificado estiver próximo do vencimento.' },
+      { type: 'tip', text: 'Nunca compartilhe a senha do seu certificado digital. Em caso de comprometimento, revogue imediatamente junto à Autoridade Certificadora.' },
+    ],
+    related: ['assinaturas/validacao', 'fiscal/nfse-sp'],
+  },
+
   'administracao/certificados': {
     title: 'Certificados Digitais',
     section: 'Assinaturas',
@@ -502,7 +751,17 @@ export const contextualHelp: Record<string, string> = {
   '/app/profiles':                         'administracao/perfis',
   '/app/administracao/auditoria':          'administracao/auditoria',
   '/app/documents/signatures/certificates': 'administracao/certificados',
-  '/app/assinaturas':                      'administracao/certificados',
+  '/app/assinaturas':                      'assinaturas/certificados',
+  '/app/signatures/validate':              'assinaturas/validacao',
+  '/app/documents/signatures/certificates': 'assinaturas/certificados',
+  '/app/assets':                           'patrimonio/cadastro',
+  '/app/assets/maintenances':              'patrimonio/manutencoes',
+  '/app/societario':                       'societario/estatuto-contrato',
+  '/app/societario/livros':                'societario/livros',
+  '/app/arquivo':                          'acervo/introducao',
+  '/app/sped/ecd':                         'sped/ecd',
+  '/app/sped/efd':                         'sped/efd',
+  '/app/sistema/obrigacoes':               'sped/obrigacoes',
 };
 
 // ── Índice de seções para a Central de Ajuda ─────────────────────────────────
@@ -553,6 +812,48 @@ export const helpSections = [
       { slug: 'dp/pro-labore',   title: 'Pró-labore' },
       { slug: 'dp/rescisao',     title: 'Rescisão de Contrato' },
       { slug: 'dp/esocial',      title: 'eSocial' },
+    ],
+  },
+  {
+    title: 'Societário',
+    icon: 'building',
+    articles: [
+      { slug: 'societario/estatuto-contrato', title: 'Estatuto Social e Contrato Social' },
+      { slug: 'societario/socios',            title: 'Sócios e Quadro Societário (QSA)' },
+      { slug: 'societario/livros',            title: 'Livros e Registros Societários' },
+    ],
+  },
+  {
+    title: 'Patrimônio',
+    icon: 'package',
+    articles: [
+      { slug: 'patrimonio/cadastro',     title: 'Cadastro de Bens' },
+      { slug: 'patrimonio/manutencoes',  title: 'Ordens de Serviço e Manutenções' },
+      { slug: 'patrimonio/depreciacao',  title: 'Depreciação de Bens' },
+    ],
+  },
+  {
+    title: 'SPED / Obrigações',
+    icon: 'database',
+    articles: [
+      { slug: 'sped/ecd',        title: 'ECD — Escrituração Contábil Digital' },
+      { slug: 'sped/efd',        title: 'EFD-Contribuições (PIS/COFINS)' },
+      { slug: 'sped/obrigacoes', title: 'Calendário de Obrigações Fiscais' },
+    ],
+  },
+  {
+    title: 'Acervo',
+    icon: 'archive',
+    articles: [
+      { slug: 'acervo/introducao', title: 'O que é o Acervo' },
+    ],
+  },
+  {
+    title: 'Assinaturas',
+    icon: 'shield',
+    articles: [
+      { slug: 'assinaturas/validacao',    title: 'Validação de Assinatura Digital' },
+      { slug: 'assinaturas/certificados', title: 'Certificados Digitais' },
     ],
   },
   {
