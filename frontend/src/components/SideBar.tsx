@@ -30,6 +30,7 @@ interface MenuItem {
   path: string;
   icon: React.ElementType;
   label: string;
+  dividerBefore?: string;
   children?: SubItem[];
 }
 
@@ -49,7 +50,7 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
     { path: '/app/dashboard', icon: FiHome, label: 'Visão Geral' },
 
     {
-      path: '/app/accounting', icon: FiBook, label: 'Contabilidade',
+      path: '/app/accounting', icon: FiBook, label: 'Contabilidade', dividerBefore: 'Operacional',
       children: [
         { path: '/app/accounting/accounts', label: 'Plano de Contas', icon: FiLayers },
         { path: '/app/accounting/journal', label: 'Lançamentos', icon: FiEdit3 },
@@ -133,7 +134,7 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
     },
 
     {
-      path: '/app/societario', icon: FiLayers, label: 'Societário',
+      path: '/app/societario', icon: FiLayers, label: 'Societário', dividerBefore: 'Empresa',
       children: [
         { path: cid ? `/app/societario/${cid}/apresentacao` : '#', label: 'Apresentação Institucional', icon: FiBriefcase, disabled: !cid },
         { path: cid ? `/app/companies/corporate/statute/${cid}` : '#', label: 'Estatuto Social', icon: FiBook, disabled: !cid },
@@ -158,7 +159,7 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
     },
 
     {
-      path: '/app/sped', icon: FiDatabase, label: 'SPED / Obrigações',
+      path: '/app/sped', icon: FiDatabase, label: 'SPED / Obrigações', dividerBefore: 'Compliance',
       children: [
         { path: '/app/sped/ecd', label: 'ECD — Escrituração Contábil', icon: FiDatabase },
         { path: '/app/sped/ecd/pre-validate', label: 'ECD — Pré-Validação', icon: FiCheckCircle },
@@ -225,7 +226,7 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
     },
 
     {
-      path: '/app/administracao',
+      path: '/app/administracao', dividerBefore: 'Sistema',
       icon: FiSettings,
       label: 'Administração',
       children: [
@@ -345,7 +346,15 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
             const isExp = expanded.includes(item.path);
 
             return (
-              <div key={item.path} className="mb-1">
+              <div key={item.path}>
+                {open && item.dividerBefore && (
+                  <div className="px-3 pt-4 pb-1">
+                    <span className="text-[10px] font-semibold tracking-widest text-gray-400 uppercase">
+                      {item.dividerBefore}
+                    </span>
+                  </div>
+                )}
+                <div className="mb-1">
                 {item.children ? (
                   <button
                     onClick={() => handleParentClick(item.path)}
@@ -416,6 +425,7 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
                     ))}
                   </div>
                 )}
+                </div>
               </div>
             );
           })}
