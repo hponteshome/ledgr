@@ -233,6 +233,7 @@ export class NfseSpEmissaoService {
       disc: dto.discriminacao,
       codMun,
       vServ, vDed,
+      aliq:    this.fmt(aliqIss),
       aliqIss: this.fmt(aliqIss),
       vIss,
       issRet: dto.issRetido ?? false,
