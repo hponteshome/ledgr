@@ -27,6 +27,8 @@ const DOC_TYPE_COLOR: Record<FiscalDocumentType, AgendaColor> = {
 
 // Conta contábil padrão para cada tipo (configurável futuro)
 const DEFAULT_AP_ACCOUNT = '2.1.01'; // Fornecedores a Pagar
+const DEFAULT_AR_ACCOUNT = '1.1.03'; // Clientes a Receber
+const DEFAULT_REV_ACCOUNT = '4.1.01'; // Receitas de Servicos
 
 @Injectable()
 export class IntegrationService {
@@ -198,33 +200,140 @@ export class IntegrationService {
 
   // ── Re-integra um documento com status PENDING/ERROR ────────
   async runIntegration(doc: FiscalDocument, companyId: string, userId: string) {
-    // Monta DTO a partir do documento existente para reusar createWithIntegration
-    const dto: CreateFiscalDocumentDto = {
-      documentType:   doc.documentType,
-      documentNumber: doc.documentNumber ?? undefined,
-      accessKey:      doc.accessKey ?? undefined,
-      issuerCnpj:     doc.issuerCnpj,
-      issuerName:     doc.issuerName,
-      issuerStateReg: doc.issuerStateReg ?? undefined,
-      issueDate:      doc.issueDate.toISOString(),
-      dueDate:        doc.dueDate.toISOString(),
-      competenceMonth: doc.competenceMonth,
-      grossAmount:    Number(doc.grossAmount),
-      netAmount:      Number(doc.netAmount),
-      discountAmount: Number(doc.discountAmount),
-      irAmount:       Number(doc.irAmount),
-      pisAmount:      Number(doc.pisAmount),
-      cofinsAmount:   Number(doc.cofinsAmount),
-      csllAmount:     Number(doc.csllAmount),
-      issAmount:      Number(doc.issAmount),
-      inssAmount:     Number(doc.inssAmount),
-      expenseAccountId: doc.expenseAccountId ?? undefined,
-      costCenter:     doc.costCenter ?? undefined,
-      notes:          doc.notes ?? undefined,
-      attachmentUrl:  doc.attachmentUrl ?? undefined,
-    };
+    // Detecta modo: TOMADOR (recebeu servico -> AP) ou PRESTADOR (emitiu -> AR)
+    const notes = (doc.notes ?? '').toUpperCase();
+    const isPrestador = notes.includes('PRESTADOR') || notes.includes('EMITIDA');
+    const mode = isPrestador ? 'PRESTADOR' : 'TOMADOR';
 
-    return this.createWithIntegration(companyId, dto, userId);
+    try {
+      const result = await this.prisma.$transaction(async (tx) => {
+        const net = doc.netAmount;
+        const agendaTitle = this.buildAgendaTitle(doc);
+        let entryId: string;
+        let agendaEventId: string;
+
+        if (!isPrestador) {
+          // ── TOMADOR: cria Contas a PAGAR ─────────────────────────────
+          const apEntry = await tx.apEntry.create({
+            data: {
+              companyId,
+              title:          `${doc.documentType} - ${doc.issuerName}`,
+              description:    `NFS-e ${doc.documentNumber ?? 'S/N'} — ${doc.competenceMonth} | Tomador`,
+              documentNumber: doc.documentNumber ?? undefined,
+              issueDate:      doc.issueDate,
+              dueDate:        doc.dueDate,
+              amount:         net,
+              status:         'OPEN',
+              fiscalDocumentId: doc.id,
+              createdById:    userId,
+            },
+          });
+          entryId = apEntry.id;
+
+          // Lancamento contabil: Debito Despesa / Credito Fornecedores
+          const je = await tx.journalEntry.create({
+            data: {
+              companyId,
+              date:         doc.issueDate,
+              description:  `Auto — ${doc.documentType} ${doc.issuerName} (Tomador)`,
+              reference:    doc.documentNumber ?? doc.id,
+              sourceModule: 'FISCAL',
+              createdById:  userId,
+            },
+          });
+          await tx.journalEntryItem.createMany({ data: [
+            { journalEntryId: je.id, accountId: doc.expenseAccountId ?? '3.1.01', type: 'DEBIT',  value: net },
+            { journalEntryId: je.id, accountId: DEFAULT_AP_ACCOUNT,               type: 'CREDIT', value: net },
+          ]});
+
+          const agendaEvent = await tx.agendaEvent.create({
+            data: {
+              companyId, eventType: 'PAYMENT', title: agendaTitle,
+              description: `${doc.documentType} nº ${doc.documentNumber ?? 'S/N'} — ${doc.issuerName}`,
+              color:   DOC_TYPE_COLOR[doc.documentType],
+              dueDate: doc.dueDate, amount: net, isPaid: false,
+              fiscalDocumentId: doc.id, apEntryId: apEntry.id, createdById: userId,
+            },
+          });
+          agendaEventId = agendaEvent.id;
+
+          await tx.fiscalDocument.update({
+            where: { id: doc.id },
+            data: { apEntryId: apEntry.id, journalEntryId: je.id,
+              agendaEventId, integrationStatus: 'INTEGRATED' },
+          });
+
+          return { mode, apEntry, journalEntryId: je.id, agendaEventId };
+
+        } else {
+          // ── PRESTADOR: cria Contas a RECEBER ─────────────────────────
+          const arEntry = await tx.arEntry.create({
+            data: {
+              companyId,
+              title:          `${doc.documentType} - ${doc.issuerName}`,
+              description:    `NFS-e ${doc.documentNumber ?? 'S/N'} — ${doc.competenceMonth} | Prestador`,
+              documentNumber: doc.documentNumber ?? undefined,
+              origin:         'NOTA_FISCAL' as any,
+              issueDate:      doc.issueDate,
+              dueDate:        doc.dueDate,
+              competenceMonth: doc.competenceMonth,
+              amount:         net,
+              status:         'OPEN',
+              fiscalDocumentId: doc.id,
+              createdById:    userId,
+            },
+          });
+          entryId = arEntry.id;
+
+          // Lancamento contabil: Debito Clientes / Credito Receitas
+          const je = await tx.journalEntry.create({
+            data: {
+              companyId,
+              date:         doc.issueDate,
+              description:  `Auto — ${doc.documentType} ${doc.issuerName} (Prestador)`,
+              reference:    doc.documentNumber ?? doc.id,
+              sourceModule: 'FISCAL',
+              createdById:  userId,
+            },
+          });
+          await tx.journalEntryItem.createMany({ data: [
+            { journalEntryId: je.id, accountId: DEFAULT_AR_ACCOUNT,  type: 'DEBIT',  value: net },
+            { journalEntryId: je.id, accountId: DEFAULT_REV_ACCOUNT, type: 'CREDIT', value: net },
+          ]});
+
+          const agendaEvent = await tx.agendaEvent.create({
+            data: {
+              companyId, eventType: 'RECEIPT', title: agendaTitle,
+              description: `${doc.documentType} nº ${doc.documentNumber ?? 'S/N'} — ${doc.issuerName}`,
+              color:   DOC_TYPE_COLOR[doc.documentType],
+              dueDate: doc.dueDate, amount: net, isPaid: false,
+              fiscalDocumentId: doc.id, createdById: userId,
+            },
+          });
+          agendaEventId = agendaEvent.id;
+
+          await tx.fiscalDocument.update({
+            where: { id: doc.id },
+            data: { journalEntryId: je.id, agendaEventId,
+              integrationStatus: 'INTEGRATED' },
+          });
+
+          return { mode, arEntry, journalEntryId: je.id, agendaEventId };
+        }
+      });
+
+      return result;
+    } catch (error) {
+      this.logger.error('Falha na integracao fiscal', error);
+      // Marca documento com erro
+      await this.prisma.fiscalDocument.update({
+        where: { id: doc.id },
+        data: { integrationStatus: 'ERROR' },
+      }).catch(() => {});
+      throw new InternalServerErrorException(
+        `Falha ao integrar ${mode}: ${(error as any)?.message?.slice(0,200)}`
+      );
+    }
   }
 
   // ── Helpers ─────────────────────────────────────────────────
