@@ -6,7 +6,7 @@ import {
   FiFolder, FiBook, FiPenTool, FiClipboard, FiShield, FiPercent, FiLayers,
   FiUserCheck, FiUpload, FiDatabase, FiPieChart, FiCalendar, FiCheckCircle,
   FiServer, FiEdit2, FiEdit3, FiPackage, FiTool, FiTruck, FiTrendingUp,
-  FiAlertCircle, FiTrendingDown, FiLogOut, FiBarChart2, FiArchive, FiBookOpen, FiCpu, FiRepeat, FiLock, FiFilePlus, FiHelpCircle,
+  FiAlertCircle, FiTrendingDown, FiLogOut, FiBarChart2, FiArchive, FiBookOpen, FiCpu, FiRepeat, FiLock, FiFilePlus, FiMessageSquare, FiHelpCircle,
 } from 'react-icons/fi';
 import { useCompany } from '../contexts/CompanyContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -54,6 +54,7 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
   const menuItems = useMemo(() => [
 
     { path: '/app/dashboard', icon: FiHome, label: 'Visão Geral' },
+    { path: '/app/chat', icon: FiMessageSquare, label: 'Mensagens' },
 
     {
       path: '/app/accounting', icon: FiBook, label: 'Contabilidade', dividerBefore: 'Operacional',
