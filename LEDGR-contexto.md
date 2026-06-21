@@ -918,3 +918,30 @@ menos de 6 cards, vai sobrar espaco vazio na ultima linha (cosmetico, ajustar se
 - Teste LEDGR Agent A3 com token fisico
 - Reimport ECD LM
 - CIB por imovel no modulo Ativo Imobilizado da LM (quando 08/2026 chegar)
+
+
+## Sessao 2026-06-21 (continuacao) — Revisao e correcoes
+
+### Dashboard — CONCLUIDO (tirar da lista)
+- DashboardPage.tsx (502 linhas) e o componente ativo — consome dados reais
+- Backend /dashboard/kpi: apTotal, apCount, arTotal, arCount, nfPending, journalCount, fechamentoStatus, docsAguardando
+- Backend /dashboard/summary: employees, folhas, decimosPendentes
+- Todos os KPI Cards com dados reais do banco Prisma
+
+### Usuarios — CONCLUIDO
+- Botao Ver: modal com detalhes completos
+- Botao Excluir: confirmacao Swal + recarrega lista do servidor
+- findAll() filtra deletedAt:null e status!=deleted
+
+### Integracao NFS-e -> AP/AR — CORRIGIDA
+- runIntegration reescrito: TOMADOR->AP, PRESTADOR->AR
+- Nao duplica FiscalDocument
+- Lancamento contabil correto por modo
+- Status INTEGRATED apos sucesso, ERROR em falha
+
+### Pendentes (atualizadas)
+- Simples Nacional NFS-e Nacional — prazo set/2026
+- Reimport ECD LM (saldo abertura 31/12/2023)
+- Rescisao Raquel + S-2299 eSocial producao real
+- Apuracao de Impostos com dados reais das notas
+- Teste LEDGR Agent A3 com token fisico
