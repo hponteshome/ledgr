@@ -1122,3 +1122,12 @@ Societario -> Patrimonio -> SPED / Obrigacoes -> Acervo -> Assinaturas -> Admini
 - Fix aplicado: SidebarPermissionsContext com debounce 150ms + guard !companyId
 - Fix isMasterAdmin: ler de user.permissions.all OU user.profile.permissions.all
 - Commit: perf(sidebar-permissions) Context unico + debounce + fix isMasterAdmin
+
+## Sessao 2026-06-21 (noite) — fix isMasterAdmin + sidebar-permissions zero calls
+
+### Resultado final
+- Master Admin: 0 chamadas a /sidebar-permissions/resolve (retorna ['*'] localmente)
+- Usuarios normais: 1 chamada apos debounce 150ms + guard !companyId
+- Root cause: user.permissions.all nao existe — esta em user.profile.permissions.all
+- React StrictMode executa effects 2x em dev — comportamento normal, nao e bug
+- Commit: fix(sidebar-permissions) isMasterAdmin
