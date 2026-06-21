@@ -967,3 +967,19 @@ menos de 6 cards, vai sobrar espaco vazio na ultima linha (cosmetico, ajustar se
 - Reimport ECD LM (saldo abertura 31/12/2023)
 - Apuracao de Impostos com dados reais das notas fiscais
 - Teste LEDGR Agent A3 com token fisico
+
+
+## Revisao pendencias 2026-06-21 (continuacao)
+
+### NFS-e Nacional Simples Nacional — IMPLEMENTADO, aguardando teste
+- NfseNacionalService: DPS XML + assinatura RSA-SHA256 + API RFB mTLS
+- NfseNacionalPage: formulario, historico, preview, cancelamento
+- Codigos locacao 99.03.xx + redutor 70% IBS/CBS
+- Prazo obrigatoriedade: 01/09/2026 (CGSN 189/2026)
+- PENDENTE: teste em homologacao RFB com cert A1 real
+
+### Lista final de pendencias tecnicas
+- Reimport ECD LM (saldo abertura 31/12/2023)
+- Apuracao de Impostos com dados reais das notas fiscais
+- Teste NFS-e Nacional em homologacao RFB
+- Teste LEDGR Agent A3 com token fisico
