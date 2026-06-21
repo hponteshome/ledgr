@@ -1131,3 +1131,19 @@ Societario -> Patrimonio -> SPED / Obrigacoes -> Acervo -> Assinaturas -> Admini
 - Root cause: user.permissions.all nao existe — esta em user.profile.permissions.all
 - React StrictMode executa effects 2x em dev — comportamento normal, nao e bug
 - Commit: fix(sidebar-permissions) isMasterAdmin
+
+## Sessao 2026-06-21 (noite) — Revisao AR + sidebar-permissions zero calls
+
+### Item 4 — Contas a Receber LM — JA OPERACIONAL
+- ContasAReceberPage.tsx: 341 linhas, completo
+- 5 titulos reais LM: R$ 32.800 emitido, R$ 13.000 recebido, R$ 19.800 pendente
+- Alugueis com locatarios, imoveis vinculados (fixedAsset), vencimentos, status
+- Backend /finance/ar: create, findAll, findOne, update, receive, cancel, remove, aging
+- Modal de baixa com NF obrigatoria para ALUGUEL ja implementado
+- Aging por faixas: a vencer, 1-30, 31-60, 61-90, 90+ dias
+- NENHUMA construcao necessaria — modulo ja funcional com dados reais
+
+### Resumo itens backlog concluidos nesta sessao
+- Item 6: sidebar_items migrado (40->63 itens, modulo fiscal adicionado)
+- Item 3: SidebarPermissionsContext (1 chamada API, 0 para Master Admin)
+- Item 4: AR ja operacional com dados reais LM
