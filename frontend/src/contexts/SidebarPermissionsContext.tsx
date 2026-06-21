@@ -27,8 +27,8 @@ export const SidebarPermissionsProvider: React.FC<{ children: React.ReactNode }>
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isMasterAdmin =
-    (user as any)?.permissions?.all === true ||
-    (user as any)?.profile?.permissions?.all === true;
+    (user as any)?.profile?.permissions?.all === true ||
+    (user as any)?.permissions?.all === true;
   const userId = (user as any)?.id ?? '';
   const companyId = activeCompany?.id ?? '';
 
