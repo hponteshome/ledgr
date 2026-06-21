@@ -1,3 +1,4 @@
+// apps/api/src/modules/fiscal/services/nfe-parser.service.ts
 import { Injectable } from '@nestjs/common';
 import { XMLParser } from 'fast-xml-parser';
 

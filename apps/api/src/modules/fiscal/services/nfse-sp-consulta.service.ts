@@ -1,3 +1,4 @@
+// apps/api/src/modules/fiscal/services/nfse-sp-consulta.service.ts
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { PrismaService }  from '../../../prisma/prisma.service';
 import { SigningService }  from '../../../core/certificates/signing.service';

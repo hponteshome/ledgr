@@ -1,3 +1,4 @@
+// apps/api/src/modules/fiscal/fiscal.module.ts
 import { Module } from '@nestjs/common';
 import { MulterModule } from '@nestjs/platform-express';
 import { PrismaModule } from '../../prisma/prisma.module';
