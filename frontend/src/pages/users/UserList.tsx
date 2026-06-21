@@ -33,7 +33,15 @@ export const UserList: React.FC = () => {
     }
   }, [location.state, navigate]);
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string, nome: string) => {
+    const ok = await (window as any).Swal?.fire({
+      title: `Excluir ${nome || 'este usuário'}?`,
+      text: 'Esta ação não pode ser desfeita.',
+      icon: 'warning', showCancelButton: true,
+      confirmButtonColor: '#DC2626', confirmButtonText: 'Excluir',
+      cancelButtonText: 'Cancelar',
+    });
+    if (!ok?.isConfirmed) return;
     if (window.confirm("Are you sure you want to deactivate this user?")) {
       try {
         await api.delete(`/users/${id}`);
@@ -157,13 +165,29 @@ export const UserList: React.FC = () => {
 
                     {/* Ação */}
                     <td className="px-6 py-4 text-right">
-                      <button
-                        onClick={() => navigate(`/app/users/edit/${user.id}`)}
-                        className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-                        title="Edit User"
-                      >
-                        <FiEdit2 size={18} />
-                      </button>
+                      <div style={{display:"flex",gap:4,justifyContent:"flex-end"}}>
+                        <button
+                          onClick={() => navigate(`/app/users/${user.id}`)}
+                          className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                          title="Visualizar usuário"
+                        >
+                          <FiEye size={18} />
+                        </button>
+                        <button
+                          onClick={() => navigate(`/app/users/edit/${user.id}`)}
+                          className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                          title="Editar usuário"
+                        >
+                          <FiEdit2 size={18} />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(user.id, user.fullName || user.email)}
+                          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                          title="Excluir usuário"
+                        >
+                          <FiTrash2 size={18} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
