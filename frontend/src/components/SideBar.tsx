@@ -23,7 +23,7 @@ interface SubItem {
   icon: React.ElementType;
   disabled?: boolean;
   isImport?: boolean;
-  children?: { path: string; label: string; icon: React.ElementType }[]; // ← novo
+  children?: { path: string; label: string; icon: React.ElementType }[];
 }
 
 interface MenuItem {
@@ -44,30 +44,51 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
   const [showImportModal, setShowImportModal] = useState(false);
   const [expanded, setExpanded] = useState<string[]>([]);
 
-  // Memorizar o menu para evitar recalculações e garantir estabilidade nas referências
   const menuItems = useMemo(() => [
-    { path: '/app/dashboard', icon: FiHome, label: 'Dashboard' },
-    { path: '/app/companies', icon: FiBriefcase, label: 'Empresas' },
-    { path: '/app/users', icon: FiUsers, label: 'Usuários' },
-    { path: '/app/profiles', icon: FiShield, label: 'Perfis' },
-    { path: '/app/persons', icon: FiUsers, label: 'Pessoas Físicas' },
+    { path: '/app/dashboard', icon: FiHome, label: 'Visão Geral' },
+
     {
-      path: '/app/hr', icon: FiUsers, label: 'RH',
+      path: '/app/accounting', icon: FiBook, label: 'Contabilidade',
       children: [
-        { path: "/app/hr/employees", label: "Funcionários", icon: FiUsers },
-        { path: '/app/hr/pro-labore', label: 'Pró-labore', icon: FiTrendingDown },
-        { path: '/app/hr/informe-rendimentos', label: 'Informe de Rendimentos', icon: FiFileText },
-        { path: '/app/hr/esocial', label: 'eSocial', icon: FiFileText },
-        { path: '/app/hr/ferias', label: 'Férias', icon: FiCalendar },
-        { path: '/app/hr/recesso', label: 'Recessos & Pontes', icon: FiRepeat },
-        { path: '/app/hr/decimo-terceiro', label: '13º Salário', icon: FiTrendingDown },
-        { path: '/app/hr/rais', label: 'RAIS', icon: FiFileText },
-        { path: '/app/hr/dctfweb', label: 'DCTFWeb', icon: FiCpu },
-        { path: '/app/hr/folha', label: 'Folha de Pagamento', icon: FiTrendingDown },
+        { path: '/app/accounting/accounts', label: 'Plano de Contas', icon: FiLayers },
+        { path: '/app/accounting/journal', label: 'Lançamentos', icon: FiEdit3 },
+        { path: '/app/accounting/trial-balance', label: 'Balancete', icon: FiPieChart },
+        { path: '/app/accounting/balance-comparison', label: 'Comparativo de Saldos', icon: FiActivity },
+        { path: '/app/accounting/visoes-contabeis', label: 'Visões Contábeis (I052)', icon: FiCpu },
+        {
+          path: '/app/accounting/relatorios',
+          label: 'Relatórios',
+          icon: FiBookOpen,
+          children: [
+            { path: '/app/accounting/diario', label: 'Diário Geral', icon: FiBook },
+            { path: '/app/accounting/razao', label: 'Razão Analítico', icon: FiBarChart2 },
+            { path: '/app/accounting/dre', label: 'DRE', icon: FiTrendingUp },
+            { path: '/app/accounting/balanco', label: 'Balanço Patrimonial', icon: FiPieChart },
+          ],
+        },
+        {
+          path: '/app/accounting/investimentos',
+          label: 'Investimentos',
+          icon: FiTrendingUp,
+          children: [
+            { path: '/app/accounting/investimentos/renda-fixa', label: 'Renda Fixa', icon: FiTrendingUp },
+            { path: '/app/accounting/investimentos/simulador', label: 'Simulador CDB', icon: FiActivity },
+          ],
+        },
+        {
+          path: '/app/accounting/importacao',
+          label: 'Importação',
+          icon: FiUpload,
+          children: [
+            { path: '/app/accounting/accounts/import', label: 'Importar Plano de Contas', icon: FiLayers },
+            { path: '/app/accounting/journal/import', label: 'Importar Lançamentos', icon: FiEdit3 },
+          ],
+        },
       ],
     },
+
     {
-      path: '/app/finance', icon: FiBarChart2, label: 'Finance',
+      path: '/app/finance', icon: FiBarChart2, label: 'Financeiro',
       children: [
         { path: '/app/finance/accounts-payable', label: 'Contas a Pagar', icon: FiTrendingDown },
         { path: '/app/finance/contas-receber', label: 'Contas a Receber', icon: FiTrendingUp },
@@ -79,79 +100,34 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
         { path: '/app/finance/fechamento', label: 'Fechamento Mensal', icon: FiLock },
       ],
     },
+
     {
       path: '/app/fiscal', icon: FiPercent, label: 'Fiscal',
       children: [
-        { path: '/app/finance/nfse-nacional', label: 'NFS-e Nacional (RFB)', icon: FiCheckCircle },
-        { path: '/app/finance/nfe',           label: 'NF-e (Produtos)',          icon: FiPackage },
-        { path: '/app/finance/nfse-sp-emissao', label: 'Emissão NFS-e SP',      icon: FiFilePlus },
-        { path: '/app/finance/nfse-sp',          label: 'NFS-e São Paulo',         icon: FiUpload },
-        { path: '/app/finance/documentos-fiscais', label: 'Documentos Fiscais',     icon: FiFileText },
-        { path: '/app/finance/apuracao',          label: 'Apuração de Impostos',    icon: FiPercent },
-        { path: '/app/finance/lalur-config',      label: 'Config. Dedutibilidade',  icon: FiSettings },
-      ],
-    },
-    {
-
-      path: '/app/accounting', icon: FiBarChart2, label: 'Accounting',
-      children: [
-        { path: '/app/accounting/accounts', label: 'Plano de Contas', icon: FiLayers },
-        { path: '/app/accounting/journal', label: 'Lancamentos', icon: FiEdit3 },
-        { path: '/app/accounting/trial-balance', label: 'Balancete', icon: FiPieChart },
-        { path: '/app/accounting/investimentos/renda-fixa', label: 'Renda Fixa', icon: FiTrendingUp },
-        { path: '/app/accounting/investimentos/simulador', label: 'Simulador CDB', icon: FiActivity },
-        { path: '/app/accounting/balance-comparison', label: 'Comparativo de Saldos', icon: FiActivity },
-
-        {
-          path: '/app/accounting/relatorios',
-          label: 'Relatorios',
-          icon: FiBookOpen,
-          children: [
-            { path: '/app/accounting/diario', label: 'Diario Geral', icon: FiBook },
-            { path: '/app/accounting/razao', label: 'Razao Analitico', icon: FiBarChart2 },
-            { path: '/app/accounting/dre', label: 'DRE', icon: FiTrendingUp },
-            { path: '/app/accounting/balanco', label: 'Balanco Patrimonial', icon: FiPieChart },
-          ],
-        },
-        {
-
-          path: '/app/accounting/importacao',
-          label: 'Importacao',
-          icon: FiUpload,
-          children: [
-            { path: '/app/accounting/accounts/import', label: 'Importar Plano de Contas', icon: FiLayers },
-            { path: '/app/accounting/journal/import', label: 'Importar Lancamentos', icon: FiEdit3 },
-          ],
-        },
+        { path: '/app/fiscal/nfse-nacional', label: 'NFS-e Nacional (RFB)', icon: FiCheckCircle },
+        { path: '/app/fiscal/nfe',            label: 'NF-e (Produtos)',         icon: FiPackage },
+        { path: '/app/fiscal/nfse-sp-emissao', label: 'Emissão NFS-e SP',      icon: FiFilePlus },
+        { path: '/app/fiscal/nfse-sp',         label: 'NFS-e São Paulo',        icon: FiUpload },
+        { path: '/app/fiscal/documentos-fiscais', label: 'Documentos Fiscais',  icon: FiFileText },
+        { path: '/app/fiscal/apuracao',        label: 'Apuração de Impostos',   icon: FiPercent },
+        { path: '/app/fiscal/lalur-config',    label: 'Config. Dedutibilidade', icon: FiSettings },
       ],
     },
 
     {
-      path: '/app/sistema',
-      icon: FiSettings,
-      label: 'Sistema',
-      accent: '#374151',
-      surface: '#F9FAFB',
+      path: '/app/hr', icon: FiUsers, label: 'Departamento Pessoal',
       children: [
-        { path: '/app/sistema/calendario', label: 'Calendario de Feriados', icon: FiCalendar },
-        { path: '/app/sistema/obrigacoes', label: 'Obrigacoes Fiscais', icon: FiCheckCircle },
-        { path: '/app/sistema/indicadores', label: 'Indicadores Economicos', icon: FiBarChart2 },
-        { path: '/app/sistema/tabelas', label: 'Tabelas Legais', icon: FiBook },
-        { path: '/app/system/backup', label: 'Backup e Restauração', icon: FiDatabase },
-        { path: '/app/settings/data-management', label: 'Manutenção de Dados', icon: FiSettings },
-        { path: '/app/sistema/sidebar-permissions', label: 'Permissões de Sidebar', icon: FiLock },
-        { path: '/app/documents/signatures/certificates', label: 'Certificados Digitais', icon: FiShield },
-      ],
-    },
-    {
-      path: '/app/sped', icon: FiDatabase, label: 'SPED',
-      children: [
-        { path: '/app/sped/ecd', label: 'ECD — Escrituração Contábil', icon: FiDatabase },
-        { path: '/app/accounting/visoes-contabeis', label: 'Visões Contábeis (I052)', icon: FiCpu },
-        { path: '/app/sped/ecd/pre-validate', label: 'ECD — Pré-Validação', icon: FiDatabase },
-        { path: '/app/sped/ecd/History', label: 'ECD — Histórico de Importações', icon: FiDatabase },
-        { path: '/app/sped/ecf', label: 'ECF — Escrituração Fiscal', icon: FiFileText },
-        { path: '/app/sped/efd', label: 'EFD-Contribuições', icon: FiFileText },
+        { path: '/app/hr/employees', label: 'Funcionários', icon: FiUsers },
+        { path: '/app/hr/pro-labore', label: 'Pró-labore', icon: FiTrendingDown },
+        { path: '/app/hr/folha', label: 'Folha de Pagamento', icon: FiTrendingDown },
+        { path: '/app/hr/ferias', label: 'Férias', icon: FiCalendar },
+        { path: '/app/hr/decimo-terceiro', label: '13º Salário', icon: FiTrendingDown },
+        { path: '/app/hr/recesso', label: 'Recessos & Pontes', icon: FiRepeat },
+        { path: '/app/hr/esocial', label: 'eSocial', icon: FiFileText },
+        { path: '/app/hr/informe-rendimentos', label: 'Informe de Rendimentos', icon: FiFileText },
+        { path: '/app/hr/rais', label: 'RAIS', icon: FiFileText },
+        { path: '/app/hr/dctfweb', label: 'DCTFWeb', icon: FiCpu },
+        { path: '/app/hr/dho', label: 'DHO', icon: FiUserCheck, disabled: true },
       ],
     },
 
@@ -170,6 +146,26 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
             { path: '#', label: 'Assembleias e Reuniões', icon: FiCalendar, disabled: true },
           ],
         },
+      ],
+    },
+
+    {
+      path: '/app/assets', icon: FiPackage, label: 'Ativo Imobilizado',
+      children: [
+        { path: '/app/assets', label: 'Bens', icon: FiPackage },
+        { path: '/app/assets/maintenances', label: 'Manutenções', icon: FiTool },
+      ],
+    },
+
+    {
+      path: '/app/sped', icon: FiDatabase, label: 'SPED / Obrigações',
+      children: [
+        { path: '/app/sped/ecd', label: 'ECD — Escrituração Contábil', icon: FiDatabase },
+        { path: '/app/sped/ecd/pre-validate', label: 'ECD — Pré-Validação', icon: FiCheckCircle },
+        { path: '/app/sped/ecd/History', label: 'ECD — Histórico', icon: FiArchive },
+        { path: '/app/sped/ecf', label: 'ECF — Escrituração Fiscal', icon: FiFileText },
+        { path: '/app/sped/efd', label: 'EFD-Contribuições', icon: FiFileText },
+        { path: '/app/sistema/obrigacoes', label: 'Obrigações Fiscais', icon: FiCheckCircle },
       ],
     },
 
@@ -219,19 +215,31 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
         },
       ],
     },
+
     {
-      path: '/app/assets', icon: FiPackage, label: 'Ativo Imobilizado',
+      path: '/app/administracao',
+      icon: FiSettings,
+      label: 'Administração',
       children: [
-        { path: '/app/assets', label: 'Bens', icon: FiPackage },
-        { path: '/app/assets/maintenances', label: 'Manutenções', icon: FiTool },
+        { path: '/app/companies', label: 'Empresas', icon: FiBriefcase },
+        { path: '/app/users', label: 'Usuários', icon: FiUsers },
+        { path: '/app/profiles', label: 'Perfis de Acesso', icon: FiShield },
+        { path: '/app/persons', label: 'Pessoas Físicas', icon: FiUserCheck },
+        { path: '/app/documents/signatures/certificates', label: 'Certificados Digitais', icon: FiShield },
+        { path: '/app/sistema/sidebar-permissions', label: 'Permissões de Menu', icon: FiLock },
+        { path: '/app/sistema/calendario', label: 'Calendário de Feriados', icon: FiCalendar },
+        { path: '/app/sistema/indicadores', label: 'Indicadores Econômicos', icon: FiBarChart2 },
+        { path: '/app/sistema/tabelas', label: 'Tabelas Legais', icon: FiBook },
+        { path: '/app/system/backup', label: 'Backup e Restauração', icon: FiDatabase },
+        { path: '/app/settings/data-management', label: 'Manutenção de Dados', icon: FiSettings },
       ],
     },
+
     { path: '/app/signatures/validate', icon: FiShield, label: 'Validação de Assinatura' },
+
   ], [cid]);
 
-  // Filtrar itens do menu pelas permissoes do usuario
   const filteredMenu = useMemo(() => {
-    // Mostrar tudo se: ainda carregando, sem permissoes resolvidas, ou lista vazia
     if (permLoading || allowed.length === 0) return menuItems;
     return menuItems
       .map(item => {
@@ -254,40 +262,37 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
       .filter(Boolean) as typeof menuItems;
   }, [menuItems, canView, permLoading]);
 
-  // Auto-expansão com suporte a 2 níveis
   useEffect(() => {
-    {
-      const currentPath = location.pathname;
-      const toExpand: string[] = [];
+    const currentPath = location.pathname;
+    const toExpand: string[] = [];
 
-      menuItems.forEach(item => {
-        if (item.children) {
-          const childMatch = item.children.some(child => {
-            if (currentPath.startsWith(child.path.split("?")[0])) return true;
-            if (child.children) {
-              return child.children.some(gc => currentPath.startsWith(gc.path.split("?")[0]));
-            }
-            return false;
-          });
-          if (childMatch) toExpand.push(item.path);
+    menuItems.forEach(item => {
+      if (item.children) {
+        const childMatch = item.children.some(child => {
+          if (currentPath.startsWith(child.path.split('?')[0])) return true;
+          if (child.children) {
+            return child.children.some(gc => currentPath.startsWith(gc.path.split('?')[0]));
+          }
+          return false;
+        });
+        if (childMatch) toExpand.push(item.path);
 
-          item.children.forEach(child => {
-            if (child.children) {
-              const gcMatch = child.children.some(gc => currentPath.startsWith(gc.path.split("?")[0]));
-              if (gcMatch) toExpand.push(child.path);
-            }
-          });
-        }
-      });
+        item.children.forEach(child => {
+          if (child.children) {
+            const gcMatch = child.children.some(gc => currentPath.startsWith(gc.path.split('?')[0]));
+            if (gcMatch) toExpand.push(child.path);
+          }
+        });
+      }
+    });
 
-      if (toExpand.length > 0) setExpanded(toExpand);
-    }
+    if (toExpand.length > 0) setExpanded(toExpand);
   }, [location.pathname, menuItems]);
 
   const handleSignOut = async () => {
     const result = await MySwal.fire({
       title: 'Sair do Sistema?',
-      text: "Sua sessão será encerrada.",
+      text: 'Sua sessão será encerrada.',
       icon: 'question',
       showCancelButton: true,
       confirmButtonColor: '#111111',
@@ -359,7 +364,6 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
 
                 {open && isExp && item.children && (
                   <div className="ml-6 pl-4 border-l-[0.5px] border-gray-100 mt-1 space-y-1 overflow-hidden transition-all duration-300">
-
                     {item.children.map(child => (
                       child.isImport ? (
                         <button key="imp" onClick={() => setShowImportModal(true)}
@@ -367,7 +371,6 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
                           <child.icon size={20} /> {child.label}
                         </button>
                       ) : child.children ? (
-                        // ── Subgrupo de segundo nível ──────────────────────────
                         <div key={child.path}>
                           <button
                             onClick={() => setExpanded(prev =>
@@ -414,9 +417,9 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
         </nav>
 
         <div className="p-4 border-t-[0.5px] border-gray-100 flex-shrink-0">
-          <button onClick={handleSignOut} title={!open ? 'Sign Out' : ''} className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all text-red-600 font-bold hover:bg-red-50 ${!open && 'justify-center'}`}>
+          <button onClick={handleSignOut} title={!open ? 'Sair' : ''} className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all text-red-600 font-bold hover:bg-red-50 ${!open && 'justify-center'}`}>
             <FiLogOut size={20} />
-            {open && <span className="text-base">Sign Out</span>}
+            {open && <span className="text-base">Sair</span>}
           </button>
         </div>
       </aside>
@@ -425,21 +428,3 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
     </>
   );
 };
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
