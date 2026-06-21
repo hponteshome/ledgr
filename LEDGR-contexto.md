@@ -1096,3 +1096,13 @@ Societario -> Patrimonio -> SPED / Obrigacoes -> Acervo -> Assinaturas -> Admini
 - Portal externo docs.ledgr.com (Opcao B) — fase posterior
 - Mais artigos: Societario, Patrimonio, SPED, Acervo, Assinaturas
 - Busca full-text no conteudo dos artigos
+
+## Sessao 2026-06-21 (noite) — fix Help sidebar
+
+### Ajuste
+- Botao flutuante removido do Layout.tsx
+- "Ajuda & Suporte" adicionado no rodape da sidebar acima do Sair
+- Estilo discreto: cinza neutro, mesmo peso visual do Sair
+- FiHelpCircle adicionado aos imports fi
+- Fix: import useState duplicado (useHelpState) removido
+- Painel lateral abre com ajuda contextual da pagina atual
