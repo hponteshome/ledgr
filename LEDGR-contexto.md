@@ -1068,3 +1068,31 @@ Societario -> Patrimonio -> SPED / Obrigacoes -> Acervo -> Assinaturas -> Admini
 - AuditPage.tsx operacional: badges coloridos, actor, alvo, paginacao
 - Sidebar secoes visiveis: OPERACIONAL/EMPRESA/COMPLIANCE/SISTEMA
 - Commit: fix(audit) path JwtAuthGuard
+
+## Sessao 2026-06-21 (noite) — Central de Ajuda
+
+### Entregue
+- helpContent.ts (33kb) — manual completo em PT-BR linguagem leiga
+  Secoes: Primeiros Passos, Contabilidade, Financeiro, Fiscal,
+  Departamento Pessoal, Administracao
+  Tipos de bloco: text, tip, warning, list, steps, table
+  contextualHelp: mapa rota -> slug (20+ rotas mapeadas)
+  helpSections: indice de navegacao por secao
+- HelpArticleView.tsx — renderizador de blocos com estilos visuais
+- HelpCenter.tsx — painel com busca, indice por secao, navegacao, historico
+- HelpButton.tsx — botao flutuante roxo canto inferior direito
+  Ajuda contextual: detecta rota atual e abre artigo relevante automaticamente
+- Layout.tsx — HelpButton integrado antes do Toaster
+- index.css — animacao slide-in-right 0.22s cubic-bezier
+- Commit: feat(help) Central de Ajuda
+
+### Arquitetura
+- frontend/src/help/helpContent.ts — unico arquivo de conteudo (editavel)
+- frontend/src/components/help/ — HelpArticleView, HelpCenter, HelpButton
+- Rota /app/ajuda planejada mas nao implementada (acesso via botao flutuante)
+
+### Futuro planejado
+- Integracao com IA (Claude) para orientacao dinamica
+- Portal externo docs.ledgr.com (Opcao B) — fase posterior
+- Mais artigos: Societario, Patrimonio, SPED, Acervo, Assinaturas
+- Busca full-text no conteudo dos artigos
