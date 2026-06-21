@@ -836,3 +836,33 @@ menos de 6 cards, vai sobrar espaco vazio na ultima linha (cosmetico, ajustar se
 - Testar com XMLs reais de NFS-e SP e NF-e SEFAZ
 - Consulta SEFAZ por chave de acesso (futura)
 - Reimport ECD LM (saldo abertura 31/12/2023)
+
+
+## Sessao 2026-06-20 (noite) — LEDGR Agent A3 + Fiscal SP
+
+### Entregue
+- LEDGR Agent (apps/agent/) — Express porta 7778, sem deps nativas
+  - GET /health, GET /certificates (Windows Certificate Store via PowerShell/CNG)
+  - POST /certificates/export-pem
+  - POST /nfse-sp/soap (mTLS via WebClient .NET — chave A3 nunca sai do token)
+  - POST /nfse-sp/buscar-tomador, /buscar-emitidas
+  - Iniciar: cd apps/agent && npx tsx src/main.ts
+- NfseImportPage: badge LEDGR Agent online/offline, optgroup A1/A3 no seletor
+- Roteamento A1/A3 completo:
+  - A1: Frontend -> Backend /fiscal/nfse-sp/buscar-tomador (certId)
+  - A3: Frontend -> Agent:7778 (thumbprint+cnpj) -> Backend /fiscal/nfse-sp/import-from-xml
+- Backend: endpoint POST /fiscal/nfse-sp/import-from-xml (importa XMLs retornados pelo agent)
+- NfseImportService: importFromXmlStrings() para receber XMLs do agent
+- URL SP atualizada para nfews.prefeitura.sp.gov.br (suporta layout v1+v2 Reforma 2026)
+- CLAUDE.md: convencao de cabecalho com caminho absoluto documentada
+
+### Pendente — LEDGR Agent A3
+- TESTE REAL com token A3 fisico conectado (usuario nao tem A3 disponivel no momento)
+- Validar que Windows CNG delega corretamente ao middleware do fabricante
+- Verificar resposta SOAP SP com cert A3 real
+
+### Commits desta sessao
+- 65b3bba: frontend detecta agent, badge, optgroup A1/A3
+- fdc3679: roteamento A1/A3 completo, /companies/me para CNPJ
+- 938749b: import-from-xml endpoint + importFromXmlStrings
+- 8778990: CLAUDE.md convencao cabecalho
