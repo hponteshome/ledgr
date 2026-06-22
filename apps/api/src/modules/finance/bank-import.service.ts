@@ -458,25 +458,52 @@ export class BankImportService {
     const XLSX = await import('xlsx');
 
     // ── Mapa Referencia LM -> propertyTag + internal_code ──────────────────
-    const PROPERTY_TAG_MAP: Record<string, { tag: string; internalCode: string | null }> = {
-      'Locacao Mare 62':    { tag: 'MARE_62',       internalCode: 'Mare 62-12015' },
-      'Locacao Mare 88':    { tag: 'MARE_88',       internalCode: 'Mare 88-12016' },
-      'Locacao Mare 92':    { tag: 'MARE_92',       internalCode: 'Mare 92-12017' },
-      'Locacao Landmark':   { tag: 'LANDMARK',      internalCode: null },
-      'Locacao Conj 32':    { tag: 'CONJ_32',       internalCode: 'Conj 32-12002' },
-      'Locacao Conj 33':    { tag: 'CONJ_33',       internalCode: 'Conj 33-12003' },
-      'Locacao Loft':       { tag: 'LOFT_SP',       internalCode: 'Loft São Paulo-12005' },
-      'Locacao Ctba':       { tag: 'ECOVILLE',      internalCode: 'Ecoville-12006' },
-      'Locacao Guaruja':    { tag: 'GUARUJA',        internalCode: 'Guarujá-12010' },
-      'Condominio':         { tag: 'CONDOMINIO',    internalCode: null },
-      'Manutencao Mare':    { tag: 'MARE',          internalCode: null },
-      'Manutencao Cotia':   { tag: 'COTIA',         internalCode: 'Cotia-12014' },
-      'IPTU':               { tag: 'IPTU',          internalCode: null },
-      'IPTU Floripa':       { tag: 'FLORIPA',       internalCode: 'Floripa-12007' },
-      'Caucao Mare 88':     { tag: 'MARE_88',       internalCode: 'Mare 88-12016' },
-      'Caucao Landmark':    { tag: 'LANDMARK',      internalCode: null },
-      'Caucao Conj 32':     { tag: 'CONJ_32',       internalCode: 'Conj 32-12002' },
-    };
+    // ── Mapa Referencia LM -> propertyTag + internal_code ─────────────────
+    // Chave = valor normalizado (sem acentos, lowercase) da coluna Referencia
+    const PROPERTY_TAG_MAP: Array<{ pattern: RegExp; tag: string; internalCode: string | null }> = [
+      // Receitas de locacao
+      { pattern: /locac[aã]o mare 62|locacao mare 62/i,      tag: 'MARE_62',    internalCode: 'Mare 62-12015' },
+      { pattern: /locac[aã]o mare 88|locacao mare 88/i,      tag: 'MARE_88',    internalCode: 'Mare 88-12016' },
+      { pattern: /locac[aã]o mare 92|locacao mare 92/i,      tag: 'MARE_92',    internalCode: 'Mare 92-12017' },
+      { pattern: /locac[aã]o landmark/i,                     tag: 'LANDMARK',   internalCode: null },
+      { pattern: /locac[aã]o conj\s*32/i,                    tag: 'CONJ_32',    internalCode: 'Conj 32-12002' },
+      { pattern: /locac[aã]o conj\s*33/i,                    tag: 'CONJ_33',    internalCode: 'Conj 33-12003' },
+      { pattern: /locac[aã]o loft/i,                         tag: 'LOFT_SP',    internalCode: 'Loft São Paulo-12005' },
+      { pattern: /locac[aã]o ecoville|locac[aã]o ctba/i,     tag: 'ECOVILLE',   internalCode: 'Ecoville-12006' },
+      { pattern: /locac[aã]o grj|locac[aã]o guaruj/i,        tag: 'GUARUJA',    internalCode: 'Guarujá-12010' },
+      // Caucoes
+      { pattern: /cau[cç][aã]o mare 88/i,                    tag: 'MARE_88',    internalCode: 'Mare 88-12016' },
+      { pattern: /cau[cç][aã]o landmark/i,                   tag: 'LANDMARK',   internalCode: null },
+      { pattern: /cau[cç][aã]o conj\s*32/i,                  tag: 'CONJ_32',    internalCode: 'Conj 32-12002' },
+      // Condomínios por ativo
+      { pattern: /cond mare 62|mare 62/i,                    tag: 'MARE_62',    internalCode: 'Mare 62-12015' },
+      { pattern: /cond mare 88|mare 88/i,                    tag: 'MARE_88',    internalCode: 'Mare 88-12016' },
+      { pattern: /cond mare 92|mare 92/i,                    tag: 'MARE_92',    internalCode: 'Mare 92-12017' },
+      { pattern: /cond floripa|iptu floripa|taxa.*floripa/i,  tag: 'FLORIPA',    internalCode: 'Floripa-12007' },
+      { pattern: /cond.*conj\s*33/i,                         tag: 'CONJ_33',    internalCode: 'Conj 33-12003' },
+      // IPTU por ativo
+      { pattern: /iptu\s*137/i,                              tag: 'LANDMARK',   internalCode: '137-A-12013' },
+      { pattern: /iptu\s*138/i,                              tag: 'LANDMARK',   internalCode: '138-A-12011' },
+      { pattern: /iptu\s*139/i,                              tag: 'LANDMARK',   internalCode: '139-A-12012' },
+      { pattern: /iptu conj\s*32/i,                          tag: 'CONJ_32',    internalCode: 'Conj 32-12002' },
+      { pattern: /iptu conj\s*33/i,                          tag: 'CONJ_33',    internalCode: 'Conj 33-12003' },
+      { pattern: /iptu.*guaruj|iptu grj/i,                   tag: 'GUARUJA',    internalCode: 'Guarujá-12010' },
+      { pattern: /iptu bertioga/i,                           tag: 'MARE',       internalCode: null },
+      { pattern: /iptu.*cotia/i,                             tag: 'COTIA',      internalCode: 'Cotia-12014' },
+      { pattern: /iptu cj|campos do jord/i,                  tag: 'CAMPOS_JORDAO', internalCode: 'Campos do Jordão-12021' },
+      { pattern: /iptu.*lomenha|lamenha/i,                   tag: 'LAMENHA',    internalCode: 'Lamenha Lins-12004' },
+      { pattern: /iptu.*lombardi|d amrmando|palais/i,        tag: 'PALAIS',     internalCode: 'Palays-12008' },
+      // Manutencoes por ativo
+      { pattern: /manutenc[aã]o cotia/i,                     tag: 'COTIA',      internalCode: 'Cotia-12014' },
+      { pattern: /manutenc[aã]o mare/i,                      tag: 'MARE',       internalCode: null },
+      { pattern: /m[oó]veis grj|lampadas gj|dep[oó]sito iporanga/i, tag: 'GUARUJA', internalCode: 'Guarujá-12010' },
+      // Despesas gerais sem ativo especifico
+      { pattern: /condom[ií]nio|cond\s/i,                    tag: 'CONDOMINIO', internalCode: null },
+      { pattern: /manutenção cotia/i,                        tag: 'COTIA',      internalCode: 'Cotia-12014' },
+    ];
+
+    // Resolve propertyTag e assetId a partir da referencia
+    const normRef2 = (s: string) => (s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
 
     // Normaliza referencia para lookup (remove acentos, lowercase)
     const normRef = (s: string) => (s ?? '')
@@ -496,22 +523,16 @@ export class BankImportService {
       return asset?.id ?? null;
     };
 
-    // Resolve propertyTag e assetId a partir da coluna Referencia
+    // Resolve propertyTag e assetId a partir da referencia
     const resolveProperty = async (referencia: string): Promise<{ propertyTag: string | null; assetId: string | null }> => {
-      const norm = normRef(referencia);
-      // Busca exata primeiro
-      for (const [key, val] of Object.entries(PROPERTY_TAG_MAP)) {
-        if (normRef(key) === norm) {
-          return { propertyTag: val.tag, assetId: await resolveAssetId(val.internalCode) };
+      if (!referencia) return { propertyTag: null, assetId: null };
+      for (const entry of PROPERTY_TAG_MAP) {
+        if (entry.pattern.test(referencia)) {
+          return { propertyTag: entry.tag, assetId: await resolveAssetId(entry.internalCode) };
         }
       }
-      // Busca parcial
-      for (const [key, val] of Object.entries(PROPERTY_TAG_MAP)) {
-        if (norm.includes(normRef(key)) || normRef(key).includes(norm)) {
-          return { propertyTag: val.tag, assetId: await resolveAssetId(val.internalCode) };
-        }
-      }
-      return { propertyTag: referencia || null, assetId: null };
+      // Fallback: retorna a referencia original como tag
+      return { propertyTag: referencia, assetId: null };
     };
     const workbook = XLSX.read(buffer, { type: 'buffer', cellDates: true });
     const sheetName = workbook.SheetNames[0];
