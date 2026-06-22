@@ -158,6 +158,8 @@ export const AppRoutes = () => {
                 <Route path="app/accounting/validate-ecd" element={<ProtectedRoute><EcdValidationPage /></ProtectedRoute>} />
                 <Route path="app/accounting/dre" element={<ProtectedRoute><DrePage /></ProtectedRoute>} /><Route path="app/accounting/balanco" element={<ProtectedRoute><BalancoPatrimonialPage /></ProtectedRoute>} />
                 <Route path="app/accounting/diario" element={<ProtectedRoute><DiarioGeralPage /></ProtectedRoute>} />
+                <Route path="app/accounting/investimentos/renda-fixa" element={<ProtectedRoute><RendaFixaPage /></ProtectedRoute>} />
+                <Route path="app/accounting/investimentos/simulador" element={<ProtectedRoute><CdbProjecaoPage /></ProtectedRoute>} />
                 <Route path="app/accounting/investimentos/cdi" element={<ProtectedRoute><CdiTabelaPage /></ProtectedRoute>} />
                 <Route path="app/sistema/indicadores" element={<ProtectedRoute><IndicadoresPage /></ProtectedRoute>} />
                 <Route path="app/sistema/calendario" element={<ProtectedRoute><CalendarioPage /></ProtectedRoute>} />
@@ -291,6 +293,9 @@ export const AppRoutes = () => {
         </Routes>
     );
 };
+
+
+
 
 
 
