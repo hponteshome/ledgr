@@ -17,6 +17,8 @@ export interface ParsedTransaction {
   agency?:         string;
   debitCode?:      string;  // codigo da conta debito (plano de contas)
   creditCode?:     string;  // codigo da conta credito (plano de contas)
+  propertyTag?:    string;  // tag do ativo (ex: MARE, LANDMARK, COTIA)
+  referencia?:     string;  // referencia original do extrato LM
 }
 
 export interface ParsedStatement {
@@ -69,6 +71,31 @@ function parseBRL(val: any): number {
   if (typeof val === 'number') return Math.abs(val);
   const s = String(val).replace(/\s/g, '').replace(/\./g, '').replace(',', '.');
   return Math.abs(parseFloat(s) || 0);
+}
+
+// ── Normaliza referencia do extrato LM para propertyTag ──────
+function normalizePropertyTag(ref: string): string | undefined {
+  if (!ref) return undefined;
+  const r = ref.toUpperCase().trim();
+  if (r.includes('LANDMARK'))    return 'LANDMARK';
+  if (r.includes('MARE 62'))     return 'MARE_62';
+  if (r.includes('MARE 88'))     return 'MARE_88';
+  if (r.includes('MARE 92'))     return 'MARE_92';
+  if (r.includes('MARE'))        return 'MARE';
+  if (r.includes('CONJ 32'))     return 'CONJ_32';
+  if (r.includes('CONJ 33'))     return 'CONJ_33';
+  if (r.includes('LOFT'))        return 'LOFT_SP';
+  if (r.includes('FLORIPA'))     return 'FLORIPA';
+  if (r.includes('GUARUJA'))     return 'GUARUJA';
+  if (r.includes('CTBA') || r.includes('CURITIBA') || r.includes('ECOVILLE')) return 'ECOVILLE';
+  if (r.includes('LAMENHA'))     return 'LAMENHA_LINS';
+  if (r.includes('COTIA'))       return 'COTIA';
+  if (r.includes('LAS PIEDRAS')) return 'LAS_PIEDRAS';
+  if (r.includes('CAMPOS'))      return 'CAMPOS_JORDAO';
+  if (r.includes('PALAIS') || r.includes('PALAYS')) return 'PALAIS';
+  if (r.includes('SAUTERNES'))   return 'SAUTERNES';
+  if (r.includes('PINHAIS') || r.includes('PIRAQUARA')) return 'PINHAIS';
+  return undefined;
 }
 
 @Injectable()
@@ -655,7 +682,7 @@ export class BankParserService {
     let headerRow = -1;
     for (let i = 0; i < Math.min(rows.length, 20); i++) {
       const flat = rows[i].join(' ').toUpperCase();
-      if (flat.match(/DATA/) && flat.match(/DESC|HIST/)) {
+      if (flat.match(/DATA/) && flat.match(/DESC|HIST|LAN/)) {
         headerRow = i;
         break;
       }
@@ -669,11 +696,18 @@ export class BankParserService {
 
     const headers = rows[headerRow].map((h: any) => normalizeText(String(h)));
     const colDate  = headers.findIndex((h: string) => /DATA/.test(h));
-    const colDesc  = headers.findIndex((h: string) => /DESC|HIST|LANCAM/.test(h));
-    const colVal   = headers.findIndex((h: string) => /VALOR/.test(h));
-    const colCred  = headers.findIndex((h: string) => /CRED/.test(h));
-    const colDeb   = headers.findIndex((h: string) => /DEB/.test(h));
-    const colSaldo = headers.findIndex((h: string) => /SALDO/.test(h));
+    const colDesc  = headers.findIndex((h: string) => /LANCAMENTO|LANCAM|DESC|HIST/.test(h));
+    const colVal   = headers.findIndex((h: string) => /^VALOR$/.test(h));
+    const colCred  = headers.findIndex((h: string) => /CREDITO/.test(h));
+    const colDeb   = headers.findIndex((h: string) => /DEBITO/.test(h));
+    const colSaldo = headers.findIndex((h: string) => /SALDO CALCULADO|SALDO/.test(h));
+    const colRef   = headers.findIndex((h: string) => /REFERENCIA|REFERÊNCIA/.test(h));
+    const colChave = headers.findIndex((h: string) => /CHAVE/.test(h));
+    const colDebCod = headers.findIndex((h: string) => /^DEBITO$/.test(h) && headers.indexOf(h) > colDeb);
+    const colCredCod = headers.findIndex((h: string) => /^CREDITO$/.test(h) && headers.indexOf(h) > colCred);
+
+    // Detecta layout LM (tem coluna Referencia ou Chave)
+    const isLM = colRef >= 0 || colChave >= 0;
 
     const transactions: ParsedTransaction[] = [];
     let periodFrom: Date | null = null;
@@ -690,8 +724,9 @@ export class BankParserService {
       if (colCred >= 0 && colDeb >= 0) {
         const cr = parseBRL(row[colCred]);
         const db = parseBRL(row[colDeb]);
-        amount = cr > 0 ? cr : db;
-        type   = db > 0 ? 'DEBIT' : 'CREDIT';
+        if (cr === 0 && db === 0) continue;
+        amount = cr > 0 ? cr : Math.abs(db);
+        type   = db !== 0 && cr === 0 ? 'DEBIT' : 'CREDIT';
       } else {
         const raw = typeof row[colVal] === 'number' ? row[colVal]
           : parseFloat(String(row[colVal]).replace(/\./g, '').replace(',', '.'));
@@ -701,6 +736,17 @@ export class BankParserService {
 
       if (amount === 0) continue;
 
+      // Extrair propertyTag da coluna Referencia (layout LM)
+      const referencia = colRef >= 0 ? String(row[colRef] ?? '').trim() : undefined;
+      const chave      = colChave >= 0 ? String(row[colChave] ?? '').trim() : undefined;
+      const propertyTag = referencia
+        ? normalizePropertyTag(referencia)
+        : chave ? normalizePropertyTag(chave) : undefined;
+
+      // Codigos de conta (layout LM)
+      const debitCode  = colDebCod  >= 0 ? String(row[colDebCod]  ?? '').trim() || undefined : undefined;
+      const creditCode = colCredCod >= 0 ? String(row[colCredCod] ?? '').trim() || undefined : undefined;
+
       const norm = normalizeText(desc);
       transactions.push({
         transactionDate: dt,
@@ -708,7 +754,11 @@ export class BankParserService {
         descriptionNorm: norm,
         amount,
         type,
-        balance: colSaldo >= 0 ? parseBRL(row[colSaldo]) : undefined,
+        balance:      colSaldo >= 0 ? parseBRL(row[colSaldo]) : undefined,
+        referencia,
+        propertyTag,
+        debitCode,
+        creditCode,
       });
 
       if (!periodFrom || dt < periodFrom) periodFrom = dt;
@@ -716,7 +766,8 @@ export class BankParserService {
     }
 
     return {
-      bankCode: 'GENERIC', bankName: 'Extrato (genérico)',
+      bankCode:  'GENERIC',
+      bankName:  isLM ? 'LM Administracao - Extrato Mapeado' : 'Extrato (genérico)',
       periodFrom: periodFrom ?? new Date(),
       periodTo:   periodTo   ?? new Date(),
       transactions,

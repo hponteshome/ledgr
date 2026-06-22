@@ -390,17 +390,29 @@ export class BankImportService {
       const r = rowKeys(rows[i]);
       const issues: string[] = [];
       const dateRaw    = r['data'] as any;
-      const memoRaw    = r['complemento'] ?? r['descricao'] ?? r['historico'] ?? '';
+      const memoRaw    = r['historico'] ?? r['complemento'] ?? r['descricao'] ?? r['lancamento'] ?? '';
+      const valorCred  = r['credito (r$)'] ?? r['credito(r$)'] ?? null;
+      const valorDeb   = r['debito (r$)'] ?? r['debito(r$)'] ?? null;
       const valorRaw   = r['valor'] ?? null;
-      const debitCode  = r['conta debito'] ?? r['conta'] ?? null;
-      const creditCode = r['conta credito'] ?? r['contrapartida'] ?? null;
+      const debitCode  = r['debito'] ?? r['conta debito'] ?? r['conta'] ?? null;
+      const creditCode = r['credito'] ?? r['conta credito'] ?? r['contrapartida'] ?? null;
+      const referenciaRaw = r['referencia'] ?? r['chave'] ?? '';
 
       if (!debitCode)  issues.push('Conta Débito ausente');
       if (!creditCode) issues.push('Conta Crédito ausente');
 
-      const valorNum = typeof valorRaw === 'number' ? valorRaw : parseFloat(String(valorRaw ?? '0').replace(/[()]/g, '').replace(/,/g, '.'));
-      const isNeg = valorNum < 0 || String(valorRaw ?? '').trim().startsWith('(');
-      const type  = isNeg ? 'DEBIT' : 'CREDIT';
+      const credNum = valorCred ? Math.abs(typeof valorCred === 'number' ? valorCred : parseFloat(String(valorCred).replace(/[()]/g,'').replace(/,/g,'.'))) : 0;
+      const debNum  = valorDeb  ? Math.abs(typeof valorDeb  === 'number' ? valorDeb  : parseFloat(String(valorDeb ).replace(/[()]/g,'').replace(/,/g,'.'))) : 0;
+      let valorNum: number;
+      let type: string;
+      if (credNum > 0 || debNum > 0) {
+        valorNum = credNum > 0 ? credNum : debNum;
+        type = credNum > 0 ? 'CREDIT' : 'DEBIT';
+      } else {
+        const raw = typeof valorRaw === 'number' ? valorRaw : parseFloat(String(valorRaw ?? '0').replace(/[()]/g,'').replace(/,/g,'.'));
+        valorNum = Math.abs(raw);
+        type = raw < 0 ? 'DEBIT' : 'CREDIT';
+      }
 
       const [debitAccount, creditAccount] = await Promise.all([
         findAccount(debitCode),
@@ -444,6 +456,63 @@ export class BankImportService {
     userId:    string,
   ) {
     const XLSX = await import('xlsx');
+
+    // ── Mapa Referencia LM -> propertyTag + internal_code ──────────────────
+    const PROPERTY_TAG_MAP: Record<string, { tag: string; internalCode: string | null }> = {
+      'Locacao Mare 62':    { tag: 'MARE_62',       internalCode: 'Mare 62-12015' },
+      'Locacao Mare 88':    { tag: 'MARE_88',       internalCode: 'Mare 88-12016' },
+      'Locacao Mare 92':    { tag: 'MARE_92',       internalCode: 'Mare 92-12017' },
+      'Locacao Landmark':   { tag: 'LANDMARK',      internalCode: null },
+      'Locacao Conj 32':    { tag: 'CONJ_32',       internalCode: 'Conj 32-12002' },
+      'Locacao Conj 33':    { tag: 'CONJ_33',       internalCode: 'Conj 33-12003' },
+      'Locacao Loft':       { tag: 'LOFT_SP',       internalCode: 'Loft São Paulo-12005' },
+      'Locacao Ctba':       { tag: 'ECOVILLE',      internalCode: 'Ecoville-12006' },
+      'Locacao Guaruja':    { tag: 'GUARUJA',        internalCode: 'Guarujá-12010' },
+      'Condominio':         { tag: 'CONDOMINIO',    internalCode: null },
+      'Manutencao Mare':    { tag: 'MARE',          internalCode: null },
+      'Manutencao Cotia':   { tag: 'COTIA',         internalCode: 'Cotia-12014' },
+      'IPTU':               { tag: 'IPTU',          internalCode: null },
+      'IPTU Floripa':       { tag: 'FLORIPA',       internalCode: 'Floripa-12007' },
+      'Caucao Mare 88':     { tag: 'MARE_88',       internalCode: 'Mare 88-12016' },
+      'Caucao Landmark':    { tag: 'LANDMARK',      internalCode: null },
+      'Caucao Conj 32':     { tag: 'CONJ_32',       internalCode: 'Conj 32-12002' },
+    };
+
+    // Normaliza referencia para lookup (remove acentos, lowercase)
+    const normRef = (s: string) => (s ?? '')
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .toLowerCase().trim();
+
+    // Busca assetId pelo internalCode (cache por companyId)
+    const assetCache = new Map<string, string | null>();
+    const resolveAssetId = async (internalCode: string | null): Promise<string | null> => {
+      if (!internalCode) return null;
+      if (assetCache.has(internalCode)) return assetCache.get(internalCode)!;
+      const asset = await this.prisma.fixedAsset.findFirst({
+        where: { companyId, internalCode, deletedAt: null },
+        select: { id: true },
+      });
+      assetCache.set(internalCode, asset?.id ?? null);
+      return asset?.id ?? null;
+    };
+
+    // Resolve propertyTag e assetId a partir da coluna Referencia
+    const resolveProperty = async (referencia: string): Promise<{ propertyTag: string | null; assetId: string | null }> => {
+      const norm = normRef(referencia);
+      // Busca exata primeiro
+      for (const [key, val] of Object.entries(PROPERTY_TAG_MAP)) {
+        if (normRef(key) === norm) {
+          return { propertyTag: val.tag, assetId: await resolveAssetId(val.internalCode) };
+        }
+      }
+      // Busca parcial
+      for (const [key, val] of Object.entries(PROPERTY_TAG_MAP)) {
+        if (norm.includes(normRef(key)) || normRef(key).includes(norm)) {
+          return { propertyTag: val.tag, assetId: await resolveAssetId(val.internalCode) };
+        }
+      }
+      return { propertyTag: referencia || null, assetId: null };
+    };
     const workbook = XLSX.read(buffer, { type: 'buffer', cellDates: true });
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
@@ -452,6 +521,10 @@ export class BankImportService {
     if (!rows || rows.length === 0) {
       throw new BadRequestException('A planilha enviada esta vazia.');
     }
+
+    // ── Verificar sobreposicao de periodo ──────────────────────────────────
+    // Primeiro parsear para saber o periodo antes de criar o statement
+    // A verificacao sera feita apos o parse, antes do createMany
 
     const today = new Date();
     const statement = await this.prisma.bankStatement.create({
@@ -468,6 +541,51 @@ export class BankImportService {
         totalCredits: new Prisma.Decimal(0),
         createdById:  userId,
       },
+    });
+
+    // ── Detectar periodo real das transacoes ───────────────────────────────
+    const dates = rows.map((r: any) => {
+      const rk = Object.fromEntries(Object.entries(r).map(([k,v]) => [k.normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase(), v]));
+      const d = rk['data'];
+      if (!d) return null;
+      if (d instanceof Date) return d;
+      const s = String(d).trim();
+      const m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+      if (m) return new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+      return null;
+    }).filter(Boolean) as Date[];
+
+    const periodFrom = dates.length ? new Date(Math.min(...dates.map(d => d.getTime()))) : today;
+    const periodTo   = dates.length ? new Date(Math.max(...dates.map(d => d.getTime()))) : today;
+
+    // Verificar sobreposicao com imports existentes
+    const overlapping = await this.prisma.bankStatement.findMany({
+      where: {
+        companyId,
+        deletedAt: null,
+        id: { not: statement.id },
+        AND: [
+          { periodFrom: { lte: periodTo } },
+          { periodTo:   { gte: periodFrom } },
+        ],
+      },
+      select: { id: true, bankName: true, periodFrom: true, periodTo: true, totalLines: true },
+    });
+
+    if (overlapping.length > 0) {
+      // Deletar statement criado (rollback manual)
+      await this.prisma.bankStatement.delete({ where: { id: statement.id } });
+      const fmt = (d: Date) => d.toLocaleDateString('pt-BR');
+      const detail = overlapping.map(o => `"${o.bankName}" (${fmt(o.periodFrom)} → ${fmt(o.periodTo)}, ${o.totalLines} lançamentos)`).join('; ');
+      throw new BadRequestException(
+        `Período sobreposto com importação existente: ${detail}. Exclua o extrato anterior antes de reimportar.`
+      );
+    }
+
+    // Atualizar periodo real no statement
+    await this.prisma.bankStatement.update({
+      where: { id: statement.id },
+      data: { periodFrom, periodTo },
     });
 
     let importedCount = 0;
@@ -502,21 +620,40 @@ export class BankImportService {
       const rowNumber = i + 2;
       try {
         const dateRaw    = r['data'] as any;
-        const memoRaw    = r['complemento'] ?? r['descricao'] ?? r['historico'] ?? null;
+        const memoRaw    = r['historico'] ?? r['complemento'] ?? r['descricao'] ?? r['lancamento'] ?? null;
+        const valorCred  = r['credito (r$)'] ?? r['credito(r$)'] ?? null;
+        const valorDeb   = r['debito (r$)'] ?? r['debito(r$)'] ?? null;
         const valorRaw   = r['valor'] ?? null;
-        const debitCode  = r['conta debito'] ?? r['conta'] ?? null;
-        const creditCode = r['conta credito'] ?? r['contrapartida'] ?? null;
+        // codigos de conta: colunas "debito" e "credito" (sem sufixo R$)
+        const debitCode  = r['debito'] ?? r['conta debito'] ?? r['conta'] ?? null;
+        const creditCode = r['credito'] ?? r['conta credito'] ?? r['contrapartida'] ?? null;
+        const referenciaRaw = r['referencia'] ?? r['chave'] ?? '';
+        const { propertyTag, assetId } = await resolveProperty(String(referenciaRaw));
 
         const transactionDate = dateRaw instanceof Date ? dateRaw : new Date(dateRaw);
         if (isNaN(transactionDate.getTime())) throw new Error('Data invalida: ' + dateRaw);
 
-        // Valor: positivo = CREDIT, negativo ou entre parenteses = DEBIT
-        if (valorRaw === null || valorRaw === undefined) throw new Error('Coluna Valor ausente.');
-        const valorNum = typeof valorRaw === 'number' ? valorRaw : parseFloat(String(valorRaw).replace(/[()]/g, '').replace(/,/g, '.'));
-        if (isNaN(valorNum)) throw new Error('Valor invalido na linha.');
-        const isNeg = valorNum < 0 || String(valorRaw).trim().startsWith('(');
-        const amountNum = Math.abs(valorNum);
-        const type: 'DEBIT' | 'CREDIT' = isNeg ? 'DEBIT' : 'CREDIT';
+        // Layout LM: colunas separadas Credito(R$) e Debito(R$)
+        let amountNum: number;
+        let type: 'DEBIT' | 'CREDIT';
+        const credNum = valorCred !== null && valorCred !== undefined && valorCred !== ''
+          ? Math.abs(typeof valorCred === 'number' ? valorCred : parseFloat(String(valorCred).replace(/[()]/g,'').replace(/,/g,'.')))
+          : 0;
+        const debNum  = valorDeb  !== null && valorDeb  !== undefined && valorDeb  !== ''
+          ? Math.abs(typeof valorDeb  === 'number' ? valorDeb  : parseFloat(String(valorDeb ).replace(/[()]/g,'').replace(/,/g,'.')))
+          : 0;
+        if (credNum > 0 || debNum > 0) {
+          amountNum = credNum > 0 ? credNum : debNum;
+          type = credNum > 0 ? 'CREDIT' : 'DEBIT';
+        } else {
+          // fallback coluna Valor
+          if (valorRaw === null || valorRaw === undefined) throw new Error('Coluna Valor ausente.');
+          const valorNum = typeof valorRaw === 'number' ? valorRaw : parseFloat(String(valorRaw).replace(/[()]/g,'').replace(/,/g,'.'));
+          if (isNaN(valorNum)) throw new Error('Valor invalido na linha.');
+          amountNum = Math.abs(valorNum);
+          type = valorNum < 0 ? 'DEBIT' : 'CREDIT';
+        }
+        if (amountNum === 0) continue;
 
         if (type === 'DEBIT') accumulatedDebits  += amountNum;
         else                  accumulatedCredits += amountNum;
@@ -545,6 +682,8 @@ export class BankImportService {
               counterAccountId: type === 'DEBIT' ? creditAcc?.id ?? null : debitAcc?.id ?? null,
               memo:             String(memoRaw),
               groupKey:         String(memoRaw).trim().toUpperCase().slice(0, 50),
+              propertyTag:      propertyTag ?? null,
+              assetId:          assetId ?? null,
             },
           });
 
@@ -561,8 +700,8 @@ export class BankImportService {
             const abs = amount.abs();
             await tx.journalEntryItem.createMany({
               data: [
-                { journalEntryId: journal.id, accountId: debitAcc!.id,  type: 'DEBIT'  as any, value: abs },
-                { journalEntryId: journal.id, accountId: creditAcc!.id, type: 'CREDIT' as any, value: abs },
+                { journalEntryId: journal.id, accountId: debitAcc!.id,  type: 'DEBIT'  as any, value: abs, propertyTag: propertyTag ?? null, assetId: assetId ?? null },
+                { journalEntryId: journal.id, accountId: creditAcc!.id, type: 'CREDIT' as any, value: abs, propertyTag: propertyTag ?? null, assetId: assetId ?? null },
               ],
             });
             await tx.bankTransaction.update({

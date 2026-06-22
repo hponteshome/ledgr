@@ -1128,10 +1128,13 @@ model JournalEntryItem {
   accountId      String        @map("account_id") @db.Uuid
   value          Decimal       @map("value") @db.Decimal(18, 2)
   type           AccountNature @map("type")
+  assetId        String?       @map("asset_id") @db.Uuid
+  propertyTag    String?       @map("property_tag") @db.VarChar(50)
   createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamp(6)
 
   journalEntry JournalEntry    @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
   account      ChartOfAccounts @relation(fields: [accountId], references: [id])
+  asset        FixedAsset?     @relation("JournalEntryItemAsset", fields: [assetId], references: [id])
 
   @@index([accountId])
   @@map("journal_entry_items")
@@ -1403,6 +1406,8 @@ model FixedAsset {
   appraisals       AssetAppraisal[]
   history          AssetHistory[]
   arEntries        ArEntry[]      @relation("ArEntryAsset")
+  bankTransactions BankTransaction[] @relation("BankTransactionAsset")
+  journalItems     JournalEntryItem[] @relation("JournalEntryItemAsset")
 
   @@unique([companyId, internalCode])
   @@index([companyId, status])
@@ -2153,12 +2158,15 @@ model BankTransaction {
   suggestionConfidence Int?             @map("suggestion_confidence")
   apEntryId            String?          @map("ap_entry_id") @db.Uuid
   arEntryId            String?          @map("ar_entry_id") @db.Uuid
+  assetId              String?          @map("asset_id") @db.Uuid
+  propertyTag          String?          @map("property_tag") @db.VarChar(50)
   payrollId            String?          @map("payroll_id") @db.Uuid
   journalEntryId       String?          @map("journal_entry_id") @db.Uuid
   createdAt            DateTime         @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt            DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
 
   statement BankStatement @relation(fields: [statementId], references: [id])
+  asset     FixedAsset? @relation("BankTransactionAsset", fields: [assetId], references: [id])
 
   @@index([companyId, transactionDate])
   @@index([statementId])
