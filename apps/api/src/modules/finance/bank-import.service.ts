@@ -357,9 +357,24 @@ export class BankImportService {
       where: { id: statementId, companyId },
     });
     if (!stmt) throw new BadRequestException('Extrato nao encontrado.');
+
+    // Buscar journal entries gerados pelas transacoes deste statement
+    const txs = await this.prisma.bankTransaction.findMany({
+      where: { statementId },
+      select: { journalEntryId: true },
+    });
+    const journalIds = txs.map(t => t.journalEntryId).filter(Boolean) as string[];
+
+    // Excluir em cascata
     await this.prisma.bankTransaction.deleteMany({ where: { statementId } });
+
+    if (journalIds.length > 0) {
+      await this.prisma.journalEntryItem.deleteMany({ where: { journalEntryId: { in: journalIds } } });
+      await this.prisma.journalEntry.deleteMany({ where: { id: { in: journalIds } } });
+    }
+
     await this.prisma.bankStatement.delete({ where: { id: statementId } });
-    return { deleted: true, statementId };
+    return { deleted: true, statementId, journalsDeleted: journalIds.length };
   }
 
   async previewExcelMapped(companyId: string, buffer: Buffer) {
