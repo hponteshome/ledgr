@@ -352,6 +352,16 @@ export class BankImportService {
   }
 
 
+  async deleteStatement(companyId: string, statementId: string) {
+    const stmt = await this.prisma.bankStatement.findFirst({
+      where: { id: statementId, companyId },
+    });
+    if (!stmt) throw new BadRequestException('Extrato nao encontrado.');
+    await this.prisma.bankTransaction.deleteMany({ where: { statementId } });
+    await this.prisma.bankStatement.delete({ where: { id: statementId } });
+    return { deleted: true, statementId };
+  }
+
   async previewExcelMapped(companyId: string, buffer: Buffer) {
     const XLSX = await import('xlsx');
     const workbook = XLSX.read(buffer, { type: 'buffer', cellDates: true });
@@ -526,6 +536,11 @@ export class BankImportService {
     // Resolve propertyTag e assetId a partir da referencia
     const resolveProperty = async (referencia: string): Promise<{ propertyTag: string | null; assetId: string | null }> => {
       if (!referencia) return { propertyTag: null, assetId: null };
+      // Reembolsos e caucoes NAO sao receita de locacao
+      const refClean = referencia.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+      if (refClean.includes('reembolso') || refClean.includes('caucao') || refClean.includes('cauca') || refClean.startsWith('deposito')) {
+        return { propertyTag: 'REEMBOLSO', assetId: null };
+      }
       // Testa com texto original E com texto normalizado (sem acentos)
       const refNorm = referencia.normalize('NFD').replace(/[̀-ͯ]/g, '');
       for (const entry of PROPERTY_TAG_MAP) {

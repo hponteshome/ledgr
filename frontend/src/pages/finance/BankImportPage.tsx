@@ -218,12 +218,28 @@ export default function BankImportPage() {
                       <td style={{ padding: '10px 14px', fontFamily: 'monospace', fontSize: 12, color: T.success }}>{fmtBRL(s.totalCredits)}</td>
                       <td style={{ padding: '10px 14px', fontSize: 11, color: T.textHint }}>{fmtDate(s.createdAt)}</td>
                       <td style={{ padding: '10px 14px' }}>
-                        <button onClick={async () => {
-                          const grps = await getGroups(s.id);
-                          setUploadRes({ statementId: s.id, bankName: s.bankName, bankCode: s.bankCode, totalLines: s.totalLines, totalDebits: Number(s.totalDebits), totalCredits: Number(s.totalCredits), periodFrom: s.periodFrom, periodTo: s.periodTo });
-                          initGroups(grps);
-                          setStep('classify');
-                        }} style={{ fontSize: 12, padding: '5px 12px', border: `0.5px solid ${T.border}`, borderRadius: 6, color: T.accent, background: '#fff', cursor: 'pointer', fontWeight: 500 }}>Abrir</button>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button onClick={async () => {
+                            const grps = await getGroups(s.id);
+                            setUploadRes({ statementId: s.id, bankName: s.bankName, bankCode: s.bankCode, totalLines: s.totalLines, totalDebits: Number(s.totalDebits), totalCredits: Number(s.totalCredits), periodFrom: s.periodFrom, periodTo: s.periodTo });
+                            initGroups(grps);
+                            setStep('classify');
+                          }} style={{ fontSize: 12, padding: '5px 12px', border: `0.5px solid ${T.border}`, borderRadius: 6, color: T.accent, background: '#fff', cursor: 'pointer', fontWeight: 500 }}>Abrir</button>
+                          <button onClick={async () => {
+                            const ok = window.confirm(`Excluir o extrato "${s.bankName}" (${fmtDate(s.periodFrom)} → ${fmtDate(s.periodTo)}) e todos os seus ${s._count.transactions} lançamentos? Esta ação não pode ser desfeita.`);
+                            if (!ok) return;
+                            try {
+                              const token = localStorage.getItem('@ledgr:token');
+                              const company = JSON.parse(localStorage.getItem('@ledgr:activeCompany') ?? '{}');
+                              const res = await fetch(`http://localhost:3000/bank-import/statements/${s.id}`, {
+                                method: 'DELETE',
+                                headers: { Authorization: 'Bearer ' + token, 'x-company-id': company.id ?? '' },
+                              });
+                              if (!res.ok) { const d = await res.json(); throw new Error(d.message ?? 'Erro ao excluir'); }
+                              loadStatements();
+                            } catch (e: any) { alert('Erro: ' + e.message); }
+                          }} style={{ fontSize: 12, padding: '5px 10px', border: '0.5px solid #FECACA', borderRadius: 6, color: '#B91C1C', background: '#FEF2F2', cursor: 'pointer', fontWeight: 500 }}>Excluir</button>
+                        </div>
                       </td>
                     </tr>
                   ))}

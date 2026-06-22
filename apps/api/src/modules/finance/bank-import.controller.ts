@@ -2,7 +2,7 @@
 // LEDGR — apps/api/src/modules/finance/bank-import.controller.ts
 // ============================================================
 import {
-  Controller, Post, Get, Patch, Body, Param,
+  Controller, Post, Get, Patch, Delete, Body, Param,
   UseGuards, UseInterceptors, Req, UploadedFile,
   HttpCode, HttpStatus, BadRequestException
 } from '@nestjs/common';
@@ -59,5 +59,11 @@ export class BankImportController {
   @HttpCode(HttpStatus.OK)
   postStatement(@Req() req: any, @Body() dto: PostStatementDto) {
     return this.service.postStatement(req.companyId, dto, req.user.id);
+  }
+
+  @Delete('statements/:id')
+  @HttpCode(HttpStatus.OK)
+  deleteStatement(@Param('id') id: string, @Req() req: any) {
+    return this.service.deleteStatement(req.companyId, id);
   }
 }

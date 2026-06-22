@@ -1192,3 +1192,14 @@ Deixar o monorepo limpo, organizado e documentado antes de avançar em novas fea
 ### Regra
 Nao deletar nada sem inspecionar primeiro — sempre confirmar o que e orfao
 antes de remover. Usar git para seguranca (branch de limpeza ou commits atomicos).
+
+## Pendencia registrada — 22/06/2026
+
+### LM Administracao — Abertura de receitas de locacao (retroativo)
+- Mare 62 e Mare 88: valores recebidos incluem condominio embutido — nao e receita tributavel
+- Landmark e Conj 32: parte dos recebimentos e reembolso de IPTU — nao e receita tributavel
+- Solucao adotada: separar na planilha em linhas distintas com contas contabeis diferentes
+  - Receita de aluguel: conta 3301
+  - Reembolso condominio/IPTU: conta passivo transitorio (a definir)
+- Pendente: retroagir e corrigir todos os periodos 2025 e jan-mai/2026
+- Impacto: base PIS/COFINS e IRPJ/CSLL sera reduzida nos periodos corrigidos
