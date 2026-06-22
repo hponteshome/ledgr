@@ -526,8 +526,10 @@ export class BankImportService {
     // Resolve propertyTag e assetId a partir da referencia
     const resolveProperty = async (referencia: string): Promise<{ propertyTag: string | null; assetId: string | null }> => {
       if (!referencia) return { propertyTag: null, assetId: null };
+      // Testa com texto original E com texto normalizado (sem acentos)
+      const refNorm = referencia.normalize('NFD').replace(/[̀-ͯ]/g, '');
       for (const entry of PROPERTY_TAG_MAP) {
-        if (entry.pattern.test(referencia)) {
+        if (entry.pattern.test(referencia) || entry.pattern.test(refNorm)) {
           return { propertyTag: entry.tag, assetId: await resolveAssetId(entry.internalCode) };
         }
       }
