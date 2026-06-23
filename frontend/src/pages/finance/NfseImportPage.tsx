@@ -21,6 +21,7 @@ export const NfseImportPage:React.FC=()=>{
   // Busca repositorio SP
   const [agentOnline,  setAgentOnline]  = useState<boolean|null>(null);
   const [certsA3,      setCertsA3]      = useState<any[]>([]);
+  const [certId,       setCertId]       = useState<string>('');
   const [companyCnpj, setCompanyCnpj] = useState<string>('');
   const [certs,    setCerts]   =useState<any[]>([]);
 
@@ -170,11 +171,12 @@ export const NfseImportPage:React.FC=()=>{
         </div>
         <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr 1fr auto',gap:8,alignItems:'end'}}>
           <div>
-            <label style={{fontSize:10,fontWeight:600,color:'#1D4ED8',textTransform:'uppercase' as const,display:'block',marginBottom:3}}>Certificado A1 *</label>
-            <select value={buscaForm.certId} onChange={e=>setBF('certId',e.target.value)}
+            <label style={{fontSize:10,fontWeight:600,color:'#1D4ED8',textTransform:'uppercase' as const,display:'block',marginBottom:3}}>Certificado Digital *</label>
+            <select value={certId} onChange={e=>{ setCertId(e.target.value); setBF('certId',e.target.value); setBEF('certId',e.target.value); }}
               style={{width:'100%',border:'0.5px solid #93C5FD',borderRadius:6,padding:'6px 10px',fontSize:12,outline:'none',background:'#fff'}}>
               <option value="">Selecione...</option>
-              {certs.map((c:any)=>(<option key={c.id} value={c.id}>{c.alias}</option>))}
+              {certs.length>0&&<optgroup label='Certificados A1 (servidor)'>{certs.map((c:any)=>(<option key={c.id} value={'a1:'+c.id}>{c.alias}</option>))}</optgroup>}
+              {certsA3.length>0&&<optgroup label='Certificados A3 (token — LEDGR Agent)'>{certsA3.filter((c:any)=>c.cnpj||c.cpf).map((c:any)=>{ const doc=c.cnpj||c.cpf; const raiz=c.cnpj?doc.slice(0,8):doc; const nome=(c.alias||(c.subject||'').replace(/^CN=([^,]+).*/,'$1').split(':')[0].trim())||doc; const tipo=c.keyType==='A3/CNG'?'A3':'A1'; return (<option key={c.thumbprint} value={'a3:'+c.thumbprint}>{nome} — {raiz} [{tipo}]</option>); })}</optgroup>}
             </select>
           </div>
           <div>
@@ -220,13 +222,10 @@ export const NfseImportPage:React.FC=()=>{
       <div style={{background:'#F0FDF4',borderBottom:'0.5px solid #86EFAC',padding:'12px 24px',flexShrink:0}}>
         <div style={{fontWeight:700,fontSize:13,color:'#15803D',marginBottom:8}}>🏛️ Buscar NFS-e Emitidas — Prefeitura de São Paulo</div>
         <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr 1fr auto',gap:8,alignItems:'end'}}>
-          <div><label style={{fontSize:10,fontWeight:600,color:'#15803D',textTransform:'uppercase' as const,display:'block',marginBottom:3}}>Certificado A1 *</label>
-            <select value={buscaEForm.certId} onChange={e=>setBEF('certId',e.target.value)}
-              style={{width:'100%',border:'0.5px solid #86EFAC',borderRadius:6,padding:'6px 10px',fontSize:12,outline:'none',background:'#fff'}}>
-              <option value=''>Selecione...</option>
-              {certs.length>0&&<optgroup label='Certificados A1 (servidor)'>{certs.map((c:any)=>(<option key={c.id} value={'a1:'+c.id}>{c.alias}</option>))}</optgroup>}
-              {certsA3.length>0&&<optgroup label='Certificados A3 (token local — via LEDGR Agent)'>{certsA3.map((c:any)=>(<option key={c.thumbprint} value={'a3:'+c.thumbprint}>{c.alias} [{c.keyType}] {c.cnpj||c.cpf||''}</option>))}</optgroup>}
-            </select></div>
+          <div><label style={{fontSize:10,fontWeight:600,color:'#15803D',textTransform:'uppercase' as const,display:'block',marginBottom:3}}>Certificado Digital *</label>
+            <div style={{border:'0.5px solid #86EFAC',borderRadius:6,padding:'6px 10px',fontSize:12,background:'#F0FDF4',color:certId?'#15803D':'#9CA3AF'}}>
+              {certId ? (() => { const c=certsA3.find((x:any)=>'a3:'+x.thumbprint===certId)||certs.find((x:any)=>'a1:'+x.id===certId); return c?(c.alias||(c.subject||'').replace(/^CN=([^,]+).*/,'$1').split(':')[0].trim()||certId):certId; })() : 'Selecione o certificado acima'}
+            </div></div>
           <div><label style={{fontSize:10,fontWeight:600,color:'#15803D',textTransform:'uppercase' as const,display:'block',marginBottom:3}}>Data Início</label>
             <input type='date' value={buscaEForm.dtInicio} onChange={e=>setBEF('dtInicio',e.target.value)}
               style={{width:'100%',border:'0.5px solid #86EFAC',borderRadius:6,padding:'6px 10px',fontSize:12,outline:'none',background:'#fff'}}/></div>

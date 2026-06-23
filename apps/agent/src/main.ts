@@ -16,13 +16,16 @@ app.use(cors({ origin: ['http://localhost:5173','http://localhost:3000','http://
 app.use(express.json({ limit: '10mb' }));
 
 // Executa script PowerShell via arquivo temp
-const ps = async (script: string): Promise<string> => {
+const ps = async (script: string, interactive = false): Promise<string> => {
   const tmp = join(tmpdir(), 'ledgr_' + Date.now() + '.ps1');
   writeFileSync(tmp, script, 'utf-8');
+  const flags = interactive
+    ? '-ExecutionPolicy Bypass'
+    : '-NonInteractive -ExecutionPolicy Bypass';
   try {
     const { stdout, stderr } = await execAsync(
-      'powershell -ExecutionPolicy Bypass -File "' + tmp + '"',
-      { maxBuffer: 10 * 1024 * 1024, timeout: 30000 }
+      'powershell ' + flags + ' -File "' + tmp + '"',
+      { maxBuffer: 10 * 1024 * 1024, timeout: 60000 }
     );
     if (stderr?.trim()) console.warn('[PS WARN]', stderr.slice(0,200));
     return stdout;
@@ -38,14 +41,14 @@ app.get('/health', (_req, res) => {
 // Lista certificados do Windows Certificate Store (inclui A3 conectados via middleware)
 app.get('/certificates', async (_req, res) => {
   const script = [
-    '$certs = Get-ChildItem Cert:\\CurrentUser\\My | Where-Object { $_.HasPrivateKey }',
+    '$store = New-Object System.Security.Cryptography.X509Certificates.X509Store("My","CurrentUser")',
+    '$store.Open("ReadOnly")',
+    '$certs = $store.Certificates | Where-Object { $_.HasPrivateKey }',
     '$result = $certs | ForEach-Object {',
     '  $sub = $_.Subject',
-    '  $cnpj = if ($sub -match "CNPJ=.?([0-9]{14})") { $Matches[1] } else { "" }',
-    '  $cpf  = if ($sub -match "CPF=.?([0-9]{11})")  { $Matches[1] } else { "" }',
-    '  $kt = "A1/Software"',
-    '  try { if ($_.PrivateKey.GetType().Name -like "*Cng*") { $kt = "A3/CNG" } } catch {}',
-    '  $alias = if ($_.FriendlyName) { $_.FriendlyName } else { ($sub -replace "^.*?CN=([^,]+).*$","$1") }',
+    '  $cnpj = if ($sub -match ":([0-9]{14})") { $Matches[1] } elseif ($sub -match "CNPJ=.?([0-9]{14})") { $Matches[1] } else { "" }',
+    '  $cpf  = if ($cnpj -eq "" -and $sub -match ":([0-9]{11})\\b") { $Matches[1] } elseif ($sub -match "CPF=.?([0-9]{11})") { $Matches[1] } else { "" }',
+    '  $kt = if ($sub -match "A3" -or $sub -match "e-CNPJ A3" -or $sub -match "e-CPF A3" -or $sub -match "PJ A3" -or $sub -match "PF A3") { "A3/CNG" } else { "A1/Software" }',
     '  @{',
     '    thumbprint = $_.Thumbprint',
     '    subject    = $sub',
@@ -77,7 +80,13 @@ app.post('/certificates/export-pem', async (req, res) => {
   const { thumbprint } = req.body;
   if (!thumbprint) return res.status(400).json({ error: 'thumbprint obrigatorio' });
   const script = [
-    '$cert = Get-Item "Cert:\\CurrentUser\\My\\' + thumbprint + '" -ErrorAction Stop',
+    '$store = New-Object System.Security.Cryptography.X509Certificates.X509Store("My","CurrentUser")',
+    '$store.Open("ReadOnly")',
+    '$cert = $store.Certificates | Where-Object { $_.Thumbprint -eq "' + thumbprint + '" } | Select-Object -First 1',
+    'Write-Host "Buscando thumbprint: ' + thumbprint + '"',
+    'Write-Host "Total certs no store: $($store2.Certificates.Count)"',
+    'Write-Host "Thumbprints: $(($store2.Certificates | ForEach-Object { $_.Thumbprint }) -join ",")"',
+    'if (-not $cert) { throw "Certificado nao encontrado: ' + thumbprint + '" }',
     '$bytes = $cert.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Cert)',
     '$b64 = [Convert]::ToBase64String($bytes)',
     'Write-Output $b64',
@@ -87,7 +96,7 @@ app.post('/certificates/export-pem', async (req, res) => {
     const pem = '-----BEGIN CERTIFICATE-----\n' + (b64.match(/.{1,64}/g) || []).join('\n') + '\n-----END CERTIFICATE-----';
     res.json({ pem, thumbprint });
   } catch(e: any) {
-    res.status(500).json({ error: e.message });
+    console.error('[SOAP ERROR]', e.message, e.stack?.slice(0,300)); res.status(500).json({ error: e.message });
   }
 });
 
@@ -101,24 +110,32 @@ app.post('/nfse-sp/soap', async (req, res) => {
   const bodyTmp = join(tmpdir(), 'soap_' + Date.now() + '.xml');
   writeFileSync(bodyTmp, soapBody, 'utf-8');
   const script = [
-    '[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12',
-    '$cert = Get-Item "Cert:\\CurrentUser\\My\\' + thumbprint + '" -ErrorAction Stop',
+    '$store2 = New-Object System.Security.Cryptography.X509Certificates.X509Store("My","CurrentUser")',
+    '$store2.Open("ReadOnly")',
+    '$cert = $store2.Certificates | Where-Object { $_.Thumbprint -eq "' + thumbprint + '" } | Select-Object -First 1',
+    'if (-not $cert) { throw "Certificado nao encontrado: ' + thumbprint + '" }',
     '$body = [System.IO.File]::ReadAllText("' + bodyTmp + '", [System.Text.Encoding]::UTF8)',
-    '$wc = New-Object System.Net.WebClient',
-    '$wc.Headers.Add("Content-Type", "text/xml; charset=UTF-8")',
-    '$wc.Headers.Add("SOAPAction", "' + (soapAction || '') + '")',
-    '$wc.ClientCertificates.Add($cert)',
-    '$bytes = [System.Text.Encoding]::UTF8.GetBytes($body)',
-    '$resp = $wc.UploadData("' + url + '", "POST", $bytes)',
-    '[System.Text.Encoding]::UTF8.GetString($resp)',
+    '[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12',
+    '[System.Net.ServicePointManager]::ServerCertificateValidationCallback = { $true }',
+    'Add-Type -AssemblyName System.Net.Http',
+    '$sslHandler = [System.Net.Http.HttpClientHandler]::new()',
+    '$sslHandler.ClientCertificates.Add($cert) | Out-Null',
+    '$sslHandler.ServerCertificateCustomValidationCallback = { $true }',
+    '$httpClient = [System.Net.Http.HttpClient]::new($sslHandler)',
+    '$httpClient.DefaultRequestHeaders.Add("SOAPAction", "' + (soapAction || '') + '")',
+    '$strContent = [System.Net.Http.StringContent]::new($body, [System.Text.Encoding]::UTF8, "text/xml")',
+    '$task = $httpClient.PostAsync("' + url + '", $strContent)',
+    '$task.GetAwaiter().GetResult() | Out-Null',
+    '$readTask = $task.Result.Content.ReadAsStringAsync()',
+    '$readTask.GetAwaiter().GetResult()',
   ].join('\n');
   try {
-    const result = await ps(script);
+    const result = await ps(script, true); // interactive para PIN do A3
     if (existsSync(bodyTmp)) unlinkSync(bodyTmp);
     res.json({ success: true, data: result.trim() });
   } catch(e: any) {
     if (existsSync(bodyTmp)) unlinkSync(bodyTmp);
-    res.status(500).json({ error: e.message });
+    console.error('[SOAP ERROR]', e.message, e.stack?.slice(0,300)); res.status(500).json({ error: e.message });
   }
 });
 
@@ -166,14 +183,14 @@ app.post('/nfse-sp/buscar-tomador', async (req, res) => {
   const { thumbprint, cnpj, dtInicio, dtFim, paginas = 5, homologacao = false } = req.body;
   if (!thumbprint || !cnpj) return res.status(400).json({ error: 'thumbprint e cnpj obrigatorios' });
   try { res.json(await consultar(thumbprint, cnpj, 'TOMADOR', dtInicio, dtFim, Number(paginas), Boolean(homologacao))); }
-  catch(e: any) { res.status(500).json({ error: e.message }); }
+  catch(e: any) { console.error('[SOAP ERROR]', e.message, e.stack?.slice(0,300)); res.status(500).json({ error: e.message }); }
 });
 
 app.post('/nfse-sp/buscar-emitidas', async (req, res) => {
   const { thumbprint, cnpj, dtInicio, dtFim, paginas = 5, homologacao = false } = req.body;
   if (!thumbprint || !cnpj) return res.status(400).json({ error: 'thumbprint e cnpj obrigatorios' });
   try { res.json(await consultar(thumbprint, cnpj, 'EMITIDAS', dtInicio, dtFim, Number(paginas), Boolean(homologacao))); }
-  catch(e: any) { res.status(500).json({ error: e.message }); }
+  catch(e: any) { console.error('[SOAP ERROR]', e.message, e.stack?.slice(0,300)); res.status(500).json({ error: e.message }); }
 });
 
 app.listen(PORT, '127.0.0.1', () => {
