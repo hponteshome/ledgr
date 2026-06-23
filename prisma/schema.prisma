@@ -1695,6 +1695,9 @@ model FiscalDocument {
   createdById String    @map("created_by_id") @db.Uuid
   updatedById String?   @map("updated_by_id") @db.Uuid
 
+  nfseImportBatchId String? @map("nfse_import_batch_id") @db.Uuid
+  nfseImportBatch   NfseImportBatch? @relation(fields: [nfseImportBatchId], references: [id])
+
   apEntry ApEntry?
 
   @@index([companyId, dueDate])
@@ -1702,6 +1705,29 @@ model FiscalDocument {
   @@index([accessKey])
   @@index([issuerCnpj, companyId])
   @@map("fiscal_documents")
+}
+
+
+/// Lote de importacao de NFS-e via CSV PMSP ou XML ABRASF.
+/// Segue padrao de BankStatement para rastreabilidade e exclusao em cascade.
+model NfseImportBatch {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId    String    @map("company_id") @db.Uuid
+  source       String    @map("source") @db.VarChar(20) // CSV_PMSP | XML_ABRASF | API_A3
+  fileName     String?   @map("file_name") @db.VarChar
+  periodFrom   DateTime? @map("period_from") @db.Timestamp(6)
+  periodTo     DateTime? @map("period_to") @db.Timestamp(6)
+  totalNotes   Int       @default(0) @map("total_notes")
+  totalAmount  Decimal   @default(0) @map("total_amount") @db.Decimal(15, 2)
+  totalIss     Decimal   @default(0) @map("total_iss") @db.Decimal(15, 2)
+  createdById  String    @map("created_by_id") @db.Uuid
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  deletedAt    DateTime? @map("deleted_at") @db.Timestamp(6)
+
+  documents FiscalDocument[]
+
+  @@index([companyId, createdAt])
+  @@map("nfse_import_batches")
 }
 
 /// Eventos da agenda financeira. Integrado com documentos fiscais e AP.

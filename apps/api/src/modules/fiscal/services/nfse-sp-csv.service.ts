@@ -71,19 +71,19 @@ export class NfseSpCsvService {
       const situacao      = cols[22]?.trim() || 'T'; // T=Tributada C=Cancelada
       const prestadorCnpj = (cols[10]?.trim() || '').replace(/\D/g,'');
       const prestadorNome = cols[11]?.trim() || '';
-      const tomadorCnpj   = (cols[33]?.trim() || '').replace(/\D/g,'');
-      const tomadorNome   = cols[36]?.trim() || '';
+      const tomadorCnpj   = (cols[34]?.trim() || '').replace(/\D/g,'');
+      const tomadorNome   = cols[37]?.trim() || '';
       const valorServicos = parseBRL(cols[26] || '');
       const valorDeducoes = parseBRL(cols[27] || '');
       const codServico    = cols[28]?.trim() || '';
       const aliquota      = parseBRL(cols[29] || '');
-      const issDevido     = parseBRL(cols[30] || '');
+      const issDevido     = parseBRL(cols[60] || '');
       const issRetidoStr  = cols[32]?.trim() || 'N';
       const issRetido     = issRetidoStr === 'S';
       const pis           = parseBRL(cols[55] || '');
       const cofins        = parseBRL(cols[56] || '');
       const ir            = parseBRL(cols[58] || '');
-      const csll          = parseBRL(cols[60] || '0');
+      const csll          = parseBRL(cols[59] || '0');
       const inss          = parseBRL(cols[61] || '0');
       // Discriminacao e ultima coluna (pode ter ; internos)
       const discriminacao = cols.slice(cols.length-1).join(';').trim();
@@ -127,11 +127,26 @@ export class NfseSpCsvService {
       company: { id: company.id, cnpj, name: company.legalName } };
   }
 
-  async importar(buffer: Buffer, companyId: string, userId: string, skipDuplicates = true) {
+  async importar(buffer: Buffer, companyId: string, userId: string, skipDuplicates = true, fileName?: string) {
     const company = await this.prisma.company.findUniqueOrThrow({ where: { id: companyId } });
     const cnpj    = company.taxId ?? '';
     const rows    = this.parseCsv(buffer, cnpj);
     const created: string[] = [], skipped: string[] = [], errors: string[] = [];
+
+    // Calcular periodo do lote
+    const datas = rows.filter(r => r.situacao !== 'C').map(r => r.dataEmissao).sort((a,b) => a.getTime()-b.getTime());
+    const periodFrom = datas[0] || new Date();
+    const periodTo   = datas[datas.length-1] || new Date();
+    const totalAmount = rows.filter(r => r.situacao !== 'C').reduce((s,r) => s+r.valorServicos, 0);
+    const totalIss    = rows.filter(r => r.situacao !== 'C').reduce((s,r) => s+r.issDevido, 0);
+
+    // Criar lote
+    const batch = await this.prisma.nfseImportBatch.create({ data: {
+      companyId, source: 'CSV_PMSP', fileName: fileName || 'import.csv',
+      periodFrom, periodTo,
+      totalNotes: rows.filter(r => r.situacao !== 'C').length,
+      totalAmount, totalIss, createdById: userId,
+    }});
 
     for (const r of rows) {
       try {
@@ -142,7 +157,7 @@ export class NfseSpCsvService {
         });
         if (dup) { if (skipDuplicates) { skipped.push(r.numero + ' (dup)'); continue; } }
 
-        await this.prisma.fiscalDocument.create({ data: {
+        await this.prisma.fiscalDocument.create({ data: { nfseImportBatchId: batch.id,
           companyId,
           documentType:   'NFSE' as any,
           documentNumber: r.numero,
@@ -175,4 +190,46 @@ export class NfseSpCsvService {
     return { created: created.length, skipped: skipped.length, errors,
       total: rows.length };
   }
+
+  // ── Listar lotes de importacao CSV ────────────────────────────────────────
+  async listarLotes(companyId: string) {
+    return this.prisma.nfseImportBatch.findMany({
+      where: { companyId, deletedAt: null },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        documents: {
+          where: { deletedAt: null },
+          select: { id: true, documentNumber: true, issuerName: true,
+            grossAmount: true, issueDate: true, integrationStatus: true, competenceMonth: true },
+        },
+      },
+    });
+  }
+
+  // ── Excluir lote de importacao CSV ────────────────────────────────────────
+  async excluirLote(companyId: string, batchId: string) {
+    const batch = await this.prisma.nfseImportBatch.findFirstOrThrow({
+      where: { id: batchId, companyId, deletedAt: null },
+      include: { documents: {
+        select: { id: true, apEntryId: true, journalEntryId: true, agendaEventId: true },
+      }},
+    });
+
+    await this.prisma.$transaction(async tx => {
+      for (const d of batch.documents) {
+        if (d.journalEntryId) {
+          await tx.journalEntryItem.deleteMany({ where: { journalEntryId: d.journalEntryId } });
+          await tx.journalEntry.delete({ where: { id: d.journalEntryId } });
+        }
+        if (d.agendaEventId)
+          await tx.agendaEvent.delete({ where: { id: d.agendaEventId } });
+        if (d.apEntryId)
+          await tx.apEntry.delete({ where: { id: d.apEntryId } });
+        await tx.fiscalDocument.delete({ where: { id: d.id } });
+      }
+      await tx.nfseImportBatch.delete({ where: { id: batchId } });
+    });
+    return { deleted: batch.documents.length };
+  }
+
 }

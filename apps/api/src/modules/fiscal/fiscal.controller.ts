@@ -190,8 +190,18 @@ export class FiscalController {
 
   @Post('nfse-sp-csv/import')
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: 20*1024*1024 } }))
-  nfseSpCsvImport(@UploadedFile() file: Express.Multer.File, @Req() req: any) {
+  nfseSpCsvImport(@UploadedFile() file: Express.Multer.File, @Body() body: any, @Req() req: any) {
     if (!file) throw new BadRequestException('Arquivo CSV nao enviado.');
-    return this.spCsv.importar(file.buffer, req.companyId, req.user.id);
+    return this.spCsv.importar(file.buffer, req.companyId, req.user.id, true, body?.fileName || file.originalname);
+  }
+
+  @Get('nfse-sp-csv/lotes')
+  nfseSpCsvLotes(@Req() req: any) {
+    return this.spCsv.listarLotes(req.companyId);
+  }
+
+  @Post('nfse-sp-csv/excluir-lote')
+  nfseSpCsvExcluirLote(@Body() body: { batchId: string }, @Req() req: any) {
+    return this.spCsv.excluirLote(req.companyId, body.batchId);
   }
 }

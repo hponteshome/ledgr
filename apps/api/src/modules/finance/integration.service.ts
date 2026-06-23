@@ -26,9 +26,20 @@ const DOC_TYPE_COLOR: Record<FiscalDocumentType, AgendaColor> = {
 };
 
 // Conta contábil padrão para cada tipo (configurável futuro)
-const DEFAULT_AP_ACCOUNT = '2.1.01'; // Fornecedores a Pagar
-const DEFAULT_AR_ACCOUNT = '1.1.03'; // Clientes a Receber
-const DEFAULT_REV_ACCOUNT = '4.1.01'; // Receitas de Servicos
+const DEFAULT_AP_ACCOUNT  = '2.1.01'; // resolvido para UUID em runtime
+const DEFAULT_AR_ACCOUNT  = '1.1.03'; // resolvido para UUID em runtime
+const DEFAULT_REV_ACCOUNT = '4.1.01'; // resolvido para UUID em runtime
+
+// Resolve codigo de conta contabil para UUID
+async function resolveAccount(prisma: any, companyId: string, code: string): Promise<string> {
+  const acc = await prisma.chartOfAccounts.findFirst({
+    where: { companyId, code: { equals: code }, deletedAt: null },
+    select: { id: true },
+  });
+  if (!acc) throw new Error(`Conta contabil nao encontrada: ${code} — configure o Plano de Contas.`);
+  return acc.id;
+}
+
 
 @Injectable()
 export class IntegrationService {
@@ -200,6 +211,13 @@ export class IntegrationService {
 
   // ── Re-integra um documento com status PENDING/ERROR ────────
   async runIntegration(doc: FiscalDocument, companyId: string, userId: string) {
+    // Resolver codigos de conta para UUIDs
+    const apAccountId  = await resolveAccount(this.prisma, companyId, DEFAULT_AP_ACCOUNT);
+    const arAccountId  = await resolveAccount(this.prisma, companyId, DEFAULT_AR_ACCOUNT);
+    const revAccountId = await resolveAccount(this.prisma, companyId, DEFAULT_REV_ACCOUNT);
+    const expAccountId = doc.expenseAccountId
+      ? doc.expenseAccountId
+      : await resolveAccount(this.prisma, companyId, DEFAULT_AP_ACCOUNT).catch(() => apAccountId);
     // Detecta modo: TOMADOR (recebeu servico -> AP) ou PRESTADOR (emitiu -> AR)
     const notes = (doc.notes ?? '').toUpperCase();
     const isPrestador = notes.includes('PRESTADOR') || notes.includes('EMITIDA');
@@ -242,8 +260,8 @@ export class IntegrationService {
             },
           });
           await tx.journalEntryItem.createMany({ data: [
-            { journalEntryId: je.id, accountId: doc.expenseAccountId ?? '3.1.01', type: 'DEBIT',  value: net },
-            { journalEntryId: je.id, accountId: DEFAULT_AP_ACCOUNT,               type: 'CREDIT', value: net },
+            { journalEntryId: je.id, accountId: doc.expenseAccountId ?? expAccountId, type: 'DEBIT',  value: net },
+            { journalEntryId: je.id, accountId: apAccountId,               type: 'CREDIT', value: net },
           ]});
 
           const agendaEvent = await tx.agendaEvent.create({
@@ -297,8 +315,8 @@ export class IntegrationService {
             },
           });
           await tx.journalEntryItem.createMany({ data: [
-            { journalEntryId: je.id, accountId: DEFAULT_AR_ACCOUNT,  type: 'DEBIT',  value: net },
-            { journalEntryId: je.id, accountId: DEFAULT_REV_ACCOUNT, type: 'CREDIT', value: net },
+            { journalEntryId: je.id, accountId: arAccountId,  type: 'DEBIT',  value: net },
+            { journalEntryId: je.id, accountId: revAccountId, type: 'CREDIT', value: net },
           ]});
 
           const agendaEvent = await tx.agendaEvent.create({
