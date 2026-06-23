@@ -139,10 +139,10 @@ export const AppRoutes = () => {
                 {/* Dashboard & Financeiro */}
                 <Route path="app/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
                 <Route path="app/finance/documentos-fiscais" element={<ProtectedRoute><DocumentosFiscaisPage /></ProtectedRoute>} />
-                <Route path="app/finance/nfse-nacional" element={<ProtectedRoute><NfseNacionalPage /></ProtectedRoute>} />
+                <Route path="app/fiscal/nfse-nacional" element={<ProtectedRoute><NfseNacionalPage /></ProtectedRoute>} />
                 <Route path="app/finance/nfe" element={<ProtectedRoute><NfeImportPage /></ProtectedRoute>} />
-                <Route path="app/finance/nfse-sp-emissao" element={<ProtectedRoute><NfseSpEmissaoPage /></ProtectedRoute>} />
-                <Route path="app/finance/nfse-sp" element={<ProtectedRoute><NfseImportPage /></ProtectedRoute>} />
+                <Route path="app/fiscal/nfse-sp-emissao" element={<ProtectedRoute><NfseSpEmissaoPage /></ProtectedRoute>} />
+                <Route path="app/fiscal/nfse-sp" element={<ProtectedRoute><NfseImportPage /></ProtectedRoute>} />
                 <Route path="app/finance/" element={<ProtectedRoute><FinancePage /></ProtectedRoute>} />
                 <Route path="app/finance/bank-import" element={<ProtectedRoute><BankImport /></ProtectedRoute>} />
 
@@ -167,7 +167,7 @@ export const AppRoutes = () => {
                 <Route path="app/sistema/tabelas" element={<ProtectedRoute><TabelasLegaisPage /></ProtectedRoute>} />
                     <Route path="app/sistema/sidebar-permissions" element={<ProtectedRoute><SidebarPermissionsPage /></ProtectedRoute>} />
                 <Route path="app/finance/fechamento" element={<ProtectedRoute><FechamentoPage /></ProtectedRoute>} />
-                <Route path="app/finance/apuracao" element={<ProtectedRoute><ApuracaoImpostosPage /></ProtectedRoute>} />
+                <Route path="app/fiscal/apuracao" element={<ProtectedRoute><ApuracaoImpostosPage /></ProtectedRoute>} />
                 <Route path="app/finance/lalur-config" element={<ProtectedRoute><LalurConfigPage /></ProtectedRoute>} />
                 <Route path="app/finance/petty-cash" element={<ProtectedRoute><PettyCashPage /></ProtectedRoute>} />
                 <Route path="app/finance/fluxo-caixa" element={<ProtectedRoute><FluxoCaixaPage /></ProtectedRoute>} />
@@ -293,6 +293,7 @@ export const AppRoutes = () => {
         </Routes>
     );
 };
+
 
 
 
