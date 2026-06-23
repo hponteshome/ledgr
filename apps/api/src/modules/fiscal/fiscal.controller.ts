@@ -1,13 +1,15 @@
 // apps/api/src/modules/fiscal/fiscal.controller.ts
-import { Controller, Post, Get, UseGuards, UseInterceptors,
-  UploadedFiles, Req, Body, Query, Param } from '@nestjs/common';
-import { FilesInterceptor } from '@nestjs/platform-express';
+import { Controller, BadRequestException, Post, Get, UseGuards, UseInterceptors,
+  UploadedFile, UploadedFiles, Req, Body, Query, Param } from '@nestjs/common';
+import { FilesInterceptor, FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import { JwtAuthGuard } from '@/auth/guards/jwt.guard';
 import { CompanyInterceptor } from '@/multi-company/company.interceptor';
 import { NfseImportService } from './services/nfse-import.service';
 import { NfeImportService  } from './services/nfe-import.service';
 import { NfseNacionalService } from './services/nfse-nacional.service';
 import { NfseSpConsultaService } from './services/nfse-sp-consulta.service';
+import { NfseSpCsvService } from './services/nfse-sp-csv.service';
 import { NfseSpEmissaoService } from './services/nfse-sp-emissao.service';
 import { PrismaService } from '../../prisma/prisma.service';
 
@@ -21,6 +23,7 @@ export class FiscalController {
     private nfseNac: NfseNacionalService,
     private spConsulta: NfseSpConsultaService,
     private spEmissao: NfseSpEmissaoService,
+    private spCsv: NfseSpCsvService,
     private prisma:  PrismaService,
   ) {}
 
@@ -175,5 +178,20 @@ export class FiscalController {
   @Post('nfse-sp/cancelar')
   cancelarNfseSP(@Req() req: any, @Body() body: any) {
     return this.spEmissao.cancelar(req.companyId, body);
+  }
+
+  // ── NFS-e SP CSV (exportação PMSP) ────────────────────────────────────────
+  @Post('nfse-sp-csv/preview')
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: 20*1024*1024 } }))
+  nfseSpCsvPreview(@UploadedFile() file: Express.Multer.File, @Req() req: any) {
+    if (!file) throw new BadRequestException('Arquivo CSV nao enviado.');
+    return this.spCsv.preview(file.buffer, req.companyId);
+  }
+
+  @Post('nfse-sp-csv/import')
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: 20*1024*1024 } }))
+  nfseSpCsvImport(@UploadedFile() file: Express.Multer.File, @Req() req: any) {
+    if (!file) throw new BadRequestException('Arquivo CSV nao enviado.');
+    return this.spCsv.importar(file.buffer, req.companyId, req.user.id);
   }
 }

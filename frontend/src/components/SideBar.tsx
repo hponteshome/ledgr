@@ -6,7 +6,7 @@ import {
   FiFolder, FiBook, FiPenTool, FiClipboard, FiShield, FiPercent, FiLayers,
   FiUserCheck, FiUpload, FiDatabase, FiPieChart, FiCalendar, FiCheckCircle,
   FiServer, FiEdit2, FiEdit3, FiPackage, FiTool, FiTruck, FiTrendingUp,
-  FiAlertCircle, FiTrendingDown, FiLogOut, FiBarChart2, FiArchive, FiBookOpen, FiCpu, FiRepeat, FiLock, FiFilePlus, FiMessageSquare, FiHelpCircle,
+  FiAlertCircle, FiTrendingDown, FiLogOut, FiBarChart2, FiArchive, FiBookOpen, FiCpu, FiRepeat, FiLock, FiFilePlus, FiArrowDown, FiMessageSquare, FiHelpCircle,
 } from 'react-icons/fi';
 import { useCompany } from '../contexts/CompanyContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -116,6 +116,7 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
         { path: '/app/fiscal/nfse-nacional', label: 'NFS-e Nacional (RFB)', icon: FiCheckCircle },
         { path: '/app/fiscal/nfe',             label: 'NF-e (Produtos)',          icon: FiPackage },
         { path: '/app/fiscal/nfse-sp-emissao', label: 'Emissão NFS-e SP',        icon: FiFilePlus },
+        { path: '/app/fiscal/nfse-sp-csv', label: 'Importar CSV PMSP', icon: FiArrowDown },
         { path: '/app/fiscal/nfse-sp',         label: 'NFS-e São Paulo',          icon: FiUpload },
         { path: '/app/fiscal/documentos-fiscais', label: 'Documentos Fiscais',    icon: FiFileText },
         { path: '/app/fiscal/apuracao',        label: 'Apuração de Impostos',     icon: FiPercent },
