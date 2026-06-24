@@ -14,6 +14,7 @@ import { UpdateFiscalDocumentDto } from './dto/update-fiscal-document.dto';
 import { FilterFiscalDocumentDto } from './dto/filter-fiscal-document.dto';
 import { CreateAgendaEventDto } from './dto/create.agenda.dto';
 import { UpdateAgendaEventDto } from './dto/update.agenda.dto';
+import { IntegrationService } from './integration.service';
 
 @UseGuards(JwtAuthGuard)
 @UseInterceptors(CompanyInterceptor)
@@ -22,6 +23,7 @@ export class FinanceController {
   constructor(
     private readonly financeService: FinanceService,
     private readonly agendaService: AgendaService,
+    private readonly integrationService: IntegrationService,
   ) {}
 
   // ── Fiscal Documents ────────────────────────────────────────
@@ -52,6 +54,11 @@ export class FinanceController {
     @Body() dto: UpdateFiscalDocumentDto,
   ) {
     return this.financeService.update(id, req.companyId, dto);
+  }
+
+  @Get('fiscal-documents/:id/integration-preview')
+  integrationPreview(@Param('id') id: string, @Req() req: any) {
+    return this.integrationService.previewIntegration(id, req.companyId);
   }
 
   @Post('fiscal-documents/:id/integrate')

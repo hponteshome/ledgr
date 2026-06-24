@@ -253,7 +253,7 @@ const DiarioGeralPage: React.FC = () => {
             const mesAno = fmtMonthYear(days[0].day);
 
             rows += "<tr class='mes-header'><td colspan='7'><b>CNPJ: " + cnpj + "</b><span style='float:right'><b>M&ecirc;s/Ano: " + mesAno + "</b></span></td></tr>";
-            rows += "<tr class='col-header'><td>Dia</td><td>Conta</td><td>Red.</td><td>Hist&oacute;rico</td><td>Lote/Lcto</td><td class='num'>D&eacute;bito</td><td class='num'>Cr&eacute;dito</td></tr>";
+            rows += "<tr class='col-header'><td>Dia</td><td>Conta</td><td>Red.</td><td>Hist&oacute;rico</td><td>Lote/Lcto</td><td>NF</td><td class='num'>D&eacute;bito</td><td class='num'>Cr&eacute;dito</td></tr>";
 
             days.forEach(function(dg) {
                 const day = dg.day;
@@ -451,6 +451,7 @@ const DiarioGeralPage: React.FC = () => {
                                                     <th style={{ ...TH, width: 50, fontSize: 14 }}>Red.</th>
                                                     <th style={{ ...TH, fontSize: 14 }}>Histórico</th>
                                                     <th style={{ ...TH, width: 80, fontSize: 14 }}>Lote/Lcto</th>
+                                                      <th style={{ ...TH, width: 80, fontSize: 14 }}>NF</th>
                                                     <th style={{ ...TH, width: 110, textAlign: 'right', fontSize: 14 }}>Débito</th>
                                                     <th style={{ ...TH, width: 110, textAlign: 'right', fontSize: 14 }}>Crédito</th>
                                                 </tr>

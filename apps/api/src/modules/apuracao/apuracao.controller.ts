@@ -38,6 +38,11 @@ export class ApuracaoController {
     return this.svc.calcularIrpjCsll(req.companyId, comp, dto, req.user.id);
   }
 
+  @Get('documentos/:ini/:fim')
+  getDocumentos(@Req() req: any, @Param('ini') ini: string, @Param('fim') fim: string) {
+    return this.svc.getDocumentosFiscaisPeriodo(req.companyId, ini, fim);
+  }
+
   @Get('lalur/:comp')
   getLalur(@Req() req: any, @Param('comp') comp: string) {
     return this.svc.getLalur(req.companyId, comp);

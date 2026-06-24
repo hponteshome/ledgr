@@ -158,8 +158,8 @@ export default function AccountsPage() {
             <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
                 {/* Cabeçalho das colunas */}
                 <div className="grid grid-cols-12 bg-slate-50 border-b border-slate-100 px-4 py-3 text-xs font-bold text-slate-400 uppercase tracking-widest">
-                    <div className="col-span-5">Conta / Descrição</div>
-                    <div className="col-span-3 text-right">Saldo Calculado</div>
+                    <div className="col-span-6">Conta / Descrição</div>
+                    <div className="col-span-2 text-right">Saldo Calculado</div>
                     <div className="col-span-2 text-right">Saldo ECD</div>
                     <div className="col-span-2 text-right">Diferença</div>
                 </div>
@@ -177,7 +177,7 @@ export default function AccountsPage() {
                             nodes={treeData}
                             renderBalances={(node: Account) => (
                                 <>
-                                    <div className="col-span-3 text-right font-mono text-sm pr-2">
+                                    <div className="col-span-2 text-right font-mono text-sm pr-2">
                                         {fmt(node.calculatedBalance)}
                                     </div>
                                     <div className="col-span-2 text-right font-mono text-sm text-slate-400 pr-2">

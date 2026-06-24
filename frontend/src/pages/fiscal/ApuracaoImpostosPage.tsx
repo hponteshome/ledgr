@@ -34,7 +34,7 @@ export default function ApuracaoImpostosPage() {
   const mesAtual = new Date().getMonth() + 1;
   const [ano, setAno] = useState(String(anoAtual));
   const [mes, setMes] = useState(String(mesAtual).padStart(2, '0'));
-  const [aba, setAba] = useState<'pis'|'irpj'|'lalur'>('pis');
+  // sem abas — tela unica
   const [dados, setDados] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -47,6 +47,28 @@ export default function ApuracaoImpostosPage() {
   const [exclusoes, setExclusoes] = useState('0');
   const [compensacoes, setCompensacoes] = useState('0');
   const [regime, setRegime] = useState('LUCRO_REAL');
+  const [periodicidade, setPeriodicidade] = useState<'MENSAL'|'TRIMESTRAL'|'ANUAL'>('MENSAL');
+
+  // Calcula competenciaFim com base na periodicidade
+  // trimestre fiscal: 1T=Jan-Mar, 2T=Abr-Jun, 3T=Jul-Set, 4T=Out-Dez
+  const compInicio = (() => {
+    const m = parseInt(mes);
+    if (periodicidade !== 'TRIMESTRAL') return ano + '-' + mes;
+    const mIni = m <= 3 ? 1 : m <= 6 ? 4 : m <= 9 ? 7 : 10;
+    return ano + '-' + String(mIni).padStart(2,'0');
+  })();
+  const compFim = (() => {
+    const m = parseInt(mes);
+    if (periodicidade === 'MENSAL') return ano + '-' + mes;
+    if (periodicidade === 'TRIMESTRAL') {
+      const mFim = m <= 3 ? 3 : m <= 6 ? 6 : m <= 9 ? 9 : 12;
+      return ano + '-' + String(mFim).padStart(2,'0');
+    }
+    return ano + '-12';
+  })();
+  const periodoLabel = periodicidade === 'MENSAL' ? (ano + '-' + mes)
+    : periodicidade === 'TRIMESTRAL' ? (compInicio + ' a ' + compFim)
+    : ano + ' (Jan-Dez)';
 
   // Sugestoes LALUR
   const [sugestoes, setSugestoes] = useState<any[]>([]);
@@ -75,6 +97,10 @@ export default function ApuracaoImpostosPage() {
     } catch (e: any) { alert(e?.response?.data?.message ?? 'Erro ao aplicar'); }
     finally { setSaving(false); }
   }
+
+  // Documentos fiscais do periodo
+  const [docs, setDocs] = useState<any[]>([]);
+  const [docsTotais, setDocsTotais] = useState<any>(null);
 
   // LALUR
   const [lalurDesc, setLalurDesc] = useState('');
@@ -121,13 +147,22 @@ export default function ApuracaoImpostosPage() {
     } catch {} finally { setLoading(false); }
   }, [comp]);
 
-  useEffect(() => { load(); }, [load]);
+  const loadDocs = useCallback(async () => {
+    try {
+      const { data } = await api.get('/apuracao/documentos/' + compInicio + '/' + compFim);
+      setDocs(data.docs ?? []);
+      setDocsTotais(data.totais ?? null);
+    } catch {}
+  }, [compInicio, compFim]);
+
+  useEffect(() => { load(); loadDocs(); }, [load, loadDocs]);
 
   async function calcularPis() {
     setSaving(true);
     try {
       await api.post('/apuracao/pis-cofins/' + comp, {
-        regime, receitaExcluida: parseFloat(receitaExcluida)||0,
+        regime, competenciaInicio: compInicio, competenciaFim: compFim,
+        receitaExcluida: parseFloat(receitaExcluida)||0,
         creditosPis: parseFloat(creditosPis)||0,
         creditosCofins: parseFloat(creditosCofins)||0,
       });
@@ -140,7 +175,7 @@ export default function ApuracaoImpostosPage() {
     setSaving(true);
     try {
       await api.post('/apuracao/irpj-csll/' + comp, {
-        regime,
+        regime, competenciaInicio: compInicio, competenciaFim: compFim,
         adicoes: parseFloat(adicoes)||0,
         exclusoes: parseFloat(exclusoes)||0,
         compensacoes: parseFloat(compensacoes)||0,
@@ -177,7 +212,7 @@ export default function ApuracaoImpostosPage() {
   const lalur = dados?.lalur ?? [];
 
   const aliqPis    = regime === 'LUCRO_REAL' ? 0.0165 : 0.0065;
-  const aliqCofins = regime === 'LUCRO_REAL' ? 0.076  : 0.03;
+  const aliqCofins = regime === 'LUCRO_REAL' ? 0.076 : 0.03;
   const baseCalc   = receitas - (parseFloat(receitaExcluida)||0);
   const pisPrev    = Math.max(0, baseCalc * aliqPis - (parseFloat(creditosPis)||0));
   const cofinsPrev = Math.max(0, baseCalc * aliqCofins - (parseFloat(creditosCofins)||0));
@@ -221,7 +256,18 @@ export default function ApuracaoImpostosPage() {
           <select style={{ ...S.input, width:150 }} value={regime} onChange={e => setRegime(e.target.value)}>
             <option value="LUCRO_REAL">Lucro Real</option>
             <option value="LUCRO_PRESUMIDO">Lucro Presumido</option>
+            <option value="SIMPLES_NACIONAL">Simples Nacional</option>
           </select>
+          <select style={{ ...S.input, width:120 }} value={periodicidade} onChange={e => setPeriodicidade(e.target.value as any)}>
+            <option value="MENSAL">Mensal</option>
+            <option value="TRIMESTRAL">Trimestral</option>
+            <option value="ANUAL">Anual</option>
+          </select>
+          {periodicidade !== 'MENSAL' && (
+            <span style={{ fontSize:11, color:'#6B7280', whiteSpace:'nowrap' }}>
+              {periodoLabel}
+            </span>
+          )}
         </div>
       </div>
 
@@ -255,15 +301,10 @@ export default function ApuracaoImpostosPage() {
             </div>
           </div>
 
-          {/* Abas */}
-          <div style={{ display:'flex', gap:6, marginBottom:16 }}>
-            <button style={S.tab(aba==='pis')} onClick={()=>setAba('pis')}>PIS / COFINS</button>
-            <button style={S.tab(aba==='irpj')} onClick={()=>setAba('irpj')}>IRPJ / CSLL</button>
-            <button style={S.tab(aba==='lalur')} onClick={()=>setAba('lalur')}>LALUR / LACS</button>
-          </div>
 
-          {/* ABA PIS/COFINS */}
-          {aba === 'pis' && (
+
+          {/* PIS/COFINS */}
+          {(
             <div style={S.card}>
               <div style={S.secTit}>Apuração PIS / COFINS — {regime === 'LUCRO_REAL' ? 'Não-Cumulativo' : 'Cumulativo'}</div>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:24 }}>
@@ -314,8 +355,56 @@ export default function ApuracaoImpostosPage() {
             </div>
           )}
 
-          {/* ABA IRPJ/CSLL */}
-          {aba === 'irpj' && (
+          {/* Tabela NFs do periodo */}
+          {docs.length > 0 && (
+            <div style={S.card}>
+              <div style={S.secTit}>Notas Fiscais do Periodo — {periodoLabel} ({docs.length} documentos)</div>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
+                  <thead>
+                    <tr>
+                      {['NF','Competencia','Emitente','Bruto','PIS','COFINS','IR Retido','CSLL Retida','INSS Retido','ISS'].map(h=>(
+                        <th key={h} style={S.th}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {docs.map((d:any) => (
+                      <tr key={d.id} style={{ borderBottom:'0.5px solid var(--color-border-tertiary)' }}>
+                        <td style={{...S.td, fontWeight:600, color:'#1D4ED8', fontFamily:'monospace'}}>{d.documentNumber||'—'}</td>
+                        <td style={S.td}>{d.competenceMonth}</td>
+                        <td style={{...S.td, maxWidth:180, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}} title={d.issuerName}>{d.issuerName}</td>
+                        <td style={{...S.td, textAlign:'right', fontFamily:'monospace'}}>{fmtBR(Number(d.grossAmount))}</td>
+                        <td style={{...S.td, textAlign:'right', fontFamily:'monospace', color:Number(d.pisAmount)>0?'#7C3AED':'#9CA3AF'}}>{fmtBR(Number(d.pisAmount))}</td>
+                        <td style={{...S.td, textAlign:'right', fontFamily:'monospace', color:Number(d.cofinsAmount)>0?'#7C3AED':'#9CA3AF'}}>{fmtBR(Number(d.cofinsAmount))}</td>
+                        <td style={{...S.td, textAlign:'right', fontFamily:'monospace', color:Number(d.irAmount)>0?'#EA580C':'#9CA3AF'}}>{fmtBR(Number(d.irAmount))}</td>
+                        <td style={{...S.td, textAlign:'right', fontFamily:'monospace', color:Number(d.csllAmount)>0?'#EA580C':'#9CA3AF'}}>{fmtBR(Number(d.csllAmount))}</td>
+                        <td style={{...S.td, textAlign:'right', fontFamily:'monospace', color:Number(d.inssAmount)>0?'#EA580C':'#9CA3AF'}}>{fmtBR(Number(d.inssAmount))}</td>
+                        <td style={{...S.td, textAlign:'right', fontFamily:'monospace', color:'#9CA3AF'}}>{fmtBR(Number(d.issAmount))}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  {docsTotais && (
+                    <tfoot>
+                      <tr style={{ background:'var(--color-background-secondary)', fontWeight:700 }}>
+                        <td colSpan={3} style={{...S.td}}>TOTAIS</td>
+                        <td style={{...S.td, textAlign:'right', fontFamily:'monospace'}}>{fmtBR(docsTotais.grossAmount)}</td>
+                        <td style={{...S.td, textAlign:'right', fontFamily:'monospace', color:'#7C3AED'}}>{fmtBR(docsTotais.pisAmount)}</td>
+                        <td style={{...S.td, textAlign:'right', fontFamily:'monospace', color:'#7C3AED'}}>{fmtBR(docsTotais.cofinsAmount)}</td>
+                        <td style={{...S.td, textAlign:'right', fontFamily:'monospace', color:'#EA580C'}}>{fmtBR(docsTotais.irAmount)}</td>
+                        <td style={{...S.td, textAlign:'right', fontFamily:'monospace', color:'#EA580C'}}>{fmtBR(docsTotais.csllAmount)}</td>
+                        <td style={{...S.td, textAlign:'right', fontFamily:'monospace', color:'#EA580C'}}>{fmtBR(docsTotais.inssAmount)}</td>
+                        <td style={{...S.td, textAlign:'right', fontFamily:'monospace', color:'#9CA3AF'}}>{fmtBR(docsTotais.issAmount)}</td>
+                      </tr>
+                    </tfoot>
+                  )}
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* IRPJ/CSLL */}
+          {(
             <div style={S.card}>
               <div style={S.secTit}>Apuração IRPJ / CSLL — {regime === 'LUCRO_REAL' ? 'Lucro Real' : 'Lucro Presumido'}</div>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:24 }}>
@@ -362,8 +451,8 @@ export default function ApuracaoImpostosPage() {
             </div>
           )}
 
-          {/* ABA LALUR */}
-          {aba === 'lalur' && (
+          {/* LALUR */}
+          {(
             <div>
               {/* Painel Sugestoes Automaticas */}
               <div style={S.card}>

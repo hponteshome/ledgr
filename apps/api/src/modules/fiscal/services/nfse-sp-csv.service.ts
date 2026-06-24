@@ -174,7 +174,7 @@ export class NfseSpCsvService {
           cofinsAmount:   r.cofins,
           csllAmount:     r.csll,
           inssAmount:     r.inss,
-          notes:          r.discriminacao.slice(0, 500),
+          notes:          `${r.mode} | ${r.discriminacao.slice(0, 480)}`,
           createdById:    userId,
         }});
         // Integrar: gera AP (tomador) ou AR (prestador) + JournalEntry

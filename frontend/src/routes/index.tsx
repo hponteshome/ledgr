@@ -73,16 +73,16 @@ import DctfWebPage from '../pages/hr/DctfWebPage';
 import FolhaPage from '../pages/hr/FolhaPage';
 import EmployeeDetailPage from '../pages/hr/EmployeeDetailPage';
 import FechamentoPage from '../pages/finance/FechamentoPage';
-import ApuracaoImpostosPage from '../pages/finance/ApuracaoImpostosPage';
-import LalurConfigPage from '../pages/finance/LalurConfigPage';
+import ApuracaoImpostosPage from '../pages/fiscal/ApuracaoImpostosPage';
+import LalurConfigPage from '../pages/fiscal/LalurConfigPage';
 import ContasAReceberPage from '../pages/finance/ContasAReceberPage';
 import ContasAPagarPage from '../pages/finance/ContasAPagarPage';
-import NfseImportPage from '../pages/finance/NfseImportPage';
-import NfeImportPage from '../pages/finance/NfeImportPage';
-import NfseNacionalPage from '../pages/finance/NfseNacionalPage';
-import NfseSpCsvPage from '../pages/finance/NfseSpCsvPage';
-import NfseSpEmissaoPage from '../pages/finance/NfseSpEmissaoPage';
-import DocumentosFiscaisPage from '../pages/finance/DocumentosFiscaisPage';
+import NfseImportPage from '../pages/fiscal/NfseImportPage';
+import NfeImportPage from '../pages/fiscal/NfeImportPage';
+import NfseNacionalPage from '../pages/fiscal/NfseNacionalPage';
+import NfseSpCsvPage from '../pages/fiscal/NfseSpCsvPage';
+import NfseSpEmissaoPage from '../pages/fiscal/NfseSpEmissaoPage';
+import DocumentosFiscaisPage from '../pages/fiscal/DocumentosFiscaisPage';
 import FluxoCaixaPage from '../pages/finance/FluxoCaixaPage';
 import PettyCashPage from '../pages/finance/PettyCashPage';
 import RendaFixaPage from '../pages/accounting/investments/RendaFixaPage';
@@ -139,9 +139,9 @@ export const AppRoutes = () => {
 
                 {/* Dashboard & Financeiro */}
                 <Route path="app/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
-                <Route path="app/finance/documentos-fiscais" element={<ProtectedRoute><DocumentosFiscaisPage /></ProtectedRoute>} />
+                <Route path="app/fiscal/documentos-fiscais" element={<ProtectedRoute><DocumentosFiscaisPage /></ProtectedRoute>} />
                 <Route path="app/fiscal/nfse-nacional" element={<ProtectedRoute><NfseNacionalPage /></ProtectedRoute>} />
-                <Route path="app/finance/nfe" element={<ProtectedRoute><NfeImportPage /></ProtectedRoute>} />
+                <Route path="app/fiscal/nfe" element={<ProtectedRoute><NfeImportPage /></ProtectedRoute>} />
                 <Route path="app/fiscal/nfse-sp-emissao" element={<ProtectedRoute><NfseSpEmissaoPage /></ProtectedRoute>} />
                 <Route path="app/fiscal/nfse-sp-csv" element={<ProtectedRoute><NfseSpCsvPage /></ProtectedRoute>} />
                 <Route path="app/fiscal/nfse-sp" element={<ProtectedRoute><NfseImportPage /></ProtectedRoute>} />
@@ -170,7 +170,7 @@ export const AppRoutes = () => {
                     <Route path="app/sistema/sidebar-permissions" element={<ProtectedRoute><SidebarPermissionsPage /></ProtectedRoute>} />
                 <Route path="app/finance/fechamento" element={<ProtectedRoute><FechamentoPage /></ProtectedRoute>} />
                 <Route path="app/fiscal/apuracao" element={<ProtectedRoute><ApuracaoImpostosPage /></ProtectedRoute>} />
-                <Route path="app/finance/lalur-config" element={<ProtectedRoute><LalurConfigPage /></ProtectedRoute>} />
+                <Route path="app/fiscal/lalur-config" element={<ProtectedRoute><LalurConfigPage /></ProtectedRoute>} />
                 <Route path="app/finance/petty-cash" element={<ProtectedRoute><PettyCashPage /></ProtectedRoute>} />
                 <Route path="app/finance/fluxo-caixa" element={<ProtectedRoute><FluxoCaixaPage /></ProtectedRoute>} />
                 <Route path="app/finance/accounts-payable" element={<ProtectedRoute><ContasAPagarPage /></ProtectedRoute>} />

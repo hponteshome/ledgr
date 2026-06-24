@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import Swal from 'sweetalert2';
+import { FiscalIntegrationModal } from './FiscalIntegrationModal';
 
 const fmtBRL  = (v:any)=>Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 const fmtDate = (s:any)=>s?new Date(String(s).slice(0,10)+'T12:00:00').toLocaleDateString('pt-BR'):'—';
@@ -34,6 +35,7 @@ export const DocumentosFiscaisPage:React.FC=()=>{
   const [comp,    setComp]    = useState('');
   const [intSt,   setIntSt]   = useState('');
   const [page,    setPage]    = useState(1);
+  const [modalDocId, setModalDocId] = useState<string|null>(null);
   const [total,   setTotal]   = useState(0);
   const th={padding:'8px 12px',fontSize:11,fontWeight:600 as const,color:'#6B7280',
     textTransform:'uppercase' as const,background:'#F9FAFB',
@@ -60,12 +62,7 @@ export const DocumentosFiscaisPage:React.FC=()=>{
 
   useEffect(()=>{load();},[load]);
 
-  const integrar=async(id:string)=>{
-    try{
-      await api.post(`/finance/fiscal-documents/${id}/integrate`);
-      load(); Swal.fire('Integrado!','AP + Agenda gerados.','success');
-    }catch(e:any){Swal.fire('Erro',e?.response?.data?.message||'Falha','error');}
-  };
+
 
   const agora = new Date();
   const compAtual = `${agora.getFullYear()}-${String(agora.getMonth()+1).padStart(2,'0')}`;
@@ -196,11 +193,19 @@ export const DocumentosFiscaisPage:React.FC=()=>{
                   </td>
                   <td style={td}>
                     {d.integrationStatus==='PENDING'&&(
-                      <button onClick={()=>integrar(d.id)}
+                      <button onClick={()=>setModalDocId(d.id)}
                         style={{padding:'3px 10px',borderRadius:6,border:'none',
                           background:'#6C63FF',color:'#fff',cursor:'pointer',
                           fontSize:11,fontWeight:600,whiteSpace:'nowrap'}}>
                         ⚡ Integrar
+                      </button>
+                    )}
+                    {d.integrationStatus==='ERROR'&&(
+                      <button onClick={()=>setModalDocId(d.id)}
+                        style={{padding:'3px 10px',borderRadius:6,border:'none',
+                          background:'#DC2626',color:'#fff',cursor:'pointer',
+                          fontSize:11,fontWeight:600,whiteSpace:'nowrap'}}>
+                        ↺ Reintegrar
                       </button>
                     )}
                   </td>
@@ -224,6 +229,13 @@ export const DocumentosFiscaisPage:React.FC=()=>{
           </div>
         )}
       </div>
+      {modalDocId && (
+        <FiscalIntegrationModal
+          docId={modalDocId}
+          onClose={()=>setModalDocId(null)}
+          onSuccess={()=>{ setModalDocId(null); load(); }}
+        />
+      )}
     </div>
   );
 };

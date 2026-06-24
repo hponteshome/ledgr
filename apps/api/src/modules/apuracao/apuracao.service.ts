@@ -8,10 +8,12 @@ export class ApuracaoService {
   constructor(private readonly prisma: PrismaService) {}
 
   // ── Busca resultado contabil do periodo (receitas - despesas) ──────────────
-  async getResultadoContabil(companyId: string, competencia: string) {
+  async getResultadoContabil(companyId: string, competencia: string, competenciaFim?: string) {
     const [ano, mes] = competencia.split('-').map(Number);
     const ini = new Date(ano, mes - 1, 1);
-    const fim = new Date(ano, mes, 0, 23, 59, 59);
+    const fimComp = competenciaFim ?? competencia;
+    const [anoF, mesF] = fimComp.split('-').map(Number);
+    const fim = new Date(anoF, mesF, 0, 23, 59, 59);
 
     const rows = await this.prisma.journalEntryItem.groupBy({
       by: ['accountId'],
@@ -46,10 +48,12 @@ export class ApuracaoService {
   }
 
   // ── Busca receitas brutas para PIS/COFINS ──────────────────────────────────
-  async getReceitasBrutas(companyId: string, competencia: string) {
+  async getReceitasBrutas(companyId: string, competencia: string, competenciaFim?: string) {
     const [ano, mes] = competencia.split('-').map(Number);
     const ini = new Date(ano, mes - 1, 1);
-    const fim = new Date(ano, mes, 0, 23, 59, 59);
+    const fimComp = competenciaFim ?? competencia;
+    const [anoF, mesF] = fimComp.split('-').map(Number);
+    const fim = new Date(anoF, mesF, 0, 23, 59, 59);
 
     const rows = await this.prisma.journalEntryItem.groupBy({
       by: ['accountId'],
@@ -81,10 +85,11 @@ export class ApuracaoService {
   // ── Calcular e salvar apuracao PIS/COFINS ──────────────────────────────────
   async calcularPisCofins(companyId: string, competencia: string, dto: any, userId: string) {
     const regime = dto.regime ?? 'LUCRO_REAL';
+    const competenciaFim = dto.competenciaFim ?? competencia;
     const aliqPis    = regime === 'LUCRO_REAL' ? 0.0165 : 0.0065;
     const aliqCofins = regime === 'LUCRO_REAL' ? 0.076  : 0.03;
 
-    const { total: receitaBruta } = await this.getReceitasBrutas(companyId, competencia);
+    const { total: receitaBruta } = await this.getReceitasBrutas(companyId, competencia, competenciaFim);
     const receitaExcluida = Number(dto.receitaExcluida ?? 0);
     const base = receitaBruta - receitaExcluida;
 
@@ -135,7 +140,9 @@ export class ApuracaoService {
   // ── Calcular e salvar apuracao IRPJ/CSLL ──────────────────────────────────
   async calcularIrpjCsll(companyId: string, competencia: string, dto: any, userId: string) {
     const regime = dto.regime ?? 'LUCRO_REAL';
-    const { resultado } = await this.getResultadoContabil(companyId, competencia);
+    const competenciaIni = dto.competenciaInicio ?? competencia;
+    const competenciaFim = dto.competenciaFim ?? competencia;
+    const { resultado } = await this.getResultadoContabil(companyId, competenciaIni, competenciaFim);
 
     let baseIrpj: number, baseCsll: number;
     let lucroReal: number | null = null;
@@ -150,8 +157,9 @@ export class ApuracaoService {
       baseIrpj  = Math.max(0, lucroReal - compensacoes);
       baseCsll  = Math.max(0, lucroReal - compensacoes);
     } else {
-      // Lucro Presumido
-      const receitaBruta     = Number(dto.receitaBruta ?? 0);
+      // Lucro Presumido: acumula receitas do periodo
+      const { total: receitaBrutaAcum } = await this.getReceitasBrutas(companyId, competenciaIni, competenciaFim);
+      const receitaBruta = Number(dto.receitaBruta) || receitaBrutaAcum;
       const percPresuncaoIrpj = Number(dto.percPresuncaoIrpj ?? 0.32);
       const percPresuncaoCsll = Number(dto.percPresuncaoCsll ?? 0.32);
       basePresumidaIrpj = receitaBruta * percPresuncaoIrpj;
@@ -404,6 +412,41 @@ export class ApuracaoService {
     } finally {
       await browser.close();
     }
+  }
+
+  // ── Busca NFS-e do periodo para detalhamento da base ─────────────────────
+  async getDocumentosFiscaisPeriodo(companyId: string, competenciaIni: string, competenciaFim: string) {
+    const [anoI, mesI] = competenciaIni.split('-').map(Number);
+    const [anoF, mesF] = competenciaFim.split('-').map(Number);
+    const ini = new Date(anoI, mesI - 1, 1);
+    const fim = new Date(anoF, mesF, 0, 23, 59, 59);
+    const docs = await this.prisma.fiscalDocument.findMany({
+      where: {
+        companyId,
+        issueDate: { gte: ini, lte: fim },
+        deletedAt: null,
+        integrationStatus: 'INTEGRATED',
+      },
+      select: {
+        id: true, documentNumber: true, issuerName: true, issuerCnpj: true,
+        issueDate: true, competenceMonth: true,
+        grossAmount: true, netAmount: true, discountAmount: true,
+        pisAmount: true, cofinsAmount: true, irAmount: true,
+        csllAmount: true, inssAmount: true, issAmount: true,
+        notes: true,
+      },
+      orderBy: [{ competenceMonth: 'asc' }, { documentNumber: 'asc' }],
+    });
+    const totais = docs.reduce((acc, d) => ({
+      grossAmount:  acc.grossAmount  + Number(d.grossAmount),
+      pisAmount:    acc.pisAmount    + Number(d.pisAmount),
+      cofinsAmount: acc.cofinsAmount + Number(d.cofinsAmount),
+      irAmount:     acc.irAmount     + Number(d.irAmount),
+      csllAmount:   acc.csllAmount   + Number(d.csllAmount),
+      inssAmount:   acc.inssAmount   + Number(d.inssAmount),
+      issAmount:    acc.issAmount    + Number(d.issAmount),
+    }), { grossAmount:0, pisAmount:0, cofinsAmount:0, irAmount:0, csllAmount:0, inssAmount:0, issAmount:0 });
+    return { docs, totais, total: docs.length };
   }
 
   // ── Listar apuracoes ───────────────────────────────────────────────────────

@@ -1203,3 +1203,80 @@ antes de remover. Usar git para seguranca (branch de limpeza ou commits atomicos
   - Reembolso condominio/IPTU: conta passivo transitorio (a definir)
 - Pendente: retroagir e corrigir todos os periodos 2025 e jan-mai/2026
 - Impacto: base PIS/COFINS e IRPJ/CSLL sera reduzida nos periodos corrigidos
+
+
+## Sessao 2026-06-21 (noite) — Central de Mensagens
+
+### Entregue
+- ChatModule completo: Conversation, ConversationParticipant, ChatMessage, ChatAttachment (schema Prisma)
+- ChatModule NestJS: service + controller + DTOs + module
+- ChatPage.tsx: UI estilo WhatsApp, mensagens diretas e grupos
+- Rota: /app/chat | Sidebar: FiMessageSquare
+- Registrado em AppModule
+
+### Commits
+- feat(chat) modulo mensagens internas WhatsApp-style
+
+
+## Sessao 2026-06-22 (manha) — Sidebar PT-BR + Auditoria + Ajuda & Suporte
+
+### Entregue
+- SideBar.tsx refatorado completo:
+  - Labels PT-BR: Finance->Financeiro, Accounting->Contabilidade, HR->Departamento Pessoal,
+    Dashboard->Visao Geral, Sign Out->Sair, Ativo Imobilizado->Patrimonio
+  - Arquivo dividido em: Acervo (historico passivo) + Assinaturas (processo ativo)
+  - Secoes visuais com dividerBefore: OPERACIONAL, EMPRESA, COMPLIANCE, SISTEMA
+  - Ajuda & Suporte: link discreto no footer acima de Sair
+- Auditoria & Logs completo:
+  - audit.controller.ts: REST GET /audit com JwtAuthGuard
+  - audit.service.ts: filtros actorId/action/targetId/dateFrom/dateTo/page/limit
+  - AuditPage.tsx: badges coloridos, diff before/after, paginacao
+  - Rota: /app/administracao/auditoria
+- Help Center completo:
+  - helpContent.ts: artigos para todos os modulos em PT-BR (51kb)
+  - HelpCenter.tsx: painel slide-in direito, busca, historico, artigos relacionados
+  - HelpArticleView.tsx: renderiza blocks (text, tip, warning, list, steps, table)
+  - Contextual: abre artigo relevante por rota atual
+- sidebar_items: migrado de 40 para 63 itens (paths Fiscal, Assinaturas, Acervo, Auditoria)
+
+
+## Sessao 2026-06-22 (tarde) — Limpeza Repositorio + Infraestrutura
+
+### Entregue
+- Limpeza repositorio: ~196 arquivos removidos
+  - Diretorios: project_files/, apps/web/, libs/, src/ raiz, dist/, tools/, backend/
+  - Arquivos: JSONs, context snapshots, scripts temp, PDFs/DOCXs soltos
+  - 2 commits e push para origin/main
+- Planejamento SERVER02 (192.168.0.10):
+  - Ubuntu Server 24.04 LTS headless via SSH
+  - Docker Compose: PostgreSQL + NestJS + Nginx/React
+  - SSD recomendado: Kingston NV2 500GB NVMe PCIe 4.0 (150 TBW, 5 anos garantia)
+  - Pendente: compra SSD + engajamento suporte TI para inventario e setup
+
+### Pendentes SERVER02
+- Compra SSD + suporte TI inventario SERVER02
+- Setup Ubuntu + Docker Compose staging
+
+
+## Sessao 2026-06-23 (manha) — LM Apuracao PIS/COFINS + Bank Import
+
+### Entregue
+- LM Administracao (Lucro Real, nao-cumulativo):
+  - Receita aluguel mai/2026 verificada: R$ 69.502,08
+  - PIS 1,65% = R$ 1.146,78 | COFINS 7,6% = R$ 5.282,16 | Total R$ 6.428,94
+  - Vencimento: 25/06/2026
+- Bank Import Excel Mapeado (LM):
+  - uploadExcelMapped: propertyTag via regex PROPERTY_TAG_MAP, assetId via internal_code
+  - Exclusao de reembolsos: refClean.includes('reembolso') apos NFD normalization
+  - Validacao overlap de periodo, cascade-delete
+  - ExcelPreviewModal: filtros status, KPI cards, busca
+  - Limpeza: 7.122 lancamentos duplicados removidos (reimports acidentais)
+  - Dados maio/2026 limpos e verificados
+- Rota sidebar corrigida: /app/finance/apuracao
+
+### Aprendizados criticos
+- LM e Lucro Real -> PIS/COFINS nao-cumulativo (1,65%/7,6%) — NUNCA cumulativo
+- Reembolsos (condominio, IPTU): excluir da base de receita — detectar por refClean.includes('reembolso')
+- Python patch files: sempre criar diretamente como .py em D:\Temp\ — nunca via PS heredoc
+- tail nao existe no PowerShell: usar Select-Object -Last
+- Retroativo pendente: segregar reembolsos em todos os periodos 2025 e jan-mai/2026 (Mare 62, Mare 88, Landmark, Conj 32)
