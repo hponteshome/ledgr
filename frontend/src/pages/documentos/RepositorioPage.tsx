@@ -1,3 +1,4 @@
+
 // frontend/src/pages/documentos/RepositorioPage.tsx
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
@@ -5,31 +6,32 @@ import { FiFileText, FiCheckCircle, FiClock, FiArchive, FiDownload, FiEye, FiShi
 import { SignatureValidateModal } from '../documents/signatures/SignatureValidateModal';
 import { DocumentViewModal } from './DocumentViewModal';
 import { ImportarDocumentoModal } from './ImportarDocumentoModal';
+import { RedigirProcuracaoModal } from './RedigirProcuracaoModal';
 import api from '../../services/api';
 
 const SHELF_CONFIG: Record<string, { label: string; types: string[] }> = {
-  'societario/contratos': { label: 'Contratos Sociais / Estatutos', types: ['CONTRATO_SOCIAL','ESTATUTO_SOCIAL','ADITIVO_CONTRATUAL'] },
-  'societario/atas':      { label: 'Atas Assinadas', types: ['ATA_AGO','ATA_AGE','ATA_DIRETORIA'] },
-  'societario/procuracoes': { label: 'Procurações', types: ['PROCURACAO'] },
-  'societario/acordos':   { label: 'Acordos de Acionistas', types: ['ACORDO_ACIONISTAS'] },
-  'societario/livros':    { label: 'Livros Encerrados', types: ['LIVRO_REGISTRO_ACOES','LIVRO_TRANSFERENCIA_ACOES','LIVRO_ATAS_AGO','LIVRO_ATAS_AGE'] },
-  'societario':           { label: 'Arquivo Societário', types: ['CONTRATO_SOCIAL','ESTATUTO_SOCIAL','ATA_AGO','ATA_AGE','ATA_DIRETORIA','PROCURACAO','ACORDO_ACIONISTAS','ADITIVO_CONTRATUAL','LIVRO_REGISTRO_ACOES','LIVRO_TRANSFERENCIA_ACOES','LIVRO_ATAS_AGO','LIVRO_ATAS_AGE'] },
-  'contabil/balancetes':  { label: 'Balancetes Aprovados', types: ['CONTABIL'] },
-  'contabil/ecd':         { label: 'ECDs Assinados', types: ['CONTABIL'] },
-  'contabil/demonstracoes': { label: 'Demonstrações Financeiras', types: ['CONTABIL'] },
-  'contabil':             { label: 'Arquivo Contábil', types: ['CONTABIL'] },
-  'fiscal/ecf':           { label: 'ECFs Assinados', types: ['FISCAL'] },
-  'fiscal/obrigacoes':    { label: 'Obrigações Acessórias', types: ['FISCAL'] },
-  'fiscal':               { label: 'Arquivo Fiscal', types: ['FISCAL'] },
-  'rh/contratos':         { label: 'Contratos de Trabalho', types: ['TRABALHISTA'] },
-  'rh/procuracoes':       { label: 'Procurações Trabalhistas', types: ['PROCURACAO'] },
-  'rh/acordos':           { label: 'Acordos Coletivos', types: ['TRABALHISTA'] },
-  'rh':                   { label: 'Arquivo RH / Trabalhista', types: ['TRABALHISTA'] },
+  'societario/contratos':   { label: 'Contratos Sociais / Estatutos', types: ['CONTRATO_SOCIAL','ESTATUTO_SOCIAL','ADITIVO_CONTRATUAL'] },
+  'societario/atas':        { label: 'Atas Assinadas', types: ['ATA_AGO','ATA_AGE','ATA_DIRETORIA'] },
+  'societario/procuracoes': { label: 'Procuracoes', types: ['PROCURACAO'] },
+  'societario/acordos':     { label: 'Acordos de Acionistas', types: ['ACORDO_ACIONISTAS'] },
+  'societario/livros':      { label: 'Livros Encerrados', types: ['LIVRO_REGISTRO_ACOES','LIVRO_TRANSFERENCIA_ACOES','LIVRO_ATAS_AGO','LIVRO_ATAS_AGE'] },
+  'societario':             { label: 'Arquivo Societario', types: ['CONTRATO_SOCIAL','ESTATUTO_SOCIAL','ATA_AGO','ATA_AGE','ATA_DIRETORIA','PROCURACAO','ACORDO_ACIONISTAS','ADITIVO_CONTRATUAL','LIVRO_REGISTRO_ACOES','LIVRO_TRANSFERENCIA_ACOES','LIVRO_ATAS_AGO','LIVRO_ATAS_AGE'] },
+  'contabil/balancetes':    { label: 'Balancetes Aprovados', types: ['CONTABIL'] },
+  'contabil/ecd':           { label: 'ECDs Assinados', types: ['CONTABIL'] },
+  'contabil/demonstracoes': { label: 'Demonstracoes Financeiras', types: ['CONTABIL'] },
+  'contabil':               { label: 'Arquivo Contabil', types: ['CONTABIL'] },
+  'fiscal/ecf':             { label: 'ECFs Assinados', types: ['FISCAL'] },
+  'fiscal/obrigacoes':      { label: 'Obrigacoes Acessorias', types: ['FISCAL'] },
+  'fiscal':                 { label: 'Arquivo Fiscal', types: ['FISCAL'] },
+  'rh/contratos':           { label: 'Contratos de Trabalho', types: ['TRABALHISTA'] },
+  'rh/procuracoes':         { label: 'Procuracoes Trabalhistas', types: ['PROCURACAO'] },
+  'rh/acordos':             { label: 'Acordos Coletivos', types: ['TRABALHISTA'] },
+  'rh':                     { label: 'Arquivo RH / Trabalhista', types: ['TRABALHISTA'] },
 };
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
   RASCUNHO:              { label: 'Rascunho',       color: 'bg-gray-100 text-gray-600',    icon: <FiFileText size={11} /> },
-  EM_REVISAO:            { label: 'Em Revisão',     color: 'bg-yellow-50 text-yellow-700', icon: <FiClock size={11} /> },
+  EM_REVISAO:            { label: 'Em Revisao',     color: 'bg-yellow-50 text-yellow-700', icon: <FiClock size={11} /> },
   AGUARDANDO_ASSINATURA: { label: 'Ag. Assinatura', color: 'bg-orange-50 text-orange-700', icon: <FiClock size={11} /> },
   ASSINADO:              { label: 'Assinado',       color: 'bg-green-50 text-green-700',   icon: <FiCheckCircle size={11} /> },
   REGISTRADO:            { label: 'Registrado',     color: 'bg-blue-50 text-blue-700',     icon: <FiCheckCircle size={11} /> },
@@ -39,15 +41,17 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.
 
 export const RepositorioPage: React.FC = () => {
   const location = useLocation();
-  const [docs, setDocs] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [docs, setDocs]           = useState<any[]>([]);
+  const [loading, setLoading]     = useState(true);
   const [filterStatus, setFilterStatus] = useState('');
   const [validateDocId, setValidateDocId] = useState<string | null>(null);
-  const [showImport, setShowImport] = useState(false);
-  const [viewDoc, setViewDoc] = useState<{id:string;title:string} | null>(null);
+  const [showImport,   setShowImport]   = useState(false);
+  const [showRedigir,  setShowRedigir]  = useState(false);
+  const [viewDoc, setViewDoc]     = useState<{id:string;title:string} | null>(null);
 
   const shelf = location.pathname.replace('/app/arquivo/', '');
   const config = SHELF_CONFIG[shelf] ?? { label: 'Arquivo', types: [] };
+  const isProcuracoes = shelf === 'societario/procuracoes';
 
   useEffect(() => {
     const load = async () => {
@@ -58,10 +62,7 @@ export const RepositorioPage: React.FC = () => {
         if (filterStatus) params.append('status', filterStatus);
         const res = await api.get(`/documents?${params}`);
         const all = res.data ?? [];
-        const filtered = config.types.length > 0
-          ? all.filter((d: any) => config.types.includes(d.type))
-          : all;
-        setDocs(filtered);
+        setDocs(config.types.length > 0 ? all.filter((d: any) => config.types.includes(d.type)) : all);
       } catch { setDocs([]); }
       setLoading(false);
     };
@@ -69,7 +70,7 @@ export const RepositorioPage: React.FC = () => {
   }, [location.pathname, filterStatus]);
 
   const fmtDate = (d: string) => {
-    if (!d) return '—';
+    if (!d) return '-';
     const dt = new Date(d);
     return dt.toLocaleDateString('pt-BR') + ' ' + dt.toLocaleTimeString('pt-BR');
   };
@@ -82,7 +83,16 @@ export const RepositorioPage: React.FC = () => {
           <p className="text-[13px] text-gray-500 mt-0.5">{docs.length} documento{docs.length !== 1 ? 's' : ''}</p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => setShowImport(true)} className="flex items-center gap-1.5 px-4 py-2 bg-[#111] text-white rounded-lg text-[13px] mr-2"><FiUpload size={13} /> Importar Documento</button>
+          {isProcuracoes && (
+            <button onClick={() => setShowRedigir(true)}
+              className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-lg text-[13px] hover:bg-blue-700">
+              <FiFileText size={13} /> Redigir Procuracao
+            </button>
+          )}
+          <button onClick={() => setShowImport(true)}
+            className="flex items-center gap-1.5 px-4 py-2 bg-[#111] text-white rounded-lg text-[13px]">
+            <FiUpload size={13} /> Importar Documento
+          </button>
           <FiFilter size={14} className="text-gray-400" />
           <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
             className="text-[13px] border border-gray-200 rounded-lg px-3 py-1.5">
@@ -102,7 +112,7 @@ export const RepositorioPage: React.FC = () => {
               <th className="px-4 py-2.5 text-left text-[11px] font-medium uppercase tracking-wide text-gray-500 bg-gray-50 border-b border-gray-200">Tipo</th>
               <th className="px-4 py-2.5 text-left text-[11px] font-medium uppercase tracking-wide text-gray-500 bg-gray-50 border-b border-gray-200">Data</th>
               <th className="px-4 py-2.5 text-left text-[11px] font-medium uppercase tracking-wide text-gray-500 bg-gray-50 border-b border-gray-200">Status</th>
-              <th className="px-4 py-2.5 text-left text-[11px] font-medium uppercase tracking-wide text-gray-500 bg-gray-50 border-b border-gray-200">Ações</th>
+              <th className="px-4 py-2.5 text-left text-[11px] font-medium uppercase tracking-wide text-gray-500 bg-gray-50 border-b border-gray-200">Acoes</th>
             </tr>
           </thead>
           <tbody>
@@ -122,12 +132,8 @@ export const RepositorioPage: React.FC = () => {
                     <p className="text-[14px] font-medium text-gray-900">{doc.title}</p>
                     {doc.description && <p className="text-[12px] text-gray-400 mt-0.5">{doc.description}</p>}
                   </td>
-                  <td className="px-4 py-3">
-                    <span className="text-[12px] text-gray-500">{doc.type?.replace(/_/g,' ')}</span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className="text-[13px] text-gray-600">{fmtDate(doc.createdAt)}</span>
-                  </td>
+                  <td className="px-4 py-3"><span className="text-[12px] text-gray-500">{doc.type?.replace(/_/g,' ')}</span></td>
+                  <td className="px-4 py-3"><span className="text-[13px] text-gray-600">{fmtDate(doc.createdAt)}</span></td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${st.color}`}>
                       {st.icon} {st.label}
@@ -135,17 +141,12 @@ export const RepositorioPage: React.FC = () => {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex gap-2">
-                      <button title="Visualizar" onClick={() => setViewDoc({id: doc.id, title: doc.title})} className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded">
-                        <FiEye size={14} />
-                      </button>
-                      <button title="Baixar PDF" className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded">
-                        <FiDownload size={14} />
-                      </button>
-                      <button title="Validar Assinatura"
-                        onClick={() => setValidateDocId(doc.id)}
-                        className="p-1.5 text-gray-400 hover:text-purple-700 hover:bg-purple-50 rounded">
-                        <FiShield size={14} />
-                      </button>
+                      <button title="Visualizar" onClick={() => setViewDoc({id: doc.id, title: doc.title})}
+                        className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded"><FiEye size={14} /></button>
+                      <button title="Baixar PDF"
+                        className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded"><FiDownload size={14} /></button>
+                      <button title="Validar Assinatura" onClick={() => setValidateDocId(doc.id)}
+                        className="p-1.5 text-gray-400 hover:text-purple-700 hover:bg-purple-50 rounded"><FiShield size={14} /></button>
                     </div>
                   </td>
                 </tr>
@@ -155,14 +156,11 @@ export const RepositorioPage: React.FC = () => {
         </table>
       </div>
 
-      {showImport && <ImportarDocumentoModal onClose={() => setShowImport(false)} onSuccess={() => window.location.reload()} />}
+      {showRedigir && <RedigirProcuracaoModal onClose={() => setShowRedigir(false)} onSuccess={() => window.location.reload()} />}
+      {showImport  && <ImportarDocumentoModal onClose={() => setShowImport(false)}  onSuccess={() => window.location.reload()} />}
       {viewDoc !== null && (
-        <DocumentViewModal
-          documentId={viewDoc.id}
-          documentTitle={viewDoc.title}
-          onClose={() => setViewDoc(null)}
-          onValidate={(id) => { setValidateDocId(id); setViewDoc(null); }}
-        />
+        <DocumentViewModal documentId={viewDoc.id} documentTitle={viewDoc.title}
+          onClose={() => setViewDoc(null)} onValidate={(id) => { setValidateDocId(id); setViewDoc(null); }} />
       )}
       {validateDocId !== null && (
         <SignatureValidateModal documentId={validateDocId} onClose={() => setValidateDocId(null)} />

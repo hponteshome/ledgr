@@ -1280,3 +1280,20 @@ antes de remover. Usar git para seguranca (branch de limpeza ou commits atomicos
 - Python patch files: sempre criar diretamente como .py em D:\Temp\ — nunca via PS heredoc
 - tail nao existe no PowerShell: usar Select-Object -Last
 - Retroativo pendente: segregar reembolsos em todos os periodos 2025 e jan-mai/2026 (Mare 62, Mare 88, Landmark, Conj 32)
+
+## Sessao 2026-06-24 — Reorganizacao Fiscal + Procuracao
+
+### Aprendizado critico — ambiente Windows
+- Comando Python no Windows: sempre python (nunca python3)
+- Confirmar sempre no mesmo bloco PS, ao final do comando principal
+
+### Entregue
+- AccountTree.tsx: col-span-4->5 (descricao), w-20->w-28 (codigo conta)
+- pages/fiscal/ criada; 9 arquivos migrados de finance/
+- routes/index.tsx: imports e rotas corrigidos para /app/fiscal/
+- SideBar.tsx: Fiscal reorganizado em 3 niveis (Documentos Fiscais, Config, Apuracao, Notas Fiscais > NF-e / NFS-e Nacional / NFS-e SP)
+- ExcelPreviewModal.tsx restaurado (usado por BankImportPage)
+
+### Pendente
+- RedigirProcuracaoModal.tsx: criar via python (nao python3)
+- RepositorioPage.tsx: adicionar botao Redigir Procuracao (so em societario/procuracoes)
