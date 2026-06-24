@@ -113,14 +113,28 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
     {
       path: '/app/fiscal', icon: FiPercent, label: 'Fiscal',
       children: [
-        { path: '/app/fiscal/nfse-nacional', label: 'NFS-e Nacional (RFB)', icon: FiCheckCircle },
-        { path: '/app/fiscal/nfe',             label: 'NF-e (Produtos)',          icon: FiPackage },
-        { path: '/app/fiscal/nfse-sp-emissao', label: 'Emissão NFS-e SP',        icon: FiFilePlus },
-        { path: '/app/fiscal/nfse-sp-csv', label: 'Importar CSV PMSP', icon: FiArrowDown },
-        { path: '/app/fiscal/nfse-sp',         label: 'NFS-e São Paulo',          icon: FiUpload },
-        { path: '/app/fiscal/documentos-fiscais', label: 'Documentos Fiscais',    icon: FiFileText },
-        { path: '/app/fiscal/apuracao',        label: 'Apuração de Impostos',     icon: FiPercent },
-        { path: '/app/fiscal/lalur-config',    label: 'Config. Dedutibilidade',   icon: FiSettings },
+        { path: '/app/fiscal/documentos-fiscais', label: 'Documentos Fiscais',  icon: FiFileText },
+        { path: '/app/fiscal/lalur-config',       label: 'Config. Dedutibilidade', icon: FiSettings },
+        { path: '/app/fiscal/apuracao',           label: 'Apuração de Impostos',   icon: FiPercent },
+        {
+          path: '/app/fiscal/notas-fiscais',
+          label: 'Notas Fiscais',
+          icon: FiFileText,
+          children: [
+            { path: '/app/fiscal/nfe',          label: 'NF-e (Produtos)',      icon: FiPackage },
+            { path: '/app/fiscal/nfse-nacional', label: 'NFS-e Nacional (RFB)', icon: FiCheckCircle },
+            {
+              path: '/app/fiscal/nfse-sp',
+              label: 'NFS-e São Paulo',
+              icon: FiUpload,
+              children: [
+                { path: '/app/fiscal/nfse-sp-emissao', label: 'Emissão NFS-e SP',  icon: FiFilePlus },
+                { path: '/app/fiscal/nfse-sp-csv',     label: 'Importar CSV PMSP', icon: FiArrowDown },
+                { path: '/app/fiscal/nfse-sp',         label: 'NFS-e Importação',  icon: FiUpload },
+              ],
+            },
+          ],
+        },
       ],
     },
 
