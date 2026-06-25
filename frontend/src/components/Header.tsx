@@ -178,6 +178,7 @@ export const Header: React.FC<{ sidebarOpen: boolean }> = ({ sidebarOpen }) => {
     selectCompany(company);
     setIsCompanyOpen(false);
     setSearchTerm('');
+    setTimeout(() => navigate(0), 50);
   };
 
   const handleSelectMonth = (year: number, month: number) => {
