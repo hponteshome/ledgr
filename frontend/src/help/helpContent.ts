@@ -750,7 +750,6 @@ export const contextualHelp: Record<string, string> = {
   '/app/users':                            'administracao/usuarios',
   '/app/profiles':                         'administracao/perfis',
   '/app/administracao/auditoria':          'administracao/auditoria',
-  '/app/documents/signatures/certificates': 'administracao/certificados',
   '/app/assinaturas':                      'assinaturas/certificados',
   '/app/signatures/validate':              'assinaturas/validacao',
   '/app/documents/signatures/certificates': 'assinaturas/certificados',

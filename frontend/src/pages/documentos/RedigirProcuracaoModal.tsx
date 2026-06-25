@@ -276,8 +276,7 @@ export const RedigirProcuracaoModal: React.FC<Props> = ({ onClose, onSuccess }) 
                 </div>
                 <p className="text-xs text-gray-400 mb-2">Edite livremente o texto que aparecera na procuracao.</p>
                 <textarea value={textoPoderes} onChange={e=>setTextoPoderes(e.target.value)} rows={16}
-                  className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm leading-relaxed focus:outline-none focus:border-gray-400 resize-y" style={{fontFamily:'"Times New Roman",Times,serif',fontSize:'12pt',minHeight:'360px',maxHeight:'65vh'}}
-                  style={{fontFamily:'"Times New Roman",Times,serif',fontSize:'12pt'}}/>
+                  className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm leading-relaxed focus:outline-none focus:border-gray-400 resize-y" style={{fontFamily:'"Times New Roman",Times,serif',fontSize:'12pt',minHeight:'360px',maxHeight:'65vh'}}/>
                 <p className="text-xs text-gray-300 mt-1 text-right">{textoPoderes.length} caracteres</p>
               </div>
               <div>
