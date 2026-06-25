@@ -176,6 +176,7 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
     {
       path: '/app/assets', icon: FiPackage, label: 'Patrimônio',
       children: [
+        { path: '/app/assets', label: 'Bens Cadastrados', icon: FiPackage },
         { path: '/app/assets/maintenances', label: 'Manutenções', icon: FiTool },
       ],
     },
