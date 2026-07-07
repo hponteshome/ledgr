@@ -1297,3 +1297,140 @@ antes de remover. Usar git para seguranca (branch de limpeza ou commits atomicos
 ### Pendente
 - RedigirProcuracaoModal.tsx: criar via python (nao python3)
 - RepositorioPage.tsx: adicionar botao Redigir Procuracao (so em societario/procuracoes)
+
+## Sessao 2026-06-24/25 — UX Fiscal + Procuracao + Reorganizacao
+
+### Entregue
+- Plano de Contas: codigo conta w-20->w-28 (suporta 6 niveis), col-span-4->5 descricao
+- Reorganizacao fisica: pages/fiscal/ criada, 9 arquivos migrados de pages/finance/
+- routes/index.tsx: imports e rotas corrigidos para /app/fiscal/
+- SideBar Fiscal: hierarquia 3 niveis (Documentos Fiscais, Config Dedutibilidade,
+  Apuracao de Impostos, Notas Fiscais > NF-e / NFS-e Nacional / NFS-e SP)
+- ExcelPreviewModal.tsx restaurado (usado por BankImportPage, deletado por engano)
+- Modulo Procuracao completo:
+  - RedigirProcuracaoModal.tsx: 4 etapas (Outorgante/Outorgado/Poderes/Revisao)
+  - Selector PF/PJ por papel com busca isolada por endpoint (/persons ou /companies)
+  - Multiplos outorgantes e outorgados com adicao progressiva (botao "+ Adicionar outro")
+  - Texto dos poderes editavel com sugestao juridica pre-preenchida + "Restaurar sugestao"
+  - Preview HTML via iframe, Imprimir (print iframe), Salvar Rascunho, Finalizar
+  - Qualificacao completa: nome, CPF/CNPJ, nacionalidade, estado civil, regime bens, RG, endereco
+  - buildHTML gera documento juridico formatado com assinaturas
+  - RepositorioPage.tsx: botao "Redigir Procuracao" visivel apenas em societario/procuracoes
+- Troca de empresa: navigate(0) no handleSelectCompany -> reload automatico sem F5
+- Patrimonio: item "Bens Cadastrados" -> /app/assets restaurado no Sidebar
+- Fixes: style duplicado textarea RedigirProcuracaoModal, chave duplicada helpContent.ts
+
+### Aprendizado critico desta sessao
+- Python no Windows: sempre python (nunca python3)
+- Confirmacao sempre no mesmo bloco PS, ao final
+- replace() PS falha com backticks/aspas duplas em JSX -> sempre Python para TSX
+- Reescrita completa preferivel a patches incrementais quando arquivo tem muitas edicoes
+
+### Commits
+- refactor: move fiscal pages to pages/fiscal/, fix routes to /app/fiscal/ prefix
+- feat: RedigirProcuracaoModal 4 etapas + botao Redigir Procuracao em RepositorioPage
+- feat: RedigirProcuracaoModal - multiplos outorgantes/outorgados, busca PF+PJ (CPF+CNPJ)
+- feat: RedigirProcuracaoModal - selector PF/PJ por papel, busca isolada por endpoint
+- feat: RedigirProcuracaoModal - texto poderes editavel, modal maior etapa 3
+- fix: remove style duplicado no textarea, remove chave duplicada helpContent
+- fix: reload automatico ao trocar empresa ativa (navigate(0))
+- fix: restaurar Bens Cadastrados no menu Patrimonio
+
+### Pendentes (priorizados)
+1. FiscalAccountConfig: SQL migration + backend CRUD + frontend config + reimport GRB CSV
+2. Apuracao impostos real: PIS/COFINS/IRPJ/CSLL por competencia; ISS GRB via guia separada
+3. AR (ArEntry) integrado com FiscalDocument para ALUGUEL (NF obrigatoria por lei)
+4. ECD LM 2024: reimport saldo abertura 31/12/2023 + validar Balancete
+5. LM retroativo 2025: segregar reembolsos (condominio/IPTU) periodos 2025 e jan-mai/2026
+6. NFS-e Nacional: homologacao pendente
+7. LEDGR Agent A3: node-forge ou PKCS#12 export para mTLS (PMSP bloqueado por CAPTCHA/F5)
+8. SERVER02: SSD pendente -> IT inventory -> Ubuntu + Docker Compose staging
+
+
+## Sessao 2026-07-07 (tarde) — Calculadora de Correcao Monetaria + UX Indicadores
+
+### Entregue
+- Nova tela: CalculadoraCorrecaoPage.tsx (/app/sistema/indicadores/calculadora)
+  - Input: valor original, indicador (Selic/IPCA/IGP-M/IGP-DI/INPC/TR — CDI fora, granularidade diaria incompativel),
+    mes/ano inicio, mes/ano fim, checkbox "incluir competencia inicial"
+  - Regra de negocio: correcao conta a partir do mes SEGUINTE a competencia inicial por padrao
+    (fiel ao uso pratico de correcao de aluguel/honorarios em atraso)
+  - Avisa competencias sem taxa cadastrada no banco (nao "chuta" valor)
+- Backend: TabelasLegaisService.calcularCorrecao() + POST /tabelas-legais/indicadores/calcular
+  - Calcula fator acumulado composto mes a mes, retorna detalhamento + competenciasFaltantes
+- IndicadoresPage.tsx: botao "Calculadora de Correcao" no header, link para nova tela
+- parseTsv (importacao manual de indicadores) estendido para aceitar:
+  - Formato AAAA-MM (original) E formato BCB SGS export "mmm/aa" (ex: jun/89) E mes por extenso (ex: janeiro/95)
+  - Taxa com virgula ou ponto decimal, com ou sem "%" no final
+  - Ignora linha de cabecalho automaticamente (nao comeca com padrao de competencia valido)
+- UX: IndicadoresPage.tsx e CdiTabelaPage.tsx — maxWidth no container (900px / 1000px),
+  tabelas com overflowY scroll interno (maxHeight 560px) e header sticky (todas as abas:
+  Selic/IPCA/IGP-M/IGP-DI/INPC/TR + CDI mensal/diario/resultado bulk-update)
+
+### Dados historicos importados
+- IGP-M 2014-01 a 2019-12 (72 registros) via TSV — fonte FGV/IBRE cruzada entre
+  dadosdemercado.com.br e debit.com.br (valores identicos nas duas fontes)
+
+### Pendencia
+- Calculadora apontou 01/2026 e 02/2026 como "sem taxa cadastrada" para IGP-M, mas a tabela
+  na UI parecia mostrar esses meses preenchidos (0.42% e 1.18%) — nao investigado, verificar
+  se e problema de cache do navegador ou de formato de competencia no banco (ex: espacos,
+  zero-padding) antes de assumir que sao dados faltantes de fato
+
+### Commit
+- feat(indicadores) calculadora de correcao monetaria, parser flexivel de importacao e
+  scroll/layout nas tabelas
+
+
+## Sessao 2026-07-07 (tarde, cont.) — Fechamento pendencia IGP-M 01-02/2026
+
+### Investigado e resolvido
+- Pendencia registrada anteriormente (calculadora apontando 01/2026 e 02/2026 como "sem taxa
+  cadastrada" para IGP-M, divergindo da tela) era FALSO ALARME.
+- Verificacao via SQL confirmou dados limpos:
+  SELECT indicador, competencia, length(competencia), taxa_mensal FROM indicadores_economicos
+  WHERE indicador = 'IGPM' AND competencia LIKE '2026%'
+  -> 2026-01 e 2026-02 presentes, length=7, sem espacos/caracteres invisiveis, valores corretos
+  (0.41% e -0.73% respectivamente)
+- Causa real: erro de leitura da mensagem de aviso da calculadora (paragrafo longo listando
+  dezenas de competencias 2014-2019 quebrado em varias linhas na tela — leitura equivocada
+  incluiu 2026 na lista por engano)
+- Nenhuma correcao de codigo necessaria. Pendencia encerrada.
+
+---
+
+### Sidebar — Reorganização Cadastros/Administração + Atalho Indicadores (07/07/2026)
+
+**Motivação:** Administração com 11 itens estava sobrecarregada; Indicadores Econômicos revisitado (mantido em Administração — é dado mestre/referência global como Tabelas Legais e Calendário de Feriados, não operação por empresa).
+
+**Mudanças em `SideBar.tsx`:**
+- Novo grupo **Cadastros** (Empresas + Pessoas Físicas), separado de Administração
+- **Administração** reduzida para 8 itens (Auditoria, Usuários, Perfis, Permissões, Calendário, Tabelas Legais, Backup, Manutenção)
+- **Indicadores Econômicos** permanece em Administração (não foi para Financeiro — é referência global compartilhada por todas as empresas, usada por Fiscal, Investimentos e Financeiro)
+- Atalho adicionado em `RendaFixaPage.tsx` (botão "↗ Indicadores Economicos" no header, via `window.location.href` — full reload, aceito por ser navegação secundária)
+- Confirmado: Renda Fixa + Simulador CDB permanecem em Contabilidade > Investimentos (regime de competência, não caixa — critério consistente com a separação Contabilidade/Financeiro)
+
+---
+
+### SmartMonthInput / SmartDateInput — Novos componentes (07/07/2026)
+
+**Motivação:** `<input type="month">` e `<input type="date">` nativos do Chrome têm bug conhecido — capturam valores parciais durante a digitação do ano (ex: "0026" em vez de esperar "2026" completo), e ainda "adivinham"/clampam datas inválidas silenciosamente (ex: dia 32 virava último dia do mês). Já era princípio de projeto evitar `type="month"`; esses componentes resolvem de forma mais robusta que o padrão "dois selects".
+
+**Componentes criados:**
+- `frontend/src/components/SmartMonthInput.tsx` — competência (mês/ano), retorna/recebe `'YYYY-MM'`
+- `frontend/src/components/SmartDateInput.tsx` — data completa, retorna/recebe `'YYYY-MM-DD'`
+
+**Comportamento:**
+- `<input type="text">` comum, sem máscara real-time (evita cursor pulando/"piscar")
+- Parse só roda no `onBlur`/`Enter` — durante a digitação o texto fica livre
+- Reconhece múltiplos formatos por contagem de dígitos, ignorando separador (`/`, `-`, ou nenhum): `MMAAAA`, `MMAA`, `MM/AAAA`, `MM/AA` (competência); `DDMMAAAA`, `DDMMAA`, `DD/MM/AAAA`, `DD/MM/AA` (data completa)
+- Ano de 2 dígitos sempre expande para `20YY` (sem pivô de século — fora do domínio do LEDGR)
+- Se inválido (mês fora de 1-12, dia inexistente no calendário): borda vermelha, **não commita**, mantém o último valor válido — diferente do `type="date"` nativo, que clampava silenciosamente sem o usuário perceber
+
+**Aplicado em `RendaFixaPage.tsx`:**
+- Filtro de competência (antigo `type="month"`) → `SmartMonthInput`
+- `InvestimentoModal`: Data aplicação (disabled ao editar, preservado) e Vencimento → `SmartDateInput`
+- `ResgateModal`: Data do resgate → `SmartDateInput`
+
+**PENDENTE — rollout para o resto do projeto:**
+Há outros `type="date"`/`type="month"` espalhados pelo sistema (não auditado ainda) com o mesmo bug. Próxima sessão: levantar todas as ocorrências via busca recursiva em `frontend/src` (`type='date'`, `type="date"`, `type='month'`, `type="month"`), priorizar telas de uso frequente (Contas a Pagar/Receber, Provisões, Fechamento, Agenda, Folha, Férias, ECD/SPED), e migrar uma a uma pro `SmartDateInput`/`SmartMonthInput`, seguindo o mesmo fluxo cirúrgico (inspecionar → bloco PS → confirmar).

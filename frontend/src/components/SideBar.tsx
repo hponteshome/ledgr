@@ -249,15 +249,23 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
     },
 
     {
-      path: '/app/administracao', dividerBefore: 'Sistema',
+      path: '/app/cadastros', dividerBefore: 'Sistema',
+      icon: FiBriefcase,
+      label: 'Cadastros',
+      children: [
+        { path: '/app/companies', label: 'Empresas', icon: FiBriefcase },
+        { path: '/app/persons', label: 'Pessoas Físicas', icon: FiUserCheck },
+      ],
+    },
+
+    {
+      path: '/app/administracao',
       icon: FiSettings,
       label: 'Administração',
       children: [
-        { path: '/app/companies', label: 'Empresas', icon: FiBriefcase },
         { path: '/app/administracao/auditoria', label: 'Auditoria & Logs', icon: FiActivity },
         { path: '/app/users', label: 'Usuários', icon: FiUsers },
         { path: '/app/profiles', label: 'Perfis de Acesso', icon: FiShield },
-        { path: '/app/persons', label: 'Pessoas Físicas', icon: FiUserCheck },
         { path: '/app/sistema/sidebar-permissions', label: 'Permissões de Menu', icon: FiLock },
         { path: '/app/sistema/calendario', label: 'Calendário de Feriados', icon: FiCalendar },
         { path: '/app/sistema/indicadores', label: 'Indicadores Econômicos', icon: FiBarChart2 },

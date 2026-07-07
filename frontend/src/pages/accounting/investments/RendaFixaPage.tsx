@@ -1,5 +1,7 @@
 ﻿import React, { useState, useEffect, useMemo } from 'react';
 import api from '../../../services/api';
+import { SmartMonthInput } from '../../../components/SmartMonthInput';
+import { SmartDateInput } from '../../../components/SmartDateInput';
 
 interface Investment {
   id: string; description: string; type: string; issuerName: string;
@@ -310,13 +312,13 @@ function InvestimentoModal({ inv, onClose, onSaved }: {
           </div>
           <div>
             <label style={S.label}>Data aplicacao *</label>
-            <input style={S.input} type='date' max='9999-12-31' value={form.applicationDate}
-              onChange={e=>set('applicationDate',e.target.value)} disabled={isEdit}/>
+            <SmartDateInput style={S.input} value={form.applicationDate}
+              onChange={v=>set('applicationDate',v)} disabled={isEdit}/>
           </div>
           <div>
             <label style={S.label}>Vencimento *</label>
-            <input style={S.input} type='date' max='9999-12-31' value={form.maturityDate}
-              onChange={e=>set('maturityDate',e.target.value)}/>
+            <SmartDateInput style={S.input} value={form.maturityDate}
+              onChange={v=>set('maturityDate',v)}/>
           </div>
           <div>
             <label style={S.label}>Indexador</label>
@@ -435,8 +437,8 @@ function ResgateModal({ inv, redemption, onClose, onSaved }: {
         <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:16}}>
           <div style={{gridColumn:'1/-1'}}>
             <label style={S.label}>Data do resgate *</label>
-            <input style={S.input} type='date' max='9999-12-31' value={form.redemptionDate}
-              onChange={e=>setF('redemptionDate',e.target.value)}/>
+            <SmartDateInput style={S.input} value={form.redemptionDate}
+              onChange={v=>setF('redemptionDate',v)}/>
           </div>
           <div>
             <label style={S.label}>Capital resgatado (extrato bancario) *</label>
@@ -674,6 +676,7 @@ export default function RendaFixaPage() {
         <span style={S.h1}>Renda Fixa — Carteira</span>
         <span style={{fontSize:11, color:'var(--color-text-secondary)', marginLeft:8}}>{historicalRates.length} meses CDI real</span>
         <div style={{marginLeft:'auto', display:'flex', gap:8}}>
+          <button style={S.btn} onClick={()=>{window.location.href='/app/sistema/indicadores';}} title="Ver serie historica: Selic, IPCA, IGP-M, INPC, TR, CDI">↗ Indicadores Economicos</button>
           <button style={S.btn} onClick={load} disabled={loading}>{loading?'...':'Atualizar'}</button>
           <button style={S.btnP} onClick={()=>setShowModal(true)}>+ Novo investimento</button>
         </div>
@@ -697,8 +700,7 @@ export default function RendaFixaPage() {
 
           <div style={{display:'flex', justifyContent:'flex-end', alignItems:'center', gap:8, marginBottom:12}}>
             {filterDate && <span style={{fontSize:11, color:'#1D4ED8', fontWeight:500}}>Acumulado ate {filterDate.split('-').reverse().join('/')}</span>}
-            <input style={{height:28, border:'0.5px solid var(--color-border-secondary)', borderRadius:6, padding:'0 8px', fontSize:13, background:'var(--color-background-primary)', color:'var(--color-text-primary)', outline:'none', width:150}} type='month'
-              value={filterDate} onChange={e=>setFilterDate(e.target.value)}/>
+            <SmartMonthInput value={filterDate} onChange={setFilterDate} />
             {filterDate && <button style={{...S.btn, fontSize:11, height:26}} onClick={()=>setFilterDate('')}>x</button>}
           </div>
 
