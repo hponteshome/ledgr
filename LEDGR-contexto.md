@@ -1434,3 +1434,103 @@ antes de remover. Usar git para seguranca (branch de limpeza ou commits atomicos
 
 **PENDENTE — rollout para o resto do projeto:**
 Há outros `type="date"`/`type="month"` espalhados pelo sistema (não auditado ainda) com o mesmo bug. Próxima sessão: levantar todas as ocorrências via busca recursiva em `frontend/src` (`type='date'`, `type="date"`, `type='month'`, `type="month"`), priorizar telas de uso frequente (Contas a Pagar/Receber, Provisões, Fechamento, Agenda, Folha, Férias, ECD/SPED), e migrar uma a uma pro `SmartDateInput`/`SmartMonthInput`, seguindo o mesmo fluxo cirúrgico (inspecionar → bloco PS → confirmar).
+
+---
+
+### Inventário type="date"/type="month" — Rollout SmartDateInput/SmartMonthInput (07/07/2026)
+
+**Total: 131 ocorrências em 61 arquivos.** Lista completa salva em `D:\Temp\inventario_date_inputs.txt` (gerar novamente se necessário: `Get-ChildItem frontend/src -Recurse -Filter *.tsx | Select-String -Pattern "type=['\"]date['\"]","type=['\"]month['\"]"`).
+
+**Ordem de migração definida:** Financeiro → Departamento Pessoal → demais módulos.
+
+#### PRIORIDADE 1 — Financeiro (16 ocorrências / 8 arquivos)
+- [ ] `components/finance/FiscalDocumentModal.tsx` — L179 (month), L232, L240 (date) — 3
+- [ ] `pages/finance/ContasAReceberPage.tsx` — L182, L183, L329 (date) — 3
+- [ ] `pages/finance/PettyCashPage.tsx` — L174, L175, L236 (date) — 3
+- [ ] `pages/finance/FechamentoPage.tsx` — L389, L457 (month) — 2
+- [ ] `pages/finance/ProvisoesPage.tsx` — L418, L423 (month) — 2
+- [ ] `components/finance/AgendaEventModal.tsx` — L242 (date) — 1
+- [ ] `components/finance/APPayModal.tsx` — L143 (date) — 1
+- [ ] `components/finance/APPositionReport.tsx` — L60 (date) — 1
+
+#### PRIORIDADE 2 — Departamento Pessoal (36 ocorrências / 9 arquivos)
+- [ ] `pages/hr/EsocialPage.tsx` — L185, L242, L259, L272, L293, L328, L356, L395, L460, L473, L503, L504, L533, L562 (mix date/month) — 14 **(maior arquivo do inventário — migrar com atenção redobrada, tem varios eventos S-XXXX diferentes)**
+- [ ] `pages/hr/EmployeeDetailPage.tsx` — L404, L432, L459, L460, L491, L508, L558, L562 — 8
+- [ ] `pages/hr/ProLabore.tsx` — L212, L216, L422, L426, L645, L649 (month) — 6
+- [ ] `pages/hr/FeriasPage.tsx` — L230, L234 (date) — 2
+- [ ] `pages/hr/RecessoPage.tsx` — L207, L211 (date) — 2
+- [ ] `pages/hr/DctfWebPage.tsx` — L28 (month) — 1
+- [ ] `pages/hr/DecimoTerceiroPage.tsx` — L93 (date) — 1
+- [ ] `pages/hr/FolhaPage.tsx` — L396 (month) — 1
+- [ ] `pages/hr/InformeRendimentosPage.tsx` — L367 (date) — 1
+
+#### PRIORIDADE 3 — Demais módulos (79 ocorrências / 44 arquivos)
+
+**Contabilidade (accounting):**
+- [ ] `pages/accounting/investments/CdiTabelaPage.tsx` — L228, L229 (date), L366, L436 (month) — 4
+- [ ] `components/accounting/BalanceView.tsx` — L55, L62 — 2
+- [ ] `components/accounting/ReportToolbar.tsx` — L132, L139 — 2
+- [ ] `pages/accounting/BalancesPage.tsx` — L75, L85 — 2
+- [ ] `pages/accounting/BulkDeleteModal.tsx` — L69, L74 — 2
+- [ ] `pages/accounting/DiarioGeralPage.tsx` — L96, L98 — 2
+- [ ] `pages/accounting/EcdValidationPage.tsx` — L82, L93 — 2
+- [ ] `pages/accounting/JournalPage.tsx` — L171, L631 — 2
+- [ ] `pages/accounting/RazaoAnaliticoPage.tsx` — L124, L128 — 2
+- [ ] `pages/accounting/investments/CdbProjecaoPage.tsx` — L194, L196, L242 — 3
+- [ ] `pages/accounting/investments/RendaFixaPage.tsx` — L954 (bulkComp, month) — **1 restante, não pego na 1a rodada de hoje**
+- [ ] `pages/accounting/AccountsPage.tsx` — L143 — 1
+
+**Societário / Corporate:**
+- [ ] `pages/corporate/shareholders/ShareMovementModal.tsx` — L419, L424, L500, L516 — 4
+- [ ] `pages/corporate/shareholders/ShareholdersPage.tsx` — L760, L852, L873 — 3
+- [ ] `pages/companies/corporate/statute/StatuteEdit.tsx` — L190, L199 — 2
+- [ ] `pages/companies/CompanyEdit.tsx` — L183 — 1
+- [ ] `pages/companies/CompanyForm.tsx` — L230 — 1
+- [ ] `pages/companies/CompanyShow.tsx` — L316 — 1
+- [ ] `pages/companies/corporate/atas/age/AgeEdit.tsx` — L588 — 1
+- [ ] `pages/companies/corporate/contratos/ContratoEdit.tsx` — L704 — 1
+- [ ] `pages/companies/corporate/meetings/MeetingForm.tsx` — L133 — 1
+
+**Patrimônio (assets):**
+- [ ] `pages/assets/AssetsList.tsx` — L432, L436 (month) — 2
+- [ ] `pages/assets/modals/ImprovementModal.tsx` — L66, L69 — 2
+- [ ] `pages/assets/modals/MaintenanceModal.tsx` — L83, L94 — 2
+- [ ] `pages/assets/modals/RetrofitModal.tsx` — L51, L54 — 2
+- [ ] `pages/assets/modals/AppraisalModal.tsx` — L51 — 1
+- [ ] `pages/assets/modals/AssetFormModal.tsx` — L288 — 1
+- [ ] `pages/assets/modals/WriteOffModal.tsx` — L98 — 1
+
+**Documentos / Assinaturas:**
+- [ ] `pages/documentos/ImportarDocumentoModal.tsx` — L172 — 1
+- [ ] `pages/documentos/RedigirProcuracaoModal.tsx` — L302 — 1
+- [ ] `pages/documents/DocumentUpload.tsx` — L246 — 1
+- [ ] `pages/documents/signatures/SignatureRequest.tsx` — L109 — 1
+
+**Fiscal (não-Financeiro):**
+- [ ] `pages/fiscal/NfseImportPage.tsx` — L184, L189, L230, L233 — 4
+- [ ] `pages/fiscal/DocumentosFiscaisPage.tsx` — L126 (month) — 1
+
+**Cadastros:**
+- [ ] `pages/persons/PersonForm.tsx` — L685, L804, L896, L1267 — 4
+
+**Sistema:**
+- [ ] `pages/sistema/TabelasLegaisPage.tsx` — L430, L490, L556, L560 — 4
+- [ ] `pages/sistema/CalendarioPage.tsx` — L345 — 1
+- [ ] `pages/sistema/IndicadoresPage.tsx` — L238 (month) — 1
+- [ ] `pages/sistema/ObrigacoesPage.tsx` — L359 (month) — 1
+
+**SPED:**
+- [ ] `pages/sped/EcdPage.tsx` — L715, L720 — 2
+- [ ] `pages/sped/EcdPreValidatePage.tsx` — L151, L160 — 2
+- [ ] `pages/sped/EcfPage.tsx` — L837, L846 — 2
+
+**Administração:**
+- [ ] `pages/admin/AuditPage.tsx` — L138, L144 — 2
+
+---
+
+**Observações para a migração:**
+- `EsocialPage.tsx` mistura `type="date"` e `type="month"` no mesmo arquivo — usar `SmartDateInput` e `SmartMonthInput` conforme o campo (competencia/perApur = month; datas de evento = date).
+- Vários campos tem `max="9999-12-31"` no input original — esse `max` não existe mais no `SmartDateInput`/`SmartMonthInput` (não é necessário, o componente já valida ano 1900-2100 internamente).
+- Padrão de import: `import { SmartDateInput } from '../../components/SmartDateInput';` ou `'../../../components/SmartDateInput'` dependendo da profundidade da pasta (ajustar por arquivo).
+- Fluxo por arquivo: inspecionar (Get-Content das linhas exatas) → bloco PS cirúrgico → confirmar antes do próximo arquivo. Não converter em lote sem ver o contexto de cada input (alguns tem `disabled`, `max`, `className` em vez de `style`).
