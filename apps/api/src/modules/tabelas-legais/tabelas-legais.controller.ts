@@ -60,4 +60,7 @@ export class TabelasLegaisController {
 
   @Delete('indicadores/:id')
   deleteIndicador(@Param('id') id: string) { return this.svc.deleteIndicador(id); }
+
+  @Post('indicadores/calcular')
+  calcularCorrecao(@Body() dto: any) { return this.svc.calcularCorrecao(dto); }
 }

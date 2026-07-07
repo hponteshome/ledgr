@@ -96,6 +96,7 @@ import ShareholdersPage from '../pages/corporate/shareholders/ShareholdersPage';
 import { RepositorioPage } from '../pages/documentos/RepositorioPage';
 import { CertificatesPage } from '../pages/certificates/CertificatesPage';
 import VisoesContabeisPage from '../pages/sped/VisoesContabeisPage';
+import CalculadoraCorrecaoPage from '../pages/sistema/CalculadoraCorrecaoPage';
 
 
 ///////////////////////////////////////
@@ -164,6 +165,7 @@ export const AppRoutes = () => {
                 <Route path="app/accounting/investimentos/simulador" element={<ProtectedRoute><CdbProjecaoPage /></ProtectedRoute>} />
                 <Route path="app/accounting/investimentos/cdi" element={<ProtectedRoute><CdiTabelaPage /></ProtectedRoute>} />
                 <Route path="app/sistema/indicadores" element={<ProtectedRoute><IndicadoresPage /></ProtectedRoute>} />
+                <Route path="app/sistema/indicadores/calculadora" element={<ProtectedRoute><CalculadoraCorrecaoPage /></ProtectedRoute>} />
                 <Route path="app/sistema/calendario" element={<ProtectedRoute><CalendarioPage /></ProtectedRoute>} />
                 <Route path="app/sistema/obrigacoes" element={<ProtectedRoute><ObrigacoesPage /></ProtectedRoute>} />
                 <Route path="app/sistema/tabelas" element={<ProtectedRoute><TabelasLegaisPage /></ProtectedRoute>} />

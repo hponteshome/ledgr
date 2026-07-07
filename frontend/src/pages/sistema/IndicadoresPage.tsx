@@ -123,6 +123,7 @@ export function IndicadoresPage() {
           <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', margin: 0 }}>Serie historica mensal — Selic, IPCA, IGP-M, INPC, TR</p>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <button style={S.btn} onClick={() => navigate('/app/sistema/indicadores/calculadora')}>Calculadora de Correcao</button>
           <select style={{ ...S.input, width: 100 }} value={anoFiltro} onChange={e => setAnoFiltro(e.target.value)}>
             <option value="">Todos</option>
             {Array.from({length: 14}, (_,i) => String(anoAtual - i)).map(a => <option key={a} value={a}>{a}</option>)}

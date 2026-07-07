@@ -134,6 +134,59 @@ export class TabelasLegaisService {
     return this.prisma.indicadorEconomico.delete({ where: { id } });
   }
 
+  // Calculadora de Correcao Monetaria
+  private proximaCompetencia(comp: string): string {
+    const [y, m] = comp.split('-').map(Number);
+    const d = new Date(y, m, 1);
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+  }
+
+  async calcularCorrecao(dto: any) {
+    const indicador = String(dto.indicador ?? '').toUpperCase();
+    const competenciaInicio = String(dto.competenciaInicio ?? '');
+    const competenciaFim = String(dto.competenciaFim ?? '');
+    const incluirInicio = !!dto.incluirInicio;
+    const valorOriginal = parseFloat(String(dto.valorOriginal ?? '0').replace(',', '.'));
+
+    if (!indicador || !competenciaInicio || !competenciaFim || competenciaInicio > competenciaFim) {
+      throw new Error('Parametros invalidos: indicador, competenciaInicio e competenciaFim sao obrigatorios (competenciaInicio <= competenciaFim).');
+    }
+
+    const where: any = {
+      indicador,
+      competencia: incluirInicio
+        ? { gte: competenciaInicio, lte: competenciaFim }
+        : { gt: competenciaInicio, lte: competenciaFim },
+    };
+    const rows = await this.prisma.indicadorEconomico.findMany({ where, orderBy: { competencia: 'asc' } });
+
+    const competenciasFaltantes: string[] = [];
+    let cursor = incluirInicio ? competenciaInicio : this.proximaCompetencia(competenciaInicio);
+    while (cursor <= competenciaFim) {
+      if (!rows.find(r => r.competencia === cursor)) competenciasFaltantes.push(cursor);
+      cursor = this.proximaCompetencia(cursor);
+    }
+
+    let fator = 1;
+    const meses = rows.map(r => {
+      fator *= (1 + Number(r.taxaMensal) / 100);
+      return { competencia: r.competencia, taxaMensal: Number(r.taxaMensal), fatorAcumulado: Math.round(fator * 1e8) / 1e8 };
+    });
+
+    const valorCorrigido = valorOriginal * fator;
+
+    return {
+      indicador, competenciaInicio, competenciaFim, incluirInicio,
+      valorOriginal,
+      fator: Math.round(fator * 1e8) / 1e8,
+      percentualAcumulado: Math.round((fator - 1) * 100 * 10000) / 10000,
+      valorCorrigido: Math.round(valorCorrigido * 100) / 100,
+      variacao: Math.round((valorCorrigido - valorOriginal) * 100) / 100,
+      meses,
+      competenciasFaltantes,
+    };
+  }
+
   // ── Vigente: retorna tabelas do ano corrente para uso nos calculos ───────────
   async getVigente() {
     const ano = new Date().getFullYear();
