@@ -15,7 +15,7 @@ const INDICADORES = [
 ];
 
 const S = {
-  page:  { padding: '24px 0', fontFamily: 'var(--font-sans,system-ui)', fontSize: 14, color: 'var(--color-text-primary)' } as React.CSSProperties,
+  page:  { padding: '24px 0', fontFamily: 'var(--font-sans,system-ui)', fontSize: 14, color: 'var(--color-text-primary)', maxWidth: 900 } as React.CSSProperties,
   card:  { background: 'var(--color-background-primary)', border: '0.5px solid var(--color-border-tertiary)', borderRadius: 10, padding: '14px 16px', marginBottom: 16 } as React.CSSProperties,
   input: { height: 32, border: '0.5px solid var(--color-border-secondary)', borderRadius: 6, padding: '0 9px', fontSize: 13, background: 'var(--color-background-primary)', color: 'var(--color-text-primary)', outline: 'none' } as React.CSSProperties,
   label: { fontSize: 10, textTransform: 'uppercase' as const, color: 'var(--color-text-secondary)', display: 'block', marginBottom: 4 },
@@ -35,15 +35,46 @@ function fmtAccum(rows: any[]) {
   return rows.map(r => { acum *= (1 + parseFloat(r.taxaMensal)/100); return acum - 1; });
 }
 
+const MESES_NOME: Record<string, string> = {
+  jan: '01', janeiro: '01',
+  fev: '02', fevereiro: '02',
+  mar: '03', marco: '03', 'março': '03',
+  abr: '04', abril: '04',
+  mai: '05', maio: '05',
+  jun: '06', junho: '06',
+  jul: '07', julho: '07',
+  ago: '08', agosto: '08',
+  set: '09', setembro: '09',
+  out: '10', outubro: '10',
+  nov: '11', novembro: '11',
+  dez: '12', dezembro: '12',
+};
+
+function normalizeCompetencia(raw: string): string | null {
+  const s = raw.trim();
+  if (/^\d{4}-\d{2}$/.test(s)) return s;
+  const m = s.match(/^([a-zA-ZçÇ]+)\/(\d{2,4})$/);
+  if (m) {
+    const mm = MESES_NOME[m[1].toLowerCase()];
+    if (!mm) return null;
+    const yRaw = m[2];
+    let year: number;
+    if (yRaw.length === 4) year = parseInt(yRaw, 10);
+    else { const n = parseInt(yRaw, 10); year = n <= 50 ? 2000 + n : 1900 + n; }
+    return year + '-' + mm;
+  }
+  return null;
+}
+
 function parseTsv(raw: string, indicador: string): any[] {
   const lines = raw.trim().split('\n').filter(l => l.trim() && !l.startsWith('//'));
   const result: any[] = [];
   for (const line of lines) {
-    const parts = line.split(/[\t;,]/).map(p => p.trim().replace(',','.'));
+    const parts = (line.includes('\t') ? line.split('\t') : line.split(';')).map(p => p.trim());
     if (parts.length < 2) continue;
-    const comp = parts[0]; // AAAA-MM
-    const taxa = parseFloat(parts[1]);
-    if (!comp.match(/^\d{4}-\d{2}$/) || isNaN(taxa)) continue;
+    const comp = normalizeCompetencia(parts[0]);
+    const taxa = parseFloat(parts[1].replace('%', '').trim().replace(',', '.'));
+    if (!comp || isNaN(taxa)) continue;
     result.push({ indicador, competencia: comp, taxaMensal: taxa, fonte: parts[2]?.trim() || undefined });
   }
   return result;
@@ -165,15 +196,15 @@ export function IndicadoresPage() {
           </div>
           {loading ? <div style={{ textAlign: 'center', padding: 40, color: 'var(--color-text-secondary)' }}>Carregando...</div> :
            dados.length === 0 ? <div style={{ textAlign: 'center', padding: 40, color: 'var(--color-text-secondary)', fontSize: 13 }}>Nenhum dado cadastrado. Use "Importar / Adicionar" para incluir dados.</div> : (
-            <div style={{ overflowX: 'auto', border: '0.5px solid var(--color-border-tertiary)', borderRadius: 8 }}>
+            <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: 560, border: '0.5px solid var(--color-border-tertiary)', borderRadius: 8 }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 400 }}>
                 <thead><tr>
-                  <th style={S.thL}>Competencia</th>
-                  <th style={S.th}>Taxa Mensal (%)</th>
-                  <th style={S.th}>Acum. Ano (%)</th>
-                  <th style={S.th}>Acum. 12m (%)</th>
-                  <th style={S.th}>Fonte</th>
-                  <th style={S.th}></th>
+                  <th style={{ ...S.thL, position: 'sticky' as const, top: 0, zIndex: 1 }}>Competencia</th>
+                  <th style={{ ...S.th, position: 'sticky' as const, top: 0, zIndex: 1 }}>Taxa Mensal (%)</th>
+                  <th style={{ ...S.th, position: 'sticky' as const, top: 0, zIndex: 1 }}>Acum. Ano (%)</th>
+                  <th style={{ ...S.th, position: 'sticky' as const, top: 0, zIndex: 1 }}>Acum. 12m (%)</th>
+                  <th style={{ ...S.th, position: 'sticky' as const, top: 0, zIndex: 1 }}>Fonte</th>
+                  <th style={{ ...S.th, position: 'sticky' as const, top: 0, zIndex: 1 }}></th>
                 </tr></thead>
                 <tbody>
                   {dados.map((d, idx) => (

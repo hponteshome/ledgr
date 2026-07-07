@@ -25,7 +25,7 @@ const fmtN    = (v: any, d=4) => v != null ? parseFloat(v).toFixed(d) : '—';
 const fmtComp = (s: string) => s.split('-').reverse().join('/');
 
 const S = {
-  page:   { padding: '24px 0', fontFamily: 'var(--font-sans,system-ui)', fontSize: 14, color: 'var(--color-text-primary)' } as React.CSSProperties,
+  page:   { padding: '24px 0', fontFamily: 'var(--font-sans,system-ui)', fontSize: 14, color: 'var(--color-text-primary)', maxWidth: 1000 } as React.CSSProperties,
   badge:  { display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 20, background: '#EFF6FF', color: '#1D4ED8' } as React.CSSProperties,
   h1:     { fontSize: 15, fontWeight: 500, margin: 0 } as React.CSSProperties,
   card:   { background: 'var(--color-background-primary)', border: '0.5px solid var(--color-border-tertiary)', borderRadius: 10, padding: '14px 16px', marginBottom: 16 } as React.CSSProperties,
@@ -40,9 +40,9 @@ const S = {
   btn:    { height: 30, border: '0.5px solid var(--color-border-secondary)', borderRadius: 6, padding: '0 12px', fontSize: 12, cursor: 'pointer', background: 'var(--color-background-primary)', color: 'var(--color-text-primary)' } as React.CSSProperties,
   btnP:   { height: 30, border: 'none', borderRadius: 6, padding: '0 14px', fontSize: 12, cursor: 'pointer', background: '#111', color: '#fff', fontWeight: 500 } as React.CSSProperties,
   btnDng: { height: 28, border: '0.5px solid #FCA5A5', borderRadius: 6, padding: '0 10px', fontSize: 11, cursor: 'pointer', background: '#FEF2F2', color: '#B91C1C' } as React.CSSProperties,
-  tblW:   { overflowX: 'auto' as const, border: '0.5px solid var(--color-border-tertiary)', borderRadius: 8 },
-  th:     { background: 'var(--color-background-secondary)', color: 'var(--color-text-secondary)', fontSize: 10, fontWeight: 500, textTransform: 'uppercase' as const, letterSpacing: '.3px', padding: '8px 10px', textAlign: 'right' as const, borderBottom: '0.5px solid var(--color-border-tertiary)', whiteSpace: 'nowrap' as const },
-  thL:    { background: 'var(--color-background-secondary)', color: 'var(--color-text-secondary)', fontSize: 10, fontWeight: 500, textTransform: 'uppercase' as const, letterSpacing: '.3px', padding: '8px 10px', textAlign: 'left' as const, borderBottom: '0.5px solid var(--color-border-tertiary)' },
+  tblW:   { overflowX: 'auto' as const, overflowY: 'auto' as const, maxHeight: 560, border: '0.5px solid var(--color-border-tertiary)', borderRadius: 8 },
+  th:     { background: 'var(--color-background-secondary)', color: 'var(--color-text-secondary)', fontSize: 10, fontWeight: 500, textTransform: 'uppercase' as const, letterSpacing: '.3px', padding: '8px 10px', textAlign: 'right' as const, borderBottom: '0.5px solid var(--color-border-tertiary)', whiteSpace: 'nowrap' as const, position: 'sticky' as const, top: 0, zIndex: 1 },
+  thL:    { background: 'var(--color-background-secondary)', color: 'var(--color-text-secondary)', fontSize: 10, fontWeight: 500, textTransform: 'uppercase' as const, letterSpacing: '.3px', padding: '8px 10px', textAlign: 'left' as const, borderBottom: '0.5px solid var(--color-border-tertiary)', position: 'sticky' as const, top: 0, zIndex: 1 },
   td:     { padding: '7px 10px', textAlign: 'right' as const, borderBottom: '0.5px solid var(--color-border-tertiary)', fontSize: 12, whiteSpace: 'nowrap' as const },
   tdL:    { padding: '7px 10px', textAlign: 'left' as const, borderBottom: '0.5px solid var(--color-border-tertiary)', fontSize: 12 },
   divider:{ border: 'none', borderTop: '0.5px solid var(--color-border-tertiary)', margin: '20px 0' } as React.CSSProperties,
