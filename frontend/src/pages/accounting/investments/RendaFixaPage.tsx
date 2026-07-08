@@ -992,7 +992,7 @@ export default function RendaFixaPage() {
             <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
               <p style={{...S.secTit,margin:0}}>Lancamentos contabeis gerados</p>
               <div style={{display:'flex',gap:8}}>
-                <button style={S.btn} onClick={async()=>{
+                <button style={{...S.btn, background:'#374151', color:'#fff', border:'none'}} onClick={async()=>{
                   const from = window.prompt('Competencia inicial (AAAA-MM) — deixe em branco para todas:');
                   if (from === null) return;
                   const to = window.prompt('Competencia final (AAAA-MM) — deixe em branco para todas:');
@@ -1007,7 +1007,7 @@ export default function RendaFixaPage() {
                     alert(r.data.total + ' eventos encontrados · ' + ok + ' gerados' + (fail ? ' · ' + fail + ' erros' : '') + '.');
                     loadJournalEntries();
                   } catch(e:any) { alert('Erro: ' + (e?.response?.data?.message ?? e.message)); }
-                }} disabled={jLoading} style={{...S.btn, background:'#374151', color:'#fff', border:'none'}}>Gerar retroativos</button>
+                }} disabled={jLoading}>Gerar retroativos</button>
                 <button style={S.btn} onClick={loadJournalEntries} disabled={jLoading}>{jLoading?'...':'Atualizar'}</button>
               </div>
             </div>
