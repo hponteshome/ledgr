@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import api from '../../services/api';
+import { SmartDateInput } from '../../components/SmartDateInput';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { useCompany } from '../../contexts/CompanyContext';
 import { Calendar, Edit } from 'lucide-react';
@@ -139,16 +140,9 @@ export default function AccountsPage() {
                             <span className="text-xs font-medium uppercase tracking-wider">Saldos em:</span>
                         </div>
 
-                        <input
-                            type="date"
+                        <SmartDateInput
                             value={referenceDate}
-                            max="9999-12-31"
-                            onChange={(e) => {
-                                const val = e.target.value;
-                                if (!val) return;
-                                const year = val.split('-')[0];
-                                if (year.length <= 4) setReferenceDate(val);
-                            }}
+                            onChange={(v) => setReferenceDate(v)}
                             className="text-sm font-semibold text-blue-600 focus:outline-none cursor-pointer"
                         />
                     </div>

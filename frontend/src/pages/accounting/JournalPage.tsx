@@ -9,6 +9,7 @@ import {
     FiAlertTriangle, FiCheckCircle,
 } from 'react-icons/fi';
 import api from '../../services/api';
+import { SmartDateInput } from '../../components/SmartDateInput';
 import { useCompany } from '../../contexts/CompanyContext';
 import { toast } from 'react-hot-toast';
 
@@ -168,7 +169,7 @@ const EditModal: React.FC<{ entry: JournalEntry; onClose: () => void; onSaved: (
                 <div className="flex gap-3 mb-4">
                     <div>
                         <label className="text-xs text-gray-500 block mb-1">Data</label>
-                        <input type="date" value={date} onChange={e => setDate(e.target.value)}
+                        <SmartDateInput value={date} onChange={v => setDate(v)}
                             className="h-8 border border-gray-200 rounded-lg px-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-36" />
                     </div>
                     <div className="flex-1">
@@ -628,7 +629,7 @@ const JournalPage: React.FC = () => {
                 <div className="flex flex-wrap gap-3 items-end">
                     <div className="flex flex-col gap-1">
                         <label className="text-xs text-gray-500">Data</label>
-                        <input type="date" value={fDate} onChange={e => setFDate(e.target.value)}
+                        <SmartDateInput value={fDate} onChange={v => setFDate(v)}
                             className="h-8 border border-gray-200 rounded-lg px-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-32" />
                     </div>
                     <div className="flex flex-col gap-1">

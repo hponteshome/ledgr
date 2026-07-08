@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import api from '../../../services/api';
+import { SmartDateInput } from '../../../components/SmartDateInput';
 
 interface HistoricalRate { competence: string; rate: number; }
 interface PartialRedemption { id: string; date: string; amount: number; label: string; }
@@ -191,9 +192,9 @@ export default function CdbProjecaoPage() {
         <p style={S.secTitle}>Parâmetros</p>
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(155px,1fr))',gap:12}}>
           <div><label style={S.label}>Data de aplicação</label>
-            <input style={S.input} type='date' value={applicationDate} onChange={e=>setApplicationDate(e.target.value)}/></div>
+            <SmartDateInput style={S.input} value={applicationDate} onChange={v=>setApplicationDate(v)}/></div>
           <div><label style={S.label}>Vencimento</label>
-            <input style={S.input} type='date' max='9999-12-31' value={maturityDate} onChange={e=>setMaturityDate(e.target.value)}/></div>
+            <SmartDateInput style={S.input} value={maturityDate} onChange={v=>setMaturityDate(v)}/></div>
           <div><label style={S.label}>Capital inicial (R$)</label>
             <input style={S.input} type='number' min={0} step={1000} value={capital} onChange={e=>setCapital(parseFloat(e.target.value)||0)}/></div>
           <div><label style={S.label}>% do CDI contratado</label>
@@ -239,7 +240,7 @@ export default function CdbProjecaoPage() {
         <div style={{...S.card,marginBottom:20}}>
           <p style={S.secTitle}>Adicionar resgate antecipado</p>
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))',gap:10,marginBottom:14}}>
-            <div><label style={S.label}>Data</label><input style={S.input} type='date' max='9999-12-31' value={redDate} onChange={e=>setRedDate(e.target.value)}/></div>
+            <div><label style={S.label}>Data</label><SmartDateInput style={S.input} value={redDate} onChange={v=>setRedDate(v)}/></div>
             <div><label style={S.label}>Valor bruto (R$)</label><input style={S.input} type='number' min={0} value={redAmount} disabled={redTotal} onChange={e=>setRedAmount(e.target.value)}/></div>
             <div style={{display:'flex',alignItems:'flex-end',paddingBottom:2}}><label style={{display:'flex',alignItems:'center',gap:6,cursor:'pointer',fontSize:13}}><input type='checkbox' checked={redTotal} onChange={e=>setRedTotal(e.target.checked)}/> Total</label></div>
             <div style={{display:'flex',alignItems:'flex-end'}}><button style={S.btnPrimary} onClick={addRedemption}>+ Adicionar</button></div>

@@ -21,6 +21,7 @@
 //   />
 
 import React, { useState, useEffect } from 'react';
+import { SmartDateInput } from '../SmartDateInput';
 import {
     FiFilter, FiPrinter, FiDownload, FiFileText,
     FiChevronDown, FiRefreshCw,
@@ -128,17 +129,17 @@ export const ReportToolbar: React.FC<ReportToolbarProps> = ({
                     <span style={{ fontSize: 18, color: '#9CA3AF', whiteSpace: 'nowrap', fontWeight: 500 }}>
                         Período:
                     </span>
-                    <input
-                        type="date" value={from} max="9999-12-31"
+                    <SmartDateInput
+                        value={from}
                         className="rtb-date"
-                        onChange={e => handleFromChange(e.target.value)}
+                        onChange={v => handleFromChange(v)}
                         style={inpStyle}
                     />
                     <span style={{ fontSize: 18, color: '#9CA3AF' }}>até</span>
-                    <input
-                        type="date" value={to} max="9999-12-31"
+                    <SmartDateInput
+                        value={to}
                         className="rtb-date"
-                        onChange={e => handleToChange(e.target.value)}
+                        onChange={v => handleToChange(v)}
                         style={inpStyle}
                     />
                     {/* Botão atualizar — aparece quando há alteração */}

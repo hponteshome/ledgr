@@ -1534,3 +1534,29 @@ Há outros `type="date"`/`type="month"` espalhados pelo sistema (não auditado a
 - Vários campos tem `max="9999-12-31"` no input original — esse `max` não existe mais no `SmartDateInput`/`SmartMonthInput` (não é necessário, o componente já valida ano 1900-2100 internamente).
 - Padrão de import: `import { SmartDateInput } from '../../components/SmartDateInput';` ou `'../../../components/SmartDateInput'` dependendo da profundidade da pasta (ajustar por arquivo).
 - Fluxo por arquivo: inspecionar (Get-Content das linhas exatas) → bloco PS cirúrgico → confirmar antes do próximo arquivo. Não converter em lote sem ver o contexto de cada input (alguns tem `disabled`, `max`, `className` em vez de `style`).
+
+---
+
+### Rollout SmartDateInput/SmartMonthInput — Pontos de atenção registrados (08/07/2026)
+
+**1) Conflito Tailwind (className) vs style inline fixo**
+`SmartDateInput`/`SmartMonthInput` sempre aplicam um `style` inline fixo (altura 28px, borda, padding,
+`background: var(--color-background-primary)`), independente de `className` ser passado.
+Em arquivos que usam Tailwind puro (ex: `BalanceView.tsx`, `BalancesPage.tsx` — `className="border rounded-lg px-3 py-2"`),
+isso faz o componente sobrescrever visualmente as classes Tailwind (outra altura, outra borda, sem o
+`focus:ring` azul). Decisão tomada em 08/07/2026: aceitar o visual divergente por ora (não bloquear o
+rollout). **Pendente para sessão futura de UI/UX:** decidir entre (a) ajustar o componente pra respeitar
+className quando presente (aplicar style minimo so pra borda vermelha de invalido), ou (b) padronizar
+todo o app pro estilo do SmartDateInput e abandonar Tailwind nesses campos especificos.
+Arquivos ja migrados com essa divergencia conhecida: `components/accounting/BalanceView.tsx`,
+`components/accounting/ReportToolbar.tsx` (mix className+style), `pages/accounting/BalancesPage.tsx`.
+
+**2) CdiTabelaPage.tsx — bulkComp duplicado**
+O campo `bulkComp` (competencia, month) aparecia **2x com texto identico** no arquivo (L366 e L436),
+usado em duas abas diferentes do modal (provavelmente "Mensal" e algo como "Atualização Mensal" — nao
+confirmado o nome exato da segunda aba). Migrado com replace count=2 (ambas as ocorrencias tratadas
+juntas, pois o texto era 100% identico). **Verificar em teste manual:** confirmar que as duas abas
+realmente devem compartilhar a mesma logica/campo `bulkComp`, ou se sao dois estados distintos que
+coincidentemente tinham o mesmo texto de input (nesse caso so uma foi migrada corretamente, a outra
+pode precisar de variavel propria — revisar `CdiTabelaPage.tsx` linhas ~360-440 se o comportamento
+das duas abas parecer cruzado apos o teste).

@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { FiX, FiTrash2, FiAlertTriangle, FiLoader } from 'react-icons/fi';
 import api from '../../services/api';
+import { SmartDateInput } from '../../components/SmartDateInput';
 
 interface Props {
   companyId: string;
@@ -66,12 +67,12 @@ export const BulkDeleteModal: React.FC<Props> = ({ defaultFrom, defaultTo, onClo
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
             <div>
               <label style={{ fontSize: 11, color: '#6B7280', display: 'block', marginBottom: 4 }}>Data inicial</label>
-              <input type="date" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setPreview(null); }} max="9999-12-31"
+              <SmartDateInput value={dateFrom} onChange={v => { setDateFrom(v); setPreview(null); }}
                 style={{ width: '100%', height: 34, border: '0.5px solid #D1D5DB', borderRadius: 8, padding: '0 10px', fontSize: 13 }} />
             </div>
             <div>
               <label style={{ fontSize: 11, color: '#6B7280', display: 'block', marginBottom: 4 }}>Data final</label>
-              <input type="date" value={dateTo} onChange={e => { setDateTo(e.target.value); setPreview(null); }} max="9999-12-31"
+              <SmartDateInput value={dateTo} onChange={v => { setDateTo(v); setPreview(null); }}
                 style={{ width: '100%', height: 34, border: '0.5px solid #D1D5DB', borderRadius: 8, padding: '0 10px', fontSize: 13 }} />
             </div>
           </div>

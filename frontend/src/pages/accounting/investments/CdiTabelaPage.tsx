@@ -1,6 +1,8 @@
 // frontend/src/pages/accounting/investments/CdiTabelaPage.tsx
 import React, { useState, useMemo, useRef } from 'react';
 import api from '../../../services/api';
+import { SmartDateInput } from '../../../components/SmartDateInput';
+import { SmartMonthInput } from '../../../components/SmartMonthInput';
 
 interface CdiRow {
   id: string;
@@ -225,8 +227,8 @@ export default function CdiTabelaPage() {
       )}
 
       <div style={{ display:'flex', gap:8, marginBottom:16, alignItems:'flex-end', flexWrap:'wrap' as const }}>
-        <div><label style={S.label}>De</label><input style={{ ...S.input, width:130 }} type="date" value={filterFrom} onChange={e=>setFrom(e.target.value)}/></div>
-        <div><label style={S.label}>Até</label><input style={{ ...S.input, width:130 }} type="date" value={filterTo} onChange={e=>setTo(e.target.value)}/></div>
+        <div><label style={S.label}>De</label><SmartDateInput style={{ width:130 }} value={filterFrom} onChange={v=>setFrom(v)}/></div>
+        <div><label style={S.label}>Até</label><SmartDateInput style={{ width:130 }} value={filterTo} onChange={v=>setTo(v)}/></div>
         <button style={S.btnP} onClick={load}>Filtrar</button>
         <div style={{ marginLeft:'auto', display:'flex', gap:4 }}>
           {(['mensal','diario','importar','atualizar'] as const).map(t => (
@@ -363,8 +365,8 @@ export default function CdiTabelaPage() {
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))', gap:12, marginBottom:14 }}>
               <div>
                 <label style={S.label}>Competencia (AAAA-MM)</label>
-                <input style={S.input} type='month' value={bulkComp}
-                  onChange={e => setBulkComp(e.target.value)} />
+                <SmartMonthInput style={S.input} value={bulkComp}
+                  onChange={v => setBulkComp(v)} />
               </div>
               <div>
                 <label style={S.label}>CDI acumulado mes (%)</label>
@@ -433,8 +435,8 @@ export default function CdiTabelaPage() {
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))', gap:12, marginBottom:14 }}>
               <div>
                 <label style={S.label}>Competencia (AAAA-MM)</label>
-                <input style={S.input} type='month' value={bulkComp}
-                  onChange={e => setBulkComp(e.target.value)} />
+                <SmartMonthInput style={S.input} value={bulkComp}
+                  onChange={v => setBulkComp(v)} />
               </div>
               <div>
                 <label style={S.label}>CDI acumulado mes (%)</label>

@@ -3,6 +3,7 @@
 import React, { useState, useCallback } from 'react';
 import { FiSearch, FiLoader, FiAlertCircle } from 'react-icons/fi';
 import api from '../../services/api';
+import { SmartDateInput } from '../../components/SmartDateInput';
 import { useCompany } from '../../contexts/CompanyContext';
 import { ReportToolbar } from '../../components/accounting/ReportToolbar';
 
@@ -93,9 +94,9 @@ const FilterModal: React.FC<{ f: F; onApply: (f: F) => void; inclTermos: boolean
                         <p style={{ fontSize: 15, fontWeight: 500, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 8 }}>Período</p>
                         <div style={{ display: 'flex', gap: 12 }}>
                             <div style={{ flex: 1 }}><label style={{ fontSize: 15, color: '#6B7280', display: 'block', marginBottom: 4 }}>Data inicial</label>
-                                <input type="date" value={f.dateFrom} max="9999-12-31" onChange={e => s({ dateFrom: e.target.value })} style={inp} /></div>
+                                <SmartDateInput value={f.dateFrom} onChange={v => s({ dateFrom: v })} style={inp} /></div>
                             <div style={{ flex: 1 }}><label style={{ fontSize: 15, color: '#6B7280', display: 'block', marginBottom: 4 }}>Data final</label>
-                                <input type="date" value={f.dateTo} max="9999-12-31" onChange={e => s({ dateTo: e.target.value })} style={inp} /></div>
+                                <SmartDateInput value={f.dateTo} onChange={v => s({ dateTo: v })} style={inp} /></div>
                         </div>
                     </div>
                     <div>

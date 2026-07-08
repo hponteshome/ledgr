@@ -951,8 +951,8 @@ export default function RendaFixaPage() {
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:12}}>
               <div>
                 <label style={S.label}>Competencia (AAAA-MM)</label>
-                <input style={S.input} type='month' value={bulkComp} onChange={e=>{
-                  const comp = e.target.value;
+                <SmartMonthInput style={S.input} value={bulkComp} onChange={v=>{
+                  const comp = v;
                   setBulkComp(comp);
                   // Buscar taxa CDI da tabela local
                   const found = historicalRates.find(r => r.competence === comp);

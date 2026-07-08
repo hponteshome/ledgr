@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { FiCalendar, FiFilter, FiDownload } from 'react-icons/fi';
 import api from '../../services/api';
+import { SmartDateInput } from '../SmartDateInput';
 
 interface Balance {
   id: string;
@@ -51,17 +52,15 @@ export const BalanceView: React.FC = () => {
         <div className="flex gap-4">
           <div className="flex items-center gap-2">
             <FiCalendar className="text-gray-400" />
-            <input
-              type="date"
+            <SmartDateInput
               value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
+              onChange={(v) => setStartDate(v)}
               className="border rounded-lg px-3 py-2"
             />
             <span>até</span>
-            <input
-              type="date"
+            <SmartDateInput
               value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
+              onChange={(v) => setEndDate(v)}
               className="border rounded-lg px-3 py-2"
             />
           </div>

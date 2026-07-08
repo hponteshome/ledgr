@@ -3,6 +3,7 @@
 import React, { useState, useCallback } from 'react';
 import { FiSearch, FiLoader, FiAlertCircle } from 'react-icons/fi';
 import api from '../../services/api';
+import { SmartDateInput } from '../../components/SmartDateInput';
 import { useCompany } from '../../contexts/CompanyContext';
 import { ReportToolbar } from '../../components/accounting/ReportToolbar';
 
@@ -121,11 +122,11 @@ const FilterModal: React.FC<{ f: F; onApply: (f: F) => void }> = ({ f: init, onA
                         <div style={{ display: 'flex', gap: 12 }}>
                             <div style={{ flex: 1 }}>
                                 <label style={{ fontSize: 13, color: '#6B7280', display: 'block', marginBottom: 4 }}>Data inicial</label>
-                                <input type="date" value={f.startDate} max="9999-12-31" onChange={e => s({ startDate: e.target.value })} style={inp} />
+                                <SmartDateInput value={f.startDate} onChange={v => s({ startDate: v })} style={inp} />
                             </div>
                             <div style={{ flex: 1 }}>
                                 <label style={{ fontSize: 13, color: '#6B7280', display: 'block', marginBottom: 4 }}>Data final</label>
-                                <input type="date" value={f.endDate} max="9999-12-31" onChange={e => s({ endDate: e.target.value })} style={inp} />
+                                <SmartDateInput value={f.endDate} onChange={v => s({ endDate: v })} style={inp} />
                             </div>
                         </div>
                     </div>
