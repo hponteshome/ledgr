@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { FiArrowLeft, FiSave, FiUsers, FiCalendar, FiClock } from 'react-icons/fi';
+import { SmartDateInput } from '../../../../components/SmartDateInput';
 
 export const MeetingForm: React.FC = () => {
     const { id } = useParams();
@@ -129,12 +130,9 @@ export const MeetingForm: React.FC = () => {
                             </label>
                             <div className="relative">
                                 <FiCalendar className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                                <input
-                                    type="date"
-                                    name="date"
+                                <SmartDateInput
                                     value={formData.date}
-                                    onChange={handleChange}
-                                    required
+                                    onChange={(v) => handleChange({ target: { name: 'date', value: v } } as any)}
                                     className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                                 />
                             </div>

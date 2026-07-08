@@ -4,6 +4,7 @@ import { useCompany } from '../../../contexts/CompanyContext';
 import ShareMovementModal from './ShareMovementModal';
 import { useLocation } from 'react-router-dom';
 import api from '../../../services/api';
+import { SmartDateInput } from '../../../components/SmartDateInput';
 import { FiPlus, FiDownload, FiSearch, FiAlertCircle } from 'react-icons/fi';
 
 // ── Tipos ──────────────────────────────────────────────────────────────────────
@@ -757,7 +758,7 @@ const ShareholdersPage: React.FC<Props> = ({ initialTab = 'registro' }) => {
                 },
                 {
                   label: 'Data de Integralização', col: 1, el: (
-                    <input type="date" value={formReg.integralizationDate} onChange={e => setFormReg(p => ({ ...p, integralizationDate: e.target.value }))}
+                    <SmartDateInput value={formReg.integralizationDate} onChange={v => setFormReg(p => ({ ...p, integralizationDate: v }))}
                       className="w-full px-3 py-1.5 text-[15px] border border-gray-200 rounded-lg" />
                   )
                 },
@@ -849,7 +850,7 @@ const ShareholdersPage: React.FC<Props> = ({ initialTab = 'registro' }) => {
                 },
                 {
                   label: 'Data da Transferência', col: 1, el: (
-                    <input type="date" value={formTransf.transferDate} onChange={e => setFormTransf(p => ({ ...p, transferDate: e.target.value }))}
+                    <SmartDateInput value={formTransf.transferDate} onChange={v => setFormTransf(p => ({ ...p, transferDate: v }))}
                       className="w-full px-3 py-1.5 text-[15px] border border-gray-200 rounded-lg" />
                   )
                 },
@@ -870,7 +871,7 @@ const ShareholdersPage: React.FC<Props> = ({ initialTab = 'registro' }) => {
                 },
                 {
                   label: 'Data do Instrumento', col: 1, el: (
-                    <input type="date" value={formTransf.instrumentDate} onChange={e => setFormTransf(p => ({ ...p, instrumentDate: e.target.value }))}
+                    <SmartDateInput value={formTransf.instrumentDate} onChange={v => setFormTransf(p => ({ ...p, instrumentDate: v }))}
                       className="w-full px-3 py-1.5 text-[15px] border border-gray-200 rounded-lg" />
                   )
                 },

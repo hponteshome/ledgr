@@ -3,6 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { FiEdit2 } from 'react-icons/fi';
 import api from '../../services/api';
 import { QsaVinculoGrid } from './QsaVinculoGrid';
+import { SmartDateInput } from '../../components/SmartDateInput';
+import toast from 'react-hot-toast';
 import { FiClock, FiCheckCircle, FiAlertTriangle } from 'react-icons/fi';
 
 const L = ({ children }: { children: React.ReactNode }) => (
@@ -313,9 +315,15 @@ export const CompanyShow: React.FC = () => {
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div>
                 <label className="text-xs font-bold text-gray-400 uppercase block mb-1">Data Inicio</label>
-                <input type="date" value={regimeForm.dtIni}
-                  min={company?.openingDate ? new Date(company.openingDate).toISOString().slice(0,10) : undefined}
-                  onChange={e => setRegimeForm(p => ({...p, dtIni: e.target.value}))}
+                <SmartDateInput value={regimeForm.dtIni}
+                  onChange={v => {
+                    const minDate = company?.openingDate ? new Date(company.openingDate).toISOString().slice(0,10) : undefined;
+                    if (minDate && v < minDate) {
+                      toast.error(`Data nao pode ser anterior a abertura da empresa (${minDate.split('-').reverse().join('/')})`);
+                      return;
+                    }
+                    setRegimeForm(p => ({...p, dtIni: v}));
+                  }}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
               </div>
 

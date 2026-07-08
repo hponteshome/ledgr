@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSearchParams } from 'react-router-dom';
 import api from '../../services/api';
+import { SmartDateInput } from '../../components/SmartDateInput';
 import { toast } from 'react-toastify';
 import SearchRFBButton from '../../components/SearchRFBButton';
 import { RfbComparePanel } from '../../components/RfbComparePanel';
@@ -180,7 +181,7 @@ export const CompanyEdit: React.FC = () => {
                 <div><label className={labelCls}>Nome Fantasia</label>
                   <input name="tradeName" value={formData.tradeName || ''} onChange={handleChange} className={inputCls} /></div>
                 <div><label className={labelCls}>Data de Abertura</label>
-                  <input type="date" name="openingDate" value={formData.openingDate ? formData.openingDate.split('T')[0] : ''} onChange={handleChange} className={inputCls} /></div>
+                  <SmartDateInput value={formData.openingDate ? formData.openingDate.split('T')[0] : ''} onChange={(v) => handleChange({ target: { name: 'openingDate', value: v } } as any)} className={inputCls} /></div>
               </div>
             </fieldset>
             <fieldset className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4">

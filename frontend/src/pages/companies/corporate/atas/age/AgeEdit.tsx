@@ -6,6 +6,7 @@ import {
     FiFileText, FiEye, FiSearch, FiUser, FiX,
 } from 'react-icons/fi';
 import api from '@/services/api';
+import { SmartDateInput } from '@/components/SmartDateInput';
 import { DocumentStylePicker, DOC_STYLES, RenderDocument } from '@/components/DocumentStylePicker';
 import { useCompany } from '@/contexts/CompanyContext';
 
@@ -585,7 +586,7 @@ export const AgeEdit: React.FC = () => {
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                             <div>
                                 <label className="block text-xs font-medium text-gray-500 mb-1">Data</label>
-                                <input type="date" value={form.date} onChange={e => set('date', e.target.value)} className={inputCls} />
+                                <SmartDateInput value={form.date} onChange={v => set('date', v)} className={inputCls} />
                             </div>
                             <div>
                                 <label className="block text-xs font-medium text-gray-500 mb-1">Hora</label>

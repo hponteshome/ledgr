@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { FiX, FiChevronRight, FiChevronLeft, FiSearch, FiCheck, FiAlertCircle } from 'react-icons/fi';
 import api from '../../../services/api';
+import { SmartDateInput } from '../../../components/SmartDateInput';
 import { useCompany } from '../../../contexts/CompanyContext';
 
 // ── Tipos ──────────────────────────────────────────────────────────────────────
@@ -416,12 +417,12 @@ const ShareMovementModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, exist
         {/* Datas */}
         <div>
           <label className={labelCls}>Data de Subscrição</label>
-          <input type="date" value={addForm.subscriptionDate} onChange={e => setAddForm(p => ({ ...p, subscriptionDate: e.target.value }))}
+          <SmartDateInput value={addForm.subscriptionDate} onChange={v => setAddForm(p => ({ ...p, subscriptionDate: v }))}
             className={inputCls} />
         </div>
         <div>
           <label className={labelCls}>Data de Integralização</label>
-          <input type="date" value={addForm.integralizationDate} onChange={e => setAddForm(p => ({ ...p, integralizationDate: e.target.value }))}
+          <SmartDateInput value={addForm.integralizationDate} onChange={v => setAddForm(p => ({ ...p, integralizationDate: v }))}
             className={inputCls} />
         </div>
 
@@ -497,8 +498,8 @@ const ShareMovementModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, exist
         {/* Data */}
         <div>
           <label className={labelCls}>Data do Ato</label>
-          <input type="date" value={redForm.transferDate}
-            onChange={e => setRedForm(p => ({ ...p, transferDate: e.target.value }))}
+          <SmartDateInput value={redForm.transferDate}
+            onChange={v => setRedForm(p => ({ ...p, transferDate: v }))}
             className={inputCls} />
         </div>
 
@@ -513,8 +514,8 @@ const ShareMovementModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, exist
 
         <div>
           <label className={labelCls}>Data do Instrumento</label>
-          <input type="date" value={redForm.instrumentDate}
-            onChange={e => setRedForm(p => ({ ...p, instrumentDate: e.target.value }))}
+          <SmartDateInput value={redForm.instrumentDate}
+            onChange={v => setRedForm(p => ({ ...p, instrumentDate: v }))}
             className={inputCls} />
         </div>
 

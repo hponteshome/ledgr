@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { FiArrowLeft, FiSave, FiUpload } from 'react-icons/fi';
 import api from '../../../../services/api';
+import { SmartDateInput } from '../../../../components/SmartDateInput';
 import { useCompany } from '../../../../contexts/CompanyContext';
 
 const STATUS_TO_BACKEND: Record<string, string> = {
@@ -186,19 +187,17 @@ export const StatuteEdit: React.FC = () => {
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Data de Aprovação</label>
-                                <input
-                                    type="date"
+                                <SmartDateInput
                                     value={formData.approvalDate}
-                                    onChange={(e) => setFormData({ ...formData, approvalDate: e.target.value })}
+                                    onChange={(v) => setFormData({ ...formData, approvalDate: v })}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                                 />
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Data de Registro</label>
-                                <input
-                                    type="date"
+                                <SmartDateInput
                                     value={formData.registrationDate}
-                                    onChange={(e) => setFormData({ ...formData, registrationDate: e.target.value })}
+                                    onChange={(v) => setFormData({ ...formData, registrationDate: v })}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                                 />
                             </div>

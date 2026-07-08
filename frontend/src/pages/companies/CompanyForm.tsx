@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useCompany } from '../../contexts/CompanyContext';
+import { SmartDateInput } from '../../components/SmartDateInput';
 import SearchRFBButton from '../../components/SearchRFBButton';
 interface CompanyFormData {
   taxId: string;
@@ -227,8 +228,8 @@ export const CompanyForm: React.FC = () => {
             </div>
             <div>
               <label className={labelCls}>Data de Abertura</label>
-              <input type="date" name="openingDate" value={formData.openingDate}
-                onChange={handleChange} className={inputCls} />
+              <SmartDateInput value={formData.openingDate}
+                onChange={(v) => handleChange({ target: { name: 'openingDate', value: v } } as any)} className={inputCls} />
             </div>
           </div>
         </fieldset>
