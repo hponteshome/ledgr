@@ -3775,6 +3775,7 @@ enum StatusDecimoTerceiro {
 }
 
 enum TipoHoraBH {
+  NORMAL          // sem acrescimo -- compensacao simples 1:1 (banco de horas por compensacao)
   DIURNA          // hora diurna (entre 5h e 22h)
   NOTURNA         // hora noturna (entre 22h e 5h) — adicional 20%
   FDS_SABADO      // sabado (CLT: 50% ou conforme CCT)

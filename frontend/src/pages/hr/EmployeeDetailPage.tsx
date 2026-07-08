@@ -510,6 +510,7 @@ export default function EmployeeDetailPage() {
             {bhDto.tipo==="CREDITO" && (
               <div><label style={S.lbl}>Tipo de Hora</label>
                 <select value={bhDto.tipoHora} onChange={e=>setBhDto(d=>({...d,tipoHora:e.target.value}))} style={S.inp}>
+                  <option value="NORMAL">Normal (sem acrescimo)</option>
                   <option value="DIURNA">Diurna (HE 50%)</option>
                   <option value="NOTURNA">Noturna (HE 50% + 20% adicional)</option>
                   <option value="FDS_SABADO">Sabado (HE 50%)</option>

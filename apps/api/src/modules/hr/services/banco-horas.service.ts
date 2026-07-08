@@ -5,6 +5,7 @@ import { Decimal } from '@prisma/client/runtime/library';
 // Multiplicadores por tipo de hora
 function getMultiplicador(tipoHora: string, bh: any): number {
   switch (tipoHora) {
+    case 'NORMAL':     return 1.00; // sem acrescimo -- compensacao simples 1:1
     case 'NOTURNA':    return Number(bh.multNoturno) * 1.50; // HE 50% + adicional noturno
     case 'FDS_SABADO': return Number(bh.multSabado);
     case 'FDS_DOMINGO':return Number(bh.multDomingo);
