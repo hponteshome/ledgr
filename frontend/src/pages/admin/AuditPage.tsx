@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { FiShield, FiSearch, FiChevronDown, FiChevronUp, FiUser, FiClock } from 'react-icons/fi';
 import api from '../../services/api';
+import { SmartDateInput } from '../../components/SmartDateInput';
 
 interface AuditEntry {
   id: string;
@@ -134,16 +135,14 @@ export default function AuditPage() {
             className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-blue-400"
           />
         </div>
-        <input
-          type="date"
+        <SmartDateInput
           value={filters.dateFrom}
-          onChange={e => setFilter('dateFrom', e.target.value)}
+          onChange={v => setFilter('dateFrom', v)}
           className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-blue-400"
         />
-        <input
-          type="date"
+        <SmartDateInput
           value={filters.dateTo}
-          onChange={e => setFilter('dateTo', e.target.value)}
+          onChange={v => setFilter('dateTo', v)}
           className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-blue-400"
         />
       </div>

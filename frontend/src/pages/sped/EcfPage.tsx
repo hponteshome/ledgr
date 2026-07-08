@@ -7,6 +7,7 @@ import {
     FiDatabase, FiFileText, FiActivity,
 } from 'react-icons/fi';
 import api from '../../services/api';
+import { SmartDateInput } from '../../components/SmartDateInput';
 
 // ── Tipos ──────────────────────────────────────────────────────
 
@@ -833,19 +834,17 @@ const EcfPage: React.FC = () => {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Início do Período</label>
-                            <input
-                                type="date"
+                            <SmartDateInput
                                 value={exportPeriodStart}
-                                onChange={e => setExportPeriodStart(e.target.value)}
+                                onChange={v => setExportPeriodStart(v)}
                                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400"
                             />
                         </div>
                         <div>
                             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Fim do Período</label>
-                            <input
-                                type="date"
+                            <SmartDateInput
                                 value={exportPeriodEnd}
-                                onChange={e => setExportPeriodEnd(e.target.value)}
+                                onChange={v => setExportPeriodEnd(v)}
                                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400"
                             />
                         </div>

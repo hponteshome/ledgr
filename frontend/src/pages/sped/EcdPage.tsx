@@ -13,6 +13,7 @@ import {
     FiClock, FiFile, FiTrash2, FiEye, FiAlertTriangle,
 } from 'react-icons/fi';
 import api from '../../services/api';
+import { SmartDateInput } from '../../components/SmartDateInput';
 
 // ── Tipos ──────────────────────────────────────────────────────
 
@@ -712,12 +713,12 @@ const EcdPage: React.FC = () => {
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="text-xs text-gray-500 block mb-1">Início do período</label>
-                            <input type="date" value={exportPeriodStart} onChange={e => setExportPeriodStart(e.target.value)}
+                            <SmartDateInput value={exportPeriodStart} onChange={v => setExportPeriodStart(v)}
                                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                         </div>
                         <div>
                             <label className="text-xs text-gray-500 block mb-1">Fim do período</label>
-                            <input type="date" value={exportPeriodEnd} onChange={e => setExportPeriodEnd(e.target.value)}
+                            <SmartDateInput value={exportPeriodEnd} onChange={v => setExportPeriodEnd(v)}
                                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                         </div>
                         <div>
