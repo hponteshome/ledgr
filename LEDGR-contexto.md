@@ -1818,3 +1818,62 @@ Ao criar um modal novo daqui pra frente, seguir sempre:
 
 Registrado também na memória de sessão do Claude para aplicação automática, sem precisar
 ser solicitado a cada modal novo.
+
+---
+
+### Módulo Banco de Horas — descoberto, corrigido e melhorado (08/07/2026)
+
+**Descoberta inicial:** funcionalidade existia desde sessão anterior (RH), mas sem item no
+menu, sem página consolidada — só acessível via aba dentro de `EmployeeDetailPage.tsx`.
+Criada `BancoHorasPage.tsx` (visão consolidada de todos os funcionários, usando o endpoint
+`GET /hr/employees/banco-horas/relatorio` que já existia no backend mas nunca era chamado
+pelo frontend). Item "Banco de Horas" adicionado ao menu Departamento Pessoal (ícone
+`FiClock`), rota `/app/hr/banco-horas`.
+
+**Bug crítico encontrado e corrigido — botão "Lançar" nunca funcionava:**
+`bhDto` (estado do modal em `EmployeeDetailPage.tsx`) declarava campo `minutos`, mas o input
+do formulário lia/escrevia em `bhDto.minutosOriginais` — nome divergente, então
+`bhDto.minutos` nunca era preenchido. O botão checava `disabled={...||!bhDto.minutos}`,
+ficando permanentemente desabilitado. Mesmo padrão de bug de "campo com nome trocado" que já
+apareceu antes nesta sessão (token key, rota payBatch) — vale ficar atento a esse tipo de
+erro ao revisar outros módulos ainda não auditados.
+
+**Achado mais profundo — dois sistemas paralelos de Banco de Horas no backend:**
+- `BancoHorasService` (`services/banco-horas.service.ts`) — o robusto: `creditar()`,
+  `debitar()`, `ajustar()`, `getSaldo()`, `getRelatorio()`, `configurar()`. Aplica
+  multiplicador por `tipoHora` (regras CLT: diurna 50%, noturna, sábado, domingo, feriado).
+- `EmployeeService.addLancamentoBH()` (`services/employee.service.ts`) — o simplificado:
+  ignora completamente `tipoHora`/multiplicador, só soma/subtrai minuto bruto.
+
+O modal estava plugado no endpoint genérico (`POST /:id/banco-horas` → `addLancamentoBH`),
+tornando o seletor "Tipo de Hora" decorativo — nenhum multiplicador era aplicado de verdade.
+**Corrigido:** modal agora roteia por `tipo` para os endpoints certos do `BancoHorasService`:
+- `CREDITO` → `POST /banco-horas/creditar` (aplica multiplicador real)
+- `DEBITO` → `POST /banco-horas/debitar` (valida saldo insuficiente no backend)
+- `AJUSTE` → `POST /banco-horas/ajustar` (aceita valor negativo)
+- `EXPIRACAO` → **contorno**, roteada como ajuste negativo (`-Math.abs(minutos)`) via
+  `/ajustar`. **Pendência real:** não existe método `expirar()` dedicado no
+  `BancoHorasService` — o correto seria criar um método próprio (provavelmente com lógica de
+  validade/prazo automática, não so decremento manual). Não implementado, fora do escopo
+  desta sessão.
+
+**Melhoria: tipo de hora NORMAL (sem acréscimo) adicionado:**
+Até então só existiam opções com multiplicador embutido (mínimo 50% para "Diurna" — não
+havia `case 'DIURNA'` explícito, caía no `default: return 1.50`). Não havia forma de
+creditar hora pura 1:1 (compensação simples, art. 59 CLT — modelo mais comum de banco de
+horas por acordo de compensação de jornada, sem hora extra). Adicionado:
+- Migration: `ALTER TYPE tipo_hora_bh ADD VALUE 'NORMAL'`
+- `getMultiplicador()`: `case 'NORMAL': return 1.00;`
+- Opção "Normal (sem acréscimo)" no seletor do modal
+
+**Endpoint órfão identificado, não corrigido:** `GET /hr/employees/banco-horas/relatorio`
+existia pronto no backend antes de hoje, mas nenhuma tela do frontend o chamava — mesmo
+padrão de "código pronto sem uso" já visto com arquivos órfãos (`Login.tsx`, `persons/index.tsx`,
+`users/index.tsx`). Agora está em uso via `BancoHorasPage.tsx`.
+
+**Recomendação para sessão futura:** este módulo teve 3 problemas reais descobertos numa
+única investigação guiada pelo usuário ("cadê o Banco de Horas?" → "por que o botão não
+funciona?" → "por que só tem hora com acréscimo?"). Vale considerar uma auditoria mais
+ampla de outros módulos de RH (Férias, Recesso, 13º, Rescisão) em busca do mesmo padrão:
+campos com nome divergente entre estado/formulário/backend, endpoints prontos sem uso no
+frontend, e funcionalidades sem item de menu.
