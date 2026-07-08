@@ -1795,3 +1795,26 @@ empresas carregam, `x-company-id` é enviado em todo request). Log do backend co
 **Bug secundário relacionado, mesma tela:** `GET /accounting/chart-of-accounts?isAnalytic=true`
 retorna 404 em `ContasAReceberPage.tsx:82` — endpoint pode nao aceitar esse query param nessa
 rota, ou rota errada sendo chamada. Nao investigado.
+
+---
+
+### ATUALIZAÇÃO — Padrão de Modais vira REGRA GERAL DO PROJETO (08/07/2026)
+
+O padrão de modal registrado acima (baseado em APPayModal/APCreateModal) deixa de ser
+específico do módulo Financeiro e passa a ser a convenção padrão para **qualquer modal
+novo em qualquer módulo do LEDGR** (Contabilidade, Societário, Patrimônio, RH, Fiscal, etc).
+
+Ao criar um modal novo daqui pra frente, seguir sempre:
+- Cores `FIN`/`FIN_ACCENT`/`FIN_LIGHT` (ou paleta equivalente do módulo, se já existir uma
+  cor de identidade própria documentada — ex: módulos podem ter suas próprias cores de
+  destaque, mas a *estrutura* do modal é sempre a mesma)
+- Header escuro com título + subtítulo + botão × de fechar
+- Seções agrupadas com `borderLeft` na cor de destaque para o bloco principal
+- Footer padrão: Cancelar (outline) + Ação (preenchido), alinhados à direita, `background:#FAFAFA`
+- Componente `Label` + `const inputSt` reutilizáveis
+- **SmartDateInput/SmartMonthInput sempre** para qualquer campo de data — nunca
+  `<input type="date">`/`type="month">` nativo, em nenhuma circunstância
+- Bloco de erro padrão (`#FCEBEB`/`#A32D2D`) para erros de API e de validação de formulário
+
+Registrado também na memória de sessão do Claude para aplicação automática, sem precisar
+ser solicitado a cada modal novo.
