@@ -1,26 +1,26 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../../services/api';
 import Swal from 'sweetalert2';
-const fmtBRL=(v)=>Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
-const fmtDate=(d)=>d?new Date(d).toLocaleDateString('pt-BR'):'—';
+const fmtBRL=(v: any)=>Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+const fmtDate=(d: any)=>d?new Date(d).toLocaleDateString('pt-BR'):'—';
 const AC='#6C63FF';
 export const RaisPage=()=>{
-  const [decls,setDecls]=useState([]);
+  const [decls,setDecls]=useState<any[]>([]);
   const [ano,setAno]=useState(new Date().getFullYear()-1);
   const [loading,setLoading]=useState(false);
-  const [sel,setSel]=useState(null);
-  const th={padding:'8px 12px',fontSize:11,fontWeight:600,color:'#6B7280',textTransform:'uppercase',background:'#F9FAFB',borderBottom:'0.5px solid #E5E7EB',textAlign:'left'};
+  const [sel,setSel]=useState<any>(null);
+  const th={padding:'8px 12px',fontSize:11,fontWeight:600,color:'#6B7280',textTransform:'uppercase',background:'#F9FAFB',borderBottom:'0.5px solid #E5E7EB',textAlign:'left'} as React.CSSProperties;
   const td={padding:'9px 12px',fontSize:13,color:'#374151',borderBottom:'0.5px solid #F5F5F5'};
-  const btn=(c)=>({padding:'6px 14px',borderRadius:6,border:'none',background:c,color:'#fff',cursor:'pointer',fontSize:12,fontWeight:600});
+  const btn=(c: any)=>({padding:'6px 14px',borderRadius:6,border:'none',background:c,color:'#fff',cursor:'pointer',fontSize:12,fontWeight:600});
   const load=useCallback(async()=>{setLoading(true);try{const r=await api.get('/hr/rais');setDecls(r.data);}finally{setLoading(false);}},[]);
   useEffect(()=>{load();},[load]);
   const gerar=async()=>{
     setLoading(true);
     try{const r=await api.post('/hr/rais/gerar',{anoBase:ano});setSel(r.data);load();}
-    catch(e){Swal.fire('Erro',e?.response?.data?.message||'Falha','error');}
+    catch(e: any){Swal.fire('Erro',e?.response?.data?.message||'Falha','error');}
     finally{setLoading(false);}
   };
-  const registrar=async(id)=>{
+  const registrar=async(id: any)=>{
     const {value}=await Swal.fire({title:'Protocolo RAIS',input:'text',inputPlaceholder:'Numero do protocolo',showCancelButton:true});
     if(!value)return;
     await api.patch('/hr/rais/'+id+'/registrar-envio',{protocolo:value});load();
@@ -57,7 +57,7 @@ export const RaisPage=()=>{
             <h3 style={{fontSize:14,fontWeight:700,margin:'0 0 10px'}}>Vinculos RAIS {sel.anoBase} ({sel.vinculos.length})</h3>
             <table style={{width:'100%',borderCollapse:'collapse',background:'#fff',borderRadius:10,overflow:'hidden',border:'0.5px solid #E5E7EB'}}>
               <thead><tr>{['Funcionario','CPF','Admissao','Desligamento','Meses','Sal.Ref','Total Rem.'].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead>
-              <tbody>{sel.vinculos.map(v=>(
+              <tbody>{sel.vinculos.map((v: any)=>(
                 <tr key={v.id}>
                   <td style={{...td,fontWeight:500}}>{v.employee?.fullName}</td>
                   <td style={{...td,fontFamily:'monospace'}}>{v.employee?.taxId}</td>

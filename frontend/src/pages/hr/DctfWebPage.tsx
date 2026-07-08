@@ -1,19 +1,19 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../../services/api';
 import { SmartMonthInput } from '../../components/SmartMonthInput';
-const fmtBRL=(v)=>Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+const fmtBRL=(v: any)=>Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 const AC='#6C63FF';
 export const DctfWebPage=()=>{
   const now=new Date();
   const [comp,setComp]=useState(now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0'));
-  const [data,setData]=useState(null);
-  const [comps,setComps]=useState([]);
+  const [data,setData]=useState<any>(null);
+  const [comps,setComps]=useState<any[]>([]);
   const [loading,setLoading]=useState(false);
   const loadComps=useCallback(async()=>{const r=await api.get('/hr/dctfweb/competencias').catch(()=>({data:[]}));setComps(r.data||[]);},[]);
   const consolidar=useCallback(async()=>{if(!comp)return;setLoading(true);try{const r=await api.get('/hr/dctfweb/'+comp);setData(r.data);}finally{setLoading(false);}},[comp]);
   useEffect(()=>{loadComps();},[loadComps]);
   useEffect(()=>{consolidar();},[consolidar]);
-  const Card=({label,value,color,sub})=>(
+  const Card=({label,value,color,sub}: any)=>(
     <div style={{background:'#fff',border:'0.5px solid #E5E7EB',borderRadius:10,padding:'14px 18px',flex:1,minWidth:160}}>
       <div style={{fontSize:11,color:'#9CA3AF',textTransform:'uppercase',fontWeight:600}}>{label}</div>
       <div style={{fontSize:18,fontWeight:700,color:color||'#111',marginTop:4}}>{value}</div>

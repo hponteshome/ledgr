@@ -2,22 +2,22 @@ import React, { useState, useEffect, useCallback } from 'react';
 import api from '../../services/api';
 import Swal from 'sweetalert2';
 import { SmartDateInput } from '../../components/SmartDateInput';
-const fmtBRL=(v)=>Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
-const fmtDate=(d)=>d?new Date(d).toLocaleDateString('pt-BR'):'—';
+const fmtBRL=(v: any)=>Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+const fmtDate=(d: any)=>d?new Date(d).toLocaleDateString('pt-BR'):'—';
 const AC='#6C63FF';
-const STATUS_STYLE={CALCULADO:{bg:'#EFF6FF',color:'#1D4ED8'},PRIMEIRA_PAGA:{bg:'#FEF3C7',color:'#92400E'},QUITADO:{bg:'#F0FDF4',color:'#15803D'}};
+const STATUS_STYLE: Record<string, {bg:string;color:string}> = {CALCULADO:{bg:'#EFF6FF',color:'#1D4ED8'},PRIMEIRA_PAGA:{bg:'#FEF3C7',color:'#92400E'},QUITADO:{bg:'#F0FDF4',color:'#15803D'}};
 export const DecimoTerceiroPage=()=>{
   const ano=new Date().getFullYear();
   const [year,setYear]=useState(ano);
-  const [dados,setDados]=useState([]);
+  const [dados,setDados]=useState<any[]>([]);
   const [loading,setLoading]=useState(false);
   const [calc,setCalc]=useState(false);
-  const [pgModal,setPgModal]=useState(null);
+  const [pgModal,setPgModal]=useState<any>(null);
   const [dtPgto,setDtPgto]=useState('');
-  const th={padding:'8px 12px',fontSize:11,fontWeight:600,color:'#6B7280',textTransform:'uppercase',background:'#F9FAFB',borderBottom:'0.5px solid #E5E7EB',textAlign:'left'};
+  const th={padding:'8px 12px',fontSize:11,fontWeight:600,color:'#6B7280',textTransform:'uppercase',background:'#F9FAFB',borderBottom:'0.5px solid #E5E7EB',textAlign:'left'} as React.CSSProperties;
   const td={padding:'9px 12px',fontSize:13,color:'#374151',borderBottom:'0.5px solid #F5F5F5'};
-  const btn=(c,sm)=>({padding:sm?'3px 8px':'7px 16px',borderRadius:6,border:'none',background:c,color:'#fff',cursor:'pointer',fontSize:sm?11:13,fontWeight:600});
-  const ov={position:'fixed',inset:0,background:'rgba(0,0,0,0.4)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000};
+  const btn=(c: any,sm?: any)=>({padding:sm?'3px 8px':'7px 16px',borderRadius:6,border:'none',background:c,color:'#fff',cursor:'pointer',fontSize:sm?11:13,fontWeight:600});
+  const ov={position:'fixed',inset:0,background:'rgba(0,0,0,0.4)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000} as React.CSSProperties;
   const load=useCallback(async()=>{
     setLoading(true);
     try{const r=await api.get('/hr/decimo-terceiro',{params:{ano:year}});setDados(r.data);}
@@ -29,15 +29,15 @@ export const DecimoTerceiroPage=()=>{
     if(!ok.isConfirmed)return;
     setCalc(true);
     try{const r=await api.post('/hr/decimo-terceiro/calcular',{ano:year});await load();Swal.fire('Calculado!',r.data.total+' funcionario(s) calculados','success');}
-    catch(e){Swal.fire('Erro',e?.response?.data?.message||'Falha','error');}
+    catch(e: any){Swal.fire('Erro',e?.response?.data?.message||'Falha','error');}
     finally{setCalc(false);}
   };
   const pagar=async()=>{
     if(!pgModal||!dtPgto)return;
     try{const ep=pgModal.parcela===1?'pagar-primeira':'pagar-segunda';await api.patch('/hr/decimo-terceiro/'+pgModal.id+'/'+ep,{dataPgto:dtPgto});setPgModal(null);setDtPgto('');load();}
-    catch(e){Swal.fire('Erro',e?.response?.data?.message||'Falha','error');}
+    catch(e: any){Swal.fire('Erro',e?.response?.data?.message||'Falha','error');}
   };
-  const pdf=(id,p)=>window.open((api.defaults.baseURL||'')+'/hr/decimo-terceiro/'+id+'/recibo/'+p+'/pdf','_blank');
+  const pdf=(id: any,p: any)=>window.open((api.defaults.baseURL||'')+'/hr/decimo-terceiro/'+id+'/recibo/'+p+'/pdf','_blank');
   const totais=dados.reduce((a,d)=>({bruto:a.bruto+Number(d.valorBruto||0),inss:a.inss+Number(d.valorInss||0),irrf:a.irrf+Number(d.valorIrrf||0),liq2:a.liq2+Number(d.segundaParcelaLiquido||0)}),{bruto:0,inss:0,irrf:0,liq2:0});
   return(
     <div style={{display:'flex',flexDirection:'column',height:'100%'}}>

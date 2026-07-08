@@ -24,7 +24,7 @@ export default function EsocialPage() {
   const [emps, setEmps]       = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [sel, setSel]         = useState<any>(null);
-  const [modal, setModal]     = useState<"s2205"|"s2299"|"s1200"|null>(null);
+  const [modal, setModal]     = useState<"s2205"|"s2230"|"s2240"|"s2210"|"s1210"|"s2190"|"s1202"|"s2220"|"s2298"|"s2299"|"s1200"|null>(null);
   const [s2205, setS2205] = useState({dtAlteracao:"",novaFuncao:"",novoSalario:"",cargaHoraria:""});
   const [s2299, setS2299] = useState({dtDeslig:"",mtvDeslig:"01",pensao:false,tpAmb:"2"});
   const [s1200, setS1200] = useState({perApur:new Date().toISOString().slice(0,7),vrBcCp:""});
