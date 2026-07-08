@@ -5,6 +5,7 @@ import React, { useState } from 'react';
 import { APTable } from '../../components/finance/APTable';
 import { APPayModal } from '../../components/finance/APPayModal';
 import { APPositionReport } from '../../components/finance/APPositionReport';
+import { APCreateModal } from '../../components/finance/APCreateModal';
 import type { AccountsPayable } from '../../pages/finance/types/accounts-payable';
 
 const FIN = '#1A4A3A';
@@ -16,11 +17,13 @@ export default function ContasAPagarPage() {
   const [tab, setTab] = useState<Tab>('titulos');
   const [payTarget, setPayTarget] = useState<AccountsPayable | null>(null);
   const [batchItems, setBatchItems] = useState<AccountsPayable[] | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
   const handleSuccess = () => {
     setPayTarget(null);
     setBatchItems(null);
+    setShowCreate(false);
     setRefreshKey(k => k + 1);
   };
 
@@ -51,7 +54,7 @@ export default function ContasAPagarPage() {
             key={refreshKey}
             onPay={ap => setPayTarget(ap)}
             onBatch={items => setBatchItems(items)}
-            onNew={() => {/* APCreateModal — próxima fase */ }}
+            onNew={() => setShowCreate(true)}
             onDetail={() => {/* APDetailDrawer — próxima fase */ }}
             refresh={refreshKey}
           />
@@ -75,6 +78,14 @@ export default function ContasAPagarPage() {
           mode="batch"
           items={batchItems}
           onClose={() => setBatchItems(null)}
+          onSuccess={handleSuccess}
+        />
+      )}
+
+      {/* Modal de cadastro manual */}
+      {showCreate && (
+        <APCreateModal
+          onClose={() => setShowCreate(false)}
           onSuccess={handleSuccess}
         />
       )}
