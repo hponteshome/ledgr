@@ -3,6 +3,7 @@
 // Modal de baixa individual e em lote
 // ============================================================
 import React, { useState, useEffect } from 'react';
+import { SmartDateInput } from '../SmartDateInput';
 import {
   AccountsPayable, PaymentMethod,
   PAYMENT_METHOD_LABEL, remaining, fmtBRL, fmtDate,
@@ -140,8 +141,8 @@ export function APPayModal(props: Props) {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
               <div>
                 <Label>Data do Pagamento *</Label>
-                <input type="date" style={inputSt} value={globalDate}
-                  onChange={e => setGlobalDate(e.target.value)} />
+                <SmartDateInput style={inputSt} value={globalDate}
+                  onChange={v => setGlobalDate(v)} />
               </div>
               <div>
                 <Label>Forma de Pagamento *</Label>

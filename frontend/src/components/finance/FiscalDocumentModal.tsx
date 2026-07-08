@@ -2,6 +2,8 @@
 // LEDGR — src/pages/finance/components/FiscalDocumentModal.tsx
 // ============================================================
 import React, { useState, useEffect } from 'react';
+import { SmartMonthInput } from '../SmartMonthInput';
+import { SmartDateInput } from '../SmartDateInput';
 import { FiscalDocumentFormData, FiscalDocumentType, FISCAL_DOC_TYPE_LABEL } from '../../pages/finance/types/finance';
 import { useFiscalDocuments } from '../../pages/finance/hooks/useFinance';
 
@@ -174,11 +176,10 @@ export function FiscalDocumentModal({ open, onClose, onSuccess }: Props) {
                   </FormRow>
                 )}
                 <FormRow label="Competência *">
-                  <input
+                  <SmartMonthInput
                     style={inputStyle}
-                    type="month"
                     value={form.competenceMonth}
-                    onChange={(e) => handleChange('competenceMonth', e.target.value)}
+                    onChange={(v) => handleChange('competenceMonth', v)}
                   />
                 </FormRow>
               </div>
@@ -227,19 +228,17 @@ export function FiscalDocumentModal({ open, onClose, onSuccess }: Props) {
               {/* Datas */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                 <FormRow label="Data de Emissão *">
-                  <input
+                  <SmartDateInput
                     style={inputStyle}
-                    type="date"
                     value={form.issueDate}
-                    onChange={(e) => handleChange('issueDate', e.target.value)}
+                    onChange={(v) => handleChange('issueDate', v)}
                   />
                 </FormRow>
                 <FormRow label="Data de Vencimento *">
-                  <input
+                  <SmartDateInput
                     style={inputStyle}
-                    type="date"
                     value={form.dueDate}
-                    onChange={(e) => handleChange('dueDate', e.target.value)}
+                    onChange={(v) => handleChange('dueDate', v)}
                   />
                 </FormRow>
               </div>

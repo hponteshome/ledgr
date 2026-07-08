@@ -2,6 +2,7 @@
 // LEDGR — apps/web/src/pages/finance/components/AgendaEventModal.tsx
 // ============================================================
 import React, { useState, useEffect } from 'react';
+import { SmartDateInput } from '../SmartDateInput';
 import { COLOR_MAP } from './AgendaCalendar';
 import { useAgenda } from '../../pages/finance/hooks/useAgenda';
 import type { AgendaEvent, AgendaColor, AgendaEventType } from '../../pages/finance/types/finance';
@@ -237,11 +238,10 @@ export function AgendaEventModal({ open, event, defaultDate, onClose, onSuccess 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
               <Label>Data de Vencimento *</Label>
-              <input
+              <SmartDateInput
                 style={inputSt}
-                type="date"
                 value={form.dueDate}
-                onChange={e => setForm(f => ({ ...f, dueDate: e.target.value }))}
+                onChange={v => setForm(f => ({ ...f, dueDate: v }))}
               />
             </div>
             <div>

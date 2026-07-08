@@ -5,6 +5,7 @@ import { useCompany } from '../../contexts/CompanyContext';
 import api from '../../services/api';
 import { parseCompetencia } from '../../utils/formatters';
 import Swal from 'sweetalert2';
+import { SmartMonthInput } from '../../components/SmartMonthInput';
 
 const fmtBRL = (v: any) => Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -415,12 +416,12 @@ export default function ProvisoesPage() {
             <div style={{display:'flex',gap:12,alignItems:'flex-end',flexWrap:'wrap' as const}}>
               <div>
                 <label style={{fontSize:10,textTransform:'uppercase' as const,color:'#6B7280',display:'block',marginBottom:3}}>Gerar para competência</label>
-                <input style={{...S.input,width:160}} type="month" value={gerarComp} onChange={e=>setGerarComp(e.target.value)} />
+                <SmartMonthInput style={{width:160}} value={gerarComp} onChange={v=>setGerarComp(v)} />
               </div>
               <button style={S.btnP} onClick={gerar} disabled={loading}>{loading?'Gerando...':'Gerar lançamentos'}</button>
               <div style={{marginLeft:'auto'}}>
                 <label style={{fontSize:10,textTransform:'uppercase' as const,color:'#6B7280',display:'block',marginBottom:3}}>Filtrar competência</label>
-                <input style={{...S.input,width:160}} type="month" value={filterComp} onChange={e=>setFilterComp(e.target.value)} />
+                <SmartMonthInput style={{width:160}} value={filterComp} onChange={v=>setFilterComp(v)} />
               </div>
             </div>
           </div>

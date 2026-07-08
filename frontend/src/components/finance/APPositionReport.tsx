@@ -3,6 +3,7 @@
 // Relatório de Posição / Aging de Contas a Pagar
 // ============================================================
 import React, { useEffect, useState } from 'react';
+import { SmartDateInput } from '../SmartDateInput';
 import { useAccountsPayable } from '../../pages/finance/hooks/useAccountsPayable';
 import type { APPositionReport as ReportData } from '../../pages/finance/types/accounts-payable';
 import { fmtBRL } from '../../pages/finance/types/accounts-payable';
@@ -57,7 +58,7 @@ export function APPositionReport() {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <label style={{ fontSize: 11, color: '#666' }}>Data de referência:</label>
-          <input type="date" value={refDate} onChange={e => setRefDate(e.target.value)}
+          <SmartDateInput value={refDate} onChange={v => setRefDate(v)}
             style={{ border: '1px solid #ddd', borderRadius: 6, padding: '5px 8px', fontSize: 12 }} />
           <button onClick={load} style={{
             background: FIN, color: '#fff', border: 'none',

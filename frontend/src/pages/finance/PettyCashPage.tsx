@@ -1,6 +1,7 @@
 // frontend/src/pages/finance/PettyCashPage.tsx
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../../services/api';
+import { SmartDateInput } from '../../components/SmartDateInput';
 
 const AC = '#0369A1';
 const AC_SURF = '#F0F9FF';
@@ -171,8 +172,8 @@ export default function PettyCashPage() {
 
               {/* Filtro período */}
               <div style={{display:'flex',gap:10,marginBottom:16,alignItems:'flex-end'}}>
-                <div><label style={S.label}>De</label><input type="date" value={from} onChange={e=>setFrom(e.target.value)} style={{...S.input,width:140}} /></div>
-                <div><label style={S.label}>Até</label><input type="date" value={to} onChange={e=>setTo(e.target.value)} style={{...S.input,width:140}} /></div>
+                <div><label style={S.label}>De</label><SmartDateInput value={from} onChange={v=>setFrom(v)} style={{width:140}} /></div>
+                <div><label style={S.label}>Até</label><SmartDateInput value={to} onChange={v=>setTo(v)} style={{width:140}} /></div>
                 <button onClick={()=>{setFrom('');setTo('');}} style={{padding:'7px 14px',borderRadius:6,border:'0.5px solid #E5E7EB',background:'#fff',fontSize:12,cursor:'pointer',color:'#6B7280'}}>Limpar</button>
               </div>
 
@@ -233,7 +234,7 @@ export default function PettyCashPage() {
             <h2 style={{fontSize:16,fontWeight:600,margin:'0 0 4px'}}>{entryType==='EXPENSE'?'Registrar Despesa':'Repor Fundo'}</h2>
             <p style={{fontSize:13,color:'#6B7280',margin:'0 0 20px'}}>Saldo atual: <strong>{fmtBRL(summary?.current)}</strong></p>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
-              <div><label style={S.label}>Data</label><input type="date" value={newEntry.date} onChange={e=>setNewEntry(d=>({...d,date:e.target.value}))} style={S.input} /></div>
+              <div><label style={S.label}>Data</label><SmartDateInput value={newEntry.date} onChange={v=>setNewEntry(d=>({...d,date:v}))} style={S.input} /></div>
               <div><label style={S.label}>Valor (R$)</label><input value={newEntry.amount} onChange={e=>setNewEntry(d=>({...d,amount:e.target.value}))} style={S.input} placeholder="0,00" /></div>
               {entryType==='EXPENSE' && <>
                 <div><label style={S.label}>Categoria</label>

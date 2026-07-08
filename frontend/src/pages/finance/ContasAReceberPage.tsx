@@ -1,6 +1,7 @@
 // frontend/src/pages/finance/ContasAReceberPage.tsx
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../../services/api';
+import { SmartDateInput } from '../../components/SmartDateInput';
 
 const AC = '#0369A1';
 const AC_SURF = '#F0F9FF';
@@ -179,8 +180,8 @@ export default function ContasAReceberPage() {
             <option value="">Todas origens</option>
             {Object.entries(ORIGIN_LABEL).map(([k,v]) => <option key={k} value={k}>{v}</option>)}
           </select>
-          <input type="date" value={filters.from} onChange={e => setFilters(f => ({...f, from: e.target.value}))} style={{ ...S.input, width: 140 }} placeholder="De" />
-          <input type="date" value={filters.to} onChange={e => setFilters(f => ({...f, to: e.target.value}))} style={{ ...S.input, width: 140 }} placeholder="Até" />
+          <SmartDateInput value={filters.from} onChange={v => setFilters(f => ({...f, from: v}))} style={{ width: 140 }} placeholder="De" />
+          <SmartDateInput value={filters.to} onChange={v => setFilters(f => ({...f, to: v}))} style={{ width: 140 }} placeholder="Até" />
           <button onClick={() => setFilters({ status:'', origin:'', from:'', to:'' })} style={{ padding: '6px 14px', borderRadius: 6, border: '0.5px solid #E5E7EB', background: '#fff', fontSize: 12, cursor: 'pointer', color: '#6B7280' }}>Limpar</button>
         </div>
       )}
@@ -326,7 +327,7 @@ export default function ContasAReceberPage() {
               </div>
               <div>
                 <label style={S.label}>Vencimento</label>
-                <input type="date" value={newDto.dueDate} onChange={e => setNewDto(d => ({...d, dueDate: e.target.value}))} style={S.input} />
+                <SmartDateInput value={newDto.dueDate} onChange={v => setNewDto(d => ({...d, dueDate: v}))} style={S.input} />
               </div>
               <div>
                 <label style={S.label}>Valor</label>

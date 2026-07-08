@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
 import { useCompany } from '../../contexts/CompanyContext';
 import Swal from 'sweetalert2';
+import { SmartMonthInput } from '../../components/SmartMonthInput';
 
 const fmtBRL = (v: any) => Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -386,8 +387,8 @@ export default function FechamentoPage() {
             <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
               <div>
                 <label style={{ fontSize: 10, textTransform: "uppercase", color: "#6B7280", display: "block", marginBottom: 3 }}>Competência</label>
-                <input style={{ ...S.input, width: 160 }} type="month" value={competencia}
-                  onChange={e => e.target.value && setCompetencia(e.target.value)} />
+                <SmartMonthInput style={{ width: 160 }} value={competencia}
+                  onChange={v => v && setCompetencia(v)} />
               </div>
               <div style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
                 {loadingEmpresas && <span style={{ fontSize: 12, color: "#9CA3AF" }}>Carregando...</span>}
@@ -454,7 +455,7 @@ export default function FechamentoPage() {
             <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' as const }}>
               <div>
                 <label style={{ fontSize: 10, textTransform: 'uppercase' as const, color: '#6B7280', display: 'block', marginBottom: 3 }}>Competência</label>
-                <input style={{ ...S.input, width: 160 }} type="month" value={competencia} onChange={e => setCompetencia(e.target.value)} />
+                <SmartMonthInput style={{ width: 160 }} value={competencia} onChange={v => setCompetencia(v)} />
               </div>
               {stFech && (
                 <span style={{ padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 500, background: stFech.bg, color: stFech.color }}>
