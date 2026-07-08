@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { FiArrowLeft, FiPlus, FiTrash2, FiShield } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
 import api from '../../../services/api';
+import { SmartDateInput } from '../../../components/SmartDateInput';
 
 const AUTH_METHODS = [
   { value: 'email', label: 'E-mail (link de assinatura)' },
@@ -106,8 +107,14 @@ export const SignatureRequest: React.FC = () => {
           )}
           <div className="mt-3">
             <label className="block text-[12px] text-gray-500 mb-1">Prazo para assinatura</label>
-            <input type="date" value={deadline} onChange={e => setDeadline(e.target.value)}
-              min={new Date().toISOString().split('T')[0]}
+            <SmartDateInput value={deadline} onChange={v => {
+                const today = new Date().toISOString().split('T')[0];
+                if (v < today) {
+                  alert('O prazo para assinatura nao pode ser uma data no passado.');
+                  return;
+                }
+                setDeadline(v);
+              }}
               className="text-[14px] border border-gray-200 rounded-lg px-3 py-2" />
           </div>
         </div>

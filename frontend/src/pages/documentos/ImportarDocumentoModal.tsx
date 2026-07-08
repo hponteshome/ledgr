@@ -1,6 +1,7 @@
 // frontend/src/pages/documentos/ImportarDocumentoModal.tsx
 import React, { useState, useRef } from 'react';
 import { FiUpload, FiX, FiCheckCircle, FiShield, FiFileText } from 'react-icons/fi';
+import { SmartDateInput } from '../../components/SmartDateInput';
 
 const TIPOS = [
   { group: 'Societário', items: [
@@ -169,7 +170,7 @@ export const ImportarDocumentoModal: React.FC<Props> = ({ onClose, onSuccess, de
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[11px] text-gray-500 mb-1">Data do documento *</label>
-                  <input type="date" value={date} onChange={e => setDate(e.target.value)}
+                  <SmartDateInput value={date} onChange={v => setDate(v)}
                     className="w-full text-[14px] border border-gray-200 rounded-lg px-3 py-2" />
                 </div>
                 <div>

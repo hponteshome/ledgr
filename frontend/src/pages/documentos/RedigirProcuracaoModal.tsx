@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { FiX, FiSearch, FiPlus, FiChevronRight, FiChevronLeft, FiSave, FiPrinter, FiFileText, FiCheck, FiTrash2, FiUserPlus } from 'react-icons/fi';
 import api from '../../services/api';
+import { SmartDateInput } from '../../components/SmartDateInput';
 
 const TEXTO_PODERES_SUGERIDO = `representar o(a) outorgante junto aos orgaos publicos em geral, em especial os orgaos fazendarios, a Receita Federal do Brasil e suas Secretarias e Delegacias, a Secretaria da Receita Previdenciaria, ao Instituto Nacional de Seguro Social, ao Fundo de Garantia por Tempo de Servico - FGTS, as prefeituras municipais, as Secretarias de Fazenda Estaduais e Municipais; Postos Fiscais do Estado de Sao Paulo; Juntas Comerciais; Cartorios de Titulos e Documentos; Cartorios de Registro de Imoveis; Banco do Brasil; Banco Itau, e demais instituicoes financeiras e bancarias, e ai abrir, encerrar e movimentar contas correntes, investimentos e aplicacoes, atraves de cartao magnetico, taloes de cheques, token, via Internet ou qualquer outro meio fisico ou digital legalmente admitido pela instituicao; as empresas privadas na contratacao e compra de produtos e servicos, contratacao de emprestimos e financiamentos, podendo para tanto dito procurador, negociar e ajustar precos e contratos, assinar escrituras publicas e particulares, conferindo-lhes, ainda, poderes especiais para notificar, confessar, desistir, transigir, firmar compromissos ou acordos, receber e dar quitacao, promover acordos e composicoes amigaveis e judiciais, assinar compromissos, assinar requerimentos, formularios e cartoes de assinaturas; fazer e prestar declaracoes, informacoes e justificativas; apresentar e retirar documentos, participar de reunioes e assembleias, e praticar, finalmente, todos os atos necessarios ao fiel cumprimento deste mandato.`;
 
@@ -299,7 +300,7 @@ export const RedigirProcuracaoModal: React.FC<Props> = ({ onClose, onSuccess }) 
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-700 mb-1 block">Data</label>
-                <input type="date" value={data} onChange={e=>setData(e.target.value)} max="9999-12-31"
+                <SmartDateInput value={data} onChange={v=>setData(v)}
                   className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-gray-400"/>
               </div>
             </div>
