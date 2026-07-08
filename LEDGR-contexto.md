@@ -1638,3 +1638,80 @@ Linha de origem: `const toggle=(id)=>setForm(f=>({...f,companyIds:f.companyIds.i
 2. Revisar `npm audit fix` nas dependencias de alta severidade, uma a uma (Axios primeiro — maior superficie de uso)
 3. Os 266 erros de tipagem tsc restantes, categorizados por modulo/arquivo
 4. Limpeza de `console.log`/`debugger` e centralizacao dos `TODO`/`FIXME`
+
+---
+
+### PendentesPage.tsx corrigido + limpeza de código morto (08/07/2026)
+
+**Bug crítico resolvido:** `PendentesPage.tsx` bloqueava `npm run build` (tsc -b como gate antes
+do vite build). Causa: 5 `useState` sem generic explícito — TypeScript inferia `never[]`/`never`
+a partir do valor inicial vazio, cascateando ~30 erros de "Property does not exist on type never".
+Corrigido com tipos explícitos (`useState<any[]>`, `useState<{...;companyIds:string[]}>` etc).
+**Nota:** tipagem usada foi `any[]`/`any` pragmático, não interfaces completas — suficiente pra
+destravar o build, mas há espaço para tipagem mais rigorosa numa passada futura.
+
+**3 arquivos órfãos removidos** (movidos para `frontend/_orfaos_removidos_2026-07-08/`, não
+deletados — reversível): `pages/login/Login.tsx`, `pages/persons/index.tsx`, `pages/users/index.tsx`.
+Confirmado via grep recursivo: zero referências/imports no projeto inteiro, zero rotas associadas
+em `routes/index.tsx`. Eram sobra de estrutura antiga. **O login real do sistema acontece embutido
+diretamente no `Header.tsx`** (formulário com `useAuth().signIn()`), não existe tela dedicada de
+login no fluxo ativo — só `/register` como link separado.
+
+**Resultado:** `npm run build` caiu de 266→232 erros TS restantes (34 eliminados só com essas
+duas correções). Build **ainda falha** — os 232 restantes são o próximo item de prioridade.
+
+---
+
+### Inventário categorizado — 232 erros TS restantes no build (08/07/2026)
+
+Lista completa salva em `D:\Temp\audit_vite_build_v3.txt`. Amostra já revisada (primeiros ~50)
+revela padrões de causa raiz distintos, não apenas "tipagem solta" genérica:
+
+**A) Interfaces desalinhadas com uso real (investigar caso a caso, pode ser bug ativo):**
+- `SideBar.tsx` — union type dos itens de menu não declara `children`/`disabled`/`isImport` como
+  opcionais em todas as variantes (7+ erros no mesmo arquivo, causa raiz única — 1 fix no type
+  resolve todos)
+- `AuthContextData` sem `logout` (usa `signOut`? — `SideBar.tsx` L40) — confirmar nome real do metodo
+- `CompanyContextData` sem `empresa` (`SignaturePanel.tsx` L50) — confirmar se propriedade existe
+  com outro nome ou se é uso indevido
+- `Company` sem `cnpj`/`name` em vários lugares (`DiarioGeralPage.tsx`, `RazaoAnaliticoPage.tsx`,
+  `BalanceComparisonPage.tsx`) — possível campo renomeado no schema sem atualizar todos os usos
+- `AccountInfo` sem `reducedCode` (`RazaoAnaliticoPage.tsx`, múltiplas ocorrências)
+- `AccountNode` sem `children` (`AccountTree.tsx`)
+
+**B) Dependência faltando / módulo não encontrado:**
+- `@tanstack/react-query` — não instalado, mas importado em `ChartOfAccountsPage.tsx`
+- `CertificateImportModal.tsx` → `'../../services/api'` não resolve (path pode estar errado,
+  arquivo pode estar em profundidade diferente do esperado)
+- `useEcdViewer` não encontrado em `EcdHistoryPage.tsx`
+
+**C) Versão de biblioteca desalinhada com tipos:**
+- `Toaster` (react-hot-toast) "cannot be used as JSX component" em `Layout.tsx` — sugere
+  `@types/react` ou `react-hot-toast` desatualizado/incompatível
+
+**D) Bugs de digitação/sintaxe reais:**
+- `AccountTree.tsx` L18-19 — identificador `difference` duplicado
+- `PersonForm.tsx` L78 — `Dependets` (typo, deveria ser `Dependents`)
+- `RazaoAnaliticoPage.tsx` L238 — `item` não declarado (variável usada fora de escopo, 3 ocorrências
+  na mesma linha)
+- `JournalPage.tsx` L533 — `EcdOpeningModal` não encontrado (import faltando ou removido)
+- `ObrigacoesPage.tsx` L189, `EcdViewerPage.tsx` L9 — chamada de função com número errado de argumentos
+
+**E) Ruído de tipagem implícita (baixo risco, cosmético):**
+- Múltiplos `Parameter 'x' implicitly has an 'any' type` (TS7006) — não quebra runtime
+- `textAlign`/`boxSizing`/`position` como `string` genérico em vez do tipo literal do CSS
+  (React.CSSProperties) — padrão recorrente em objetos de estilo inline sem `as const`
+
+**Comando para retomar a categorização completa (todos os 232, não só a amostra de 50):**
+```powershell
+Get-Content "D:\Temp\audit_vite_build_v3.txt" | Select-String -Pattern "error TS" | `
+    ForEach-Object { ($_ -split "\(")[0] } | Group-Object | Sort-Object Count -Descending
+```
+(gera contagem de erros por arquivo — usar para priorizar quais arquivos atacar primeiro)
+
+**Recomendação de abordagem para a próxima sessão:** começar pela categoria (A), já que um
+único fix de type/interface geralmente resolve vários erros simultâneos (efeito cascata
+inverso do que vimos no PendentesPage.tsx). Categoria (D) tem poucos itens mas são bugs reais
+— resolver em paralelo. Categorias (B) e (C) precisam de decisão (instalar dependência? fixar
+versão?) antes de mexer em código. Categoria (E) é a menor prioridade — não impede nada, pode
+ficar para uma "faxina" final depois que (A)-(D) estiverem resolvidas.
