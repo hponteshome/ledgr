@@ -1755,3 +1755,43 @@ empresas carregam, `x-company-id` é enviado em todo request). Log do backend co
 **Bug secundário relacionado, mesma tela:** `GET /accounting/chart-of-accounts?isAnalytic=true`
 retorna 404 em `ContasAReceberPage.tsx:82` — endpoint pode nao aceitar esse query param nessa
 rota, ou rota errada sendo chamada. Nao investigado.
+
+---
+
+### Bug ativo — 401 em GET /finance/accounts-payable (08/07/2026, investigação parcial)
+
+**Sintoma:** Tela "Contas a Pagar" (`/app/finance/accounts-payable`) não carrega dados nem
+permite criar "+ Novo Título". Console mostra `401 (Unauthorized)` repetido em:
+- `GET /finance/accounts-payable`
+- `GET /finance/accounts-payable/position-report?refDate=...`
+
+Login funciona normalmente (confirmado via log: `AuthContext.tsx` "Login realizado com sucesso",
+empresas carregam, `x-company-id` é enviado em todo request). Log do backend confirma
+`JwtStrategy.validate()` sendo chamado com sucesso repetidas vezes para o mesmo usuário
+(Administrador Master, permissions.all=true) — ou seja, o token em si parece valido nesse ponto.
+
+**Descartado como causa:**
+- `CompanyGuard` (`multi-company.guard.ts`) sempre retorna `true` (validacao de acesso a
+  empresa nao implementada ainda, ver TODO no proprio arquivo) — nao é ele barrando.
+- `GLOBAL_COMPANY_ID` ('11111111-1111-1111-1111-111111111111', definido em
+  `core/companies/company.service.ts`) é constante intencional do sistema ("Empresa Global
+  Template", usada tambem em `accounting.service.ts`), nao um artefato acidental. Aparece no
+  payload do JWT como companyId inicial antes da troca de empresa ativa — nao é a causa do
+  401 (o `CompanyGuard` le do header `x-company-id`, nao do token).
+- `jwt.strategy.ts` nao inclui `companyId` no objeto `user` retornado (so id/email/fullName/
+  profile) — pode ou nao ser relevante, nao investigado a fundo.
+
+**Ainda não verificado (próxima sessão):**
+- Corpo exato da resposta 401 (`Response`/`Preview` na aba Network do DevTools) — não
+  capturado ainda, é o proximo passo mais direto
+- Confirmar se `Authorization: Bearer ...` esta presente nos Request Headers da chamada
+  que falha
+- Por que especificamente `accounts-payable` falha e outras rotas (users, companies) nao —
+  comparar guards/decorators desse controller com outros que funcionam
+- Verificar se ha algum interceptor global ou pipe de validacao de DTO (`FilterAPDto`) que
+  possa estar rejeitando a query string vazia (`GET /finance/accounts-payable?` — note o
+  `?` sem parametros no log, pode ser relevante)
+
+**Bug secundário relacionado, mesma tela:** `GET /accounting/chart-of-accounts?isAnalytic=true`
+retorna 404 em `ContasAReceberPage.tsx:82` — endpoint pode nao aceitar esse query param nessa
+rota, ou rota errada sendo chamada. Nao investigado.
