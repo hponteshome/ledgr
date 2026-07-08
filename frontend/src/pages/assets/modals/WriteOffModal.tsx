@@ -7,6 +7,7 @@ import { useAssetMutations } from '../hooks/useAssets';
 import { WRITE_OFF_REASON_LABELS } from '../types/asset.types';
 import type { FixedAsset } from '../types/asset.types';
 import { formatCurrency } from '../../../utils/formatters';
+import { SmartDateInput } from '../../../components/SmartDateInput';
 
 // Componentes auxiliares
 function ModalWrapper({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
@@ -94,11 +95,10 @@ export function WriteOffModal({ asset, onClose, onSuccess }: {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                     <Field label="Data da Baixa *">
-                        <input
-                            type="date"
+                        <SmartDateInput
                             className={input}
                             value={form.writeOffDate}
-                            onChange={e => set('writeOffDate', e.target.value)}
+                            onChange={v => set('writeOffDate', v)}
                         />
                     </Field>
                     <Field label="Motivo da Baixa *">

@@ -6,6 +6,7 @@ import { X } from 'lucide-react'; // Caso o ModalWrapper use o ícone
 import { useState } from 'react';
 import { useAssetMutations } from '../hooks/useAssets';
 import { ModalWrapper, ModalFooter, Field } from './ModalComponents';
+import { SmartDateInput } from '../../../components/SmartDateInput';
 import {
     ASSET_GROUP_LABELS,
     DEPRECIATION_METHOD_LABELS,
@@ -63,10 +64,10 @@ export function ImprovementModal({ assetId, onClose, onSuccess }: {
                 </Field>
                 <div className="grid grid-cols-2 gap-4">
                     <Field label="Data de Início">
-                        <input type="date" className={input} value={form.startDate} onChange={e => set('startDate', e.target.value)} />
+                        <SmartDateInput className={input} value={form.startDate} onChange={v => set('startDate', v)} />
                     </Field>
                     <Field label="Data de Conclusão">
-                        <input type="date" className={input} value={form.completionDate} onChange={e => set('completionDate', e.target.value)} />
+                        <SmartDateInput className={input} value={form.completionDate} onChange={v => set('completionDate', v)} />
                     </Field>
                     <Field label="Ampliação Vida Útil (meses)">
                         <input type="number" className={input} value={form.usefulLifeExtension} onChange={e => set('usefulLifeExtension', e.target.value)} />

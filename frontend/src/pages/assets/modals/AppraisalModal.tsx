@@ -4,6 +4,7 @@
 import { APPRAISAL_TYPE_LABELS } from '../types/asset.types';
 import { formatCurrency } from '../../../utils/formatters';
 import { ModalWrapper, ModalFooter, Field } from './ModalComponents';
+import { SmartDateInput } from '../../../components/SmartDateInput';
 
 
 export function AppraisalModal({ assetId, bookValue, onClose, onSuccess }: {
@@ -48,7 +49,7 @@ export function AppraisalModal({ assetId, bookValue, onClose, onSuccess }: {
                         </select>
                     </Field>
                     <Field label="Data do Laudo">
-                        <input type="date" className={input} value={form.appraisalDate} onChange={e => set('appraisalDate', e.target.value)} />
+                        <SmartDateInput className={input} value={form.appraisalDate} onChange={v => set('appraisalDate', v)} />
                     </Field>
                     <Field label="Empresa Avaliadora *">
                         <input className={input} value={form.appraisalFirm} onChange={e => set('appraisalFirm', e.target.value)} />

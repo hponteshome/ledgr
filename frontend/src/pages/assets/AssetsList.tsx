@@ -21,6 +21,7 @@ import { AssetImportModal } from './modals/AssetImportModal';
 import { formatCurrency } from '../../utils/formatters';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCompany } from '../../contexts/CompanyContext';
+import { SmartMonthInput } from '../../components/SmartMonthInput';
 
 const API = 'http://localhost:3000';
 
@@ -429,11 +430,11 @@ export default function AssetsList() {
                         <div className="grid grid-cols-2 gap-3 mb-4">
                             <div>
                                 <label className="text-xs text-gray-500 block mb-1">De (mm/aaaa)</label>
-                                <input type="month" className="w-full border border-gray-300 rounded-lg text-sm py-2 px-3" value={backfillFrom} onChange={e => setBackfillFrom(e.target.value)} />
+                                <SmartMonthInput className="w-full border border-gray-300 rounded-lg text-sm py-2 px-3" value={backfillFrom} onChange={v => setBackfillFrom(v)} />
                             </div>
                             <div>
                                 <label className="text-xs text-gray-500 block mb-1">Até (mm/aaaa)</label>
-                                <input type="month" className="w-full border border-gray-300 rounded-lg text-sm py-2 px-3" value={backfillTo} onChange={e => setBackfillTo(e.target.value)} />
+                                <SmartMonthInput className="w-full border border-gray-300 rounded-lg text-sm py-2 px-3" value={backfillTo} onChange={v => setBackfillTo(v)} />
                             </div>
                         </div>
                         <div className="flex gap-2 justify-end">

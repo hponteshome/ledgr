@@ -5,6 +5,7 @@ import { MAINTENANCE_TYPE_LABELS, MAINTENANCE_STATUS_LABELS } from '../types/ass
 import { useState } from 'react';
 import { useAssetMutations } from '../hooks/useAssets';
 import { ModalWrapper, ModalFooter, Field } from './ModalComponents';
+import { SmartDateInput } from '../../../components/SmartDateInput';
 
 export function MaintenanceModal({ assetId, maintenance, onClose, onSuccess }: {
     assetId: string; maintenance?: any; onClose: () => void; onSuccess: () => void;
@@ -80,7 +81,7 @@ export function MaintenanceModal({ assetId, maintenance, onClose, onSuccess }: {
                         <input className={input} value={form.providerCnpj} onChange={e => set('providerCnpj', e.target.value)} maxLength={18} />
                     </Field>
                     <Field label="Data Prevista *">
-                        <input type="date" className={input} value={form.scheduledDate} onChange={e => set('scheduledDate', e.target.value)} />
+                        <SmartDateInput className={input} value={form.scheduledDate} onChange={v => set('scheduledDate', v)} />
                     </Field>
                     <Field label="Valor Orçado (R$)">
                         <input type="number" className={input} value={form.estimatedCost} onChange={e => set('estimatedCost', e.target.value)} />
@@ -91,7 +92,7 @@ export function MaintenanceModal({ assetId, maintenance, onClose, onSuccess }: {
                                 <input type="number" className={input} value={form.actualCost} onChange={e => set('actualCost', e.target.value)} />
                             </Field>
                             <Field label="Data de Conclusão">
-                                <input type="date" className={input} value={form.completedAt} onChange={e => set('completedAt', e.target.value)} />
+                                <SmartDateInput className={input} value={form.completedAt} onChange={v => set('completedAt', v)} />
                             </Field>
                         </>
                     )}

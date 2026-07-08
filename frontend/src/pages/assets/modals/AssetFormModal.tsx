@@ -14,6 +14,7 @@ import {
 } from '../types/asset.types';
 import type { FixedAsset, CreateAssetForm } from '../types/asset.types';
 import { ModalWrapper, Field } from './ModalComponents';
+import { SmartDateInput } from '../../../components/SmartDateInput';
 
 const API = 'http://localhost:3000';
 
@@ -285,8 +286,8 @@ export function AssetFormModal({ asset, onClose, onSuccess }: Props) {
                                     onChange={v => set('acquisitionCost', v)} />
                             </Field>
                             <Field label="Data de Aquisição *">
-                                <input type="date" className={input} value={form.acquisitionDate}
-                                    onChange={e => set('acquisitionDate', e.target.value)} />
+                                <SmartDateInput className={input} value={form.acquisitionDate}
+                                    onChange={v => set('acquisitionDate', v)} />
                             </Field>
                         </div>
 

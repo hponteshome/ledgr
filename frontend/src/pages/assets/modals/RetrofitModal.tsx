@@ -4,6 +4,7 @@
 import { useState } from 'react';
 import { useAssetMutations } from '../hooks/useAssets';
 import { ModalWrapper, ModalFooter, Field } from './ModalComponents';
+import { SmartDateInput } from '../../../components/SmartDateInput';
 
 
 
@@ -48,10 +49,10 @@ export function RetrofitModal({ assetId, onClose, onSuccess }: {
                         <input type="number" className={input} value={form.totalBudget} onChange={e => set('totalBudget', e.target.value)} />
                     </Field>
                     <Field label="Data de Início">
-                        <input type="date" className={input} value={form.startDate} onChange={e => set('startDate', e.target.value)} />
+                        <SmartDateInput className={input} value={form.startDate} onChange={v => set('startDate', v)} />
                     </Field>
                     <Field label="Data Fim Prevista">
-                        <input type="date" className={input} value={form.plannedEndDate} onChange={e => set('plannedEndDate', e.target.value)} />
+                        <SmartDateInput className={input} value={form.plannedEndDate} onChange={v => set('plannedEndDate', v)} />
                     </Field>
                     <Field label="Impacto na Vida Útil (meses)">
                         <input type="number" className={input} value={form.usefulLifeImpact} onChange={e => set('usefulLifeImpact', e.target.value)} />
