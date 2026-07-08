@@ -6,6 +6,7 @@ import {
   FiMapPin, FiPhone, FiAward, FiLink, FiCreditCard,
 } from 'react-icons/fi';
 import api from '@/services/api';
+import { SmartDateInput } from '@/components/SmartDateInput';
 
 
 // ── Constantes ────────────────────────────────────────────────
@@ -682,8 +683,8 @@ export const PersonForm: React.FC = () => {
 
               <div className="w-36">
                 <Field label="Data de Nascimento">
-                  <input type="date" value={form.birthDate}
-                    onChange={e => set('birthDate', e.target.value)} className={inputCls} />
+                  <SmartDateInput value={form.birthDate}
+                    onChange={v => set('birthDate', v)} className={inputCls} />
                 </Field>
               </div>
               <div className="flex-1 min-w-32">
@@ -800,12 +801,11 @@ export const PersonForm: React.FC = () => {
 
                 {/* Data Nascimento */}
                 <div className="col-span-3">
-                  <input
-                    type="date"
+                  <SmartDateInput
                     value={dep.dataNascimento}
-                    onChange={e => {
+                    onChange={v => {
                       const newDeps = [...form.dependents];
-                      newDeps[index].dataNascimento = e.target.value;
+                      newDeps[index].dataNascimento = v;
                       setForm(prev => ({ ...prev, dependents: newDeps }));
                     }}
                     className={inputCls}
@@ -893,8 +893,8 @@ export const PersonForm: React.FC = () => {
               </div>
               <div className="w-36">
                 <Field label="Data de Emissão">
-                  <input type="date" value={form.rgIssueDate}
-                    onChange={e => set('rgIssueDate', e.target.value)} className={inputCls} />
+                  <SmartDateInput value={form.rgIssueDate}
+                    onChange={v => set('rgIssueDate', v)} className={inputCls} />
                 </Field>
               </div>
             </div>
@@ -1263,10 +1263,9 @@ export const PersonForm: React.FC = () => {
                     </select>
                   </Field>
                   <Field label="Data de Início">
-                    <input
-                      type="date"
+                    <SmartDateInput
                       value={newLink.startDate}
-                      onChange={e => setNewLink(p => ({ ...p, startDate: e.target.value }))}
+                      onChange={v => setNewLink(p => ({ ...p, startDate: v }))}
                       className={inputCls}
                     />
                   </Field>

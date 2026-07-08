@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import Swal from 'sweetalert2';
+import { SmartMonthInput } from '../../components/SmartMonthInput';
 import { FiscalIntegrationModal } from './FiscalIntegrationModal';
 
 const fmtBRL  = (v:any)=>Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
@@ -123,8 +124,8 @@ export const DocumentosFiscaisPage:React.FC=()=>{
           <option value="BOLETO">Boleto</option>
           <option value="CONSUMO">Consumo</option>
         </select>
-        <input type="month" value={comp} onChange={e=>{setComp(e.target.value);setPage(1);}}
-          style={{border:'0.5px solid #E5E7EB',borderRadius:6,padding:'6px 10px',fontSize:12,outline:'none'}}/>
+        <SmartMonthInput value={comp} onChange={v=>{setComp(v);setPage(1);}}
+          style={{border:'0.5px solid #E5E7EB',borderRadius:6,padding:'6px 10px',fontSize:12}}/>
         <select value={intSt} onChange={e=>{setIntSt(e.target.value);setPage(1);}}
           style={{border:'0.5px solid #E5E7EB',borderRadius:6,padding:'6px 10px',fontSize:12,outline:'none'}}>
           <option value="">Todos os status</option>

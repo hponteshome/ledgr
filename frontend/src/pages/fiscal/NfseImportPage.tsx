@@ -2,6 +2,7 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import api from '../../services/api';
 import Swal from 'sweetalert2';
+import { SmartDateInput } from '../../components/SmartDateInput';
 const fmtBRL=(v:any)=>Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 const fmtCNPJ=(v:string)=>v?.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/,'$1.$2.$3/$4-$5')||v;
 const fmtDate=(s:string)=>s?new Date(s+'T12:00:00').toLocaleDateString('pt-BR'):'—';
@@ -181,13 +182,13 @@ export const NfseImportPage:React.FC=()=>{
           </div>
           <div>
             <label style={{fontSize:10,fontWeight:600,color:'#1D4ED8',textTransform:'uppercase' as const,display:'block',marginBottom:3}}>Data Início</label>
-            <input type="date" value={buscaForm.dtInicio} onChange={e=>setBF('dtInicio',e.target.value)}
-              style={{width:'100%',border:'0.5px solid #93C5FD',borderRadius:6,padding:'6px 10px',fontSize:12,outline:'none',background:'#fff'}}/>
+            <SmartDateInput value={buscaForm.dtInicio} onChange={v=>setBF('dtInicio',v)}
+              style={{width:'100%',border:'0.5px solid #93C5FD',borderRadius:6,padding:'6px 10px',fontSize:12,background:'#fff'}}/>
           </div>
           <div>
             <label style={{fontSize:10,fontWeight:600,color:'#1D4ED8',textTransform:'uppercase' as const,display:'block',marginBottom:3}}>Data Fim</label>
-            <input type="date" value={buscaForm.dtFim} onChange={e=>setBF('dtFim',e.target.value)}
-              style={{width:'100%',border:'0.5px solid #93C5FD',borderRadius:6,padding:'6px 10px',fontSize:12,outline:'none',background:'#fff'}}/>
+            <SmartDateInput value={buscaForm.dtFim} onChange={v=>setBF('dtFim',v)}
+              style={{width:'100%',border:'0.5px solid #93C5FD',borderRadius:6,padding:'6px 10px',fontSize:12,background:'#fff'}}/>
           </div>
           <div>
             <label style={{fontSize:10,fontWeight:600,color:'#1D4ED8',textTransform:'uppercase' as const,display:'block',marginBottom:3}}>Págs</label>
@@ -227,11 +228,11 @@ export const NfseImportPage:React.FC=()=>{
               {certId ? (() => { const c=certsA3.find((x:any)=>'a3:'+x.thumbprint===certId)||certs.find((x:any)=>'a1:'+x.id===certId); return c?(c.alias||(c.subject||'').replace(/^CN=([^,]+).*/,'$1').split(':')[0].trim()||certId):certId; })() : 'Selecione o certificado acima'}
             </div></div>
           <div><label style={{fontSize:10,fontWeight:600,color:'#15803D',textTransform:'uppercase' as const,display:'block',marginBottom:3}}>Data Início</label>
-            <input type='date' value={buscaEForm.dtInicio} onChange={e=>setBEF('dtInicio',e.target.value)}
-              style={{width:'100%',border:'0.5px solid #86EFAC',borderRadius:6,padding:'6px 10px',fontSize:12,outline:'none',background:'#fff'}}/></div>
+            <SmartDateInput value={buscaEForm.dtInicio} onChange={v=>setBEF('dtInicio',v)}
+              style={{width:'100%',border:'0.5px solid #86EFAC',borderRadius:6,padding:'6px 10px',fontSize:12,background:'#fff'}}/></div>
           <div><label style={{fontSize:10,fontWeight:600,color:'#15803D',textTransform:'uppercase' as const,display:'block',marginBottom:3}}>Data Fim</label>
-            <input type='date' value={buscaEForm.dtFim} onChange={e=>setBEF('dtFim',e.target.value)}
-              style={{width:'100%',border:'0.5px solid #86EFAC',borderRadius:6,padding:'6px 10px',fontSize:12,outline:'none',background:'#fff'}}/></div>
+            <SmartDateInput value={buscaEForm.dtFim} onChange={v=>setBEF('dtFim',v)}
+              style={{width:'100%',border:'0.5px solid #86EFAC',borderRadius:6,padding:'6px 10px',fontSize:12,background:'#fff'}}/></div>
           <div><label style={{fontSize:10,fontWeight:600,color:'#15803D',textTransform:'uppercase' as const,display:'block',marginBottom:3}}>Págs</label>
             <input type='number' min={1} max={20} value={buscaEForm.paginas} onChange={e=>setBEF('paginas',e.target.value)}
               style={{width:'100%',border:'0.5px solid #86EFAC',borderRadius:6,padding:'6px 10px',fontSize:12,outline:'none',background:'#fff',textAlign:'center'}}/></div>
