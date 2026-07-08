@@ -9,11 +9,11 @@ const FLAGS={
 };
 const AC='#6C63FF';
 export const PendentesPage=()=>{
-  const [users,setUsers]=useState([]);
-  const [profiles,setProfiles]=useState([]);
-  const [companies,setCompanies]=useState([]);
-  const [sel,setSel]=useState(null);
-  const [form,setForm]=useState({profileId:'',level:'1',companyIds:[]});
+  const [users,setUsers]=useState<any[]>([]);
+  const [profiles,setProfiles]=useState<any[]>([]);
+  const [companies,setCompanies]=useState<any[]>([]);
+  const [sel,setSel]=useState<any>(null);
+  const [form,setForm]=useState<{profileId:string;level:string;companyIds:string[]}>({profileId:'',level:'1',companyIds:[]});
   const [loading,setLoading]=useState(false);
   const inp={width:'100%',border:'1px solid #E5E7EB',borderRadius:6,padding:'7px 10px',fontSize:13,outline:'none',boxSizing:'border-box'};
   const lbl={fontSize:11,fontWeight:600,color:'#6B7280',textTransform:'uppercase',display:'block',marginBottom:4};
