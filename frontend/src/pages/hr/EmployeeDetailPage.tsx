@@ -43,7 +43,7 @@ export default function EmployeeDetailPage() {
   const [histDto, setHistDto]   = useState({tipo:"REAJUSTE_SALARIAL",dataAlteracao:"",funcaoNova:"",salarioNovo:"",percentualReajuste:"",setorNovo:"",motivo:"",observacao:""});
   const [ocoDto, setOcoDto]     = useState({tipo:"ADVERTENCIA_VERBAL",data:"",motivo:"",descricao:"",testemunha:"",diasSuspensao:""});
   const [afasDto, setAfasDto]   = useState({tipo:"FERIAS",dataInicio:"",dataFim:"",diasTotal:"",cid:"",beneficioINSS:false,nrBeneficioINSS:"",observacao:""});
-  const [bhDto, setBhDto]       = useState({tipo:"CREDITO",data:"",minutos:"",competencia:new Date().toISOString().slice(0,7),descricao:""});
+  const [bhDto, setBhDto]       = useState({tipo:"CREDITO",data:"",minutosOriginais:"",tipoHora:"DIURNA",competencia:new Date().toISOString().slice(0,7),descricao:""});
 
   const load = useCallback(async()=>{
     setLoading(true);
@@ -90,7 +90,22 @@ export default function EmployeeDetailPage() {
 
   async function saveBH() {
     setSaving(true);
-    try { await api.post("/hr/employees/"+id+"/banco-horas", {...bhDto,minutos:parseInt(bhDto.minutos)}); setShowBH(false); load(); }
+    try {
+      const minutos = parseInt(bhDto.minutosOriginais);
+      const base = { data: bhDto.data, competencia: bhDto.competencia, descricao: bhDto.descricao || undefined };
+      if (bhDto.tipo === "CREDITO") {
+        await api.post("/hr/employees/"+id+"/banco-horas/creditar", { ...base, minutosOriginais: minutos, tipoHora: bhDto.tipoHora });
+      } else if (bhDto.tipo === "DEBITO") {
+        await api.post("/hr/employees/"+id+"/banco-horas/debitar", { ...base, minutos });
+      } else if (bhDto.tipo === "AJUSTE") {
+        await api.post("/hr/employees/"+id+"/banco-horas/ajustar", { ...base, minutos });
+      } else if (bhDto.tipo === "EXPIRACAO") {
+        // Nao ha endpoint dedicado de expiracao no backend -- roteado como ajuste negativo.
+        // Pendencia: criar BancoHorasService.expirar() proprio numa sessao futura.
+        await api.post("/hr/employees/"+id+"/banco-horas/ajustar", { ...base, minutos: -Math.abs(minutos) });
+      }
+      setShowBH(false); load();
+    }
     catch(e:any){ alert(e?.response?.data?.message??"Erro"); } finally{setSaving(false);}
   }
 
@@ -504,8 +519,8 @@ export default function EmployeeDetailPage() {
               </div>
             )}
             <div style={S.row}>
-              <div><label style={S.lbl}>{bhDto.tipo==="CREDITO"?"Minutos Brutos *":"Minutos *"}</label>
-                <input type="number" value={bhDto.minutosOriginais} onChange={e=>setBhDto(d=>({...d,minutosOriginais:e.target.value}))} style={S.inp} placeholder="Ex: 120 = 2h"/>
+              <div><label style={S.lbl}>{bhDto.tipo==="CREDITO"?"Minutos Brutos *":bhDto.tipo==="AJUSTE"?"Minutos (+ ou -) *":"Minutos *"}</label>
+                <input type="number" value={bhDto.minutosOriginais} onChange={e=>setBhDto(d=>({...d,minutosOriginais:e.target.value}))} style={S.inp} placeholder={bhDto.tipo==="AJUSTE"?"Ex: -30 ou 30":"Ex: 120 = 2h"}/>
               </div>
               <div><label style={S.lbl}>Competencia *</label><SmartMonthInput value={bhDto.competencia} onChange={v=>setBhDto(d=>({...d,competencia:v}))} style={S.inp}/></div>
             </div>
@@ -513,7 +528,7 @@ export default function EmployeeDetailPage() {
           </div>
           <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginTop:20}}>
             <button onClick={()=>setShowBH(false)} style={S.btn("#fff","#374151")}>Cancelar</button>
-            <button onClick={saveBH} disabled={saving||!bhDto.data||!bhDto.minutos} style={S.btn(AC)}>{saving?"Salvando...":"Lancar"}</button>
+            <button onClick={saveBH} disabled={saving||!bhDto.data||!bhDto.minutosOriginais} style={S.btn(AC)}>{saving?"Salvando...":"Lancar"}</button>
           </div>
         </div></div>
       )}
