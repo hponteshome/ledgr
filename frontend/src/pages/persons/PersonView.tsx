@@ -4,6 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   FiArrowLeft, FiEdit2, FiUser, FiUsers, FiBriefcase,
   FiMapPin, FiPhone, FiAward, FiLink, FiCreditCard,
+  FiCopy, FiCheck,
 } from 'react-icons/fi';
 import api from '@/services/api';
 
@@ -92,6 +93,7 @@ export const PersonView: React.FC = () => {
 
   const [person, setPerson] = useState<any>(null);
   const [qualificacao, setQualificacao] = useState('');
+  const [copiado, setCopiado] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -176,7 +178,21 @@ export const PersonView: React.FC = () => {
           <span className="block text-[10px] font-semibold uppercase tracking-wide text-indigo-400 mb-1">
             Qualificação
           </span>
-          <p className="text-xs text-indigo-800 leading-relaxed">{qualificacao}</p>
+          <p className="text-xs text-indigo-800 leading-relaxed">
+            {qualificacao}
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(qualificacao);
+                setCopiado(true);
+                setTimeout(() => setCopiado(false), 1500);
+              }}
+              title="Copiar qualificação"
+              className="inline-flex items-center align-middle ml-1.5 text-indigo-400 hover:text-indigo-600 transition-colors"
+              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2 }}
+            >
+              {copiado ? <FiCheck size={13} /> : <FiCopy size={13} />}
+            </button>
+          </p>
         </div>
       )}
 
