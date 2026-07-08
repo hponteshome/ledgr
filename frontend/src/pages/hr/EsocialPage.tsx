@@ -2,6 +2,8 @@
 import React, { useState, useEffect, useCallback } from "react";
 import api from "@/services/api";
 import Swal from "sweetalert2";
+import { SmartDateInput } from "../../components/SmartDateInput";
+import { SmartMonthInput } from "../../components/SmartMonthInput";
 
 const AC = "#0369A1";
 const MOTIVOS: Record<string, string> = {
@@ -182,8 +184,8 @@ export default function EsocialPage() {
             <div style={{fontSize:12,fontWeight:700,color:"#374151",marginBottom:2}}>S-1299 — Fechamento de Eventos Periódicos</div>
             <div style={{fontSize:11,color:"#9CA3AF"}}>Transmita após todos os S-1200 do mês</div>
           </div>
-          <input type="month" value={s1299.perApur} onChange={e=>setS1299(d=>({...d,perApur:e.target.value}))}
-            style={{border:"0.5px solid #E5E7EB",borderRadius:6,padding:"5px 10px",fontSize:13,outline:"none"}}/>
+          <SmartMonthInput value={s1299.perApur} onChange={v=>setS1299(d=>({...d,perApur:v}))}
+            style={{border:"0.5px solid #E5E7EB",borderRadius:6,padding:"5px 10px",fontSize:13}}/>
           <select value={s1299.tpAmb} onChange={e=>setS1299(d=>({...d,tpAmb:e.target.value}))}
             style={{border:"0.5px solid #E5E7EB",borderRadius:6,padding:"5px 10px",fontSize:12,color:s1299.tpAmb==="1"?"#B91C1C":"#0369A1",fontWeight:600,outline:"none"}}>
             <option value="2">Prod. Restrita</option>
@@ -239,7 +241,7 @@ export default function EsocialPage() {
           <h2 style={{fontSize:16,fontWeight:600,margin:"0 0 4px"}}>S-2205 - Alteracao Contratual</h2>
           <p style={{fontSize:13,color:"#6B7280",margin:"0 0 16px"}}>{sel.fullName}</p>
           <div style={{display:"grid",gap:12}}>
-            <div><label style={S.lbl}>Data da Alteracao *</label><input type="date" value={s2205.dtAlteracao} onChange={e=>setS2205(d=>({...d,dtAlteracao:e.target.value}))} style={S.inp}/></div>
+            <div><label style={S.lbl}>Data da Alteracao *</label><SmartDateInput value={s2205.dtAlteracao} onChange={v=>setS2205(d=>({...d,dtAlteracao:v}))} style={S.inp}/></div>
             <div><label style={S.lbl}>Nova Funcao</label><input value={s2205.novaFuncao} onChange={e=>setS2205(d=>({...d,novaFuncao:e.target.value}))} style={S.inp} placeholder="Vazio = sem alteracao"/></div>
             <div><label style={S.lbl}>Novo Salario</label><input value={s2205.novoSalario} onChange={e=>setS2205(d=>({...d,novoSalario:e.target.value}))} style={S.inp} placeholder="0,00"/></div>
             <div><label style={S.lbl}>Nova Carga Horaria</label><input value={s2205.cargaHoraria} onChange={e=>setS2205(d=>({...d,cargaHoraria:e.target.value}))} style={S.inp} placeholder="44"/></div>
@@ -256,7 +258,7 @@ export default function EsocialPage() {
           <h2 style={{fontSize:16,fontWeight:600,margin:"0 0 4px"}}>S-2230 - Afastamento Temporario</h2>
           <p style={{fontSize:13,color:"#6B7280",margin:"0 0 16px"}}>{sel.fullName}</p>
           <div style={{display:"grid",gap:12}}>
-            <div><label style={S.lbl}>Inicio do Afastamento *</label><input type="date" value={s2230.dtIniAfast} onChange={e=>setS2230(d=>({...d,dtIniAfast:e.target.value}))} style={S.inp}/></div>
+            <div><label style={S.lbl}>Inicio do Afastamento *</label><SmartDateInput value={s2230.dtIniAfast} onChange={v=>setS2230(d=>({...d,dtIniAfast:v}))} style={S.inp}/></div>
             <div><label style={S.lbl}>Motivo *</label>
               <select value={s2230.codMotAfast} onChange={e=>setS2230(d=>({...d,codMotAfast:e.target.value}))} style={S.inp}>
                 <option value="17">17 - Ferias</option>
@@ -269,7 +271,7 @@ export default function EsocialPage() {
                 <option value="99">99 - Outros</option>
               </select>
             </div>
-            <div><label style={S.lbl}>Termino (opcional — para ferias)</label><input type="date" value={s2230.dtTermAfast} onChange={e=>setS2230(d=>({...d,dtTermAfast:e.target.value}))} style={S.inp}/></div>
+            <div><label style={S.lbl}>Termino (opcional — para ferias)</label><SmartDateInput value={s2230.dtTermAfast} onChange={v=>setS2230(d=>({...d,dtTermAfast:v}))} style={S.inp}/></div>
             <div><label style={S.lbl}>Ambiente</label>
               <select value={s2230.tpAmb} onChange={e=>setS2230(d=>({...d,tpAmb:e.target.value}))} style={{...S.inp,color:s2230.tpAmb==="1"?"#B91C1C":"#0369A1",fontWeight:600}}>
                 <option value="2">Producao Restrita</option>
@@ -290,7 +292,7 @@ export default function EsocialPage() {
           <h2 style={{fontSize:16,fontWeight:600,margin:"0 0 4px"}}>S-2190 - Admissao Preliminar</h2>
           <p style={{fontSize:13,color:"#6B7280",margin:"0 0 16px"}}>{sel.fullName}</p>
           <div style={{display:"grid",gap:12}}>
-            <div><label style={S.lbl}>Data de Admissao *</label><input type="date" value={s2190.dtAdm} onChange={e=>setS2190(d=>({...d,dtAdm:e.target.value}))} style={S.inp}/></div>
+            <div><label style={S.lbl}>Data de Admissao *</label><SmartDateInput value={s2190.dtAdm} onChange={v=>setS2190(d=>({...d,dtAdm:v}))} style={S.inp}/></div>
             <div><label style={S.lbl}>Categoria</label>
               <select value={s2190.codCateg} onChange={e=>setS2190(d=>({...d,codCateg:e.target.value}))} style={S.inp}>
                 <option value="01">01 - Empregado CLT</option>
@@ -325,7 +327,7 @@ export default function EsocialPage() {
           <h2 style={{fontSize:16,fontWeight:600,margin:"0 0 4px"}}>S-1202 - Remuneracao Sem Vinculo (Pro-labore/Autonomo)</h2>
           <p style={{fontSize:13,color:"#6B7280",margin:"0 0 16px"}}>{sel.fullName}</p>
           <div style={{display:"grid",gap:12}}>
-            <div><label style={S.lbl}>Competencia *</label><input type="month" value={s1202.perApur} onChange={e=>setS1202(d=>({...d,perApur:e.target.value}))} style={S.inp}/></div>
+            <div><label style={S.lbl}>Competencia *</label><SmartMonthInput value={s1202.perApur} onChange={v=>setS1202(d=>({...d,perApur:v}))} style={S.inp}/></div>
             <div><label style={S.lbl}>Valor Base INSS (R$) *</label><input value={s1202.vrBcCp} onChange={e=>setS1202(d=>({...d,vrBcCp:e.target.value}))} style={S.inp} placeholder="0,00"/></div>
             <div><label style={S.lbl}>Categoria</label>
               <select value={s1202.codCateg} onChange={e=>setS1202(d=>({...d,codCateg:e.target.value}))} style={S.inp}>
@@ -353,7 +355,7 @@ export default function EsocialPage() {
           <h2 style={{fontSize:16,fontWeight:600,margin:"0 0 4px"}}>S-2220 - ASO / Monitoramento Saude</h2>
           <p style={{fontSize:13,color:"#6B7280",margin:"0 0 16px"}}>{sel.fullName}</p>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-            <div><label style={S.lbl}>Data do ASO *</label><input type="date" value={s2220.dtAso} onChange={e=>setS2220(d=>({...d,dtAso:e.target.value}))} style={S.inp}/></div>
+            <div><label style={S.lbl}>Data do ASO *</label><SmartDateInput value={s2220.dtAso} onChange={v=>setS2220(d=>({...d,dtAso:v}))} style={S.inp}/></div>
             <div><label style={S.lbl}>Resultado</label>
               <select value={s2220.resAso} onChange={e=>setS2220(d=>({...d,resAso:e.target.value}))} style={S.inp}>
                 <option value="1">1 - Apto</option>
@@ -392,7 +394,7 @@ export default function EsocialPage() {
           <h2 style={{fontSize:16,fontWeight:600,margin:"0 0 4px"}}>S-2298 - Reintegracao</h2>
           <p style={{fontSize:13,color:"#6B7280",margin:"0 0 16px"}}>{sel.fullName}</p>
           <div style={{display:"grid",gap:12}}>
-            <div><label style={S.lbl}>Data da Reintegracao *</label><input type="date" value={s2298.dtReintegr} onChange={e=>setS2298(d=>({...d,dtReintegr:e.target.value}))} style={S.inp}/></div>
+            <div><label style={S.lbl}>Data da Reintegracao *</label><SmartDateInput value={s2298.dtReintegr} onChange={v=>setS2298(d=>({...d,dtReintegr:v}))} style={S.inp}/></div>
             <div><label style={S.lbl}>Motivo</label>
               <select value={s2298.motivo} onChange={e=>setS2298(d=>({...d,motivo:e.target.value}))} style={S.inp}>
                 <option value="1">1 - Reintegracao Judicial</option>
@@ -457,7 +459,7 @@ export default function EsocialPage() {
           <h2 style={{fontSize:16,fontWeight:600,margin:"0 0 4px"}}>S-2210 - CAT (Acidente de Trabalho)</h2>
           <p style={{fontSize:13,color:"#6B7280",margin:"0 0 16px"}}>{sel.fullName}</p>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-            <div><label style={S.lbl}>Data do Acidente *</label><input type="date" value={s2210.dtAcid} onChange={e=>setS2210(d=>({...d,dtAcid:e.target.value}))} style={S.inp}/></div>
+            <div><label style={S.lbl}>Data do Acidente *</label><SmartDateInput value={s2210.dtAcid} onChange={v=>setS2210(d=>({...d,dtAcid:v}))} style={S.inp}/></div>
             <div><label style={S.lbl}>Hora</label><input type="time" value={s2210.hrAcid} onChange={e=>setS2210(d=>({...d,hrAcid:e.target.value}))} style={S.inp}/></div>
             <div><label style={S.lbl}>Tipo de Acidente</label>
               <select value={s2210.tpAcid} onChange={e=>setS2210(d=>({...d,tpAcid:e.target.value}))} style={S.inp}>
@@ -470,7 +472,7 @@ export default function EsocialPage() {
               </select>
             </div>
             <div><label style={S.lbl}>CID *</label><input value={s2210.codCID} onChange={e=>setS2210(d=>({...d,codCID:e.target.value.toUpperCase()}))} style={S.inp} placeholder="Ex: S60.0"/></div>
-            <div><label style={S.lbl}>Data Atendimento *</label><input type="date" value={s2210.dtAtend} onChange={e=>setS2210(d=>({...d,dtAtend:e.target.value}))} style={S.inp}/></div>
+            <div><label style={S.lbl}>Data Atendimento *</label><SmartDateInput value={s2210.dtAtend} onChange={v=>setS2210(d=>({...d,dtAtend:v}))} style={S.inp}/></div>
             <div style={{gridColumn:"1/-1"}}><label style={S.lbl}>Local do Acidente *</label><input value={s2210.dscLoc} onChange={e=>setS2210(d=>({...d,dscLoc:e.target.value}))} style={S.inp} placeholder="Ex: Almoxarifado, estrada PR-151"/></div>
             <div style={{gridColumn:"1/-1"}}><label style={S.lbl}>Descricao da Lesao *</label><input value={s2210.dscLesao} onChange={e=>setS2210(d=>({...d,dscLesao:e.target.value}))} style={S.inp} placeholder="Ex: Fratura de falange"/></div>
             <div style={{gridColumn:"1/-1"}}><label style={S.lbl}>Descricao do Acidente *</label><input value={s2210.descricao} onChange={e=>setS2210(d=>({...d,descricao:e.target.value}))} style={S.inp} placeholder="Como ocorreu o acidente"/></div>
@@ -500,8 +502,8 @@ export default function EsocialPage() {
           <h2 style={{fontSize:16,fontWeight:600,margin:"0 0 4px"}}>S-1210 - Pagamento de Rendimentos</h2>
           <p style={{fontSize:13,color:"#6B7280",margin:"0 0 16px"}}>{sel.fullName}</p>
           <div style={{display:"grid",gap:12}}>
-            <div><label style={S.lbl}>Competencia *</label><input type="month" value={s1210.perApur} onChange={e=>setS1210(d=>({...d,perApur:e.target.value}))} style={S.inp}/></div>
-            <div><label style={S.lbl}>Data do Pagamento *</label><input type="date" value={s1210.dtPgto} onChange={e=>setS1210(d=>({...d,dtPgto:e.target.value}))} style={S.inp}/></div>
+            <div><label style={S.lbl}>Competencia *</label><SmartMonthInput value={s1210.perApur} onChange={v=>setS1210(d=>({...d,perApur:v}))} style={S.inp}/></div>
+            <div><label style={S.lbl}>Data do Pagamento *</label><SmartDateInput value={s1210.dtPgto} onChange={v=>setS1210(d=>({...d,dtPgto:v}))} style={S.inp}/></div>
             <div><label style={S.lbl}>Tipo de Pagamento</label>
               <select value={s1210.tpPgto} onChange={e=>setS1210(d=>({...d,tpPgto:e.target.value}))} style={S.inp}>
                 <option value="1">1 - Mensal (normal)</option>
@@ -530,7 +532,7 @@ export default function EsocialPage() {
           <h2 style={{fontSize:16,fontWeight:600,margin:"0 0 4px"}}>S-2299 - Desligamento</h2>
           <p style={{fontSize:13,color:"#6B7280",margin:"0 0 16px"}}>{sel.fullName}</p>
           <div style={{display:"grid",gap:12}}>
-            <div><label style={S.lbl}>Data do Desligamento *</label><input type="date" value={s2299.dtDeslig} onChange={e=>setS2299(d=>({...d,dtDeslig:e.target.value}))} style={S.inp}/></div>
+            <div><label style={S.lbl}>Data do Desligamento *</label><SmartDateInput value={s2299.dtDeslig} onChange={v=>setS2299(d=>({...d,dtDeslig:v}))} style={S.inp}/></div>
             <div><label style={S.lbl}>Motivo *</label>
               <select value={s2299.mtvDeslig} onChange={e=>setS2299(d=>({...d,mtvDeslig:e.target.value}))} style={S.inp}>
                 {Object.entries(MOTIVOS).map(([k,v])=><option key={k} value={k}>{v}</option>)}
@@ -559,7 +561,7 @@ export default function EsocialPage() {
           <h2 style={{fontSize:16,fontWeight:600,margin:"0 0 4px"}}>S-1200 - Remuneracao Mensal</h2>
           <p style={{fontSize:13,color:"#6B7280",margin:"0 0 16px"}}>{sel.fullName} - {fmtBRL(sel.salary)}</p>
           <div style={{display:"grid",gap:12}}>
-            <div><label style={S.lbl}>Periodo de Apuracao *</label><input type="month" value={s1200.perApur} onChange={e=>setS1200(d=>({...d,perApur:e.target.value}))} style={S.inp}/></div>
+            <div><label style={S.lbl}>Periodo de Apuracao *</label><SmartMonthInput value={s1200.perApur} onChange={v=>setS1200(d=>({...d,perApur:v}))} style={S.inp}/></div>
             <div><label style={S.lbl}>Base INSS *</label><input value={s1200.vrBcCp} onChange={e=>setS1200(d=>({...d,vrBcCp:e.target.value}))} style={S.inp} placeholder="0,00"/></div>
           </div>
           <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginTop:20}}>

@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useCompany } from '../../contexts/CompanyContext';
 import api from '../../services/api';
 import Swal from 'sweetalert2';
+import { SmartDateInput } from '../../components/SmartDateInput';
 
 const S = {
   card: { background: '#fff', border: '0.5px solid #E5E7EB', borderRadius: 10, padding: 20, marginBottom: 16 },
@@ -363,8 +364,8 @@ function InformeModal({ informe, onClose, onSaved }: any) {
               </td>
               <td style={{ padding: '4px 6px', fontSize: '8pt', borderBottom: '0.5px solid #E5E7EB' }}>
                 <label style={{ fontSize: '7pt', display: 'block', color: '#666', marginBottom: 2 }}>Data da assinatura</label>
-                <input style={{ height: 24, border: '0.5px solid #D1D5DB', borderRadius: 4, padding: '0 6px', fontSize: '8pt', width: '100%', boxSizing: 'border-box' as const }}
-                  type="date" value={form.q8DataAssinatura} onChange={e => set('q8DataAssinatura', e.target.value)} />
+                <SmartDateInput style={{ height: 24, border: '0.5px solid #D1D5DB', borderRadius: 4, padding: '0 6px', fontSize: '8pt', width: '100%', boxSizing: 'border-box' as const }}
+                  value={form.q8DataAssinatura} onChange={v => set('q8DataAssinatura', v)} />
               </td>
             </tr>
           </tbody>

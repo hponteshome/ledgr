@@ -1,6 +1,7 @@
 // frontend/src/pages/hr/FolhaPage.tsx
 import React, { useState, useEffect, useCallback } from "react";
 import api from "@/services/api";
+import { SmartMonthInput } from "../../components/SmartMonthInput";
 
 const AC = "#0891B2";
 const AC_SURF = "#ECFEFF";
@@ -393,7 +394,7 @@ export default function FolhaPage() {
         <div style={ov}><div style={{background:"#fff",borderRadius:14,width:400,padding:24,boxShadow:"0 20px 60px rgba(0,0,0,.15)"}}>
           <h2 style={{fontSize:16,fontWeight:600,margin:"0 0 16px"}}>Nova Folha de Pagamento</h2>
           <div><label style={S.lbl}>Competencia *</label>
-            <input type="month" value={competencia} onChange={e=>setCompetencia(e.target.value)} style={S.inp}/>
+            <SmartMonthInput value={competencia} onChange={v=>setCompetencia(v)} style={S.inp}/>
           </div>
           <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginTop:20}}>
             <button onClick={()=>setShowNova(false)} style={S.btn("#fff","#374151")}>Cancelar</button>

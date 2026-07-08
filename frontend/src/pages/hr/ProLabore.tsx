@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
 import Swal from 'sweetalert2';
+import { SmartMonthInput } from '../../components/SmartMonthInput';
 
 const fmtBRL = (v: any) => Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmtCPF = (v: string) => v?.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') ?? '';
@@ -209,11 +210,11 @@ function ConfigModal({ config, persons, accounts, onClose, onSaved }: {
           </div>
           <div>
             <label style={{ fontSize: 10, textTransform: 'uppercase' as const, letterSpacing: '.3px', color: '#6B7280', display: 'block', marginBottom: 3 }}>Competência Inicial (AAAA-MM) *</label>
-            <input style={S.input} type="month" value={form.competenciaIni} onChange={e => set('competenciaIni', e.target.value)} disabled={isEdit} />
+            <SmartMonthInput style={S.input} value={form.competenciaIni} onChange={v => set('competenciaIni', v)} disabled={isEdit} />
           </div>
           <div>
             <label style={{ fontSize: 10, textTransform: 'uppercase' as const, letterSpacing: '.3px', color: '#6B7280', display: 'block', marginBottom: 3 }}>Competência Final (opcional)</label>
-            <input style={S.input} type="month" value={form.competenciaFim} onChange={e => set('competenciaFim', e.target.value)} />
+            <SmartMonthInput style={S.input} value={form.competenciaFim} onChange={v => set('competenciaFim', v)} />
           </div>
 
           {previa && (
@@ -419,11 +420,11 @@ export default function ProLaborePage() {
             <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' as const }}>
               <div>
                 <label style={{ fontSize: 10, textTransform: 'uppercase' as const, letterSpacing: '.3px', color: '#6B7280', display: 'block', marginBottom: 3 }}>Competência inicial</label>
-                <input style={{ ...S.input, width: 160 }} type="month" value={bulkComp} onChange={e => setBulkComp(e.target.value)} />
+                <SmartMonthInput style={{ width: 160 }} value={bulkComp} onChange={v => setBulkComp(v)} />
               </div>
               <div>
                 <label style={{ fontSize: 10, textTransform: 'uppercase' as const, letterSpacing: '.3px', color: '#6B7280', display: 'block', marginBottom: 3 }}>Competência final</label>
-                <input style={{ ...S.input, width: 160 }} type="month" value={bulkCompFim} onChange={e => setBulkCompFim(e.target.value)} />
+                <SmartMonthInput style={{ width: 160 }} value={bulkCompFim} onChange={v => setBulkCompFim(v)} />
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingBottom: 2 }}>
                 <input type="checkbox" id="bulkJ" checked={bulkJournal} onChange={e => setBulkJournal(e.target.checked)} />
@@ -642,11 +643,11 @@ export default function ProLaborePage() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
               <div>
                 <label style={{ fontSize: 10, textTransform: 'uppercase' as const, letterSpacing: '.3px', color: '#6B7280', display: 'block', marginBottom: 3 }}>Competencia inicial</label>
-                <input style={S.input} type='month' value={retroFrom} onChange={e => setRetroFrom(e.target.value)} />
+                <SmartMonthInput style={S.input} value={retroFrom} onChange={v => setRetroFrom(v)} />
               </div>
               <div>
                 <label style={{ fontSize: 10, textTransform: 'uppercase' as const, letterSpacing: '.3px', color: '#6B7280', display: 'block', marginBottom: 3 }}>Competencia final</label>
-                <input style={S.input} type='month' value={retroTo} onChange={e => setRetroTo(e.target.value)} />
+                <SmartMonthInput style={S.input} value={retroTo} onChange={v => setRetroTo(v)} />
               </div>
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>

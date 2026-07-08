@@ -2,6 +2,8 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "@/services/api";
+import { SmartDateInput } from "../../components/SmartDateInput";
+import { SmartMonthInput } from "../../components/SmartMonthInput";
 
 const AC = "#0891B2";
 function fmtDate(s: any) { if(!s) return "—"; const p=String(s).split("T")[0].split("-"); return p[2]+"/"+p[1]+"/"+p[0]; }
@@ -401,7 +403,7 @@ export default function EmployeeDetailPage() {
                   {TIPOS_HIST.map(t=><option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
-              <div><label style={S.lbl}>Data *</label><input type="date" value={histDto.dataAlteracao} onChange={e=>setHistDto(d=>({...d,dataAlteracao:e.target.value}))} style={S.inp}/></div>
+              <div><label style={S.lbl}>Data *</label><SmartDateInput value={histDto.dataAlteracao} onChange={v=>setHistDto(d=>({...d,dataAlteracao:v}))} style={S.inp}/></div>
             </div>
             <div style={S.row}>
               <div><label style={S.lbl}>Funcao Anterior</label><input value={histDto.funcaoNova} onChange={e=>setHistDto(d=>({...d,funcaoNova:e.target.value}))} style={S.inp} placeholder="Nova funcao"/></div>
@@ -429,7 +431,7 @@ export default function EmployeeDetailPage() {
                   {TIPOS_OCO.map(t=><option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
-              <div><label style={S.lbl}>Data *</label><input type="date" value={ocoDto.data} onChange={e=>setOcoDto(d=>({...d,data:e.target.value}))} style={S.inp}/></div>
+              <div><label style={S.lbl}>Data *</label><SmartDateInput value={ocoDto.data} onChange={v=>setOcoDto(d=>({...d,data:v}))} style={S.inp}/></div>
             </div>
             <div><label style={S.lbl}>Motivo *</label><input value={ocoDto.motivo} onChange={e=>setOcoDto(d=>({...d,motivo:e.target.value}))} style={S.inp}/></div>
             <div><label style={S.lbl}>Descricao</label><textarea value={ocoDto.descricao} onChange={e=>setOcoDto(d=>({...d,descricao:e.target.value}))} style={{...S.inp,height:80,resize:"vertical" as const}}/></div>
@@ -456,8 +458,8 @@ export default function EmployeeDetailPage() {
               </select>
             </div>
             <div style={S.row}>
-              <div><label style={S.lbl}>Data Inicio *</label><input type="date" value={afasDto.dataInicio} onChange={e=>setAfasDto(d=>({...d,dataInicio:e.target.value}))} style={S.inp}/></div>
-              <div><label style={S.lbl}>Data Fim</label><input type="date" value={afasDto.dataFim} onChange={e=>setAfasDto(d=>({...d,dataFim:e.target.value}))} style={S.inp}/></div>
+              <div><label style={S.lbl}>Data Inicio *</label><SmartDateInput value={afasDto.dataInicio} onChange={v=>setAfasDto(d=>({...d,dataInicio:v}))} style={S.inp}/></div>
+              <div><label style={S.lbl}>Data Fim</label><SmartDateInput value={afasDto.dataFim} onChange={v=>setAfasDto(d=>({...d,dataFim:v}))} style={S.inp}/></div>
             </div>
             <div style={S.row}>
               <div><label style={S.lbl}>Dias Total</label><input type="number" value={afasDto.diasTotal} onChange={e=>setAfasDto(d=>({...d,diasTotal:e.target.value}))} style={S.inp}/></div>
@@ -488,7 +490,7 @@ export default function EmployeeDetailPage() {
                   {["CREDITO","DEBITO","AJUSTE","EXPIRACAO"].map(t=><option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
-              <div><label style={S.lbl}>Data *</label><input type="date" value={bhDto.data} onChange={e=>setBhDto(d=>({...d,data:e.target.value}))} style={S.inp}/></div>
+              <div><label style={S.lbl}>Data *</label><SmartDateInput value={bhDto.data} onChange={v=>setBhDto(d=>({...d,data:v}))} style={S.inp}/></div>
             </div>
             {bhDto.tipo==="CREDITO" && (
               <div><label style={S.lbl}>Tipo de Hora</label>
@@ -505,7 +507,7 @@ export default function EmployeeDetailPage() {
               <div><label style={S.lbl}>{bhDto.tipo==="CREDITO"?"Minutos Brutos *":"Minutos *"}</label>
                 <input type="number" value={bhDto.minutosOriginais} onChange={e=>setBhDto(d=>({...d,minutosOriginais:e.target.value}))} style={S.inp} placeholder="Ex: 120 = 2h"/>
               </div>
-              <div><label style={S.lbl}>Competencia *</label><input type="month" value={bhDto.competencia} onChange={e=>setBhDto(d=>({...d,competencia:e.target.value}))} style={S.inp}/></div>
+              <div><label style={S.lbl}>Competencia *</label><SmartMonthInput value={bhDto.competencia} onChange={v=>setBhDto(d=>({...d,competencia:v}))} style={S.inp}/></div>
             </div>
             <div><label style={S.lbl}>Descricao</label><input value={bhDto.descricao} onChange={e=>setBhDto(d=>({...d,descricao:e.target.value}))} style={S.inp}/></div>
           </div>
@@ -555,11 +557,11 @@ export default function EmployeeDetailPage() {
               </div>
               <div>
                 <label style={S.lbl}>Data do Comunicado do Aviso *</label>
-                <input type="date" value={rescisaoDto.dataAviso} onChange={e=>setRescisaoDto(d=>({...d,dataAviso:e.target.value}))} style={S.inp}/>
+                <SmartDateInput value={rescisaoDto.dataAviso} onChange={v=>setRescisaoDto(d=>({...d,dataAviso:v}))} style={S.inp}/>
               </div>
               <div>
                 <label style={S.lbl}>Data de Afastamento (ultimo dia trabalhado) *</label>
-                <input type="date" value={rescisaoDto.dataAfastamento} onChange={e=>setRescisaoDto(d=>({...d,dataAfastamento:e.target.value}))} style={S.inp}/>
+                <SmartDateInput value={rescisaoDto.dataAfastamento} onChange={v=>setRescisaoDto(d=>({...d,dataAfastamento:v}))} style={S.inp}/>
               </div>
               <div>
                 <label style={S.lbl}>Saldo FGTS Conta Vinculada (R$)</label>

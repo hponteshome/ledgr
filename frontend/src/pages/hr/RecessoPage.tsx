@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import api from '../../services/api';
 import Swal from 'sweetalert2';
+import { SmartDateInput } from '../../components/SmartDateInput';
 
 const AC = '#6C63FF';
 const fmtDate = (d: any) => d ? new Date(d).toLocaleDateString('pt-BR') : '—';
@@ -204,12 +205,12 @@ export const RecessoPage: React.FC = () => {
             </div>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
               <div><label style={S.lbl}>Data Início *</label>
-                <input type="date" value={dto.dataInicio}
-                  onChange={e=>setDto(d=>({...d,dataInicio:e.target.value}))} style={S.inp}/>
+                <SmartDateInput value={dto.dataInicio}
+                  onChange={v=>setDto(d=>({...d,dataInicio:v}))} style={S.inp}/>
               </div>
               <div><label style={S.lbl}>Data Fim *</label>
-                <input type="date" value={dto.dataFim}
-                  onChange={e=>setDto(d=>({...d,dataFim:e.target.value}))} style={S.inp}/>
+                <SmartDateInput value={dto.dataFim}
+                  onChange={v=>setDto(d=>({...d,dataFim:v}))} style={S.inp}/>
               </div>
             </div>
             <div><label style={S.lbl}>Observação</label>

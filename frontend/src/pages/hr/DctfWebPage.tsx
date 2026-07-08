@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../../services/api';
+import { SmartMonthInput } from '../../components/SmartMonthInput';
 const fmtBRL=(v)=>Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 const AC='#6C63FF';
 export const DctfWebPage=()=>{
@@ -25,8 +26,8 @@ export const DctfWebPage=()=>{
         <div><span style={{fontSize:11,fontWeight:600,color:AC}}>◆ RH / FISCAL</span>
           <h1 style={{fontSize:18,fontWeight:600,color:'#111',margin:'2px 0 0'}}>DCTFWeb</h1>
           <p style={{fontSize:12,color:'#9CA3AF',margin:'4px 0 0'}}>Consolidacao mensal INSS + IRRF para declaracao ao Fisco</p></div>
-        <input type="month" value={comp} onChange={e=>setComp(e.target.value)}
-          style={{border:'0.5px solid #E5E7EB',borderRadius:6,padding:'6px 10px',fontSize:13,outline:'none'}}/>
+        <SmartMonthInput value={comp} onChange={v=>setComp(v)}
+          style={{border:'0.5px solid #E5E7EB',borderRadius:6,padding:'6px 10px',fontSize:13}}/>
       </div>
       <div style={{flex:1,overflow:'auto',padding:'20px 24px'}}>
         {loading&&<div style={{textAlign:'center',padding:60,color:'#9CA3AF'}}>Carregando...</div>}

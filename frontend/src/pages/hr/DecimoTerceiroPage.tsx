@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../../services/api';
 import Swal from 'sweetalert2';
+import { SmartDateInput } from '../../components/SmartDateInput';
 const fmtBRL=(v)=>Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 const fmtDate=(d)=>d?new Date(d).toLocaleDateString('pt-BR'):'—';
 const AC='#6C63FF';
@@ -90,7 +91,7 @@ export const DecimoTerceiroPage=()=>{
       {pgModal&&(<div style={ov}><div style={{background:'#fff',borderRadius:14,width:380,padding:24,boxShadow:'0 20px 60px rgba(0,0,0,.15)'}}>
         <h3 style={{margin:'0 0 16px',fontSize:15,fontWeight:700}}>Registrar Pagamento — {pgModal.parcela}a Parcela</h3>
         <div><label style={{fontSize:11,fontWeight:600,color:'#6B7280',textTransform:'uppercase',display:'block',marginBottom:4}}>Data *</label>
-          <input type="date" value={dtPgto} onChange={e=>setDtPgto(e.target.value)} style={{width:'100%',border:'0.5px solid #E5E7EB',borderRadius:6,padding:'7px 10px',fontSize:13,outline:'none',boxSizing:'border-box'}}/></div>
+          <SmartDateInput value={dtPgto} onChange={v=>setDtPgto(v)} style={{width:'100%',border:'0.5px solid #E5E7EB',borderRadius:6,padding:'7px 10px',fontSize:13,boxSizing:'border-box'}}/></div>
         <div style={{display:'flex',justifyContent:'flex-end',gap:8,marginTop:16}}>
           <button onClick={()=>setPgModal(null)} style={{padding:'7px 16px',borderRadius:8,border:'0.5px solid #E5E7EB',background:'#fff',cursor:'pointer',fontSize:13}}>Cancelar</button>
           <button onClick={pagar} disabled={!dtPgto} style={btn('#15803D')}>Confirmar</button>
