@@ -6,7 +6,7 @@ import {
   FiFolder, FiBook, FiPenTool, FiClipboard, FiShield, FiPercent, FiLayers,
   FiUserCheck, FiUpload, FiDatabase, FiPieChart, FiCalendar, FiCheckCircle,
   FiServer, FiEdit2, FiEdit3, FiPackage, FiTool, FiTruck, FiTrendingUp,
-  FiAlertCircle, FiTrendingDown, FiLogOut, FiBarChart2, FiArchive, FiBookOpen, FiCpu, FiRepeat, FiLock, FiFilePlus, FiArrowDown, FiMessageSquare, FiHelpCircle,
+  FiAlertCircle, FiTrendingDown, FiLogOut, FiBarChart2, FiArchive, FiBookOpen, FiCpu, FiRepeat, FiLock, FiFilePlus, FiArrowDown, FiMessageSquare, FiHelpCircle, FiClock,
 } from 'react-icons/fi';
 import { useCompany } from '../contexts/CompanyContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -37,7 +37,7 @@ interface MenuItem {
 }
 
 export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ open, onToggle }) => {
-  const { user, logout } = useAuth();
+  const { user, signOut } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const { activeCompany } = useCompany();
@@ -51,7 +51,7 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
     location.pathname.startsWith(path)
   )?.[1];
 
-  const menuItems = useMemo(() => [
+  const menuItems = useMemo<MenuItem[]>(() => [
 
     { path: '/app/dashboard', icon: FiHome, label: 'Visão Geral' },
     { path: '/app/chat', icon: FiMessageSquare, label: 'Mensagens' },
@@ -145,6 +145,7 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
         { path: '/app/hr/pro-labore', label: 'Pró-labore', icon: FiTrendingDown },
         { path: '/app/hr/folha', label: 'Folha de Pagamento', icon: FiTrendingDown },
         { path: '/app/hr/ferias', label: 'Férias', icon: FiCalendar },
+        { path: '/app/hr/banco-horas', label: 'Banco de Horas', icon: FiClock },
         { path: '/app/hr/decimo-terceiro', label: '13º Salário', icon: FiTrendingDown },
         { path: '/app/hr/recesso', label: 'Recessos & Pontes', icon: FiRepeat },
         { path: '/app/hr/esocial', label: 'eSocial', icon: FiFileText },
@@ -339,7 +340,7 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
       cancelButtonText: 'Cancelar'
     });
     if (result.isConfirmed) {
-      logout();
+      signOut();
       navigate('/auth/login');
     }
   };
