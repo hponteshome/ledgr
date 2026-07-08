@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import CdiTabelaPage from '../accounting/investments/CdiTabelaPage';
 import api from '../../services/api';
+import { SmartMonthInput } from '../../components/SmartMonthInput';
 
 const INDICADORES = [
   { key: 'SELIC', label: 'Selic',  cor: '#0369A1', fonte: 'BCB Serie 11', desc: 'Taxa Selic acumulada no mes (% a.m.)' },
@@ -235,7 +236,7 @@ export function IndicadoresPage() {
             <div style={{ display: 'grid', gridTemplateColumns: '160px 160px auto', gap: 12, alignItems: 'flex-end' }}>
               <div>
                 <label style={S.label}>Competencia</label>
-                <input style={S.input} type="month" value={manComp} onChange={e => setManComp(e.target.value)} />
+                <SmartMonthInput style={S.input} value={manComp} onChange={v => setManComp(v)} />
               </div>
               <div>
                 <label style={S.label}>Taxa Mensal (%)</label>

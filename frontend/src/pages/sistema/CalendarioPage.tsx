@@ -1,6 +1,7 @@
 // frontend/src/pages/sistema/CalendarioPage.tsx
 import React, { useState, useEffect, useMemo } from 'react';
 import api from '../../services/api';
+import { SmartDateInput } from '../../components/SmartDateInput';
 
 const toYMD = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -342,8 +343,8 @@ export function CalendarioPage() {
           <div style={{display:'grid',gap:12}}>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
               <div><Lbl>Data *</Lbl>
-                <Inp type="date" value={form.date}
-                  onChange={e=>setForm(f=>({...f,date:e.target.value}))}/>
+                <SmartDateInput value={form.date}
+                  onChange={v=>setForm(f=>({...f,date:v}))}/>
               </div>
               {modal==='feriado' && (
                 <div><Lbl>Tipo</Lbl>

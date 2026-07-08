@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import api from "../../services/api";
 import { useCompany } from "../../contexts/CompanyContext";
+import { SmartMonthInput } from "../../components/SmartMonthInput";
 import { FiAlertCircle, FiCheckCircle, FiClock, FiDownload, FiFilter, FiRefreshCw } from "react-icons/fi";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
@@ -355,10 +356,9 @@ export function ObrigacoesPage() {
       <div className="flex flex-wrap gap-3 items-end bg-white border border-slate-200 rounded-xl p-4">
         <div className="flex flex-col gap-1">
           <label className="text-xs text-slate-500">Competência</label>
-          <input
-            type="month"
+          <SmartMonthInput
             value={competence}
-            onChange={e => e.target.value && setCompetence(e.target.value)}
+            onChange={v => v && setCompetence(v)}
             className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-300"
           />
         </div>

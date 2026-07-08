@@ -1,6 +1,7 @@
 // frontend/src/pages/sistema/TabelasLegaisPage.tsx
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../../services/api';
+import { SmartDateInput } from '../../components/SmartDateInput';
 
 interface IrrfFaixa { ordem: number; limiteAte: number; aliquota: number; deducao: number; }
 interface IrrfRedutor { ordem: number; limiteAte: number; redutor: number; }
@@ -427,7 +428,7 @@ export function TabelasLegaisPage() {
                 </div>
                 <div>
                   <span style={lbl}>Vigência Início</span>
-                  <input type="date" value={editInssForm.vigenciaIni} onChange={e => setEditInssForm(f => ({ ...f, vigenciaIni: e.target.value }))} style={inp} />
+                  <SmartDateInput value={editInssForm.vigenciaIni} onChange={v => setEditInssForm(f => ({ ...f, vigenciaIni: v }))} style={inp} />
                 </div>
                 <div>
                   <span style={lbl}>Teto (R$)</span>
@@ -487,7 +488,7 @@ export function TabelasLegaisPage() {
               </div>
               <div>
                 <span style={lbl}>Vigência Início</span>
-                <input type="date" value={editIrrfForm.vigenciaIni} onChange={e => setEditIrrfForm(f => ({ ...f, vigenciaIni: e.target.value }))} style={inp} />
+                <SmartDateInput value={editIrrfForm.vigenciaIni} onChange={v => setEditIrrfForm(f => ({ ...f, vigenciaIni: v }))} style={inp} />
               </div>
             </div>
 
@@ -553,11 +554,11 @@ export function TabelasLegaisPage() {
               </div>
               <div>
                 <span style={lbl}>Vigência Início *</span>
-                <input type="date" value={editSalMinForm.vigenciaIni} onChange={e => setEditSalMinForm(f => ({ ...f, vigenciaIni: e.target.value }))} style={inp} />
+                <SmartDateInput value={editSalMinForm.vigenciaIni} onChange={v => setEditSalMinForm(f => ({ ...f, vigenciaIni: v }))} style={inp} />
               </div>
               <div>
                 <span style={lbl}>Vigência Fim (opcional)</span>
-                <input type="date" value={editSalMinForm.vigenciaFim} onChange={e => setEditSalMinForm(f => ({ ...f, vigenciaFim: e.target.value }))} style={inp} />
+                <SmartDateInput value={editSalMinForm.vigenciaFim} onChange={v => setEditSalMinForm(f => ({ ...f, vigenciaFim: v }))} style={inp} />
               </div>
               <div style={{ gridColumn: 'span 2' }}>
                 <span style={lbl}>Lei / Decreto</span>
