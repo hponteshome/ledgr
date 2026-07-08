@@ -1560,3 +1560,81 @@ realmente devem compartilhar a mesma logica/campo `bulkComp`, ou se sao dois est
 coincidentemente tinham o mesmo texto de input (nesse caso so uma foi migrada corretamente, a outra
 pode precisar de variavel propria — revisar `CdiTabelaPage.tsx` linhas ~360-440 se o comportamento
 das duas abas parecer cruzado apos o teste).
+
+---
+
+### Rollout SmartDateInput/SmartMonthInput — CONCLUÍDO (08/07/2026)
+
+**Status: 100% completo.** 131 ocorrências de `type="date"`/`type="month"` migradas em 61 arquivos, 11 módulos.
+
+| Módulo | Arquivos | Ocorrências |
+|---|---|---|
+| Financeiro | 8 | 16 |
+| Departamento Pessoal | 9 | 36 |
+| Contabilidade | 12 | 25 |
+| Societário | 9 | 15 |
+| Patrimônio | 7 | 11 |
+| Documentos/Assinaturas | 4 | 4 |
+| Fiscal (não-Financeiro) | 2 | 5 |
+| Cadastros | 1 | 4 |
+| Sistema | 4 | 7 |
+| SPED | 3 | 6 |
+| Admin | 1 | 2 |
+| **Total** | **61** | **131** |
+
+Checagem final: 0 ocorrências restantes em `frontend/src` (busca recursiva confirmada).
+
+**Padrões consolidados:**
+- Campos com `name`+`handleChange` generico: `onChange={(v) => handleChange({ target: { name: 'x', value: v } } as any)}`
+- `required`, `max`, `min` estaticos nao suportados pelo componente — removidos
+- Regras de negocio com `min` dinamico (data >= abertura empresa, prazo >= hoje) preservadas via bloqueio manual no `onChange` (CompanyShow.tsx, SignatureRequest.tsx)
+- Divergencia visual Tailwind (`className`) vs style fixo do componente — aceita por decisao, ~15 arquivos afetados, pendente de revisao de UI futura
+
+**Bugfix relacionado (não causado pelo rollout):** `RendaFixaPage.tsx` tinha atributo `style` duplicado no botão "Gerar retroativos" (commit `f2017d07`, 07/05/2026) — corrigido durante auditoria pós-rollout, commit `1f3d341`.
+
+---
+
+### Auditoria ampliada pós-rollout (08/07/2026)
+
+Rodada além do `tsc --noEmit` do frontend (266 erros, ja mapeados por codigo TS em sessao anterior).
+
+**Resultado por frente:**
+| Auditoria | Resultado |
+|---|---|
+| ESLint (frontend) | 0 erros, 0 warnings |
+| `tsc --noEmit` backend (apps/api) | 0 erros |
+| `prisma validate` | Schema valido |
+| `madge --circular` (frontend + backend) | Nenhuma dependencia circular |
+| `vite build` (producao) | **FALHA** |
+| `npm audit` frontend | 13 vulnerabilidades (1 low, 8 moderate, 4 high) |
+| `npm audit` backend | 35 vulnerabilidades (3 low, 15 moderate, 17 high) |
+| `console.log`/`debugger` | 94 ocorrencias (frontend+backend) |
+| `TODO`/`FIXME`/`XXX` | 15 ocorrencias |
+
+**CRÍTICO — Build de produção quebrado:**
+`frontend/src/pages/users/PendentesPage.tsx` — `useState` com tipo inferido errado
+(`companyIds` virou `never[]` em vez de `string[]`), cascateando ~30 erros
+`Property 'X' does not exist on type 'never'` no mesmo arquivo. Bug pre-existente,
+commit `91080fc` (19/06/2026, "feat(registro): Header badge pendentes..."), nao
+relacionado ao rollout de datas. **Bloqueia deploy — prioridade maxima da proxima sessao.**
+Linha de origem: `const toggle=(id)=>setForm(f=>({...f,companyIds:f.companyIds.includes(id)?...}));`
+(useState inicial provavelmente sem tipo explicito em companyIds).
+
+**Vulnerabilidades de seguranca (alta severidade) mais relevantes:**
+- **Axios** (SSRF via NO_PROXY bypass, prototype pollution em validateStatus) — usado em toda chamada de API, front e back
+- **form-data** (CRLF injection) — provavel via upload de documentos/certificados
+- **xmldom** (XML injection, DoS) — relevante para geracao de XML eSocial/NFS-e/SPED
+- **basic-ftp**, **linkify-it**, `@nestjs/core` (injection) — impacto mais indireto
+- Detalhe completo salvo em `D:\Temp\audit_npm_frontend.txt` / `audit_npm_backend.txt` (json tambem disponivel)
+- **Nao rodar `npm audit fix --force` sem revisao individual** — risco de breaking changes
+
+**Ruido de baixa prioridade (nao urgente):**
+- 94 `console.log`/`debugger` — poluicao de log, risco leve de vazamento de dado em console do navegador. Detalhe: `D:\Temp\audit_console_log.txt`
+- 15 `TODO`/`FIXME`/`XXX` nunca centralizados. Detalhe: `D:\Temp\audit_todos.txt`
+- 266 erros `tsc --noEmit` frontend (nao bloqueiam build via Vite/esbuild, mas sao divida tecnica) — distribuicao por codigo ja registrada anteriormente (TS2339=139, TS7006=32, TS2322=29, TS2345=13, TS2304=9, TS2307=9, TS2367=8, TS7053=6, TS2554=4, TS2353=4, TS7031=4, TS2741=3, TS2300=2, outros=3). 48 arquivos distintos afetados. Detalhe completo: `D:\Temp\tsc_errors_full_2026-07-08.txt`
+
+**Ordem de prioridade sugerida para proxima sessao:**
+1. `PendentesPage.tsx` — corrige build quebrado (bloqueia deploy)
+2. Revisar `npm audit fix` nas dependencias de alta severidade, uma a uma (Axios primeiro — maior superficie de uso)
+3. Os 266 erros de tipagem tsc restantes, categorizados por modulo/arquivo
+4. Limpeza de `console.log`/`debugger` e centralizacao dos `TODO`/`FIXME`
