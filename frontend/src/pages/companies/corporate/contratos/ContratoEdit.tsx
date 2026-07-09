@@ -507,7 +507,7 @@ export const ContratoEdit: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { activeCompany } = useCompany();
-  const { usuario } = useAuth();
+  const { user: usuario } = useAuth();
 
   const isEditing = !!docId;
   const typeParam = (searchParams.get('type') ?? 'CONTRATO_SOCIAL') as DocType;

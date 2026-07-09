@@ -80,7 +80,7 @@ export default function MaintenancesPage() {
               background: statusFilter === s ? '#111' : '#fff',
               color: statusFilter === s ? '#fff' : '#374151' }}
           >
-            {s === '' ? 'Todos' : MAINTENANCE_STATUS_LABELS[s] ?? s}
+            {s === '' ? 'Todos' : (MAINTENANCE_STATUS_LABELS as any)[s] ?? s}
           </button>
         ))}
       </div>

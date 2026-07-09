@@ -40,6 +40,8 @@ interface ShareTransfer {
   reason: string;
   instrumentType?: string;
   averbacaoDate?: string;
+  notaryOffice?: string;
+  notes?: string;
 }
 
 interface CapitalSummary {

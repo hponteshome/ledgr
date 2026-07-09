@@ -186,7 +186,7 @@ function gerarObrigacoes(competence: string, empresas: EmpresaLocal[]): Obrigaca
           cfg.regime.includes("TODOS") ||
           cfg.regime.includes(emp.regime as Regime);
         if (!aplicavel) return;
-        const dueDate = cfg.calcDue(refYear);
+        const dueDate = cfg.calcDue(refYear, 12);
         const storageKey = `ledgr:obrig:${emp.id}:${cfg.code}:${refYear}`;
         const savedStatus = localStorage.getItem(storageKey) as Status | null;
         const status: Status = savedStatus ?? (dueDate < today ? "OVERDUE" : "PENDING");

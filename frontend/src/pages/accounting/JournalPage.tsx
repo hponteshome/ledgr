@@ -118,7 +118,7 @@ const EditModal: React.FC<{ entry: JournalEntry; onClose: () => void; onSaved: (
         value: Number(i.value),
         type: i.type,
     })));
-    const [sourceModules, setSourceModules] = useState<{ value: string; label: string }[]>([]);
+    const [sourceModules, setSourceModules] = useState<{ value: string; label: string; count?: number }[]>([]);
     const [dedutibilidade, setDedutibilidade] = useState<string>(entry.dedutibilidade ?? '');
     const [percDeducao, setPercDeducao] = useState<number>(entry.percDeducao ? Number(entry.percDeducao) : 100);
     const [lalurObservacao, setLalurObservacao] = useState<string>(entry.lalurObservacao ?? '');
@@ -317,7 +317,7 @@ const JournalPage: React.FC = () => {
     const [fPercDeducao, setFPercDeducao] = useState(100);
     const [fLalurObs, setFLalurObs] = useState('');
 
-    const [sourceModules, setSourceModules] = useState<{ value: string; label: string }[]>([]);
+    const [sourceModules, setSourceModules] = useState<{ value: string; label: string; count?: number }[]>([]);
     const [saving, setSaving] = useState(false);
     const [formError, setFormError] = useState('');
     const [formSuccess, setFormSuccess] = useState('');

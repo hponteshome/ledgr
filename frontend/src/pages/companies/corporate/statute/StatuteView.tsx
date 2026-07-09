@@ -75,8 +75,8 @@ function documentToStatute(doc: DocumentRecord, companyName: string): StatuteWit
     };
 }
 
-function mapStatus(status: string): string {
-    const map: Record<string, string> = {
+function mapStatus(status: string): 'draft' | 'registered' | 'archived' | 'approved' {
+    const map: Record<string, 'draft' | 'registered' | 'archived' | 'approved'> = {
         RASCUNHO: 'draft', APROVADO: 'approved',
         REGISTRADO: 'registered', ARQUIVADO: 'archived',
         draft: 'draft', approved: 'approved',

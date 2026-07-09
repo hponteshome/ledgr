@@ -6,6 +6,7 @@ interface SmartMonthInputProps {
   placeholder?: string;
   style?: React.CSSProperties;
   className?: string;
+  disabled?: boolean;
 }
 
 function parseCompetence(raw: string): string | null {
@@ -53,7 +54,7 @@ function formatCompetence(value: string): string {
  * Sempre retorna/recebe 'YYYY-MM' via onChange/value.
  */
 export const SmartMonthInput: React.FC<SmartMonthInputProps> = ({
-  value, onChange, placeholder = 'MM/AAAA', style, className,
+  value, onChange, placeholder = 'MM/AAAA', style, className, disabled,
 }) => {
   const [editing, setEditing] = useState(false);
   const [raw, setRaw] = useState('');
@@ -87,6 +88,7 @@ export const SmartMonthInput: React.FC<SmartMonthInputProps> = ({
       className={className}
       placeholder={placeholder}
       value={raw}
+      disabled={disabled}
       onFocus={() => setEditing(true)}
       onChange={e => { setRaw(e.target.value); setInvalid(false); }}
       onBlur={commit}

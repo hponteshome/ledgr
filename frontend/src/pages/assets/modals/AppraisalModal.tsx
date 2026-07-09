@@ -1,10 +1,12 @@
 // ============================================================
 // LEDGR — frontend/src/pages/assets/modals/AppraisalModal.tsx
 // ============================================================
+import { useState } from 'react';
 import { APPRAISAL_TYPE_LABELS } from '../types/asset.types';
 import { formatCurrency } from '../../../utils/formatters';
 import { ModalWrapper, ModalFooter, Field } from './ModalComponents';
 import { SmartDateInput } from '../../../components/SmartDateInput';
+import { useAssetMutations } from '../hooks/useAssets';
 
 
 export function AppraisalModal({ assetId, bookValue, onClose, onSuccess }: {
