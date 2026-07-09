@@ -1877,3 +1877,77 @@ funciona?" → "por que só tem hora com acréscimo?"). Vale considerar uma audi
 ampla de outros módulos de RH (Férias, Recesso, 13º, Rescisão) em busca do mesmo padrão:
 campos com nome divergente entre estado/formulário/backend, endpoints prontos sem uso no
 frontend, e funcionalidades sem item de menu.
+
+---
+
+### BUILD DE PRODUÇÃO 100% CORRIGIDO — 230 → 0 erros TypeScript (08/07/2026)
+
+**Marco importante:** `npm run build` estava quebrado desde 19/06/2026 (commit `91080fc`,
+`PendentesPage.tsx`), sem que ninguém notasse — porque `npm run dev` não roda `tsc`, só
+esbuild permissivo. Auditoria pós-rollout de datas revelou o problema; corrigido nesta sessão
+em ~15 lotes incrementais, cada um testado e commitado separadamente.
+
+**Progressão:** 267 (contagem inicial via tsc --noEmit) → 230 (primeira contagem real via
+`npm run build`) → 121 → 116 → 100 → 63 → 44 → 40 → 17 → 8 → 3 → **0**.
+
+**Padrão mais recorrente (7 ocorrências nesta sessão): campo com nome divergente entre
+interface TypeScript e uso real no código** — sintoma de refatorações onde o campo foi
+renomeado em um lugar mas não em todos:
+1. `PendentesPage.tsx` — useState sem generic (ontem)
+2. `RazaoAnaliticoPage.tsx` — `activeCompany.cnpj` (correto: `taxId`)
+3. `AgeView.tsx` — mesmo `cnpj`/`taxId`
+4. `DiarioGeralPage.tsx` — mesmo `cnpj`/`taxId` (3º arquivo distinto com esse exato bug)
+5. `ContratoEdit.tsx` — `useAuth().usuario` (correto: `user`)
+6. `SignaturePanel.tsx` — `useCompany().empresa` (correto: `activeCompany`)
+7. `PersonForm.tsx` — `Dependents.gender` (código sempre usou `sexo`)
+
+**Recomendação para futuras sessões:** ao criar/editar qualquer componente que consome
+`useAuth()`/`useCompany()`, sempre conferir a interface real do contexto
+(`AuthContextData`: `user`, `signOut`; `CompanyContextData`: `activeCompany`, `companies`)
+em vez de assumir nomes de campo por convenção ou memória.
+
+**Outros bugs reais encontrados e corrigidos (não apenas tipagem):**
+- `AccountTree.tsx` — identificador `difference` duplicado na interface (erro de digitação
+  puro); `children` nunca declarado (impedia recursão real da árvore de contas)
+- `use-ecd-viewer.ts` — hook lia `useParams()` internamente em vez de receber `importId`
+  como argumento (o componente já passava certo, o hook que ignorava) — tela de visualização
+  de ECD provavelmente nunca funcionou de verdade
+- `ObrigacoesPage.tsx` — `calcDue()` chamado com 1 argumento, assinatura exige 2
+- `AgeEdit.tsx`/`index.tsx` (atas/age) — import com profundidade de path errada (arquivo
+  copiado de `statute/`, path relativo não ajustado)
+- `react-hot-toast` — **nunca estava declarado no `package.json` do frontend**, existia só
+  como instalação acidental na raiz do monorepo (`D:\Projetos\Ledgr\node_modules\`). Funcionava
+  em dev por resolução ascendente do Node, mas quebrava `tsc`. Instalado oficialmente via
+  `npm install react-hot-toast --save` dentro de `frontend/`.
+- `Certificateimportmodal.tsx` — conflito de nome por case-sensitivity (Windows tolera,
+  Linux/SERVER02 não) — renomeado para `CertificateImportModal.tsx`
+
+**Código morto removido (movido para `frontend/_orfaos_removidos_2026-07-08/`, não deletado):**
+- `ChartOfAccountsPage.tsx` — zero referências, dependência `@tanstack/react-query` nem instalada
+- `EcdHistoryPage.tsx` — continha código de `EcdViewerPage` colado por engano, rota comentada
+- `components/CertificateImportModal.tsx` — duplicata do arquivo em `pages/certificates/`
+
+**Divergências de arquitetura documentadas, aceitas como estão:**
+- `SortKey` em `AssetsList.tsx` relaxado para `string` (o union type original não cobria
+  colunas dinâmicas reais como anos de depreciação)
+- `AccountTree.tsx` ganhou prop `renderBalances` real (antes era passada sem nenhum efeito)
+- Diversos `Record<Enum, string>` acessados com `as any` quando o valor de índice já vem
+  como string solta do backend, não como o enum estrito do frontend
+
+**IMPORTANTE — lição de processo:** durante a consolidação final, descobrimos que vários
+arquivos ficaram "staged mas não commitados" em interações anteriores da sessão (a página
+`BancoHorasPage.tsx` inteira, a rota correspondente, e as deleções dos 3 arquivos órfãos
+originais). Um `git status` de verificação antes de declarar "build 100% resolvido" pegou
+isso a tempo — o repositório remoto estava incompleto e um clone limpo teria falhado.
+**Recomendação: sempre rodar `git status` full (não só conferir o commit mais recente) antes
+de encerrar uma sessão longa com múltiplos commits incrementais.**
+
+**Verificação final:** `git status` limpo, `npm run build` com 0 erros, a partir do estado
+exato commitado em `a629bb5`. `vite v5.4.21 building for production... built in 35.20s`.
+
+**Pendências que ficaram fora do escopo desta sessão (não eram bugs de build):**
+- `npm audit`: 48 vulnerabilidades de segurança (Axios SSRF, form-data, xmldom, etc.) —
+  próximo item de prioridade, não corrigir com `--force` sem revisão individual
+- `payBatch` (baixa em lote AP) com rota divergente `/batch/pay` vs `/batch-pay` real
+- `EXPIRACAO` no Banco de Horas sem endpoint dedicado (usa contorno via `ajustar`)
+- Divergência visual Tailwind vs `SmartDateInput`/`SmartMonthInput` em ~15 arquivos
