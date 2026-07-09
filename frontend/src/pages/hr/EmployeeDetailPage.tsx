@@ -409,7 +409,7 @@ export default function EmployeeDetailPage() {
                   <td style={{...S.td,fontFamily:"monospace"}}>{fmtMin(l.saldoApos)}</td>
                   <td style={S.td}>{l.competencia}</td>
                   <td style={S.td}>{l.descricao||"—"}</td>
-                  <td style={S.td}>{!l.estornado&&l.tipo!=="ESTORNO"&&<button onClick={()=>abrirCorrecao(l)} style={S.btn("#B91C1C",true)}>Corrigir</button>}</td>
+                  <td style={S.td}>{!l.estornado&&l.tipo!=="ESTORNO"&&<button onClick={()=>abrirCorrecao(l)} style={{...S.btn("#B91C1C"),padding:"4px 12px",fontSize:12}}>Corrigir</button>}</td>
                 </tr>
               ))}
               {!(bh?.lancamentos?.length)&&<tr><td colSpan={10} style={{...S.td,textAlign:"center",color:"#9CA3AF",padding:40}}>Nenhum lancamento no banco de horas.</td></tr>}
