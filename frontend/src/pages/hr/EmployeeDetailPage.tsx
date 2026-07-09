@@ -183,7 +183,7 @@ export default function EmployeeDetailPage() {
   async function downloadDoc(url: string, filename: string) {
     try {
       const res = await api.get(url, { responseType: 'blob' });
-      const ct  = res.headers['content-type'] ?? '';
+      const ct  = String(res.headers['content-type'] ?? '');
       if (ct.includes('html')) {
         const html = new TextDecoder().decode(await (res.data as Blob).arrayBuffer());
         const blob = new Blob([html], { type: 'text/html' });
