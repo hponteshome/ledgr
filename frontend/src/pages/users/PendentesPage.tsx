@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../../services/api';
 import Swal from 'sweetalert2';
-const fmtDate=(d)=>d?new Date(d).toLocaleString('pt-BR'):'—';
-const FLAGS={
+const fmtDate=(d: any)=>d?new Date(d).toLocaleString('pt-BR'):'—';
+const FLAGS: Record<string, {label:string;bg:string;color:string}> = {
   OK:{label:'✓ Dados OK',bg:'#F0FDF4',color:'#15803D'},
   CPF_NAO_ENCONTRADO:{label:'⚠ CPF não encontrado na base',bg:'#FEF3C7',color:'#92400E'},
   DIVERGENCIA_NOME:{label:'⚠ Divergência de nome',bg:'#FEF2F2',color:'#DC2626'},
@@ -15,9 +15,9 @@ export const PendentesPage=()=>{
   const [sel,setSel]=useState<any>(null);
   const [form,setForm]=useState<{profileId:string;level:string;companyIds:string[]}>({profileId:'',level:'1',companyIds:[]});
   const [loading,setLoading]=useState(false);
-  const inp={width:'100%',border:'1px solid #E5E7EB',borderRadius:6,padding:'7px 10px',fontSize:13,outline:'none',boxSizing:'border-box'};
+  const inp={width:'100%',border:'1px solid #E5E7EB',borderRadius:6,padding:'7px 10px',fontSize:13,outline:'none',boxSizing:'border-box'} as React.CSSProperties;
   const lbl={fontSize:11,fontWeight:600,color:'#6B7280',textTransform:'uppercase',display:'block',marginBottom:4};
-  const ov={position:'fixed',inset:0,background:'rgba(0,0,0,0.4)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000};
+  const ov={position:'fixed',inset:0,background:'rgba(0,0,0,0.4)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000} as React.CSSProperties;
   const load=useCallback(async()=>{
     setLoading(true);
     try{const [u,p,c]=await Promise.all([api.get('/users/pendentes'),api.get('/profiles'),api.get('/companies')]);
@@ -29,16 +29,16 @@ export const PendentesPage=()=>{
     if(!sel||!form.profileId||!form.companyIds.length){Swal.fire('Atenção','Selecione perfil e ao menos uma empresa.','warning');return;}
     try{await api.post('/users/'+sel.id+'/aprovar',{profileId:form.profileId,level:parseInt(form.level),companyIds:form.companyIds});
       setSel(null);load();Swal.fire('Aprovado!','Usuário ativado com sucesso.','success');}
-    catch(e){Swal.fire('Erro',e?.response?.data?.message||'Falha','error');}
+    catch(e: any){Swal.fire('Erro',e?.response?.data?.message||'Falha','error');}
   };
   const rejeitar=async()=>{
     const{value}=await Swal.fire({title:'Motivo da rejeição',input:'text',inputPlaceholder:'Opcional',showCancelButton:true,confirmButtonColor:'#DC2626',confirmButtonText:'Rejeitar'});
     if(value===undefined)return;
     try{await api.post('/users/'+sel.id+'/rejeitar',{motivo:value||'Sem motivo'});
       setSel(null);load();Swal.fire('Rejeitado','Cadastro rejeitado.','info');}
-    catch(e){Swal.fire('Erro',e?.response?.data?.message||'Falha','error');}
+    catch(e: any){Swal.fire('Erro',e?.response?.data?.message||'Falha','error');}
   };
-  const toggle=(id)=>setForm(f=>({...f,companyIds:f.companyIds.includes(id)?f.companyIds.filter(x=>x!==id):[...f.companyIds,id]}));
+  const toggle=(id: any)=>setForm(f=>({...f,companyIds:f.companyIds.includes(id)?f.companyIds.filter(x=>x!==id):[...f.companyIds,id]}));
   return(
     <div style={{display:'flex',flexDirection:'column',height:'100%'}}>
       <div style={{background:'#fff',borderBottom:'0.5px solid #E5E7EB',padding:'14px 24px',flexShrink:0}}>

@@ -30,7 +30,7 @@ const GRUPO_ICONS: Record<string, any> = {
     FURNITURE_FIXTURE: Package, IT_EQUIPMENT: Package, INTANGIBLE: Package, OTHER: Package,
 };
 
-type SortKey = 'internalCode' | 'description' | 'assetAccount' | 'city' | 'bookValue' | 'accumDeprec' | 'status';
+type SortKey = string;
 type SortDir = 'asc' | 'desc';
 
 function SortIcon({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey; sortDir: SortDir }) {

@@ -226,6 +226,10 @@ export function AgendaCalendar({
 }
 
 ////ADICIONADO GEMINI AgendaSidebar
+interface AgendaSidebarProps {
+  events: AgendaEvent[];
+  onEventClick?: (event: AgendaEvent) => void;
+}
 export function AgendaSidebar({ events, onEventClick }: AgendaSidebarProps) {
   const today = new Date();
   const upcomingEvents = events

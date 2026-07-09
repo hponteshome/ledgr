@@ -12,6 +12,7 @@ interface AccountInfo {
     id: string; code: string; name: string;
     type: string; nature: string; level: number;
     isAnalytic: boolean;
+    reducedCode?: string;
 }
 interface JournalItem {
     accountId: string; account?: AccountInfo;
@@ -233,10 +234,6 @@ const RazaoAnaliticoPage: React.FC = () => {
                     console.log(`[SALDO ANTERIOR] Processando ${entries.length} lançamentos de períodos passados.`);
                 }
                 entries.forEach(entry => {
-                    // LOG 2: Verificar se o item de 2014 tem a conta preenchida
-                    if (field === 'prev' && entry.date.includes('2014')) {
-                        console.log(`>> Lançamento 2014: Valor ${item.value} | Conta ID: ${item.accountId} | Tem objeto account?`, !!item.account);
-                    }
                     entry.items.forEach(item => {
                         if (!item.account) return;
                         if (!accMap.has(item.accountId)) {
@@ -341,7 +338,7 @@ const RazaoAnaliticoPage: React.FC = () => {
     const printLivroRazao = () => {
         if (!reportData || !activeCompany) return;
         const empresa = activeCompany.legalName || activeCompany.tradeName || '';
-        const cnpj = (activeCompany.cnpj || '').replace(/\D/g,'').replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/,'$1.$2.$3/$4-$5');
+        const cnpj = (activeCompany.taxId || '').replace(/\D/g,'').replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/,'$1.$2.$3/$4-$5');
         const periodo = filters.startDate.split('-').reverse().join('/') + ' a ' + filters.endDate.split('-').reverse().join('/');
         const hoje = new Date().toLocaleDateString('pt-BR');
         const hora = new Date().toLocaleTimeString('pt-BR');
