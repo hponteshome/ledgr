@@ -16,12 +16,13 @@ interface AccountNode {
     calculatedBalance?: number;
     ecdBalance?: number | null;
     difference?: number | null;
-    difference?: number | null;
     reducedCode?: string;
+    children?: AccountNode[];
 }
 
 interface AccountTreeProps {
     nodes: AccountNode[];
+    renderBalances?: (node: any) => React.ReactNode;
 }
 
 // ── Formatadores ────────────────────────────────────────────────────────────
@@ -55,7 +56,7 @@ const fmtDiff = (value: number | null | undefined) => {
 
 // ── Nó da árvore ────────────────────────────────────────────────────────────
 
-const TreeNode: React.FC<{ node: AccountNode }> = ({ node }) => {
+const TreeNode: React.FC<{ node: AccountNode; renderBalances?: (node: AccountNode) => React.ReactNode }> = ({ node, renderBalances }) => {
     const [isOpen, setIsOpen] = useState(node.code.split('.').length <= 2);
     const hasChildren = node.children && node.children.length > 0;
     const isAnalytic = node.isAnalytic ?? node.isAnalytical ?? false;
@@ -113,16 +114,20 @@ const TreeNode: React.FC<{ node: AccountNode }> = ({ node }) => {
                     {fmt(ecdBalance)}
                 </div>
 
+                {renderBalances ? renderBalances(node) : (
+                <>
                 {/* Coluna 4 — Diferença */}
                 <div className="col-span-2 text-right font-mono pr-2">
                     {fmtDiff(difference)}
                 </div>
+                </>
+                )}
             </div>
 
             {hasChildren && isOpen && (
                 <div>
-                    {node.children!.map(child => (
-                        <TreeNode key={child.id} node={child} />
+                    {node.children!.map((child: AccountNode) => (
+                        <TreeNode key={child.id} node={child} renderBalances={renderBalances} />
                     ))}
                 </div>
             )}
@@ -132,7 +137,7 @@ const TreeNode: React.FC<{ node: AccountNode }> = ({ node }) => {
 
 // ── Componente principal ─────────────────────────────────────────────────────
 
-export const AccountTree: React.FC<AccountTreeProps> = ({ nodes }) => {
+export const AccountTree: React.FC<AccountTreeProps> = ({ nodes, renderBalances }) => {
     return (
         <div className="rounded-lg overflow-hidden">
             {/* Cabeçalho interno da árvore */}
@@ -146,7 +151,7 @@ export const AccountTree: React.FC<AccountTreeProps> = ({ nodes }) => {
             </div>
 
             {nodes.map(node => (
-                <TreeNode key={node.id} node={node} />
+                <TreeNode key={node.id} node={node} renderBalances={renderBalances} />
             ))}
         </div>
     );

@@ -45,13 +45,13 @@ export const ContabilTab: React.FC<Props> = ({ companyId, labelCls, inputCls, pa
       {/* Escritorio Contabil */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4">
       {partners && partners.length > 0 && (
-        <QsaVinculoGrid companyId={companyId} partners={partners} labelCls={labelCls} />
+        <QsaVinculoGrid companyId={companyId} partners={partners} />
       )}
 
         <div className="text-xs font-bold text-gray-500 uppercase tracking-widest border-l-4 border-green-500 pl-3">Escritório / Organização Contábil</div>
         <PersonLookupField
           label="Escritório Contábil"
-          cpfCnpj={config.escritorioCnpj || ''} initialFound={!!config.escritorioCnpj}
+          cpfCnpj={config.escritorioCnpj || ''}
           name={config.escritorioNome || ''}
           onCpfCnpjChange={v => upd('escritorioCnpj', v)}
           onNameChange={v => upd('escritorioNome', v)}
@@ -70,7 +70,7 @@ export const ContabilTab: React.FC<Props> = ({ companyId, labelCls, inputCls, pa
         <div className="text-xs font-bold text-gray-500 uppercase tracking-widest border-l-4 border-blue-500 pl-3">Contador Responsável (Assina ECD/ECF)</div>
         <PersonLookupField
           label="Contador"
-          cpfCnpj={config.accountantCpf || ''} initialFound={!!config.accountantCpf}
+          cpfCnpj={config.accountantCpf || ''}
           name={config.accountantName || ''}
           onCpfCnpjChange={v => upd('accountantCpf', v)}
           onNameChange={v => upd('accountantName', v)}
@@ -103,7 +103,7 @@ export const ContabilTab: React.FC<Props> = ({ companyId, labelCls, inputCls, pa
         <div className="text-xs font-bold text-gray-500 uppercase tracking-widest border-l-4 border-purple-500 pl-3">Representante Legal</div>
         <PersonLookupField
           label="Representante Legal"
-          cpfCnpj={config.legalRepCpf || ''} initialFound={!!config.legalRepCpf}
+          cpfCnpj={config.legalRepCpf || ''}
           name={config.legalRepName || ''}
           onCpfCnpjChange={v => upd('legalRepCpf', v)}
           onNameChange={v => upd('legalRepName', v)}
@@ -119,7 +119,7 @@ export const ContabilTab: React.FC<Props> = ({ companyId, labelCls, inputCls, pa
         <div className="text-xs font-bold text-gray-500 uppercase tracking-widest border-l-4 border-orange-500 pl-3">Auditor Independente (se aplicável)</div>
         <PersonLookupField
           label="Auditor"
-          cpfCnpj={config.auditorCpf || ''} initialFound={!!config.auditorCpf}
+          cpfCnpj={config.auditorCpf || ''}
           name={config.auditorName || ''}
           onCpfCnpjChange={v => upd('auditorCpf', v)}
           onNameChange={v => upd('auditorName', v)}

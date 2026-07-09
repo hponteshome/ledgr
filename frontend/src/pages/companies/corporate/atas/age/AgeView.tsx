@@ -207,7 +207,7 @@ export const AgeView: React.FC = () => {
                                 content={age.content}
                                 companyName={activeCompany?.legalName || activeCompany?.tradeName || 'Empresa'}
                                 docTitle={age.title}
-                                cnpj={activeCompany?.cnpj}
+                                cnpj={activeCompany?.taxId}
                                 registerInfo={
                                     (activeCompany as any)?.registerOrg
                                         ? ((activeCompany as any).registerOrg.toLowerCase().includes('jucesp')

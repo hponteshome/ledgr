@@ -83,6 +83,7 @@ interface FormData {
     bookNumber: string;
     changeNote: string;
     numerarSecoes: boolean;
+    styleId?: string;
 }
 
 const MEMBRO_VAZIO: MembroMesa = { cargo: '', personId: undefined, cpf: '', nome: '' };
