@@ -81,7 +81,7 @@ export const CompanyForm: React.FC = () => {
 
   const [preenchido, setPreenchido] = useState(false);
 
-  const [formData, setFormData] = useState<CompanyFormData>({ taxId: initialCnpj, legalName: '', tradeName: '', openingDate: '', legalNature: '', taxRegime: '', size: '', status: '', statusDate: '', equity: '', street: '', number: '', complement: '', neighborhood: '', zipCode: '', city: '', state: '', email: '', phone1: '', phone2: '', isHeadquarter: false, registerOrg: '', registerNumber: '', registerDate: '', registerBook: '', registerSheet: '', mainActivity: '', secondaryActivities: [], nire: '', orgRegistro: '', codMun: '', ieEstadual: '', cnae: '', fpas: '' });
+  const [formData, setFormData] = useState<CompanyFormData>({ taxId: initialCnpj, legalName: '', tradeName: '', openingDate: '', legalNature: '', taxRegime: '', size: '', status: '', statusDate: '', equity: '', street: '', number: '', complement: '', neighborhood: '', zipCode: '', city: '', state: '', email: '', phone1: '', phone2: '', isHeadquarter: false, registerOrg: '', registerNumber: '', registerDate: '', registerBook: '', registerSheet: '', registerUF: '', mainActivity: '', secondaryActivities: [], nire: '', orgRegistro: '', codMun: '', ieEstadual: '', cnae: '', fpas: '', partners: [], cnaes: [] });
   const [loading, setLoading] = useState(false);
   const set = (name: keyof CompanyFormData, value: any) =>
     setFormData(prev => ({ ...prev, [name]: value }));

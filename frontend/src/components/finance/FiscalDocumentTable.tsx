@@ -15,6 +15,7 @@ const FIN_ACCENT = '#3DAA7A';
 
 interface Props {
   onNewDocument: () => void;
+  filterType?: string;
 }
 
 const TYPE_FILTERS: { key: string; label: string }[] = [
@@ -33,12 +34,12 @@ function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString('pt-BR');
 }
 
-export function FiscalDocumentTable({ onNewDocument }: Props) {
+export function FiscalDocumentTable({ onNewDocument, filterType }: Props) {
   const { fetchDocuments, reintegrate, loading } = useFiscalDocuments();
   const [docs, setDocs] = useState<FiscalDocument[]>([]);
   const [summary, setSummary] = useState<FinanceSummary | null>(null);
   const [search, setSearch] = useState('');
-  const [typeFilter, setTypeFilter] = useState('');
+  const [typeFilter, setTypeFilter] = useState(filterType ?? '');
   const [currentMonth] = useState(new Date().toISOString().slice(0, 7));
 
   const load = async () => {

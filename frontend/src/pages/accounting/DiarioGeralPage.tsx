@@ -237,7 +237,7 @@ const DiarioGeralPage: React.FC = () => {
     const printLivroDiario = () => {
         if (!data?.entries.length || !activeCompany) return;
         const empresa = activeCompany.legalName || activeCompany.tradeName || '';
-        const cnpj = fmtCnpj(activeCompany.cnpj || '');
+        const cnpj = fmtCnpj(activeCompany.taxId || '');
         const periodo = filters.dateFrom.split('-').reverse().join('/') + ' a ' + filters.dateTo.split('-').reverse().join('/');
         const hoje = new Date().toLocaleDateString('pt-BR');
         const hora = new Date().toLocaleTimeString('pt-BR');

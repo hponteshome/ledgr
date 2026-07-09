@@ -101,7 +101,7 @@ export const BalanceComparisonPage = () => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `Mapa_Saldos_ECD_${activeCompany?.name || 'Relatorio'}.csv`);
+    link.setAttribute('download', `Mapa_Saldos_ECD_${activeCompany?.legalName || activeCompany?.tradeName || 'Relatorio'}.csv`);
     link.click();
     URL.revokeObjectURL(url);
   };

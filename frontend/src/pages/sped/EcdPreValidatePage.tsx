@@ -142,7 +142,7 @@ export default function EcdPreValidatePage() {
       <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6">
         {currentCompany && (
           <p className="text-xs text-gray-500 mb-4">
-            Empresa: <span className="font-medium text-gray-700">{currentCompany.name}</span>
+            Empresa: <span className="font-medium text-gray-700">{currentCompany.legalName || currentCompany.tradeName}</span>
           </p>
         )}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

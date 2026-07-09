@@ -47,7 +47,7 @@ const fmt = (d: string) => new Date(d).toLocaleString('pt-BR', { dateStyle: 'sho
 
 // ── Componente ───────────────────────────────────────────────────
 export const SignaturePanel: React.FC<Props> = ({ documentId, onSigned }) => {
-  const { empresa }   = useCompany();
+  const { activeCompany: empresa }   = useCompany();
   const [signers, setSigners]   = useState<Signer[]>([]);
   const [certs, setCerts]       = useState<Certificate[]>([]);
   const [selCert, setSelCert]   = useState('');

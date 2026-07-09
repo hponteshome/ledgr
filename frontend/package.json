@@ -29,6 +29,7 @@
     "react": "^18.2.0",
     "react-diff-viewer-continued": "^4.1.2",
     "react-dom": "^18.2.0",
+    "react-hot-toast": "^2.6.0",
     "react-icons": "^4.11.0",
     "react-pdf": "^10.4.1",
     "react-router-dom": "^6.18.0",

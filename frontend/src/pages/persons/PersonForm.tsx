@@ -75,7 +75,7 @@ interface FormData {
   birthCity: string;
   birthState: string;
   birthCountry: string;       // ← campo do schema
-  dependents: Dependets[],
+  dependents: Dependents[],
   gender: string;
   nationality: string;
   maritalStatus: string;
@@ -117,7 +117,7 @@ interface FormData {
 interface Dependents {
   id?: string;              // Para identificar no frontend
   nome: string;
-  gender: string;             // Masculino, Feminino
+  sexo: string;             // M, F (usado nos lancamentos de dependente)
   dataNascimento: string;   // formato YYYY-MM-DD
   parentesco?: string;      // Filho(a), Enteado(a), etc. (opcional)
 }

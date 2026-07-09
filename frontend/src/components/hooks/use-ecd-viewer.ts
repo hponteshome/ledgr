@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom'; // Importação necessária
 import  api  from '@/services/api';
 
-export function useEcdViewer() {
-    const { id } = useParams<{ id: string }>(); // Captura o ID da URL automaticamente
+export function useEcdViewer(importId: string) {
+    const id = importId;
     const [data, setData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
 

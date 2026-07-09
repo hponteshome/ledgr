@@ -103,7 +103,7 @@ function ConfigModal({ config, accounts, onClose, onSaved }: { config?: any; acc
     };
   });
   const [saving, setSaving] = useState(false);
-  const set = (k: string, v: any) => setForm(p => ({ ...p, [k]: v }));
+  const set = (k: string, v: any) => setForm((p: any) => ({ ...p, [k]: v }));
 
 
 

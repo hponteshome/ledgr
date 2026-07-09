@@ -6,7 +6,7 @@ import { useCompany } from '@/contexts/CompanyContext';
 import type {
   APListResponse, APPositionReport,
   AccountsPayable,
-} from '../../pages/finance/types/accounts-payable';
+} from '../types/accounts-payable';
 
 const API = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
 

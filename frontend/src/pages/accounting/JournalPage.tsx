@@ -2,6 +2,7 @@
 import { BulkDeleteModal } from './BulkDeleteModal';
 
 import { IobLotdImportModal } from './IobLotdImportModal';
+import EcdOpeningModal from '../../components/accounting/EcdOpeningModal';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
     FiSearch, FiTrash2, FiRotateCcw, FiChevronLeft, FiChevronRight,
