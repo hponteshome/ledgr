@@ -1951,3 +1951,70 @@ exato commitado em `a629bb5`. `vite v5.4.21 building for production... built in 
 - `payBatch` (baixa em lote AP) com rota divergente `/batch/pay` vs `/batch-pay` real
 - `EXPIRACAO` no Banco de Horas sem endpoint dedicado (usa contorno via `ajustar`)
 - Divergência visual Tailwind vs `SmartDateInput`/`SmartMonthInput` em ~15 arquivos
+
+---
+
+### npm audit — Frontend liquidado, Backend registrado como pendência maior (08-09/07/2026)
+
+**Frontend: 13 → 2 vulnerabilidades, resolvido via `npm audit fix` (sem --force).**
+Corrigidas sem breaking change: Axios (23 CVEs incluindo SSRF/prototype pollution),
+form-data, js-yaml, linkify-it, markdown-it, postcss, react-router, yaml,
+follow-redirects, @babel/core.
+
+**Regressão corrigida:** upgrade do Axios mudou o tipo de `res.headers['x']` (agora
+`AxiosHeaders` em vez de `string`) — `EmployeeDetailPage.tsx` usava `.includes()` direto,
+quebrou o build. Corrigido envolvendo em `String(...)`. Build revalidado com 0 erros TS
+apos a correcao. Commit `6970ca6`.
+
+**Restam 2 vulnerabilidades (esbuild/vite) — decisao deliberada de NÃO forçar agora:**
+`npm audit fix --force` instalaria `vite@8.1.3`, mas o dry-run revelou conflito real de
+peer dependencies com dois pacotes centrais do build:
+- `@tailwindcss/vite@4.2.1` — declara suporte só a `vite ^5.2 || ^6 || ^7`
+- `@vitejs/plugin-react@4.7.0` — declara suporte só a `vite ^4.2 a ^7`
+
+`--force` ignoraria esses avisos, deixando o Tailwind e o plugin do React rodando em
+versão de Vite que eles próprios não afirmam suportar — risco de quebra sutil em
+HMR/dev-server/build que o `tsc` não pegaria.
+
+**Avaliação de risco da vulnerabilidade em si:** o alerta do `esbuild` é sobre o
+**servidor de desenvolvimento** (`npm run dev`) aceitar requisições de origem externa —
+não afeta build de produção nem o app publicado. Exploração exigiria o desenvolvedor
+visitar um site malicioso enquanto o dev server local está ativo. Risco prático baixo
+para o cenário atual (dev local, não exposto).
+
+**Pendência para sessão dedicada futura:** upgrade coordenado de `vite` (5→7 ou 8) +
+`@tailwindcss/vite` + `@vitejs/plugin-react` juntos, com teste completo de dev server,
+build de produção, e renderização de estilos/HMR em várias telas antes de aceitar.
+
+---
+
+**Backend: 35 vulnerabilidades, NENHUMA aplicada — bloqueado por conflito estrutural.**
+`npm audit fix` (sem --force) falhou com erro `ERESOLVE`: `@nestjs/axios@^4.0.1` (fixado
+no `package.json`) exige `@nestjs/common@^10 || ^11`, mas existe uma dependência
+transitiva de `@nestjs/axios@3.1.3` na árvore que só aceita `@nestjs/common` até `^10`.
+
+Resolver a vulnerabilidade principal (`@nestjs/core` — injection) exigiria subir
+`@nestjs/common`/`@nestjs/core`/`@nestjs/platform-express` para `11.x` — **upgrade major
+do NestJS v10 → v11 no backend inteiro**, com breaking changes potenciais espalhados por
+todos os módulos (accounting, finance, hr, sped, fiscal, corporate, assets, etc — 90+
+controllers mapeados).
+
+**Vulnerabilidades mais relevantes no backend (por severidade/uso difundido):**
+- `@nestjs/core` (high) — requer NestJS v11
+- `xmldom` (high) — XML injection, relevante para geração de XML eSocial/NFS-e/SPED
+- `axios` (high) — mesmas 23 CVEs do frontend, backend usa Axios em integrações fiscais
+- `multer` (high) — DoS via upload, usado em toda importação de arquivo do sistema
+- `lodash` (high) — code injection via `_.template`
+- `form-data`, `basic-ftp`, `path-to-regexp`, `picomatch`, `tmp`, `webpack`, `glob`, `ws` (high) —
+  a maioria transitiva de ferramentas de dev/CLI, não necessariamente em produção
+- `xlsx` (high) — **sem fix disponível** (SheetJS não lançou correção), usado em
+  importação/exportação de planilhas Excel — avaliar substituição da biblioteca numa
+  sessão futura se o risco for considerado inaceitável
+
+**Recomendação para a sessão dedicada ao backend:**
+1. Mapear todo uso de `@nestjs/*` no projeto antes de decidir a estratégia de upgrade
+2. Testar upgrade do NestJS v10→v11 em branch separada, módulo por módulo
+3. Avaliar separadamente o `xlsx` sem fix — pode precisar de biblioteca alternativa
+   (ex: `exceljs`) se o risco for julgado alto para dados fiscais sensíveis
+4. Não usar `--force` sem entender a árvore de dependências primeiro (mesmo erro do
+   `@nestjs/axios` pode se repetir em outros pacotes)
