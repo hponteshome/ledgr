@@ -66,6 +66,7 @@ import InformeRendimentosPage from '../pages/hr/InformeRendimentosPage';
 import { EmployeesPage } from '../pages/hr/EmployeesPage';
 import EsocialPage from '../pages/hr/EsocialPage';
 import FeriasPage from '../pages/hr/FeriasPage';
+import BancoHorasPage from '../pages/hr/BancoHorasPage';
 import RecessoPage from '../pages/hr/RecessoPage';
 import DecimoTerceiroPage from '../pages/hr/DecimoTerceiroPage';
 import RaisPage from '../pages/hr/RaisPage';
@@ -184,6 +185,7 @@ export const AppRoutes = () => {
                 <Route path="app/hr/employees" element={<ProtectedRoute><EmployeesPage /></ProtectedRoute>} />
                 <Route path="/app/hr/esocial" element={<ProtectedRoute><EsocialPage /></ProtectedRoute>} />
                 <Route path="/app/hr/ferias" element={<ProtectedRoute><FeriasPage /></ProtectedRoute>} />
+                <Route path="/app/hr/banco-horas" element={<ProtectedRoute><BancoHorasPage /></ProtectedRoute>} />
                 <Route path="/app/hr/recesso" element={<ProtectedRoute><RecessoPage /></ProtectedRoute>} />
                 <Route path="/app/hr/decimo-terceiro" element={<ProtectedRoute><DecimoTerceiroPage /></ProtectedRoute>} />
                 <Route path="/app/hr/rais" element={<ProtectedRoute><RaisPage /></ProtectedRoute>} />

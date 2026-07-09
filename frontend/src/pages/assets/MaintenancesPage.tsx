@@ -120,13 +120,13 @@ export default function MaintenancesPage() {
                 <td style={{ padding: '10px 14px', color: '#2563EB', fontSize: 12 }}>
                   {m.asset?.internalCode} — {m.asset?.description}
                 </td>
-                <td style={{ padding: '10px 14px', color: '#374151' }}>{MAINTENANCE_TYPE_LABELS[m.type] ?? m.type}</td>
+                <td style={{ padding: '10px 14px', color: '#374151' }}>{(MAINTENANCE_TYPE_LABELS as any)[m.type] ?? m.type}</td>
                 <td style={{ padding: '10px 14px', color: '#374151' }}>{formatDate(m.scheduledDate)}</td>
                 <td style={{ padding: '10px 14px', color: '#374151' }}>{m.estimatedCost ? formatCurrency(m.estimatedCost) : '—'}</td>
                 <td style={{ padding: '10px 14px' }}>
                   <span style={{ padding: '2px 10px', borderRadius: 20, fontSize: 11, fontWeight: 500 }}
                     className={STATUS_COLORS[m.status] ?? 'bg-gray-100 text-gray-500'}>
-                    {MAINTENANCE_STATUS_LABELS[m.status] ?? m.status}
+                    {(MAINTENANCE_STATUS_LABELS as any)[m.status] ?? m.status}
                   </span>
                 </td>
               </tr>
