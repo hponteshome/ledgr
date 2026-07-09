@@ -3789,6 +3789,7 @@ enum TipoLancamentoBH {
   DEBITO       // horas compensadas/abonadas
   EXPIRACAO    // horas expiradas por politica
   AJUSTE       // ajuste manual
+  ESTORNO      // reversao auditavel de um lancamento anterior
 
   @@map("tipo_lancamento_bh")
 }
@@ -3838,6 +3839,8 @@ model BancoHorasLancamento {
   descricao    String?           @map("descricao") @db.VarChar(255)
   folhaId      String?           @map("folha_id") @db.Uuid // origem folha
   dataExpiracao DateTime?        @map("data_expiracao") @db.Date
+  estornado    Boolean           @default(false) @map("estornado")
+  estornoDeId  String?           @map("estorno_de_id") @db.Uuid // preenchido no lancamento ESTORNO, aponta pro original
 
   createdById String   @map("created_by_id") @db.Uuid
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp(6)

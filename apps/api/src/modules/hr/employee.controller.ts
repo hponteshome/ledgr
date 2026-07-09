@@ -125,6 +125,16 @@ export class EmployeeController {
     return this.bhService.configurar(req.companyId, id, body);
   }
 
+  @Post(':id/banco-horas/lancamentos/:lancamentoId/estornar')
+  bhEstornar(@Req() req: any, @Param('id') id: string, @Param('lancamentoId') lancamentoId: string, @Body() body: any) {
+    return this.bhService.estornar(req.companyId, id, lancamentoId, body.motivo, req.user.id);
+  }
+
+  @Post(':id/banco-horas/lancamentos/:lancamentoId/corrigir')
+  bhCorrigir(@Req() req: any, @Param('id') id: string, @Param('lancamentoId') lancamentoId: string, @Body() body: any) {
+    return this.bhService.corrigir(req.companyId, id, lancamentoId, body, req.user.id);
+  }
+
   @Post(':id/banco-horas')
   addBancoHoras(@Req() req: any, @Param('id') id: string, @Body() body: any) {
     return this.service.addLancamentoBH(req.companyId, id, body, req.user.id);

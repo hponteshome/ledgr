@@ -133,6 +133,150 @@ export class BancoHorasService {
     });
   }
 
+  // Estorno de lancamento -- reversao auditavel, NUNCA edita ou exclui o original
+  async estornar(companyId: string, employeeId: string, lancamentoId: string, motivo: string, userId: string) {
+    return this.prisma.$transaction(async (tx: any) => {
+      const original = await tx.bancoHorasLancamento.findFirst({
+        where: { id: lancamentoId, companyId, employeeId },
+      });
+      if (!original) throw new BadRequestException('Lancamento nao encontrado.');
+      if (original.estornado) throw new BadRequestException('Lancamento ja foi estornado.');
+      if (original.tipo === 'ESTORNO') throw new BadRequestException('Nao e possivel estornar um estorno.');
+
+      const bh = await this.ensureBH(tx, companyId, employeeId);
+      const minutosReversos = -original.minutos;
+      const saldoApos = bh.saldoMinutos + minutosReversos;
+
+      const estorno = await tx.bancoHorasLancamento.create({
+        data: {
+          bancoHorasId: bh.id, companyId, employeeId,
+          tipo: 'ESTORNO', tipoHora: original.tipoHora,
+          multiplicador: new Decimal('1.00'),
+          minutosOriginais: Math.abs(minutosReversos),
+          minutos: minutosReversos,
+          saldoApos,
+          data: new Date(),
+          competencia: original.competencia,
+          descricao: motivo || ('Estorno do lancamento de ' + original.data.toISOString().slice(0, 10)),
+          estornoDeId: original.id,
+          createdById: userId,
+        },
+      });
+
+      await tx.bancoHorasLancamento.update({ where: { id: original.id }, data: { estornado: true } });
+      await tx.bancoHoras.update({ where: { id: bh.id }, data: { saldoMinutos: saldoApos } });
+
+      // AuditLog -- campos corretos conforme schema do projeto
+      await tx.auditLog.create({
+        data: {
+          actorId:  userId,
+          action:   'ESTORNAR_BANCO_HORAS',
+          targetId: original.id,
+          before:   { minutos: original.minutos, saldoApos: original.saldoApos, tipo: original.tipo } as any,
+          after:    { estornoId: estorno.id, minutosReversos, saldoApos, motivo } as any,
+          ip:       null,
+        },
+      });
+
+      return { saldoApos, fmtSaldo: fmtMin(saldoApos), estornoId: estorno.id };
+    });
+  }
+
+  // Correcao de lancamento -- estorna o original e (opcionalmente) lanca o corrigido, tudo em uma unica transacao.
+  // "Apenas estornar" cobre o caso de reversao total (nao lanca nada novo).
+  async corrigir(companyId: string, employeeId: string, lancamentoId: string, dto: {
+    apenasEstornar: boolean;
+    tipo?: string; tipoHora?: string; minutosOriginais?: number;
+    data?: string; competencia?: string; descricao?: string; motivo?: string;
+  }, userId: string) {
+    return this.prisma.$transaction(async (tx: any) => {
+      const original = await tx.bancoHorasLancamento.findFirst({
+        where: { id: lancamentoId, companyId, employeeId },
+      });
+      if (!original) throw new BadRequestException('Lancamento nao encontrado.');
+      if (original.estornado) throw new BadRequestException('Lancamento ja foi estornado.');
+      if (original.tipo === 'ESTORNO') throw new BadRequestException('Nao e possivel corrigir um estorno.');
+
+      const bh = await this.ensureBH(tx, companyId, employeeId);
+
+      // 1) Estorna o lancamento original (preservado no historico, nunca editado/excluido)
+      const minutosReversos = -original.minutos;
+      let saldoApos = bh.saldoMinutos + minutosReversos;
+
+      const estorno = await tx.bancoHorasLancamento.create({
+        data: {
+          bancoHorasId: bh.id, companyId, employeeId,
+          tipo: 'ESTORNO', tipoHora: original.tipoHora,
+          multiplicador: new Decimal('1.00'),
+          minutosOriginais: Math.abs(minutosReversos),
+          minutos: minutosReversos,
+          saldoApos,
+          data: new Date(),
+          competencia: original.competencia,
+          descricao: dto.motivo || ('Estorno para correcao do lancamento de ' + original.data.toISOString().slice(0, 10)),
+          estornoDeId: original.id,
+          createdById: userId,
+        },
+      });
+
+      await tx.bancoHorasLancamento.update({ where: { id: original.id }, data: { estornado: true } });
+
+      let novo: any = null;
+
+      // 2) Lanca o valor corrigido (se nao for "apenas estornar")
+      if (!dto.apenasEstornar) {
+        const tipo = dto.tipo ?? original.tipo;
+        const tipoHora = dto.tipoHora ?? original.tipoHora;
+        const minutosOriginaisIn = dto.minutosOriginais ?? original.minutosOriginais;
+        const dataIn = dto.data ?? original.data.toISOString().slice(0, 10);
+        const competenciaIn = dto.competencia ?? original.competencia;
+        const descricaoIn = dto.descricao ?? original.descricao;
+
+        let minutos: number;
+        let mult = new Decimal('1.00');
+        if (tipo === 'CREDITO') {
+          const m = getMultiplicador(tipoHora, bh);
+          mult = new Decimal(m.toFixed(2));
+          minutos = Math.round(minutosOriginaisIn * m);
+        } else if (tipo === 'AJUSTE') {
+          minutos = minutosOriginaisIn;
+        } else {
+          minutos = -Math.abs(minutosOriginaisIn);
+        }
+
+        saldoApos = saldoApos + minutos;
+
+        novo = await tx.bancoHorasLancamento.create({
+          data: {
+            bancoHorasId: bh.id, companyId, employeeId,
+            tipo, tipoHora,
+            multiplicador: mult,
+            minutosOriginais: Math.abs(minutosOriginaisIn),
+            minutos, saldoApos,
+            data: new Date(dataIn), competencia: competenciaIn,
+            descricao: descricaoIn ?? undefined,
+            createdById: userId,
+          },
+        });
+      }
+
+      await tx.bancoHoras.update({ where: { id: bh.id }, data: { saldoMinutos: saldoApos } });
+
+      await tx.auditLog.create({
+        data: {
+          actorId:  userId,
+          action:   dto.apenasEstornar ? 'ESTORNAR_BANCO_HORAS' : 'CORRIGIR_BANCO_HORAS',
+          targetId: original.id,
+          before:   { minutos: original.minutos, saldoApos: original.saldoApos, tipo: original.tipo } as any,
+          after:    { estornoId: estorno.id, novoId: novo?.id ?? null, saldoApos, motivo: dto.motivo } as any,
+          ip:       null,
+        },
+      });
+
+      return { saldoApos, fmtSaldo: fmtMin(saldoApos), estornoId: estorno.id, novoId: novo?.id ?? null };
+    });
+  }
+
   // Saldo do funcionario
   async getSaldo(companyId: string, employeeId: string) {
     const bh = await this.prisma.bancoHoras.findFirst({

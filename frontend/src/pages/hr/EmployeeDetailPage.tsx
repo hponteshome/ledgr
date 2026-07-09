@@ -89,6 +89,8 @@ export default function EmployeeDetailPage() {
   }
 
   async function saveBH() {
+    if (!bhDto.data) { alert("Informe a data do lancamento."); return; }
+    if (!bhDto.minutosOriginais) { alert("Informe os minutos."); return; }
     setSaving(true);
     try {
       const minutos = parseInt(bhDto.minutosOriginais);
@@ -105,6 +107,44 @@ export default function EmployeeDetailPage() {
         await api.post("/hr/employees/"+id+"/banco-horas/ajustar", { ...base, minutos: -Math.abs(minutos) });
       }
       setShowBH(false); load();
+    }
+    catch(e:any){ alert(e?.response?.data?.message??"Erro"); } finally{setSaving(false);}
+  }
+
+  const [showCorrecao, setShowCorrecao] = useState<any>(null);
+  const [correcaoDto, setCorrecaoDto] = useState<any>({});
+
+  function abrirCorrecao(l: any) {
+    setShowCorrecao(l);
+    setCorrecaoDto({
+      apenasEstornar: false,
+      tipo: l.tipo,
+      tipoHora: l.tipoHora || "DIURNA",
+      minutosOriginais: String(l.minutosOriginais ?? Math.abs(l.minutos)),
+      data: String(l.data).slice(0,10),
+      competencia: l.competencia,
+      descricao: l.descricao || "",
+      motivo: "",
+    });
+  }
+
+  async function salvarCorrecao() {
+    if (!showCorrecao) return;
+    if (!correcaoDto.motivo) { alert("Informe o motivo da correcao."); return; }
+    setSaving(true);
+    try {
+      await api.post("/hr/employees/"+id+"/banco-horas/lancamentos/"+showCorrecao.id+"/corrigir", {
+        apenasEstornar: correcaoDto.apenasEstornar,
+        tipo: correcaoDto.tipo,
+        tipoHora: correcaoDto.tipoHora,
+        minutosOriginais: parseInt(correcaoDto.minutosOriginais),
+        data: correcaoDto.data,
+        competencia: correcaoDto.competencia,
+        descricao: correcaoDto.descricao,
+        motivo: correcaoDto.motivo,
+      });
+      setShowCorrecao(null);
+      load();
     }
     catch(e:any){ alert(e?.response?.data?.message??"Erro"); } finally{setSaving(false);}
   }
@@ -357,11 +397,11 @@ export default function EmployeeDetailPage() {
               <button onClick={()=>setShowBH(true)} style={S.btn(AC)}>+ Lancamento</button>
             </div>
             <table style={{width:"100%",borderCollapse:"collapse",background:"#fff",borderRadius:10,overflow:"hidden",border:"0.5px solid #E5E7EB"}}>
-              <thead><tr>{["Data","Tipo","Tipo Hora","Min.Orig","Mult","Minutos","Saldo Apos","Competencia","Descricao"].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
+              <thead><tr>{["Data","Tipo","Tipo Hora","Min.Orig","Mult","Minutos","Saldo Apos","Competencia","Descricao","Acoes"].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
               <tbody>{(bh?.lancamentos??[]).map((l:any)=>(
                 <tr key={l.id}>
                   <td style={S.td}>{fmtDate(l.data)}</td>
-                  <td style={S.td}><span style={{fontSize:11,padding:"2px 8px",borderRadius:20,background:l.minutos>0?"#DCFCE7":"#FEE2E2",color:l.minutos>0?"#15803D":"#B91C1C"}}>{l.tipo}</span></td>
+                  <td style={S.td}><span style={{fontSize:11,padding:"2px 8px",borderRadius:20,background:l.minutos>0?"#DCFCE7":"#FEE2E2",color:l.minutos>0?"#15803D":"#B91C1C"}}>{l.tipo}</span>{l.estornado&&<span style={{marginLeft:6,fontSize:10,padding:"1px 6px",borderRadius:20,background:"#F3F4F6",color:"#6B7280"}}>Estornado</span>}</td>
                   <td style={{...S.td,fontSize:11,color:"#6B7280"}}>{l.tipoHora?.replace("FDS_","")??"-"}</td>
                   <td style={{...S.td,fontFamily:"monospace",fontSize:11}}>{l.minutosOriginais??"-"}</td>
                   <td style={{...S.td,fontFamily:"monospace",fontSize:11}}>{l.multiplicador?`x${Number(l.multiplicador).toFixed(2)}`:"-"}</td>
@@ -369,9 +409,10 @@ export default function EmployeeDetailPage() {
                   <td style={{...S.td,fontFamily:"monospace"}}>{fmtMin(l.saldoApos)}</td>
                   <td style={S.td}>{l.competencia}</td>
                   <td style={S.td}>{l.descricao||"—"}</td>
+                  <td style={S.td}>{!l.estornado&&l.tipo!=="ESTORNO"&&<button onClick={()=>abrirCorrecao(l)} style={S.btn("#B91C1C",true)}>Corrigir</button>}</td>
                 </tr>
               ))}
-              {!(bh?.lancamentos?.length)&&<tr><td colSpan={6} style={{...S.td,textAlign:"center",color:"#9CA3AF",padding:40}}>Nenhum lancamento no banco de horas.</td></tr>}
+              {!(bh?.lancamentos?.length)&&<tr><td colSpan={10} style={{...S.td,textAlign:"center",color:"#9CA3AF",padding:40}}>Nenhum lancamento no banco de horas.</td></tr>}
               </tbody>
             </table>
           </div>
@@ -494,6 +535,67 @@ export default function EmployeeDetailPage() {
         </div></div>
       )}
 
+      {/* Modal Corrigir Lancamento */}
+      {showCorrecao && (
+        <div style={ov}><div style={cd(420)}>
+          <h3 style={{margin:"0 0 4px",fontSize:15,fontWeight:700}}>Corrigir Lancamento</h3>
+          <p style={{fontSize:12,color:"#6B7280",margin:"0 0 16px"}}>
+            O lancamento original sera estornado (preservado no historico) e, se aplicavel, um novo lancamento corrigido sera criado.
+          </p>
+          <div style={{display:"grid",gap:12}}>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <input type="checkbox" id="apenasEstornar" checked={correcaoDto.apenasEstornar}
+                onChange={e=>setCorrecaoDto((d:any)=>({...d,apenasEstornar:e.target.checked}))}/>
+              <label htmlFor="apenasEstornar" style={{fontSize:13}}>Apenas estornar (sem lancar corrigido)</label>
+            </div>
+
+            {!correcaoDto.apenasEstornar && (<>
+              <div style={S.row}>
+                <div><label style={S.lbl}>Tipo *</label>
+                  <select value={correcaoDto.tipo} onChange={e=>setCorrecaoDto((d:any)=>({...d,tipo:e.target.value}))} style={S.inp}>
+                    {["CREDITO","DEBITO","AJUSTE","EXPIRACAO"].map(t=><option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div><label style={S.lbl}>Data *</label>
+                  <SmartDateInput value={correcaoDto.data} onChange={v=>setCorrecaoDto((d:any)=>({...d,data:v}))} style={S.inp}/>
+                </div>
+              </div>
+              {correcaoDto.tipo==="CREDITO" && (
+                <div><label style={S.lbl}>Tipo de Hora</label>
+                  <select value={correcaoDto.tipoHora} onChange={e=>setCorrecaoDto((d:any)=>({...d,tipoHora:e.target.value}))} style={S.inp}>
+                    <option value="NORMAL">Normal (sem acrescimo)</option>
+                    <option value="DIURNA">Diurna (HE 50%)</option>
+                    <option value="NOTURNA">Noturna (HE 50% + 20% adicional)</option>
+                    <option value="FDS_SABADO">Sabado (HE 50%)</option>
+                    <option value="FDS_DOMINGO">Domingo (HE 100%)</option>
+                    <option value="FERIADO">Feriado (HE 100%)</option>
+                  </select>
+                </div>
+              )}
+              <div style={S.row}>
+                <div><label style={S.lbl}>{correcaoDto.tipo==="CREDITO"?"Minutos Brutos *":"Minutos *"}</label>
+                  <input type="number" value={correcaoDto.minutosOriginais} onChange={e=>setCorrecaoDto((d:any)=>({...d,minutosOriginais:e.target.value}))} style={S.inp}/>
+                </div>
+                <div><label style={S.lbl}>Competencia *</label>
+                  <SmartMonthInput value={correcaoDto.competencia} onChange={v=>setCorrecaoDto((d:any)=>({...d,competencia:v}))} style={S.inp}/>
+                </div>
+              </div>
+              <div><label style={S.lbl}>Descricao</label>
+                <input value={correcaoDto.descricao} onChange={e=>setCorrecaoDto((d:any)=>({...d,descricao:e.target.value}))} style={S.inp}/>
+              </div>
+            </>)}
+
+            <div><label style={S.lbl}>Motivo da Correcao * (auditoria)</label>
+              <input value={correcaoDto.motivo} onChange={e=>setCorrecaoDto((d:any)=>({...d,motivo:e.target.value}))} style={S.inp} placeholder="Ex: Valor lancado incorretamente"/>
+            </div>
+          </div>
+          <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginTop:20}}>
+            <button onClick={()=>setShowCorrecao(null)} style={S.btn("#fff","#374151")}>Cancelar</button>
+            <button onClick={salvarCorrecao} disabled={saving||!correcaoDto.motivo} style={S.btn("#B91C1C")}>{saving?"Salvando...":"Confirmar Correcao"}</button>
+          </div>
+        </div></div>
+      )}
+
       {/* Modal Banco de Horas */}
       {showBH && (
         <div style={ov}><div style={cd(420)}>
@@ -529,7 +631,7 @@ export default function EmployeeDetailPage() {
           </div>
           <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginTop:20}}>
             <button onClick={()=>setShowBH(false)} style={S.btn("#fff","#374151")}>Cancelar</button>
-            <button onClick={saveBH} disabled={saving||!bhDto.data||!bhDto.minutosOriginais} style={S.btn(AC)}>{saving?"Salvando...":"Lancar"}</button>
+            <button onClick={saveBH} disabled={saving} style={S.btn(AC)}>{saving?"Salvando...":"Lancar"}</button>
           </div>
         </div></div>
       )}
