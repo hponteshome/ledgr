@@ -77,10 +77,11 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
   )?.[1];
 
   useEffect(() => {
+    if (!user) { setTree([]); return; }
     api.get('/sidebar-permissions/tree')
       .then(r => setTree(r.data))
       .catch(() => setTree([]));
-  }, []);
+  }, [user]);
 
   const menuItems = useMemo<MenuItem[]>(() => {
     return tree.map(node => {

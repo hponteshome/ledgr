@@ -63,8 +63,8 @@ api.interceptors.response.use(
       localStorage.removeItem('@ledgr:activeCompany');
       localStorage.removeItem('@ledgr:companyId');
       
-      if (!window.location.pathname.includes('/login')) {
-        window.location.href = '/login';
+      if (window.location.pathname !== '/') {
+        window.location.href = '/';
       }
     }
 
