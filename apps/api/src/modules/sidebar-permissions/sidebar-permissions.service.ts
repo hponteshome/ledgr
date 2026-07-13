@@ -92,7 +92,7 @@ export class SidebarPermissionsService {
     });
 
     const userOverrides = await this.prisma.userSidebarPermission.findMany({
-      where: { userId, companyId: { in: [companyId, null] } },
+      where: { userId, OR: [{ companyId }, { companyId: null }] },
       include: { item: { select: { path: true } } },
     });
 
@@ -126,10 +126,11 @@ export class SidebarPermissionsService {
       where: { profileId: user.profileId },
     });
 
-    const override = await this.prisma.userSidebarPermission.findFirst({
-      where: { userId, itemId: item.id, companyId: { in: [companyId, null] } },
-      orderBy: { companyId: 'desc' },
+    const overrides = await this.prisma.userSidebarPermission.findMany({
+      where: { userId, itemId: item.id, OR: [{ companyId }, { companyId: null }] },
     });
+    // Prioriza override especifico da empresa ativa sobre o global (companyId nulo)
+    const override = overrides.find(o => o.companyId === companyId) ?? overrides.find(o => o.companyId === null) ?? null;
 
     if (profileCount === 0) {
       return override ? (override.accessLevel as Level) : 'EDIT';
