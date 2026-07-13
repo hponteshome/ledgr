@@ -1,8 +1,10 @@
 // /apps/api/src/modules/accounting/controllers/balance-comparison.controller.ts
-import { Controller, Get, Param } from '@nestjs/common';
+import { Controller, Get, Param, UseGuards } from '@nestjs/common';
 import { BalancesService } from '../services/balances.service';
+import { JwtAuthGuard } from '../../../auth/guards/jwt.guard';
 
-@Controller('reports') // Define o prefixo da rota
+@UseGuards(JwtAuthGuard)
+@Controller('reports')
 export class BalanceComparisonController {
   constructor(private readonly balancesService: BalancesService) {}
 

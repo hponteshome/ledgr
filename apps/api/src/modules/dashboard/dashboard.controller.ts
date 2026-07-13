@@ -1,7 +1,9 @@
 // apps/api/src/modules/dashboard/dashboard.controller.ts
-import { Controller, Get, Query, Req } from '@nestjs/common';
+import { Controller, Get, Query, Req, UseGuards } from '@nestjs/common';
 import { DashboardService } from './dashboard.service';
+import { JwtAuthGuard } from '../../auth/guards/jwt.guard';
 
+@UseGuards(JwtAuthGuard)
 @Controller('dashboard')
 export class DashboardController {
   constructor(private readonly svc: DashboardService) {}

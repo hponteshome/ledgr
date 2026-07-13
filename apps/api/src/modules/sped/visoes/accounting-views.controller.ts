@@ -1,7 +1,9 @@
 // apps/api/src/modules/sped/visoes/accounting-views.controller.ts
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, Req } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, Req, UseGuards } from '@nestjs/common';
 import { AccountingViewsService } from './accounting-views.service';
+import { JwtAuthGuard } from '../../../auth/guards/jwt.guard';
 
+@UseGuards(JwtAuthGuard)
 @Controller('sped/visoes')
 export class AccountingViewsController {
   constructor(private readonly svc: AccountingViewsService) {}

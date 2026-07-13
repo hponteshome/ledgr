@@ -6,7 +6,10 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
 import { ExportDataService } from './export-data.service';
+import { UseGuards } from '@nestjs/common';
+import { JwtAuthGuard } from '../../auth/guards/jwt.guard';
 
+@UseGuards(JwtAuthGuard)
 @Controller('system')
 export class SystemController {
   constructor(private readonly exportService: ExportDataService) {}

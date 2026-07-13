@@ -11,6 +11,8 @@ import { GovBrService } from './govbr.service';
 import { ClicksignService } from './clicksign.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SignatureValidatorService } from './signature-validator.service';
+import { JwtAuthGuard } from '../../auth/guards/jwt.guard';
+import { UseGuards } from '@nestjs/common';
 
 @Controller('signatures')
 export class SignaturesController {
@@ -24,22 +26,26 @@ export class SignaturesController {
   ) {}
 
   // ── Certificados ───────────────────────────────────────────────────────────
+  @UseGuards(JwtAuthGuard)
   @Get('certificates')
   async listCertificates(@Req() req: any) {
     return this.certificatesService.findAll(req.companyId);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Delete('certificates/:id')
   async revokeCertificate(@Req() req: any, @Param('id') id: string) {
     return this.certificatesService.revoke(req.companyId, id);
   }
 
   // ── Signatários ────────────────────────────────────────────────────────────
+  @UseGuards(JwtAuthGuard)
   @Get('documents/:documentId/signers')
   async getSigners(@Param('documentId') documentId: string) {
     return this.signatureService.getSigners(documentId);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Post('documents/:documentId/signers')
   async addSigners(
     @Req() req: any,
@@ -50,6 +56,7 @@ export class SignaturesController {
   }
 
   // ── ClickSign — criar solicitação ─────────────────────────────────────────
+  @UseGuards(JwtAuthGuard)
   @Post('documents/:documentId/clicksign/request')
   async createClicksignRequest(
     @Req() req: any,
@@ -91,6 +98,7 @@ export class SignaturesController {
   }
 
   // ── ClickSign — baixar PDF assinado ──────────────────────────────────────
+  @UseGuards(JwtAuthGuard)
   @Get('documents/:documentId/clicksign/download')
   async downloadSignedPdf(
     @Req() req: any,
@@ -104,6 +112,7 @@ export class SignaturesController {
   }
 
   // ── ClickSign — status ────────────────────────────────────────────────────
+  @UseGuards(JwtAuthGuard)
   @Get('documents/:documentId/clicksign/status')
   async getClicksignStatus(
     @Req() req: any,
@@ -117,6 +126,7 @@ export class SignaturesController {
   }
 
   // ── Gov.br ────────────────────────────────────────────────────────────────
+  @UseGuards(JwtAuthGuard)
   @Post('documents/:documentId/sign/govbr/init')
   async initiateGovBr(
     @Req() req: any,
@@ -149,11 +159,13 @@ export class SignaturesController {
   }
 
   // ── Status geral ──────────────────────────────────────────────────────────
+  @UseGuards(JwtAuthGuard)
   @Get('documents/:documentId/status')
   async getStatus(@Param('documentId') documentId: string) {
     return this.signatureService.getSignatureStatus(documentId);
   }
   // ── Validar PDF assinado ──────────────────────────────────────────────────
+  @UseGuards(JwtAuthGuard)
   @Post('validate')
   @UseInterceptors(FileInterceptor('pdf'))
   async validateSignature(
