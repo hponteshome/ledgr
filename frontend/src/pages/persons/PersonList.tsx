@@ -3,6 +3,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FiPlus, FiSearch, FiUser, FiEdit2, FiTrash2, FiExternalLink, FiEye } from 'react-icons/fi';
 import api from '@/services/api';
+import toast from 'react-hot-toast';
+import { useSidebarPermissions } from '@/contexts/SidebarPermissionsContext';
 
 interface Person {
   id: string;
@@ -55,6 +57,9 @@ export const PersonList: React.FC = () => {
   const [pages, setPages] = useState(1);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  const { canEdit, canDelete } = useSidebarPermissions();
+  const canEditPersons = canEdit('/app/persons');
+  const canDeletePersons = canDelete('/app/persons');
 
   const load = useCallback(async (p = 1, q = search) => {
     setLoading(true);
@@ -79,6 +84,7 @@ export const PersonList: React.FC = () => {
   };
 
   const handleDelete = async (id: string, name: string) => {
+    if (!canDeletePersons) { toast.error('Seu perfil não tem permissão para excluir.'); return; }
     if (!confirm(`Remover "${name}"? Esta ação não pode ser desfeita.`)) return;
     await api.delete(`/persons/${id}`);
     load(page, search);
@@ -94,12 +100,14 @@ export const PersonList: React.FC = () => {
             Base central de qualificação — {total} {total === 1 ? 'pessoa' : 'pessoas'}
           </p>
         </div>
-        <button
-          onClick={() => navigate('/app/persons/new')}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm"
-        >
-          <FiPlus size={16} /> Nova Pessoa
-        </button>
+        {canEditPersons && (
+          <button
+            onClick={() => navigate('/app/persons/new')}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm"
+          >
+            <FiPlus size={16} /> Nova Pessoa
+          </button>
+        )}
       </div>
 
       {/* Busca */}
@@ -191,20 +199,24 @@ export const PersonList: React.FC = () => {
                           >
                             <FiEye size={14} />
                           </button>
-                          <button
-                            onClick={() => navigate(`/app/persons/${p.id}`)}
-                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                            title="Editar"
-                          >
-                            <FiEdit2 size={14} />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(p.id, p.fullName)}
-                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                            title="Remover"
-                          >
-                            <FiTrash2 size={14} />
-                          </button>
+                          {canEditPersons && (
+                            <button
+                              onClick={() => navigate(`/app/persons/${p.id}`)}
+                              className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                              title="Editar"
+                            >
+                              <FiEdit2 size={14} />
+                            </button>
+                          )}
+                          {canDeletePersons && (
+                            <button
+                              onClick={() => handleDelete(p.id, p.fullName)}
+                              className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                              title="Remover"
+                            >
+                              <FiTrash2 size={14} />
+                            </button>
+                          )}
                         </div>
                       </div>
                     </td>

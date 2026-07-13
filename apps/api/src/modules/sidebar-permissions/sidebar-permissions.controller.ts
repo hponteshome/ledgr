@@ -1,7 +1,9 @@
-import { Controller, Get, Post, Delete, Body, Param, Req } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Body, Param, Req, UseGuards } from '@nestjs/common';
 import { SidebarPermissionsService } from './sidebar-permissions.service';
 import { SkipCompanyCheck } from '../../multi-company/company.interceptor';
+import { JwtAuthGuard } from '../../auth/guards/jwt.guard';
 
+@UseGuards(JwtAuthGuard)
 @Controller('sidebar-permissions')
 export class SidebarPermissionsController {
   constructor(private svc: SidebarPermissionsService) {}

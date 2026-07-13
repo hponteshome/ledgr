@@ -7,6 +7,8 @@ import {
 } from 'react-icons/fi';
 import api from '@/services/api';
 import { SmartDateInput } from '@/components/SmartDateInput';
+import toast from 'react-hot-toast';
+import { useSidebarPermissions } from '@/contexts/SidebarPermissionsContext';
 
 
 // ── Constantes ────────────────────────────────────────────────
@@ -264,6 +266,9 @@ export const PersonForm: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'dados' | 'vinculos'>('dados');
   const [cpfError, setCpfError] = useState('');
+  const { canEdit, allowed, loading: permLoading } = useSidebarPermissions();
+  const canEditPersons = canEdit('/app/persons');
+  console.log('[DEBUG canEditPersons]', { canEditPersons, permLoading, allowed });
 
   // Novo vínculo
   const [newLink, setNewLink] = useState({ companyId: '', role: '', startDate: '', notes: '' });
@@ -330,7 +335,7 @@ export const PersonForm: React.FC = () => {
         });
         setLinks(data.companyLinks ?? []);
       })
-      .catch(() => alert('Erro ao carregar pessoa.'))
+      .catch(() => toast.error('Erro ao carregar pessoa.'))
       .finally(() => setLoading(false));
   }, [personId]);
 
@@ -465,8 +470,8 @@ export const PersonForm: React.FC = () => {
 
   // ── Save ──────────────────────────────────────────────────
   const handleSave = async () => {
-    if (!form.fullName.trim()) { alert('Nome completo obrigatório.'); return; }
-    if (!form.cpf.trim()) { alert('CPF obrigatório.'); return; }
+    if (!form.fullName.trim()) { toast.error('Nome completo obrigatório.'); return; }
+    if (!form.cpf.trim()) { toast.error('CPF obrigatório.'); return; }
 
     setSaving(true);
     setCpfError('');
@@ -485,7 +490,7 @@ export const PersonForm: React.FC = () => {
         setCpfError(msg);
         setActiveTab('dados');
       } else {
-        alert(typeof msg === 'string' ? msg : 'Erro ao salvar. Verifique os dados.');
+        toast.error(typeof msg === 'string' ? msg : 'Erro ao salvar. Verifique os dados.');
       }
     } finally {
       setSaving(false);
@@ -495,7 +500,7 @@ export const PersonForm: React.FC = () => {
   // ── Vínculos ──────────────────────────────────────────────
   const handleAddLink = async () => {
     if (!newLink.companyId || !newLink.role) {
-      alert('Empresa e papel são obrigatórios.');
+      toast.error('Empresa e papel são obrigatórios.');
       return;
     }
     try {
@@ -503,7 +508,7 @@ export const PersonForm: React.FC = () => {
       setLinks(prev => [...prev, data]);
       setNewLink({ companyId: '', role: '', startDate: '', notes: '' });
     } catch {
-      alert('Erro ao adicionar vínculo.');
+      toast.error('Erro ao adicionar vínculo.');
     }
   };
 
@@ -516,7 +521,7 @@ export const PersonForm: React.FC = () => {
       const { data } = await api.get(`/persons/${personId}`);
       setLinks(data.companyLinks ?? []);
     } catch {
-      alert('Erro ao encerrar vínculo.');
+      toast.error('Erro ao encerrar vínculo.');
     }
   };
 
@@ -526,7 +531,7 @@ export const PersonForm: React.FC = () => {
       await api.delete(`/persons/links/${linkId}`);
       setLinks(prev => prev.filter(l => l.id !== linkId));
     } catch {
-      alert('Erro ao remover vínculo.');
+      toast.error('Erro ao remover vínculo.');
     }
   };
 
@@ -561,13 +566,17 @@ export const PersonForm: React.FC = () => {
           </div>
         </div>
         <button
-          onClick={handleSave}
+          onClick={canEditPersons ? handleSave : () => toast.error('Seu perfil tem apenas visualização para Pessoas Físicas.')}
           disabled={saving}
-          className="flex items-center gap-2 px-5 py-2 bg-blue-600 text-white rounded-lg
-                     hover:bg-blue-700 disabled:opacity-60 transition-colors font-medium"
+          title={!canEditPersons ? 'Seu perfil tem apenas visualização para Pessoas Físicas.' : undefined}
+          className={`flex items-center gap-2 px-5 py-2 rounded-lg transition-colors font-medium ${
+            canEditPersons
+              ? 'bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60'
+              : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+          }`}
         >
           <FiSave size={16} />
-          {saving ? 'Salvando…' : 'Salvar'}
+          {saving ? 'Salvando…' : canEditPersons ? 'Salvar' : 'Somente leitura'}
         </button>
       </div>
 
