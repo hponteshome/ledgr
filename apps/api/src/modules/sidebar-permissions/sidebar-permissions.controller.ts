@@ -11,6 +11,11 @@ export class SidebarPermissionsController {
   @SkipCompanyCheck()
   listItems() { return this.svc.listItems(); }
 
+  // GET /sidebar-permissions/tree
+  @Get('tree')
+  @SkipCompanyCheck()
+  getTree() { return this.svc.getTree(); }
+
   // GET /sidebar-permissions/resolve
   @Get('resolve')
   @SkipCompanyCheck()

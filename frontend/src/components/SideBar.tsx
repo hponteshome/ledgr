@@ -1,12 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
-  FiHome, FiBriefcase, FiUsers, FiFileText, FiMenu,
-  FiChevronLeft, FiChevronDown, FiChevronRight, FiActivity, FiSettings,
-  FiFolder, FiBook, FiPenTool, FiClipboard, FiShield, FiPercent, FiLayers,
-  FiUserCheck, FiUpload, FiDatabase, FiPieChart, FiCalendar, FiCheckCircle,
-  FiServer, FiEdit2, FiEdit3, FiPackage, FiTool, FiTruck, FiTrendingUp,
-  FiAlertCircle, FiTrendingDown, FiLogOut, FiBarChart2, FiArchive, FiBookOpen, FiCpu, FiRepeat, FiLock, FiFilePlus, FiArrowDown, FiMessageSquare, FiHelpCircle, FiClock,
+  FiChevronLeft, FiChevronDown, FiChevronRight, FiMenu, FiHelpCircle, FiLogOut, FiCircle,
 } from 'react-icons/fi';
 import { useCompany } from '../contexts/CompanyContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -16,6 +11,8 @@ import { ImportBalancesModal } from './accounting/ImportBalancesModal';
 import { useSidebarPermissions } from '../contexts/SidebarPermissionsContext';
 import { HelpCenter } from './help/HelpCenter';
 import { contextualHelp } from '../help/helpContent';
+import { iconRegistry } from '../config/iconRegistry';
+import api from '../services/api';
 
 const MySwal = withReactContent(Swal);
 
@@ -25,7 +22,7 @@ interface SubItem {
   icon: React.ElementType;
   disabled?: boolean;
   isImport?: boolean;
-  children?: { path: string; label: string; icon: React.ElementType }[];
+  children?: SubItem[];
 }
 
 interface MenuItem {
@@ -34,6 +31,33 @@ interface MenuItem {
   label: string;
   dividerBefore?: string;
   children?: SubItem[];
+}
+
+interface RawTreeNode {
+  id: string;
+  path: string;
+  label: string;
+  module: string;
+  icon: string;
+  ordem: number;
+  dividerBefore: string | null;
+  disabled: boolean;
+  actionType: string;
+  resource: string | null;
+  children: RawTreeNode[];
+}
+
+function mapNode(node: RawTreeNode): SubItem {
+  const sub: SubItem = {
+    path: node.path,
+    label: node.label,
+    icon: iconRegistry[node.icon] ?? FiCircle,
+    disabled: node.disabled,
+  };
+  if (node.children && node.children.length > 0) {
+    sub.children = node.children.map(mapNode);
+  }
+  return sub;
 }
 
 export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ open, onToggle }) => {
@@ -47,236 +71,42 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
   const [showImportModal, setShowImportModal] = useState(false);
   const [expanded, setExpanded] = useState<string[]>([]);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [tree, setTree] = useState<RawTreeNode[]>([]);
   const helpSlug = Object.entries(contextualHelp).find(([path]) =>
     location.pathname.startsWith(path)
   )?.[1];
 
-  const menuItems = useMemo<MenuItem[]>(() => [
+  useEffect(() => {
+    api.get('/sidebar-permissions/tree')
+      .then(r => setTree(r.data))
+      .catch(() => setTree([]));
+  }, []);
 
-    { path: '/app/dashboard', icon: FiHome, label: 'Visão Geral' },
-    { path: '/app/chat', icon: FiMessageSquare, label: 'Mensagens' },
+  const menuItems = useMemo<MenuItem[]>(() => {
+    return tree.map(node => {
+      let children = node.children && node.children.length > 0
+        ? node.children.map(mapNode)
+        : undefined;
 
-    {
-      path: '/app/accounting', icon: FiBook, label: 'Contabilidade', dividerBefore: 'Operacional',
-      children: [
-        { path: '/app/accounting/accounts', label: 'Plano de Contas', icon: FiLayers },
-        { path: '/app/accounting/journal', label: 'Lançamentos', icon: FiEdit3 },
-        { path: '/app/accounting/trial-balance', label: 'Balancete', icon: FiPieChart },
-        { path: '/app/accounting/balance-comparison', label: 'Comparativo de Saldos', icon: FiActivity },
-        { path: '/app/accounting/visoes-contabeis', label: 'Visões Contábeis (I052)', icon: FiCpu },
-        {
-          path: '/app/accounting/relatorios',
-          label: 'Relatórios',
-          icon: FiBookOpen,
-          children: [
-            { path: '/app/accounting/diario', label: 'Diário Geral', icon: FiBook },
-            { path: '/app/accounting/razao', label: 'Razão Analítico', icon: FiBarChart2 },
-            { path: '/app/accounting/dre', label: 'DRE', icon: FiTrendingUp },
-            { path: '/app/accounting/balanco', label: 'Balanço Patrimonial', icon: FiPieChart },
-          ],
-        },
-        {
-          path: '/app/accounting/investimentos',
-          label: 'Investimentos',
-          icon: FiTrendingUp,
-          children: [
-            { path: '/app/accounting/investimentos/renda-fixa', label: 'Renda Fixa', icon: FiTrendingUp },
-            { path: '/app/accounting/investimentos/simulador', label: 'Simulador CDB', icon: FiActivity },
-          ],
-        },
-        {
-          path: '/app/accounting/importacao',
-          label: 'Importação',
-          icon: FiUpload,
-          children: [
-            { path: '/app/accounting/accounts/import', label: 'Importar Plano de Contas', icon: FiLayers },
-            { path: '/app/accounting/journal/import', label: 'Importar Lançamentos', icon: FiEdit3 },
-          ],
-        },
-      ],
-    },
+      // Subitens dinamicos de Societario (dependem da empresa ativa - fora do catalogo de banco)
+      if (node.path === '/app/societario') {
+        const dynamicChildren: SubItem[] = [
+          { path: cid ? `/app/societario/${cid}/apresentacao` : '#', label: 'Apresentação Institucional', icon: iconRegistry['FiBriefcase'], disabled: !cid },
+          { path: cid ? `/app/companies/corporate/statute/${cid}` : '#', label: 'Estatuto Social', icon: iconRegistry['FiBook'], disabled: !cid },
+          { path: cid ? `/app/companies/corporate/contratos/${cid}` : '#', label: 'Contrato Social', icon: iconRegistry['FiFileText'], disabled: !cid },
+        ];
+        children = [...dynamicChildren, ...(children ?? [])];
+      }
 
-    {
-      path: '/app/finance', icon: FiBarChart2, label: 'Financeiro',
-      children: [
-        { path: '/app/finance/accounts-payable', label: 'Contas a Pagar', icon: FiTrendingDown },
-        { path: '/app/finance/contas-receber', label: 'Contas a Receber', icon: FiTrendingUp },
-        { path: '/app/finance/fluxo-caixa', label: 'Fluxo de Caixa', icon: FiActivity },
-        { path: '/app/finance/petty-cash', label: 'Fundo Fixo', icon: FiTrendingDown },
-        { path: '/app/finance/agenda', label: 'Agenda Financeira', icon: FiCalendar },
-        { path: '/app/finance/bank-import', label: 'Importação Bancária', icon: FiUpload },
-        { path: '/app/finance/provisoes', label: 'Provisões Recorrentes', icon: FiRepeat },
-        { path: '/app/finance/fechamento', label: 'Fechamento Mensal', icon: FiLock },
-      ],
-    },
-
-    {
-      path: '/app/fiscal', icon: FiPercent, label: 'Fiscal',
-      children: [
-        { path: '/app/fiscal/documentos-fiscais', label: 'Documentos Fiscais',  icon: FiFileText },
-        { path: '/app/fiscal/lalur-config',       label: 'Config. Dedutibilidade', icon: FiSettings },
-        { path: '/app/fiscal/apuracao',           label: 'Apuração de Impostos',   icon: FiPercent },
-        {
-          path: '/app/fiscal/notas-fiscais',
-          label: 'Notas Fiscais',
-          icon: FiFileText,
-          children: [
-            { path: '/app/fiscal/nfe',          label: 'NF-e (Produtos)',      icon: FiPackage },
-            { path: '/app/fiscal/nfse-nacional', label: 'NFS-e Nacional (RFB)', icon: FiCheckCircle },
-            {
-              path: '/app/fiscal/nfse-sp',
-              label: 'NFS-e São Paulo',
-              icon: FiUpload,
-              children: [
-                { path: '/app/fiscal/nfse-sp-emissao', label: 'Emissão NFS-e SP',  icon: FiFilePlus },
-                { path: '/app/fiscal/nfse-sp-csv',     label: 'Importar CSV PMSP', icon: FiArrowDown },
-                { path: '/app/fiscal/nfse-sp',         label: 'NFS-e Importação',  icon: FiUpload },
-              ],
-            },
-          ],
-        },
-      ],
-    },
-
-    {
-      path: '/app/hr', icon: FiUsers, label: 'Departamento Pessoal',
-      children: [
-        { path: '/app/hr/employees', label: 'Funcionários', icon: FiUsers },
-        { path: '/app/hr/pro-labore', label: 'Pró-labore', icon: FiTrendingDown },
-        { path: '/app/hr/folha', label: 'Folha de Pagamento', icon: FiTrendingDown },
-        { path: '/app/hr/ferias', label: 'Férias', icon: FiCalendar },
-        { path: '/app/hr/banco-horas', label: 'Banco de Horas', icon: FiClock },
-        { path: '/app/hr/decimo-terceiro', label: '13º Salário', icon: FiTrendingDown },
-        { path: '/app/hr/recesso', label: 'Recessos & Pontes', icon: FiRepeat },
-        { path: '/app/hr/esocial', label: 'eSocial', icon: FiFileText },
-        { path: '/app/hr/informe-rendimentos', label: 'Informe de Rendimentos', icon: FiFileText },
-        { path: '/app/hr/rais', label: 'RAIS', icon: FiFileText },
-        { path: '/app/hr/dctfweb', label: 'DCTFWeb', icon: FiCpu },
-        { path: '/app/hr/dho', label: 'DHO', icon: FiUserCheck, disabled: true },
-      ],
-    },
-
-    {
-      path: '/app/societario', icon: FiLayers, label: 'Societário', dividerBefore: 'Empresa',
-      children: [
-        { path: cid ? `/app/societario/${cid}/apresentacao` : '#', label: 'Apresentação Institucional', icon: FiBriefcase, disabled: !cid },
-        { path: cid ? `/app/companies/corporate/statute/${cid}` : '#', label: 'Estatuto Social', icon: FiBook, disabled: !cid },
-        { path: cid ? `/app/companies/corporate/contratos/${cid}` : '#', label: 'Contrato Social', icon: FiFileText, disabled: !cid },
-        {
-          path: '/app/societario/livros',
-          label: 'Livros e Registros',
-          icon: FiLayers,
-          children: [
-            { path: '/app/societario/livros/acionistas', label: 'Acionistas e Participações', icon: FiUserCheck },
-            { path: '#', label: 'Assembleias e Reuniões', icon: FiCalendar, disabled: true },
-          ],
-        },
-      ],
-    },
-
-    {
-      path: '/app/assets', icon: FiPackage, label: 'Patrimônio',
-      children: [
-        { path: '/app/assets', label: 'Bens Cadastrados', icon: FiPackage },
-        { path: '/app/assets/maintenances', label: 'Manutenções', icon: FiTool },
-      ],
-    },
-
-    {
-      path: '/app/sped', icon: FiDatabase, label: 'SPED / Obrigações', dividerBefore: 'Compliance',
-      children: [
-        { path: '/app/sped/ecd', label: 'ECD — Escrituração Contábil', icon: FiDatabase },
-        { path: '/app/sped/ecd/pre-validate', label: 'ECD — Pré-Validação', icon: FiCheckCircle },
-        { path: '/app/sped/ecd/History', label: 'ECD — Histórico', icon: FiArchive },
-        { path: '/app/sped/ecf', label: 'ECF — Escrituração Fiscal', icon: FiFileText },
-        { path: '/app/sped/efd', label: 'EFD-Contribuições', icon: FiFileText },
-        { path: '/app/sistema/obrigacoes', label: 'Obrigações Fiscais', icon: FiCheckCircle },
-      ],
-    },
-
-    {
-      path: '/app/arquivo', icon: FiArchive, label: 'Acervo',
-      children: [
-        {
-          path: '/app/arquivo/societario',
-          label: 'Societário',
-          icon: FiLayers,
-          children: [
-            { path: '/app/arquivo/societario/contratos', label: 'Contratos / Estatutos', icon: FiFileText },
-            { path: '/app/arquivo/societario/atas', label: 'Atas Assinadas', icon: FiBookOpen },
-            { path: '/app/arquivo/societario/procuracoes', label: 'Procurações', icon: FiEdit2 },
-            { path: '/app/arquivo/societario/acordos', label: 'Acordos de Acionistas', icon: FiClipboard },
-            { path: '/app/arquivo/societario/livros', label: 'Livros Encerrados', icon: FiBook },
-          ],
-        },
-        {
-          path: '/app/arquivo/contabil',
-          label: 'Contábil',
-          icon: FiBarChart2,
-          children: [
-            { path: '/app/arquivo/contabil/balancetes', label: 'Balancetes Aprovados', icon: FiFileText },
-            { path: '/app/arquivo/contabil/ecd', label: 'ECDs Assinados', icon: FiDatabase },
-            { path: '/app/arquivo/contabil/demonstracoes', label: 'Demonstrações Financeiras', icon: FiPieChart },
-          ],
-        },
-        {
-          path: '/app/arquivo/fiscal',
-          label: 'Fiscal',
-          icon: FiFileText,
-          children: [
-            { path: '/app/arquivo/fiscal/ecf', label: 'ECFs Assinados', icon: FiDatabase },
-            { path: '/app/arquivo/fiscal/obrigacoes', label: 'Obrigações Acessórias', icon: FiAlertCircle },
-          ],
-        },
-        {
-          path: '/app/arquivo/rh',
-          label: 'RH / Trabalhista',
-          icon: FiUsers,
-          children: [
-            { path: '/app/arquivo/rh/contratos', label: 'Contratos de Trabalho', icon: FiClipboard },
-            { path: '/app/arquivo/rh/procuracoes', label: 'Procurações Trabalhistas', icon: FiEdit2 },
-            { path: '/app/arquivo/rh/acordos', label: 'Acordos Coletivos', icon: FiBookOpen },
-          ],
-        },
-      ],
-    },
-
-    {
-      path: '/app/assinaturas', icon: FiShield, label: 'Assinaturas',
-      children: [
-        { path: '/app/signatures/validate', label: 'Validação de Assinatura', icon: FiCheckCircle },
-        { path: '/app/documents/signatures/certificates', label: 'Certificados Digitais', icon: FiShield },
-      ],
-    },
-
-    {
-      path: '/app/cadastros', dividerBefore: 'Sistema',
-      icon: FiBriefcase,
-      label: 'Cadastros',
-      children: [
-        { path: '/app/companies', label: 'Empresas', icon: FiBriefcase },
-        { path: '/app/persons', label: 'Pessoas Físicas', icon: FiUserCheck },
-      ],
-    },
-
-    {
-      path: '/app/administracao',
-      icon: FiSettings,
-      label: 'Administração',
-      children: [
-        { path: '/app/administracao/auditoria', label: 'Auditoria & Logs', icon: FiActivity },
-        { path: '/app/users', label: 'Usuários', icon: FiUsers },
-        { path: '/app/profiles', label: 'Perfis de Acesso', icon: FiShield },
-        { path: '/app/sistema/sidebar-permissions', label: 'Permissões de Menu', icon: FiLock },
-        { path: '/app/sistema/calendario', label: 'Calendário de Feriados', icon: FiCalendar },
-        { path: '/app/sistema/indicadores', label: 'Indicadores Econômicos', icon: FiBarChart2 },
-        { path: '/app/sistema/tabelas', label: 'Tabelas Legais', icon: FiBook },
-        { path: '/app/system/backup', label: 'Backup e Restauração', icon: FiDatabase },
-        { path: '/app/settings/data-management', label: 'Manutenção de Dados', icon: FiSettings },
-      ],
-    },
-
-  ], [cid]);
+      return {
+        path: node.path,
+        icon: iconRegistry[node.icon] ?? FiCircle,
+        label: node.label,
+        dividerBefore: node.dividerBefore ?? undefined,
+        children,
+      };
+    });
+  }, [tree, cid]);
 
   const filteredMenu = useMemo(() => {
     if (permLoading || allowed.length === 0) return menuItems;
@@ -483,7 +313,6 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
           </button>
         </div>
 
-        {/* Painel de Ajuda */}
         {helpOpen && (
           <>
             <div className="fixed inset-0 z-50 bg-black/20 backdrop-blur-sm" onClick={() => setHelpOpen(false)} />
@@ -498,5 +327,3 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
     </>
   );
 };
-
-

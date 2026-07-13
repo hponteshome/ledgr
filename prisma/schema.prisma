@@ -4054,13 +4054,22 @@ model LalurItem {
 // SIDEBAR PERMISSIONS — Controle granular de acesso ao menu
 // =============================================================================
 
-/// Catalogo de itens do sidebar (populado via seed/admin)
+/// Catalogo de itens do sidebar - fonte unica de verdade da navegacao (data-driven)
 model SidebarItem {
-  id     String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  path   String @unique @db.VarChar(120)
-  label  String @db.VarChar(100)
-  module String @db.VarChar(50)
-  ordem  Int    @default(0)
+  id            String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  path          String  @unique @db.VarChar(160)
+  label         String  @db.VarChar(100)
+  module        String  @db.VarChar(50)
+  icon          String  @default("FiCircle") @db.VarChar(40)
+  parentId      String? @map("parent_id") @db.Uuid
+  ordem         Int     @default(0)
+  dividerBefore String? @map("divider_before") @db.VarChar(50)
+  disabled      Boolean @default(false)
+  actionType    String  @default("link") @map("action_type") @db.VarChar(20)
+  resource      String? @db.VarChar(50)
+
+  parent   SidebarItem?  @relation("SidebarItemChildren", fields: [parentId], references: [id], onDelete: Cascade)
+  children SidebarItem[] @relation("SidebarItemChildren")
 
   profilePermissions ProfileSidebarPermission[]
   userPermissions    UserSidebarPermission[]

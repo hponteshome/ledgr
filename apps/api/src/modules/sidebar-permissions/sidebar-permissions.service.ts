@@ -86,4 +86,19 @@ export class SidebarPermissionsService {
 
     return [...allowed];
   }
+
+  // Arvore completa do catalogo (fonte de dados do SideBar.tsx e da tela de permissoes)
+  async getTree() {
+    const all = await this.prisma.sidebarItem.findMany({ orderBy: { ordem: "asc" } });
+    const byId = new Map(all.map(i => [i.id, { ...i, children: [] as any[] }]));
+    const roots: any[] = [];
+    for (const item of byId.values()) {
+      if (item.parentId && byId.has(item.parentId)) {
+        byId.get(item.parentId)!.children.push(item);
+      } else {
+        roots.push(item);
+      }
+    }
+    return roots;
+  }
 }
