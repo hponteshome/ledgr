@@ -1,95 +1,18 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@prisma/prisma.service';
 
+type Level = 'NONE' | 'VIEW' | 'EDIT' | 'DELETE';
+
 @Injectable()
 export class SidebarPermissionsService {
   constructor(private prisma: PrismaService) {}
 
-  // Todos os itens cadastrados
   async listItems() {
     return this.prisma.sidebarItem.findMany({ orderBy: { ordem: 'asc' } });
   }
 
-  // Permissoes de um perfil
-  async getProfilePermissions(profileId: string) {
-    return this.prisma.profileSidebarPermission.findMany({
-      where: { profileId },
-      include: { item: true },
-    });
-  }
-
-  // Salvar permissoes de um perfil (substituicao completa)
-  async setProfilePermissions(profileId: string, itemIds: string[]) {
-    await this.prisma.profileSidebarPermission.deleteMany({ where: { profileId } });
-    if (itemIds.length === 0) return;
-    await this.prisma.profileSidebarPermission.createMany({
-      data: itemIds.map(itemId => ({ profileId, itemId, canView: true })),
-    });
-    return this.getProfilePermissions(profileId);
-  }
-
-  // Permissoes de um usuario (overrides)
-  async getUserPermissions(userId: string) {
-    return this.prisma.userSidebarPermission.findMany({
-      where: { userId },
-      include: { item: true },
-    });
-  }
-
-  // Salvar override de usuario
-  async setUserPermission(userId: string, itemId: string, canView: boolean, companyId?: string) {
-    return this.prisma.userSidebarPermission.upsert({
-      where: { userId_itemId_companyId: { userId, itemId, companyId: companyId ?? null } },
-      create: { userId, itemId, canView, companyId: companyId ?? null },
-      update: { canView },
-    });
-  }
-
-  // Remover override de usuario
-  async removeUserPermission(userId: string, itemId: string) {
-    await this.prisma.userSidebarPermission.deleteMany({ where: { userId, itemId } });
-  }
-
-  // Resolver permissoes efetivas para um usuario/empresa
-  async resolvePermissions(userId: string, companyId: string): Promise<string[]> {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { profileId: true, profile: { select: { permissions: true } } },
-    });
-    if (!user) return [];
-
-    // Master Admin ve tudo
-    const perms = user.profile?.permissions as any;
-    if (perms?.all === true) {
-      const all = await this.prisma.sidebarItem.findMany({ select: { path: true } });
-      return all.map(i => i.path);
-    }
-
-    // Base: permissoes do perfil
-    const profilePerms = user.profileId
-      ? await this.prisma.profileSidebarPermission.findMany({
-          where: { profileId: user.profileId, canView: true },
-          include: { item: { select: { path: true } } },
-        })
-      : [];
-    const allowed = new Set(profilePerms.map(p => p.item.path));
-
-    // Overrides do usuario (global + empresa especifica)
-    const userOverrides = await this.prisma.userSidebarPermission.findMany({
-      where: { userId, companyId: { in: [companyId, null] } },
-      include: { item: { select: { path: true } } },
-    });
-    for (const o of userOverrides) {
-      if (o.canView) allowed.add(o.item.path);
-      else allowed.delete(o.item.path);
-    }
-
-    return [...allowed];
-  }
-
-  // Arvore completa do catalogo (fonte de dados do SideBar.tsx e da tela de permissoes)
   async getTree() {
-    const all = await this.prisma.sidebarItem.findMany({ orderBy: { ordem: "asc" } });
+    const all = await this.prisma.sidebarItem.findMany({ orderBy: { ordem: 'asc' } });
     const byId = new Map(all.map(i => [i.id, { ...i, children: [] as any[] }]));
     const roots: any[] = [];
     for (const item of byId.values()) {
@@ -100,5 +23,113 @@ export class SidebarPermissionsService {
       }
     }
     return roots;
+  }
+
+  async getProfilePermissions(profileId: string) {
+    return this.prisma.profileSidebarPermission.findMany({
+      where: { profileId },
+      include: { item: true },
+    });
+  }
+
+  async setProfilePermissions(profileId: string, items: { itemId: string; accessLevel: Level }[]) {
+    await this.prisma.profileSidebarPermission.deleteMany({ where: { profileId } });
+    const toCreate = items.filter(i => i.accessLevel !== 'NONE');
+    if (toCreate.length === 0) return this.getProfilePermissions(profileId);
+    await this.prisma.profileSidebarPermission.createMany({
+      data: toCreate.map(i => ({ profileId, itemId: i.itemId, accessLevel: i.accessLevel as any })),
+    });
+    return this.getProfilePermissions(profileId);
+  }
+
+  async getUserPermissions(userId: string) {
+    return this.prisma.userSidebarPermission.findMany({
+      where: { userId },
+      include: { item: true },
+    });
+  }
+
+  async setUserPermission(userId: string, itemId: string, accessLevel: Level, companyId?: string) {
+    return this.prisma.userSidebarPermission.upsert({
+      where: { userId_itemId_companyId: { userId, itemId, companyId: companyId ?? null } },
+      create: { userId, itemId, accessLevel: accessLevel as any, companyId: companyId ?? null },
+      update: { accessLevel: accessLevel as any },
+    });
+  }
+
+  async removeUserPermission(userId: string, itemId: string) {
+    await this.prisma.userSidebarPermission.deleteMany({ where: { userId, itemId } });
+  }
+
+  async resolvePermissions(userId: string, companyId: string): Promise<{ path: string; level: Level }[]> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { profileId: true, profile: { select: { permissions: true } } },
+    });
+    if (!user) return [];
+
+    const perms = user.profile?.permissions as any;
+    if (perms?.all === true) {
+      return [{ path: '*', level: 'DELETE' }];
+    }
+
+    if (!user.profileId) return [];
+
+    const profilePerms = await this.prisma.profileSidebarPermission.findMany({
+      where: { profileId: user.profileId },
+      include: { item: { select: { path: true } } },
+    });
+
+    const userOverrides = await this.prisma.userSidebarPermission.findMany({
+      where: { userId, companyId: { in: [companyId, null] } },
+      include: { item: { select: { path: true } } },
+    });
+
+    if (profilePerms.length === 0 && userOverrides.length === 0) {
+      return [];
+    }
+
+    const map = new Map<string, Level>();
+    for (const p of profilePerms) map.set(p.item.path, p.accessLevel as Level);
+    for (const o of userOverrides) map.set(o.item.path, o.accessLevel as Level);
+
+    return [...map.entries()].map(([path, level]) => ({ path, level }));
+  }
+
+  async resolveResourceLevel(userId: string, companyId: string, resource: string): Promise<Level> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { profileId: true, profile: { select: { permissions: true } } },
+    });
+    if (!user) return 'NONE';
+
+    const perms = user.profile?.permissions as any;
+    if (perms?.all === true) return 'DELETE';
+
+    if (!user.profileId) return 'NONE';
+
+    const item = await this.prisma.sidebarItem.findFirst({ where: { resource } });
+    if (!item) return 'NONE';
+
+    const profileCount = await this.prisma.profileSidebarPermission.count({
+      where: { profileId: user.profileId },
+    });
+
+    const override = await this.prisma.userSidebarPermission.findFirst({
+      where: { userId, itemId: item.id, companyId: { in: [companyId, null] } },
+      orderBy: { companyId: 'desc' },
+    });
+
+    if (profileCount === 0) {
+      return override ? (override.accessLevel as Level) : 'EDIT';
+    }
+
+    const profilePerm = await this.prisma.profileSidebarPermission.findUnique({
+      where: { profileId_itemId: { profileId: user.profileId, itemId: item.id } },
+    });
+
+    let level: Level = (profilePerm?.accessLevel as Level) ?? 'NONE';
+    if (override) level = override.accessLevel as Level;
+    return level;
   }
 }

@@ -4077,11 +4077,18 @@ model SidebarItem {
   @@map("sidebar_items")
 }
 
-/// Permissao base por perfil
+enum SidebarAccessLevel {
+  NONE
+  VIEW
+  EDIT
+  DELETE
+}
+
+/// Permissao base por perfil - nivel de acesso por item de menu
 model ProfileSidebarPermission {
-  profileId String @map("profile_id") @db.Uuid
-  itemId    String @map("item_id") @db.Uuid
-  canView   Boolean @default(true) @map("can_view")
+  profileId   String              @map("profile_id") @db.Uuid
+  itemId      String              @map("item_id") @db.Uuid
+  accessLevel SidebarAccessLevel  @default(VIEW) @map("access_level")
 
   profile Profile     @relation(fields: [profileId], references: [id], onDelete: Cascade)
   item    SidebarItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
@@ -4090,13 +4097,13 @@ model ProfileSidebarPermission {
   @@map("profile_sidebar_permissions")
 }
 
-/// Override individual por usuario (pode bloquear ou liberar alem do perfil)
+/// Override individual por usuario (pode bloquear ou liberar/elevar alem do perfil)
 model UserSidebarPermission {
-  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId    String  @map("user_id") @db.Uuid
-  itemId    String  @map("item_id") @db.Uuid
-  companyId String? @map("company_id") @db.Uuid
-  canView   Boolean @default(true) @map("can_view")
+  id          String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String              @map("user_id") @db.Uuid
+  itemId      String              @map("item_id") @db.Uuid
+  companyId   String?             @map("company_id") @db.Uuid
+  accessLevel SidebarAccessLevel  @default(VIEW) @map("access_level")
 
   user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   item    SidebarItem @relation(fields: [itemId], references: [id], onDelete: Cascade)

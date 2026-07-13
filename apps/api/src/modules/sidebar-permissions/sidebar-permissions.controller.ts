@@ -20,7 +20,6 @@ export class SidebarPermissionsController {
   @Get('resolve')
   @SkipCompanyCheck()
   resolve(@Req() req: any) {
-    // req.user pode ter id diretamente ou via sub (JWT payload)
     const userId = req.user?.id ?? req.user?.sub ?? '';
     const companyId = req.headers['x-company-id'] ?? '';
     if (!userId) return [];
@@ -33,10 +32,11 @@ export class SidebarPermissionsController {
   getProfile(@Param('id') id: string) { return this.svc.getProfilePermissions(id); }
 
   // POST /sidebar-permissions/profile/:id
+  // body: { items: { itemId: string; accessLevel: 'NONE'|'VIEW'|'EDIT'|'DELETE' }[] }
   @Post('profile/:id')
   @SkipCompanyCheck()
-  setProfile(@Param('id') id: string, @Body() body: { itemIds: string[] }) {
-    return this.svc.setProfilePermissions(id, body.itemIds);
+  setProfile(@Param('id') id: string, @Body() body: { items: { itemId: string; accessLevel: any }[] }) {
+    return this.svc.setProfilePermissions(id, body.items);
   }
 
   // GET /sidebar-permissions/user/:id
@@ -45,10 +45,11 @@ export class SidebarPermissionsController {
   getUser(@Param('id') id: string) { return this.svc.getUserPermissions(id); }
 
   // POST /sidebar-permissions/user/:id
+  // body: { itemId: string; accessLevel: 'NONE'|'VIEW'|'EDIT'|'DELETE'; companyId?: string }
   @Post('user/:id')
   @SkipCompanyCheck()
-  setUser(@Param('id') id: string, @Body() body: { itemId: string; canView: boolean; companyId?: string }) {
-    return this.svc.setUserPermission(id, body.itemId, body.canView, body.companyId);
+  setUser(@Param('id') id: string, @Body() body: { itemId: string; accessLevel: any; companyId?: string }) {
+    return this.svc.setUserPermission(id, body.itemId, body.accessLevel, body.companyId);
   }
 
   // DELETE /sidebar-permissions/user/:userId/:itemId
