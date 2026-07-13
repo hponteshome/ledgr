@@ -61,6 +61,17 @@ export class SidebarPermissionsService {
     await this.prisma.userSidebarPermission.deleteMany({ where: { userId, itemId } });
   }
 
+  // Salvar overrides de usuario em lote (substituicao completa do escopo userId+companyId)
+  async setUserPermissionsBulk(userId: string, items: { itemId: string; accessLevel: Level }[], companyId?: string) {
+    await this.prisma.userSidebarPermission.deleteMany({ where: { userId, companyId: companyId ?? null } });
+    const toCreate = items.filter(i => i.accessLevel !== "NONE");
+    if (toCreate.length === 0) return this.getUserPermissions(userId);
+    await this.prisma.userSidebarPermission.createMany({
+      data: toCreate.map(i => ({ userId, itemId: i.itemId, accessLevel: i.accessLevel as any, companyId: companyId ?? null })),
+    });
+    return this.getUserPermissions(userId);
+  }
+
   async resolvePermissions(userId: string, companyId: string): Promise<{ path: string; level: Level }[]> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },

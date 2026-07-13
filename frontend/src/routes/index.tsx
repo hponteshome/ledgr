@@ -123,7 +123,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
     if (permLoading) return null;
 
-    const isMaster = allowed.includes('*');
+    const isMaster = allowed.some(a => a.path === '*');
     if (!isMaster && allowed.length > 0 && !canView(location.pathname)) {
         return <AccessDenied />;
     }

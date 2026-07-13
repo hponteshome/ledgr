@@ -52,6 +52,14 @@ export class SidebarPermissionsController {
     return this.svc.setUserPermission(id, body.itemId, body.accessLevel, body.companyId);
   }
 
+  // POST /sidebar-permissions/user/:id/bulk
+  // body: { items: { itemId: string; accessLevel: 'NONE'|'VIEW'|'EDIT'|'DELETE' }[]; companyId?: string }
+  @Post('user/:id/bulk')
+  @SkipCompanyCheck()
+  setUserBulk(@Param('id') id: string, @Body() body: { items: { itemId: string; accessLevel: any }[]; companyId?: string }) {
+    return this.svc.setUserPermissionsBulk(id, body.items, body.companyId);
+  }
+
   // DELETE /sidebar-permissions/user/:userId/:itemId
   @Delete('user/:userId/:itemId')
   @SkipCompanyCheck()

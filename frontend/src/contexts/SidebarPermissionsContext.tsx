@@ -4,10 +4,18 @@ import api from '../services/api';
 import { useAuth } from './AuthContext';
 import { useCompany } from './CompanyContext';
 
+type Level = 'NONE' | 'VIEW' | 'EDIT' | 'DELETE';
+type Entry = { path: string; level: Level };
+
+const LEVEL_RANK: Record<Level, number> = { NONE: 0, VIEW: 1, EDIT: 2, DELETE: 3 };
+
 interface SidebarPermissionsContextValue {
-  allowed: string[];
+  allowed: Entry[];
   loading: boolean;
   canView: (path: string) => boolean;
+  canEdit: (path: string) => boolean;
+  canDelete: (path: string) => boolean;
+  levelOf: (path: string) => Level;
   invalidate: () => void;
 }
 
@@ -15,13 +23,16 @@ const SidebarPermissionsContext = createContext<SidebarPermissionsContextValue>(
   allowed: [],
   loading: false,
   canView: () => true,
+  canEdit: () => true,
+  canDelete: () => true,
+  levelOf: () => 'DELETE',
   invalidate: () => {},
 });
 
 export const SidebarPermissionsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
   const { activeCompany } = useCompany();
-  const [allowed, setAllowed] = useState<string[]>([]);
+  const [allowed, setAllowed] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(false);
   const lastFetchedKey = useRef('');
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -45,8 +56,7 @@ export const SidebarPermissionsProvider: React.FC<{ children: React.ReactNode }>
 
   useEffect(() => {
     if (!user) { setAllowed([]); return; }
-    if (isMasterAdmin) { setAllowed(['*']); return; }
-    // Aguardar empresa ativa estar definida antes de chamar a API
+    if (isMasterAdmin) { setAllowed([{ path: '*', level: 'DELETE' }]); return; }
     if (!companyId) return;
     const key = `${userId}-${companyId}`;
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -63,13 +73,29 @@ export const SidebarPermissionsProvider: React.FC<{ children: React.ReactNode }>
     doFetch(key, companyId);
   }, [doFetch, userId, companyId]);
 
-  const canView = useCallback((path: string): boolean => {
-    if (allowed.includes('*')) return true;
-    return allowed.some(p => path === p || path.startsWith(p + '/'));
+  const levelOf = useCallback((path: string): Level => {
+    const wildcard = allowed.find(a => a.path === '*');
+    if (wildcard) return wildcard.level;
+    let best: Level = 'NONE';
+    for (const a of allowed) {
+      if (path === a.path || path.startsWith(a.path + '/')) {
+        if (LEVEL_RANK[a.level] > LEVEL_RANK[best]) best = a.level;
+      }
+    }
+    return best;
   }, [allowed]);
 
+  const hasAtLeast = useCallback((path: string, min: Level): boolean => {
+    if (loading || allowed.length === 0) return true; // bootstrap: sem config = acesso liberado
+    return LEVEL_RANK[levelOf(path)] >= LEVEL_RANK[min];
+  }, [loading, allowed, levelOf]);
+
+  const canView = useCallback((path: string) => hasAtLeast(path, 'VIEW'), [hasAtLeast]);
+  const canEdit = useCallback((path: string) => hasAtLeast(path, 'EDIT'), [hasAtLeast]);
+  const canDelete = useCallback((path: string) => hasAtLeast(path, 'DELETE'), [hasAtLeast]);
+
   return (
-    <SidebarPermissionsContext.Provider value={{ allowed, loading, canView, invalidate }}>
+    <SidebarPermissionsContext.Provider value={{ allowed, loading, canView, canEdit, canDelete, levelOf, invalidate }}>
       {children}
     </SidebarPermissionsContext.Provider>
   );
