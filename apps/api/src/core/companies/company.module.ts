@@ -10,11 +10,13 @@ import { AuditModule } from '../audit/audit.module';
 import { ShareholderController } from './shareholder.controller';
 import { ShareholderService } from './shareholder.service';
 import { PrismaModule } from '../../prisma/prisma.module';
+import { SidebarPermissionsModule } from '../../modules/sidebar-permissions/sidebar-permissions.module';
+import { SidebarResourceGuard } from '../../auth/guards/sidebar-resource.guard';
 
 @Module({
-  imports: [PrismaModule, AuditModule, HttpModule],
+  imports: [PrismaModule, AuditModule, HttpModule, SidebarPermissionsModule],
   controllers: [CompanyController, CompanyHistoryController, CompanyTaxRegimeController, ShareholderController],
-  providers: [CompanyService, CompanyHistoryService, CompanyTaxRegimeService, ShareholderService],
+  providers: [CompanyService, CompanyHistoryService, CompanyTaxRegimeService, ShareholderService, SidebarResourceGuard],
   exports: [CompanyService, CompanyHistoryService, CompanyTaxRegimeService, ShareholderService],
 })
 export class CompaniesModule {}

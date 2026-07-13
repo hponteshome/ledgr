@@ -5,17 +5,20 @@ import { ProfilesController } from './profiles.controller';
 import { ProfilesService } from './profiles.service';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { AuditModule } from '../audit/audit.module';
+import { SidebarPermissionsModule } from '../../modules/sidebar-permissions/sidebar-permissions.module';
+import { SidebarResourceGuard } from '../../auth/guards/sidebar-resource.guard';
 
 @Module({
   imports: [
     PrismaModule,
     AuditModule,
+    SidebarPermissionsModule,
   ],
   controllers: [
-    UsersController, 
-    ProfilesController  // ← ADICIONAR AQUI
+    UsersController,
+    ProfilesController
   ],
-  providers: [UsersService, ProfilesService,],
+  providers: [UsersService, ProfilesService, SidebarResourceGuard],
   exports: [UsersService],
 })
 export class UsersModule {}

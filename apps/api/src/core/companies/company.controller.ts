@@ -14,9 +14,9 @@ import {
   Query,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/guards/jwt.guard';
-import { ProfileGuard } from '../../auth/guards/profile.guard';
+import { SidebarResourceGuard } from '../../auth/guards/sidebar-resource.guard';
+import { RequireResourceAccess } from '../../auth/decorators/require-resource-access.decorator';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
-import { RequirePermission } from '../../auth/decorators/permission.decorator';
 import { SkipCompanyCheck } from '../../multi-company/company.interceptor';
 import { CompanyService } from './company.service';
 import { CompanyDto } from '../../core/dto/company.dto';
@@ -29,10 +29,14 @@ import { CompanyDto } from '../../core/dto/company.dto';
 //  3. @SkipCompanyCheck() adicionado nas rotas que não exigem empresa ativa
 //  4. Tipagem `any` substituída onde possível
 //  5. Logs de console mantidos apenas onde agregam valor diagnóstico real
+//  6. Migrado de ProfileGuard/RequirePermission (legado) para
+//     SidebarResourceGuard/RequireResourceAccess (catalogo de sidebar_items).
+//     Rota /companies/audit mantida integralmente sem restricao adicional,
+//     igual ja era antes da migracao.
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Controller('companies')
-@UseGuards(JwtAuthGuard, ProfileGuard)
+@UseGuards(JwtAuthGuard, SidebarResourceGuard)
 export class CompanyController {
 
   constructor(private readonly companyService: CompanyService) {}
@@ -125,8 +129,8 @@ export class CompanyController {
     return new CompanyDto(result);
   }
 
+  @RequireResourceAccess('companies', 'EDIT')
   @Patch(':id/status')
-  @RequirePermission('companies_edit')
   async changeStatus(
     @Param('id') id: string,
     @Body('status') status: string,
@@ -136,13 +140,15 @@ export class CompanyController {
     return new CompanyDto(result);
   }
 
+  @RequireResourceAccess('companies', 'DELETE')
   @Delete(':id')
-  @RequirePermission('companies_delete')
   async remove(@Param('id') id: string, @CurrentUser('object') user: any) {
     return this.companyService.remove(id, user.id);
   }
 
   // ── Rota de audit ────────────────────────────────────────────────────────────
+  // Mantida integralmente: sem RequireResourceAccess adicional, exatamente
+  // como estava antes da migracao (so a autenticacao basica da classe).
 
   @Get('audit')
   getAuditInfo() {

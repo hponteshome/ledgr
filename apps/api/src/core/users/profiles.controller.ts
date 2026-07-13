@@ -11,8 +11,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/guards/jwt.guard';
-import { ProfileGuard } from '../../auth/guards/profile.guard';
-import { RequirePermission } from '../../auth/decorators/permission.decorator';
+import { SidebarResourceGuard } from '../../auth/guards/sidebar-resource.guard';
+import { RequireResourceAccess } from '../../auth/decorators/require-resource-access.decorator';
 import { SkipCompanyCheck } from '../../multi-company/company.interceptor';
 import { ProfilesService } from './profiles.service';
 
@@ -22,11 +22,12 @@ import { ProfilesService } from './profiles.service';
 //  2. @SkipCompanyCheck() na classe inteira — perfis são globais do sistema,
 //     não pertencem a uma empresa específica
 //  3. CRUD completo: GET, GET :id, PATCH :id, DELETE :id
-//  4. ProfileGuard adicionado para proteger mutations
+//  4. Migrado de ProfileGuard/RequirePermission (legado) para
+//     SidebarResourceGuard/RequireResourceAccess (catalogo de sidebar_items)
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Controller('profiles')
-@UseGuards(JwtAuthGuard, ProfileGuard)
+@UseGuards(JwtAuthGuard, SidebarResourceGuard)
 @SkipCompanyCheck() // Perfis são globais — não exigem empresa ativa
 export class ProfilesController {
 
@@ -44,16 +45,16 @@ export class ProfilesController {
     return profile;
   }
 
+  @RequireResourceAccess('profiles', 'EDIT')
   @Patch(':id')
-  @RequirePermission('profiles_edit')
   async update(@Param('id') id: string, @Body() data: any) {
     const profile = await this.profilesService.update(id, data);
     if (!profile) throw new NotFoundException('Perfil não encontrado.');
     return profile;
   }
 
+  @RequireResourceAccess('profiles', 'DELETE')
   @Delete(':id')
-  @RequirePermission('profiles_delete')
   async remove(@Param('id') id: string) {
     return this.profilesService.remove(id);
   }

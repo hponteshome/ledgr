@@ -13,9 +13,9 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/guards/jwt.guard';
-import { ProfileGuard } from '../../auth/guards/profile.guard';
+import { SidebarResourceGuard } from '../../auth/guards/sidebar-resource.guard';
+import { RequireResourceAccess } from '../../auth/decorators/require-resource-access.decorator';
 import { CurrentUser } from '../decorators/current-user.decorator';
-import { RequirePermission } from '../../auth/decorators/permission.decorator';
 import { SkipCompanyCheck } from '../../multi-company/company.interceptor';
 import { UsersService } from './users.service';
 import { UserDto } from '../../auth/dto/user.dto';
@@ -29,10 +29,12 @@ import { CreateUserDto } from '../dto/create-user.dto';
 //  4. @Post() reposicionado corretamente
 //  5. Guards e permissões reativados (estavam comentados)
 //  6. @Req() substituído por @Request() e @CurrentUser() onde aplicável
+//  7. Migrado de ProfileGuard/RequirePermission (legado) para
+//     SidebarResourceGuard/RequireResourceAccess (catalogo de sidebar_items)
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Controller('users')
-@UseGuards(JwtAuthGuard, ProfileGuard)
+@UseGuards(JwtAuthGuard, SidebarResourceGuard)
 @SkipCompanyCheck() // Usuários são globais — não exigem empresa ativa
 export class UsersController {
 
@@ -47,8 +49,8 @@ export class UsersController {
     return new UserDto(found);
   }
 
+  @RequireResourceAccess('users', 'VIEW')
   @Get('audit-logs')
-  @RequirePermission('users_view')
   getAuditLogs() {
     return { message: 'Auditoria será integrada em breve ao monolito Ledgr.' };
   }
@@ -62,15 +64,15 @@ export class UsersController {
 
   // ── Rotas com parâmetro dinâmico ────────────────────────────────────────────
 
+  @RequireResourceAccess('users', 'VIEW')
   @Get()
-  @RequirePermission('users_view')
   async findAll() {
     const users = await this.usersService.findAll();
     return users.map(u => new UserDto(u));
   }
 
+  @RequireResourceAccess('users', 'EDIT')
   @Post()
-  @RequirePermission('users_create')
   async create(@Body() dto: CreateUserDto) {
     return this.usersService.create(dto);
   }
@@ -99,8 +101,8 @@ export class UsersController {
     return new UserDto(found);
   }
 
+  @RequireResourceAccess('users', 'EDIT')
   @Patch(':id')
-  @RequirePermission('users_edit')
   async update(
     @Param('id') id: string,
     @Body() data: any,
@@ -109,8 +111,8 @@ export class UsersController {
     return this.usersService.updateUser(id, data, user.id);
   }
 
+  @RequireResourceAccess('users', 'EDIT')
   @Patch(':id/status')
-  @RequirePermission('users_edit')
   async changeStatus(
     @Param('id') id: string,
     @Body('status') status: string,
@@ -119,8 +121,8 @@ export class UsersController {
     return this.usersService.updateUser(id, { status }, user.id);
   }
 
+  @RequireResourceAccess('users', 'EDIT')
   @Patch(':id/deactivate')
-  @RequirePermission('users_edit')
   async deactivate(@Param('id') id: string, @CurrentUser('object') user: any) {
     return this.usersService.updateUser(
       id,
@@ -129,8 +131,8 @@ export class UsersController {
     );
   }
 
+  @RequireResourceAccess('users', 'DELETE')
   @Delete(':id')
-  @RequirePermission('users_delete')
   async remove(@Param('id') id: string, @CurrentUser('object') user: any) {
     return this.usersService.remove(id, user.id);
   }
