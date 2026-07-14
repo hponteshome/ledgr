@@ -2018,3 +2018,63 @@ controllers mapeados).
    (ex: `exceljs`) se o risco for julgado alto para dados fiscais sensíveis
 4. Não usar `--force` sem entender a árvore de dependências primeiro (mesmo erro do
    `@nestjs/axios` pode se repetir em outros pacotes)
+
+---
+
+## Sessão 13/07/2026 — Sistema de Permissões de Sidebar (Fases A + B) + Auditoria de Segurança
+
+**Contexto:** Pedido original era simples — "checkbox de selecionar tudo" na tela de Permissões de Sidebar. Virou uma reconstrução completa do sistema de permissões e uma auditoria de segurança que corrigiu falhas reais em produção.
+
+### Fase A — Sidebar 100% Data-Driven
+- `SidebarItem` (schema.prisma): ganhou `parentId` (self-relation, hierarquia real), `icon` (string, resolvido via registry), `dividerBefore`, `disabled`, `actionType`, `resource` (chave ligando item de menu → recurso de API).
+- Reseed completo: 98 itens migrados do `SideBar.tsx` hardcoded para o banco, com hierarquia via `parent_id`. Path do path.
+- **Descoberta:** o catálogo antigo (63 itens) estava desatualizado em relação ao menu real — causa raiz identificada: não havia fonte única de verdade. Agora o banco É a fonte única.
+- Novo endpoint `GET /sidebar-permissions/tree` — árvore hierárquica completa do catálogo.
+- `iconRegistry.ts` criado — mapa string→componente React Icon.
+- `SideBar.tsx` reescrito: renderiza a partir da API (`/tree`) em vez de array hardcoded. Itens dinâmicos de Societário (dependem de `cid` da empresa ativa) injetados client-side, fora do catálogo.
+- Itens problemáticos corrigidos: "NFS-e São Paulo" (path duplicado com filho), "Patrimônio" (path duplicado com filho — inofensivo pois nunca navegável).
+- `resource` preenchido em todos os 98 itens (mapeamento manual para módulos sem controller óbvio ainda).
+
+### Fase B — Níveis de Acesso (NONE/VIEW/EDIT/DELETE)
+- `ProfileSidebarPermission`/`UserSidebarPermission`: `canView: Boolean` → `accessLevel: SidebarAccessLevel` (enum NONE/VIEW/EDIT/DELETE, cumulativo).
+- Novo `SidebarResourceGuard` + decorator `@RequireResourceAccess(resource, level)` — guard real de API baseado no catálogo de sidebar (substitui o sistema legado `ProfileGuard`/`Profile.permissions` JSON).
+- **Fallback de bootstrap:** perfil sem nenhuma linha configurada = acesso liberado (evita quebrar usuários existentes ao ativar guards novos). Assim que 1 item é configurado para um perfil, os demais não-configurados desse perfil passam a valer NONE.
+- `PersonsController`: primeiro controller com guard real em produção (12 rotas: 5 VIEW, 4 EDIT, 3 DELETE/outras).
+- `SidebarPermissionsPage.tsx`: reescrita completa como árvore hierárquica.
+  - Checkbox por coluna (Nenhum/Visualizar/Editar/Excluir) no cabeçalho: preenche **apenas itens ainda sem definição** (não sobrescreve ajustes manuais); segundo clique desfaz só o que o próprio clique preencheu.
+  - Definir nível num item pai propaga para toda a subárvore (mas não trava — filhos podem ser divergidos manualmente depois).
+  - Endpoint `POST /sidebar-permissions/user/:id/bulk` criado (salvamento em lote, evitando 1 request por item).
+- `SidebarPermissionsContext.tsx`: `canView`/`canEdit`/`canDelete`/`levelOf` sobre o novo `accessLevel`.
+- `PersonForm.tsx`/`PersonList.tsx`: UX de bloqueio visual — botão Salvar desabilitado ("Somente leitura") quando sem EDIT; "Nova Pessoa"/editar/excluir ocultos conforme `canEdit`/`canDelete`; todos os `alert()` nativos trocados por `toast.error()`.
+
+### Bugs críticos encontrados e corrigidos nesta sessão
+1. **`SidebarPermissionsController` sem `@UseGuards(JwtAuthGuard)`** — qualquer requisição sem token retornava `userId` vazio → função de resolução de permissões nunca executava → fallback de bootstrap acionado incorretamente → parecia "liberar tudo" mesmo com restrições configuradas. Corrigido.
+2. **Prisma `in: [valor, null]` inválido** para campos nullable — `resolveResourceLevel`/`resolvePermissions` quebravam com 500 ao checar override de usuário com `companyId`. Corrigido para `OR: [{companyId}, {companyId: null}]`.
+3. **Auditoria completa de `@UseGuards(JwtAuthGuard)`** em todos os ~65 controllers do backend — 6 estavam sem autenticação nenhuma:
+   - `backup.controller.ts` — `GET /system/backup/export` expunha backup completo do banco. Também tinha método duplicado (`export`/`handleExport` mapeados pra mesma rota) — duplicata removida.
+   - `system.controller.ts` — export/import de qualquer tabela do banco, sem auth.
+   - `balance-comparison.controller.ts`, `dashboard.controller.ts`, `accounting-views.controller.ts` — dados financeiros/contábeis sem auth.
+   - `signatures.controller.ts` — guard aplicado rota a rota (não no controller inteiro): `clicksign/webhook` e `govbr/callback` mantidos públicos de propósito (chamados por serviços externos sem sessão LEDGR).
+4. **Sistema legado (`ProfileGuard`/`RequirePermission`/`Profile.permissions` JSON) migrado** para `SidebarResourceGuard`/`RequireResourceAccess` em `UsersController`, `ProfilesController`, `CompanyController` — mesmo comportamento de acesso preservado, só o mecanismo mudou. Rota `/companies/audit` mantida sem alteração (pedido explícito). `ProfileGuard`/`RequirePermission` agora são código morto (nenhum uso real restante) — **não removidos ainda**, decisão pendente para sessão futura.
+5. **Loop infinito de reload** — consequência direta da correção #1: `SideBar.tsx` chamava `GET /sidebar-permissions/tree` incondicionalmente (sem checar se `user` existe), e o `Layout` envolve todas as rotas incluindo a landing/login (`/`). Sem token → 401 → interceptor do `api.ts` redirecionava para `/login` (rota **inexistente** no app, que usa `/` como login) → fallback de rotas volta pra `/` → `Layout` remonta → `Sidebar` dispara `/tree` de novo → loop. Corrigido: `SideBar.tsx` só busca `/tree` com `user` autenticado; `api.ts` redireciona para `/` (não `/login`).
+
+### Outras melhorias
+- `main.ts`: `QuietLogger` customizado — filtra mensagens `RouterExplorer`/`InstanceLoader`/`RoutesResolver` do boot do Nest (reduz log de ~500 para ~10 linhas), mantendo erros e mensagens de negócio intactos.
+- `hooks/useSidebarPermissions.ts` removido (código morto, substituído pelo Context).
+
+### Pendências para próxima sessão
+- **Antes do deploy em rede com usuários reais**, vale revisar:
+  - Confirmar que `resource` em todos os 98 itens do catálogo está correto e que os módulos SEM guard real ainda (todos exceto Persons/Users/Profiles/Companies) não têm exposição indevida — hoje o nível configurado na árvore só controla visibilidade de menu nesses módulos, **não bloqueia API** ainda.
+  - `ProfileGuard`/`RequirePermission`/`Profile.permissions` legado: decidir remoção ou manter documentado como código morto.
+  - Dois arquivos `assets.controller.ts` (`modules/assets/assets.controller.ts` e `modules/assets/controllers/assets.controller.ts`) — suspeita de duplicação/código morto, não investigado ainda.
+  - `ProfilesModule` (arquivo separado) parece não ser mais usado — `ProfilesController` está registrado dentro de `UsersModule`.
+  - Usuário de teste `visualizador.teste@ledgr.local` (perfil Visualizador) reativado nesta sessão, senha resetada para `Visualizador@123` — considerar desativar ou trocar senha antes de ambiente de rede real.
+- Estender o padrão de bloqueio visual (toast + botões desabilitados) aplicado em Persons para os demais módulos, conforme forem ganhando guards reais (Fase C, módulo por módulo).
+- Aplicar `@UseGuards(JwtAuthGuard)` como checklist obrigatório em qualquer controller novo daqui pra frente.
+
+---
+
+## Convenções de senha (13/07/2026)
+
+- **Senha padrão para novo usuário / reset manual:** `Troque@123` (sinaliza ao usuário que deve trocar no primeiro acesso). Usar esse valor sempre que resetar senha via script/banco daqui pra frente, para manter consistência.
+- **Pendência identificada:** o sistema não tem rotina de recuperação de senha (esqueci minha senha). Hoje, todo reset é manual via banco (gerar hash bcrypt com Node e fazer UPDATE direto em `password_hash`). Isso não escala para usuários reais em produção/rede — precisa de um fluxo de "esqueci minha senha" (provavelmente: solicitação → e-mail com link/token de reset → tela para definir nova senha → expiração do token). Avaliar prioridade antes ou logo após o deploy em rede, dependendo de quantos usuários reais vão precisar se autenticar sem suporte manual disponível o tempo todo.

@@ -21,11 +21,13 @@ import { PettyCashController } from './petty-cash.controller';
 import { PettyCashService } from './petty-cash.service';
 import { AccountsPayableController } from './accounts-payable.controller';
 import { AccountsPayableService } from './accounts-payable.service';
+import { SidebarPermissionsModule } from '../sidebar-permissions/sidebar-permissions.module';
+import { SidebarResourceGuard } from '../../auth/guards/sidebar-resource.guard';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, SidebarPermissionsModule],
   controllers: [FinanceController, ProvisaoController, FechamentoController, ObrigacoesController, AccountsReceivableController, CashflowController, PettyCashController, AccountsPayableController],
-  providers: [FinanceService, IntegrationService, AgendaService, ProvisaoService, FechamentoService, ObrigacoesService, AccountsReceivableService, CashflowService, PettyCashService, AccountsPayableService],
+  providers: [FinanceService, IntegrationService, AgendaService, ProvisaoService, FechamentoService, ObrigacoesService, AccountsReceivableService, CashflowService, PettyCashService, AccountsPayableService, SidebarResourceGuard],
   exports: [FinanceService, AgendaService, IntegrationService, ProvisaoService, FechamentoService, ObrigacoesService, AccountsReceivableService],
 })
 export class FinanceModule {}

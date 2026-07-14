@@ -271,3 +271,14 @@ frontend/src/components/Layout.tsx, frontend/src/components/Header.tsx
 ---
 Manter este arquivo atualizado quando convencoes/arquitetura mudarem. Estado de sessao e
 pendencias ficam em LEDGR-contexto.md (append-only).
+
+---
+
+## Sistema de Permissões (atualizado 13/07/2026)
+
+- **Fonte única de verdade do menu:** tabela `sidebar_items` no banco. NUNCA hardcode itens de menu no frontend — o SideBar.tsx renderiza via `GET /sidebar-permissions/tree`.
+- **Padrão de guard obrigatório para controllers novos:** todo controller novo DEVE ter `@UseGuards(JwtAuthGuard)` na classe, sem exceção. Checklist de sessão: rodar a auditoria de guards ausentes antes de considerar uma feature "pronta" (ver histórico 13/07/2026 no LEDGR-contexto.md).
+- **Controle de acesso fino (View/Edit/Delete):** usar `SidebarResourceGuard` + `@RequireResourceAccess(resource, nivel)` por rota — NÃO usar mais `ProfileGuard`/`RequirePermission` (legado, mantido só por compatibilidade, sem uso ativo).
+- **Fallback de bootstrap:** perfil sem nenhuma linha configurada em `profile_sidebar_permissions` = acesso liberado. Isso é intencional (evita quebrar usuários existentes), mas significa que qualquer perfil novo criado precisa ser configurado na tela de Permissões de Menu antes de restringir acesso.
+- **Comando de start do backend:** `npm run dev` (de dentro de `apps\api`) OU `npm run start:dev` (da raiz do monorepo) — ambos válidos, mesmo resultado, terminais diferentes.
+- **UX de bloqueio visual:** ao adicionar guard real de API a um módulo (`RequireResourceAccess`), replicar o padrão do Persons — botão de ação principal desabilitado com texto "Somente leitura" quando sem EDIT, ações de editar/excluir ocultas conforme `canEdit`/`canDelete` do `SidebarPermissionsContext`, `alert()` nativo trocado por `toast.error()`.

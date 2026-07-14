@@ -38,6 +38,8 @@ import { IobLotdParserService }     from './services/iob-lotd-parser.service';
 import { FixedIncomeModule } from './fixed-income/fixed-income.module';
 import { CdiModule } from './cdi/cdi.module';
 import { IobLotdImportService }     from './services/iob-lotd-import.service';
+import { SidebarPermissionsModule } from '../sidebar-permissions/sidebar-permissions.module';
+import { SidebarResourceGuard } from '../../auth/guards/sidebar-resource.guard';
 
 @Module({
   imports: [
@@ -45,6 +47,7 @@ import { IobLotdImportService }     from './services/iob-lotd-import.service';
     FixedIncomeModule,
     CdiModule,
     MulterModule.register({ limits: { fileSize: 50 * 1024 * 1024 } }),
+    SidebarPermissionsModule,
   ],
   controllers: [
     AccountingConfigController,
@@ -78,6 +81,7 @@ import { IobLotdImportService }     from './services/iob-lotd-import.service';
     IobPlanoParserService,
     IobLotdParserService,
     IobLotdImportService,
+    SidebarResourceGuard,
   ],
   exports: [
     AccountingService,

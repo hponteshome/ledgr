@@ -86,7 +86,7 @@ export const SidebarPermissionsProvider: React.FC<{ children: React.ReactNode }>
   }, [allowed]);
 
   const hasAtLeast = useCallback((path: string, min: Level): boolean => {
-    if (loading || allowed.length === 0) return true; // bootstrap: sem config = acesso liberado
+    if (loading) return true; // aguardando resolucao inicial (breve, evita flash)
     return LEVEL_RANK[levelOf(path)] >= LEVEL_RANK[min];
   }, [loading, allowed, levelOf]);
 

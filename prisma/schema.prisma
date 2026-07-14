@@ -90,13 +90,14 @@ model User {
 /// Perfis de acesso com permissões em formato JSON.
 /// Vinculado a User via profileId.
 model Profile {
-  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name        String?   @map("name") @db.VarChar
-  permissions Json      @map("permissions")
-  isActive    Boolean   @default(true) @map("is_active")
-  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
-  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
-  deletedAt   DateTime? @map("deleted_at") @db.Timestamp(6)
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name               String?   @map("name") @db.VarChar
+  permissions        Json      @map("permissions")
+  isActive           Boolean   @default(true) @map("is_active")
+  sidebarConfigured  Boolean   @default(false) @map("sidebar_configured")
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt          DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  deletedAt          DateTime? @map("deleted_at") @db.Timestamp(6)
 
   users User[]
   sidebarPermissions ProfileSidebarPermission[]

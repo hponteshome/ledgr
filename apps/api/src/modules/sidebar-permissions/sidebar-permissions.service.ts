@@ -35,10 +35,15 @@ export class SidebarPermissionsService {
   async setProfilePermissions(profileId: string, items: { itemId: string; accessLevel: Level }[]) {
     await this.prisma.profileSidebarPermission.deleteMany({ where: { profileId } });
     const toCreate = items.filter(i => i.accessLevel !== 'NONE');
-    if (toCreate.length === 0) return this.getProfilePermissions(profileId);
-    await this.prisma.profileSidebarPermission.createMany({
-      data: toCreate.map(i => ({ profileId, itemId: i.itemId, accessLevel: i.accessLevel as any })),
-    });
+    if (toCreate.length > 0) {
+      await this.prisma.profileSidebarPermission.createMany({
+        data: toCreate.map(i => ({ profileId, itemId: i.itemId, accessLevel: i.accessLevel as any })),
+      });
+    }
+    // Marca o perfil como revisado explicitamente por um admin - a partir
+    // daqui, o resultado configurado (mesmo que tudo NONE) e definitivo,
+    // nao aciona mais o fallback de bootstrap.
+    await this.prisma.profile.update({ where: { id: profileId }, data: { sidebarConfigured: true } });
     return this.getProfilePermissions(profileId);
   }
 
@@ -75,7 +80,7 @@ export class SidebarPermissionsService {
   async resolvePermissions(userId: string, companyId: string): Promise<{ path: string; level: Level }[]> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { profileId: true, profile: { select: { permissions: true } } },
+      select: { profileId: true, profile: { select: { permissions: true, sidebarConfigured: true } } },
     });
     if (!user) return [];
 
@@ -96,12 +101,16 @@ export class SidebarPermissionsService {
       include: { item: { select: { path: true } } },
     });
 
-    if (profilePerms.length === 0 && userOverrides.length === 0) {
-      return [];
-    }
-
     const map = new Map<string, Level>();
-    for (const p of profilePerms) map.set(p.item.path, p.accessLevel as Level);
+
+    if (!user.profile?.sidebarConfigured) {
+      // Perfil nunca revisado por um admin: fallback restrito (nao mais
+      // "libera tudo") - so o essencial fica visivel ate ser configurado.
+      map.set('/app/dashboard', 'VIEW');
+      map.set('/app/chat', 'VIEW');
+    } else {
+      for (const p of profilePerms) map.set(p.item.path, p.accessLevel as Level);
+    }
     for (const o of userOverrides) map.set(o.item.path, o.accessLevel as Level);
 
     return [...map.entries()].map(([path, level]) => ({ path, level }));
@@ -110,7 +119,7 @@ export class SidebarPermissionsService {
   async resolveResourceLevel(userId: string, companyId: string, resource: string): Promise<Level> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { profileId: true, profile: { select: { permissions: true } } },
+      select: { profileId: true, profile: { select: { permissions: true, sidebarConfigured: true } } },
     });
     if (!user) return 'NONE';
 
@@ -122,18 +131,16 @@ export class SidebarPermissionsService {
     const item = await this.prisma.sidebarItem.findFirst({ where: { resource } });
     if (!item) return 'NONE';
 
-    const profileCount = await this.prisma.profileSidebarPermission.count({
-      where: { profileId: user.profileId },
-    });
-
     const overrides = await this.prisma.userSidebarPermission.findMany({
       where: { userId, itemId: item.id, OR: [{ companyId }, { companyId: null }] },
     });
     // Prioriza override especifico da empresa ativa sobre o global (companyId nulo)
     const override = overrides.find(o => o.companyId === companyId) ?? overrides.find(o => o.companyId === null) ?? null;
 
-    if (profileCount === 0) {
-      return override ? (override.accessLevel as Level) : 'EDIT';
+    if (!user.profile?.sidebarConfigured) {
+      // Perfil nunca revisado por um admin: sem acesso a recursos
+      // protegidos ate ser explicitamente configurado.
+      return override ? (override.accessLevel as Level) : 'NONE';
     }
 
     const profilePerm = await this.prisma.profileSidebarPermission.findUnique({

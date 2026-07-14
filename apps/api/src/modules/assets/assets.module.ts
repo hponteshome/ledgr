@@ -11,11 +11,14 @@ import { RetrofitService }     from './services/retrofit.service';
 import { AppraisalService }    from './services/appraisal.service';
 import { AssetHistoryService } from './services/history.service';
 import { AssetImportService }  from './services/asset-import.service';
+import { SidebarPermissionsModule } from '../sidebar-permissions/sidebar-permissions.module';
+import { SidebarResourceGuard } from '../../auth/guards/sidebar-resource.guard';
 
 @Module({
   imports: [
     PrismaModule,
     ScheduleModule.forRoot(),
+    SidebarPermissionsModule,
   ],
   controllers: [AssetsController],
   providers: [
@@ -27,6 +30,7 @@ import { AssetImportService }  from './services/asset-import.service';
     AppraisalService,
     AssetHistoryService,
     AssetImportService,
+    SidebarResourceGuard,
   ],
   exports: [AssetsService, DepreciationService],
 })

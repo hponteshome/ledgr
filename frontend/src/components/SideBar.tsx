@@ -110,7 +110,7 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
   }, [tree, cid]);
 
   const filteredMenu = useMemo(() => {
-    if (permLoading || allowed.length === 0) return menuItems;
+    if (permLoading) return menuItems;
     return menuItems
       .map(item => {
         if (!item.children) {
