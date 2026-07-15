@@ -2092,3 +2092,26 @@ read/write/delete la nao muda nada na pratica, o que e enganoso para quem admini
 Tratar numa sessao futura (pos-deploy, sem pressa): esconder o editor JSON generico,
 ou substituir por link para a tela real (/app/sistema/sidebar-permissions), preservando
 apenas o campo "all" para identificar o Master Admin.
+
+---
+
+## PENDENCIA - PROXIMA SESSAO: Janela de acesso por horario/dia da semana
+
+Feature solicitada 15/07/2026, escopo levantado mas NAO implementada ainda.
+
+**Requisitos:**
+- Horario permitido por usuario/perfil (ex: 08:00-18:00, seg-sex)
+- Bloqueio total em mes(es) de ferias
+- Somente Master Admin pode atribuir excecoes pontuais
+
+**Desenho tecnico proposto:**
+- Novo model AccessSchedule (ou campos direto em User): diasSemana[], horaInicio,
+  horaFim, mesesBloqueados[], excecoes (tabela separada: userId, data, motivo, criadoPorId)
+- Enforcement via guard GLOBAL (nao so no login) - similar ao JwtAuthGuard, roda em toda
+  requisicao autenticada. Master Admin sempre bypassa (mesmo padrao de permissions.all).
+
+**Decisoes pendentes de confirmar com o usuario antes de implementar:**
+1. Bloqueia so no login, ou expulsa sessao ativa quando o horario vence?
+2. Mes de ferias e fixo (ex: sempre dezembro) ou configuravel por usuario?
+3. Excecao pontual e por data especifica, ou tambem permite desligar a regra
+   temporariamente pro usuario inteiro?
