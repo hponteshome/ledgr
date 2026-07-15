@@ -282,3 +282,20 @@ pendencias ficam em LEDGR-contexto.md (append-only).
 - **Fallback de bootstrap:** perfil sem nenhuma linha configurada em `profile_sidebar_permissions` = acesso liberado. Isso é intencional (evita quebrar usuários existentes), mas significa que qualquer perfil novo criado precisa ser configurado na tela de Permissões de Menu antes de restringir acesso.
 - **Comando de start do backend:** `npm run dev` (de dentro de `apps\api`) OU `npm run start:dev` (da raiz do monorepo) — ambos válidos, mesmo resultado, terminais diferentes.
 - **UX de bloqueio visual:** ao adicionar guard real de API a um módulo (`RequireResourceAccess`), replicar o padrão do Persons — botão de ação principal desabilitado com texto "Somente leitura" quando sem EDIT, ações de editar/excluir ocultas conforme `canEdit`/`canDelete` do `SidebarPermissionsContext`, `alert()` nativo trocado por `toast.error()`.
+
+## Padrao de avisos/erros (toast vs inline) — atualizado 15/07/2026
+
+- **Regra geral:** `toast.error()` (react-hot-toast) e o padrao para feedback de acoes do
+  sistema — erros de permissao (403), falhas de salvamento, confirmacoes. NUNCA usar
+  `alert()`/`confirm()` nativos do navegador em codigo novo ou ao tocar em codigo existente.
+- **Excecao deliberada — erros de validacao vinculados a um campo especifico:** quando o erro
+  esta contextualmente preso a um input (ex: login invalido, campo obrigatorio nao preenchido),
+  um banner inline proximo ao campo pode ser mais claro que um toast no canto da tela. Exemplo
+  ja implementado: Header.tsx, erro de login aparece como caixinha vermelha abaixo do form,
+  nao como toast.
+- **Ao revisar/criar qualquer tela nova:** se houver `alert()`/`confirm()` nativo, avaliar se e
+  claramente contextual (fica inline) ou geral (vira toast) antes de decidir o padrao a aplicar.
+- **Pendencia registrada:** ~36 arquivos ainda usam alert() nativo fora dos modulos ja
+  padronizados (Persons, e os 6 modulos financeiros/contabeis com guard real de 14/07). Tratar
+  por modulo, priorizando conforme cada um ganhar guard real de API (mesmo criterio de risco
+  usado ate agora).
