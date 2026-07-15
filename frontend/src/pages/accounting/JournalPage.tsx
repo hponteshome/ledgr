@@ -499,7 +499,7 @@ const JournalPage: React.FC = () => {
         if (!confirmId) return;
         setActionLoading(true);
         try { await api.delete(`/accounting/journal/${confirmId}`); setConfirmId(null); loadEntries(); loadTotals(); }
-        catch (e: any) { alert(e.response?.data?.message || 'Erro ao excluir.'); }
+        catch (e: any) { toast.error(e.response?.data?.message || 'Erro ao excluir.'); }
         finally { setActionLoading(false); }
     };
 
@@ -507,7 +507,7 @@ const JournalPage: React.FC = () => {
         if (!reverseId) return;
         setActionLoading(true);
         try { await api.post(`/accounting/journal/${reverseId}/reverse`); setReverseId(null); loadEntries(); loadTotals(); }
-        catch (e: any) { alert(e.response?.data?.message || 'Erro ao estornar.'); }
+        catch (e: any) { toast.error(e.response?.data?.message || 'Erro ao estornar.'); }
         finally { setActionLoading(false); }
     };
 

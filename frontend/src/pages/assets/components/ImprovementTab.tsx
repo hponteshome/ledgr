@@ -7,6 +7,7 @@ import { ImprovementModal } from '../modals/ImprovementModal';
 import { useAssetMutations } from '../hooks/useAssets';
 import type { FixedAsset, AssetImprovement } from '../types/asset.types';
 import { formatCurrency, formatDate } from '../../../utils/formatters';
+import toast from 'react-hot-toast';
 
 export function ImprovementTab({ asset, onRefresh }: { asset: FixedAsset; onRefresh: () => void }) {
     const [showModal, setShowModal] = useState(false);
@@ -15,7 +16,7 @@ export function ImprovementTab({ asset, onRefresh }: { asset: FixedAsset; onRefr
 
     async function handleCapitalize(id: string) {
         if (!confirm('Confirma a capitalização desta benfeitoria ao valor do ativo?')) return;
-        try { await capitalizeImprovement(id); onRefresh(); } catch (e: any) { alert(e.message); }
+        try { await capitalizeImprovement(id); onRefresh(); } catch (e: any) { toast.error(e.message); }
     }
 
     return (

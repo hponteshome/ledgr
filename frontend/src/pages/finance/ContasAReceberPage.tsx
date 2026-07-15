@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../../services/api';
 import { SmartDateInput } from '../../components/SmartDateInput';
+import toast from 'react-hot-toast';
 
 const AC = '#0369A1';
 const AC_SURF = '#F0F9FF';
@@ -87,7 +88,7 @@ export default function ContasAReceberPage() {
   async function handleReceive() {
     if (!selected) return;
     if (selected.origin === 'ALUGUEL' && !receiveDto.nfNumero.trim()) {
-      alert('Para recebimentos de aluguel, o número da NF é obrigatório.');
+      toast.error('Para recebimentos de aluguel, o número da NF é obrigatório.');
       return;
     }
     try {
@@ -102,7 +103,7 @@ export default function ContasAReceberPage() {
       });
       setShowModal(false);
       setRefreshKey(k => k+1);
-    } catch (e: any) { alert(e?.response?.data?.message ?? 'Erro ao registrar recebimento'); }
+    } catch (e: any) { toast.error(e?.response?.data?.message ?? 'Erro ao registrar recebimento'); }
   }
 
   async function handleCreate() {
@@ -115,7 +116,7 @@ export default function ContasAReceberPage() {
       setShowNewModal(false);
       setRefreshKey(k => k+1);
       setNewDto({ title: '', origin: 'ALUGUEL', dueDate: '', amount: '', customerName: '', customerCnpjCpf: '', fixedAssetId: '', notes: '', competenceMonth: '' });
-    } catch (e: any) { alert(e?.response?.data?.message ?? 'Erro ao criar conta a receber'); }
+    } catch (e: any) { toast.error(e?.response?.data?.message ?? 'Erro ao criar conta a receber'); }
   }
 
   async function handleCancel(id: string) {
@@ -123,7 +124,7 @@ export default function ContasAReceberPage() {
     try {
       await api.patch(`/finance/ar/${id}/cancel`);
       setRefreshKey(k => k+1);
-    } catch (e: any) { alert(e?.response?.data?.message ?? 'Erro'); }
+    } catch (e: any) { toast.error(e?.response?.data?.message ?? 'Erro'); }
   }
 
   const S = {

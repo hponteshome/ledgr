@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../../services/api';
 import { SmartDateInput } from '../../components/SmartDateInput';
+import toast from 'react-hot-toast';
 
 const AC = '#0369A1';
 const AC_SURF = '#F0F9FF';
@@ -76,7 +77,7 @@ export default function PettyCashPage() {
       });
       setShowFund(false);
       setRefreshKey(k=>k+1);
-    } catch(e:any) { alert(e?.response?.data?.message ?? 'Erro'); }
+    } catch(e:any) { toast.error(e?.response?.data?.message ?? 'Erro'); }
   }
 
   async function handleAddEntry() {
@@ -86,7 +87,7 @@ export default function PettyCashPage() {
       setShowEntry(false);
       setRefreshKey(k=>k+1);
       setNewEntry({type:'EXPENSE',category:'OUTROS',date:new Date().toISOString().slice(0,10),amount:'',description:'',receiptRef:'',supplier:''});
-    } catch(e:any) { alert(e?.response?.data?.message ?? 'Erro'); }
+    } catch(e:any) { toast.error(e?.response?.data?.message ?? 'Erro'); }
   }
 
   const pct = summary?.pct ?? 0;
