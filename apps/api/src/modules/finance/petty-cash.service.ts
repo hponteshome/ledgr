@@ -7,9 +7,9 @@ import { Prisma } from '@prisma/client';
 export class PettyCashService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAll(companyId: string) {
+  async findAll(companyId: string, includeInactive = false) {
     return this.prisma.pettyCash.findMany({
-      where: { companyId, active: true },
+      where: includeInactive ? { companyId } : { companyId, active: true },
       include: { responsible: { select: { id: true, fullName: true } } },
       orderBy: { name: 'asc' },
     });
@@ -55,7 +55,83 @@ export class PettyCashService {
         },
       });
 
+      await tx.auditLog.create({
+        data: {
+          actorId: userId,
+          action: 'CREATE_PETTY_CASH',
+          targetId: fund.id,
+          before: null,
+          after: { name: fund.name, targetBalance: fund.targetBalance },
+          ip: null,
+        },
+      });
+
       return fund;
+    });
+  }
+
+  async update(companyId: string, id: string, dto: any, userId: string, ip?: string) {
+    const before = await this.findOne(companyId, id);
+    const data: any = {};
+    if (dto.name !== undefined) data.name = dto.name;
+    if (dto.targetBalance !== undefined) data.targetBalance = new Prisma.Decimal(String(dto.targetBalance).replace(',','.'));
+    if (dto.alertThreshold !== undefined) data.alertThreshold = new Prisma.Decimal(String(dto.alertThreshold).replace(',','.'));
+    if (dto.responsibleId !== undefined) data.responsibleId = dto.responsibleId || null;
+    if (dto.expenseAccountId !== undefined) data.expenseAccountId = dto.expenseAccountId || null;
+    if (dto.cashAccountId !== undefined) data.cashAccountId = dto.cashAccountId || null;
+
+    return this.prisma.$transaction(async (tx) => {
+      const after = await tx.pettyCash.update({ where: { id }, data });
+      await tx.auditLog.create({
+        data: {
+          actorId: userId,
+          action: 'UPDATE_PETTY_CASH',
+          targetId: id,
+          before: { name: before.name, targetBalance: before.targetBalance, alertThreshold: before.alertThreshold, responsibleId: before.responsibleId },
+          after: { name: after.name, targetBalance: after.targetBalance, alertThreshold: after.alertThreshold, responsibleId: after.responsibleId },
+          ip: ip ?? null,
+        },
+      });
+      return after;
+    });
+  }
+
+  async remove(companyId: string, id: string, userId: string, ip?: string) {
+    const fund = await this.findOne(companyId, id);
+    if (new Prisma.Decimal(fund.currentBalance).greaterThan(0)) {
+      throw new BadRequestException('Nao e possivel excluir um fundo com saldo diferente de zero. Registre uma despesa (ou repasse o saldo) para zerar antes de excluir.');
+    }
+    return this.prisma.$transaction(async (tx) => {
+      const after = await tx.pettyCash.update({ where: { id }, data: { active: false } });
+      await tx.auditLog.create({
+        data: {
+          actorId: userId,
+          action: 'DELETE_PETTY_CASH',
+          targetId: id,
+          before: { name: fund.name, active: true },
+          after: { name: fund.name, active: false },
+          ip: ip ?? null,
+        },
+      });
+      return after;
+    });
+  }
+
+  async toggleActive(companyId: string, id: string, active: boolean, userId: string, ip?: string) {
+    const fund = await this.findOne(companyId, id);
+    return this.prisma.$transaction(async (tx) => {
+      const after = await tx.pettyCash.update({ where: { id }, data: { active } });
+      await tx.auditLog.create({
+        data: {
+          actorId: userId,
+          action: active ? 'ACTIVATE_PETTY_CASH' : 'DEACTIVATE_PETTY_CASH',
+          targetId: id,
+          before: { name: fund.name, active: fund.active },
+          after: { name: fund.name, active },
+          ip: ip ?? null,
+        },
+      });
+      return after;
     });
   }
 
@@ -93,7 +169,134 @@ export class PettyCashService {
         data: { currentBalance: newBalance },
       });
 
+      await tx.auditLog.create({
+        data: {
+          actorId: userId,
+          action: dto.type === 'EXPENSE' ? 'PETTY_CASH_EXPENSE' : 'PETTY_CASH_REPLENISHMENT',
+          targetId: fundId,
+          before: { balanceBefore: fund.currentBalance },
+          after: { balanceAfter: newBalance, amount, description: dto.description },
+          ip: null,
+        },
+      });
+
       return { entry, currentBalance: newBalance };
+    });
+  }
+
+  async updateEntry(companyId: string, fundId: string, entryId: string, dto: any, userId: string, ip?: string) {
+    await this.findOne(companyId, fundId);
+    const entry = await this.prisma.pettyCashEntry.findFirst({ where: { id: entryId, pettyCashId: fundId, companyId } });
+    if (!entry) throw new NotFoundException('Movimento nao encontrado.');
+    if (entry.type === 'OPENING') throw new BadRequestException('Nao e possivel editar o lancamento de abertura. Use "Editar Fundo" para ajustar o saldo inicial.');
+
+    const newAmount = dto.amount !== undefined ? new Prisma.Decimal(String(dto.amount).replace(',','.')) : new Prisma.Decimal(entry.amount);
+    const newType = dto.type ?? entry.type;
+    const newDate = dto.date !== undefined ? new Date(dto.date) : entry.date;
+    const newDescription = dto.description !== undefined ? dto.description : entry.description;
+
+    return this.prisma.$transaction(async (tx) => {
+      const allEntries = await tx.pettyCashEntry.findMany({
+        where: { pettyCashId: fundId },
+        orderBy: { createdAt: 'asc' },
+      });
+
+      let running = new Prisma.Decimal(0);
+      const recalculated: { id: string; balanceAfter: Prisma.Decimal }[] = [];
+
+      for (const e of allEntries) {
+        const isTarget = e.id === entryId;
+        const type = isTarget ? newType : e.type;
+        const amount = isTarget ? newAmount : new Prisma.Decimal(e.amount);
+        running = type === 'EXPENSE' ? running.minus(amount) : running.plus(amount);
+        if (running.lessThan(0)) {
+          throw new BadRequestException(`A edicao deixaria o saldo negativo apos o lancamento de ${e.date.toISOString().slice(0,10)}. Ajuste o valor antes de salvar.`);
+        }
+        recalculated.push({ id: e.id, balanceAfter: running });
+      }
+
+      for (const r of recalculated) {
+        if (r.id === entryId) {
+          await tx.pettyCashEntry.update({
+            where: { id: entryId },
+            data: {
+              type: newType,
+              amount: newAmount,
+              category: dto.category !== undefined ? dto.category : entry.category,
+              date: newDate,
+              description: newDescription,
+              receiptRef: dto.receiptRef !== undefined ? dto.receiptRef : entry.receiptRef,
+              supplier: dto.supplier !== undefined ? dto.supplier : entry.supplier,
+              balanceAfter: r.balanceAfter,
+            },
+          });
+        } else {
+          await tx.pettyCashEntry.update({ where: { id: r.id }, data: { balanceAfter: r.balanceAfter } });
+        }
+      }
+
+      const finalBalance = recalculated[recalculated.length - 1].balanceAfter;
+      await tx.pettyCash.update({ where: { id: fundId }, data: { currentBalance: finalBalance } });
+
+      await tx.auditLog.create({
+        data: {
+          actorId: userId,
+          action: 'UPDATE_PETTY_CASH_ENTRY',
+          targetId: entryId,
+          before: { type: entry.type, amount: entry.amount, description: entry.description, date: entry.date },
+          after: { type: newType, amount: newAmount, description: newDescription, date: newDate },
+          ip: ip ?? null,
+        },
+      });
+
+      return { finalBalance };
+    });
+  }
+
+  async removeEntry(companyId: string, fundId: string, entryId: string, userId: string, ip?: string) {
+    await this.findOne(companyId, fundId);
+    const entry = await this.prisma.pettyCashEntry.findFirst({ where: { id: entryId, pettyCashId: fundId, companyId } });
+    if (!entry) throw new NotFoundException('Movimento nao encontrado.');
+    if (entry.type === 'OPENING') throw new BadRequestException('Nao e possivel excluir o lancamento de abertura. Exclua o fundo inteiro se necessario.');
+
+    return this.prisma.$transaction(async (tx) => {
+      const allEntries = await tx.pettyCashEntry.findMany({
+        where: { pettyCashId: fundId },
+        orderBy: { createdAt: 'asc' },
+      });
+
+      let running = new Prisma.Decimal(0);
+      const recalculated: { id: string; balanceAfter: Prisma.Decimal }[] = [];
+
+      for (const e of allEntries) {
+        if (e.id === entryId) continue;
+        running = e.type === 'EXPENSE' ? running.minus(e.amount) : running.plus(e.amount);
+        if (running.lessThan(0)) {
+          throw new BadRequestException('A exclusao deixaria o saldo negativo em algum ponto do historico. Nao e possivel excluir este lancamento.');
+        }
+        recalculated.push({ id: e.id, balanceAfter: running });
+      }
+
+      await tx.pettyCashEntry.delete({ where: { id: entryId } });
+      for (const r of recalculated) {
+        await tx.pettyCashEntry.update({ where: { id: r.id }, data: { balanceAfter: r.balanceAfter } });
+      }
+
+      const finalBalance = recalculated.length > 0 ? recalculated[recalculated.length - 1].balanceAfter : new Prisma.Decimal(0);
+      await tx.pettyCash.update({ where: { id: fundId }, data: { currentBalance: finalBalance } });
+
+      await tx.auditLog.create({
+        data: {
+          actorId: userId,
+          action: 'DELETE_PETTY_CASH_ENTRY',
+          targetId: entryId,
+          before: { type: entry.type, amount: entry.amount, description: entry.description, date: entry.date },
+          after: null,
+          ip: ip ?? null,
+        },
+      });
+
+      return { finalBalance };
     });
   }
 

@@ -9,6 +9,24 @@ const AC_SURF = '#F0F9FF';
 function fmtBRL(v: any) { return Number(v??0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}); }
 function fmtDate(s: any) { if(!s) return '—'; const p=String(s).split('T')[0].split('-'); return p[2]+'/'+p[1]+'/'+p[0]; }
 
+function maskCurrency(raw: string): string {
+  const digits = raw.replace(/\D/g, '');
+  if (!digits) return '';
+  const cents = digits.padStart(3, '0');
+  const intPart = cents.slice(0, -2).replace(/^0+(?=\d)/, '');
+  const decPart = cents.slice(-2);
+  const intFormatted = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  return intFormatted + ',' + decPart;
+}
+function unmaskCurrency(masked: string): number {
+  if (!masked) return 0;
+  return parseFloat(masked.replace(/\./g, '').replace(',', '.')) || 0;
+}
+function numberToMask(value: number | string): string {
+  const num = Number(value) || 0;
+  return maskCurrency(Math.round(num * 100).toString());
+}
+
 const TYPE_LABEL: Record<string,{label:string;bg:string;color:string}> = {
   EXPENSE:       {label:'Despesa',     bg:'#FEE2E2',color:'#B91C1C'},
   REPLENISHMENT: {label:'Reposição',   bg:'#DCFCE7',color:'#15803D'},
@@ -35,7 +53,10 @@ export default function PettyCashPage() {
   const [showNew, setShowNew]     = useState(false);
   const [showEntry, setShowEntry] = useState(false);
   const [showFund, setShowFund]   = useState(false);
+  const [editingFundId, setEditingFundId] = useState<string|null>(null);
+  const [showInactive, setShowInactive] = useState(false);
   const [entryType, setEntryType] = useState<'EXPENSE'|'REPLENISHMENT'>('EXPENSE');
+  const [editingEntryId, setEditingEntryId] = useState<string|null>(null);
   const [from, setFrom]           = useState('');
   const [to, setTo]               = useState('');
   const [refreshKey, setRefreshKey] = useState(0);
@@ -44,10 +65,10 @@ export default function PettyCashPage() {
   const [newEntry, setNewEntry] = useState({type:'EXPENSE',category:'OUTROS',date:new Date().toISOString().slice(0,10),amount:'',description:'',receiptRef:'',supplier:''});
 
   const loadFunds = useCallback(async () => {
-    const {data} = await api.get('/finance/petty-cash');
+    const {data} = await api.get('/finance/petty-cash', { params: { includeInactive: showInactive } });
     setFunds(data);
     if (data.length && !selected) setSelected(data[0]);
-  }, [refreshKey]);
+  }, [refreshKey, showInactive]);
 
   const loadSummary = useCallback(async () => {
     if (!selected) return;
@@ -68,25 +89,105 @@ export default function PettyCashPage() {
   useEffect(() => { loadFunds(); }, [loadFunds]);
   useEffect(() => { loadSummary(); loadEntries(); }, [loadSummary, loadEntries]);
 
-  async function handleCreateFund() {
+  async function handleSaveFund() {
+    if (!newFund.name.trim()) { toast.error('Informe o nome do fundo.'); return; }
+    if (!newFund.targetBalance || unmaskCurrency(newFund.targetBalance) <= 0) { toast.error('Informe o saldo alvo.'); return; }
     try {
-      await api.post('/finance/petty-cash', {
+      const payload = {
         ...newFund,
-        targetBalance:  parseFloat(newFund.targetBalance.replace(',','.')),
-        alertThreshold: parseFloat(newFund.alertThreshold.replace(',','.')),
-      });
+        targetBalance:  unmaskCurrency(newFund.targetBalance),
+        alertThreshold: unmaskCurrency(newFund.alertThreshold),
+      };
+      if (editingFundId) {
+        await api.put(`/finance/petty-cash/${editingFundId}`, payload);
+        toast.success('Fundo atualizado.');
+      } else {
+        await api.post('/finance/petty-cash', payload);
+        toast.success('Fundo criado.');
+      }
       setShowFund(false);
+      setEditingFundId(null);
+      setNewFund({name:'',targetBalance:'',alertThreshold:'',responsibleId:''});
       setRefreshKey(k=>k+1);
     } catch(e:any) { toast.error(e?.response?.data?.message ?? 'Erro'); }
   }
 
-  async function handleAddEntry() {
+  function openEditFund() {
     if (!selected) return;
+    setNewFund({
+      name: selected.name ?? '',
+      targetBalance: numberToMask(selected.targetBalance ?? 0),
+      alertThreshold: numberToMask(selected.alertThreshold ?? 0),
+      responsibleId: selected.responsibleId ?? '',
+    });
+    setEditingFundId(selected.id);
+    setShowFund(true);
+  }
+
+  async function handleToggleActive() {
+    if (!selected) return;
+    const novoStatus = !selected.active;
+    if (!confirm(`${novoStatus ? 'Reativar' : 'Desativar'} o fundo "${selected.name}"?`)) return;
     try {
-      await api.post(`/finance/petty-cash/${selected.id}/entries`, {...newEntry, type: entryType});
+      await api.patch(`/finance/petty-cash/${selected.id}/toggle-active`, { active: novoStatus });
+      toast.success(novoStatus ? 'Fundo reativado.' : 'Fundo desativado.');
+      setRefreshKey(k=>k+1);
+    } catch(e:any) { toast.error(e?.response?.data?.message ?? 'Erro'); }
+  }
+
+  async function handleDeleteFund() {
+    if (!selected) return;
+    if (!confirm(`Excluir o fundo "${selected.name}"? Esta acao nao pode ser desfeita.`)) return;
+    try {
+      await api.delete(`/finance/petty-cash/${selected.id}`);
+      toast.success('Fundo excluido.');
+      setSelected(null);
+      setRefreshKey(k=>k+1);
+    } catch(e:any) { toast.error(e?.response?.data?.message ?? 'Erro'); }
+  }
+
+  async function handleSaveEntry() {
+    if (!selected) return;
+    if (!newEntry.amount || unmaskCurrency(newEntry.amount) <= 0) { toast.error('Informe o valor.'); return; }
+    if (!newEntry.description.trim()) { toast.error('Informe a descrição.'); return; }
+    try {
+      const entryPayload = { ...newEntry, amount: unmaskCurrency(newEntry.amount), type: entryType };
+      if (editingEntryId) {
+        await api.put(`/finance/petty-cash/${selected.id}/entries/${editingEntryId}`, entryPayload);
+        toast.success('Movimento atualizado.');
+      } else {
+        await api.post(`/finance/petty-cash/${selected.id}/entries`, entryPayload);
+        toast.success(entryType==='EXPENSE' ? 'Despesa registrada.' : 'Reposicao confirmada.');
+      }
       setShowEntry(false);
+      setEditingEntryId(null);
       setRefreshKey(k=>k+1);
       setNewEntry({type:'EXPENSE',category:'OUTROS',date:new Date().toISOString().slice(0,10),amount:'',description:'',receiptRef:'',supplier:''});
+    } catch(e:any) { toast.error(e?.response?.data?.message ?? 'Erro'); }
+  }
+
+  function openEditEntry(e: any) {
+    setNewEntry({
+      type: e.type,
+      category: e.category ?? 'OUTROS',
+      date: String(e.date).split('T')[0],
+      amount: numberToMask(e.amount),
+      description: e.description ?? '',
+      receiptRef: e.receiptRef ?? '',
+      supplier: e.supplier ?? '',
+    });
+    setEntryType(e.type === 'EXPENSE' ? 'EXPENSE' : 'REPLENISHMENT');
+    setEditingEntryId(e.id);
+    setShowEntry(true);
+  }
+
+  async function handleDeleteEntry(entryId: string) {
+    if (!selected) return;
+    if (!confirm('Excluir este movimento? Os saldos posteriores serao recalculados.')) return;
+    try {
+      await api.delete(`/finance/petty-cash/${selected.id}/entries/${entryId}`);
+      toast.success('Movimento excluido.');
+      setRefreshKey(k=>k+1);
     } catch(e:any) { toast.error(e?.response?.data?.message ?? 'Erro'); }
   }
 
@@ -103,20 +204,30 @@ export default function PettyCashPage() {
             <h1 style={{fontSize:18,fontWeight:600,color:'#111',margin:'2px 0 0'}}>Fundo Fixo / Caixa Pequeno</h1>
           </div>
           <div style={{display:'flex',gap:8}}>
-            <button onClick={()=>setShowFund(true)} style={{padding:'7px 16px',borderRadius:8,border:'0.5px solid #E5E7EB',background:'#fff',fontSize:13,cursor:'pointer',color:'#374151'}}>+ Novo Fundo</button>
-            {selected && <button onClick={()=>{setEntryType('EXPENSE');setShowEntry(true);}} style={{padding:'7px 16px',borderRadius:8,border:'none',background:'#B91C1C',color:'#fff',fontSize:13,cursor:'pointer',fontWeight:500}}>− Registrar Despesa</button>}
-            {selected && <button onClick={()=>{setEntryType('REPLENISHMENT');setShowEntry(true);}} style={{padding:'7px 16px',borderRadius:8,border:'none',background:'#15803D',color:'#fff',fontSize:13,cursor:'pointer',fontWeight:500}}>+ Repor Fundo</button>}
+            <button onClick={()=>{setEditingFundId(null); setNewFund({name:'',targetBalance:'',alertThreshold:'',responsibleId:''}); setShowFund(true);}} style={{padding:'7px 16px',borderRadius:8,border:'0.5px solid #E5E7EB',background:'#fff',fontSize:13,cursor:'pointer',color:'#374151'}}>+ Novo Fundo</button>
+            {selected && <button onClick={openEditFund} style={{padding:'7px 16px',borderRadius:8,border:'0.5px solid #E5E7EB',background:'#fff',fontSize:13,cursor:'pointer',color:'#374151'}}>✏️ Editar Fundo</button>}
+            {selected && <button onClick={handleToggleActive} style={{padding:'7px 16px',borderRadius:8,border:'0.5px solid #E5E7EB',background:'#fff',fontSize:13,cursor:'pointer',color:selected.active?'#92400E':'#15803D'}}>{selected.active ? '⏸️ Desativar Fundo' : '▶️ Reativar Fundo'}</button>}
+            {selected && <button onClick={handleDeleteFund} style={{padding:'7px 16px',borderRadius:8,border:'0.5px solid #FCA5A5',background:'#fff',fontSize:13,cursor:'pointer',color:'#B91C1C'}}>🗑️ Excluir Fundo</button>}
+            <label style={{display:'flex',alignItems:'center',gap:6,fontSize:12,color:'#6B7280',cursor:'pointer',marginLeft:4}}>
+              <input type="checkbox" checked={showInactive} onChange={e=>{setShowInactive(e.target.checked); setSelected(null);}} />
+              Mostrar inativos
+            </label>
+            {selected && <button onClick={()=>{setEditingEntryId(null); setEntryType('EXPENSE');setShowEntry(true);}} style={{padding:'7px 16px',borderRadius:8,border:'none',background:'#B91C1C',color:'#fff',fontSize:13,cursor:'pointer',fontWeight:500}}>− Registrar Despesa</button>}
+            {selected && <button onClick={()=>{setEditingEntryId(null); setEntryType('REPLENISHMENT');setShowEntry(true);}} style={{padding:'7px 16px',borderRadius:8,border:'none',background:'#15803D',color:'#fff',fontSize:13,cursor:'pointer',fontWeight:500}}>+ Repor Fundo</button>}
           </div>
         </div>
       </div>
 
       <div style={{display:'flex',flex:1,overflow:'hidden'}}>
         {/* Sidebar fundos */}
-        {funds.length > 1 && (
+        {(funds.length > 1 || showInactive) && (
           <div style={{width:200,borderRight:'0.5px solid #E5E7EB',padding:'12px 8px',background:'#F9FAFB',overflowY:'auto'}}>
             {funds.map(f => (
-              <div key={f.id} onClick={()=>setSelected(f)} style={{padding:'10px 12px',borderRadius:8,cursor:'pointer',background:selected?.id===f.id ? AC_SURF : 'transparent',borderLeft:selected?.id===f.id ? `3px solid ${AC}` : '3px solid transparent',marginBottom:4}}>
-                <div style={{fontSize:13,fontWeight:600,color:selected?.id===f.id ? AC : '#374151'}}>{f.name}</div>
+              <div key={f.id} onClick={()=>setSelected(f)} style={{padding:'10px 12px',borderRadius:8,cursor:'pointer',opacity:f.active?1:0.5,background:selected?.id===f.id ? AC_SURF : 'transparent',borderLeft:selected?.id===f.id ? `3px solid ${AC}` : '3px solid transparent',marginBottom:4}}>
+                <div style={{fontSize:13,fontWeight:600,color:selected?.id===f.id ? AC : '#374151',display:'flex',alignItems:'center',gap:6}}>
+                  {f.name}
+                  {!f.active && <span style={{fontSize:9,padding:'1px 6px',borderRadius:10,background:'#FEE2E2',color:'#B91C1C',fontWeight:700}}>INATIVO</span>}
+                </div>
                 <div style={{fontSize:11,color:'#9CA3AF'}}>{f.responsible?.fullName ?? 'Sem responsável'}</div>
               </div>
             ))}
@@ -182,11 +293,11 @@ export default function PettyCashPage() {
               <div style={{background:'#fff',border:'0.5px solid #E5E7EB',borderRadius:12,overflow:'hidden'}}>
                 <table style={{width:'100%',borderCollapse:'collapse'}}>
                   <thead>
-                    <tr>{['Data','Tipo','Categoria','Fornecedor','Descrição','Comprovante','Valor','Saldo'].map(h=><th key={h} style={S.th}>{h}</th>)}</tr>
+                    <tr>{['Data','Tipo','Categoria','Fornecedor','Descrição','Comprovante','Valor','Saldo',''].map(h=><th key={h} style={S.th}>{h}</th>)}</tr>
                   </thead>
                   <tbody>
                     {entries.length === 0 ? (
-                      <tr><td colSpan={8} style={{...S.td,textAlign:'center',padding:'40px',color:'#9CA3AF'}}>Nenhum movimento no período.</td></tr>
+                      <tr><td colSpan={9} style={{...S.td,textAlign:'center',padding:'40px',color:'#9CA3AF'}}>Nenhum movimento no período.</td></tr>
                     ) : entries.map(e=>{
                       const t = TYPE_LABEL[e.type] ?? TYPE_LABEL.EXPENSE;
                       return (
@@ -199,6 +310,14 @@ export default function PettyCashPage() {
                           <td style={{...S.td,fontSize:11,color:'#9CA3AF'}}>{e.receiptRef ?? '—'}</td>
                           <td style={{...S.td,fontFamily:'monospace',fontWeight:600,color:e.type==='EXPENSE'?'#B91C1C':'#15803D'}}>{e.type==='EXPENSE'?'-':'+' }{fmtBRL(e.amount)}</td>
                           <td style={{...S.td,fontFamily:'monospace',color:'#374151'}}>{fmtBRL(e.balanceAfter)}</td>
+                          <td style={{...S.td,whiteSpace:'nowrap'}}>
+                            {e.type !== 'OPENING' && (
+                              <>
+                                <button onClick={()=>openEditEntry(e)} title="Editar" style={{border:'none',background:'transparent',cursor:'pointer',padding:4,color:'#6B7280'}}>✏️</button>
+                                <button onClick={()=>handleDeleteEntry(e.id)} title="Excluir" style={{border:'none',background:'transparent',cursor:'pointer',padding:4,color:'#B91C1C'}}>🗑️</button>
+                              </>
+                            )}
+                          </td>
                         </tr>
                       );
                     })}
@@ -214,15 +333,18 @@ export default function PettyCashPage() {
       {showFund && (
         <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.4)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000}}>
           <div style={{background:'#fff',borderRadius:14,width:460,padding:24,boxShadow:'0 20px 60px rgba(0,0,0,.15)'}}>
-            <h2 style={{fontSize:16,fontWeight:600,margin:'0 0 20px'}}>Novo Fundo Fixo</h2>
+            <h2 style={{fontSize:16,fontWeight:600,margin:'0 0 20px'}}>{editingFundId ? 'Editar Fundo Fixo' : 'Novo Fundo Fixo'}</h2>
             <div style={{display:'grid',gap:12}}>
               {[{label:'Nome do Fundo',key:'name',type:'text',placeholder:'Ex: Caixa da Maria'},{label:'Saldo Alvo (R$)',key:'targetBalance',type:'text',placeholder:'1000,00'},{label:'Alerta abaixo de (R$)',key:'alertThreshold',type:'text',placeholder:'200,00'}].map(f=>(
-                <div key={f.key}><label style={S.label}>{f.label}</label><input type={f.type} placeholder={f.placeholder} value={(newFund as any)[f.key]} onChange={e=>setNewFund(d=>({...d,[f.key]:e.target.value}))} style={S.input} /></div>
+                <div key={f.key}><label style={S.label}>{f.label}</label><input type={f.type} placeholder={f.placeholder} value={(newFund as any)[f.key]} onChange={e=>{
+                  const isMoney = f.key==='targetBalance'||f.key==='alertThreshold';
+                  setNewFund(d=>({...d,[f.key]: isMoney ? maskCurrency(e.target.value) : e.target.value}));
+                }} style={S.input} /></div>
               ))}
             </div>
             <div style={{display:'flex',justifyContent:'flex-end',gap:8,marginTop:20}}>
-              <button onClick={()=>setShowFund(false)} style={{padding:'8px 16px',borderRadius:8,border:'0.5px solid #E5E7EB',background:'#fff',cursor:'pointer',fontSize:13}}>Cancelar</button>
-              <button onClick={handleCreateFund} disabled={!newFund.name||!newFund.targetBalance} style={{padding:'8px 18px',borderRadius:8,border:'none',background:AC,color:'#fff',cursor:'pointer',fontSize:13,fontWeight:500}}>Criar</button>
+              <button onClick={()=>{setShowFund(false); setEditingFundId(null);}} style={{padding:'8px 16px',borderRadius:8,border:'0.5px solid #E5E7EB',background:'#fff',cursor:'pointer',fontSize:13}}>Cancelar</button>
+              <button onClick={handleSaveFund} style={{padding:'8px 18px',borderRadius:8,border:'none',background:AC,color:'#fff',cursor:'pointer',fontSize:13,fontWeight:500}}>{editingFundId ? 'Salvar' : 'Criar'}</button>
             </div>
           </div>
         </div>
@@ -232,11 +354,11 @@ export default function PettyCashPage() {
       {showEntry && (
         <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.4)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000}}>
           <div style={{background:'#fff',borderRadius:14,width:540,padding:24,boxShadow:'0 20px 60px rgba(0,0,0,.15)',maxHeight:'90vh',overflowY:'auto'}}>
-            <h2 style={{fontSize:16,fontWeight:600,margin:'0 0 4px'}}>{entryType==='EXPENSE'?'Registrar Despesa':'Repor Fundo'}</h2>
+            <h2 style={{fontSize:16,fontWeight:600,margin:'0 0 4px'}}>{editingEntryId ? 'Editar Movimento' : (entryType==='EXPENSE'?'Registrar Despesa':'Repor Fundo')}</h2>
             <p style={{fontSize:13,color:'#6B7280',margin:'0 0 20px'}}>Saldo atual: <strong>{fmtBRL(summary?.current)}</strong></p>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
               <div><label style={S.label}>Data</label><SmartDateInput value={newEntry.date} onChange={v=>setNewEntry(d=>({...d,date:v}))} style={S.input} /></div>
-              <div><label style={S.label}>Valor (R$)</label><input value={newEntry.amount} onChange={e=>setNewEntry(d=>({...d,amount:e.target.value}))} style={S.input} placeholder="0,00" /></div>
+              <div><label style={S.label}>Valor (R$)</label><input value={newEntry.amount} onChange={e=>setNewEntry(d=>({...d,amount:maskCurrency(e.target.value)}))} style={S.input} placeholder="0,00" /></div>
               {entryType==='EXPENSE' && <>
                 <div><label style={S.label}>Categoria</label>
                   <select value={newEntry.category} onChange={e=>setNewEntry(d=>({...d,category:e.target.value}))} style={S.input}>
@@ -252,9 +374,9 @@ export default function PettyCashPage() {
               </div>
             </div>
             <div style={{display:'flex',justifyContent:'flex-end',gap:8,marginTop:20}}>
-              <button onClick={()=>setShowEntry(false)} style={{padding:'8px 16px',borderRadius:8,border:'0.5px solid #E5E7EB',background:'#fff',cursor:'pointer',fontSize:13}}>Cancelar</button>
-              <button onClick={handleAddEntry} disabled={!newEntry.amount||!newEntry.description} style={{padding:'8px 18px',borderRadius:8,border:'none',background:entryType==='EXPENSE'?'#B91C1C':'#15803D',color:'#fff',cursor:'pointer',fontSize:13,fontWeight:500}}>
-                {entryType==='EXPENSE'?'Registrar Despesa':'Confirmar Reposição'}
+              <button onClick={()=>{setShowEntry(false); setEditingEntryId(null);}} style={{padding:'8px 16px',borderRadius:8,border:'0.5px solid #E5E7EB',background:'#fff',cursor:'pointer',fontSize:13}}>Cancelar</button>
+              <button onClick={handleSaveEntry} style={{padding:'8px 18px',borderRadius:8,border:'none',background:entryType==='EXPENSE'?'#B91C1C':'#15803D',color:'#fff',cursor:'pointer',fontSize:13,fontWeight:500}}>
+                {editingEntryId ? 'Salvar' : (entryType==='EXPENSE'?'Registrar Despesa':'Confirmar Reposição')}
               </button>
             </div>
           </div>
