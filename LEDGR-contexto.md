@@ -2078,3 +2078,17 @@ controllers mapeados).
 
 - **Senha padrão para novo usuário / reset manual:** `Troque@123` (sinaliza ao usuário que deve trocar no primeiro acesso). Usar esse valor sempre que resetar senha via script/banco daqui pra frente, para manter consistência.
 - **Pendência identificada:** o sistema não tem rotina de recuperação de senha (esqueci minha senha). Hoje, todo reset é manual via banco (gerar hash bcrypt com Node e fazer UPDATE direto em `password_hash`). Isso não escala para usuários reais em produção/rede — precisa de um fluxo de "esqueci minha senha" (provavelmente: solicitação → e-mail com link/token de reset → tela para definir nova senha → expiração do token). Avaliar prioridade antes ou logo após o deploy em rede, dependendo de quantos usuários reais vão precisar se autenticar sem suporte manual disponível o tempo todo.
+
+---
+
+### Pendencia pos-deploy: tela "Editar Perfil" (JSON read/write/delete) obsoleta
+
+Confirmado 15/07/2026: o campo Profile.permissions (JSON legado {read,write,delete}) nao
+tem mais efeito algum sobre Operador/Visualizador desde a migracao de Users/Profiles/
+Companies para SidebarResourceGuard. So resta 1 uso real: permissions.all === true continua
+sendo o marcador de Master Admin (NAO REMOVER esse campo do schema por causa disso).
+A tela /app/profiles/edit/:id ainda expoe esse JSON como se fosse funcional - editar
+read/write/delete la nao muda nada na pratica, o que e enganoso para quem administra.
+Tratar numa sessao futura (pos-deploy, sem pressa): esconder o editor JSON generico,
+ou substituir por link para a tela real (/app/sistema/sidebar-permissions), preservando
+apenas o campo "all" para identificar o Master Admin.
