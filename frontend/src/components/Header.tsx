@@ -409,6 +409,11 @@ export const Header: React.FC<{ sidebarOpen: boolean }> = ({ sidebarOpen }) => {
                   </a>
                 </div>
               </div>
+              {loginError && (
+                <div className="absolute top-full left-0 mt-1 px-2 py-1.5 bg-red-50 border border-red-200 rounded-md text-[11px] text-red-600 font-medium whitespace-nowrap z-50 shadow-sm">
+                  {loginError}
+                </div>
+              )}
             </form>
           )}
 
