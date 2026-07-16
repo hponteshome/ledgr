@@ -71,4 +71,29 @@ export class PettyCashController {
   removeEntry(@Req() req: any, @Param('id') id: string, @Param('entryId') entryId: string) {
     return this.service.removeEntry(req.companyId, id, entryId, req.user.id, req.ip);
   }
+
+  @RequireResourceAccess('petty-cash', 'VIEW')
+  @Get('category-accounts')
+  getCategoryAccounts(@Req() req: any) {
+    return this.service.getCategoryAccountMap(req.companyId);
+  }
+
+  @RequireResourceAccess('petty-cash', 'EDIT')
+  @Put('category-accounts/:category')
+  setCategoryAccount(@Req() req: any, @Param('category') category: string, @Body('accountId') accountId: string) {
+    return this.service.setCategoryAccountMap(req.companyId, category, accountId);
+  }
+
+  @RequireResourceAccess('petty-cash', 'VIEW')
+  @Get(':id/closure-preview')
+  getClosurePreview(@Req() req: any, @Param('id') id: string) {
+    return this.service.getClosurePreview(req.companyId, id);
+  }
+
+  @RequireResourceAccess('petty-cash', 'EDIT')
+  @Post(':id/close')
+  closeCashier(@Req() req: any, @Param('id') id: string, @Body() body: any) {
+    return this.service.closeCashier(req.companyId, id, req.user.id, body, req.ip);
+  }
+
 }

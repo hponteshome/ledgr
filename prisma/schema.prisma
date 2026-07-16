@@ -222,6 +222,8 @@ model Company {
   employeeTerminations  EmployeeTermination[]
 
   pettyCash              PettyCash[]
+  pettyCashCategoryAccounts PettyCashCategoryAccount[]
+  pettyCashClosures      PettyCashClosure[]
   accountingViews        AccountingView[]
   // -- Dados SPED/ECD ----------------------------------------
   nire                   String?                   @map("nire") @db.VarChar(20)
@@ -1046,6 +1048,8 @@ model ChartOfAccounts {
   viewMappings      AccountingViewMapping[]
   rules             AccountingRule[]
   balances          AccountBalance[]
+  pettyCashEntries  PettyCashEntry[]
+  pettyCashCategoryAccounts PettyCashCategoryAccount[]
   fixedAssetsAsset  FixedAsset[]            @relation("AssetAccount")
   fixedAssetsDeprec FixedAsset[]            @relation("DepreciationAcc")
   fixedAssetsAccum  FixedAsset[]            @relation("AccumDeprecAcc")
@@ -1110,6 +1114,7 @@ model JournalEntry {
   items   JournalEntryItem[]
 
   apEntries ApEntry[]
+  pettyCashClosures PettyCashClosure[]
 
 
   // ── Dedutibilidade Fiscal (LALUR) — override por lancamento ──────────
@@ -3048,9 +3053,10 @@ model PettyCash {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
 
-  company     Company          @relation(fields: [companyId], references: [id])
-  responsible Person?          @relation("PettyCashResponsible", fields: [responsibleId], references: [id])
+  company     Company            @relation(fields: [companyId], references: [id])
+  responsible Person?            @relation("PettyCashResponsible", fields: [responsibleId], references: [id])
   entries     PettyCashEntry[]
+  closures    PettyCashClosure[]
 
   @@index([companyId])
   @@map("petty_cash")
@@ -3071,17 +3077,61 @@ model PettyCashEntry {
   balanceAfter Decimal            @map("balance_after") @db.Decimal(15, 2)
 
   journalEntryId String? @map("journal_entry_id") @db.Uuid
+  accountId      String? @map("account_id") @db.Uuid
+  closureId      String? @map("closure_id") @db.Uuid
 
   createdById String   @map("created_by_id") @db.Uuid
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
 
-  pettyCash PettyCash @relation(fields: [pettyCashId], references: [id])
-  company   Company   @relation(fields: [companyId], references: [id])
+  pettyCash PettyCash         @relation(fields: [pettyCashId], references: [id])
+  company   Company           @relation(fields: [companyId], references: [id])
+  account   ChartOfAccounts?  @relation(fields: [accountId], references: [id])
+  closure   PettyCashClosure? @relation(fields: [closureId], references: [id])
 
   @@index([pettyCashId])
   @@index([companyId, date])
+  @@index([closureId])
   @@map("petty_cash_entries")
+}
+
+/// Conta contabil padrao sugerida por categoria de despesa do fundo fixo.
+/// Usada para pre-preencher o classificador no momento do fechamento.
+model PettyCashCategoryAccount {
+  id        String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId String            @map("company_id") @db.Uuid
+  category  PettyCashCategory @map("category")
+  accountId String            @map("account_id") @db.Uuid
+  createdAt DateTime          @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  company Company         @relation(fields: [companyId], references: [id])
+  account ChartOfAccounts @relation(fields: [accountId], references: [id])
+
+  @@unique([companyId, category])
+  @@map("petty_cash_category_accounts")
+}
+
+/// Fechamento de periodo do fundo fixo. Trava os lancamentos incluidos e gera
+/// um lancamento contabil agregado das despesas classificadas do periodo.
+model PettyCashClosure {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId      String   @map("company_id") @db.Uuid
+  pettyCashId    String   @map("petty_cash_id") @db.Uuid
+  periodStart    DateTime @map("period_start") @db.Timestamp(6)
+  periodEnd      DateTime @map("period_end") @db.Timestamp(6)
+  totalExpenses  Decimal  @map("total_expenses") @db.Decimal(15, 2)
+  journalEntryId String?  @map("journal_entry_id") @db.Uuid
+  closedById     String   @map("closed_by_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+
+  company      Company          @relation(fields: [companyId], references: [id])
+  pettyCash    PettyCash        @relation(fields: [pettyCashId], references: [id])
+  journalEntry JournalEntry?    @relation(fields: [journalEntryId], references: [id])
+  entries      PettyCashEntry[]
+
+  @@index([pettyCashId])
+  @@map("petty_cash_closures")
 }
 
 // =============================================================================

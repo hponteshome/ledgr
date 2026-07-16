@@ -57,12 +57,23 @@ export default function PettyCashPage() {
   const [showInactive, setShowInactive] = useState(false);
   const [entryType, setEntryType] = useState<'EXPENSE'|'REPLENISHMENT'>('EXPENSE');
   const [editingEntryId, setEditingEntryId] = useState<string|null>(null);
+  const [showClosure, setShowClosure] = useState(false);
+  const [closurePreview, setClosurePreview] = useState<any>(null);
+  const [closureEntries, setClosureEntries] = useState<Record<string,string>>({});
+  const [closureAccountText, setClosureAccountText] = useState<Record<string,string>>({});
+  const [closureCashAccountId, setClosureCashAccountId] = useState('');
+  const [closureCashAccountText, setClosureCashAccountText] = useState('');
+  const [closureSaveMappings, setClosureSaveMappings] = useState(true);
+  const [accountsList, setAccountsList] = useState<{id:string;code:string;name:string}[]>([]);
+  const [closureSubmitting, setClosureSubmitting] = useState(false);
   const [from, setFrom]           = useState('');
   const [to, setTo]               = useState('');
   const [refreshKey, setRefreshKey] = useState(0);
 
   const [newFund, setNewFund] = useState({name:'',targetBalance:'',alertThreshold:'',responsibleId:''});
-  const [newEntry, setNewEntry] = useState({type:'EXPENSE',category:'OUTROS',date:new Date().toISOString().slice(0,10),amount:'',description:'',receiptRef:'',supplier:''});
+  const [newEntry, setNewEntry] = useState({type:'EXPENSE',category:'OUTROS',date:new Date().toISOString().slice(0,10),amount:'',description:'',receiptRef:'',supplier:'',accountId:''});
+  const [entryAccountText, setEntryAccountText] = useState('');
+  const [categoryAccountMap, setCategoryAccountMap] = useState<Record<string,string>>({});
 
   const loadFunds = useCallback(async () => {
     const {data} = await api.get('/finance/petty-cash', { params: { includeInactive: showInactive } });
@@ -87,6 +98,18 @@ export default function PettyCashPage() {
   }, [selected, from, to, refreshKey]);
 
   useEffect(() => { loadFunds(); }, [loadFunds]);
+  useEffect(() => {
+    api.get('/chart-of-accounts', { params: { onlyAnalytic: true, limit: 1000 } })
+      .then(({data}) => setAccountsList(data.items ?? data))
+      .catch(() => {});
+    api.get('/finance/petty-cash/category-accounts')
+      .then(({data}) => {
+        const map: Record<string,string> = {};
+        for (const m of data) map[m.category] = m.accountId;
+        setCategoryAccountMap(map);
+      })
+      .catch(() => {});
+  }, []);
   useEffect(() => { loadSummary(); loadEntries(); }, [loadSummary, loadEntries]);
 
   async function handleSaveFund() {
@@ -162,7 +185,8 @@ export default function PettyCashPage() {
       setShowEntry(false);
       setEditingEntryId(null);
       setRefreshKey(k=>k+1);
-      setNewEntry({type:'EXPENSE',category:'OUTROS',date:new Date().toISOString().slice(0,10),amount:'',description:'',receiptRef:'',supplier:''});
+      setNewEntry({type:'EXPENSE',category:'OUTROS',date:new Date().toISOString().slice(0,10),amount:'',description:'',receiptRef:'',supplier:'',accountId:''});
+      setEntryAccountText('');
     } catch(e:any) { toast.error(e?.response?.data?.message ?? 'Erro'); }
   }
 
@@ -175,10 +199,85 @@ export default function PettyCashPage() {
       description: e.description ?? '',
       receiptRef: e.receiptRef ?? '',
       supplier: e.supplier ?? '',
+      accountId: e.accountId ?? '',
     });
+    const acc = accountsList.find(a => a.id === e.accountId);
+    setEntryAccountText(acc ? `${acc.code} - ${acc.name}` : '');
     setEntryType(e.type === 'EXPENSE' ? 'EXPENSE' : 'REPLENISHMENT');
     setEditingEntryId(e.id);
     setShowEntry(true);
+  }
+
+  function resolveAccountFromText(text: string): string {
+    const match = accountsList.find(a => `${a.code} - ${a.name}` === text);
+    return match ? match.id : '';
+  }
+
+  function handleNewEntryAccountChange(text: string) {
+    setEntryAccountText(text);
+    const id = resolveAccountFromText(text);
+    setNewEntry(d => ({...d, accountId: id}));
+  }
+
+  function handleEntryAccountChange(entryId: string, text: string) {
+    setClosureAccountText(prev => ({ ...prev, [entryId]: text }));
+    setClosureEntries(prev => ({ ...prev, [entryId]: resolveAccountFromText(text) }));
+  }
+
+  function handleCashAccountChange(text: string) {
+    setClosureCashAccountText(text);
+    setClosureCashAccountId(resolveAccountFromText(text));
+  }
+
+  async function openClosure() {
+    if (!selected) return;
+    try {
+      const [{data: preview}, {data: accountsRaw}] = await Promise.all([
+        api.get(`/finance/petty-cash/${selected.id}/closure-preview`),
+        api.get('/chart-of-accounts', { params: { onlyAnalytic: true, limit: 1000 } }),
+      ]);
+      const accounts = accountsRaw.items ?? accountsRaw;
+      if (!preview.entries || preview.entries.length === 0) {
+        toast.error('Nao ha despesas pendentes para fechar neste fundo.');
+        return;
+      }
+      setClosurePreview(preview);
+      setAccountsList(accounts);
+      const initEntries: Record<string,string> = {};
+      const initText: Record<string,string> = {};
+      for (const e of preview.entries) {
+        const accId = e.suggestedAccountId ?? '';
+        initEntries[e.id] = accId;
+        const acc = accounts.find((a:any) => a.id === accId);
+        initText[e.id] = acc ? `${acc.code} - ${acc.name}` : '';
+      }
+      setClosureEntries(initEntries);
+      setClosureAccountText(initText);
+      const cashId = preview.fund.cashAccountId ?? '';
+      setClosureCashAccountId(cashId);
+      const cAcc = accounts.find((a:any) => a.id === cashId);
+      setClosureCashAccountText(cAcc ? `${cAcc.code} - ${cAcc.name}` : '');
+      setShowClosure(true);
+    } catch(e:any) { toast.error(e?.response?.data?.message ?? 'Erro ao carregar previa do fechamento.'); }
+  }
+
+  async function handleConfirmClosure() {
+    if (!closurePreview || !selected) return;
+    const missing = closurePreview.entries.filter((e:any) => !closureEntries[e.id]);
+    if (missing.length > 0) { toast.error(`Falta classificar ${missing.length} despesa(s) antes de fechar.`); return; }
+    if (!closureCashAccountId) { toast.error('Selecione a conta de caixa do fundo.'); return; }
+    setClosureSubmitting(true);
+    try {
+      await api.post(`/finance/petty-cash/${selected.id}/close`, {
+        entries: closurePreview.entries.map((e:any) => ({ id: e.id, accountId: closureEntries[e.id] })),
+        cashAccountId: closureCashAccountId,
+        saveMappings: closureSaveMappings,
+      });
+      toast.success('Caixa fechado. Lancamento contabil gerado.');
+      setShowClosure(false);
+      setRefreshKey(k=>k+1);
+    } catch(e:any) { toast.error(e?.response?.data?.message ?? 'Erro ao fechar caixa.'); }
+    finally { setClosureSubmitting(false); }
   }
 
   async function handleDeleteEntry(entryId: string) {
@@ -212,8 +311,58 @@ export default function PettyCashPage() {
               <input type="checkbox" checked={showInactive} onChange={e=>{setShowInactive(e.target.checked); setSelected(null);}} />
               Mostrar inativos
             </label>
+      {showClosure && closurePreview && (
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.4)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:60}}>
+          <div style={{background:'#fff',borderRadius:12,padding:24,width:640,maxHeight:'85vh',overflowY:'auto',boxShadow:'0 10px 40px rgba(0,0,0,0.2)'}}>
+            <h2 style={{fontSize:16,fontWeight:600,margin:'0 0 4px'}}>Fechar Caixa</h2>
+            <p style={{fontSize:12,color:'#6B7280',margin:'0 0 16px'}}>
+              Revise a conta contabil de cada despesa do periodo antes de confirmar. O lancamento contabil sera gerado automaticamente.
+            </p>
+
+            <datalist id="accounts-dl">
+              {accountsList.map(a => <option key={a.id} value={`${a.code} - ${a.name}`} />)}
+            </datalist>
+
+            <div style={{marginBottom:16,padding:12,background:'#F9FAFB',borderRadius:8}}>
+              <label style={S.label}>Conta de Caixa do Fundo (credito)</label>
+              <input list="accounts-dl" value={closureCashAccountText} onChange={e=>handleCashAccountChange(e.target.value)}
+                placeholder="Buscar conta de caixa..." style={{...S.input, borderColor: closureCashAccountId ? '#D1D5DB' : '#FCA5A5'}} />
+            </div>
+
+            <div style={{display:'grid',gap:10}}>
+              {closurePreview.entries.map((e:any) => (
+                <div key={e.id} style={{border:'0.5px solid #E5E7EB',borderRadius:8,padding:10}}>
+                  <div style={{display:'flex',justifyContent:'space-between',fontSize:13,marginBottom:6}}>
+                    <span style={{fontWeight:500}}>{e.description}</span>
+                    <span style={{fontFamily:'monospace',color:'#B91C1C'}}>{fmtBRL(e.amount)}</span>
+                  </div>
+                  <div style={{fontSize:11,color:'#9CA3AF',marginBottom:6}}>{fmtDate(e.date)} · {e.category ? CAT_LABEL[e.category] : '—'}</div>
+                  <input list="accounts-dl" value={closureAccountText[e.id] ?? ''} onChange={ev=>handleEntryAccountChange(e.id, ev.target.value)}
+                    placeholder="Buscar conta contabil..." style={{...S.input, borderColor: closureEntries[e.id] ? '#D1D5DB' : '#FCA5A5'}} />
+                </div>
+              ))}
+            </div>
+
+            <label style={{display:'flex',alignItems:'center',gap:6,fontSize:12,color:'#6B7280',cursor:'pointer',marginTop:14}}>
+              <input type="checkbox" checked={closureSaveMappings} onChange={e=>setClosureSaveMappings(e.target.checked)} />
+              Salvar como conta padrao para cada categoria (proximas despesas ja vem sugeridas)
+            </label>
+
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:20,paddingTop:16,borderTop:'0.5px solid #E5E7EB'}}>
+              <div style={{fontSize:13}}>Total do periodo: <strong style={{fontFamily:'monospace'}}>{fmtBRL(closurePreview.totalExpenses)}</strong></div>
+              <div style={{display:'flex',gap:8}}>
+                <button onClick={()=>setShowClosure(false)} style={{padding:'8px 16px',borderRadius:8,border:'0.5px solid #E5E7EB',background:'#fff',cursor:'pointer',fontSize:13}}>Cancelar</button>
+                <button onClick={handleConfirmClosure} disabled={closureSubmitting} style={{padding:'8px 18px',borderRadius:8,border:'none',background:'#1E3A8A',color:'#fff',cursor:'pointer',fontSize:13,fontWeight:500,opacity:closureSubmitting?0.6:1}}>
+                  {closureSubmitting ? 'Fechando...' : '🔒 Confirmar Fechamento'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
             {selected && <button onClick={()=>{setEditingEntryId(null); setEntryType('EXPENSE');setShowEntry(true);}} style={{padding:'7px 16px',borderRadius:8,border:'none',background:'#B91C1C',color:'#fff',fontSize:13,cursor:'pointer',fontWeight:500}}>− Registrar Despesa</button>}
             {selected && <button onClick={()=>{setEditingEntryId(null); setEntryType('REPLENISHMENT');setShowEntry(true);}} style={{padding:'7px 16px',borderRadius:8,border:'none',background:'#15803D',color:'#fff',fontSize:13,cursor:'pointer',fontWeight:500}}>+ Repor Fundo</button>}
+            {selected && <button onClick={openClosure} style={{padding:'7px 16px',borderRadius:8,border:'none',background:'#1E3A8A',color:'#fff',fontSize:13,cursor:'pointer',fontWeight:500}}>🔒 Fechar Caixa</button>}
           </div>
         </div>
       </div>
@@ -311,7 +460,9 @@ export default function PettyCashPage() {
                           <td style={{...S.td,fontFamily:'monospace',fontWeight:600,color:e.type==='EXPENSE'?'#B91C1C':'#15803D'}}>{e.type==='EXPENSE'?'-':'+' }{fmtBRL(e.amount)}</td>
                           <td style={{...S.td,fontFamily:'monospace',color:'#374151'}}>{fmtBRL(e.balanceAfter)}</td>
                           <td style={{...S.td,whiteSpace:'nowrap'}}>
-                            {e.type !== 'OPENING' && (
+                            {e.closureId ? (
+                              <span title="Lancamento fechado - imutavel" style={{color:'#9CA3AF',fontSize:14}}>🔒</span>
+                            ) : e.type !== 'OPENING' && (
                               <>
                                 <button onClick={()=>openEditEntry(e)} title="Editar" style={{border:'none',background:'transparent',cursor:'pointer',padding:4,color:'#6B7280'}}>✏️</button>
                                 <button onClick={()=>handleDeleteEntry(e.id)} title="Excluir" style={{border:'none',background:'transparent',cursor:'pointer',padding:4,color:'#B91C1C'}}>🗑️</button>
@@ -361,9 +512,27 @@ export default function PettyCashPage() {
               <div><label style={S.label}>Valor (R$)</label><input value={newEntry.amount} onChange={e=>setNewEntry(d=>({...d,amount:maskCurrency(e.target.value)}))} style={S.input} placeholder="0,00" /></div>
               {entryType==='EXPENSE' && <>
                 <div><label style={S.label}>Categoria</label>
-                  <select value={newEntry.category} onChange={e=>setNewEntry(d=>({...d,category:e.target.value}))} style={S.input}>
+                  <select value={newEntry.category} onChange={e=>{
+                    const cat = e.target.value;
+                    setNewEntry(d=>({...d,category:cat}));
+                    if (!entryAccountText) {
+                      const suggestedId = categoryAccountMap[cat];
+                      if (suggestedId) {
+                        const acc = accountsList.find(a => a.id === suggestedId);
+                        if (acc) { setEntryAccountText(`${acc.code} - ${acc.name}`); setNewEntry(d=>({...d,category:cat,accountId:suggestedId})); }
+                      }
+                    }
+                  }} style={S.input}>
                     {Object.entries(CAT_LABEL).map(([k,v])=><option key={k} value={k}>{v}</option>)}
                   </select>
+                </div>
+                <div>
+                  <label style={S.label}>Conta Contabil (opcional)</label>
+                  <input list="accounts-dl-entry" value={entryAccountText} onChange={e=>handleNewEntryAccountChange(e.target.value)}
+                    placeholder="Buscar conta contabil..." style={S.input} />
+                  <datalist id="accounts-dl-entry">
+                    {accountsList.map(a => <option key={a.id} value={`${a.code} - ${a.name}`} />)}
+                  </datalist>
                 </div>
                 <div><label style={S.label}>Fornecedor</label><input value={newEntry.supplier} onChange={e=>setNewEntry(d=>({...d,supplier:e.target.value}))} style={S.input} /></div>
                 <div><label style={S.label}>Nº Comprovante</label><input value={newEntry.receiptRef} onChange={e=>setNewEntry(d=>({...d,receiptRef:e.target.value}))} style={S.input} placeholder="NF, recibo, etc." /></div>

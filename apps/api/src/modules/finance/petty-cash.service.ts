@@ -189,6 +189,7 @@ export class PettyCashService {
     const entry = await this.prisma.pettyCashEntry.findFirst({ where: { id: entryId, pettyCashId: fundId, companyId } });
     if (!entry) throw new NotFoundException('Movimento nao encontrado.');
     if (entry.type === 'OPENING') throw new BadRequestException('Nao e possivel editar o lancamento de abertura. Use "Editar Fundo" para ajustar o saldo inicial.');
+    if (entry.closureId) throw new BadRequestException('Este lancamento pertence a um fechamento ja realizado e nao pode mais ser editado.');
 
     const newAmount = dto.amount !== undefined ? new Prisma.Decimal(String(dto.amount).replace(',','.')) : new Prisma.Decimal(entry.amount);
     const newType = dto.type ?? entry.type;
@@ -258,6 +259,7 @@ export class PettyCashService {
     const entry = await this.prisma.pettyCashEntry.findFirst({ where: { id: entryId, pettyCashId: fundId, companyId } });
     if (!entry) throw new NotFoundException('Movimento nao encontrado.');
     if (entry.type === 'OPENING') throw new BadRequestException('Nao e possivel excluir o lancamento de abertura. Exclua o fundo inteiro se necessario.');
+    if (entry.closureId) throw new BadRequestException('Este lancamento pertence a um fechamento ja realizado e nao pode mais ser excluido.');
 
     return this.prisma.$transaction(async (tx) => {
       const allEntries = await tx.pettyCashEntry.findMany({
@@ -331,4 +333,167 @@ export class PettyCashService {
       replenishmentAmount: Math.max(0, target - current),
     };
   }
+
+  async getCategoryAccountMap(companyId: string) {
+    return this.prisma.pettyCashCategoryAccount.findMany({
+      where: { companyId },
+      include: { account: { select: { id: true, code: true, name: true } } },
+    });
+  }
+
+  async setCategoryAccountMap(companyId: string, category: string, accountId: string) {
+    return this.prisma.pettyCashCategoryAccount.upsert({
+      where: { companyId_category: { companyId, category: category as any } },
+      create: { companyId, category: category as any, accountId },
+      update: { accountId },
+    });
+  }
+
+  async getClosurePreview(companyId: string, fundId: string) {
+    const fund = await this.findOne(companyId, fundId);
+    const entries = await this.prisma.pettyCashEntry.findMany({
+      where: { pettyCashId: fundId, companyId, closureId: null, type: 'EXPENSE' },
+      orderBy: { date: 'asc' },
+    });
+    const categoryMap = await this.prisma.pettyCashCategoryAccount.findMany({ where: { companyId } });
+    const mapByCategory = new Map(categoryMap.map(m => [m.category, m.accountId]));
+
+    const entriesWithSuggestion = entries.map(e => ({
+      ...e,
+      suggestedAccountId: e.accountId ?? (e.category ? mapByCategory.get(e.category) ?? null : null),
+    }));
+
+    const totalExpenses = entries.reduce((sum, e) => sum.plus(e.amount), new Prisma.Decimal(0));
+
+    return {
+      fund,
+      entries: entriesWithSuggestion,
+      totalExpenses,
+      needsCashAccount: !fund.cashAccountId,
+      oldestUnclosedDate: entries.length > 0 ? entries[0].date : null,
+    };
+  }
+
+  async closeCashier(
+    companyId: string,
+    fundId: string,
+    userId: string,
+    payload: { entries: { id: string; accountId: string }[]; cashAccountId?: string; saveMappings?: boolean },
+    ip?: string,
+  ) {
+    const fund = await this.findOne(companyId, fundId);
+
+    const cashAccountId = payload.cashAccountId ?? fund.cashAccountId;
+    if (!cashAccountId) {
+      throw new BadRequestException('Selecione a conta de caixa do fundo antes de fechar.');
+    }
+
+    const unclosedExpenses = await this.prisma.pettyCashEntry.findMany({
+      where: { pettyCashId: fundId, companyId, closureId: null, type: 'EXPENSE' },
+    });
+
+    if (unclosedExpenses.length === 0) {
+      throw new BadRequestException('Nao ha despesas pendentes para fechar neste periodo.');
+    }
+
+    const accountByEntryId = new Map(payload.entries.map(e => [e.id, e.accountId]));
+    for (const entry of unclosedExpenses) {
+      const acc = accountByEntryId.get(entry.id) ?? entry.accountId;
+      if (!acc) {
+        throw new BadRequestException(`A despesa "${entry.description}" precisa de uma conta contabil antes de fechar.`);
+      }
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const allEntriesInPeriod = await tx.pettyCashEntry.findMany({
+        where: { pettyCashId: fundId, companyId, closureId: null },
+        orderBy: { date: 'asc' },
+      });
+
+      const periodStart = allEntriesInPeriod.length > 0 ? allEntriesInPeriod[0].date : fund.createdAt;
+      const periodEnd = new Date();
+
+      const totalsByAccount = new Map<string, Prisma.Decimal>();
+      for (const entry of unclosedExpenses) {
+        const acc = (accountByEntryId.get(entry.id) ?? entry.accountId)!;
+        const current = totalsByAccount.get(acc) ?? new Prisma.Decimal(0);
+        totalsByAccount.set(acc, current.plus(entry.amount));
+      }
+
+      const totalExpenses = [...totalsByAccount.values()].reduce((s, v) => s.plus(v), new Prisma.Decimal(0));
+
+      const journalEntry = await tx.journalEntry.create({
+        data: {
+          companyId,
+          date: periodEnd,
+          description: `Fechamento Fundo Fixo - ${fund.name} - ${periodStart.toISOString().slice(0,10)} a ${periodEnd.toISOString().slice(0,10)}`,
+          sourceModule: 'FINANCE',
+          createdById: userId,
+          items: {
+            create: [
+              ...[...totalsByAccount.entries()].map(([accountId, value]) => ({
+                accountId, value, type: 'DEBIT' as const,
+              })),
+              { accountId: cashAccountId, value: totalExpenses, type: 'CREDIT' as const },
+            ],
+          },
+        },
+      });
+
+      const closure = await tx.pettyCashClosure.create({
+        data: {
+          companyId,
+          pettyCashId: fundId,
+          periodStart,
+          periodEnd,
+          totalExpenses,
+          journalEntryId: journalEntry.id,
+          closedById: userId,
+        },
+      });
+
+      for (const entry of allEntriesInPeriod) {
+        const isExpense = entry.type === 'EXPENSE';
+        const acc = isExpense ? (accountByEntryId.get(entry.id) ?? entry.accountId) : undefined;
+        await tx.pettyCashEntry.update({
+          where: { id: entry.id },
+          data: {
+            closureId: closure.id,
+            ...(isExpense ? { accountId: acc, journalEntryId: journalEntry.id } : {}),
+          },
+        });
+      }
+
+      if (payload.cashAccountId && payload.cashAccountId !== fund.cashAccountId) {
+        await tx.pettyCash.update({ where: { id: fundId }, data: { cashAccountId: payload.cashAccountId } });
+      }
+
+      if (payload.saveMappings) {
+        for (const entry of unclosedExpenses) {
+          if (!entry.category) continue;
+          const acc = accountByEntryId.get(entry.id) ?? entry.accountId;
+          if (!acc) continue;
+          await tx.pettyCashCategoryAccount.upsert({
+            where: { companyId_category: { companyId, category: entry.category } },
+            create: { companyId, category: entry.category, accountId: acc },
+            update: { accountId: acc },
+          });
+        }
+      }
+
+      await tx.auditLog.create({
+        data: {
+          actorId: userId,
+          action: 'CLOSE_PETTY_CASH_PERIOD',
+          targetId: fundId,
+          before: { periodStart, periodEnd },
+          after: { closureId: closure.id, totalExpenses, journalEntryId: journalEntry.id },
+          ip: ip ?? null,
+        },
+      });
+
+      return closure;
+    });
+  }
+
 }
