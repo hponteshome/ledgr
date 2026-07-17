@@ -2141,3 +2141,11 @@ Feature solicitada 15/07/2026, escopo levantado mas NAO implementada ainda.
 - Mensagens: removida da arvore dinamica (SideBar.tsx filtra path '/app/chat'), agora e icone fixo no Header.tsx (respeita canView('/app/chat')).
 - SidebarPermissionsPage.tsx: passou a exibir divider_before como cabecalho de secao, agrupando visualmente as macro-categorias e resolvendo de vez a ambiguidade Fiscal/Societario Arquivo vs Operacao.
 - Commit 689544c. tsc --noEmit limpo.
+
+**Atualização 17/07/2026 — Vite 5->7 concluido:**
+- vite 5.4.21 -> 7.3.6 (pinado, nao usado npm audit fix --force que iria para 8.1.5 e quebraria peer deps do @tailwindcss/vite e @vitejs/plugin-react).
+- Confirmado antes do upgrade: vite@7.3.6 exige esbuild ^0.27/^0.28, fora da faixa vulneravel <=0.24.2.
+- Node v24.14.0, acima do minimo exigido pelo Vite 7 (20.19+/22.12+).
+- npm audit: 0 vulnerabilidades (frontend zerado, era 2 restantes desde a sessao de 12/07).
+- tsc --noEmit limpo, build de producao OK (1m55s). Dois avisos preexistentes sem relacao com o upgrade: import misto AgendaPage/ContasAPagarPage, chunk principal 2.7MB (xlsx contribui 429KB).
+- Testado visualmente: dev server/HMR/Tailwind ok.
