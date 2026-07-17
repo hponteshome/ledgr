@@ -2115,3 +2115,24 @@ Feature solicitada 15/07/2026, escopo levantado mas NAO implementada ainda.
 2. Mes de ferias e fixo (ex: sempre dezembro) ou configuravel por usuario?
 3. Excecao pontual e por data especifica, ou tambem permite desligar a regra
    temporariamente pro usuario inteiro?
+
+---
+
+## Sessão 17/07/2026 — Reorganização de Sidebar em Macro-Categorias
+
+**Contexto:** Reorg total do posicionamento dos itens da sidebar a partir de proposta em .md do usuário (macro-categorias: Painel Principal, Gestão Operacional, Compliance & Obrigações, Configurações e Sistema).
+
+**Achados fora do .md original:**
+- 'Societário' existia duplicado: um em Arquivo (documentos) e um operacional real (Livros e Registros, Acionistas) não previsto no .md — ambos desambiguados com sufixo '· Arquivo' / '· Operação', mesmo padrão aplicado a 'Fiscal'.
+- 'Administração' misturava itens estruturais (Usuários/Perfis/Auditoria/Backup) com parâmetros globais (Calendário/Indicadores/Tabelas Legais) — separados em 'Administração do Sistema' e novo item 'Parâmetros Globais'.
+
+**Mudanças aplicadas (via UPDATE preservando IDs — zero impacto em profile_sidebar_permissions/user_sidebar_permissions já configuradas):**
+- Divisores de macro-categoria adicionados: Gestão Operacional, Compliance & Obrigações, Configurações e Sistema.
+- eSocial/RAIS/DCTFWeb reparentados de Departamento Pessoal -> SPED & Entregas (limpa rotina diária do DP).
+- Novo item 'Parâmetros Globais' criado; Calendário/Indicadores/Tabelas Legais reparentados para ele.
+- 'Acervo' renomeado para 'Arquivos Digitais' e reposicionado como item dentro de Gestão Operacional (decisão final do usuário — sem divisor próprio).
+
+**Pendências desta sessão:**
+- 'Mensagens' ainda no menu dinâmico — usuário quer fixo no header/rodapé (mudança de SideBar.tsx/Header.tsx, não feita ainda).
+- SidebarPermissionsPage.tsx lista a árvore plana (depth=0 sem agrupar por divider_before) — sufixos '· Arquivo'/'· Operação' mitigam ambiguidade mas não resolvem de vez.
+- SQL versionado em prisma/migrations-manuais/2026-07-17_sidebar_reorg_macro_categorias.sql.
