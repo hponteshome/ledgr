@@ -12,6 +12,14 @@ export const ProfileList: React.FC = () => {
   const location = useLocation();
   const [profiles,    setProfiles]    = useState<any[]>([]);
   const [viewProfile, setViewProfile] = useState<any>(null);
+  const [viewSchedule, setViewSchedule] = useState<any>(null);
+
+  useEffect(() => {
+    if (!viewProfile) { setViewSchedule(null); return; }
+    api.get(`/profiles/${viewProfile.id}/access-schedule`)
+      .then(({data}) => setViewSchedule(data))
+      .catch(() => setViewSchedule(null));
+  }, [viewProfile]);
 
   const [isLoading, setIsLoading] = useState(true);
 
@@ -186,17 +194,23 @@ export const ProfileList: React.FC = () => {
               </div>
             ))}
           </div>
-          {viewProfile.permissions&&Object.keys(viewProfile.permissions).length>0&&(
-            <div style={{background:'#F9FAFB',borderRadius:8,padding:'12px 14px',marginBottom:16}}>
-              <div style={{fontSize:10,color:'#9CA3AF',textTransform:'uppercase',fontWeight:600,marginBottom:8}}>Permissões</div>
-              <div style={{display:'flex',flexWrap:'wrap',gap:4}}>
-                {Object.keys(viewProfile.permissions).map((p:string)=>(
-                  <span key={p} style={{fontSize:10,padding:'2px 8px',borderRadius:20,
-                    background:'#EFF6FF',color:'#1D4ED8',fontWeight:600}}>{p}</span>
-                ))}
+          <div style={{background:'#F9FAFB',borderRadius:8,padding:'12px 14px',marginBottom:16}}>
+            <div style={{fontSize:10,color:'#9CA3AF',textTransform:'uppercase',fontWeight:600,marginBottom:8}}>Janela de Acesso</div>
+            {!viewSchedule ? (
+              <div style={{fontSize:12,color:'#9CA3AF',fontStyle:'italic'}}>Nao configurada (bloqueio total ate ser definida)</div>
+            ) : viewSchedule.mode === 'EXEMPT' ? (
+              <span style={{fontSize:11,padding:'3px 10px',borderRadius:20,background:'#DCFCE7',color:'#15803D',fontWeight:700}}>Sem restricao</span>
+            ) : (
+              <div style={{fontSize:12,color:'#374151'}}>
+                <div>Dias: {['Dom','Seg','Ter','Qua','Qui','Sex','Sab'].filter((_,i)=>viewSchedule.weekdays.includes(i)).join(', ')}</div>
+                <div>Horario: {viewSchedule.startTime} - {viewSchedule.endTime}</div>
+                {viewSchedule.vacationMonths?.length > 0 && (
+                  <div>Ferias: {['','Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']
+                    .filter((_,i)=>viewSchedule.vacationMonths.includes(i)).join(', ')}</div>
+                )}
               </div>
-            </div>
-          )}
+            )}
+          </div>
           <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
             <button onClick={()=>setViewProfile(null)}
               style={{padding:'8px 20px',borderRadius:8,border:'0.5px solid #E5E7EB',

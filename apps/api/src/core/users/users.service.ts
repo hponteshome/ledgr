@@ -273,4 +273,58 @@ async findByLogin(login: string) {
     });
   }
 
+
+  getAccessSchedule(userId: string) {
+    return this.prisma.accessSchedule.findUnique({ where: { userId } });
+  }
+
+  setAccessSchedule(userId: string, dto: any, adminId: string) {
+    const data = {
+      mode: dto.mode ?? 'SCHEDULED',
+      weekdays: dto.weekdays ?? [1,2,3,4,5],
+      startTime: dto.startTime ?? '08:00',
+      endTime: dto.endTime ?? '18:00',
+      vacationMonths: dto.vacationMonths ?? [],
+      exemptSetById: dto.mode === 'EXEMPT' ? adminId : null,
+      exemptSetAt: dto.mode === 'EXEMPT' ? new Date() : null,
+    };
+    return this.prisma.accessSchedule.upsert({
+      where: { userId },
+      create: { userId, ...data },
+      update: data,
+    });
+  }
+
+  removeAccessSchedule(userId: string) {
+    return this.prisma.accessSchedule.delete({ where: { userId } }).catch(() => null);
+  }
+
+  listUnlockRequests(status?: string) {
+    return this.prisma.accessUnlockRequest.findMany({
+      where: status ? { status } : {},
+      include: { user: { select: { id: true, fullName: true, email: true } } },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async resolveUnlockRequest(requestId: string, approve: boolean, adminId: string) {
+    const request = await this.prisma.accessUnlockRequest.findUnique({ where: { id: requestId } });
+    if (!request) throw new Error('Solicitacao nao encontrada.');
+
+    const updated = await this.prisma.accessUnlockRequest.update({
+      where: { id: requestId },
+      data: { status: approve ? 'APPROVED' : 'DENIED', respondedById: adminId, respondedAt: new Date() },
+    });
+
+    if (approve) {
+      await this.prisma.accessSchedule.upsert({
+        where: { userId: request.userId },
+        create: { userId: request.userId, mode: 'EXEMPT', exemptSetById: adminId, exemptSetAt: new Date() },
+        update: { mode: 'EXEMPT', exemptSetById: adminId, exemptSetAt: new Date() },
+      });
+    }
+
+    return updated;
+  }
+
 }

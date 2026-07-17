@@ -1,5 +1,5 @@
 // src/auth/auth.service.ts
-import { Injectable } from '@nestjs/common';
+import { Injectable, ForbiddenException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { UsersService } from '../core/users/users.service';
 import { RegisterDto } from './dto/register.dto';
@@ -72,6 +72,37 @@ export class AuthService {
     return null;
   }
 
+  private isWithinAccessWindow(schedule: any): { ok: boolean; reason?: string } {
+    const now = new Date();
+    const fmt = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Sao_Paulo',
+      weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false, month: 'numeric',
+    });
+    const parts = fmt.formatToParts(now);
+    const get = (type: string) => parts.find(p => p.type === type)?.value;
+    const weekdayMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+    const weekday = weekdayMap[get('weekday') as string];
+    const month = parseInt(get('month') as string, 10);
+    const hour = parseInt(get('hour') as string, 10);
+    const minute = parseInt(get('minute') as string, 10);
+    const nowMinutes = hour * 60 + minute;
+
+    if (schedule.vacationMonths?.includes(month)) {
+      return { ok: false, reason: 'Acesso bloqueado neste mes (periodo de ferias configurado).' };
+    }
+    if (!schedule.weekdays?.includes(weekday)) {
+      return { ok: false, reason: 'Acesso nao permitido neste dia da semana.' };
+    }
+    const [sh, sm] = (schedule.startTime as string).split(':').map(Number);
+    const [eh, em] = (schedule.endTime as string).split(':').map(Number);
+    const startMinutes = sh * 60 + sm;
+    const endMinutes = eh * 60 + em;
+    if (nowMinutes < startMinutes || nowMinutes > endMinutes) {
+      return { ok: false, reason: `Acesso permitido apenas entre ${schedule.startTime} e ${schedule.endTime}.` };
+    }
+    return { ok: true };
+  }
+
   async login(user: any) {
     // Buscar usuário com perfil E empresas (através de companies)
     const fullUser = await this.prisma.user.findUnique({
@@ -85,6 +116,25 @@ export class AuthService {
         }
       }
     });
+
+    const isMaster = (fullUser?.profile?.permissions as any)?.all === true;
+    if (!isMaster) {
+      // Prioridade: override do usuario > regra do perfil > bloqueado
+      const userOverride = await this.prisma.accessSchedule.findUnique({ where: { userId: fullUser!.id } });
+      const schedule = userOverride ?? (fullUser?.profile
+        ? await this.prisma.profileAccessSchedule.findUnique({ where: { profileId: fullUser.profile.id } })
+        : null);
+
+      if (!schedule) {
+        throw new ForbiddenException('Seu acesso ainda nao foi liberado pelo administrador. Solicite desbloqueio.');
+      }
+      if (schedule.mode === 'SCHEDULED') {
+        const check = this.isWithinAccessWindow(schedule);
+        if (!check.ok) {
+          throw new ForbiddenException(check.reason ?? 'Fora da janela de acesso permitida.');
+        }
+      }
+    }
 
     // Pega a primeira empresa associada ao usuário
     const firstUserCompany = fullUser?.companies?.[0];
@@ -127,4 +177,15 @@ export class AuthService {
       },
     };
   }
+
+  async requestUnlock(email: string, message: string) {
+    const user = await this.usersService.findByEmail(email.toLowerCase());
+    if (user) {
+      await this.prisma.accessUnlockRequest.create({
+        data: { userId: user.id, message },
+      });
+    }
+    return { success: true, message: 'Solicitacao enviada. O administrador ira analisar.' };
+  }
+
 }

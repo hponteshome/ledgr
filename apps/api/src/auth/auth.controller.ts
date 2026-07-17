@@ -42,6 +42,11 @@ export class AuthController {
     return this.authService.login(user);
   }
 
+  @Post('request-unlock')
+  async requestUnlock(@Body() body: { email: string; message: string }) {
+    return this.authService.requestUnlock(body.email, body.message);
+  }
+
   @UseGuards(JwtAuthGuard)
   @Get('me')
   async getMe(@Request() req: any) {

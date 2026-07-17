@@ -83,8 +83,73 @@ model User {
   // -- Chat --
   chatParticipations  ConversationParticipant[]
   sentMessages        ChatMessage[]             @relation("SentMessages")
+  accessSchedule       AccessSchedule?
+  accessUnlockRequests AccessUnlockRequest[]     @relation("UnlockRequester")
+  accessUnlockResponses AccessUnlockRequest[]    @relation("UnlockResponder")
 
   @@map("users")
+}
+
+/// Janela de acesso por usuario. Sem registro = usuario BLOQUEADO no login
+/// (padrao restritivo). mode=SCHEDULED segue diasSemana/horaInicio/horaFim/
+/// mesesFerias. mode=EXEMPT libera sem restricao (ativado por aprovacao de
+/// solicitacao de desbloqueio, ou definido direto pelo Master).
+/// Override individual - so existe quando um usuario precisa de janela
+/// DIFERENTE da regra do perfil dele. Ausencia = herda do ProfileAccessSchedule.
+model AccessSchedule {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId         String    @unique @map("user_id") @db.Uuid
+  mode           String    @default("SCHEDULED") @map("mode") @db.VarChar(20)
+  weekdays       Int[]     @default([1,2,3,4,5]) @map("weekdays")
+  startTime      String    @default("08:00") @map("start_time") @db.VarChar(5)
+  endTime        String    @default("18:00") @map("end_time") @db.VarChar(5)
+  vacationMonths Int[]     @default([]) @map("vacation_months")
+  exemptSetById  String?   @map("exempt_set_by_id") @db.Uuid
+  exemptSetAt    DateTime? @map("exempt_set_at") @db.Timestamp(6)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("access_schedules")
+}
+
+/// Regra padrao de janela de acesso herdada por todo usuario daquele perfil,
+/// exceto quando o usuario tiver um AccessSchedule (override) proprio.
+/// Ausencia de registro aqui = perfil bloqueado por padrao (sem override).
+model ProfileAccessSchedule {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  profileId      String   @unique @map("profile_id") @db.Uuid
+  mode           String   @default("SCHEDULED") @map("mode") @db.VarChar(20)
+  weekdays       Int[]    @default([1,2,3,4,5]) @map("weekdays")
+  startTime      String   @default("08:00") @map("start_time") @db.VarChar(5)
+  endTime        String   @default("18:00") @map("end_time") @db.VarChar(5)
+  vacationMonths Int[]    @default([]) @map("vacation_months")
+  updatedById    String?  @map("updated_by_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  profile Profile @relation(fields: [profileId], references: [id])
+
+  @@map("profile_access_schedules")
+}
+
+/// Solicitacao de desbloqueio enviada pelo usuario quando bloqueado no login
+/// (sem registro de AccessSchedule, ou fora da janela SCHEDULED). Nao exige
+/// sessao autenticada para ser criada.
+model AccessUnlockRequest {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId         String    @map("user_id") @db.Uuid
+  message        String    @map("message") @db.Text
+  status         String    @default("PENDING") @map("status") @db.VarChar(20)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  respondedById  String?   @map("responded_by_id") @db.Uuid
+  respondedAt    DateTime? @map("responded_at") @db.Timestamp(6)
+
+  user     User  @relation("UnlockRequester", fields: [userId], references: [id])
+  responder User? @relation("UnlockResponder", fields: [respondedById], references: [id])
+
+  @@map("access_unlock_requests")
 }
 
 /// Perfis de acesso com permissões em formato JSON.
@@ -101,6 +166,7 @@ model Profile {
 
   users User[]
   sidebarPermissions ProfileSidebarPermission[]
+  accessSchedule ProfileAccessSchedule?
 
   @@map("profiles")
 }

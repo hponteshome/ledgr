@@ -5,9 +5,10 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   FiUser, FiMail, FiPhone, FiCreditCard, FiAtSign,
   FiLock, FiSave, FiArrowLeft, FiShield, FiAlertCircle,
-  FiCheckCircle, FiLoader, FiUserPlus
+  FiCheckCircle, FiLoader, FiUserPlus, FiClock
 } from 'react-icons/fi';
 import api from '@/services/api';
+import toast from 'react-hot-toast';
 
 interface Profile {
   id: string;
@@ -38,6 +39,13 @@ export const UserForm: React.FC = () => {
   const [showPersonOption, setShowPersonOption] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
   const [profiles, setProfiles] = useState<Profile[]>([]);
+
+  const [scheduleSource, setScheduleSource] = useState<'PROFILE'|'CUSTOM'>('PROFILE');
+  const [schedMode, setSchedMode] = useState<'SCHEDULED'|'EXEMPT'>('SCHEDULED');
+  const [schedWeekdays, setSchedWeekdays] = useState<number[]>([1,2,3,4,5]);
+  const [schedStart, setSchedStart] = useState('08:00');
+  const [schedEnd, setSchedEnd] = useState('18:00');
+  const [schedVacation, setSchedVacation] = useState<number[]>([]);
 
   const [formData, setFormData] = useState<FormData>({
     name: '', nickname: '', email: '', phone: '', level: '',
@@ -74,6 +82,19 @@ export const UserForm: React.FC = () => {
       })
       .catch(() => setFeedback({ type: 'error', message: 'Erro ao carregar dados do usuário.' }))
       .finally(() => setIsLoading(false));
+
+    api.get(`/users/${id}/access-schedule`)
+      .then(({data}) => {
+        if (data) {
+          setScheduleSource('CUSTOM');
+          setSchedMode(data.mode);
+          setSchedWeekdays(data.weekdays);
+          setSchedStart(data.startTime);
+          setSchedEnd(data.endTime);
+          setSchedVacation(data.vacationMonths);
+        }
+      })
+      .catch(() => {});
   }, [id]);
 
   // ── Busca por documento (apenas em modo criação) ────────────────────────────
@@ -137,8 +158,22 @@ export const UserForm: React.FC = () => {
         fullName: formData.name,
         isActive: formData.status === 'active',
       };
-      if (isEditing) await api.patch(`/users/${id}`, payload);
-      else await api.post('/users', payload);
+      let userId = id;
+      if (isEditing) {
+        await api.patch(`/users/${id}`, payload);
+      } else {
+        const { data } = await api.post('/users', payload);
+        userId = data.id;
+      }
+
+      if (scheduleSource === 'CUSTOM') {
+        await api.post(`/users/${userId}/access-schedule`, {
+          mode: schedMode, weekdays: schedWeekdays, startTime: schedStart, endTime: schedEnd, vacationMonths: schedVacation,
+        });
+      } else if (isEditing) {
+        await api.delete(`/users/${userId}/access-schedule`).catch(() => {});
+      }
+
       setFeedback({ type: 'success', message: 'Usuário salvo com sucesso!' });
       setTimeout(() => navigate('/app/users'), 1500);
     } catch (error: any) {
@@ -358,6 +393,77 @@ export const UserForm: React.FC = () => {
               </select>
             </div>
           </div>
+        </div>
+
+        {/* Seção 4 — Janela de Acesso */}
+        <div className="px-8 py-6 border-t border-gray-100">
+          <h2 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-5 flex items-center gap-2">
+            <FiClock size={14} /> Janela de Acesso
+          </h2>
+          <div className="flex gap-3 mb-4">
+            <button type="button" onClick={()=>setScheduleSource('PROFILE')}
+              className={`px-4 py-2 rounded-lg text-sm font-bold border ${scheduleSource==='PROFILE' ? 'bg-gray-700 text-white border-gray-700' : 'bg-white text-gray-600 border-gray-200'}`}>
+              Herdar do Perfil
+            </button>
+            <button type="button" onClick={()=>setScheduleSource('CUSTOM')}
+              className={`px-4 py-2 rounded-lg text-sm font-bold border ${scheduleSource==='CUSTOM' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200'}`}>
+              Definir Horario Proprio
+            </button>
+          </div>
+
+          {scheduleSource === 'CUSTOM' && (
+            <>
+              <div className="flex gap-3 mb-4">
+                <button type="button" onClick={()=>setSchedMode('SCHEDULED')}
+                  className={`px-4 py-2 rounded-lg text-sm font-bold border ${schedMode==='SCHEDULED' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200'}`}>
+                  Horario Restrito
+                </button>
+                <button type="button" onClick={()=>setSchedMode('EXEMPT')}
+                  className={`px-4 py-2 rounded-lg text-sm font-bold border ${schedMode==='EXEMPT' ? 'bg-green-600 text-white border-green-600' : 'bg-white text-gray-600 border-gray-200'}`}>
+                  Sem Restricao
+                </button>
+              </div>
+
+              {schedMode === 'SCHEDULED' && (
+                <div className="space-y-4 bg-gray-50 rounded-xl p-4">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 mb-2">Dias permitidos</label>
+                    <div className="flex gap-2">
+                      {[{v:0,l:'Dom'},{v:1,l:'Seg'},{v:2,l:'Ter'},{v:3,l:'Qua'},{v:4,l:'Qui'},{v:5,l:'Sex'},{v:6,l:'Sab'}].map(d => (
+                        <button key={d.v} type="button"
+                          onClick={()=>setSchedWeekdays(prev => prev.includes(d.v) ? prev.filter(x=>x!==d.v) : [...prev,d.v].sort())}
+                          className={`w-12 h-9 rounded-lg text-xs font-bold border ${schedWeekdays.includes(d.v) ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-500 border-gray-200'}`}>
+                          {d.l}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 mb-1">Horario inicio</label>
+                      <input type="time" value={schedStart} onChange={e=>setSchedStart(e.target.value)} className="px-3 py-2 border rounded-lg text-sm" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 mb-1">Horario fim</label>
+                      <input type="time" value={schedEnd} onChange={e=>setSchedEnd(e.target.value)} className="px-3 py-2 border rounded-lg text-sm" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 mb-2">Meses de ferias (bloqueio total)</label>
+                    <div className="flex flex-wrap gap-2">
+                      {[{v:1,l:'Jan'},{v:2,l:'Fev'},{v:3,l:'Mar'},{v:4,l:'Abr'},{v:5,l:'Mai'},{v:6,l:'Jun'},{v:7,l:'Jul'},{v:8,l:'Ago'},{v:9,l:'Set'},{v:10,l:'Out'},{v:11,l:'Nov'},{v:12,l:'Dez'}].map(m => (
+                        <button key={m.v} type="button"
+                          onClick={()=>setSchedVacation(prev => prev.includes(m.v) ? prev.filter(x=>x!==m.v) : [...prev,m.v].sort((a,b)=>a-b))}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold border ${schedVacation.includes(m.v) ? 'bg-red-600 text-white border-red-600' : 'bg-white text-gray-500 border-gray-200'}`}>
+                          {m.l}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
         </div>
 
         {/* Footer */}

@@ -11,6 +11,7 @@ import {
   Req,
   UseGuards,
   NotFoundException,
+  Query,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/guards/jwt.guard';
 import { SidebarResourceGuard } from '../../auth/guards/sidebar-resource.guard';
@@ -135,6 +136,43 @@ export class UsersController {
   @Delete(':id')
   async remove(@Param('id') id: string, @CurrentUser('object') user: any) {
     return this.usersService.remove(id, user.id);
+  }
+
+
+  @RequireResourceAccess('users', 'VIEW')
+  @Get(':id/access-schedule')
+  getAccessSchedule(@Param('id') id: string) {
+    return this.usersService.getAccessSchedule(id);
+  }
+
+  @RequireResourceAccess('users', 'EDIT')
+  @Post(':id/access-schedule')
+  setAccessSchedule(@Param('id') id: string, @Body() dto: any, @Req() req: any) {
+    return this.usersService.setAccessSchedule(id, dto, req.user.id);
+  }
+
+  @RequireResourceAccess('users', 'EDIT')
+  @Delete(':id/access-schedule')
+  removeAccessSchedule(@Param('id') id: string) {
+    return this.usersService.removeAccessSchedule(id);
+  }
+
+  @RequireResourceAccess('users', 'VIEW')
+  @Get('unlock-requests/list')
+  listUnlockRequests(@Query('status') status?: string) {
+    return this.usersService.listUnlockRequests(status);
+  }
+
+  @RequireResourceAccess('users', 'EDIT')
+  @Post('unlock-requests/:requestId/approve')
+  approveUnlockRequest(@Param('requestId') requestId: string, @Req() req: any) {
+    return this.usersService.resolveUnlockRequest(requestId, true, req.user.id);
+  }
+
+  @RequireResourceAccess('users', 'EDIT')
+  @Post('unlock-requests/:requestId/deny')
+  denyUnlockRequest(@Param('requestId') requestId: string, @Req() req: any) {
+    return this.usersService.resolveUnlockRequest(requestId, false, req.user.id);
   }
 
 }

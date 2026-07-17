@@ -35,4 +35,28 @@ export class ProfilesService {
       data: { isActive: false, deletedAt: new Date() },
     });
   }
+
+  getAccessSchedule(profileId: string) {
+    return this.prisma.profileAccessSchedule.findUnique({ where: { profileId } });
+  }
+
+  setAccessSchedule(profileId: string, dto: any, userId: string) {
+    const data = {
+      mode: dto.mode ?? 'SCHEDULED',
+      weekdays: dto.weekdays ?? [1,2,3,4,5],
+      startTime: dto.startTime ?? '08:00',
+      endTime: dto.endTime ?? '18:00',
+      vacationMonths: dto.vacationMonths ?? [],
+      updatedById: userId,
+    };
+    return this.prisma.profileAccessSchedule.upsert({
+      where: { profileId },
+      create: { profileId, ...data },
+      update: data,
+    });
+  }
+
+  removeAccessSchedule(profileId: string) {
+    return this.prisma.profileAccessSchedule.delete({ where: { profileId } }).catch(() => null);
+  }
 }

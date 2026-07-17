@@ -15,6 +15,7 @@ import { SidebarResourceGuard } from '../../auth/guards/sidebar-resource.guard';
 import { RequireResourceAccess } from '../../auth/decorators/require-resource-access.decorator';
 import { SkipCompanyCheck } from '../../multi-company/company.interceptor';
 import { ProfilesService } from './profiles.service';
+import { Req, Post } from '@nestjs/common';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PROBLEMAS CORRIGIDOS:
@@ -57,5 +58,23 @@ export class ProfilesController {
   @Delete(':id')
   async remove(@Param('id') id: string) {
     return this.profilesService.remove(id);
+  }
+
+  @RequireResourceAccess('profiles', 'VIEW')
+  @Get(':id/access-schedule')
+  getAccessSchedule(@Param('id') id: string) {
+    return this.profilesService.getAccessSchedule(id);
+  }
+
+  @RequireResourceAccess('profiles', 'EDIT')
+  @Post(':id/access-schedule')
+  setAccessSchedule(@Param('id') id: string, @Body() dto: any, @Req() req: any) {
+    return this.profilesService.setAccessSchedule(id, dto, req.user.id);
+  }
+
+  @RequireResourceAccess('profiles', 'EDIT')
+  @Delete(':id/access-schedule')
+  removeAccessSchedule(@Param('id') id: string) {
+    return this.profilesService.removeAccessSchedule(id);
   }
 }

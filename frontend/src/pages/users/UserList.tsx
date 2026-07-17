@@ -10,6 +10,14 @@ export const UserList: React.FC = () => {
   const location = useLocation();
   const [users,     setUsers]     = useState<any[]>([]);
   const [viewUser,  setViewUser]  = useState<any>(null);
+  const [viewSchedule, setViewSchedule] = useState<any>(null);
+
+  useEffect(() => {
+    if (!viewUser) { setViewSchedule(null); return; }
+    api.get(`/users/${viewUser.id}/access-schedule`)
+      .then(({data}) => setViewSchedule(data))
+      .catch(() => setViewSchedule(null));
+  }, [viewUser]);
 
   const [isLoading, setIsLoading] = useState(true);
 
@@ -238,6 +246,26 @@ export const UserList: React.FC = () => {
                 <div style={{fontSize:13,fontWeight:500,color:'#374151'}}>{f.v}</div>
               </div>
             ))}
+          </div>
+          <div style={{background:'#F9FAFB',borderRadius:8,padding:'12px 14px',marginTop:12}}>
+            <div style={{fontSize:10,color:'#9CA3AF',textTransform:'uppercase',fontWeight:600,marginBottom:8}}>Janela de Acesso</div>
+            {!viewSchedule ? (
+              <span style={{fontSize:11,padding:'3px 10px',borderRadius:20,background:'#F3F4F6',color:'#6B7280',fontWeight:700}}>Herda do perfil</span>
+            ) : viewSchedule.mode === 'EXEMPT' ? (
+              <span style={{fontSize:11,padding:'3px 10px',borderRadius:20,background:'#DCFCE7',color:'#15803D',fontWeight:700}}>Sem restricao (override individual)</span>
+            ) : (
+              <div style={{fontSize:12,color:'#374151'}}>
+                <div style={{marginBottom:4}}>
+                  <span style={{fontSize:10,padding:'2px 8px',borderRadius:20,background:'#DBEAFE',color:'#1D4ED8',fontWeight:700}}>Override individual</span>
+                </div>
+                <div>Dias: {['Dom','Seg','Ter','Qua','Qui','Sex','Sab'].filter((_,i)=>viewSchedule.weekdays.includes(i)).join(', ')}</div>
+                <div>Horario: {viewSchedule.startTime} - {viewSchedule.endTime}</div>
+                {viewSchedule.vacationMonths?.length > 0 && (
+                  <div>Ferias: {['','Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']
+                    .filter((_,i)=>viewSchedule.vacationMonths.includes(i)).join(', ')}</div>
+                )}
+              </div>
+            )}
           </div>
           <div style={{display:'flex',gap:8,marginTop:20,justifyContent:'flex-end'}}>
             <button onClick={()=>setViewUser(null)}
