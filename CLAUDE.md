@@ -299,3 +299,19 @@ pendencias ficam em LEDGR-contexto.md (append-only).
   padronizados (Persons, e os 6 modulos financeiros/contabeis com guard real de 14/07). Tratar
   por modulo, priorizando conforme cada um ganhar guard real de API (mesmo criterio de risco
   usado ate agora).
+
+---
+
+## Protocolo de Sessão — Licoes de 16/07/2026 (sessao lenta, para nao repetir)
+
+**Regra 1 — Reler antes de editar.** Se um arquivo ja foi editado nesta sessao (mesmo que so uma vez), SEMPRE pedir o conteudo atual real (Get-Content) imediatamente antes de escrever o proximo patch. Nunca reconstruir de memoria ou de busca anterior. Isso vale mesmo quando parecer redundante — sai mais barato que um script falhando por ancora desatualizada.
+
+**Regra 2 — Verificar contrato de API antes de escrever a chamada.** Antes de qualquer chamada nova do frontend a um endpoint, ler o controller/service real primeiro (rota exata, nome dos parametros, formato do retorno — array puro vs paginado). Nunca assumir por convencao/semelhanca com outro endpoint.
+
+**Regra 3 — Preferir patches pequenos e independentes a scripts grandes.** Para qualquer arquivo com mais de ~3 pontos de edicao, aplicar um de cada vez com verificacao entre eles (grep/tsc), em vez de um script Python so com todas as substituicoes. Se uma ancora falhar no meio de um script grande, ele aborta SEM escrever nada — e isso pode nao ficar claro na hora.
+
+**Regra 4 — Nao investigar problema cosmetico como se fosse funcional.** Se um sintoma (ex: encoding de terminal, emoji quebrado) for confirmado como nao afetando o funcionamento real, encerrar a investigacao e seguir — nao gastar turnos em polimento sem valor prático.
+
+**Regra 5 — Sinalizar quando o escopo cresce.** Se uma tarefa que parecia pequena (ex: "travar lancamento") evoluir para algo estrutural maior (ex: integracao contabil completa) no meio da conversa, dizer isso explicitamente e propor checkpoints, em vez de simplesmente seguir em frente.
+
+**Regra 6 — Nunca usar bash_tool neste projeto**, sob nenhuma circunstancia, nem por engano/teste. Toda edicao de arquivo do projeto passa por PowerShell (blocos que o usuario executa) ou Python via script gerado — nunca por chamada direta de ferramenta.
