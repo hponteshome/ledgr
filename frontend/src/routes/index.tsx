@@ -14,6 +14,7 @@ import { CompanyForm } from '../pages/companies/CompanyForm';
 import { Register } from '../pages/register/Register';
 import { UserList } from '../pages/users/UserList';
 import PendentesPage from '../pages/users/PendentesPage';
+import UnlockRequestsPage from '../pages/users/UnlockRequestsPage';
 import { UserForm } from '../pages/users/UserForm';
 import { ProfileForm } from '../pages/users/ProfileForm';
 import { useAuth } from '../contexts/AuthContext';
@@ -233,6 +234,7 @@ export const AppRoutes = () => {
                 <Route path="app/persons/:personId/view" element={<ProtectedRoute><PersonView /></ProtectedRoute>} />
 
                 <Route path="app/usuarios/pendentes" element={<ProtectedRoute><PendentesPage /></ProtectedRoute>} />
+                <Route path="app/usuarios/desbloqueios" element={<ProtectedRoute><UnlockRequestsPage /></ProtectedRoute>} />
                 <Route path="app/users" element={<ProtectedRoute><UserList /></ProtectedRoute>} />
                 <Route path="app/users/edit/:id" element={<UserForm />} />
                 <Route path="app/users/new" element={<ProtectedRoute><UserForm /></ProtectedRoute>} />

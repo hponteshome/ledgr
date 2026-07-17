@@ -33,12 +33,31 @@ function usePendentesCount(isMaster: boolean) {
   return count;
 }
 
+// ── Badge de solicitacoes de desbloqueio (polling 60s) ────────────────────
+function useUnlockRequestsCount(isMaster: boolean) {
+  const [count, setCount] = React.useState(0);
+  React.useEffect(() => {
+    if (!isMaster) return;
+    const fetch = async () => {
+      try {
+        const r = await api.get('/users/unlock-requests/list', { params: { status: 'PENDING' } });
+        setCount(Array.isArray(r.data) ? r.data.length : 0);
+      } catch { /* silencioso */ }
+    };
+    fetch();
+    const t = setInterval(fetch, 60000);
+    return () => clearInterval(t);
+  }, [isMaster]);
+  return count;
+}
+
 export const Header: React.FC<{ sidebarOpen: boolean }> = ({ sidebarOpen }) => {
   const { user, signIn, signOut } = useAuth();
   // Extrai o nome do perfil corretamente (se for objeto, pega o name)
   const profileName = (user as any)?.profile?.name || (user as any)?.profile || 'Usuário';
   const isMaster = profileName === 'Administrador Master' || (user as any)?.permissions?.all === true;
   const pendentesCount = usePendentesCount(!!user && isMaster);
+  const unlockRequestsCount = useUnlockRequestsCount(isMaster);
   const { companies, activeCompany, selectCompany } = useCompany();
   const [isCompanyOpen, setIsCompanyOpen] = useState(false);
   const [isMonthOpen, setIsMonthOpen] = useState(false);
@@ -59,6 +78,11 @@ export const Header: React.FC<{ sidebarOpen: boolean }> = ({ sidebarOpen }) => {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [canRequestUnlock, setCanRequestUnlock] = useState(false);
+  const [showUnlockForm, setShowUnlockForm] = useState(false);
+  const [unlockMessage, setUnlockMessage] = useState('');
+  const [unlockSending, setUnlockSending] = useState(false);
+  const [unlockSent, setUnlockSent] = useState(false);
 
   // Banners
   const [noCompanyDismissed, setNoCompanyDismissed] = useState(false);
@@ -160,11 +184,32 @@ export const Header: React.FC<{ sidebarOpen: boolean }> = ({ sidebarOpen }) => {
       navigate('/app/dashboard');
     } catch (error: any) {
       const status = error?.response?.status;
+      setCanRequestUnlock(false);
+      setShowUnlockForm(false);
+      setUnlockSent(false);
       if (status === 401) setLoginError('Credenciais inválidas.');
       else if (status === 429) setLoginError('Muitas tentativas.');
+      else if (status === 403) {
+        setLoginError(error?.response?.data?.message || 'Acesso bloqueado no momento.');
+        setCanRequestUnlock(true);
+      }
       else setLoginError('Erro ao conectar com o servidor.');
     } finally {
       setIsLoggingIn(false);
+    }
+  };
+
+  const handleRequestUnlock = async () => {
+    if (!email) { setLoginError('Informe o e-mail antes de solicitar desbloqueio.'); return; }
+    setUnlockSending(true);
+    try {
+      await api.post('/auth/request-unlock', { email, message: unlockMessage || 'Solicito liberacao de acesso.' });
+      setUnlockSent(true);
+      setShowUnlockForm(false);
+    } catch {
+      setLoginError('Erro ao enviar solicitacao. Tente novamente.');
+    } finally {
+      setUnlockSending(false);
     }
   };
 
@@ -410,8 +455,37 @@ export const Header: React.FC<{ sidebarOpen: boolean }> = ({ sidebarOpen }) => {
                 </div>
               </div>
               {loginError && (
-                <div className="absolute top-full left-0 mt-1 px-2 py-1.5 bg-red-50 border border-red-200 rounded-md text-[11px] text-red-600 font-medium whitespace-nowrap z-50 shadow-sm">
-                  {loginError}
+                <div className="absolute top-full left-0 mt-1 px-2 py-1.5 bg-red-50 border border-red-200 rounded-md text-[11px] text-red-600 font-medium z-50 shadow-sm" style={{minWidth:220}}>
+                  <div className="whitespace-nowrap">{loginError}</div>
+                  {canRequestUnlock && !unlockSent && (
+                    <div className="mt-1">
+                      {!showUnlockForm ? (
+                        <button type="button" onClick={() => setShowUnlockForm(true)}
+                          className="text-blue-600 underline font-semibold text-[11px]">
+                          Solicitar Desbloqueio
+                        </button>
+                      ) : (
+                        <div className="mt-1 flex flex-col gap-1">
+                          <textarea
+                            value={unlockMessage}
+                            onChange={(e) => setUnlockMessage(e.target.value)}
+                            placeholder="Mensagem para o administrador (opcional)"
+                            className="text-[11px] border border-gray-300 rounded p-1 w-full text-gray-700"
+                            rows={2}
+                          />
+                          <button type="button" onClick={handleRequestUnlock} disabled={unlockSending}
+                            className="px-2 py-1 bg-blue-600 text-white rounded text-[11px] font-semibold">
+                            {unlockSending ? 'Enviando...' : 'Enviar Solicitação'}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {unlockSent && (
+                    <div className="mt-1 text-green-700 font-semibold whitespace-nowrap">
+                      Solicitação enviada. Aguarde aprovação.
+                    </div>
+                  )}
                 </div>
               )}
             </form>
@@ -426,6 +500,16 @@ export const Header: React.FC<{ sidebarOpen: boolean }> = ({ sidebarOpen }) => {
                 border:'1px solid #FCD34D',marginRight:8,flexShrink:0}}>
               <FiAlertTriangle size={13}/>
               {pendentesCount} pendente{pendentesCount > 1 ? 's' : ''}
+            </a>
+          )}
+          {isMaster && unlockRequestsCount > 0 && (
+            <a href='/app/usuarios/desbloqueios'
+              style={{display:'flex',alignItems:'center',gap:6,padding:'5px 12px',
+                borderRadius:20,background:'#DBEAFE',color:'#1D4ED8',
+                fontSize:12,fontWeight:700,textDecoration:'none',
+                border:'1px solid #93C5FD',marginRight:8,flexShrink:0}}>
+              <FiAlertTriangle size={13}/>
+              {unlockRequestsCount} desbloqueio{unlockRequestsCount > 1 ? 's' : ''}
             </a>
           )}
           <div className="flex flex-col items-end text-right border-l border-gray-200 pl-4">
