@@ -315,3 +315,17 @@ pendencias ficam em LEDGR-contexto.md (append-only).
 **Regra 5 — Sinalizar quando o escopo cresce.** Se uma tarefa que parecia pequena (ex: "travar lancamento") evoluir para algo estrutural maior (ex: integracao contabil completa) no meio da conversa, dizer isso explicitamente e propor checkpoints, em vez de simplesmente seguir em frente.
 
 **Regra 6 — Nunca usar bash_tool neste projeto**, sob nenhuma circunstancia, nem por engano/teste. Toda edicao de arquivo do projeto passa por PowerShell (blocos que o usuario executa) ou Python via script gerado — nunca por chamada direta de ferramenta.
+
+## Licao adicional — project_knowledge_search pode ficar desatualizado (17/07/2026)
+
+Para arquivos editados MUITAS vezes na mesma sessao (ex: Header.tsx sofreu 4+ patches num unico
+dia), o `project_knowledge_search` (busca nos arquivos do projeto) pode retornar conteudo
+DESATUALIZADO mesmo apos o usuario re-subir o arquivo atualizado. Confirmado nesta sessao: a
+busca trouxe 3 vezes seguidas uma versao antiga do Header.tsx (sem o bloco loginError/unlock que
+ja estava aplicado e confirmado via Select-String no arquivo real).
+
+**Regra pratica:** para arquivos que ja sofreram edicao HOJE (nesta sessao), nao confiar no
+project_knowledge_search como fonte de verdade — ir direto ao Select-String/Get-Content no
+terminal real do usuario. A busca do projeto continua sendo o primeiro passo correto para
+arquivos AINDA NAO tocados na sessao atual (evita pedir de novo algo que ja esta disponivel),
+mas perde confiabilidade a partir da primeira edicao do dia.
