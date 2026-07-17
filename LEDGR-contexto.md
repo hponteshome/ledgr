@@ -2136,3 +2136,8 @@ Feature solicitada 15/07/2026, escopo levantado mas NAO implementada ainda.
 - 'Mensagens' ainda no menu dinâmico — usuário quer fixo no header/rodapé (mudança de SideBar.tsx/Header.tsx, não feita ainda).
 - SidebarPermissionsPage.tsx lista a árvore plana (depth=0 sem agrupar por divider_before) — sufixos '· Arquivo'/'· Operação' mitigam ambiguidade mas não resolvem de vez.
 - SQL versionado em prisma/migrations-manuais/2026-07-17_sidebar_reorg_macro_categorias.sql.
+
+**Atualização 17/07/2026 — Pendências da reorg de sidebar resolvidas na mesma sessão:**
+- Mensagens: removida da arvore dinamica (SideBar.tsx filtra path '/app/chat'), agora e icone fixo no Header.tsx (respeita canView('/app/chat')).
+- SidebarPermissionsPage.tsx: passou a exibir divider_before como cabecalho de secao, agrupando visualmente as macro-categorias e resolvendo de vez a ambiguidade Fiscal/Societario Arquivo vs Operacao.
+- Commit 689544c. tsc --noEmit limpo.
