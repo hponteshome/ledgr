@@ -84,7 +84,8 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
   }, [user]);
 
   const menuItems = useMemo<MenuItem[]>(() => {
-    return tree.map(node => {
+    // 'Mensagens' saiu da arvore dinamica - vira icone fixo no Header.tsx
+    return tree.filter(node => node.path !== '/app/chat').map(node => {
       let children = node.children && node.children.length > 0
         ? node.children.map(mapNode)
         : undefined;

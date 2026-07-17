@@ -3,9 +3,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   FiBriefcase, FiChevronDown, FiUser, FiLogOut, FiSettings,
   FiEye, FiEyeOff, FiCalendar, FiChevronLeft, FiChevronRight,
-  FiAlertTriangle, FiInfo, FiX, FiSearch,
+  FiAlertTriangle, FiInfo, FiX, FiSearch, FiMessageSquare,
 } from 'react-icons/fi';
 import { useAuth } from '../contexts/AuthContext';
+import { useSidebarPermissions } from '../contexts/SidebarPermissionsContext';
 import { useCompany } from '../contexts/CompanyContext';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
@@ -59,6 +60,7 @@ export const Header: React.FC<{ sidebarOpen: boolean }> = ({ sidebarOpen }) => {
   const pendentesCount = usePendentesCount(!!user && isMaster);
   const unlockRequestsCount = useUnlockRequestsCount(isMaster);
   const { companies, activeCompany, selectCompany } = useCompany();
+  const { canView } = useSidebarPermissions();
   const [isCompanyOpen, setIsCompanyOpen] = useState(false);
   const [isMonthOpen, setIsMonthOpen] = useState(false);
   const [isUserOpen, setIsUserOpen] = useState(false);
@@ -389,6 +391,16 @@ export const Header: React.FC<{ sidebarOpen: boolean }> = ({ sidebarOpen }) => {
         </div>
 
         <div className="flex items-center gap-4">
+          {/* Mensagens - fixo no header, fora da arvore dinamica do menu */}
+          {user && canView('/app/chat') && (
+            <button
+              onClick={() => navigate('/app/chat')}
+              title="Mensagens"
+              className="p-2.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-gray-50 transition-colors flex-shrink-0"
+            >
+              <FiMessageSquare size={20} />
+            </button>
+          )}
           {/* USER SELECTOR / LOGGED USER INFO */}
           {user ? (
             <div className="relative user-trigger">

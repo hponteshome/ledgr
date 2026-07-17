@@ -16,6 +16,7 @@ interface TreeNode {
   path: string;
   label: string;
   module: string;
+  dividerBefore?: string | null;
   children: TreeNode[];
 }
 interface Profile { id: string; name: string; }
@@ -274,7 +275,16 @@ export default function SidebarPermissionsPage() {
           <div className="border border-gray-100 rounded-lg overflow-hidden">
             <ColumnHeader allIds={allIds} perms={perms} onSetAll={l => setAllToLevel(l, setPerms)} />
             {tree.map(node => (
-              <TreeRow key={node.id} node={node} depth={0} perms={perms} onChangeNode={setLevel} />
+              <React.Fragment key={node.id}>
+                {node.dividerBefore && (
+                  <div className="px-3 pt-3 pb-1 bg-gray-50 border-b border-gray-100">
+                    <span className="text-[10px] font-semibold tracking-widest text-gray-400 uppercase">
+                      {node.dividerBefore}
+                    </span>
+                  </div>
+                )}
+                <TreeRow node={node} depth={0} perms={perms} onChangeNode={setLevel} />
+              </React.Fragment>
             ))}
           </div>
         </>
