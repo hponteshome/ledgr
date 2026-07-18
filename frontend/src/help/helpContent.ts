@@ -541,19 +541,25 @@ export const helpContent: Record<string, HelpArticle> = {
   'administracao/usuarios': {
     title: 'Usuários',
     section: 'Administração',
-    intro: 'Gerencie quem tem acesso ao LEDGR, com que nível de permissão e em quais módulos.',
+    intro: 'Cadastro e controle de usuários do sistema: quem pode entrar, com qual perfil de permissões e em quais horários.',
     content: [
       { type: 'steps', items: [
-        'Acesse Administração → Usuários.',
-        'Clique em Novo Usuário.',
-        'Preencha nome, e-mail e selecione o perfil de acesso.',
-        'O usuário receberá um e-mail para definir sua senha.',
-        'Para desativar um usuário, clique no ícone de lixeira e confirme.',
+        'Clique em "New User" e informe o CPF ou CNPJ - o sistema busca automaticamente se já existe um usuário ou uma pessoa cadastrada com esse documento e pré-preenche nome, e-mail e telefone.',
+        'Se não encontrar ninguém, o sistema oferece um atalho para cadastrar a pessoa física antes de continuar.',
+        'Defina o nickname (nome de usuário para login), a senha e o perfil de acesso.',
+        'Escolha o Status: Ativo, Inativo ou Bloqueado.',
+        'Se quiser restringir dias e horários de login especificamente para essa pessoa, configure a "Janela de Acesso" no final do formulário.',
       ]},
-      { type: 'tip', text: 'Um usuário desativado não consegue fazer login, mas seus registros e histórico são preservados no sistema.' },
-      { type: 'warning', text: 'Apenas usuários com perfil Administrador Master podem criar, editar ou excluir outros usuários.' },
+      { type: 'text', text: 'Por padrão, cada usuário "Herda do Perfil" a janela de acesso (dias e horários permitidos para login) configurada no perfil dele. Escolhendo "Definir Horário Próprio", você cria uma exceção individual: pode restringir a dias/horários específicos, marcar meses de férias com bloqueio total, ou liberar sem nenhuma restrição mesmo que o perfil seja restrito.' },
+      { type: 'table', headers: ['Status', 'Efeito'], rows: [
+        ['Ativo', 'Login liberado normalmente'],
+        ['Inativo', 'Login bloqueado, mas o cadastro e todo o histórico permanecem no sistema'],
+        ['Bloqueado', 'Login bloqueado - usado tipicamente após tentativas de acesso suspeitas'],
+      ]},
+      { type: 'warning', text: '"Excluir" um usuário (ícone de lixeira) é uma exclusão definitiva, diferente de deixá-lo Inativo. Se só quer impedir o login preservando o histórico e os registros vinculados a esse usuário, use o Status "Inativo" em vez de excluir.' },
+      { type: 'tip', text: 'O ícone de olho na listagem mostra os detalhes completos do usuário sem precisar entrar no modo de edição, incluindo status do 2FA, último acesso e a janela de acesso configurada.' },
     ],
-    related: ['administracao/perfis', 'administracao/auditoria'],
+    related: ['administracao/perfis', 'administracao/permissoes-menu'],
   },
 
   'administracao/perfis': {
@@ -601,6 +607,125 @@ export const helpContent: Record<string, HelpArticle> = {
       { type: 'tip', text: 'O log de auditoria não pode ser editado ou excluído — é um registro imutável para fins de compliance e rastreabilidade.' },
     ],
     related: ['administracao/usuarios', 'administracao/perfis'],
+  },
+
+  'administracao/permissoes-menu': {
+    title: 'Permissões de Menu',
+    section: 'Administração',
+    intro: 'Permissões de Menu controla o que cada perfil ou usuário pode ver e fazer em cada item do menu do sistema - por padrão (perfil) ou como exceção individual (usuário).',
+    content: [
+      { type: 'text', text: 'Cada item do menu pode ter um dos quatro níveis de acesso, sempre cumulativos: Nenhum (bloqueado), Visualizar, Editar ou Excluir. Quem tem Excluir automaticamente tem Editar e Visualizar também - não é preciso marcar os três.' },
+      { type: 'text', text: 'Existem duas camadas: permissões Por Perfil (o padrão aplicado a todos os usuários daquele perfil) e Por Usuário (exceções individuais que sobrepõem o perfil apenas para aquela pessoa). Configure primeiro os perfis; use "Por Usuário" só quando alguém específico precisar de um acesso diferente do resto do seu perfil.' },
+      { type: 'steps', items: [
+        'Escolha a aba "Por Perfil" ou "Por Usuário" e selecione quem será configurado.',
+        'Para cada item do menu, clique no nível desejado (Nenhum, Visualizar, Editar, Excluir).',
+        'Definir um nível num item com submenu aplica automaticamente o mesmo nível a todos os itens abaixo dele - ajuste manualmente os que precisarem ser diferentes depois.',
+        'Clique em "Salvar" - as alterações só valem depois de salvas.',
+      ]},
+      { type: 'warning', text: '"Nenhum" oculta o item do menu e, nos módulos que já têm proteção de API implementada, também bloqueia o acesso direto pela URL ou por chamadas ao backend - não é só uma questão visual. Em módulos sem essa proteção ainda implementada, o bloqueio é apenas do menu.' },
+      { type: 'tip', text: 'Marque o checkbox no topo de uma coluna (ex: "Visualizar") para aplicar aquele nível a TODOS os itens do menu de uma vez - útil para configurar rapidamente um perfil amplo, mas sobrescreve qualquer ajuste fino que já existia nessa coluna.' },
+    ],
+    related: ['administracao/usuarios', 'administracao/perfis'],
+  },
+
+  'administracao/backup': {
+    title: 'Backup e Restauração',
+    section: 'Administração',
+    intro: 'Backup e Restauração permite exportar todo o banco de dados do LEDGR em um arquivo JSON, ou restaurar o sistema a partir de um backup anterior. A restauração é uma operação destrutiva e irreversível.',
+    content: [
+      { type: 'steps', items: [
+        'Para gerar um backup, clique em "Generate Backup Now" - o sistema baixa um arquivo .json com data e hora no nome.',
+        'Guarde o arquivo em um local seguro, de preferência criptografado.',
+      ]},
+      { type: 'warning', text: 'O arquivo de backup contém dados sensíveis: hashes de senha de usuários e documentos da empresa. Nunca compartilhe o arquivo por canais inseguros (email, chat) - armazene em volumes criptografados.' },
+      { type: 'text', text: 'A restauração substitui permanentemente todo o banco de dados atual pelos dados do arquivo selecionado - não existe desfazer. Antes de restaurar, o sistema pede uma Master Key (uma senha técnica configurada no servidor, não é a senha do seu usuário) e uma confirmação explícita.' },
+      { type: 'warning', text: 'A Master Key não é cadastrada pelo usuário - é uma configuração do servidor. Se você não sabe essa chave, a restauração só pode ser feita por quem administra a infraestrutura do sistema.' },
+      { type: 'tip', text: 'Use o backup para migração entre ambientes ou arquivamento periódico de segurança - não como rotina de "desfazer" um erro pontual. Para corrigir um erro sem apagar o histórico, prefira um estorno ou consulte a Auditoria.' },
+    ],
+    related: ['administracao/permissoes-menu', 'administracao/auditoria'],
+  },
+
+  'administracao/manutencao-dados': {
+    title: 'Manutenção de Dados',
+    section: 'Administração',
+    intro: 'Manutenção de Dados permite exportar ou importar tabelas individuais do sistema em arquivos de texto (TXT), útil para migrações parciais, correções em massa ou movimentação de dados entre ambientes.',
+    content: [
+      { type: 'text', text: 'Diferente do Backup e Restauração (que exporta o banco inteiro em JSON), aqui você trabalha tabela por tabela, em arquivos de texto delimitados por ponto e vírgula (;) - útil para corrigir ou migrar apenas um conjunto específico de dados.' },
+      { type: 'steps', items: [
+        'Para exportar uma única tabela, clique em "Exportar" na linha correspondente - baixa um arquivo .txt.',
+        'Para exportar várias de uma vez, marque as tabelas desejadas e clique em "Exportar Selecionadas".',
+        'Para importar, clique em "Importar TXT" na tabela desejada e selecione o arquivo - o sistema mostra quantos registros foram inseridos, atualizados ou ignorados (duplicados).',
+      ]},
+      { type: 'warning', text: 'A importação funciona por Upsert: registros cujo ID já existe no banco são atualizados (sobrescritos), não duplicados. Confira o arquivo antes de importar, especialmente em bases de produção.' },
+      { type: 'warning', text: 'Ao importar várias tabelas relacionadas, respeite a ordem recomendada: Perfis → Empresas → Pessoas → Usuários → Vínculos. Importar uma tabela antes de suas dependências pode falhar por referência a um registro que ainda não existe.' },
+      { type: 'tip', text: 'Faça um backup completo (em Backup e Restauração) antes de qualquer importação em massa - a importação por Upsert pode sobrescrever dados existentes sem aviso adicional.' },
+    ],
+    related: ['administracao/backup', 'administracao/auditoria'],
+  },
+
+  'parametros/calendario': {
+    title: 'Calendário de Feriados',
+    section: 'Parâmetros Globais',
+    intro: 'O Calendário de Feriados centraliza feriados nacionais, estaduais e municipais, sugere pontes automaticamente e mostra férias e recessos de funcionários no mesmo calendário visual.',
+    content: [
+      { type: 'steps', items: [
+        'Se o ano ainda não tiver feriados cadastrados, clique em "Gerar Calendário [ano]" para importar automaticamente os feriados nacionais.',
+        'Para adicionar um feriado manual (estadual ou municipal, por exemplo), clique em "+ Feriado", escolha o tipo e, se aplicável, o estado ou município.',
+        'Quando um feriado nacional, estadual ou facultativo cai numa terça ou quinta-feira, o sistema sugere automaticamente a ponte (segunda ou sexta) no calendário - clique na sugestão para confirmar.',
+      ]},
+      { type: 'text', text: 'Feriados Estaduais aparecem apenas para empresas cadastradas naquele estado; Municipais, apenas para empresas daquele município específico. Marque "Recorrente" para um feriado se repetir automaticamente todos os anos, sem precisar recadastrar.' },
+      { type: 'warning', text: 'Confirmar uma ponte sugerida cria um Recesso que se aplica a todos os funcionários da empresa, visível e editável em Departamento Pessoal → Recessos & Pontes - não é só uma marcação visual no calendário.' },
+      { type: 'list', items: [
+        'Feriado Nacional / Estadual / Municipal - datas oficiais, coloridas por abrangência.',
+        'Ponte Sugerida - o sistema identificou uma oportunidade de emenda, ainda não confirmada.',
+        'Ponte Registrada - ponte já confirmada, vira Recesso.',
+        'Recesso - período de parada coletiva registrado em Departamento Pessoal.',
+        'Férias - períodos de férias de funcionários, puxados automaticamente do módulo de RH.',
+      ]},
+    ],
+    related: ['dp/funcionarios'],
+  },
+
+  'parametros/indicadores': {
+    title: 'Indicadores Econômicos',
+    section: 'Parâmetros Globais',
+    intro: 'Indicadores Econômicos mantém a série histórica mensal dos principais índices usados em correção monetária e contratos: Selic, IPCA, IGP-M, IGP-DI, INPC, TR e CDI. A atualização é manual - o sistema não busca os valores automaticamente.',
+    content: [
+      { type: 'text', text: 'Nenhum indicador é atualizado automaticamente - o sistema não busca os valores nas fontes oficiais sozinho. É preciso visitar a fonte periodicamente (mensalmente, após a divulgação oficial) e lançar o valor no LEDGR, um a um ou em lote.' },
+      { type: 'steps', items: [
+        'Escolha o indicador na aba superior (Selic, IPCA, IGP-M, IGP-DI, INPC, TR ou CDI).',
+        'Para lançar um único mês, use "Importar / Adicionar" → "Adicionar registro manual": informe a competência e a taxa mensal em %.',
+        'Para lançar vários meses de uma vez, cole os dados na caixa de "Importação em lote", um registro por linha.',
+      ]},
+      { type: 'text', text: 'O formato aceito na importação em lote é AAAA-MM seguido de tabulação (ou ponto e vírgula) e a taxa mensal em %, um registro por linha - por exemplo "2025-01" + tab + "0,9643". O campo de competência também aceita o formato "jan/25" ou "janeiro/2025": o sistema converte automaticamente.' },
+      { type: 'table', headers: ['Indicador', 'Fonte oficial recomendada'], rows: [
+        ['Selic / TR', 'Banco Central (BCB) - Sistema Gerenciador de Séries Temporais (SGS)'],
+        ['IPCA / INPC', 'IBGE'],
+        ['IGP-M / IGP-DI', 'FGV/IBRE'],
+        ['CDI', 'BCB - tem tabela própria e dedicada, com layout diferente dos demais'],
+      ]},
+      { type: 'tip', text: 'As colunas "Acum. Ano" e "Acum. 12m" são calculadas automaticamente pelo sistema a partir dos lançamentos mensais - não precisam ser informadas manualmente.' },
+      { type: 'warning', text: 'Os dados cadastrados aqui são usados em cálculos de correção monetária e contratos no sistema todo - um valor errado ou desatualizado se propaga para todos os relatórios que dependem daquele índice. Sempre confira o valor lançado contra a fonte oficial antes de salvar.' },
+    ],
+    related: ['parametros/calendario'],
+  },
+
+  'parametros/tabelas-legais': {
+    title: 'Tabelas Legais',
+    section: 'Parâmetros Globais',
+    intro: 'Tabelas Legais mantém as tabelas oficiais de IRPF, INSS e Salário Mínimo usadas nos cálculos de folha de pagamento e pró-labore do sistema, organizadas por ano de vigência.',
+    content: [
+      { type: 'text', text: 'As três tabelas alimentam diretamente os cálculos de Folha de Pagamento e Pró-labore do sistema inteiro - qualquer alteração aqui se reflete em todos os cálculos daquele ano de vigência em diante.' },
+      { type: 'steps', items: [
+        'Escolha a aba (Tabela IRPF, Tabela INSS ou Salário Mínimo) e o ano na barra de anos.',
+        'Clique em "Editar [ano]" para ajustar a tabela vigente, ou "+ Novo Ano" para cadastrar um ano ainda não existente.',
+        'Preencha as faixas progressivas (limite até, alíquota) - a coluna "Dedução" da tabela INSS é calculada automaticamente pelo sistema a partir dos limites e alíquotas informados, não precisa ser digitada.',
+      ]},
+      { type: 'text', text: 'O "Redutor Progressivo" da tabela IRPF (Lei 15.270/2025) é opcional - deixe as faixas de redutor vazias se o ano não tiver essa regra. Quando preenchido, um valor de dedução em branco numa faixa significa isenção total naquela faixa de renda.' },
+      { type: 'tip', text: 'A aba IRPF inclui um simulador: informe salário bruto, número de dependentes e escolha entre desconto simplificado ou dedução por dependente para ver o INSS, a base de cálculo, o IRRF e o valor líquido resultante, sem precisar rodar uma folha de verdade.' },
+      { type: 'warning', text: 'Um valor incorreto nessas tabelas afeta todos os cálculos de folha de pagamento e pró-labore que usarem aquele ano de vigência. Confira sempre contra a tabela oficial publicada pela Receita Federal (IRPF) e pelo INSS antes de salvar.' },
+    ],
+    related: ['parametros/indicadores', 'dp/funcionarios'],
   },
 
 
@@ -903,6 +1028,12 @@ export const contextualHelp: Record<string, string> = {
   '/app/users':                            'administracao/usuarios',
   '/app/profiles':                         'administracao/perfis',
   '/app/administracao/auditoria':          'administracao/auditoria',
+  '/app/sistema/sidebar-permissions':      'administracao/permissoes-menu',
+  '/app/system/backup':                    'administracao/backup',
+  '/app/settings/data-management':         'administracao/manutencao-dados',
+  '/app/sistema/calendario':                'parametros/calendario',
+  '/app/sistema/indicadores':               'parametros/indicadores',
+  '/app/sistema/tabelas':                   'parametros/tabelas-legais',
   '/app/assinaturas':                      'assinaturas/certificados',
   '/app/signatures/validate':              'assinaturas/validacao',
   '/app/documents/signatures/certificates': 'assinaturas/certificados',
@@ -1020,7 +1151,19 @@ export const helpSections = [
       { slug: 'administracao/usuarios',      title: 'Usuários' },
       { slug: 'administracao/perfis',        title: 'Perfis de Acesso' },
       { slug: 'administracao/auditoria',     title: 'Auditoria & Logs' },
+      { slug: 'administracao/permissoes-menu', title: 'Permissões de Menu' },
+      { slug: 'administracao/backup',          title: 'Backup e Restauração' },
+      { slug: 'administracao/manutencao-dados', title: 'Manutenção de Dados' },
       { slug: 'administracao/certificados',  title: 'Certificados Digitais' },
+    ],
+  },
+  {
+    title: 'Parâmetros Globais',
+    icon: 'globe',
+    articles: [
+      { slug: 'parametros/calendario', title: 'Calendário de Feriados' },
+      { slug: 'parametros/indicadores', title: 'Indicadores Econômicos' },
+      { slug: 'parametros/tabelas-legais', title: 'Tabelas Legais' },
     ],
   },
 ];
