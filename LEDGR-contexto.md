@@ -2149,3 +2149,86 @@ Feature solicitada 15/07/2026, escopo levantado mas NAO implementada ainda.
 - npm audit: 0 vulnerabilidades (frontend zerado, era 2 restantes desde a sessao de 12/07).
 - tsc --noEmit limpo, build de producao OK (1m55s). Dois avisos preexistentes sem relacao com o upgrade: import misto AgendaPage/ContasAPagarPage, chunk principal 2.7MB (xlsx contribui 429KB).
 - Testado visualmente: dev server/HMR/Tailwind ok.
+
+**Pendencia registrada 17/07/2026 — Revisao dos arquivos de ajuda/help:**
+Usuario sinalizou intencao de revisar e reescrever integralmente os arquivos de ajuda
+(contextualHelp e afins) antes da instalacao na rede para testes reais. Prioridade
+alta por ser pre-requisito de UX/onboarding para os primeiros usuarios reais do sistema
+fora do ambiente de desenvolvimento. Ainda nao escopado (nao sabemos quantos arquivos,
+formato atual, nem se sera revisao de conteudo ou reescrita completa) - proxima sessao
+dedicada deve comecar mapeando os arquivos de ajuda existentes antes de planejar.
+
+---
+
+## Sessão 17-18/07/2026 — Migração xlsx -> exceljs (vulnerabilidade sem fix)
+
+**Motivo:** pacote xlsx (SheetJS) tinha 2 CVEs sem correção disponivel (Prototype Pollution, ReDoS).
+
+**Escopo real (achado por grep completo, incluindo import() dinamico que grep inicial nao pegou):**
+- apps/api/.../bank-parser.service.ts — parser Itau/Bradesco/BB/Santander + XLS generico (4 usos: XLSX.read, sheet_to_json, SSF.parse_date_code)
+- apps/api/.../bank-import.service.ts — previewExcelMapped + uploadExcelMapped (Planilha Mapeada LM)
+- frontend/.../AssetsList.tsx — export de depreciacao anual (unico uso no frontend, geracao nao leitura)
+
+**Decisao de arquitetura critica:** workbook.xlsx.load() do exceljs (nao-streaming) causou
+'JavaScript heap out of memory' (~4GB) com arquivo real de 46MB. Migrado para
+ExcelJS.stream.xlsx.WorkbookReader (SAX-based) nos dois arquivos do backend -
+resolve memoria mas exige reconstrucao manual do 'includeEmpty' (gaps de linha)
+via row.number como indice.
+
+**3 bugs REAIS encontrados e corrigidos na Planilha Mapeada (regressao da migracao,
+xlsx antigo usava cellDates:true que mascarava os dois primeiros):**
+1. Linha 1 da planilha LM real e um titulo ('Extrato de: Agencia...'), header
+   verdadeiro esta na linha 2 - codigo assumia cegamente linha 1 = header.
+   Fix: escaneia as 5 primeiras linhas procurando celula == 'data'.
+2. Cabecalho tem coluna 'Data' DUPLICADA (uma mini-tabela/legenda extra mais a
+   direita na mesma linha de header) - ultima ocorrencia sobrescrevia a correta.
+   Fix: mantem so a 1a ocorrencia de cada nome de coluna (if (h && !(h in obj))).
+3. Datas chegam como numero serial do Excel (ex: 45659), nao mais auto-convertidas
+   para Date pelo exceljs streaming como o SheetJS+cellDates:true fazia.
+   Fix: helper parseFlexibleDate() (Date | number serial | string DD/MM/AAAA).
+
+**Limites de upload subidos (arquivo real de teste tem 46MB):**
+- POST /bank-import/upload: 10MB -> 60MB
+- POST /bank-import/preview-excel e /upload-excel: 15MB -> 60MB
+- memoryStorage() do Multer mantido por ora; se precisar de arquivos >100MB no
+  futuro, avaliar diskStorage (streaming para disco).
+
+**npm overrides para uuid (exceljs depende de uuid@8.3.2, vulneravel):**
+- Faixa vulneravel real e uuid <11.1.1 (nao so <9 como assumido inicialmente).
+- Override deve ser ESCOPADO ('exceljs': { 'uuid': '^11.1.1' }), nunca global -
+  um override global quebra o @nestjs/typeorm (que pina uuid em outra faixa).
+- Projeto tem 3 arvores npm independentes (raiz do monorepo, apps/api via
+  workspace, frontend como projeto standalone) - override precisa ser aplicado
+  nos 3 package.json separadamente, nao propaga entre eles.
+
+**xlsx removido de 100% dos package.json (raiz, apps/api, frontend) - confirmado
+por grep de codigo-fonte E dist/ apos rebuild limpo.**
+
+**Pendencia nao resolvida:** mensagem amigavel de erro 413 em
+BankImportPage.tsx->handleConfirmUpload pode nao estar disparando corretamente
+(assumi formato de erro estilo axios - e.response.status - sem confirmar contra
+o hook useBankImport real). Testar/corrigir em sessao futura se o erro cru
+'File too large' voltar a aparecer nesse fluxo especifico.
+
+**Descoberta separada (fora de escopo, registrada para a sessao de NestJS v11):**
+npm audit rodado a partir da RAIZ do monorepo (nunca feito antes, so dentro de
+apps/api) revelou 53 vulnerabilidades reais, incluindo @nestjs/core (high,
+injection) e uuid@9.0.1 pinado pelo proprio @nestjs/typeorm@10.0.2 (nao e
+o mesmo uuid do exceljs, e problema dele, resolve so com upgrade para
+@nestjs/typeorm@11.0.3). Tambem apareceram deps de outros workspaces nunca
+antes visiveis (Prisma dev tooling, hono, effect, bcrypt/tar).
+
+**Validacao real executada (nao so tsc/build):**
+- '+Importar Extrato' com arquivo LM real de 46MB: 38 lancamentos, sem estouro
+  de memoria, dados conferidos.
+- 'Planilha Mapeada' com o mesmo arquivo: 38/38 OK, mesmos totais do extrato
+  acima (R\.293,79 debito / R\.752,09 credito) - validacao cruzada por
+  dois parsers diferentes. Confirmar Importacao testado ate o fim.
+- Export de Depreciacao Anual (Patrimonio): arquivo .xlsx baixado e valido.
+
+**Nota operacional:** processos node.exe zumbis se acumularam varias vezes
+durante a sessao (rodar 'npm run build' manual enquanto 'npm run dev' watch
+mode esta ativo corrompe a pasta dist e derruba o processo com MODULE_NOT_FOUND
+ou ENOTEMPTY). Se acontecer de novo: Get-CimInstance Win32_Process -Filter
+"Name='node.exe'" | Select ProcessId,CommandLine para identificar e matar so
+os processos do backend (tsx src/main.ts), preservando o do Vite (frontend).

@@ -507,7 +507,7 @@ function DepreciationReportTab({ token, companyId }: { token: string; companyId:
     const years: number[] = data[0]?.years ?? [];
 
     const exportXlsx = async () => {
-        const XLSX = await import('xlsx');
+        const ExcelJS = await import('exceljs');
         const header = ['Código', 'Descrição', 'Grupo', 'Conta', 'Início Deprec.', ...years.map(String), 'Total Deprec.', 'Valor Contábil'];
         const rows = data.map(a => [
             a.internalCode, a.description, a.group, a.accountCode,
@@ -515,10 +515,20 @@ function DepreciationReportTab({ token, companyId }: { token: string; companyId:
             ...years.map(y => a.yearTotals[y] ?? 0),
             a.totalDeprec, a.bookValue
         ]);
-        const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, 'Depreciação Anual');
-        XLSX.writeFile(wb, `depreciacao-anual-${yearFrom}-${yearTo}.xlsx`);
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('Depreciação Anual');
+        worksheet.addRow(header);
+        rows.forEach(r => worksheet.addRow(r));
+        const buffer = await workbook.xlsx.writeBuffer();
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `depreciacao-anual-${yearFrom}-${yearTo}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
     };
 
     const fmt = (v: number) => v ? formatCurrency(v) : '—';

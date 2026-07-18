@@ -24,21 +24,21 @@ export class BankImportController {
   }
 
   @Post('upload')
-  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } }))
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: 60 * 1024 * 1024 } }))
   upload(@Req() req: any, @UploadedFile() file: Express.Multer.File) {
     if (!file) throw new BadRequestException('Arquivo não enviado.');
     return this.service.uploadStatement(req.companyId, file.buffer, file.originalname, req.user.id);
   }
 
   @Post('preview-excel')
-  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } }))
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: 60 * 1024 * 1024 } }))
   previewExcel(@Req() req: any, @UploadedFile() file: Express.Multer.File) {
     if (!file) throw new BadRequestException('Arquivo Excel não fornecido.');
     return this.service.previewExcelMapped(req.companyId, file.buffer);
   }
 
   @Post('upload-excel')
-  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } }))
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: 60 * 1024 * 1024 } }))
   uploadExcel(@Req() req: any, @UploadedFile() file: Express.Multer.File) {
     if (!file) throw new BadRequestException('Arquivo Excel não fornecido.');
     return this.service.uploadExcelMapped(req.companyId, file.buffer, file.originalname, req.user.id);

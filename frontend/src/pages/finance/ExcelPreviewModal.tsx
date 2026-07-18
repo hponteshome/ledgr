@@ -9,6 +9,18 @@ const API = 'http://localhost:3000';
 function fmtBRL(v: number) { return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
 function fmtDate(s: string) { if (!s) return ''; try { return new Date(s + 'T12:00:00').toLocaleDateString('pt-BR'); } catch { return s; } }
 
+// Limite configurado no backend para /bank-import/preview-excel e /bank-import/upload-excel
+// (ver apps/api/src/modules/finance/bank-import.controller.ts) - manter em sincronia
+const MAX_EXCEL_SIZE_MB = 60;
+function humanFileSize(bytes: number) { return (bytes / (1024 * 1024)).toFixed(1) + ' MB'; }
+function friendlyUploadError(res: Response, data: any, file: File | null): string {
+  if (res.status === 413) {
+    const atual = file ? ` (arquivo enviado: ${humanFileSize(file.size)})` : '';
+    return `Arquivo muito grande${atual}. O limite para planilhas mapeadas é de ${MAX_EXCEL_SIZE_MB}MB.`;
+  }
+  return data?.message ?? 'Erro ao processar a planilha.';
+}
+
 export const ExcelPreviewModal: React.FC<Props> = ({ onClose, onSuccess, companyId, token }) => {
   const [step, setStep]       = useState<'upload' | 'preview' | 'done'>('upload');
   const [file, setFile]       = useState<File | null>(null);
@@ -26,8 +38,8 @@ export const ExcelPreviewModal: React.FC<Props> = ({ onClose, onSuccess, company
     try {
       const fd = new FormData(); fd.append('file', file);
       const res = await fetch(`${API}/bank-import/preview-excel`, { method: 'POST', headers, body: fd });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message ?? 'Erro ao processar planilha');
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(friendlyUploadError(res, data, file));
       setPreview(data);
       setStep('preview');
       if (data.errors > 0) setFilter('error');
@@ -41,8 +53,8 @@ export const ExcelPreviewModal: React.FC<Props> = ({ onClose, onSuccess, company
     try {
       const fd = new FormData(); fd.append('file', file);
       const res = await fetch(`${API}/bank-import/upload-excel`, { method: 'POST', headers, body: fd });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message ?? 'Erro na importacao');
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(friendlyUploadError(res, data, file));
       setResult(data);
       setStep('done');
       onSuccess();

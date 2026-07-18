@@ -116,7 +116,15 @@ export default function BankImportPage() {
       const grps = await getGroups(res.statementId);
       initGroups(grps);
       setStep('classify');
-    } catch {}
+    } catch (e: any) {
+      const status = e?.response?.status;
+      if (status === 413) {
+        const atual = (pendingFile.size / (1024 * 1024)).toFixed(1);
+        alert(`Arquivo muito grande (${atual} MB). O limite para extratos bancários é de 10MB.`);
+      } else {
+        alert('Erro ao importar extrato: ' + (e?.response?.data?.message ?? e?.message ?? 'erro desconhecido'));
+      }
+    }
   };
 
   const handleUploadExcel = async (file: File) => {
@@ -129,8 +137,14 @@ export default function BankImportPage() {
         headers: { Authorization: 'Bearer ' + token, 'x-company-id': company.id ?? '' },
         body: fd,
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message ?? 'Erro ao importar planilha');
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        if (res.status === 413) {
+          const atual = (file.size / (1024 * 1024)).toFixed(1);
+          throw new Error(`Arquivo muito grande (${atual} MB). O limite para planilhas mapeadas é de 60MB.`);
+        }
+        throw new Error(data.message ?? 'Erro ao importar planilha');
+      }
       alert('Planilha importada: ' + data.imported + ' lanc. | Erros: ' + (data.errors?.length ?? 0));
       setStep('list');
     } catch (e: any) { alert('Erro: ' + e.message); }

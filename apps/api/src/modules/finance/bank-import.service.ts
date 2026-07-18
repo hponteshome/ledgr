@@ -7,6 +7,71 @@ import { BankParserService, buildGroupKey } from './parsers/bank-parser.service'
 import { SuggestionService } from './suggestion.service';
 import { Prisma } from '@prisma/client';
 
+import * as ExcelJS from 'exceljs';
+import { Readable } from 'stream';
+
+// Converte worksheet exceljs em array de objetos (chave = cabecalho da
+// primeira linha) - equivalente ao XLSX.utils.sheet_to_json(ws) do SheetJS
+async function readRowsAsObjects(buffer) {
+  const stream = Readable.from(buffer);
+  const workbookReader = new ExcelJS.stream.xlsx.WorkbookReader(stream, {});
+  const allRows = [];
+  for await (const worksheetReader of workbookReader) {
+    for await (const row of worksheetReader) {
+      const vals = (row.values as any[]).slice(1).map((v: any) => {
+        if (v && typeof v === 'object' && !(v instanceof Date)) {
+          if ('result' in v) return (v).result;
+          if ('richText' in v) return (v).richText.map((t) => t.text).join('');
+          if ('text' in v) return (v).text;
+          return String(v);
+        }
+        return v;
+      });
+      allRows[row.number - 1] = vals;
+    }
+    break;
+  }
+  // Detecta a linha real de cabecalho (algumas planilhas LM tem uma linha de
+  // titulo/agencia-conta antes do cabecalho de verdade - procura pela celula 'Data'
+  // entre as 5 primeiras linhas, mesmo padrao usado no parser XLS generico)
+  const normKey = (s) => String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+  let headerRowIdx = 0;
+  for (let i = 0; i < Math.min(allRows.length, 5); i++) {
+    if (allRows[i] && allRows[i].some((v) => normKey(v) === 'data')) {
+      headerRowIdx = i;
+      break;
+    }
+  }
+  const headers = (allRows[headerRowIdx] || []).map((h) => (h != null ? String(h).trim() : ''));
+  const rows = [];
+  for (let i = headerRowIdx + 1; i < allRows.length; i++) {
+    const vals = allRows[i] || [];
+    const obj = {};
+    headers.forEach((h, idx) => {
+      // mantem so a 1a ocorrencia de um nome de coluna duplicado (planilhas LM
+      // as vezes tem uma segunda mini-tabela/legenda mais a direita na mesma linha)
+      if (h && !(h in obj)) obj[h] = vals[idx] ?? undefined;
+    });
+    rows.push(obj);
+  }
+  return rows;
+}
+
+function parseFlexibleDate(v) {
+  if (v === null || v === undefined || v === '') return null;
+  if (v instanceof Date) return isNaN(v.getTime()) ? null : v;
+  if (typeof v === 'number') {
+    // serial Excel: dia 0 = 1899-12-30 (compensa bug do ano bissexto de 1900)
+    const d = new Date(Math.round((v - 25569) * 86400 * 1000));
+    return isNaN(d.getTime()) ? null : d;
+  }
+  const s = String(v).trim();
+  const m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+  if (m) return new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+  const d2 = new Date(s);
+  return isNaN(d2.getTime()) ? null : d2;
+}
+
 export interface ClassifyGroupDto {
   groupKey:    string;
   accountId:   string;
@@ -37,7 +102,7 @@ export class BankImportService {
     fileName:  string,
     userId:    string,
   ) {
-    const parsed = this.parser.parse(buffer, fileName);
+    const parsed = await this.parser.parse(buffer, fileName);
 
     if (parsed.transactions.length === 0) {
       throw new BadRequestException('Nenhuma transação encontrada no arquivo.');
@@ -378,10 +443,7 @@ export class BankImportService {
   }
 
   async previewExcelMapped(companyId: string, buffer: Buffer) {
-    const XLSX = await import('xlsx');
-    const workbook = XLSX.read(buffer, { type: 'buffer', cellDates: true });
-    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-    const rows = XLSX.utils.sheet_to_json<any>(worksheet);
+    const rows = await readRowsAsObjects(buffer);
 
     if (!rows || rows.length === 0) throw new BadRequestException('Planilha vazia.');
 
@@ -451,7 +513,7 @@ export class BankImportService {
 
       lines.push({
         row: i + 2,
-        date: dateRaw instanceof Date ? dateRaw.toISOString().slice(0, 10) : String(dateRaw ?? ''),
+        date: (() => { const _d = parseFlexibleDate(dateRaw); return _d ? _d.toISOString().slice(0, 10) : ''; })(),
         description: String(memoRaw),
         value: Math.abs(valorNum),
         type,
@@ -480,7 +542,6 @@ export class BankImportService {
     fileName:  string,
     userId:    string,
   ) {
-    const XLSX = await import('xlsx');
 
     // ── Mapa Referencia LM -> propertyTag + internal_code ──────────────────
     // ── Mapa Referencia LM -> propertyTag + internal_code ─────────────────
@@ -566,10 +627,7 @@ export class BankImportService {
       // Fallback: retorna a referencia original como tag
       return { propertyTag: referencia, assetId: null };
     };
-    const workbook = XLSX.read(buffer, { type: 'buffer', cellDates: true });
-    const sheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[sheetName];
-    const rows = XLSX.utils.sheet_to_json<any>(worksheet);
+    const rows = await readRowsAsObjects(buffer);
 
     if (!rows || rows.length === 0) {
       throw new BadRequestException('A planilha enviada esta vazia.');
@@ -598,14 +656,8 @@ export class BankImportService {
 
     // ── Detectar periodo real das transacoes ───────────────────────────────
     const dates = rows.map((r: any) => {
-      const rk = Object.fromEntries(Object.entries(r).map(([k,v]) => [k.normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase(), v]));
-      const d = rk['data'];
-      if (!d) return null;
-      if (d instanceof Date) return d;
-      const s = String(d).trim();
-      const m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
-      if (m) return new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
-      return null;
+      const rk = Object.fromEntries(Object.entries(r).map(([k,v]) => [String(k).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase(), v]));
+      return parseFlexibleDate(rk['data']);
     }).filter(Boolean) as Date[];
 
     const periodFrom = dates.length ? new Date(Math.min(...dates.map(d => d.getTime()))) : today;
@@ -683,8 +735,8 @@ export class BankImportService {
         const referenciaRaw = r['referencia'] ?? r['chave'] ?? '';
         const { propertyTag, assetId } = await resolveProperty(String(referenciaRaw));
 
-        const transactionDate = dateRaw instanceof Date ? dateRaw : new Date(dateRaw);
-        if (isNaN(transactionDate.getTime())) throw new Error('Data invalida: ' + dateRaw);
+        const transactionDate = parseFlexibleDate(dateRaw);
+        if (!transactionDate) throw new Error('Data invalida: ' + dateRaw);
 
         // Layout LM: colunas separadas Credito(R$) e Debito(R$)
         let amountNum: number;

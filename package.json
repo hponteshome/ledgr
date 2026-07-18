@@ -34,8 +34,7 @@
     "rxjs": "^7.8.1",
     "sweetalert2": "^11.26.22",
     "sweetalert2-react-content": "^5.1.1",
-    "typeorm": "^0.3.0",
-    "xlsx": "^0.18.5"
+    "typeorm": "^0.3.0"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.0.0",
@@ -62,5 +61,10 @@
     "build": "nest build api",
     "start:dev": "nest start api --watch",
     "dev:fresh": "npm run clean; npm run generate; npm run start:dev"
+  },
+  "overrides": {
+    "exceljs": {
+      "uuid": "^11.1.1"
+    }
   }
 }

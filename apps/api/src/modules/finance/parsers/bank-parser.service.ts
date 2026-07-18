@@ -4,7 +4,8 @@
 // Suporta: Itaú XLS, Bradesco XLS, Banco do Brasil XLS, OFX, CSV
 // ============================================================
 import { Injectable, BadRequestException } from '@nestjs/common';
-import * as XLSX from 'xlsx';
+import * as ExcelJS from 'exceljs';
+import { Readable } from 'stream';
 
 export interface ParsedTransaction {
   transactionDate: Date;
@@ -51,16 +52,22 @@ export function buildGroupKey(norm: string): string {
 }
 
 // ── Parser de data BR (DD/MM/YYYY) ───────────────────────────
+function excelSerialToDate(serial: number): Date {
+  // Epoch do Excel: dia 0 = 1899-12-30 (compensa o bug do ano bissexto de 1900)
+  const utcDays = serial - 25569; // dias entre 1899-12-30 e 1970-01-01 (epoch JS)
+  return new Date(Math.round(utcDays * 86400 * 1000));
+}
+
 function parseDateBR(val: any): Date | null {
   if (!val) return null;
   if (val instanceof Date) return val;
   const s = String(val).trim();
   const m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
   if (m) return new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
-  // Excel serial
+  // Excel serial - fallback; exceljs normalmente ja retorna Date p/ celulas formatadas como data
   if (/^\d+$/.test(s)) {
-    const d = XLSX.SSF.parse_date_code(Number(s));
-    if (d) return new Date(d.y, d.m - 1, d.d);
+    const d = excelSerialToDate(Number(s));
+    if (!isNaN(d.getTime())) return d;
   }
   return null;
 }
@@ -98,11 +105,37 @@ function normalizePropertyTag(ref: string): string | undefined {
   return undefined;
 }
 
+// Converte worksheet exceljs em array-de-arrays, equivalente ao
+// XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' }) do SheetJS
+function normalizeCellValue(v) {
+  if (v && typeof v === 'object' && !(v instanceof Date)) {
+    if ('result' in v) return (v).result;
+    if ('richText' in v) return (v).richText.map((t) => t.text).join('');
+    if ('text' in v) return (v).text;
+    return String(v);
+  }
+  return v ?? '';
+}
+
+async function readRowsAsArrays(buffer) {
+  const stream = Readable.from(buffer);
+  const workbookReader = new ExcelJS.stream.xlsx.WorkbookReader(stream, {});
+  const rows = [];
+  for await (const worksheetReader of workbookReader) {
+    for await (const row of worksheetReader) {
+      rows[row.number - 1] = (row.values as any[]).slice(1).map(normalizeCellValue);
+    }
+    break;
+  }
+  for (let i = 0; i < rows.length; i++) if (!rows[i]) rows[i] = [];
+  return rows;
+}
+
 @Injectable()
 export class BankParserService {
 
   // ── Entry point: detecta formato e delega ──────────────────
-  parse(buffer: Buffer, fileName: string): ParsedStatement {
+  async parse(buffer: Buffer, fileName: string): Promise<ParsedStatement> {
     const ext = fileName.split('.').pop()?.toLowerCase() ?? '';
 
     if (ext === 'ofx' || ext === 'ofc') {
@@ -118,10 +151,8 @@ export class BankParserService {
   }
 
   // ── Parser XLS/XLSX — detecta banco pelo conteúdo ─────────
-  private parseXLS(buffer: Buffer): ParsedStatement {
-    const wb = XLSX.read(buffer, { type: 'buffer', cellDates: false });
-    const ws = wb.Sheets[wb.SheetNames[0]];
-    const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+  private async parseXLS(buffer: Buffer): Promise<ParsedStatement> {
+    const rows: any[][] = await readRowsAsArrays(buffer);
 
     // Detecção do banco pela presença de células-chave
     const flatText = rows.slice(0, 15).map(r => r.join(' ')).join(' ').toUpperCase();
