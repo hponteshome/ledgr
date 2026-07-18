@@ -2338,3 +2338,63 @@ helpContent.ts: 61KB -> 75KB. Cobertura: 38/98 -> 46/98 rotas (~47%). Passou da 
 
 Depois: revisar os 33 artigos ORIGINAIS (pre-sessao) conferindo breadcrumbs internos contra
 os nomes atuais pos-reorg (ex: 'Fiscal' -> 'Fiscal · Operação').
+
+---
+
+## Sessão 17-18/07/2026 (continuação 3) — Planejamento para deploy real de segunda-feira
+
+**Decisão do usuário:** teste de segunda sera com equipe de confianca, MAS quer seguranca
+EFETIVA desde ja (nao adiar), considerando que perfis diferentes e pessoas externas vao usar
+o sistema no futuro. Deploy sera em Docker de producao de verdade, nao npm run dev.
+
+**Descoberta importante — corrige confusao de sessoes anteriores:**
+SERVER02 e 192.168.0.60 SAO A MESMA MAQUINA (nao dois servidores diferentes como o
+contexto antigo sugeria). Nunca foi instalado Ubuntu Server — e Windows. Inventario
+completo rodado hoje (17/07) numa sessao anterior:
+- Windows, IP 192.168.0.60
+- Intel i7-8550U (4 nucleos/8 threads), 15.9GB RAM
+- SSD dedicado mapeado como H: -- 223GB livres, praticamente vazio, PRONTO para uso
+- Docker 27.4.0, Node v24.14.0, npm 9.8.1, Git 2.47.1 -- TODOS JA INSTALADOS
+- Disco D: quase cheio (30GB livres de ~953GB) -- NAO USAR para o projeto
+
+**Isso significa que o setup de infraestrutura e MENOR do que se pensava** -- nao precisa
+instalar SO nem ferramentas base, so configurar Docker Compose de producao e apontar pro
+disco H:.
+
+**ROADMAP para ficar pronto ate segunda-feira -- DUAS FRENTES, sessoes dedicadas:**
+
+### Frente A — Fase C: guards de API reais (PRIORIDADE, decisao explicita do usuario)
+Hoje so ~10 modulos tem SidebarResourceGuard real (Persons, Users, Profiles, Companies +
+6 financeiros de alto risco: Contas a Pagar/Receber, Fundo Fixo, Fechamento Mensal,
+Lancamentos, Patrimonio). Faltam guards reais em:
+- Fiscal (Documentos Fiscais, NFS-e, NF-e, Apuracao, Config Dedutibilidade)
+- Contabilidade (Plano de Contas, Balancete, Relatorios, Visoes Contabeis, Investimentos)
+- Departamento Pessoal (Funcionarios, Folha, Ferias, Banco de Horas, eSocial, etc)
+- Societario, SPED (ECD/ECF/EFD), Arquivo Digital, Patrimonio (Manutencoes)
+- Proxima sessao: mapear TODOS os controllers sem @UseGuards(SidebarResourceGuard),
+  priorizar por sensibilidade de dado, aplicar em lote seguindo o padrao ja usado em
+  PersonsController.
+
+### Frente B — Deploy Docker de producao no SERVER02 (192.168.0.60, disco H:)
+Preparar (pode ser feito em paralelo, nao depende da Frente A):
+1. Dockerfile do backend NestJS (build + run compilado, nao --watch)
+2. Dockerfile do frontend (vite build + Nginx servindo estatico)
+3. docker-compose.prod.yml unindo Postgres + API + Nginx, apontando volumes pro H:
+4. .env.production -- JWT secret, Master Key do backup (system/backup), credenciais DB
+   REAIS diferentes das de dev
+5. CORS no main.ts -- hoje so libera http://localhost:5173, precisa liberar o
+   IP/porta real que os clientes vao acessar na rede (ex: http://192.168.0.60:PORTA)
+6. Processo persistente -- Docker Compose ja resolve isso (restart: always), nao
+   precisa de pm2 separado
+7. Testar de OUTRA maquina na rede (nao o SERVER02 nem o PC de dev) antes de liberar
+   pra equipe -- confirma que CORS/rede/portas realmente funcionam de fora
+
+### Checklist final antes de liberar segunda (rodar do zero, maquina limpa se possivel):
+- [ ] Login funciona de outra maquina na rede
+- [ ] Testar com 2+ perfis diferentes que os guards da Fase C bloqueiam de verdade
+      (nao so escondem o menu -- tentar acessar rota via URL direta)
+- [ ] Backup funciona no ambiente novo (Master Key configurada certo no .env.production)
+- [ ] git status limpo, tudo commitado antes do deploy
+
+**Pendencia menor tambem registrada:** confirmar se o SERVER02 tem antivirus/firewall
+corporativo que pode bloquear as portas do Docker -- nao verificado ainda no inventario.
