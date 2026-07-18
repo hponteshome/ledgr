@@ -2232,3 +2232,59 @@ mode esta ativo corrompe a pasta dist e derruba o processo com MODULE_NOT_FOUND
 ou ENOTEMPTY). Se acontecer de novo: Get-CimInstance Win32_Process -Filter
 "Name='node.exe'" | Select ProcessId,CommandLine para identificar e matar so
 os processos do backend (tsx src/main.ts), preservando o do Vite (frontend).
+
+---
+
+## Sessão 17-18/07/2026 (continuação) — Central de Ajuda: revisão e expansão
+
+**Decisão tomada:** NÃO reescrever do zero. Design do HelpCenter/HelpArticleView mantido
+(aprovado como está - busca, breadcrumb, blocos text/tip/warning/list/steps/table, artigos
+relacionados). Trabalho é 100% de CONTEÚDO: cobertura (33/98 rotas cobertas no início) e
+atualização (contextualHelp referenciava paths e categorias anteriores à reorg de hoje).
+
+**Correção aplicada:** label '/app/arquivo' tinha revertido para 'Acervo' no banco (a
+migração de sidebar desta sessão não persistiu esse campo especificamente) - corrigido
+de volta para 'Arquivos Digitais' via UPDATE direto.
+
+**Metodologia usada (repetir nos próximos lotes):** NUNCA escrever artigo por suposição.
+Sempre pedir o .tsx real da tela (e componentes filhos/hooks se a página for um shell fino,
+como aconteceu com AgendaPage.tsx) antes de escrever, extraindo: campos reais do formulário,
+regras de negocio visíveis no código (validações, avisos, campos obrigatórios condicionais),
+nomes exatos de botões/labels. Isso já rendeu descobertas que uma descrição genérica teria
+errado ou omitido - ex: regra de NF obrigatória em recebimento de Aluguel (Contas a Receber),
+lançamentos travados após Fechar Caixa (Fundo Fixo), 3 fontes de dado diferentes convivendo
+na mesma tela (Fluxo de Caixa: previsto/realizado/bancário).
+
+**Lote 1 CONCLUÍDO — Financeiro (5 artigos novos), commit 92d71ab:**
+- financeiro/fundo-fixo — CRUD + tipos de movimento + fechamento de caixa (irreversível)
+- financeiro/fluxo-caixa — views Tabela/Gráfico/Bancário, aviso sobre divergência de fontes
+- financeiro/contas-a-receber — ciclo de status + regra NF obrigatória p/ Aluguel + aging
+- financeiro/agenda — 6 tipos de evento, cores sugeridas, recorrência (só na criação)
+- financeiro/provisoes — modelo Config->Lançamentos, PIS/COFINS/CSLL/IRPJ, status
+
+helpContent.ts: 49KB -> 61KB. Cobertura: 33/98 -> 38/98 rotas (~39%).
+
+**PENDENTE — próximos lotes, em ordem de prioridade (ver mapeamento completo da sessão):**
+1. 🔴 Sistema/Segurança (8 artigos): Permissões de Menu, Backup e Restauração, Usuários
+   (revisar o existente), Auditoria, Manutenção de Dados, Parâmetros Globais, Calendário
+   de Feriados, Indicadores Econômicos, Tabelas Legais.
+2. 🟡 Arquivo Digital (16 sub-rotas: Societário/Contábil/Fiscal/RH · Arquivo) - hoje só tem
+   1 artigo genérico de introdução para o grupo inteiro.
+3. 🟡 Fiscal · Operação (4): Config. Dedutibilidade, NFS-e Nacional, Importar CSV PMSP,
+   Notas Fiscais (grupo pai de NFS-e SP/Nacional/CSV/NFe).
+4. 🟡 Departamento Pessoal (9): Férias, Banco de Horas, 13º Salário, DHO, RAIS, DCTFWeb,
+   Informe de Rendimentos, Recessos & Pontes, Folha (revisar o existente). Nota: artigo
+   'dp/rescisao' existe no helpContent mas a rota correspondente não existe mais no
+   catálogo atual - provavelmente removida; decidir se apaga o artigo ou recria a rota.
+5. 🟢 Contabilidade (5): Comparativo de Saldos, Visões Contábeis, Investimentos/Renda
+   Fixa/Simulador, Importação de Lançamentos, Importação de Plano de Contas.
+6. 🟡 SPED & Entregas (3): ECF, ECD Histórico, Obrigações Fiscais (rota real
+   /app/sistema/obrigacoes ainda não mapeada - contextualHelp aponta só para
+   /app/sistema/obrigacoes -> sped/obrigacoes, conferir se bate).
+7. 🟢 Societário · Operação, Patrimônio, Cadastros (4): Livros/Acionistas, Manutenções
+   (já existe, revisar), Empresas, Pessoas Físicas.
+
+Depois de cobrir as 98 rotas: revisar os 33 artigos ORIGINAIS (pré-sessão) um a um,
+conferindo se os breadcrumbs internos ('Acesse Financeiro -> X') ainda batem com os nomes
+atuais das macro-categorias/módulos pós-reorg de hoje (ex: 'Fiscal' agora é
+'Fiscal · Operação' no menu).
