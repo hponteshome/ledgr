@@ -2288,3 +2288,53 @@ Depois de cobrir as 98 rotas: revisar os 33 artigos ORIGINAIS (pré-sessão) um 
 conferindo se os breadcrumbs internos ('Acesse Financeiro -> X') ainda batem com os nomes
 atuais das macro-categorias/módulos pós-reorg de hoje (ex: 'Fiscal' agora é
 'Fiscal · Operação' no menu).
+
+---
+
+## Sessão 17-18/07/2026 (continuação 2) — Central de Ajuda: lote Sistema/Segurança CONCLUÍDO
+
+**Lote 2 concluído, commit 9eec579 — 8 artigos (7 novos + 1 revisado):**
+- administracao/permissoes-menu (NOVO) — 4 niveis cumulativos, cascata em subarvore, override
+  usuario > perfil, checkbox de coluna sobrescreve tudo (nao e fill-only-blanks, e full overwrite -
+  conferir se documentacao antiga da Fase B mencionava comportamento diferente, codigo atual manda).
+- administracao/backup (NOVO) — Master Key e config de servidor (.env), nao senha de usuario;
+  restauracao e destrutiva/irreversivel.
+- administracao/usuarios (REESCRITO) — artigo antigo estava errado (falava em convite por email,
+  que nao existe). Real: senha digitada direto, CPF/CNPJ com lookup automatico em Person/User
+  existente, Janela de Acesso (dias/horario por usuario, override do perfil), Status
+  Ativo/Inativo/Bloqueado != Excluir (hard delete real).
+- administracao/manutencao-dados (NOVO) — export/import por tabela em TXT (;), Upsert por ID,
+  ordem de dependencia obrigatoria (Perfis->Empresas->Pessoas->Usuarios->Vinculos).
+- parametros/calendario (NOVO) — sugestao automatica de pontes (ter/qui adjacentes), confirmar
+  ponte cria Recesso real que afeta todos funcionarios (nao e so visual).
+- parametros/indicadores (NOVO) — Selic/IPCA/IGP-M/IGP-DI/INPC/TR/CDI, atualizacao 100% manual
+  (sistema nao busca fonte oficial sozinho), aceita import em lote TSV/CSV.
+- parametros/tabelas-legais (NOVO) — IRPF/INSS/Salario Minimo por ano, deducao INSS calculada
+  automaticamente (nao digitar), redutor Lei 15.270/2025 opcional, simulador embutido na aba IRPF.
+
+**Novo grupo criado no indice (helpSections):** 'Parâmetros Globais', espelhando a reorg de
+sidebar desta sessao (Calendario/Indicadores/Tabelas Legais agora sao filhos desse container).
+
+helpContent.ts: 61KB -> 75KB. Cobertura: 38/98 -> 46/98 rotas (~47%). Passou da metade.
+
+**Ambiguidades resolvidas nesta rodada (documentar para nao repetir a busca):**
+- Auditoria: arquivo real e pages/admin/AuditPage.tsx (rota /app/administracao/auditoria e
+  tambem /app/audit) - pages/audit/Audit.tsx e AuditLogs.tsx NAO sao os usados nessa rota.
+- Manutencao de Dados: componente chama-se TableManager.tsx (nao "DataManagement").
+- Parametros Globais (a rota /app/sistema/parametros em si) NAO tem tela propria - e so um
+  container organizacional no menu, sem artigo de ajuda dedicado (correto, nao e bug).
+
+**PENDENTE — próximos lotes (ordem de prioridade, ver sessão anterior para lista completa):**
+1. 🟡 Arquivo Digital (16 sub-rotas) - so tem 1 artigo generico de introducao hoje.
+2. 🟡 Fiscal · Operação (4): Config. Dedutibilidade, NFS-e Nacional, Importar CSV PMSP, Notas Fiscais.
+3. 🟡 Departamento Pessoal (9): Ferias, Banco de Horas, 13o, DHO, RAIS, DCTFWeb, Informe de
+   Rendimentos, Recessos & Pontes, Folha (revisar existente). Artigo orfao 'dp/rescisao' ainda
+   sem decisao (rota nao existe mais no catalogo atual).
+4. 🟢 Contabilidade (5): Comparativo de Saldos, Visoes Contabeis, Investimentos/Renda
+   Fixa/Simulador, Importacao de Lancamentos, Importacao de Plano de Contas.
+5. 🟡 SPED & Entregas (3): ECF, ECD Historico, Obrigacoes Fiscais.
+6. 🟢 Societario · Operacao, Patrimonio, Cadastros (4): Livros/Acionistas, Manutencoes
+   (revisar existente), Empresas, Pessoas Fisicas.
+
+Depois: revisar os 33 artigos ORIGINAIS (pre-sessao) conferindo breadcrumbs internos contra
+os nomes atuais pos-reorg (ex: 'Fiscal' -> 'Fiscal · Operação').
