@@ -236,6 +236,154 @@ export const helpContent: Record<string, HelpArticle> = {
     related: ['financeiro/contas-a-pagar', 'financeiro/fechamento-mensal'],
   },
 
+  'financeiro/fundo-fixo': {
+    title: 'Fundo Fixo / Caixa Pequeno',
+    section: 'Financeiro',
+    intro: 'O Fundo Fixo controla um caixa pequeno para despesas do dia a dia (material de escritorio, correios, taxas), com saldo alvo, alerta de reposicao e fechamento contabil periodico.',
+    content: [
+      { type: 'text', text: 'Cada fundo tem um saldo alvo (o valor que ele deveria ter cheio) e um limite de alerta (abaixo do qual o sistema avisa que e hora de repor). O saldo atual e sempre: saldo alvo menos despesas registradas mais reposicoes, descontado o que ja foi fechado.' },
+      { type: 'list', items: [
+        'Despesa - registra uma saida do caixa (material, transporte, etc.), sempre associada a uma categoria.',
+        'Reposicao - registra a entrada de dinheiro que recompoe o fundo ate o saldo alvo.',
+        'Abertura - lancamento inicial automatico quando o fundo e criado; nao pode ser editado nem excluido.',
+      ]},
+      { type: 'steps', items: [
+        'Crie o fundo em "+ Novo Fundo": defina nome, saldo alvo e o limite de alerta.',
+        'Registre despesas conforme elas acontecem, em "- Registrar Despesa" - categoria, valor, descricao e, se quiser, o comprovante e o fornecedor.',
+        'Quando o saldo cair perto do limite (a barra fica amarela ou vermelha), use "+ Repor Fundo" para lancar a reposicao.',
+        'Periodicamente, use "Fechar Caixa" para revisar todas as despesas do periodo, associar cada uma a uma conta contabil e gerar o lancamento contabil automaticamente.',
+      ]},
+      { type: 'warning', text: 'Depois que o caixa e fechado, as despesas daquele periodo ficam marcadas com um cadeado e nao podem mais ser editadas nem excluidas - e um lancamento contabil ja gerado. Se precisar corrigir algo, sera necessario lancar um novo movimento de ajuste.' },
+      { type: 'tip', text: 'Ao fechar o caixa, marque "Salvar como conta padrao para cada categoria" - da proxima vez, o sistema ja sugere a conta contabil certa para cada categoria de despesa, agilizando o fechamento seguinte.' },
+      { type: 'table', headers: ['Cor da barra', 'Significado'], rows: [
+        ['Verde', 'Saldo acima de 40% do alvo - situacao normal'],
+        ['Amarelo', 'Saldo entre 20% e 40% do alvo - considere repor em breve'],
+        ['Vermelho', 'Saldo abaixo de 20% do alvo - reposicao recomendada'],
+      ]},
+    ],
+    related: ['financeiro/fechamento-mensal', 'financeiro/contas-a-pagar'],
+  },
+
+  'financeiro/fluxo-caixa': {
+    title: 'Fluxo de Caixa Gerencial',
+    section: 'Financeiro',
+    intro: 'O Fluxo de Caixa Gerencial mostra a entrada e saida de dinheiro mes a mes, comparando o que estava previsto (Contas a Pagar e Receber) com o que realmente aconteceu, alem do saldo bancario real importado dos extratos.',
+    content: [
+      { type: 'text', text: '"Previsto" sao os valores agendados em Contas a Pagar e Contas a Receber - o que deveria acontecer. "Realizado" sao os valores efetivamente pagos ou recebidos. A coluna Acumulado soma o saldo realizado de todos os meses anteriores, mostrando a evolucao do caixa ao longo do tempo.' },
+      { type: 'list', items: [
+        'Tabela - visao mensal detalhada com todos os valores previstos, realizados e o acumulado.',
+        'Grafico - barras comparando previsto x realizado de receitas e despesas, mes a mes.',
+        'Bancario - movimentacao real da conta bancaria, vinda dos extratos importados (nao das contas a pagar/receber).',
+      ]},
+      { type: 'steps', items: [
+        'Defina o periodo em "De" e "Ate" (mes e ano).',
+        'Para empresas de locacao, selecione um imovel especifico no filtro "Imovel" para ver o fluxo de caixa apenas daquele bem.',
+        'Alterne entre Tabela, Grafico e Bancario conforme a analise desejada.',
+      ]},
+      { type: 'warning', text: 'A aba "Bancario" usa dados dos extratos bancarios importados (Importacao Bancaria), nao das Contas a Pagar/Receber - por isso os valores podem divergir da aba "Tabela" se houver movimentacoes na conta que nao passaram por contas a pagar/receber, ou extratos ainda nao importados para o periodo.' },
+      { type: 'tip', text: 'O filtro de "Imovel" so lista bens do grupo Imoveis (Patrimonio) que estao ativos - util para administradoras que querem separar o fluxo de caixa de um imovel especifico do consolidado da empresa.' },
+    ],
+    related: ['financeiro/importacao-bancaria', 'financeiro/contas-a-pagar'],
+  },
+
+  'financeiro/contas-a-receber': {
+    title: 'Contas a Receber',
+    section: 'Financeiro',
+    intro: 'Contas a Receber controla os titulos a receber da empresa (alugueis, honorarios, vendas), do lancamento ate a baixa, com acompanhamento de inadimplencia por faixa de atraso (aging).',
+    content: [
+      { type: 'text', text: 'Cada titulo passa por um ciclo: Aberto (aguardando vencimento ou pagamento) - Parcial (recebeu parte do valor) - Recebido (baixa total) ou Vencido (passou do vencimento sem baixa). Titulos tambem podem ser Cancelados quando nao serao mais cobrados.' },
+      { type: 'list', items: [
+        'Manual - lancado diretamente pelo usuario, sem vinculo com outro documento.',
+        'NF - gerado a partir de uma nota fiscal emitida.',
+        'Aluguel - receita de locacao de imovel, vinculada a um Ativo Imobilizado (Patrimonio).',
+        'Recorrente - gerado automaticamente por uma Provisao Recorrente.',
+      ]},
+      { type: 'steps', items: [
+        'Clique em "+ Nova Conta": preencha titulo, origem, vencimento, valor e, se aplicavel, o locatario/cliente e o imovel vinculado.',
+        'Quando o pagamento acontecer, clique em "Baixar" na linha do titulo.',
+        'Informe o valor recebido, a data, a forma de pagamento e, opcionalmente, uma conta contabil para gerar o lancamento contabil automaticamente.',
+        'Confirme - o titulo passa para Parcial (se o valor for menor que o total) ou Recebido (se for o valor completo).',
+      ]},
+      { type: 'warning', text: 'Para titulos de origem "Aluguel", o numero da Nota Fiscal e obrigatorio no momento da baixa - locacao de imoveis exige emissao de NF por lei, e o sistema nao permite registrar o recebimento sem esse numero.' },
+      { type: 'table', headers: ['Status', 'Significado'], rows: [
+        ['Aberto', 'Aguardando vencimento ou pagamento'],
+        ['Parcial', 'Recebeu parte do valor - falta uma diferenca'],
+        ['Recebido', 'Baixa total - valor completo recebido'],
+        ['Vencido', 'Passou da data de vencimento sem baixa'],
+        ['Cancelado', 'Titulo cancelado, nao sera mais cobrado'],
+      ]},
+      { type: 'tip', text: 'A aba "Aging" mostra o total em aberto agrupado por faixa de atraso (a vencer, 1-30, 31-60, 61-90, 90+ dias) - util para identificar rapidamente a inadimplencia mais critica.' },
+    ],
+    related: ['financeiro/fechamento-mensal', 'financeiro/importacao-bancaria'],
+  },
+
+  'financeiro/agenda': {
+    title: 'Agenda Financeira',
+    section: 'Financeiro',
+    intro: 'A Agenda Financeira e um calendario de compromissos e vencimentos - pagamentos, obrigacoes fiscais, fechamentos, reunioes e lembretes - com post-its coloridos por tipo.',
+    content: [
+      { type: 'list', items: [
+        'Pagamento - contas e boletos a pagar',
+        'Obrigacao Fiscal - impostos e declaracoes com prazo',
+        'Fechamento - datas de fechamento contabil/financeiro',
+        'Reuniao - compromissos com terceiros',
+        'Lembrete - avisos gerais',
+        'Outro - qualquer outro compromisso',
+      ]},
+      { type: 'text', text: 'Alguns eventos sao gerados automaticamente pelo sistema a partir de documentos fiscais (NF-e, NFS-e). Esses eventos aparecem marcados como gerados automaticamente e nao podem ser excluidos manualmente, pois estao vinculados ao documento de origem.' },
+      { type: 'steps', items: [
+        'Clique em um dia do calendario, ou no botao de novo evento, para criar um compromisso.',
+        'Escolha o tipo - a cor do post-it e sugerida automaticamente, mas pode ser trocada.',
+        'Preencha titulo, data de vencimento e, se quiser, um valor.',
+        'Para compromissos que se repetem, marque "Evento recorrente" e escolha semanal, mensal ou anual - o sistema gera a serie inteira de uma vez.',
+        'Quando o evento for cumprido, abra-o e marque "Marcar como pago / liquidado", ou use o atalho no painel lateral de proximos eventos.',
+      ]},
+      { type: 'table', headers: ['Cor', 'Uso sugerido'], rows: [
+        ['Amarelo', 'NF-e / NFS-e'],
+        ['Azul', 'Pagamentos fixos'],
+        ['Verde', 'Fiscal / Impostos'],
+        ['Vermelho', 'Urgente / Vencido'],
+        ['Laranja', 'Contas de consumo'],
+        ['Roxo', 'Reunioes / Avisos'],
+      ]},
+      { type: 'tip', text: 'A opcao de marcar como recorrente so aparece na criacao de um evento novo - eventos ja existentes nao podem virar recorrentes depois. Nesse caso, exclua e recrie como recorrente.' },
+    ],
+    related: ['financeiro/contas-a-pagar', 'financeiro/fechamento-mensal'],
+  },
+
+  'financeiro/provisoes': {
+    title: 'Provisões Recorrentes',
+    section: 'Financeiro',
+    intro: 'Provisoes Recorrentes automatiza o lancamento de despesas fixas e periodicas (aluguel, condominio, honorarios, energia) - configura uma vez e gera os lancamentos mes a mes, com controle de NF e credito de PIS/COFINS quando aplicavel.',
+    content: [
+      { type: 'text', text: 'O modulo funciona em duas etapas: primeiro voce cadastra a Configuracao (a regra recorrente - descricao, valor, periodicidade, conta contabil), depois usa "Gerar lancamentos" informando a competencia (mes/ano) para criar os lancamentos daquele mes a partir de todas as configuracoes ativas.' },
+      { type: 'steps', items: [
+        'Na aba Configuracoes, clique em "+ Nova provisao" e preencha descricao, tipo, periodicidade, valor e dia de vencimento.',
+        'Informe a competencia inicial (e final, se a provisao tiver prazo definido - deixe vazio para indeterminado).',
+        'Selecione a Conta Despesa (debito) e a Conta Passivo (credito) para o lancamento contabil.',
+        'Na aba Lancamentos, escolha a competencia e clique em "Gerar lancamentos" - o sistema cria um lancamento para cada provisao ativa naquele mes.',
+        'Se a provisao exige NF, use "Conferir NF" para registrar o numero (e a chave de acesso, se tiver) quando a nota chegar.',
+      ]},
+      { type: 'list', items: [
+        'Exigir NF para conferencia - o lancamento fica pendente ate a nota fiscal ser conferida.',
+        'Dedutivel (LALUR) - marca a despesa como dedutivel na apuracao do IRPJ/CSLL.',
+        'Gerar Lancamento Contabil - cria automaticamente o lancamento no Diario ao gerar a competencia.',
+        'Gerar Agenda Financeira - cria um evento na Agenda Financeira com o vencimento.',
+        'Credita PIS/COFINS - para regime nao-cumulativo, calcula e credita PIS/COFINS/CSLL/IRPJ sobre o valor, exigindo as contas de "a recuperar" de cada tributo.',
+      ]},
+      { type: 'table', headers: ['Status', 'Significado'], rows: [
+        ['Provisionado', 'Lancamento gerado, aguardando NF ou pagamento'],
+        ['NF Pendente', 'Provisao exige NF e ela ainda nao foi conferida'],
+        ['NF Conferida', 'Nota fiscal ja registrada e conferida'],
+        ['Pago', 'Pagamento efetuado'],
+        ['Cancelado', 'Lancamento cancelado, nao sera pago'],
+      ]},
+      { type: 'tip', text: 'Ao informar o CPF/CNPJ do favorecido, o sistema busca automaticamente o cadastro existente. Se nao encontrar, oferece um atalho para cadastrar a pessoa ou empresa sem perder o que ja foi preenchido no formulario.' },
+      { type: 'warning', text: '"Excluir" uma configuracao na verdade a inativa, nao apaga o historico - lancamentos ja gerados continuam existindo e visiveis na aba Lancamentos mesmo depois que a configuracao for inativada.' },
+    ],
+    related: ['financeiro/fechamento-mensal', 'financeiro/contas-a-pagar'],
+  },
+
   // ── FISCAL ─────────────────────────────────────────────────────────────────
 
   'fiscal/nfse-sp': {
@@ -739,6 +887,11 @@ export const contextualHelp: Record<string, string> = {
   '/app/finance/accounts-payable':         'financeiro/contas-a-pagar',
   '/app/finance/fechamento':               'financeiro/fechamento-mensal',
   '/app/finance/bank-import':              'financeiro/importacao-bancaria',
+  '/app/finance/petty-cash':                'financeiro/fundo-fixo',
+  '/app/finance/fluxo-caixa':               'financeiro/fluxo-caixa',
+  '/app/finance/contas-receber':            'financeiro/contas-a-receber',
+  '/app/finance/agenda':                    'financeiro/agenda',
+  '/app/finance/provisoes':                 'financeiro/provisoes',
   '/app/fiscal/nfse-sp':                   'fiscal/nfse-sp',
   '/app/fiscal/nfse-sp-emissao':           'fiscal/nfse-sp',
   '/app/fiscal/nfe':                       'fiscal/nfe',
@@ -791,6 +944,11 @@ export const helpSections = [
       { slug: 'financeiro/contas-a-pagar',      title: 'Contas a Pagar' },
       { slug: 'financeiro/fechamento-mensal',   title: 'Fechamento Mensal' },
       { slug: 'financeiro/importacao-bancaria', title: 'Importação Bancária' },
+      { slug: 'financeiro/fundo-fixo',           title: 'Fundo Fixo / Caixa Pequeno' },
+      { slug: 'financeiro/fluxo-caixa',          title: 'Fluxo de Caixa Gerencial' },
+      { slug: 'financeiro/contas-a-receber',     title: 'Contas a Receber' },
+      { slug: 'financeiro/agenda',               title: 'Agenda Financeira' },
+      { slug: 'financeiro/provisoes',            title: 'Provisões Recorrentes' },
     ],
   },
   {
