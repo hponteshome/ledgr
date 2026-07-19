@@ -461,6 +461,70 @@ export const helpContent: Record<string, HelpArticle> = {
     related: ['fiscal/documentos-fiscais'],
   },
 
+  'fiscal/lalur-config': {
+    title: 'Configuração de Dedutibilidade',
+    section: 'Fiscal',
+    intro: 'Configuração de Dedutibilidade classifica contas do Plano de Contas quanto à dedutibilidade fiscal para fins de LALUR/LACS - usado por empresas no regime Lucro Real para gerar automaticamente sugestões de ajuste (adições e exclusões) na apuração do IRPJ/CSLL.',
+    content: [
+      { type: 'text', text: 'Toda conta analítica de despesa (ou receita/ativo, conforme o filtro escolhido) pode ser marcada como Dedutível (100%, o padrão - não precisa configurar), Parcialmente Dedutível (informando o percentual dedutível) ou Não Dedutível. Cada configuração também define o tipo de ajuste no LALUR: Adição (soma ao lucro tributável) ou Exclusão (subtrai).' },
+      { type: 'steps', items: [
+        'Filtre pelo tipo de conta (Despesas, Receitas ou Ativo) e busque por código ou nome.',
+        'Clique em "Configurar" na conta desejada.',
+        'Escolha a classificação de dedutibilidade. Se for parcial, informe o percentual dedutível.',
+        'Escolha o tipo de ajuste LALUR (Adição ou Exclusão) e, opcionalmente, uma descrição padrão que será usada automaticamente nos ajustes gerados.',
+        'Clique em Salvar - a conta passa a aparecer na lista de "Contas Configuradas" no topo da tela.',
+      ]},
+      { type: 'warning', text: 'Essa configuração só tem efeito para empresas no regime Lucro Real - é usada para sugerir automaticamente os ajustes de adição/exclusão na apuração do IRPJ/CSLL (LALUR/LACS). Empresas no Lucro Presumido ou Simples Nacional não usam essa tela.' },
+      { type: 'tip', text: 'Só é preciso configurar as contas que são total ou parcialmente NÃO dedutíveis - contas dedutíveis normalmente (100%) não precisam de nenhuma configuração especial.' },
+    ],
+    related: ['fiscal/apuracao', 'sped/ecd'],
+  },
+
+  'fiscal/nfse-nacional': {
+    title: 'NFS-e Nacional — Emissor RFB',
+    section: 'Fiscal',
+    intro: 'NFS-e Nacional emite notas fiscais de serviço diretamente pela API da Receita Federal, incluindo o novo regime de locação de imóveis da Reforma Tributária (IBS/CBS). Obrigatório para Simples Nacional a partir de 01/09/2026.',
+    content: [
+      { type: 'text', text: 'Para emitir, é necessário ter um certificado digital A1 já cadastrado no sistema e escolher o ambiente: Homologação (testes) ou Produção.' },
+      { type: 'warning', text: 'Notas emitidas em ambiente de Homologação NÃO têm validade fiscal - servem só para testar o fluxo. Só mude para Produção quando estiver tudo validado.' },
+      { type: 'text', text: 'Locação de imóveis segue uma regra diferente, criada pela Reforma Tributária (NT 007/2026): incide IBS e CBS, NÃO incide ISS, e a base de cálculo tem um redutor de 70% (paga-se sobre 30% do valor). Para esses códigos é obrigatório informar o CIB (Cadastro Imobiliário Brasileiro) e a Inscrição Imobiliária do tomador. As alíquotas de 2026 são simbólicas/de teste (IBS 0,1% + CBS 0,9%); a obrigatoriedade plena entra em 2027.' },
+      { type: 'steps', items: [
+        'Selecione o certificado digital e o ambiente.',
+        'Preencha os dados do tomador (CNPJ/CPF, nome, e-mail).',
+        'Escolha o código de serviço (LC 116) - os códigos de Locação ficam num grupo separado, com o aviso da Reforma Tributária.',
+        'Descreva o serviço e informe o valor - o sistema calcula automaticamente ISS ou IBS/CBS (conforme o código escolhido) e mostra o preview antes de emitir.',
+        'Confirme a emissão. Se autorizada, o número e a chave da NFS-e aparecem na hora; se ficar pendente, acompanhe pela aba Histórico.',
+      ]},
+      { type: 'table', headers: ['Status', 'Significado'], rows: [
+        ['Rascunho', 'Nota criada, ainda não enviada'],
+        ['Assinada', 'Assinada digitalmente, aguardando autorização da Receita'],
+        ['Autorizada', 'Nota válida, número e chave definitivos'],
+        ['Rejeitada', 'A Receita recusou - confira o motivo e reenvie após corrigir'],
+        ['Cancelada', 'Nota cancelada (exige motivo informado no momento do cancelamento)'],
+      ]},
+      { type: 'tip', text: 'Notas Rejeitadas ou já Assinadas podem ser reenviadas pelo botão correspondente no Histórico; notas já Autorizadas só podem ser Canceladas (nunca editadas), informando o motivo do cancelamento.' },
+    ],
+    related: ['fiscal/nfse-sp', 'fiscal/documentos-fiscais'],
+  },
+
+  'fiscal/nfse-sp-csv': {
+    title: 'Importação NFS-e SP — CSV PMSP',
+    section: 'Fiscal',
+    intro: 'Importa em lote as NFS-e emitidas ou recebidas exportadas pelo portal da Prefeitura de São Paulo (nfe.prefeitura.sp.gov.br), gerando automaticamente os lançamentos contábeis e financeiros vinculados.',
+    content: [
+      { type: 'steps', items: [
+        'No portal nfe.prefeitura.sp.gov.br, exporte o CSV de NFS-e Emitidas ou Recebidas do período desejado.',
+        'Arraste o arquivo (ou clique para selecionar) e clique em "Validar CSV".',
+        'O sistema mostra um preview: quantas notas vão ser importadas, quantas já existem (duplicatas) e quantas estão canceladas - use os filtros para revisar cada grupo antes de confirmar.',
+        'Clique em "Importar" - notas duplicadas e canceladas são automaticamente ignoradas, só as válidas entram no sistema.',
+      ]},
+      { type: 'text', text: 'Cada nota importada é classificada como PRESTADOR (a empresa emitiu a nota, é receita) ou TOMADOR (a empresa recebeu o serviço, é despesa) - o sistema detecta automaticamente pelo CNPJ.' },
+      { type: 'warning', text: 'Excluir um lote de importação remove não só as notas, mas também todos os lançamentos contábeis, contas a pagar/receber e eventos de agenda financeira gerados a partir dele - é uma exclusão em cascata, use com cuidado.' },
+      { type: 'tip', text: 'O histórico de "Importações anteriores" mostra todos os lotes já importados, com totais de notas, valor e ISS - útil para conferir rapidamente se um período já foi importado antes de repetir.' },
+    ],
+    related: ['fiscal/nfse-sp', 'fiscal/documentos-fiscais'],
+  },
+
   // ── DEPARTAMENTO PESSOAL ───────────────────────────────────────────────────
 
   'dp/funcionarios': {
@@ -1033,6 +1097,9 @@ export const contextualHelp: Record<string, string> = {
   '/app/fiscal/nfe':                       'fiscal/nfe',
   '/app/fiscal/documentos-fiscais':        'fiscal/documentos-fiscais',
   '/app/fiscal/apuracao':                  'fiscal/apuracao',
+  '/app/fiscal/lalur-config':               'fiscal/lalur-config',
+  '/app/fiscal/nfse-nacional':              'fiscal/nfse-nacional',
+  '/app/fiscal/nfse-sp-csv':                'fiscal/nfse-sp-csv',
   '/app/hr/employees':                     'dp/funcionarios',
   '/app/hr/pro-labore':                    'dp/pro-labore',
   '/app/hr/esocial':                       'dp/esocial',
@@ -1124,6 +1191,9 @@ export const helpSections = [
       { slug: 'fiscal/nfe',               title: 'NF-e (Produtos)' },
       { slug: 'fiscal/documentos-fiscais', title: 'Documentos Fiscais' },
       { slug: 'fiscal/apuracao',          title: 'Apuração de Impostos' },
+      { slug: 'fiscal/lalur-config',       title: 'Configuração de Dedutibilidade' },
+      { slug: 'fiscal/nfse-nacional',      title: 'NFS-e Nacional' },
+      { slug: 'fiscal/nfse-sp-csv',        title: 'Importação CSV PMSP' },
     ],
   },
   {
