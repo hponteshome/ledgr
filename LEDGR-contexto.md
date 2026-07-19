@@ -2398,3 +2398,30 @@ Preparar (pode ser feito em paralelo, nao depende da Frente A):
 
 **Pendencia menor tambem registrada:** confirmar se o SERVER02 tem antivirus/firewall
 corporativo que pode bloquear as portas do Docker -- nao verificado ainda no inventario.
+
+---
+
+## Achado 18/07/2026 — Discrepância entre rotas registradas e catálogo sidebar_items (Arquivo Digital)
+
+Ao mapear o lote de ajuda do Arquivo Digital, outes/index.tsx tem paths que NÃO batem
+com os paths do catálogo sidebar_items no banco:
+
+- Rotas reais em outes/index.tsx: /app/arquivo/livros, /app/arquivo/livros/acoes,
+  /app/arquivo/livros/transferencias, /app/arquivo/livros/atas-ago,
+  /app/arquivo/livros/atas-age, /app/arquivo/livros/presenca, /app/arquivo/fiscal/nf
+- Paths no catálogo sidebar_items (o que aparece no MENU): /app/arquivo/societario/livros,
+  /app/arquivo/societario/livros/acionistas (não /app/arquivo/livros/acoes), e não existe
+  nenhum item de menu apontando para /app/arquivo/fiscal/nf.
+
+**Hipóteses (não investigado a fundo ainda):**
+1. Rotas órfãs em outes/index.tsx — sobraram de uma reorg anterior e nunca foram
+   removidas (a página existe mas nenhum link de menu leva até ela).
+2. Ou o catálogo sidebar_items está desatualizado e deveria ter itens de menu apontando
+   pra essas rotas que hoje só são acessíveis digitando a URL direto.
+3. /app/arquivo/fiscal/nf pode ser resquício de uma prateleira que foi renomeada/removida
+   (o SHELF_CONFIG do RepositorioPage.tsx não tem entrada para 'fiscal/nf' especificamente,
+   cairia no fallback genérico 'Arquivo').
+
+**Ação:** não corrigido nesta sessão (fora de escopo da tarefa de ajuda). Registrar para
+sessão futura de limpeza de rotas — decidir se remove as rotas órfãs ou adiciona os itens
+de menu faltantes, e confirmar family do path /app/arquivo/fiscal/nf antes de decidir.
