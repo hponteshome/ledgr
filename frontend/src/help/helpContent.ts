@@ -600,6 +600,157 @@ export const helpContent: Record<string, HelpArticle> = {
     related: ['dp/funcionarios', 'dp/rescisao'],
   },
 
+  'dp/banco-horas': {
+    title: 'Banco de Horas',
+    section: 'Departamento Pessoal',
+    intro: 'Banco de Horas mostra a visão consolidada do saldo de horas extras de cada funcionário, com alerta quando o saldo se aproxima do limite configurado.',
+    content: [
+      { type: 'text', text: 'O saldo é sempre acumulado: positivo significa que o funcionário tem horas extras a compensar ou receber; negativo significa que ele deve horas à empresa. O "Limite" é o teto configurado para aquele funcionário - ao se aproximar dele, a linha fica marcada como "Próximo do limite".' },
+      { type: 'text', text: 'Esta tela é só uma visão consolidada, somente leitura. Para lançar horas, corrigir um saldo ou ver o histórico detalhado de um funcionário específico, clique em "Ver detalhe" na linha correspondente.' },
+      { type: 'tip', text: 'Use a busca para localizar rapidamente um funcionário específico numa lista longa.' },
+    ],
+    related: ['dp/funcionarios'],
+  },
+
+  'dp/ferias': {
+    title: 'Gestão de Férias',
+    section: 'Departamento Pessoal',
+    intro: 'Gestão de Férias controla os períodos aquisitivos de cada funcionário, o agendamento de férias (em até 3 parcelas) e gera automaticamente o aviso e o recibo de férias.',
+    content: [
+      { type: 'text', text: 'Cada funcionário tem "períodos aquisitivos" - ciclos anuais de 12 meses que dão direito a 30 dias de férias. Se ainda não existir nenhum período cadastrado, clique em "Inicializar Períodos" para o sistema criar automaticamente a partir da data de admissão.' },
+      { type: 'list', items: [
+        'Aberto / Disponível - período aquisitivo formado, férias podem ser agendadas',
+        'Programado - já tem férias agendadas, mas ainda com saldo de dias',
+        'Vencido - passou do prazo concessivo sem férias gozadas',
+        'Gozado - todos os dias do período já foram usados',
+      ]},
+      { type: 'steps', items: [
+        'Selecione o funcionário na lista.',
+        'Clique em "+ Agendar Férias" (só fica ativo se houver período com saldo disponível).',
+        'Escolha o período aquisitivo e a parcela (as férias podem ser divididas em até 3 períodos no ano).',
+        'Informe os dias de férias, o abono pecuniário (venda de até 10 dias, opcional) e as datas de início e fim.',
+        'Confira a prévia do cálculo (férias + 1/3 constitucional + abono, com desconto de INSS/IRRF) e confirme.',
+        'Baixe o Aviso de Férias e o Recibo em PDF diretamente na linha da programação.',
+      ]},
+      { type: 'warning', text: 'Um período aquisitivo tem prazo concessivo de 12 meses para ser usado após ser formado - se vencer sem férias agendadas, o status muda para "Vencido", o que gera obrigação de pagamento em dobro por lei. Fique atento à coluna "Concessivo até".' },
+      { type: 'tip', text: 'O número de dependentes informado no agendamento afeta o cálculo do IRRF sobre as férias - confira se está correto antes de confirmar.' },
+    ],
+    related: ['dp/funcionarios', 'dp/pro-labore'],
+  },
+
+  'dp/decimo-terceiro': {
+    title: '13º Salário',
+    section: 'Departamento Pessoal',
+    intro: '13º Salário calcula automaticamente o décimo terceiro de todos os funcionários do ano, controla o pagamento das duas parcelas e gera os recibos em PDF.',
+    content: [
+      { type: 'text', text: 'O cálculo é feito de uma vez para todos os funcionários do ano selecionado, proporcional aos meses trabalhados (X/12). Recalcular substitui os valores anteriores daquele ano - use com cuidado se já houver parcelas pagas.' },
+      { type: 'text', text: 'O 13º é pago em duas parcelas: a primeira (adiantamento, sem descontos) e a segunda (valor líquido, com INSS e IRRF descontados). Cada parcela é paga e registrada separadamente.' },
+      { type: 'steps', items: [
+        'Selecione o ano e clique em "Calcular [ano]" - o sistema gera os valores para todos os funcionários de uma vez.',
+        'Quando a primeira parcela for paga, clique em "Pagar 1ª" e informe a data.',
+        'Quando a segunda parcela for paga, clique em "Pagar 2ª" e informe a data.',
+        'Baixe os recibos em PDF de cada parcela pelos botões "PDF 1ª" e "PDF 2ª".',
+      ]},
+      { type: 'table', headers: ['Status', 'Significado'], rows: [
+        ['Calculado', 'Valores calculados, nenhuma parcela paga ainda'],
+        ['Primeira Paga', '1ª parcela (adiantamento) já paga, aguardando a 2ª'],
+        ['Quitado', 'As duas parcelas foram pagas'],
+      ]},
+      { type: 'warning', text: 'Recalcular um ano que já tem parcelas pagas sobrescreve os valores - as datas de pagamento já registradas não são apagadas, mas confira se os novos valores calculados ainda fazem sentido antes de prosseguir.' },
+    ],
+    related: ['dp/funcionarios'],
+  },
+
+  'dp/rais': {
+    title: 'RAIS',
+    section: 'Departamento Pessoal',
+    intro: 'RAIS gera a declaração anual de vínculos empregatícios (Relação Anual de Informações Sociais) a partir dos dados de funcionários do ano-base selecionado.',
+    content: [
+      { type: 'text', text: 'A RAIS declara o ano anterior, por isso o seletor de ano já vem preenchido com o ano passado por padrão.' },
+      { type: 'steps', items: [
+        'Selecione o ano-base e clique em "Gerar RAIS [ano]" - o sistema reúne todos os vínculos empregatícios daquele ano.',
+        'Clique em "Ver Vínculos" para conferir os dados de cada funcionário antes de transmitir.',
+        'Transmita a declaração pelo canal oficial do governo (fora do LEDGR).',
+        'Volte aqui e clique em "Registrar Envio", informando o número do protocolo recebido - isso marca a declaração como Enviada.',
+      ]},
+      { type: 'warning', text: 'O LEDGR gera os dados da RAIS, mas a transmissão em si acontece pelo canal oficial do governo, fora do sistema. "Registrar Envio" só guarda o protocolo para controle interno - não envia nada automaticamente.' },
+    ],
+    related: ['dp/funcionarios'],
+  },
+
+  'dp/dctfweb': {
+    title: 'DCTFWeb',
+    section: 'Departamento Pessoal',
+    intro: 'DCTFWeb consolida os valores de INSS, IRRF e FGTS calculados na folha de pagamento do mês, servindo de referência para a declaração oficial no portal da Receita Federal.',
+    content: [
+      { type: 'text', text: 'Selecione a competência (mês/ano) - a tela só mostra dados se a folha de pagamento daquele mês já tiver sido calculada.' },
+      { type: 'list', items: [
+        'Contribuição Previdenciária (CP) - INSS do empregado, INSS patronal (20%), RAT ajustado, terceiros (Sistema S) e pró-labore',
+        'IRRF Retido na Fonte - imposto de renda retido dos funcionários',
+        'FGTS - total do mês',
+        'Total DARF - soma de CP + IRRF, o valor de referência para a guia única',
+      ]},
+      { type: 'warning', text: 'Esta tela é apenas uma consolidação informativa gerada a partir da folha de pagamento - não envia nem gera a declaração oficial. A DCTFWeb de verdade é transmitida pelo portal da Receita Federal, depois que o evento S-1299 for enviado no eSocial.' },
+    ],
+    related: ['dp/esocial', 'dp/rais'],
+  },
+
+  'dp/informe-rendimentos': {
+    title: 'Informe de Rendimentos',
+    section: 'Departamento Pessoal',
+    intro: 'Informe de Rendimentos gera o Comprovante de Rendimentos Pagos e de Imposto sobre a Renda Retido na Fonte (modelo oficial da IN RFB 2.060/2021) para cada beneficiário (funcionário, pró-labore, sócio), por ano-calendário.',
+    content: [
+      { type: 'text', text: 'Existem duas formas de gerar o informe: importar automaticamente da folha de pagamento (mais rápido, cobre todos os funcionários de uma vez) ou preencher manualmente um por um (útil para casos avulsos, como distribuição de lucros não vindos da folha).' },
+      { type: 'steps', items: [
+        'Clique em "Importar da Folha", escolha o ano-calendário e confirme - o sistema agrega os valores de todas as folhas fechadas daquele ano e gera ou atualiza o informe de cada funcionário com cadastro de Pessoa Física vinculado.',
+        'Para um lançamento avulso, clique em "+ Novo Informe", informe o CPF do beneficiário (o sistema busca o cadastro automaticamente) e preencha os quadros do formulário oficial (rendimentos tributáveis, isentos, 13º, etc.).',
+        'Use "Ver" para conferir o documento no layout oficial antes de gerar o PDF definitivo.',
+      ]},
+      { type: 'text', text: 'O formulário segue exatamente a estrutura do Comprovante de Rendimentos oficial (Instrução Normativa RFB nº 2.060/2021): quadros 3 a 8, cobrindo rendimentos tributáveis, isentos, tributação exclusiva (13º), rendimentos recebidos acumuladamente e informações complementares.' },
+      { type: 'warning', text: 'Reimportar da folha para um ano já gerado atualiza os informes existentes com os novos valores - se você já fez ajustes manuais num informe específico, confira se eles não foram sobrescritos após reimportar.' },
+    ],
+    related: ['dp/funcionarios', 'dp/dctfweb'],
+  },
+
+  'dp/recesso': {
+    title: 'Recessos Coletivos & Pontes',
+    section: 'Departamento Pessoal',
+    intro: 'Recessos Coletivos & Pontes aplica um período de parada (recesso de fim de ano, ponte de feriado) para todos os funcionários de uma vez, debitando automaticamente do saldo de férias de cada um.',
+    content: [
+      { type: 'text', text: 'Existem dois tipos: Recesso Coletivo (parada geral, ex: final de ano) e Ponte de Feriado (um ou poucos dias emendando um feriado). Os dias úteis do período são calculados automaticamente, excluindo fins de semana e feriados já cadastrados no Calendário.' },
+      { type: 'steps', items: [
+        'Clique em "+ Novo Recesso / Ponte", escolha o tipo, descreva e informe as datas de início e fim.',
+        'O recesso fica com status Planejado. Clique em "Preview / Aplicar" para ver quais funcionários têm saldo de férias suficiente para cobrir o período.',
+        'Revise a lista - funcionários sem saldo suficiente ficam marcados em vermelho e são automaticamente ignorados na aplicação.',
+        'Clique em "Aplicar" para confirmar - o sistema cria uma programação de férias para cada funcionário com saldo, debitando os dias automaticamente.',
+        'Depois de aplicado, baixe todos os recibos de uma vez pelo botão "Recibos ZIP".',
+      ]},
+      { type: 'warning', text: 'Aplicar um recesso é uma ação irreversível - gera programações de férias reais para todos os funcionários com saldo, não apenas uma marcação no calendário. Confira o preview com atenção antes de confirmar.' },
+      { type: 'tip', text: 'Um recesso também pode ser criado automaticamente a partir de uma ponte sugerida no Calendário de Feriados - confirmar a sugestão lá registra o recesso aqui, pronto para revisar e aplicar.' },
+    ],
+    related: ['dp/ferias', 'parametros/calendario'],
+  },
+
+  'dp/folha': {
+    title: 'Folha de Pagamento',
+    section: 'Departamento Pessoal',
+    intro: 'Folha de Pagamento calcula os salários de todos os funcionários por competência (mês), gera GPS e DARF IRRF, o lançamento contábil automático e os recibos individuais.',
+    content: [
+      { type: 'text', text: 'Cada folha passa por um ciclo: Aberta (recém criada) - Calculada (valores gerados) - Fechada (travada, sem alteração) - Paga. É possível Reabrir uma folha Calculada ou Fechada se precisar corrigir algo.' },
+      { type: 'steps', items: [
+        'Clique em "+ Nova" e escolha a competência (mês/ano).',
+        'Clique em "Calcular" - o sistema gera os valores de todos os funcionários ativos: bruto, INSS, IRRF, FGTS, descontos e líquido.',
+        'Revise os valores por funcionário na tabela de detalhe.',
+        'Clique em "Fechar Folha" quando estiver tudo conferido - isso trava a folha e, se a Configuração Contábil estiver preenchida, gera o lançamento contábil automaticamente.',
+        'Baixe a GPS e o DARF IRRF (guias de recolhimento) e os recibos individuais de cada funcionário em PDF.',
+      ]},
+      { type: 'warning', text: '"Fechar Folha" trava os valores - não é mais possível recalcular. Se precisar corrigir algo depois de fechada, use "Reabrir" primeiro.' },
+      { type: 'text', text: 'O botão "⚙ Contas" abre a Configuração Contábil da Folha - defina as 8 contas (despesa e passivo, para salários, INSS empregado, INSS patronal, IRRF e FGTS) para que o lançamento contábil seja gerado automaticamente ao fechar a folha. Sem essa configuração completa, o lançamento não é criado.' },
+      { type: 'tip', text: 'GPS e DARF ficam disponíveis assim que a folha é Calculada (não precisa esperar fechar); os recibos individuais também podem ser baixados a qualquer momento após o cálculo.' },
+    ],
+    related: ['dp/funcionarios', 'dp/pro-labore', 'dp/decimo-terceiro'],
+  },
+
   // ── ADMINISTRAÇÃO ──────────────────────────────────────────────────────────
 
   'administracao/usuarios': {
@@ -1103,6 +1254,14 @@ export const contextualHelp: Record<string, string> = {
   '/app/hr/employees':                     'dp/funcionarios',
   '/app/hr/pro-labore':                    'dp/pro-labore',
   '/app/hr/esocial':                       'dp/esocial',
+  '/app/hr/banco-horas':                    'dp/banco-horas',
+  '/app/hr/ferias':                         'dp/ferias',
+  '/app/hr/decimo-terceiro':                'dp/decimo-terceiro',
+  '/app/hr/rais':                           'dp/rais',
+  '/app/hr/dctfweb':                        'dp/dctfweb',
+  '/app/hr/informe-rendimentos':            'dp/informe-rendimentos',
+  '/app/hr/recesso':                        'dp/recesso',
+  '/app/hr/folha':                          'dp/folha',
   '/app/users':                            'administracao/usuarios',
   '/app/profiles':                         'administracao/perfis',
   '/app/administracao/auditoria':          'administracao/auditoria',
@@ -1204,6 +1363,14 @@ export const helpSections = [
       { slug: 'dp/pro-labore',   title: 'Pró-labore' },
       { slug: 'dp/rescisao',     title: 'Rescisão de Contrato' },
       { slug: 'dp/esocial',      title: 'eSocial' },
+      { slug: 'dp/banco-horas',  title: 'Banco de Horas' },
+      { slug: 'dp/ferias',       title: 'Gestão de Férias' },
+      { slug: 'dp/decimo-terceiro', title: '13º Salário' },
+      { slug: 'dp/rais',          title: 'RAIS' },
+      { slug: 'dp/dctfweb',      title: 'DCTFWeb' },
+      { slug: 'dp/informe-rendimentos', title: 'Informe de Rendimentos' },
+      { slug: 'dp/recesso',      title: 'Recessos & Pontes' },
+      { slug: 'dp/folha',        title: 'Folha de Pagamento' },
     ],
   },
   {
