@@ -2425,3 +2425,93 @@ com os paths do catálogo sidebar_items no banco:
 **Ação:** não corrigido nesta sessão (fora de escopo da tarefa de ajuda). Registrar para
 sessão futura de limpeza de rotas — decidir se remove as rotas órfãs ou adiciona os itens
 de menu faltantes, e confirmar family do path /app/arquivo/fiscal/nf antes de decidir.
+
+---
+
+## Sessão 17-19/07/2026 (continuação 4) — Central de Ajuda: lotes Fiscal, DP e Contabilidade CONCLUÍDOS
+
+**Retomada de sessão:** confusão inicial — "vamos continuar de onde paramos" foi interpretado
+por engano como o roadmap de deploy (Fase C / Docker) discutido no fim da sessão anterior, mas
+o usuario queria retomar a Central de Ajuda mesmo. Corrigido rapido. Licao: 'de onde paramos'
+apos uma sessao com multiplos topicos em aberto e ambiguo — perguntar antes de assumir.
+
+**Lote Fiscal · Operação concluído (3 artigos), commit fdc4246:**
+- fiscal/lalur-config — Config. Dedutibilidade, so relevante para Lucro Real.
+- fiscal/nfse-nacional — emissor RFB direto, inclui regime de locacao de imoveis da Reforma
+  Tributaria 2026 (IBS/CBS, sem ISS, redutor 70%, aliquotas simbolicas 2026: IBS 0,1%+CBS 0,9%,
+  obrigatoriedade plena 2027) — confirma o que ja estava registrado no contexto anterior.
+- fiscal/nfse-sp-csv — importacao de CSV do portal PMSP; exclusao de lote e EM CASCATA
+  (remove tambem lancamentos contabeis, AP/AR, agenda vinculados).
+- Confirmado: '/app/fiscal/notas-fiscais' nao tem rota propria, e so um no de agrupamento
+  no menu (pai de NFS-e SP/Nacional/CSV/NFe) — nao precisa de artigo, como Arquivo Digital.
+
+**Lote Departamento Pessoal concluído (8 artigos), commit 4dcdb87:**
+- dp/banco-horas, dp/ferias, dp/decimo-terceiro, dp/rais, dp/dctfweb,
+  dp/informe-rendimentos, dp/recesso, dp/folha (NOVO — nunca teve artigo, nao era revisao).
+- DHO confirmado sem rota implementada ainda — fora do escopo, sem artigo.
+- dp/rescisao (artigo orfao da sessao anterior): RESOLVIDO. Feature confirmada real e ativa
+  em EmployeeDetailPage.tsx (rescisao/calcular). Fica sem gatilho de URL porque vive num modal
+  dentro de rota dinamica (/app/hr/employees/:id) que o contextualHelp nao mapeia por path
+  exato — mantido como esta, ainda buscavel pelo indice/busca da Central de Ajuda.
+- Achado: RAIS e DCTFWeb sao so GERACAO/CONSOLIDACAO de dados — a transmissao oficial em si
+  acontece fora do sistema, no portal do governo. Documentado explicitamente nos artigos.
+- Achado: Recessos & Pontes confirma e detalha o fluxo ja visto no Calendario (ponte
+  confirmada -> cria Recesso). Aplicar um recesso e IRREVERSIVEL, debita saldo de ferias real.
+- Achado: Folha de Pagamento tem uma 'Configuracao Contabil' separada (8 contas) — sem ela
+  completa, o lancamento contabil automatico NAO e gerado ao fechar a folha (falha silenciosa).
+
+**Lote Contabilidade concluído (6 artigos, cresceu de 5 planejados), commit 27961d9:**
+- contabilidade/comparativo-saldos — 'Mapa de Saldos (ECD)', multi-ano, DIFERENTE de
+  Balancete (1 periodo) e Balanco Patrimonial (1 data). Achado: os anos exibidos no codigo
+  atual (BalanceComparisonPage.tsx) estavam hardcoded como [2014..2020] — nao se atualizam
+  sozinhos. Verificar se isso ja foi corrigido numa sessao futura antes de deploy.
+- contabilidade/visoes-contabeis — mapeamento de contas para codigos RFB (I052), gera o
+  Bloco J do ECD. Precisa de tabela RFB importada (JSON) antes de mapear.
+- contabilidade/renda-fixa — carteira REAL de investimentos (CDB/LCI/LCA/CRI/CRA/Debenture/
+  Tesouro). Achado importante: investimento sem as 3 contas contabeis (Ativo, Receita, IRRF
+  a Recuperar) fica com alerta visivel mas NAO gera lancamento automatico mesmo com a opcao
+  marcada — falha silenciosa, mesmo padrao da Folha de Pagamento.
+- contabilidade/simulador-cdb — calculadora hipotetica separada (NAO salva, nao conectada
+  a carteira real) — importante nao confundir as duas telas.
+- contabilidade/importacao-lancamentos — formato pipe (|), anti-duplicata por referencia
+  (ignora silenciosamente, nao e erro), origem tag JOURNAL_IMPORT.
+- contabilidade/importacao-plano-contas — ACHADO CRITICO: operacao DESTRUTIVA, substitui
+  INTEGRALMENTE o plano de contas atual (remove tudo antes de importar o novo). Artigo
+  com aviso forte logo no topo. Confirmar se ha alguma protecao no backend contra rodar
+  isso numa empresa que ja tem lancamentos (nao verificado nesta sessao, so o frontend).
+
+**Achado de rota órfã (mesma classe do 'Arquivo Digital' anterior):** o catalogo sidebar_items
+registra '/app/accounting/balance-comparison', mas a rota real em routes/index.tsx e
+'/app/reports/balance-comparison'. Mapeado o path REAL no contextualHelp (funciona), mas
+o catalogo do banco continua desatualizado — mesma classe de problema ja registrada para
+Arquivo Digital, considerar limpar os dois de uma vez numa sessao de manutencao de rotas.
+
+**Erro operacional nesta sessao (documentar para nao repetir):** duas vezes o script Python
+de insercao usando string literal simples como ancora deu problema:
+1. Rodar o MESMO script duas vezes por engano gerou artigo duplicado (TS1117) — resolvido
+   removendo a segunda ocorrencia via script de limpeza.
+2. Usar reconhecimento de texto com travessao/caracteres especiais (em-dash '—' vs hifen '-')
+   fez a ancora simples falhar (achou 0). Resolvido migrando para abordagem por REGEX:
+   localizar a DECLARACAO exata do artigo (padrao '  'slug': {' com 2 espacos + chave),
+   depois achar o proximo fechamento '\n  },\n' via regex, e inserir ali — evita colisao
+   com menções ao mesmo slug dentro de arrays 'related' de OUTROS artigos (que e o que
+   causou uma insercao no lugar ERRADO na primeira tentativa, corrigida a tempo).
+   Esse metodo por regex (ancora = declaracao, nao string livre) e mais robusto e deve
+   ser preferido daqui pra frente para insercoes na parte 'content' do helpContent.ts.
+
+**Confirmado com o usuario:** 'npm run build' completo NAO e necessario a cada artigo de
+ajuda — 'tsc --noEmit' sozinho ja basta para esse tipo de arquivo (dados TS puros, sem JSX).
+Build completo reservado para o fim do dia ou quando ha mudanca de codigo de verdade.
+
+helpContent.ts: 98KB -> 109KB. Cobertura: 80/98 -> 86/98 rotas (~88%).
+
+**PENDENTE — últimos lotes:**
+1. 🟡 SPED & Entregas (3): ECF, ECD Historico, Obrigacoes Fiscais.
+2. 🟢 Societário · Operação, Patrimônio, Cadastros (4): Livros/Acionistas, Manutencoes
+   (revisar existente), Empresas, Pessoas Fisicas.
+
+Depois: revisar os 33 artigos ORIGINAIS (pre-sessao) contra a nomenclatura pos-reorg.
+
+**Ainda em aberto da sessao anterior (nao esquecer):** Fase C de guards reais (seguranca) e
+setup do Docker Compose de producao no SERVER02 (192.168.0.60, disco H:, ambiente ja pronto:
+Docker/Node/npm/Git instalados) — nao tocado nesta sessao, focada 100% em Central de Ajuda.
