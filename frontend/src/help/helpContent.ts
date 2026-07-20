@@ -1194,9 +1194,29 @@ export const helpContent: Record<string, HelpArticle> = {
       ]},
       { type: 'warning', text: 'Erros de mapeamento (Visões Contábeis) são de responsabilidade do contador — não são bugs do sistema. O LEDGR indica quais contas precisam ser mapeadas.' },
       { type: 'tip', text: 'O prazo de entrega da ECD é 31 de maio do ano seguinte ao ano-base. Ex: ECD 2025 deve ser entregue até 31/05/2026.' },
+      { type: 'tip', text: 'Se você já importou uma ECD anterior (ex: para conferência ou migração), pode reabrir os dados daquela importação específica clicando nela no histórico - a visualização mostra o resumo, alertas de divergência e a árvore completa de contas e saldos daquele arquivo.' },
     ],
     related: ['sped/efd', 'contabilidade/lancamentos', 'contabilidade/relatorios'],
   },
+
+  'sped/ecf': {
+    title: 'ECF — Escrituração Contábil Fiscal',
+    section: 'SPED / Obrigações',
+    intro: 'ECF importa, exporta e mantém o histórico dos arquivos de Escrituração Contábil Fiscal - a declaração anual que apura IRPJ/CSLL a partir dos dados contábeis, blocos 0, L, M e N.',
+    content: [
+      { type: 'steps', items: [
+        'Na aba "Importar", selecione o arquivo .txt da ECF e clique em "Validar arquivo" antes de importar - o sistema confere a estrutura e mostra CNPJ, empresa e período do arquivo.',
+        'Se o CNPJ do arquivo for diferente da empresa ativa no sistema, a importação é bloqueada - troque a empresa no seletor do topo antes de tentar de novo.',
+        'Se já existirem dados importados para aquele período, o sistema avisa que a importação vai SUBSTITUIR os saldos e lançamentos existentes - confirme só se tiver certeza.',
+        'Após importar, confira o resumo de consistência: contas Consistentes, Divergentes e Ausentes, comparando o saldo da ECF com o saldo calculado a partir da contabilidade (ECD) - divergências merecem investigação antes de transmitir a declaração oficial.',
+        'Na aba "Exportar", escolha o período e gere o arquivo .txt da ECF para transmissão no programa da Receita Federal.',
+      ]},
+      { type: 'text', text: 'A ECF cobre os blocos 0 (abertura/identificação), L (lucro líquido/apuração), M (ajustes do LALUR/LACS) e N (cálculo do IRPJ/CSLL) - é a declaração que efetivamente apura o imposto de renda e a contribuição social devidos no regime Lucro Real.' },
+      { type: 'warning', text: 'A ECF depende dos dados já lançados na contabilidade (ECD) para bater. Se houver muitas divergências no relatório de consistência, revise primeiro os lançamentos contábeis e a configuração de Dedutibilidade (LALUR) antes de prosseguir com a transmissão oficial.' },
+    ],
+    related: ['sped/ecd', 'fiscal/lalur-config', 'fiscal/apuracao'],
+  },
+
 
   'sped/efd': {
     title: 'EFD-Contribuições (PIS/COFINS)',
@@ -1419,6 +1439,7 @@ export const contextualHelp: Record<string, string> = {
   '/app/arquivo/rh/procuracoes':            'acervo/introducao',
   '/app/arquivo/rh/acordos':                'acervo/introducao',
   '/app/sped/ecd':                         'sped/ecd',
+  '/app/sped/ecf':                         'sped/ecf',
   '/app/sped/efd':                         'sped/efd',
   '/app/sistema/obrigacoes':               'sped/obrigacoes',
 };
@@ -1518,6 +1539,7 @@ export const helpSections = [
     icon: 'database',
     articles: [
       { slug: 'sped/ecd',        title: 'ECD — Escrituração Contábil Digital' },
+      { slug: 'sped/ecf',        title: 'ECF — Escrituração Contábil Fiscal' },
       { slug: 'sped/efd',        title: 'EFD-Contribuições (PIS/COFINS)' },
       { slug: 'sped/obrigacoes', title: 'Calendário de Obrigações Fiscais' },
     ],
