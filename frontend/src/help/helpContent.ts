@@ -104,6 +104,25 @@ export const helpContent: Record<string, HelpArticle> = {
     related: ['contabilidade/lancamentos', 'contabilidade/balancete'],
   },
 
+  'contabilidade/importacao-plano-contas': {
+    title: 'Importação de Plano de Contas',
+    section: 'Contabilidade',
+    intro: 'Importação de Plano de Contas substitui integralmente o plano de contas atual da empresa por um novo, a partir de um arquivo .txt em layout posicional.',
+    content: [
+      { type: 'warning', text: 'Esta é uma operação destrutiva: o plano de contas ATUAL da empresa é completamente removido antes da nova importação entrar - não é um merge nem uma atualização parcial. Só use isso numa empresa nova ou se tiver certeza absoluta de que quer substituir tudo. Certifique-se de que não existem lançamentos contábeis vinculados às contas atuais antes de prosseguir.' },
+      { type: 'text', text: 'O arquivo precisa ser .txt em layout posicional (não é separado por pipe nem CSV) - o mesmo formato usado por sistemas contábeis tradicionais para exportar plano de contas.' },
+      { type: 'steps', items: [
+        'Selecione o arquivo .txt - o sistema mostra um preview com código, nome, nível, tipo, natureza (devedora/credora), código reduzido e código SPED de cada conta.',
+        'Corrija erros estruturais no arquivo se houver (a importação fica bloqueada) e reenvie.',
+        'Revise a contagem de contas analíticas vs sintéticas e os avisos (ex: contas analíticas sem código SPED).',
+        'Confirme a importação - o plano de contas atual será substituído pelo novo.',
+      ]},
+      { type: 'tip', text: 'Contas analíticas sem código SPED geram apenas um aviso, não um erro - mas sem esse código a conta não poderá ser usada corretamente na geração do ECD/ECF depois. Vale preencher antes de importar.' },
+    ],
+    related: ['contabilidade/plano-de-contas', 'contabilidade/importacao-lancamentos'],
+  },
+
+
   'contabilidade/lancamentos': {
     title: 'Lançamentos Contábeis',
     section: 'Contabilidade',
@@ -123,6 +142,25 @@ export const helpContent: Record<string, HelpArticle> = {
     ],
     related: ['contabilidade/plano-de-contas', 'contabilidade/balancete', 'financeiro/fechamento-mensal'],
   },
+
+  'contabilidade/importacao-lancamentos': {
+    title: 'Importação de Lançamentos',
+    section: 'Contabilidade',
+    intro: 'Importação de Lançamentos traz um diário contábil externo (formato separado por pipe) para dentro do sistema, validando saldo (débito = crédito) e evitando duplicatas antes de confirmar.',
+    content: [
+      { type: 'text', text: 'O arquivo precisa estar no formato separado por pipe (|), no padrão do Diário de Lançamentos - não aceita XLSX nem CSV com vírgula ou ponto e vírgula.' },
+      { type: 'steps', items: [
+        'Arraste ou selecione o arquivo - o sistema mostra automaticamente um preview: quantos lançamentos, quantas partidas, erros e avisos.',
+        'Corrija os erros no arquivo original se houver (a importação fica bloqueada enquanto existirem erros) e reenvie.',
+        'Revise os avisos (não bloqueiam a importação, mas vale checar) e clique em "Próximo".',
+        'Confirme a importação - lançamentos com referência já existente no banco são automaticamente ignorados, sem gerar erro.',
+      ]},
+      { type: 'warning', text: 'Um lançamento é bloqueado se o débito não bater com o crédito (desbalanceado) - a coluna com o ícone de check/X na pré-visualização mostra isso linha a linha.' },
+      { type: 'tip', text: 'Todo lançamento importado por aqui recebe a origem "JOURNAL_IMPORT" no sistema, o que ajuda a distinguir dados importados dos lançados manualmente.' },
+    ],
+    related: ['contabilidade/lancamentos', 'contabilidade/plano-de-contas'],
+  },
+
 
   'contabilidade/balancete': {
     title: 'Balancete de Verificação',
@@ -163,6 +201,78 @@ export const helpContent: Record<string, HelpArticle> = {
       { type: 'tip', text: 'A DRE e o Balanço Patrimonial são os principais relatórios solicitados por bancos, investidores e pela Receita Federal.' },
     ],
     related: ['contabilidade/balancete', 'contabilidade/lancamentos'],
+  },
+
+  'contabilidade/comparativo-saldos': {
+    title: 'Comparativo de Saldos (Mapa ECD)',
+    section: 'Contabilidade',
+    intro: 'Comparativo de Saldos mostra o saldo de cada conta analítica lado a lado ao longo de vários anos, permitindo comparar a evolução histórica - diferente do Balancete (um único período) ou do Balanço Patrimonial (uma única data).',
+    content: [
+      { type: 'text', text: 'Não confunda com o Balancete (movimentação de um único período) nem com o Balanço Patrimonial (posição numa única data): o Comparativo de Saldos mostra, lado a lado, o saldo final de cada conta em vários anos diferentes - útil para analisar evolução histórica ou conferir séries longas importadas de ECDs anteriores.' },
+      { type: 'steps', items: [
+        'A tabela carrega automaticamente para a empresa ativa.',
+        'Clique no cabeçalho de uma coluna (conta ou ano) para ordenar por ela.',
+        'Clique em "Exportar CSV" para baixar a tabela completa.',
+      ]},
+      { type: 'warning', text: 'Os anos exibidos nesta tela podem estar limitados a um intervalo fixo - se um ano recente não aparecer na comparação, confirme com o suporte se é uma limitação conhecida antes de assumir que faltam dados.' },
+    ],
+    related: ['contabilidade/balancete', 'sped/ecd'],
+  },
+
+  'contabilidade/visoes-contabeis': {
+    title: 'Visões Contábeis (I052)',
+    section: 'Contabilidade',
+    intro: 'Visões Contábeis mapeia grupos de contas analíticas do Plano de Contas aos códigos de aglutinação da Receita Federal (I052), usados para gerar o Bloco J do ECD.',
+    content: [
+      { type: 'text', text: 'O mapeamento é feito por Ano Base e Tipo (BP - Balanço Patrimonial ou DRE), pois os códigos RFB podem mudar de ano para ano. Antes de mapear, é preciso ter a tabela de códigos RFB daquele layout importada (veja o indicador "códigos RFB" no topo da tela) - sem isso, os selects de código ficam vazios.' },
+      { type: 'steps', items: [
+        'Se ainda não houver códigos RFB para o ano/leiaute, clique em "Importar JSON RFB" e selecione o arquivo.',
+        'Escolha o Ano Base e o Tipo (BP ou DRE).',
+        'Para cada grupo de contas, selecione o código RFB - isso aplica o mesmo código a todas as contas daquele grupo de uma vez.',
+        'Se uma conta específica precisar de um código diferente do resto do grupo, expanda o grupo (seta) e mude o código só daquela conta.',
+        'Clique em "Salvar" - as alterações ficam pendentes (contador de "alterações não salvas") até você confirmar.',
+      ]},
+      { type: 'tip', text: 'Use "Auto-mapear" para o sistema sugerir códigos automaticamente a partir de grupo/tipo de conta - as sugestões ficam como pendentes de salvar, então você pode revisar e corrigir antes de confirmar.' },
+      { type: 'warning', text: 'O símbolo ✎ ("individual") indica uma conta que diverge do código aplicado ao resto do grupo - confira se essas divergências são intencionais antes de gerar o ECD, já que elas afetam diretamente o Bloco J.' },
+    ],
+    related: ['sped/ecd', 'contabilidade/plano-de-contas'],
+  },
+
+  'contabilidade/renda-fixa': {
+    title: 'Investimentos — Renda Fixa',
+    section: 'Contabilidade',
+    intro: 'Renda Fixa controla a carteira de investimentos (CDB, LCI, LCA, CRI, CRA, Debêntures, Tesouro Direto), projeta rendimentos mês a mês com base no CDI real e gera automaticamente os lançamentos contábeis de receita financeira.',
+    content: [
+      { type: 'text', text: 'Cada investimento tem um indexador (CDI, Selic, IPCA, IGP-M ou Prefixado) e um percentual sobre ele. LCI, LCA, CRI e CRA são normalmente isentos de IRRF para pessoa jurídica - marque essa opção ao cadastrar.' },
+      { type: 'steps', items: [
+        'Cadastre o investimento em "+ Novo investimento": emissor, capital inicial, datas de aplicação e vencimento, indexador e percentual.',
+        'Preencha as Contas Contábeis (Ativo, Receita, IRRF a Recuperar) - sem isso, o lançamento automático não é gerado.',
+        'Todo mês, após o BCB divulgar o CDI, vá em "Orientação e Lançamentos" e importe a taxa na Tabela CDI.',
+        'Volte aqui e use "Executar atualização mensal": escolha a competência (a taxa é preenchida automaticamente se já importada) e marque "Gerar lançamento contábil" para registrar a receita financeira do mês em todos os investimentos ativos de uma vez.',
+        'Quando houver resgate (parcial ou total), selecione o investimento, vá na aba Resgates e clique em "+ Novo Resgate" - informe a data, o capital e o rendimento líquido creditados no extrato bancário; o sistema calcula o IR retido automaticamente.',
+      ]},
+      { type: 'warning', text: 'Investimentos sem as três contas contábeis configuradas (Ativo, Receita, IRRF a Recuperar) aparecem num alerta na aba "Orientação e Lançamentos" e NÃO geram lançamento contábil na atualização mensal, mesmo com a opção marcada.' },
+      { type: 'tip', text: 'A alíquota de IRRF é regressiva por prazo: 22,5% até 180 dias, 20% até 360, 17,5% até 720, e 15% acima disso - o sistema aplica automaticamente com base na data de aplicação.' },
+      { type: 'tip', text: 'Se algum mês ficou sem lançamento contábil gerado (ex: investimento cadastrado com atraso), use "Gerar retroativos" na aba de lançamentos para preencher os meses faltantes de uma vez.' },
+    ],
+    related: ['parametros/indicadores', 'contabilidade/lancamentos'],
+  },
+
+  'contabilidade/simulador-cdb': {
+    title: 'Simulador CDB',
+    section: 'Contabilidade',
+    intro: 'Simulador CDB é uma calculadora "e se" - projeta o rendimento de um investimento hipotético (ou planejado) usando o CDI real já divulgado até hoje e uma taxa projetada para os meses futuros. Não salva nem se conecta à carteira real de investimentos.',
+    content: [
+      { type: 'text', text: 'Diferente da tela "Renda Fixa" (que controla a carteira real de investimentos da empresa), o Simulador não salva nada - é uma calculadora para responder "se eu aplicar X reais a Y% do CDI, quanto eu teria no vencimento?", usando o histórico real do CDI para os meses já passados e uma taxa projetada para o futuro.' },
+      { type: 'steps', items: [
+        'Preencha data de aplicação, vencimento, capital, percentual do CDI contratado e a taxa mensal projetada para os meses futuros.',
+        'Marque "Isento de IRRF" se estiver simulando uma LCI/LCA.',
+        'Confira o extrato mensal projetado e os indicadores de rendimento bruto, IRRF estimado e saldo líquido final.',
+        'Para simular um resgate antecipado (parcial ou total), use a aba "Resgates".',
+      ]},
+      { type: 'tip', text: 'Clique em "Ver metodologia" para conferir a fórmula de cálculo e a tabela regressiva de IRRF usada na simulação.' },
+    ],
+    related: ['contabilidade/renda-fixa', 'parametros/indicadores'],
   },
 
   // ── FINANCEIRO ─────────────────────────────────────────────────────────────
@@ -1234,6 +1344,12 @@ export const contextualHelp: Record<string, string> = {
   '/app/accounting/diario':                'contabilidade/relatorios',
   '/app/accounting/razao':                 'contabilidade/relatorios',
   '/app/accounting/dre':                   'contabilidade/relatorios',
+  '/app/reports/balance-comparison':        'contabilidade/comparativo-saldos',
+  '/app/accounting/visoes-contabeis':       'contabilidade/visoes-contabeis',
+  '/app/accounting/investimentos/renda-fixa': 'contabilidade/renda-fixa',
+  '/app/accounting/investimentos/simulador': 'contabilidade/simulador-cdb',
+  '/app/accounting/journal/import':         'contabilidade/importacao-lancamentos',
+  '/app/accounting/import-chart':           'contabilidade/importacao-plano-contas',
   '/app/accounting/balanco':               'contabilidade/relatorios',
   '/app/finance/accounts-payable':         'financeiro/contas-a-pagar',
   '/app/finance/fechamento':               'financeiro/fechamento-mensal',
@@ -1326,6 +1442,12 @@ export const helpSections = [
       { slug: 'contabilidade/lancamentos',     title: 'Lançamentos Contábeis' },
       { slug: 'contabilidade/balancete',       title: 'Balancete de Verificação' },
       { slug: 'contabilidade/relatorios',      title: 'Relatórios Contábeis' },
+      { slug: 'contabilidade/comparativo-saldos', title: 'Comparativo de Saldos' },
+      { slug: 'contabilidade/visoes-contabeis', title: 'Visões Contábeis (I052)' },
+      { slug: 'contabilidade/renda-fixa', title: 'Investimentos — Renda Fixa' },
+      { slug: 'contabilidade/simulador-cdb', title: 'Simulador CDB' },
+      { slug: 'contabilidade/importacao-lancamentos', title: 'Importação de Lançamentos' },
+      { slug: 'contabilidade/importacao-plano-contas', title: 'Importação de Plano de Contas' },
     ],
   },
   {
