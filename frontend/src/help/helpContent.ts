@@ -61,8 +61,10 @@ export const helpContent: Record<string, HelpArticle> = {
       ]},
       { type: 'warning', text: 'Atenção: o regime tributário (Lucro Real, Lucro Presumido ou Simples Nacional) afeta diretamente o cálculo de impostos e a geração de obrigações fiscais. Em caso de dúvida, consulte seu contador.' },
       { type: 'tip', text: 'Se sua empresa possui mais de um CNPJ, o LEDGR suporta múltiplas empresas na mesma conta. Use o seletor de empresa no topo da tela para alternar entre elas.' },
+      { type: 'tip', text: 'O selo "HQ" na listagem identifica a empresa matriz (sede) - ela não pode ser excluída enquanto existirem filiais vinculadas.' },
+      { type: 'warning', text: 'Excluir uma empresa é uma ação destrutiva e permanente: remove também os dados fiscais e o quadro societário vinculados a ela. Só administradores com permissão total podem excluir.' },
     ],
-    related: ['primeiros-passos/bem-vindo', 'administracao/usuarios'],
+    related: ['primeiros-passos/bem-vindo', 'administracao/usuarios', 'cadastros/empresas'],
   },
 
   'primeiros-passos/navegar': {
@@ -1112,6 +1114,26 @@ export const helpContent: Record<string, HelpArticle> = {
     related: ['societario/estatuto-contrato', 'societario/socios'],
   },
 
+  'societario/acionistas': {
+    title: 'Acionistas e Participações',
+    section: 'Societário',
+    intro: 'Acionistas e Participações controla o Livro de Registro de titulares (quotistas ou acionistas) e o Livro de Transferência de participações societárias, incluindo geração do PDF oficial dos livros.',
+    content: [
+      { type: 'text', text: 'A tela tem dois livros: Livro de Registro (quem são os titulares - quotistas de Ltda ou acionistas de S/A - e quanto cada um possui) e Livro de Transferência (histórico de movimentações entre titulares).' },
+      { type: 'steps', items: [
+        'No Livro de Registro, clique em "Novo Registro", escolha Ltda (quotas) ou S/A (ações), e informe o CPF/CNPJ do titular - o sistema busca automaticamente na base de Pessoas; se não encontrar, oferece um atalho para cadastrar.',
+        'Preencha quantidade, valor nominal, percentual do capital e se já foi integralizado.',
+        'Para registrar uma movimentação, vá no Livro de Transferência, clique em "Nova Transferência" e escolha o cedente e o cessionário (ambos precisam já estar cadastrados como titulares ativos), a quantidade e o motivo (compra e venda, doação, herança, etc).',
+        'Uma transferência registrada fica "Pendente" até ser averbada - clique em "Averbar" quando o registro oficial (na junta comercial ou no livro físico) for feito.',
+        'Clique em "Gerar PDF" para baixar o livro oficial correspondente à aba ativa (Registro ou Transferência).',
+      ]},
+      { type: 'tip', text: 'Clique em qualquer titular na lista para expandir e ver o extrato completo de movimentações dele (entradas, saídas e saldo ao longo do tempo).' },
+      { type: 'warning', text: 'A geração de PDF depende do Puppeteer estar instalado no servidor - se der erro ao gerar, isso é uma questão de configuração do servidor, não um problema com os dados cadastrados.' },
+    ],
+    related: ['societario/livros', 'societario/socios'],
+  },
+
+
   // ── PATRIMÔNIO ─────────────────────────────────────────────────────────────
 
   'patrimonio/cadastro': {
@@ -1138,6 +1160,7 @@ export const helpContent: Record<string, HelpArticle> = {
     section: 'Patrimônio',
     intro: 'Registre e acompanhe todas as manutenções realizadas nos bens da empresa: reparos, revisões, retrofits e avaliações.',
     content: [
+      { type: 'text', text: 'Esta tela mostra uma visão global de manutenções de TODOS os ativos da empresa de uma vez - incluindo as que já venceram e ainda não foram concluídas (atrasadas). Clicar numa linha leva para a página do ativo correspondente, não para um detalhe isolado da ordem de serviço.' },
       { type: 'steps', items: [
         'Acesse Patrimônio → Manutenções.',
         'Clique em + Nova OS.',
@@ -1259,6 +1282,42 @@ export const helpContent: Record<string, HelpArticle> = {
     related: ['sped/ecd', 'sped/efd', 'dp/esocial'],
   },
 
+  'cadastros/empresas': {
+    title: 'Empresas',
+    section: 'Cadastros',
+    intro: 'Lista e gerencia todas as empresas cadastradas no sistema, incluindo matriz e filiais.',
+    content: [
+      { type: 'steps', items: [
+        'Clique em "New Company" para cadastrar uma nova empresa (matriz ou filial).',
+        'Use a busca para localizar por razão social, nome fantasia ou CNPJ.',
+        'Clique no ícone de olho para visualizar os detalhes, ou no de lápis para editar.',
+        'Clique nos cabeçalhos das colunas para ordenar a lista.',
+      ]},
+      { type: 'tip', text: 'O selo "HQ" identifica a empresa matriz (sede) - ela não pode ser excluída enquanto existirem filiais vinculadas.' },
+      { type: 'warning', text: 'Excluir uma empresa é uma ação destrutiva e permanente: remove também os dados fiscais e o quadro societário vinculados a ela. Só administradores com permissão total podem excluir, e empresas matriz nunca podem ser excluídas diretamente.' },
+    ],
+    related: ['societario/socios'],
+  },
+
+  'cadastros/pessoas-fisicas': {
+    title: 'Pessoas Físicas',
+    section: 'Cadastros',
+    intro: 'Pessoas Físicas é a base central de cadastro de indivíduos do sistema - usada como referência em Usuários, Funcionários, Acionistas, Procurações e outros módulos que precisam vincular uma pessoa a algo.',
+    content: [
+      { type: 'text', text: 'Este cadastro é a referência central usada por vários módulos do sistema - ao criar um usuário, registrar um acionista, redigir uma procuração ou vincular um sócio, o sistema busca automaticamente pelo CPF nesta base. Cadastrar a pessoa aqui uma única vez evita ter que redigitar os dados em cada módulo.' },
+      { type: 'text', text: 'O campo "Registro" mostra o principal registro profissional da pessoa, na ordem OAB (advogado), CRC (contador), CREA (engenheiro) ou CORECON (economista) - o primeiro preenchido que for encontrado.' },
+      { type: 'steps', items: [
+        'Clique em "Nova Pessoa" para cadastrar (disponível apenas para quem tem permissão de edição neste módulo).',
+        'Use a busca para localizar por nome, CPF ou e-mail.',
+        'A coluna "Vínculos ativos" mostra em quais empresas a pessoa está associada atualmente e em qual função.',
+      ]},
+      { type: 'warning', text: 'Excluir uma pessoa é permanente e não pode ser desfeito. As ações de editar e excluir só aparecem para usuários com permissão configurada para este módulo - se você não vê esses botões, seu perfil não tem esse acesso.' },
+    ],
+    related: ['cadastros/empresas', 'administracao/usuarios'],
+  },
+
+
+
   // ── ACERVO ─────────────────────────────────────────────────────────────────
 
   'acervo/introducao': {
@@ -1358,6 +1417,7 @@ export const helpContent: Record<string, HelpArticle> = {
 export const contextualHelp: Record<string, string> = {
   '/app/dashboard':                        'primeiros-passos/bem-vindo',
   '/app/companies':                        'primeiros-passos/configurar-empresa',
+  '/app/persons':                          'cadastros/pessoas-fisicas',
   '/app/accounting/accounts':              'contabilidade/plano-de-contas',
   '/app/accounting/journal':               'contabilidade/lancamentos',
   '/app/accounting/trial-balance':         'contabilidade/balancete',
@@ -1414,6 +1474,8 @@ export const contextualHelp: Record<string, string> = {
   '/app/assets/maintenances':              'patrimonio/manutencoes',
   '/app/societario':                       'societario/estatuto-contrato',
   '/app/societario/livros':                'societario/livros',
+  '/app/societario/livros/acionistas':     'societario/acionistas',
+  '/app/societario/livros/transferencias': 'societario/acionistas',
   '/app/arquivo':                          'acervo/introducao',
   '/app/arquivo/societario':                'acervo/introducao',
   '/app/arquivo/societario/contratos':      'acervo/introducao',
@@ -1523,6 +1585,7 @@ export const helpSections = [
       { slug: 'societario/estatuto-contrato', title: 'Estatuto Social e Contrato Social' },
       { slug: 'societario/socios',            title: 'Sócios e Quadro Societário (QSA)' },
       { slug: 'societario/livros',            title: 'Livros e Registros Societários' },
+      { slug: 'societario/acionistas',       title: 'Acionistas e Participações' },
     ],
   },
   {
@@ -1579,6 +1642,14 @@ export const helpSections = [
       { slug: 'parametros/calendario', title: 'Calendário de Feriados' },
       { slug: 'parametros/indicadores', title: 'Indicadores Econômicos' },
       { slug: 'parametros/tabelas-legais', title: 'Tabelas Legais' },
+    ],
+  },
+  {
+    title: 'Cadastros',
+    icon: 'address-book',
+    articles: [
+      { slug: 'cadastros/empresas', title: 'Empresas' },
+      { slug: 'cadastros/pessoas-fisicas', title: 'Pessoas Físicas' },
     ],
   },
 ];
