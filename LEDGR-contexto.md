@@ -2605,3 +2605,87 @@ Depois: revisar os 33 artigos ORIGINAIS (pre-sessao) contra a nomenclatura pos-r
 **Ainda em aberto da sessao anterior (nao esquecer):** Fase C de guards reais (seguranca) e
 setup do Docker Compose de producao no SERVER02 (192.168.0.60, disco H:, ambiente ja pronto:
 Docker/Node/npm/Git instalados) — nao tocado nesta sessao, focada 100% em Central de Ajuda.
+
+---
+
+## Sessão 19/07/2026 (bloco 2, início do dia) — Central de Ajuda: TODOS OS LOTES PLANEJADOS CONCLUÍDOS
+
+**Lote SPED & Entregas concluído (1 artigo novo, ECD e Obrigações já existiam), commit 18b4176:**
+- sped/ecf — importação/exportação/histórico do ECF (blocos 0, L, M, N). Achado: checagem
+  automática de CONSISTÊNCIA entre saldos da ECF importada e os saldos calculados a partir
+  da ECD (Consistentes/Divergentes/Ausentes) — cruzar com LALUR se houver muitas divergências.
+- Confirmado: sped/ecd e sped/obrigacoes já existiam desde os 33 artigos originais — o
+  roadmap anterior estava desatualizado nesse ponto (só faltava mesmo o ECF).
+- EcdViewerPage.tsx (rota dinâmica /viewer/:id) não ganhou artigo próprio — é um drill-down
+  simples acessado a partir da tela principal de ECD, mencionado como dica dentro do
+  artigo sped/ecd existente.
+
+**Lote Societário/Patrimônio/Cadastros concluído, commit 5975112:**
+- patrimonio/manutencoes (REVISADO) — confirmado que é visão GLOBAL cross-ativos (todas as
+  OS de todos os bens, incluindo atrasadas), clicar na linha leva pro ATIVO, não pra OS.
+  Status do código bate exatamente com o artigo antigo (SCHEDULED/IN_PROGRESS/COMPLETED/
+  CANCELLED) — só faltava esse contexto, adicionado.
+- societario/acionistas (NOVO) — Livro de Registro + Livro de Transferência, com averbação,
+  extrato por titular, geração de PDF oficial (depende de Puppeteer no servidor).
+- cadastros/empresas (NOVO) — nova seção 'Cadastros' criada no índice. Conflito de contextual
+  trigger resolvido: já existia '/app/companies' -> 'primeiros-passos/configurar-empresa'
+  (onboarding); ao invés de sobrescrever, ENRIQUECI o artigo de onboarding existente com os
+  achados de segurança (selo HQ = matriz não pode ser excluída, exclusão remove dados fiscais
+  e QSA) e deixei cadastros/empresas como artigo complementar buscável mas sem gatilho de URL
+  próprio (mesmo padrão dp/rescisao).
+- cadastros/pessoas-fisicas (NOVO) — confirmado que é a BASE CENTRAL referenciada por outros
+  módulos (Usuários, Acionistas, Procurações) via lookup automático de CPF.
+
+**ACHADO SÉRIO — quase documentei a tela ERRADA:** ao buscar 'Acionistas', encontrei um arquivo
+por nome de pasta (src/pages/companies/corporate/shareholders/ShareholderList.tsx +
+ShareholderForm.tsx) que PARECIA ser o certo, mas é código morto/stub nunca usado por nenhuma
+rota real (formulário nem chama API, só um setTimeout fake dizendo "em desenvolvimento").
+A rota real (/app/societario/livros/acionistas) usa um componente completamente diferente
+(pages/corporate/shareholders/ShareholdersPage.tsx), descoberto só depois de checar
+routes/index.tsx. Corrigido a tempo, artigo certo escrito sobre o componente real.
+
+**REGRA NOVA para todas as sessões futuras (o próprio usuário pediu pra formalizar):**
+Nunca ler/confiar no conteúdo de um arquivo encontrado só por NOME DE PASTA/ARQUIVO parecido
+com o conceito procurado. Sempre confirmar em routes/index.tsx qual componente a rota REAL
+usa ANTES de pedir o conteúdo do arquivo — não depois. Isso já era prática em vários pontos
+anteriores da sessão (Auditoria, ECD/ECF, Notas Fiscais), mas foi pulada uma vez porque o
+nome do arquivo "parecia óbvio demais" — esse é justamente o sinal de alerta pra checar,
+não pra pular a checagem.
+
+**Achado de usabilidade/consistência (não corrigido, só registrado):** CompanyList.tsx
+(tela de Empresas) está com toda a interface em INGLÊS ('Companies', 'New Company',
+'Search by legal name...', 'Actions') enquanto o resto do sistema é em portugues.
+Provavelmente sobrou de uma versão anterior/template. Vale corrigir numa sessão de
+polimento de UI antes do teste de segunda, já que o usuario se importa com consistencia.
+
+**Erro operacional (repetido, mesma categoria dos anteriores):** ao adicionar contextualHelp
+para '/app/companies' sem checar antes, dei de cara com uma chave DUPLICADA (TS1117) porque
+já existia mapeamento daquela rota desde os 33 artigos originais. Resolvido sem perda de
+conteudo (mesclei os dois artigos). Reforça a regra: sempre 'grep' a chave em contextualHelp
+ANTES de adicionar uma nova, mesmo quando a rota parece nova/obvia.
+
+**Build de producao rodado ao final do bloco (marco: todos os lotes concluidos) — limpo,
+sem erros, 52.65s.**
+
+helpContent.ts: 109KB -> 117KB. Cobertura estimada: ~98/98 rotas mapeaveis por URL exata
+(as excecoes intencionais continuam: DHO sem rota, nos de agrupamento no menu sem tela propria,
+dp/rescisao com rota dinamica sem gatilho automatico).
+
+**PENDENTE PARA PRÓXIMA SESSÃO — 3 itens que o usuário quer conferir (ainda não investigados):**
+1. Cadastro de Perfil — revisar o fluxo/tela de perfis de acesso (nao verificado nesta sessao
+   se ha algo estranho, so foi pedido para conferir).
+2. Vínculo CPF no cadastro de Company — conferir como funciona a ligacao entre CPF de
+   socio/responsavel e o cadastro de empresa (possivel sobreposicao com o cadastro de
+   Pessoas Fisicas documentado hoje, ou possivel gap).
+3. Recuperação de senha — revisar o fluxo completo (existe? funciona? esta seguro?) — nao
+   foi tocado em nenhuma sessao de ajuda ate agora, pode nem ter artigo de ajuda ainda.
+
+**PENDENTE — Central de Ajuda, fase final (depois dos 3 itens acima):**
+Revisar os 33 artigos ORIGINAIS (pre-sessao) contra a nomenclatura pos-reorg de sidebar
+(ex: 'Fiscal' -> 'Fiscal · Operação' nos breadcrumbs internos). Ja foram enriquecidos hoje
+2 desses originais (dp/esocial via referencia, primeiros-passos/configurar-empresa) — os
+outros ~31 ainda nao foram conferidos nesta rodada.
+
+**Ainda em aberto de sessoes anteriores (nao esquecer, nao tocado hoje):** Fase C de guards
+reais (seguranca) e setup do Docker Compose de producao no SERVER02 (192.168.0.60, disco H:,
+ambiente ja pronto).
