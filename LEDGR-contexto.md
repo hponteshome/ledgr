@@ -2689,3 +2689,81 @@ outros ~31 ainda nao foram conferidos nesta rodada.
 **Ainda em aberto de sessoes anteriores (nao esquecer, nao tocado hoje):** Fase C de guards
 reais (seguranca) e setup do Docker Compose de producao no SERVER02 (192.168.0.60, disco H:,
 ambiente ja pronto).
+
+---
+
+## Sessão 20/07/2026 (bloco 3) — Bugs reais encontrados testando os 3 itens pendentes
+
+**Item 1: Cadastro de Perfil — BUG REAL ENCONTRADO E CORRIGIDO.**
+'Cannot POST /profiles' (404). Causa raiz: ProfilesController (apps/api/src/core/users/
+profiles.controller.ts) nunca teve metodo de criacao - so GET, GET:id, PATCH:id, DELETE:id
+e sub-rotas de access-schedule. ProfilesService tambem nao tinha metodo create(). Confirmado
+que ProfilesModule (profiles.module.ts) e codigo morto - o controller/service reais sao
+registrados direto dentro de UsersModule (users.module.ts), confirmando a pendencia ja
+registrada em sessoes anteriores ('ProfilesModule separado aparenta nao mais usado').
+Contrato do frontend confirmado via ProfileForm.tsx: POST /profiles espera {name, permissions}
+e retorna {id}, depois chama POST /profiles/:id/access-schedule (esse ja funcionava).
+CORRIGIDO: adicionado create() no service (prisma.profile.create) e @Post() no controller
+(gated com @RequireResourceAccess('profiles','EDIT'), mesmo padrao dos outros endpoints).
+Testado e CONFIRMADO funcionando pelo usuario (perfil criado com sucesso).
+
+**Item 2 (parcial): Vínculo CPF no cadastro de Company — BUG REAL ENCONTRADO E CORRIGIDO
+(parte 1), investigacao em andamento (parte 2).**
+
+Parte 1 CORRIGIDA — QsaVinculoGrid.tsx, funcao handleVincular(): quando a pessoa nao e
+encontrada pelo CPF (mascarado pela RFB no QSA, ex '***240219**' -> so 6 digitos visiveis
+apos remover asteriscos), o codigo redirecionava para /app/persons/new passando o CPF e o
+'returnTo' DENTRO da query string. Dois problemas: (a) nenhum parametro CPF ou nome era
+passado pra pagina /app/persons/new de fato (o codigo so embutia 'vinculado=' dentro do
+'returnTo', nunca no proprio /app/persons/new); (b) mesmo que fosse passado, PersonForm.tsx
+so le 'returnTo' de location.state (React Router), NUNCA de query string - entao o retorno
+automatico pro cadastro da empresa depois de salvar tambem estava quebrado.
+CORRIGIDO: handleVincular agora usa navigate(path, { state: { initialCpf, returnTo } })
+em vez de concatenar tudo na query string, batendo com o que PersonForm.tsx realmente le.
+Limitacao estrutural que PERMANECE (nao e bug, e dado real): como o CPF do QSA vem
+mascarado pela Receita Federal, o pre-preenchimento so tera os digitos visiveis parciais -
+usuario ainda precisa completar o resto manualmente. O NOME (socio.nome) nao e mascarado
+mas tambem nao esta sendo pre-preenchido - PersonForm.tsx nao tem suporte a prefill de nome
+ainda (so 'initialCpf'), ficou de fora do fix rapido, registrar como melhoria futura.
+
+Parte 2 EM INVESTIGACAO — usuario reportou: no VIEWER da empresa (CompanyShow.tsx) o socio
+aparece 'Nao vinculado', mas na tela de EDICAO (CompanyEdit.tsx) o mesmo socio aparece 'Ok'.
+Causa raiz suspeita (nao confirmada 100%, precisa de dados reais do banco pra confirmar):
+duas fontes de dado DIFERENTES para o mesmo QSA:
+  - Viewer (CompanyShow.tsx): usa 'company.partners' - o QSA SALVO no banco.
+  - Edicao (CompanyEdit.tsx -> ContabilTab.tsx -> QsaVinculoGrid): usa 'formData.partners',
+    inicializado como 'dados.qsa || prev.partners' - aparenta vir de uma CONSULTA AO VIVO
+    (provavelmente Receita Federal/CNPJ), disparada por algum botao de 'Consultar CNPJ'
+    ainda nao localizado no codigo.
+  Hipotese: se a consulta ao vivo trouxer o CPF mais completo (ou diferente) do que ficou
+  gravado no banco na importacao original da empresa, o vinculo bate na Edicao (CPF mais
+  completo -> encontra a pessoa) mas falha no Viewer (CPF do banco, possivelmente mais
+  mascarado/desatualizado -> nao encontra). NAO CONFIRMADO - precisa comparar os dados reais
+  de 'Pontes Contabilidade' (CPF salvo no banco vs CPF que a consulta ao vivo retorna) para
+  fechar o diagnostico. Proximo passo: achar o botao/fluxo que dispara a consulta e ver o
+  que populate dados.qsa, e comparar com o que esta gravado em company.partners no banco
+  para essa empresa especifica.
+
+**Pergunta em aberto do usuário (não totalmente esclarecida ainda):** 'deve fazer uma
+pesquisa em nosso cadastro Person e Companies, quando cnpj' - possivelmente sugerindo que a
+busca de vinculo para socios Pessoa Juridica (CNPJ) deveria TAMBEM buscar nos cadastros
+internos de Person/Company (nao so em fonte externa/RFB). Verificar: handleVincular ja
+busca em '/companies/taxid/{digits}' para isPJ - confirmar com o usuario se isso ja cobre
+a intencao dele ou se ha um gap especifico a esclarecer numa proxima interacao.
+
+**Item 3 (Recuperação de senha): AINDA NÃO INVESTIGADO nesta sessao.**
+
+**Erro de protocolo cometido e corrigido nesta sessao:** pedi ao usuario para rodar comando
+buscando schema.prisma quando o arquivo ja estava disponivel em /mnt/project/schema.prisma
+(acessivel via grep direto). Usuario corrigiu na hora. Reforcar: SEMPRE checar /mnt/project/
+antes de pedir informacao ao usuario, mesmo no meio de uma sessao de debugging ativa onde o
+foco esta nos arquivos do PC dele via PowerShell.
+
+**Arquivos alterados nesta sessao (backend + frontend, fora do escopo de ajuda):**
+- apps/api/src/core/users/profiles.service.ts — metodo create() adicionado
+- apps/api/src/core/users/profiles.controller.ts — endpoint @Post() adicionado
+- frontend/src/pages/companies/QsaVinculoGrid.tsx — handleVincular corrigido (state em vez
+  de query string para initialCpf/returnTo)
+
+**Nao commitado ainda** - sessao de debugging ativa, aguardando fechar a investigacao da
+Parte 2 antes de commitar tudo junto (backend + frontend) com git status/add/commit/push.
