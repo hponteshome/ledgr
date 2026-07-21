@@ -4,7 +4,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { Decimal } from '@prisma/client/runtime/library';
 
 // ── Tabela INSS 2026 (Contribuinte Individual) ────────────────────────────────
-const INSS_TETO_2026 = 8157.41;
+const INSS_TETO_2026 = 8475.55;
 const INSS_ALIQ_DIRETOR = 0.11;   // descontado do diretor
 const INSS_ALIQ_EMPRESA = 0.20;   // patronal
 
@@ -14,10 +14,21 @@ const IRPF_2026 = [
   { ate: 2826.65,  aliq: 0.075,  deducao: 182.16  },
   { ate: 3751.05,  aliq: 0.15,   deducao: 394.16  },
   { ate: 4664.68,  aliq: 0.225,  deducao: 675.49  },
-  { ate: Infinity, aliq: 0.275,  deducao: 908.73  },
+  { ate: Infinity, aliq: 0.275,  deducao: 908.74  },
 ];
 
-const SALARIO_MINIMO_2026 = 1518.00;
+// Redutor Lei 15.270/2025 - vigente jan/2026 (mesma tabela do folha.service.ts)
+const IRRF_REDUTORES_2026 = [
+  { ate: 5000.00,  redutor: Infinity },
+  { ate: 5500.00,  redutor: 738.46 },
+  { ate: 6000.00,  redutor: 619.23 },
+  { ate: 6500.00,  redutor: 500.00 },
+  { ate: 7000.00,  redutor: 380.77 },
+  { ate: 7350.00,  redutor: 261.54 },
+  { ate: Infinity, redutor: 0 },
+];
+
+const SALARIO_MINIMO_2026 = 1621.00;
 
 function nullIfEmpty(v: any): string | null { return v && v.toString().trim() !== '' ? v : null; }
 
@@ -32,7 +43,9 @@ function calcularINSSEmpresa(bruto: number): number {
 
 function calcularIRRF(baseCalculo: number): { irrf: number; aliq: number; deducao: number } {
   const faixa = IRPF_2026.find(f => baseCalculo <= f.ate)!;
-  const irrf = Math.max(0, Math.round((baseCalculo * faixa.aliq - faixa.deducao) * 100) / 100);
+  const irrfBruto = Math.max(0, Math.round((baseCalculo * faixa.aliq - faixa.deducao) * 100) / 100);
+  const red = IRRF_REDUTORES_2026.find(r => baseCalculo <= r.ate)!;
+  const irrf = red.redutor === Infinity ? 0 : Math.max(0, Math.round((irrfBruto - red.redutor) * 100) / 100);
   return { irrf, aliq: faixa.aliq, deducao: faixa.deducao };
 }
 

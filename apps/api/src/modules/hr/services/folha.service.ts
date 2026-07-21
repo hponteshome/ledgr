@@ -5,12 +5,12 @@ import { Prisma } from "@prisma/client";
 
 // ── Tabelas INSS 2024/2025 (progressiva) ─────────────────────────────────────
 const INSS_FAIXAS = [
-  { ate: 1412.00,  aliq: 0.075, deducao: 0 },
-  { ate: 2666.68,  aliq: 0.09,  deducao: 21.18 },
-  { ate: 4000.03,  aliq: 0.12,  deducao: 101.18 },
-  { ate: 7786.02,  aliq: 0.14,  deducao: 181.18 },
+  { ate: 1621.00,  aliq: 0.075, deducao: 0 },
+  { ate: 2902.84,  aliq: 0.09,  deducao: 24.32 },
+  { ate: 4354.27,  aliq: 0.12,  deducao: 111.41 },
+  { ate: 8475.55,  aliq: 0.14,  deducao: 198.50 },
 ];
-const INSS_TETO = 7786.02;
+const INSS_TETO = 8475.55;
 
 // ── Tabelas IRRF 2026 (Lei 15.270/2025 — vigente jan/2026) ───────────────────
 // Tabela progressiva base (mantida de 2025)
