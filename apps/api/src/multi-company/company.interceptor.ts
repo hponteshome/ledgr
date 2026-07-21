@@ -4,6 +4,7 @@ import {
   ExecutionContext,
   CallHandler,
   BadRequestException,
+  SetMetadata,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Observable } from 'rxjs';
@@ -14,8 +15,7 @@ export const SKIP_COMPANY_KEY = 'skipCompanyCheck';
  * Decorator para rotas que não exigem x-company-id.
  * Uso: @SkipCompanyCheck() antes do método ou controller.
  */
-export const SkipCompanyCheck = () =>
-  Reflect.metadata(SKIP_COMPANY_KEY, true);
+export const SkipCompanyCheck = () => SetMetadata(SKIP_COMPANY_KEY, true);
 
 @Injectable()
 export class CompanyInterceptor implements NestInterceptor {
@@ -43,7 +43,7 @@ export class CompanyInterceptor implements NestInterceptor {
 
     // ── 3. Bypass para Master Admin (vê e opera todas as empresas) ───────────
     const user = request.user;
-    const isMasterAdmin = user?.profile?.isMasterAdmin === true;
+    const isMasterAdmin = (user?.profile?.permissions as any)?.all === true;
 
     const companyId: string | undefined = request.headers['x-company-id'];
 

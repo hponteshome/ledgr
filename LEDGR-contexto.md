@@ -2767,3 +2767,70 @@ foco esta nos arquivos do PC dele via PowerShell.
 
 **Nao commitado ainda** - sessao de debugging ativa, aguardando fechar a investigacao da
 Parte 2 antes de commitar tudo junto (backend + frontend) com git status/add/commit/push.
+
+## Sessao 21/07/2026 — Bug critico: SkipCompanyCheck nao funcionava em nivel de metodo
+
+**Causa raiz do DB zerado + sidebar vazia + varios 400 misteriosos:**
+company.interceptor.ts usava \Reflect.metadata()\ cru em vez do \SetMetadata()\ do NestJS
+para o decorator @SkipCompanyCheck(). Reflect.metadata() grava a metadata no prototipo da
+classe quando aplicado a metodo, mas context.getHandler() (usado pelo Reflector do interceptor)
+le a metadata anexada na FUNCAO do handler - que so o SetMetadata() faz corretamente.
+Resultado: @SkipCompanyCheck() SO funcionava quando aplicado a nivel de CLASSE/controller
+inteiro; em nivel de metodo individual (como em sidebar-permissions.controller.ts: tree,
+items, resolve, profile/:id, etc.) o Reflector sempre retornava undefined, forcando a
+validacao normal de x-company-id obrigatorio.
+
+**Por que so apareceu agora:** provavelmente sempre esteve quebrado, mas antes do DB ser
+zerado sempre havia uma empresa ativa no localStorage, entao o header x-company-id ia
+junto por acidente e mascarava o bug nas rotas @SkipCompanyCheck a nivel de metodo.
+
+**Fix:** SkipCompanyCheck trocado de \Reflect.metadata(SKIP_COMPANY_KEY, true)\ para
+\SetMetadata(SKIP_COMPANY_KEY, true)\ (import de @nestjs/common).
+
+**Bug secundario corrigido junto:** isMasterAdmin no company.interceptor.ts checava
+user.profile.isMasterAdmin, campo que NUNCA existiu no schema (Profile so tem
+permissions: Json). Trocado para checar (profile.permissions as any)?.all === true,
+que e o campo real usado em todo o resto do sistema (sidebar-permissions.service.ts,
+etc). Bypass de Master Admin no CompanyInterceptor provavelmente nunca funcionou de
+verdade fora da rota /tree.
+
+**Pendente para proxima sessao:** varrer o codebase por outros usos de @SkipCompanyCheck()
+em nivel de metodo (fora de sidebar-permissions.controller.ts) para confirmar se algum
+outro endpoint dependia desse bypass e estava silenciosamente exigindo x-company-id
+quando nao deveria.
+
+### Varredura completa 21/07/2026 — alcance do bug SkipCompanyCheck
+
+Scan em todos os *.controller.ts (D:\Temp\scan_skipcompanycheck.py) encontrou 23
+ocorrencias de @SkipCompanyCheck(), sendo 12 em nivel de metodo (afetadas pelo bug):
+- 8x sidebar-permissions.controller.ts (listItems, getTree, resolve, getProfile,
+  setProfile, getUser, setUser, setUserBulk, removeUser) - confirmado corrigido, /tree
+  retornando 200 com arvore completa.
+- 3x company.controller.ts (listAvailable, getHeadquarters, GET /:id) - nunca deram
+  erro na pratica porque a whitelist de URL do CompanyInterceptor (etapa 2, antes da
+  checagem de decorator) ja cobria essas rotas especificas (/companies/available,
+  /companies/headquarters, /companies/:uuid). Decorator quebrado era redundante ali.
+
+Como a correcao foi na IMPLEMENTACAO do decorator (SkipCompanyCheck trocado de
+Reflect.metadata() para SetMetadata()), o fix cobre as 23 ocorrencias automaticamente -
+nenhuma edicao adicional necessaria nos controllers. Confirmado via curl:
+GET /companies/available -> 200 [] (0 empresas, esperado pos-reconstrucao do banco).
+
+Falsos positivos do scan (comentarios antes de declaracao de classe, nao decorators
+reais): auth.controller.ts:21, company.controller.ts:29/49, persons.controller.ts:16,
+profiles.controller.ts:23, users.controller.ts:27 - nao sao bugs, ignorar.
+
+**Arquivos alterados nesta sessao:**
+- apps/api/src/multi-company/company.interceptor.ts (SkipCompanyCheck -> SetMetadata;
+  isMasterAdmin -> permissions.all; logs de debug removidos)
+- prisma/migrations-manuais/2026-07-17_sidebar_reorg_macro_categorias.sql atualizado
+  para versao sem o INSERT duplicado de Parametros Globais (ver sidebar_reorg_fixed.sql)
+
+**Causa raiz do incidente completo desta sessao:** confusao de terminais/portas com
+outro projeto (Lume, porta 3002) rodando em paralelo levou a um TRUNCATE acidental do
+banco ledgr_app inteiro (nao so sidebar_items). Sem backup previo - dados transacionais
+(ECD LM 2024, NFS-e GRB, etc) precisam ser reimportados dos arquivos-fonte originais,
+nao sao recuperaveis via banco. Empresas serao recriadas via lookup automatico de CNPJ
+na RFB (nao exige preenchimento manual). RECOMENDACAO REGISTRADA: configurar pg_dump
+periodico antes do proximo trabalho destrutivo no banco, especialmente antes do deploy
+em SERVER02.
