@@ -441,7 +441,7 @@ export const Header: React.FC<{ sidebarOpen: boolean }> = ({ sidebarOpen }) => {
           ) : (
             <form onSubmit={handleLogin} className="flex flex-col gap-1 relative">
               <div className="flex items-center gap-2">
-                <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="px-2 py-1.5 text-xs border border-gray-300 rounded-md w-36" required />
+                <input type="email" placeholder="E-mail ou usuário" value={email} onChange={(e) => setEmail(e.target.value)} className="px-2 py-1.5 text-xs border border-gray-300 rounded-md w-36" required />
                 <div className="relative">
                   <input type={showPassword ? 'text' : 'password'} placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="px-2 py-1.5 pr-7 text-xs border border-gray-300 rounded-md w-28" required />
                   <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400">

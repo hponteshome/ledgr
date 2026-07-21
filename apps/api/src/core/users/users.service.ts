@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import { RegisterDto } from '../../auth/dto/register.dto';
@@ -118,6 +118,15 @@ async findByDocument(document: string) {
       throw new NotFoundException('User not found');
     }
 
+    if (data.nickname) {
+      const nicknameOwner = await this.prisma.user.findFirst({
+        where: { nickname: { equals: data.nickname, mode: 'insensitive' }, id: { not: id } },
+      });
+      if (nicknameOwner) {
+        throw new ConflictException('Este nickname ja esta em uso por outro usuario.');
+      }
+    }
+
     const updatedUser = await this.prisma.user.update({
       where: { id },
       data: {
@@ -151,6 +160,13 @@ async findByDocument(document: string) {
   return this.prisma.user.findUnique({
     where: { email },
     include: { profile: true } // se precisar das permissões
+  });
+}
+
+async findByNickname(nickname: string) {
+  return this.prisma.user.findFirst({
+    where: { nickname: { equals: nickname, mode: 'insensitive' } },
+    include: { profile: true }
   });
 }
 

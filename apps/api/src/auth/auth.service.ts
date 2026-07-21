@@ -59,8 +59,12 @@ export class AuthService {
   }
 
   
-  async validateUser(email: string, password: string): Promise<any> {
-    const user = await this.usersService.findByEmail(email.toLowerCase());
+  async validateUser(identifier: string, password: string): Promise<any> {
+    const normalized = identifier.toLowerCase();
+    let user = await this.usersService.findByEmail(normalized);
+    if (!user) {
+      user = await this.usersService.findByNickname(normalized);
+    }
     if (!user) {
       return null;
     }

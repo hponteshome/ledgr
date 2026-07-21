@@ -34,7 +34,7 @@ model User {
   email               String    @unique @map("email") @db.VarChar
   passwordHash        String    @map("password_hash") @db.VarChar(255)
   fullName            String    @map("full_name") @db.VarChar
-  nickname            String?   @map("nickname") @db.VarChar
+  nickname            String?   @unique @map("nickname") @db.VarChar
   birthDate           DateTime? @map("birth_date") @db.Timestamp(6)
   phone1              String?   @map("phone_1") @db.VarChar
   phone2              String?   @map("phone_2") @db.VarChar
