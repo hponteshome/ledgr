@@ -135,7 +135,12 @@ export const QsaVinculoGrid: React.FC<Props> = ({ companyId, partners, readOnly 
       }
     } catch { /* nao encontrado */ }
     const cpfParam = digits ? '&vinculado=' + digits : '';
-    navigate('/app/persons/new?returnTo=' + encodeURIComponent('/app/companies/edit/' + companyId + '?tab=contabil' + cpfParam));
+    navigate('/app/persons/new', {
+      state: {
+        initialCpf: digits || undefined,
+        returnTo: '/app/companies/edit/' + companyId + '?tab=contabil' + cpfParam,
+      },
+    });
   };
 
   if (!partners || partners.length === 0) return null;

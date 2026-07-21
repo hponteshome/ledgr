@@ -7,6 +7,14 @@ import { PrismaService } from '../../prisma/prisma.service';
 export class ProfilesService {
   constructor(private readonly prisma: PrismaService) {}
 
+  create(data: { name?: string; permissions?: any }) {
+    return this.prisma.profile.create({
+      data: {
+        name: data.name,
+        permissions: data.permissions ?? {},
+      },
+    });
+  }
   findAll() {
     return this.prisma.profile.findMany({
       where: { isActive: true },

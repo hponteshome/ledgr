@@ -34,6 +34,11 @@ export class ProfilesController {
 
   constructor(private readonly profilesService: ProfilesService) {}
 
+  @RequireResourceAccess('profiles', 'EDIT')
+  @Post()
+  async create(@Body() data: any) {
+    return this.profilesService.create(data);
+  }
   @Get()
   async findAll() {
     return this.profilesService.findAll();
