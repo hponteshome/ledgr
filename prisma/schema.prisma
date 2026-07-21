@@ -68,6 +68,7 @@ model User {
   documents         Document[]
   documentVersions  DocumentVersion[]
   documentSigners   DocumentSigner[]
+  passwordResetTokens PasswordResetToken[]
   documentTemplates DocumentTemplate[]
   auditLogs         AuditLog[]                @relation("UserAuditLogs")
   createdAccounts   ChartOfAccounts[]         @relation("CreatedAccounts")
@@ -154,6 +155,20 @@ model AccessUnlockRequest {
 
 /// Perfis de acesso com permissões em formato JSON.
 /// Vinculado a User via profileId.
+model PasswordResetToken {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @map("token_hash") @db.VarChar(255)
+  expiresAt DateTime  @map("expires_at") @db.Timestamp(6)
+  usedAt    DateTime? @map("used_at") @db.Timestamp(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
 model Profile {
   id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name               String?   @map("name") @db.VarChar

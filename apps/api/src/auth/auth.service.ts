@@ -4,7 +4,9 @@ import { JwtService } from '@nestjs/jwt';
 import { UsersService } from '../core/users/users.service';
 import { RegisterDto } from './dto/register.dto';
 import * as bcrypt from 'bcryptjs';
+import * as crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
+import { MailService } from '../mail/mail.service';
 
 @Injectable()
 export class AuthService {
@@ -12,6 +14,7 @@ export class AuthService {
     private usersService: UsersService,
     private jwtService: JwtService,
     private prisma: PrismaService,
+    private mailService: MailService,
   ) {}
 
   async debugUser(email: string) {
@@ -186,6 +189,59 @@ export class AuthService {
       });
     }
     return { success: true, message: 'Solicitacao enviada. O administrador ira analisar.' };
+  }
+
+  async forgotPassword(email: string) {
+    const genericResponse = {
+      success: true,
+      message: 'Se este e-mail estiver cadastrado, voce recebera um link de recuperacao em instantes.',
+    };
+    const user = await this.usersService.findByEmail(email.toLowerCase());
+    if (!user) return genericResponse;
+
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hora
+
+    await this.prisma.passwordResetToken.create({
+      data: { userId: user.id, tokenHash, expiresAt },
+    });
+
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const resetLink = `${frontendUrl}/reset-password?token=${rawToken}`;
+
+    try {
+      await this.mailService.sendPasswordReset(user.email, resetLink);
+    } catch {
+      // Nao expõe falha de envio ao cliente - loga no servico de email
+    }
+
+    return genericResponse;
+  }
+
+  async resetPassword(token: string, newPassword: string) {
+    if (!token || !newPassword || newPassword.length < 6) {
+      throw new ForbiddenException('Token invalido ou senha muito curta.');
+    }
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const record = await this.prisma.passwordResetToken.findFirst({
+      where: { tokenHash, usedAt: null, expiresAt: { gt: new Date() } },
+    });
+    if (!record) {
+      throw new ForbiddenException('Link invalido ou expirado. Solicite uma nova recuperacao de senha.');
+    }
+
+    const hash = await bcrypt.hash(newPassword, 10);
+    await this.prisma.$transaction([
+      this.prisma.user.update({ where: { id: record.userId }, data: { passwordHash: hash } }),
+      this.prisma.passwordResetToken.update({ where: { id: record.id }, data: { usedAt: new Date() } }),
+      this.prisma.passwordResetToken.updateMany({
+        where: { userId: record.userId, usedAt: null, id: { not: record.id } },
+        data: { usedAt: new Date() },
+      }),
+    ]);
+
+    return { success: true, message: 'Senha redefinida com sucesso.' };
   }
 
 }

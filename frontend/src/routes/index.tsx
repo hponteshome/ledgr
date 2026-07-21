@@ -12,6 +12,8 @@ import ProvisoesPage from '../pages/finance/ProvisoesPage';
 import { CompanyList } from '../pages/companies/CompanyList';
 import { CompanyForm } from '../pages/companies/CompanyForm';
 import { Register } from '../pages/register/Register';
+import { ForgotPassword } from '../pages/forgot-password/ForgotPassword';
+import { ResetPassword } from '../pages/reset-password/ResetPassword';
 import { UserList } from '../pages/users/UserList';
 import PendentesPage from '../pages/users/PendentesPage';
 import UnlockRequestsPage from '../pages/users/UnlockRequestsPage';
@@ -136,6 +138,8 @@ export const AppRoutes = () => {
     return (
         <Routes>
             <Route path="/register" element={<Register />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/" element={<Layout />}>
                 <Route index element={<LedgrHome />} />
                 <Route path="app" element={<Navigate to="/app/dashboard" replace />} />
