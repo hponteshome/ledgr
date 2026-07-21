@@ -19,8 +19,13 @@ async function bootstrap() {
     logger: new QuietLogger(),
   });
   // 1. Configuração de CORS (Essencial para o seu frontend em Vite)
+  const corsOrigins = (process.env.CORS_ORIGINS || 'http://localhost:5173')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+
   app.enableCors({
-    origin: 'http://localhost:5173',
+    origin: corsOrigins,
     credentials: true,
       exposedHeaders: ['x-company-id', 'Content-Disposition'], // ← ISSO ESTÁ FALTANDO
   allowedHeaders: ['Content-Type', 'Authorization', 'x-company-id'],
