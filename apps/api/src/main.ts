@@ -35,7 +35,10 @@ async function bootstrap() {
   // app.setGlobalPrefix('api');
   (app as any).useStaticAssets(join(__dirname, '..', 'uploads'), { prefix: '/uploads' });
   console.log('📁 Uploads servidos em http://localhost:3000/uploads');
-  app.use(require('express').json({ limit: '10mb' }));
+  app.use(require('express').json({
+    limit: '10mb',
+    verify: (req: any, _res, buf) => { req.rawBody = buf; },
+  }));
   app.use(require('express').urlencoded({ limit: '10mb', extended: true }));
   await app.listen(3000);
   console.log('🚀 Servidor rodando em http://localhost:3000');

@@ -248,7 +248,7 @@ export class CompanyService {
   }
 
 async findAvailable(user: any) {
-  const isMasterAdmin = user?.profile?.isMasterAdmin === true;
+  const isMasterAdmin = (user?.profile?.permissions as any)?.all === true;
 
   return this.prisma.company.findMany({
     where: {

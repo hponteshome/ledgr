@@ -1,7 +1,9 @@
+import * as crypto from 'crypto';
 // apps/api/src/modules/signatures/signatures.controller.ts
 import {
   Controller, Post, Get, Delete, Param, Body,
   UseInterceptors, Req, Query, Redirect, RawBodyRequest,
+  ForbiddenException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UploadedFile } from '@nestjs/common';
@@ -12,6 +14,7 @@ import { ClicksignService } from './clicksign.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SignatureValidatorService } from './signature-validator.service';
 import { JwtAuthGuard } from '../../auth/guards/jwt.guard';
+import { SkipCompanyCheck } from '../../multi-company/company.interceptor';
 import { UseGuards } from '@nestjs/common';
 
 @Controller('signatures')
@@ -92,7 +95,19 @@ export class SignaturesController {
 
   // ── ClickSign — webhook ───────────────────────────────────────────────────
   @Post('clicksign/webhook')
-  async clicksignWebhook(@Body() body: any) {
+  @SkipCompanyCheck()
+  async clicksignWebhook(@Req() req: any, @Body() body: any) {
+    const signature = req.headers['x-clicksign-signature'];
+    const secret = process.env.CLICKSIGN_WEBHOOK_SECRET;
+    if (!secret) {
+      console.error('[ClickSign Webhook] CLICKSIGN_WEBHOOK_SECRET nao configurado - rejeitando por seguranca');
+      throw new ForbiddenException('Webhook nao configurado corretamente.');
+    }
+    const expected = crypto.createHmac('sha256', secret).update(req.rawBody).digest('hex');
+    if (!signature || !crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) {
+      console.warn('[ClickSign Webhook] Assinatura invalida - requisicao rejeitada');
+      throw new ForbiddenException('Assinatura invalida.');
+    }
     await this.clicksignService.processWebhook(body);
     return { ok: true };
   }
@@ -140,6 +155,7 @@ export class SignaturesController {
 
   @Get('govbr/callback')
   @Redirect()
+  @SkipCompanyCheck()
   async govBrCallback(
     @Req() req: any,
     @Query('code') code: string,
