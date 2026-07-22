@@ -2995,3 +2995,48 @@ risco de afetar funcionalidade real ja em uso), depois avaliar se os arquivos em
 infra/prisma/ (fix-auth.ts, seed-Levels.ts) ainda sao necessarios ou podem ser
 removidos (parecem scripts pontuais de setup/migracao ja usados uma vez, como o
 executa-plano.ts que corrigimos).
+
+## PENDENCIA registrada 22/07/2026 - Feature "Contrato de Locacao" (medio prazo)
+
+**Origem:** discussao sobre apuracao de impostos LM (Lucro Real, competencia junho/2026).
+Usuario apontou corretamente: aluguel deve ser tributado por competencia mesmo sem receber
+(regime de competencia do Lucro Real), e propos ter um card por imovel com dados de
+locacao/vigencia/valor.
+
+**Descoberta arquitetural:** ProvisaoService (apps/api/src/modules/finance/provisao.service.ts)
+ja e um motor completo de recorrencia mensal com vigencia (competenciaIni/Fim), geracao
+automatica de AgendaEvent, ApEntry e JournalEntry (debito Despesa / credito Passivo) - mas
+e assimetrico, construido so para DESPESA/PASSIVO (contas a pagar), nao para RECEITA/ATIVO
+(contas a receber).
+
+**Proposta de design (nao implementada ainda):**
+Criar entidade 'PropertyLease' (Contrato de Locacao) vinculada a FixedAsset, espelhando a
+logica do ProvisaoConfig mas para o lado de receita:
+- fixedAssetId, locatarioNome, locatarioDocumento, valorMensal, diaVencimento
+- vigenciaInicio/vigenciaFim, indiceReajuste + dataProximoReajuste, status
+- Gera ArEntry (origin ALUGUEL) automaticamente por competencia, dentro da vigencia,
+  reaproveitando o padrao de gerarLancamentos() do ProvisaoService (evento AgendaEvent +
+  JournalEntry debito Clientes/credito Receita, espelhado do debito Despesa/credito Passivo)
+- Card por imovel na tela Ativo Imobilizado (ou aba nova): locatario atual, valor, vigencia,
+  dias ate vencimento do contrato, proximo reajuste, status de recebimento do mes corrente
+
+**Dados reais ja levantados nesta sessao (aproveitar quando implementar):**
+Contratos ativos LM confirmados via extrato Galvao Locacoes #000264690 (jun/2026):
+- NorthYork (Rua Pedro Nicco 225 SB 25): locatario Diogo Gabriel Lovato, CPF 050.735.699-38,
+  aluguel R\.871,25/mes, vigencia 01/02/24 a 30/01/27, proximo reajuste 01/02/27
+- Ecoville (Rua Prof. Pedro Viriato Parigot de Souza 1609 AP 1602): locatario Andre Calle
+  Volpi, CPF 036.830.059-55, aluguel R\.356,68/mes, vigencia 22/05/20 a 30/10/26,
+  proximo reajuste 01/11/26
+- Demais 6 imoveis alugados (Conj32 R\.000, Landmark-conjunto R\.500, LoftSP R\.700,
+  Mare62 R\.000, Mare88 R\.000, Guaruja R\.000) - valores de planilha propria, locatario
+  e vencimento ainda 'A definir', pendente de contratos para completar
+- Mare92: vacante, nao alugado
+
+**Achado colateral relevante:** condominio de Mare62/Mare88 e DESPESA DA LM (nao repassado
+ao locatario) - corrige nota anterior do projeto (22/06/2026) que assumia ser reembolso
+recebido do locatario. Taxa de administracao da Galvao (R\.625,41 combinado NorthYork+
+Ecoville em jun/2026) tambem e despesa dedutivel real, ainda nao lancada em lugar nenhum.
+
+**Nao bloqueia a apuracao de sexta** - resolvido no curto prazo via patch direto no
+accounts-receivable.service.ts (gerar journalEntry no create()) + ProvisaoService existente
+para provisionar as DARFs em contas a pagar.
