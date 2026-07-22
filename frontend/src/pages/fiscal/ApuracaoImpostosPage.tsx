@@ -5,6 +5,7 @@ import api from '../../services/api';
 const fmtBR = (v: number | null | undefined) =>
   v == null ? 'R$ 0,00' : v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const fmtPct = (v: number) => (v * 100).toFixed(4).replace('.', ',') + '%';
+const parseBR = (v: string) => parseFloat(v.replace(/\./g, '').replace(',', '.')) || 0;
 
 const S = {
   page:  { padding: '24px 0', fontFamily: 'var(--font-sans,system-ui)', fontSize: 14, color: 'var(--color-text-primary)' } as React.CSSProperties,
@@ -18,6 +19,7 @@ const S = {
   label: { fontSize: 12, color: 'var(--color-text-secondary)' },
   value: { fontSize: 13, fontWeight: 500 },
   input: { height: 32, border: '0.5px solid var(--color-border-secondary)', borderRadius: 6, padding: '0 9px', fontSize: 13, background: 'var(--color-background-primary)', color: 'var(--color-text-primary)', outline: 'none', width: '100%', boxSizing: 'border-box' as const },
+  inputSm: { height: 30, border: '0.5px solid var(--color-border-secondary)', borderRadius: 6, padding: '0 9px', fontSize: 13, background: 'var(--color-background-primary)', color: 'var(--color-text-primary)', outline: 'none', width: 140, textAlign: 'right' as const, boxSizing: 'border-box' as const },
   btn:   (c='#111') => ({ height: 32, border: 'none', borderRadius: 6, padding: '0 16px', fontSize: 12, cursor: 'pointer', background: c, color: '#fff', fontWeight: 500 } as React.CSSProperties),
   btnO:  { height: 32, border: '0.5px solid var(--color-border-secondary)', borderRadius: 6, padding: '0 14px', fontSize: 12, cursor: 'pointer', background: 'var(--color-background-primary)', color: 'var(--color-text-primary)' } as React.CSSProperties,
   tab:   (a: boolean) => ({ height: 30, border: '0.5px solid ' + (a ? '#111' : 'var(--color-border-tertiary)'), borderRadius: 6, padding: '0 14px', fontSize: 12, cursor: 'pointer', background: a ? '#111' : 'var(--color-background-primary)', color: a ? '#fff' : 'var(--color-text-secondary)' } as React.CSSProperties),
@@ -41,6 +43,7 @@ export default function ApuracaoImpostosPage() {
 
   // Ajustes editaveis
   const [receitaExcluida, setReceitaExcluida] = useState('0');
+  const [receitaExcluidaFocado, setReceitaExcluidaFocado] = useState(false);
   const [creditosPis, setCreditosPis] = useState('0');
   const [creditosCofins, setCreditosCofins] = useState('0');
   const [adicoes, setAdicoes] = useState('0');
@@ -280,8 +283,8 @@ export default function ApuracaoImpostosPage() {
               <div style={{ ...S.kpiV, color:'#15803D' }}>{fmtBR(receitas)}</div>
             </div>
             <div style={S.kpi}>
-              <div style={S.kpiL}>Resultado Contábil</div>
-              <div style={{ ...S.kpiV, color: resultado >= 0 ? '#15803D' : '#DC2626' }}>{fmtBR(resultado)}</div>
+              <div style={S.kpiL}>Base de Cálculo</div>
+              <div style={{ ...S.kpiV, color: baseCalc >= 0 ? '#15803D' : '#DC2626' }}>{fmtBR(baseCalc)}</div>
             </div>
             <div style={S.kpi}>
               <div style={S.kpiL}>PIS Devido</div>
@@ -310,9 +313,17 @@ export default function ApuracaoImpostosPage() {
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:24 }}>
                 <div>
                   <div style={S.row}><span style={S.label}>Receita Bruta</span><span style={{ ...S.value, color:'#15803D' }}>{fmtBR(receitas)}</span></div>
-                  <div style={{ ...S.row, alignItems:'flex-start', flexDirection:'column', gap:4 }}>
-                    <span style={S.label}>(-) Receitas Excluídas</span>
-                    <input style={S.input} type="text" value={receitaExcluida} onChange={e=>setReceitaExcluida(e.target.value)} placeholder="0,00"/>
+                  <div style={{ ...S.row }}>
+                    <span style={S.label}>(-) Deduções da Receita</span>
+                    <input
+                      style={S.inputSm}
+                      type="text"
+                      value={receitaExcluidaFocado ? receitaExcluida : fmtBR(Number(receitaExcluida) || 0)}
+                      onFocus={() => setReceitaExcluidaFocado(true)}
+                      onBlur={() => setReceitaExcluidaFocado(false)}
+                      onChange={e => setReceitaExcluida(e.target.value)}
+                      placeholder="0,00"
+                    />
                   </div>
                   <div style={S.row}><span style={S.label}>Base de Cálculo</span><span style={S.value}>{fmtBR(baseCalc)}</span></div>
                   <div style={S.row}><span style={S.label}>Alíq. PIS ({fmtPct(aliqPis)})</span><span style={S.value}>{fmtBR(baseCalc * aliqPis)}</span></div>
@@ -320,13 +331,13 @@ export default function ApuracaoImpostosPage() {
                 </div>
                 <div>
                   {regime === 'LUCRO_REAL' && <>
-                    <div style={{ ...S.row, alignItems:'flex-start', flexDirection:'column', gap:4 }}>
+                    <div style={{ ...S.row }}>
                       <span style={S.label}>(-) Créditos PIS</span>
-                      <input style={S.input} type="text" value={creditosPis} onChange={e=>setCreditosPis(e.target.value)} placeholder="0,00"/>
+                      <input style={S.inputSm} type="text" value={creditosPis} onChange={e=>setCreditosPis(e.target.value)} placeholder="0,00"/>
                     </div>
-                    <div style={{ ...S.row, alignItems:'flex-start', flexDirection:'column', gap:4 }}>
+                    <div style={{ ...S.row }}>
                       <span style={S.label}>(-) Créditos COFINS</span>
-                      <input style={S.input} type="text" value={creditosCofins} onChange={e=>setCreditosCofins(e.target.value)} placeholder="0,00"/>
+                      <input style={S.inputSm} type="text" value={creditosCofins} onChange={e=>setCreditosCofins(e.target.value)} placeholder="0,00"/>
                     </div>
                   </>}
                   <div style={{ ...S.row, borderTop:'2px solid var(--color-border-tertiary)', marginTop:8, paddingTop:12 }}>
@@ -411,18 +422,18 @@ export default function ApuracaoImpostosPage() {
                 <div>
                   <div style={S.row}><span style={S.label}>Resultado Contábil</span><span style={{ ...S.value, color: resultado >= 0 ? '#15803D' : '#DC2626' }}>{fmtBR(resultado)}</span></div>
                   {regime === 'LUCRO_REAL' && <>
-                    <div style={{ ...S.row, alignItems:'flex-start', flexDirection:'column', gap:4 }}>
+                    <div style={{ ...S.row }}>
                       <span style={S.label}>(+) Adições LALUR</span>
-                      <input style={S.input} type="text" value={adicoes} onChange={e=>setAdicoes(e.target.value)} placeholder="0,00"/>
+                      <input style={S.inputSm} type="text" value={adicoes} onChange={e=>setAdicoes(e.target.value)} placeholder="0,00"/>
                     </div>
-                    <div style={{ ...S.row, alignItems:'flex-start', flexDirection:'column', gap:4 }}>
+                    <div style={{ ...S.row }}>
                       <span style={S.label}>(-) Exclusões LALUR</span>
-                      <input style={S.input} type="text" value={exclusoes} onChange={e=>setExclusoes(e.target.value)} placeholder="0,00"/>
+                      <input style={S.inputSm} type="text" value={exclusoes} onChange={e=>setExclusoes(e.target.value)} placeholder="0,00"/>
                     </div>
                     <div style={S.row}><span style={S.label}>Lucro Real</span><span style={S.value}>{fmtBR(resultado + (parseFloat(adicoes)||0) - (parseFloat(exclusoes)||0))}</span></div>
-                    <div style={{ ...S.row, alignItems:'flex-start', flexDirection:'column', gap:4 }}>
+                    <div style={{ ...S.row }}>
                       <span style={S.label}>(-) Compensações Prej. Acumulados</span>
-                      <input style={S.input} type="text" value={compensacoes} onChange={e=>setCompensacoes(e.target.value)} placeholder="0,00"/>
+                      <input style={S.inputSm} type="text" value={compensacoes} onChange={e=>setCompensacoes(e.target.value)} placeholder="0,00"/>
                     </div>
                   </>}
                 </div>
