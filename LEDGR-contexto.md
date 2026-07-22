@@ -2960,3 +2960,38 @@ vinculada e campo country preenchido.
 
 **Pendente:** LM/PlanoLM.Txt e outros CSVs de importacao ficam intencionalmente fora
 do git (arquivos de trabalho local, nao dados versionaveis).
+
+## PENDENCIA CRITICA registrada 22/07/2026 - 3.870 erros de TypeScript no build da raiz
+
+Ao rodar 'npm run start:dev' da RAIZ do monorepo (D:\Projetos\Ledgr), o tsc --watch
+reporta 3.870 erros de compilacao no projeto inteiro. Rodando de dentro de apps/api
+especificamente, o build compila limpo (0 erros) - e esse tem sido o padrao de uso
+real ate agora, por isso nunca foi percebido antes.
+
+Erros identificados na amostra que vimos (nao investigado a fundo, so descoberto por
+acidente enquanto debugavamos o backup.service.ts):
+- infra/prisma/fix-auth.ts:35 - Cannot find name 'prisma' (variavel nao declarada/importada)
+- infra/prisma/seed-Levels.ts:3 - Module 'pg' has no exported member 'Pool' (import errado
+  ou versao do pacote 'pg' incompativel)
+- infra/prisma/executa-plano.ts - JA CORRIGIDO nesta sessao (era 'await prisma.()' sem
+  nome de metodo, virou 'await prisma.\()')
+- multi-company/multi-company.service.ts:5 - Type 'null' is not assignable to type
+  'string' (private companyId: string = null - provavelmente devia ser string | null
+  ou string ou ainda nao inicializado)
+- modules/tabelas-legais/tabelas-legais.controller.ts - erros TS1241/TS1206/TS1270 em
+  cascata nos decorators @Post/@Delete das rotas de indicadores (linhas ~51-65) -
+  parece problema de configuracao de decorators legacy vs novos no tsconfig, ou
+  metodo declarado de forma incorreta afetando os decorators seguintes
+
+Risco: NAO sabemos se algum desses erros afeta funcionalidade real em producao (o
+build de apps/api isolado compila limpo, entao pode ser so ruido de scripts soltos em
+infra/ nunca executados). Mas o de tabelas-legais.controller.ts merece atencao - fica
+no mesmo arquivo que os indicadores economicos que populamos hoje via API do BCB, e
+os erros sao de decorator quebrando SEQUENCIALMENTE varios metodos do controller
+(possivel que algo ANTES da linha 51 tenha um erro de sintaxe que cascateia).
+
+Proximo passo sugerido: investigar tabelas-legais.controller.ts primeiro (maior
+risco de afetar funcionalidade real ja em uso), depois avaliar se os arquivos em
+infra/prisma/ (fix-auth.ts, seed-Levels.ts) ainda sao necessarios ou podem ser
+removidos (parecem scripts pontuais de setup/migracao ja usados uma vez, como o
+executa-plano.ts que corrigimos).
