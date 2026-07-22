@@ -3081,3 +3081,66 @@ passado despercebido se o watch mode nao estivesse ativo.
 **Commits da sessao completa de hoje (do incidente de DB zerado ate aqui):**
 d12e62f, d6612c1, f028c28, 49ea4e5, 5c7452c, e8f9af6, 41f952b, 6f012ef,
 828bdf7, 218ec98, d756f55, 1a4e352, fa17a6f, d4a3554, 2501c11 (15 commits)
+
+## AGENDA - Proxima sessao: resolver os ~3.870 erros de TypeScript (build da raiz)
+
+**Contexto:** ja documentado antes nesta mesma sessao (ver nota anterior "PENDENCIA
+CRITICA registrada 22/07/2026"). Descoberto por acidente ao rodar 'npm run start:dev'
+da RAIZ do monorepo (nao de apps/api) - o build isolado de apps/api sempre compilou
+limpo, entao isso nunca afetou producao ate onde sabemos, mas precisa ser investigado
+e limpo antes do deploy no SERVER02.
+
+**Comando para rodar no INICIO da proxima sessao (gera contagem atualizada + lista
+de arquivos com mais erros, para comparar com os 3.870 originais):**
+
+\\\powershell
+cd D:\Projetos\Ledgr
+npm run start:dev > D:\Temp\tsc_errors_full.log 2>&1
+Start-Sleep -Seconds 90
+Stop-Process -Name node -Force -ErrorAction SilentlyContinue
+
+Write-Host "=== Total de erros ===" -ForegroundColor Green
+Select-String -Path "D:\Temp\tsc_errors_full.log" -Pattern "Found \d+ errors?"
+
+Write-Host "
+=== Top 20 arquivos com mais erros ===" -ForegroundColor Green
+Select-String -Path "D:\Temp\tsc_errors_full.log" -Pattern "^(.+?\.ts)\(\d+,\d+\)|^src/.+?\.ts:\d+:\d+" |
+  ForEach-Object { ( -split ':')[0] } | Group-Object | Sort-Object Count -Descending | Select-Object -First 20
+\\\
+
+**O que ja sabemos de erros especificos (achados por acaso hoje, nao investigados a fundo):**
+1. infra/prisma/fix-auth.ts:35 - Cannot find name 'prisma' (variavel nao
+   declarada/importada) - script solto, provavelmente pode ser removido apos
+   confirmar que ja cumpriu sua funcao (mesmo padrao do executa-plano.ts que
+   corrigimos hoje - so tinha 1 erro de sintaxe, nada estrutural)
+2. infra/prisma/seed-Levels.ts:3 - Module 'pg' has no exported member 'Pool' -
+   import errado ou versao do pacote 'pg' incompativel com o import usado
+3. multi-company/multi-company.service.ts:5 - private companyId: string = null
+   (Type 'null' is not assignable to type 'string') - provavelmente devia ser
+   'string | null' ou nao ter default nenhum
+4. modules/tabelas-legais/tabelas-legais.controller.ts - cascata de erros
+   TS1241/TS1206/TS1270 nos decorators @Post/@Delete das rotas de indicadores
+   (linhas ~51-65) - suspeita de que algo ANTES dessas linhas quebra a sintaxe
+   e cascateia erro nos decorators seguintes. Este e o de MAIOR RISCO REAL,
+   porque fica no mesmo arquivo que ja usamos hoje para os indicadores
+   economicos do BCB (calcularCorrecao, upsertIndicador etc. - tudo isso
+   FUNCIONOU normalmente via curl/tela hoje, entao o erro pode ser cosmetico/
+   nao-bloqueante, mas precisa confirmar)
+5. Ja corrigido nesta sessao: infra/prisma/executa-plano.ts (era so
+   'await prisma.()' sem nome de metodo, virou 'prisma.\()')
+
+**Plano de ataque sugerido para amanha:**
+1. Rodar o comando acima para contagem atualizada e lista por arquivo
+2. Investigar tabelas-legais.controller.ts PRIMEIRO (maior risco de afetar
+   funcionalidade real ja em uso - indicadores/tabelas legais que usamos hoje)
+3. Avaliar infra/prisma/*.ts (fix-auth.ts, seed-Levels.ts) - provavelmente
+   scripts de setup ja usados uma vez, candidatos a remocao apos confirmar
+4. Corrigir multi-company.service.ts (fix trivial, so trocar tipo)
+5. Para o resto (provavelmente a maioria dos ~3.800 restantes), classificar
+   por padrao repetido antes de corrigir um por um - erros em cascata (tipo
+   o dos decorators) podem ter uma causa raiz comum que resolve dezenas de
+   uma vez so
+
+**Nao tentar corrigir tudo numa sessao so** - avaliar extensao real primeiro,
+e focar no que tem risco de afetar producao antes de limpar ruido cosmetico
+de scripts nunca executados.
