@@ -25,6 +25,7 @@ export interface ImportRow {
     landFraction?: number;
     iptuRegistration?: string;
     depreciationStart?: string;
+    country?: string;
 }
 
 export interface ImportPreview {
@@ -88,7 +89,7 @@ export class AssetImportService {
             'codigo', 'grupo', 'descricao', 'data_aquisicao', 'valor_aquisicao',
             'land_pct', 'matricula', 'municipio', 'uf', 'conta_ativo', 'conta_deprec',
             'conta_acum', 'cartorio', 'area_construida', 'area_total',
-            'valor_venal_itbi', 'fracao_ideal', 'inscricao iptu',
+            'valor_venal_itbi', 'fracao_ideal', 'inscricao iptu', 'pais',
         ];
 
         // Validação básica do cabeçalho
@@ -145,6 +146,7 @@ export class AssetImportService {
                 landFraction: parseDecimal(cols[16]),
                 iptuRegistration: cols[17] || undefined,
                 depreciationStart: parseDate(cols[18]) || undefined,
+                country: cols[19] || undefined,
             });
         }
 
@@ -175,7 +177,19 @@ export class AssetImportService {
             },
             select: { id: true },
         });
-        return acc?.id ?? undefined;
+        if (acc) return acc.id;
+
+        // Fallback: codigo no banco pode ter pontos (hierarquico) enquanto o
+        // codigo digitado na importacao veio sem pontos (formato "flat").
+        // Compara ignorando pontos dos dois lados.
+        const raw = await this.prisma.$queryRaw<{ id: string }[]>`
+            SELECT id FROM chart_of_accounts
+            WHERE company_id = ${companyId}::uuid
+              AND deleted_at IS NULL
+              AND REPLACE(code, '.', '') = ${clean}
+            LIMIT 1
+        `;
+        return raw[0]?.id ?? undefined;
     }
 
     // ── Importar ────────────────────────────────────────────
@@ -234,6 +248,7 @@ export class AssetImportService {
                     totalArea: row.totalArea ?? null,
                     assessedValue: row.assessedValue ?? null,
                     iptuRegistration: row.iptuRegistration ?? null,
+                    country: row.country || 'Brasil',
                     assetAccountId: assetAccountId ?? null,
                     depreciationAccId: depreciationAccId ?? null,
                     accumDeprecAccId: accumDeprecAccId ?? null,

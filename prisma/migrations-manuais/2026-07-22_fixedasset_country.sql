@@ -1,0 +1,1 @@
+ALTER TABLE fixed_assets ADD COLUMN country VARCHAR DEFAULT 'Brasil';

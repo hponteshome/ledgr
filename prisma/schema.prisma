@@ -1469,6 +1469,7 @@ model FixedAsset {
   zipCode          String?          @map("zip_code") @db.VarChar(9)
   state            String?          @map("state") @db.VarChar(2)
   city             String?          @map("city") @db.VarChar(100)
+  country          String?          @default("Brasil") @map("country") @db.VarChar
 
   // ── Vínculos contábeis ────────────────────────────────────
   assetAccountId    String?          @map("asset_account_id") @db.Uuid
