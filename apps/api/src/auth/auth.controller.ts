@@ -86,6 +86,7 @@ export class AuthController {
         phone:        body.phone,
         level:        body.level,
         password:     body.password,
+        nickname:     body.nickname,
       });
     } catch(e: any) {
       throw new (require('@nestjs/common').BadRequestException)(e.message);

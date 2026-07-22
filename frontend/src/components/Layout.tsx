@@ -1,17 +1,35 @@
 // src/components/Layout.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useCompany } from '../contexts/CompanyContext';
 import { Header } from './Header';
 import { Sidebar } from './SideBar';
 import { FiLogOut, FiAlertTriangle } from 'react-icons/fi';
-import { Toaster } from 'react-hot-toast';
+import { Toaster, toast } from 'react-hot-toast';
 import { SidebarPermissionsProvider } from '../contexts/SidebarPermissionsContext';
 
 export const Layout: React.FC = () => {
   const { signOut, user } = useAuth();
   const { loading } = useCompany();
+
+  // Listener global SSE para notificacoes de sistema (Master Admin apenas)
+  useEffect(() => {
+    const isMaster = (user as any)?.profile?.permissions?.all === true;
+    if (!isMaster) return;
+    const token = localStorage.getItem('@ledgr:token');
+    if (!token) return;
+    const es = new EventSource(`http://localhost:3000/chat/stream?token=${token}`);
+    es.onmessage = (e) => {
+      try {
+        const event = JSON.parse(e.data);
+        if (event.type === 'NEW_MESSAGE' && event.message?.type === 'SYSTEM') {
+          toast(event.message.body ?? 'Nova notificacao do sistema', { icon: '\u{1F514}', duration: 6000 });
+        }
+      } catch {}
+    };
+    return () => es.close();
+  }, [user]);
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(true);
 

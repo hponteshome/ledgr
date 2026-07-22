@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { FiUser, FiMail, FiLock, FiPhone, FiFileText, FiArrowRight, FiCheckCircle } from 'react-icons/fi';
+import { FiUser, FiMail, FiLock, FiPhone, FiFileText, FiArrowRight, FiCheckCircle, FiAtSign } from 'react-icons/fi';
 import api from '../../services/api';
 
 export const Register: React.FC = () => {
   const navigate = useNavigate();
-  const [form, setForm] = useState({document:'',fullName:'',email:'',phone:'',password:'',confirm:''});
+  const [form, setForm] = useState({document:'',fullName:'',nickname:'',email:'',phone:'',password:'',confirm:''});
   const [loading,  setLoading]  = useState(false);
   const [error,    setError]    = useState('');
   const [success,  setSuccess]  = useState('');
@@ -27,7 +27,7 @@ export const Register: React.FC = () => {
     setLoading(true);
     try {
       const r = await api.post('/auth/register', {
-        document: cpf, fullName: form.fullName,
+        document: cpf, fullName: form.fullName, nickname: form.nickname,
         email: form.email, phone: form.phone, password: form.password,
       });
       setSuccess(r.data.message || 'Cadastro enviado! Aguarde aprovação do administrador.');
@@ -69,6 +69,8 @@ export const Register: React.FC = () => {
                   value:fmtCPF(form.document),maxLen:14},
                 {icon:<FiUser/>,label:'Nome Completo *',field:'fullName',
                   placeholder:'Seu nome completo'},
+                {icon:<FiAtSign/>,label:'Nickname (usuario de login) *',field:'nickname',
+                  placeholder:'Como voce quer logar, ex: joaosilva'},
                 {icon:<FiMail/>,label:'E-mail *',field:'email',type:'email',
                   placeholder:'seu@email.com'},
                 {icon:<FiPhone/>,label:'Telefone',field:'phone',

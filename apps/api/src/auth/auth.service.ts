@@ -7,6 +7,7 @@ import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
+import { ChatService } from '../chat/chat.service';
 
 @Injectable()
 export class AuthService {
@@ -15,6 +16,7 @@ export class AuthService {
     private jwtService: JwtService,
     private prisma: PrismaService,
     private mailService: MailService,
+    private chatService: ChatService,
   ) {}
 
   async debugUser(email: string) {
@@ -23,13 +25,13 @@ export class AuthService {
 
   async register(dto: {
     document: string; documentType?: string; fullName: string; email: string;
-    phone?: string; level?: number; password: string;
+    phone?: string; level?: number; password: string; nickname: string;
   }) {
     const cleanCpf = dto.document.replace(/\D/g,'');
     const exists = await this.prisma.user.findFirst({
-      where: { OR: [{ document: cleanCpf },{ email: dto.email.toLowerCase() }], deletedAt: null }
+      where: { OR: [{ document: cleanCpf },{ email: dto.email.toLowerCase() },{ nickname: { equals: dto.nickname, mode: 'insensitive' } }], deletedAt: null }
     });
-    if (exists) throw new BadRequestException('CPF ou e-mail ja cadastrado.');
+    if (exists) throw new BadRequestException('CPF, e-mail ou nickname ja cadastrado.');
 
     const person = await this.prisma.person.findFirst({
       where: { cpf: cleanCpf, deletedAt: null }
@@ -46,16 +48,45 @@ export class AuthService {
     }
     const hash = await bcrypt.hash(dto.password, 10);
     try {
-      await this.prisma.user.create({
-        data: {
-          document: cleanCpf, documentType: dto.documentType || 'CPF',
-          email: dto.email.toLowerCase(), passwordHash: hash,
-          fullName: dto.fullName, phone1: dto.phone,
-          status: 'PENDENTE', isActive: false, level: dto.level ?? 0,
-          requestedAt: new Date(), pendingFlags,
-          ...(personId ? { personId } : {}),
-        },
+      const newUser = await this.prisma.user.create({
+      data: {
+        document: cleanCpf, documentType: dto.documentType || 'CPF',
+        email: dto.email.toLowerCase(), passwordHash: hash,
+        fullName: dto.fullName, phone1: dto.phone, nickname: dto.nickname,
+        status: 'PENDENTE', isActive: false, level: dto.level ?? 0,
+        requestedAt: new Date(), pendingFlags,
+        ...(personId ? { personId } : {}),
+      },
+    });
+
+    // Notifica todos os Master Admins ativos (nao bloqueia o cadastro se falhar)
+    try {
+      const masterAdmins = await this.prisma.user.findMany({
+        where: { isActive: true, status: 'active', profile: { isNot: null } },
+        include: { profile: true },
       });
+      const notificar = masterAdmins.filter(u => (u.profile?.permissions as any)?.all === true);
+      for (const admin of notificar) {
+        this.mailService.sendNewRegistrationNotification(admin.email, {
+          fullName: dto.fullName, email: dto.email, document: cleanCpf, pendingFlags,
+        }).catch(() => {});
+            try {
+        const conv = await this.chatService.createConversation(newUser.id, {
+          type: 'DIRECT',
+          participantIds: [admin.id],
+        });
+        await this.chatService.sendMessage(newUser.id, conv.id, {
+          type: 'SYSTEM',
+          body: `Nova solicitacao de cadastro: ${dto.fullName} (${dto.email}) aguardando aprovacao.`,
+          contextLabel: 'novo_cadastro',
+        });
+      } catch (chatErr: any) {
+        console.error('[register] Falha ao criar mensagem de chat:', chatErr.message, chatErr.code, chatErr.meta);
+      }
+    }
+  } catch (outerErr: any) {
+    console.error('[register] Falha ao buscar/notificar admins:', outerErr.message);
+  }
     } catch (err: any) {
       if (err?.code === 'P2002') {
         throw new BadRequestException('CPF ou e-mail ja cadastrado.');

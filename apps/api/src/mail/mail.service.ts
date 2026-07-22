@@ -44,4 +44,40 @@ export class MailService {
       throw err;
     }
   }
+
+  async sendNewRegistrationNotification(to: string, dados: { fullName: string; email: string; document: string; pendingFlags: string }) {
+    try {
+      const flagLabel: Record<string, string> = {
+        OK: 'CPF conferido — sem divergencias',
+        CPF_NAO_ENCONTRADO: 'ATENCAO: CPF nao encontrado na base de Pessoas',
+        DIVERGENCIA_NOME: 'ATENCAO: Nome divergente do cadastro de Pessoas',
+      };
+      await this.transporter.sendMail({
+        from: process.env.SMTP_FROM || process.env.SMTP_USER,
+        to,
+        subject: 'LEDGR — Nova solicitacao de cadastro pendente',
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
+            <h2 style="color: #1D4ED8;">Nova solicitacao de acesso</h2>
+            <p>Um novo usuario solicitou acesso ao sistema e aguarda sua aprovacao.</p>
+            <table style="width:100%;border-collapse:collapse;margin:16px 0;">
+              <tr><td style="padding:4px 0;color:#6B7280;">Nome:</td><td style="padding:4px 0;font-weight:600;">${dados.fullName}</td></tr>
+              <tr><td style="padding:4px 0;color:#6B7280;">E-mail:</td><td style="padding:4px 0;">${dados.email}</td></tr>
+              <tr><td style="padding:4px 0;color:#6B7280;">CPF:</td><td style="padding:4px 0;">${dados.document}</td></tr>
+              <tr><td style="padding:4px 0;color:#6B7280;">Status:</td><td style="padding:4px 0;">${flagLabel[dados.pendingFlags] ?? dados.pendingFlags}</td></tr>
+            </table>
+            <p>
+              <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/app/usuarios/pendentes" style="display:inline-block;padding:12px 24px;background:#2563EB;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;">
+                Analisar solicitacao
+              </a>
+            </p>
+          </div>
+        `,
+      });
+      this.logger.log(`Notificacao de novo cadastro enviada para ${to}`);
+    } catch (err: any) {
+      this.logger.error(`Falha ao enviar notificacao de novo cadastro para ${to}: ${err.message}`);
+      // Nao propaga o erro - falha de e-mail nao deve bloquear o cadastro do usuario
+    }
+  }
 }

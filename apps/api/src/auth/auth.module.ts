@@ -9,6 +9,7 @@ import { LocalStrategy } from './strategies/local.strategy';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { MailModule } from '../mail/mail.module';
+import { ChatModule } from '../chat/chat.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { MailModule } from '../mail/mail.module';
     }),
      UsersModule,
     MailModule,
+    ChatModule,
   ],
   providers: [AuthService, LocalStrategy, JwtStrategy, PrismaService],
   controllers: [AuthController],

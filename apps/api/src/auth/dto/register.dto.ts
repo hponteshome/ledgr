@@ -34,6 +34,10 @@ export class RegisterDto {
   @MinLength(3, { message: 'Full name must be at least 3 characters long' })
   fullName: string; // Antes: nome
 
+  @IsString()
+  @MinLength(3, { message: 'Nickname deve ter ao menos 3 caracteres' })
+  nickname: string;
+
   @IsOptional()
   @IsString()
   phoneNumber?: string; // Antes: telefone

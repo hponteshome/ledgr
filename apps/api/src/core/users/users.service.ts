@@ -220,7 +220,7 @@ async findByLogin(login: string) {
     });
   }
 
-  async create(data: RegisterDto) {
+  async create(data: any) {
     const salt = await bcrypt.genSalt();
     const passwordHash = await bcrypt.hash(data.password, salt);
 
