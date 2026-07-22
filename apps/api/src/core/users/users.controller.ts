@@ -103,6 +103,7 @@ export class UsersController {
   }
 
   @RequireResourceAccess('users', 'EDIT')
+  @RequireResourceAccess('users', 'EDIT')
   @Patch(':id')
   async update(
     @Param('id') id: string,

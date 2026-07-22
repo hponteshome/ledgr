@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, Logger, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger, ConflictException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import { RegisterDto } from '../../auth/dto/register.dto';
@@ -116,6 +116,24 @@ async findByDocument(document: string) {
     
     if (!oldUser) {
       throw new NotFoundException('User not found');
+    }
+
+    // Hierarquia de edicao: ninguem edita usuario de nivel igual ou maior,
+    // e Master Admin (permissions.all) so pode ser editado por outro Master Admin.
+    if (adminId !== id) {
+      const admin = await this.prisma.user.findUnique({
+        where: { id: adminId },
+        include: { profile: true },
+      });
+      const adminIsMaster = (admin?.profile?.permissions as any)?.all === true;
+      const targetIsMaster = (oldUser.profile?.permissions as any)?.all === true;
+
+      if (targetIsMaster && !adminIsMaster) {
+        throw new ForbiddenException('Apenas Master Admin pode editar outro Master Admin.');
+      }
+      if (!adminIsMaster && admin && oldUser.level >= admin.level) {
+        throw new ForbiddenException('Voce nao pode editar um usuario de nivel igual ou superior ao seu.');
+      }
     }
 
     if (data.nickname) {
