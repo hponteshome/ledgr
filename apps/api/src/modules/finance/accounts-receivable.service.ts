@@ -8,27 +8,55 @@ export class AccountsReceivableService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(companyId: string, dto: any, userId: string) {
-    return this.prisma.arEntry.create({
-      data: {
-        companyId,
-        title:          dto.title,
-        description:    dto.description ?? null,
-        documentNumber: dto.documentNumber ?? null,
-        origin:         dto.origin ?? 'MANUAL',
-        issueDate:      dto.issueDate ? new Date(dto.issueDate) : null,
-        dueDate:        new Date(dto.dueDate),
-        competenceMonth: dto.competenceMonth ?? null,
-        amount:         new Prisma.Decimal(dto.amount),
-        customerName:    dto.customerName ?? null,
-        customerCnpjCpf: dto.customerCnpjCpf ?? null,
-        customerId:      dto.customerId ?? null,
-        propertyId:      dto.propertyId ?? null,
-        fiscalDocumentId: dto.fiscalDocumentId ?? null,
-        revenueAccountId: dto.revenueAccountId ?? null,
-        fixedAssetId:    dto.fixedAssetId ?? null,
-        notes:           dto.notes ?? null,
-        createdById:     userId,
-      },
+    if (!dto.receivableAccountId) {
+      throw new BadRequestException('receivableAccountId e obrigatorio (conta de Contas a Receber para o lancamento de competencia).');
+    }
+    if (!dto.revenueAccountId) {
+      throw new BadRequestException('revenueAccountId e obrigatorio (conta de Receita para o lancamento de competencia).');
+    }
+    const amount = new Prisma.Decimal(String(dto.amount).replace(',', '.'));
+
+    return this.prisma.$transaction(async (tx) => {
+      const journalEntry = await tx.journalEntry.create({
+        data: {
+          companyId,
+          date: dto.competenceDate ? new Date(dto.competenceDate) : (dto.issueDate ? new Date(dto.issueDate) : new Date()),
+          description: `Receita de competencia: ${dto.title}`,
+          sourceModule: 'FINANCE',
+          createdById: userId,
+          items: {
+            create: [
+              { accountId: dto.receivableAccountId, value: amount, type: 'DEBIT' },
+              { accountId: dto.revenueAccountId,     value: amount, type: 'CREDIT' },
+            ],
+          },
+        },
+      });
+
+      return tx.arEntry.create({
+        data: {
+          companyId,
+          title:          dto.title,
+          description:    dto.description ?? null,
+          documentNumber: dto.documentNumber ?? null,
+          origin:         dto.origin ?? 'MANUAL',
+          issueDate:      dto.issueDate ? new Date(dto.issueDate) : null,
+          dueDate:        new Date(dto.dueDate),
+          competenceMonth: dto.competenceMonth ?? null,
+          amount,
+          customerName:    dto.customerName ?? null,
+          customerCnpjCpf: dto.customerCnpjCpf ?? null,
+          customerId:      dto.customerId ?? null,
+          propertyId:      dto.propertyId ?? null,
+          fiscalDocumentId: dto.fiscalDocumentId ?? null,
+          revenueAccountId: dto.revenueAccountId,
+          receivableAccountId: dto.receivableAccountId,
+          journalEntryId:  journalEntry.id,
+          fixedAssetId:    dto.fixedAssetId ?? null,
+          notes:           dto.notes ?? null,
+          createdById:     userId,
+        },
+      });
     });
   }
 
@@ -127,9 +155,11 @@ export class AccountsReceivableService {
         },
       });
 
-      // Integração contábil: D Caixa/Banco / C Receita (se revenueAccountId configurado)
+      // Integracao contabil: D Caixa/Banco / C Contas a Receber (baixa do titulo).
+      // A receita ja foi reconhecida na COMPETENCIA (ver create()), nao aqui -
+      // creditar revenueAccountId de novo duplicaria a receita.
       const receivingAccountId = dto.receivingAccountId ?? null;
-      if (receivingAccountId && entry.revenueAccountId) {
+      if (receivingAccountId && entry.receivableAccountId) {
         await tx.journalEntry.create({
           data: {
             companyId,
@@ -139,7 +169,26 @@ export class AccountsReceivableService {
             createdById:  userId,
             items: {
               create: [
-                { accountId: receivingAccountId,   value: amount, type: 'DEBIT'  },
+                { accountId: receivingAccountId,      value: amount, type: 'DEBIT'  },
+                { accountId: entry.receivableAccountId, value: amount, type: 'CREDIT' },
+              ],
+            },
+          },
+        });
+      } else if (receivingAccountId && entry.revenueAccountId && !entry.receivableAccountId) {
+        // Compatibilidade com titulos antigos criados antes desta correcao
+        // (sem receivableAccountId - nunca geraram lancamento na competencia).
+        // Mantem comportamento legado: reconhece receita so no recebimento.
+        await tx.journalEntry.create({
+          data: {
+            companyId,
+            date:         new Date(dto.receivedAt),
+            description:  `Recebimento (legado, sem competencia previa): ${entry.title}`,
+            sourceModule: 'FINANCE',
+            createdById:  userId,
+            items: {
+              create: [
+                { accountId: receivingAccountId,     value: amount, type: 'DEBIT'  },
                 { accountId: entry.revenueAccountId, value: amount, type: 'CREDIT' },
               ],
             },

@@ -1,0 +1,1 @@
+ALTER TABLE ar_entries ADD COLUMN receivable_account_id UUID REFERENCES chart_of_accounts(id);

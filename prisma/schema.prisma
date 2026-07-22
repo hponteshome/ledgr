@@ -2099,6 +2099,7 @@ model ArEntry {
   journalEntryId   String? @map("journal_entry_id") @db.Uuid
   agendaEventId    String? @unique @map("agenda_event_id") @db.Uuid
   revenueAccountId String? @map("revenue_account_id") @db.Uuid
+  receivableAccountId String? @map("receivable_account_id") @db.Uuid
 
   notes         String? @map("notes") @db.Text
   attachmentUrl String? @map("attachment_url") @db.VarChar(500)

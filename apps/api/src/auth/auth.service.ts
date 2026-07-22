@@ -1,5 +1,5 @@
 // src/auth/auth.service.ts
-import { Injectable, ForbiddenException } from '@nestjs/common';
+import { Injectable, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { UsersService } from '../core/users/users.service';
 import { RegisterDto } from './dto/register.dto';
@@ -29,7 +29,7 @@ export class AuthService {
     const exists = await this.prisma.user.findFirst({
       where: { OR: [{ document: cleanCpf },{ email: dto.email.toLowerCase() }], deletedAt: null }
     });
-    if (exists) throw new Error('CPF ou e-mail ja cadastrado.');
+    if (exists) throw new BadRequestException('CPF ou e-mail ja cadastrado.');
 
     const person = await this.prisma.person.findFirst({
       where: { cpf: cleanCpf, deletedAt: null }
@@ -45,16 +45,23 @@ export class AuthService {
         pendingFlags = 'DIVERGENCIA_NOME';
     }
     const hash = await bcrypt.hash(dto.password, 10);
-    await this.prisma.user.create({
-      data: {
-        document: cleanCpf, documentType: dto.documentType || 'CPF',
-        email: dto.email.toLowerCase(), passwordHash: hash,
-        fullName: dto.fullName, phone1: dto.phone,
-        status: 'PENDENTE', isActive: false, level: dto.level ?? 0,
-        requestedAt: new Date(), pendingFlags,
-        ...(personId ? { personId } : {}),
-      },
-    });
+    try {
+      await this.prisma.user.create({
+        data: {
+          document: cleanCpf, documentType: dto.documentType || 'CPF',
+          email: dto.email.toLowerCase(), passwordHash: hash,
+          fullName: dto.fullName, phone1: dto.phone,
+          status: 'PENDENTE', isActive: false, level: dto.level ?? 0,
+          requestedAt: new Date(), pendingFlags,
+          ...(personId ? { personId } : {}),
+        },
+      });
+    } catch (err: any) {
+      if (err?.code === 'P2002') {
+        throw new BadRequestException('CPF ou e-mail ja cadastrado.');
+      }
+      throw err;
+    }
     return { status:'PENDENTE', pendingFlags, message:'Cadastro recebido. Aguarde aprovacao.' };
   }
 
