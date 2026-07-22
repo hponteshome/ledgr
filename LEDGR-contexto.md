@@ -2834,3 +2834,129 @@ nao sao recuperaveis via banco. Empresas serao recriadas via lookup automatico d
 na RFB (nao exige preenchimento manual). RECOMENDACAO REGISTRADA: configurar pg_dump
 periodico antes do proximo trabalho destrutivo no banco, especialmente antes do deploy
 em SERVER02.
+
+## Pendencia registrada 21/07/2026 - tabela_inss/tabela_irrf nao suporta multiplas vigencias no mesmo ano
+
+O schema (@@unique([ano, faixaOrdem]) em TabelaInss, @@unique([ano, tipo, faixaOrdem]) em
+TabelaIrrf) so permite UMA tabela por ano - nao ha campo para diferenciar sub-periodos
+dentro do mesmo ano quando a norma muda no meio do ano (ex: 2023 teve Portaria 26/2023
+vigente jan-abr E Portaria 27/2023 vigente mai-dez, com valores diferentes; o mesmo
+aconteceu com IRRF via MP 1.171/2023 em maio/2023).
+
+Decisao tomada nesta sessao: armazenar apenas a tabela vigente no FIM do ano (a mais
+recente), documentada via observacao. Dado do periodo anterior (jan-abr/2023) NAO esta
+no banco - se precisar processar rescisao/calculo retroativo de jan-abr/2023, os
+valores estao registrados no historico de conversa desta sessao (nao no banco).
+
+Pendente: decidir se vale mudar o schema (ex: trocar unique de [ano, faixaOrdem] para
+[vigenciaIni, faixaOrdem], igual ja funciona em SalarioMinimo) para suportar
+corretamente anos com multiplas vigencias, ou se e aceitavel manter so a ultima tabela
+do ano (uso atual do sistema parece ser so consulta/simulador de referencia, nao
+recalculo de folha historica - rescisao.service.ts/ferias.service.ts buscam a tabela
+do ANO da rescisao, entao anos com duas vigencias tem risco real de calculo errado
+para competencias anteriores a mudanca).
+
+Anos ja confirmados com mais de uma vigencia dentro do proprio ano: 2023 (INSS e IRRF).
+Outros anos do range 2000-2026 nao foram totalmente investigados ainda - risco de mais
+casos existirem.
+
+## Sessao 21/07/2026 (cont.) - Populamento retroativo de Tabelas Legais e Indicadores Economicos
+
+**Indicadores Economicos (indicadores_economicos) - 100% automatizado via API BCB/SGS:**
+SELIC (serie 4390), CDI (4391), IPCA (433), IGPM (189), IGPDI (190), INPC (188) - 2000 a
+jul/2026 (~319 competencias cada). TR (serie 226, tratamento especial - serie diaria com
+limite de 10 anos por consulta, extraido via filtro dia=01 de cada mes) - 2000 a jul/2026.
+SELIC populada separadamente pelo usuario com serie historica desde 1995 (379 registros,
+fonte propria - planilha Excel conferida com frequencia).
+Scripts reutilizaveis: D:\Temp\fetch_indicadores.js (CDI/IPCA/IGPM/IGPDI/INPC) e
+D:\Temp\fetch_tr.js (TR). Rodar novamente a qualquer momento para atualizar - usa
+ON CONFLICT DO UPDATE, seguro para re-executar.
+
+**Tabelas Legais (tabela_inss, tabela_irrf, salario_minimo) - populado 2022-2026:**
+Fonte: pesquisa web ano a ano, com nivel de confianca documentado em cada campo
+'observacao'. Nenhum dado foi assumido de memoria de treinamento sem verificacao.
+Metodologia quando a fonte nao citava valores explicitos (deducoes de faixas
+intermediarias): derivacao por continuidade matematica (cada faixa deve produzir o
+mesmo resultado da faixa anterior no ponto de corte), validada sempre que possivel
+contra exemplos de calculo publicados independentemente (bateu exato em 2022, 2024,
+2025).
+
+INSS: 2022 (Portaria MTP/ME 12/2022), 2023 (Portaria 27/2023, so o periodo vigente
+mai-dez), 2024 (Portaria MPS/MF 2/2024 - valores identicos ao que ja estava hardcoded
+em folha.service.ts, boa validacao cruzada), 2025 (validado contra exemplo de calculo
+completo, correspondencia exata), 2026 (Portaria MPS/MF 13/2026).
+
+IRRF: 2022 (tabela congelada desde abril/2015), 2023 (so periodo vigente mai-dez, MP
+1.171/2023), 2024 (vigente desde fev/2024, isencao R\.259,20), 2025 (vigente desde
+mai/2025, mesma tabela usada em 2026), 2026 (PROGRESSIVA + REDUTOR Lei 15.270/2025,
+7 faixas de redutor).
+
+Salario Minimo: todos os anos 2022-2026, incluindo os 2 periodos de 2023
+(R\.302 jan-abr, R\.320 mai-dez).
+
+**PENDENCIA CRITICA registrada anteriormente nesta sessao:** schema tabela_inss/
+tabela_irrf (@@unique [ano, faixaOrdem] / [ano, tipo, faixaOrdem]) nao suporta mais de
+uma vigencia por ano. Anos com essa limitacao real, dados do periodo anterior NAO
+armazenados no banco (so no historico desta conversa):
+- 2023: INSS e IRRF mudaram em maio (jan-abr usa valores diferentes dos aplicados)
+- 2025: IRRF mudou em maio (jan-abr usa a tabela de 2024, nao a aplicada)
+Risco: rescisao.service.ts/ferias.service.ts buscam a tabela do ANO da rescisao - calculo
+de rescisao/ferias para competencias jan-abr/2023 ou jan-abr/2025 vai usar a tabela ERRADA
+(a do fim do ano, nao a vigente na competencia real). Nao corrigido nesta sessao.
+
+**Historico anterior a 2022 (ate 2000):** adiado por decisao do usuario, sem necessidade
+imediata de reprocessamento de folha/rescisao desses anos. Retomar se necessario.
+
+**Bugs de codigo corrigidos nesta sessao (fora do escopo de dados):**
+- folha.service.ts: INSS_FAIXAS/INSS_TETO estava em valores 2024/2025 (obsoleto) -
+  corrigido para 2026 real
+- pro-labore.service.ts: INSS_TETO_2026 tinha valor incorreto (R\.157,41 = teto de
+  2025, nao 2026); calcularIRRF() nao aplicava o redutor Lei 15.270/2025 (corrigido,
+  agora usa IRRF_REDUTORES_2026); SALARIO_MINIMO_2026 estava com valor de 2025
+  (R\.518 em vez de R\.621)
+- Commits: 828bdf7 (fix hr tabelas), commits anteriores da sessao (auditoria seguranca,
+  login por nickname, higiene git)
+
+**Descoberta de divergencia de fonte:** artigo JOTA.info citou deducoes diferentes para
+INSS 2026 faixas 2-3 (R\,66/R\,75) das que aplicamos (R\,32/R\,41, validadas
+por continuidade e por multiplas outras fontes concordantes). Mantido o valor ja aplicado
+por ter maior consistencia matematica - vale conferencia futura contra o PDF oficial da
+Portaria MPS/MF 13/2026 se surgir duvida real.
+
+## Sessao 22/07/2026 - Importacao de Ativos Imobilizados (Imoveis LM) + fix asset-import
+
+**Resultado:** 20 imoveis da LM importados em fixed_assets, todos com conta contabil
+vinculada e campo country preenchido.
+
+**Bugs reais encontrados e corrigidos no asset-import.service.ts:**
+1. lookupAccount() nao casava codigo de conta 'flat' (sem pontos, ex: 12301010018)
+   contra codigo do banco hierarquico (com pontos, ex: 1.2.3.01.01.0018). Corrigido
+   com fallback via REPLACE(code, '.', '') = clean direto no banco.
+2. FixedAsset nao tinha campo country (Property/Company/Person ja tinham, com
+   @default('Brasil')) - inconsistencia de schema corrigida. Import agora aceita
+   coluna PAIS opcional (20a coluna, ao final do layout, sem quebrar arquivos antigos).
+3. Campo state (VARCHAR(2)) trava com valores tipo 'Franca'/'Uruguai' - correto e
+   esperado (UF so existe para BR); imoveis no exterior devem deixar UF vazio e usar
+   o novo campo country.
+
+**Armadilhas encontradas durante a operacao (nao sao bugs de codigo, sao
+'gotchas' operacionais a lembrar):**
+- Delimitador do importador e '|' (pipe), nao ';' nem tab - conversao manual de CSV
+  brasileiro (Excel, separado por ';') precisa trocar para pipe antes de colar.
+- DELETE em fixed_assets falha com FK violation se houver linhas em asset_history
+  (e possivelmente asset_maintenances, asset_improvements, asset_retrofit_projects,
+  asset_appraisals, asset_depreciation_logs - so testamos asset_history nesta sessao).
+  Apagar o historico associado primeiro.
+- Container ledgr-postgres pode cair sozinho (Exited 255) sem aviso - sempre
+  confirmar 'docker ps' antes de assumir que ALTER TABLE manual persistiu entre
+  sessoes. ALTER TABLE fora do Prisma Migrate NAO e restaurado automaticamente
+  se o container for recriado - so as migrations formais do Prisma sao.
+- Migracoes manuais (prisma/migrations-manuais/*.sql) precisam ser de fato salvas
+  em disco E commitadas - gerar e aplicar ao banco sem salvar o arquivo deixa a
+  mudanca orfa (ja aconteceu 2x nesta sessao: nickname_unique e agora quase
+  aconteceu de novo).
+
+**Commits desta parte:** 5c7452c (nickname_unique orfa), e8f9af6 (country + lookupAccount fix)
+
+**Pendente:** LM/PlanoLM.Txt e outros CSVs de importacao ficam intencionalmente fora
+do git (arquivos de trabalho local, nao dados versionaveis).
