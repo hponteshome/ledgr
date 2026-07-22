@@ -3040,3 +3040,44 @@ Ecoville em jun/2026) tambem e despesa dedutivel real, ainda nao lancada em luga
 **Nao bloqueia a apuracao de sexta** - resolvido no curto prazo via patch direto no
 accounts-receivable.service.ts (gerar journalEntry no create()) + ProvisaoService existente
 para provisionar as DARFs em contas a pagar.
+
+## Sessao 22/07/2026 (encerramento) - Nickname obrigatorio + notificacoes multi-canal de cadastro
+
+**Entregue:**
+- Nickname obrigatorio no auto-cadastro publico (/register), com checagem de
+  duplicidade case-insensitive (email OU CPF OU nickname)
+- Notificacao de novo cadastro pendente chega em 3 canais simultaneos para
+  todos os Master Admins ativos: e-mail, mensagem automatica no modulo de
+  Chat (conversa DIRECT, type SYSTEM), e toast em tempo real via SSE
+- Bug critico corrigido: jwt.strategy.ts so aceitava token via header
+  Authorization Bearer. EventSource (usado pelo SSE do chat, /chat/stream)
+  nao consegue enviar headers customizados - toast nunca teria funcionado
+  sem esse fix. Agora aceita token via header OU query string.
+- Bug corrigido: auth.module.ts nao importava ChatModule apos injecao do
+  ChatService no AuthService - quebrava o boot do backend inteiro
+  ('Nest can't resolve dependencies'). Sempre que um novo Service e
+  injetado, conferir se o Module de origem esta nos imports do modulo
+  consumidor.
+- Bug corrigido: register() no auth.service.ts nunca dava erro amigavel de
+  duplicidade (throw new Error() generico) - trocado por
+  BadRequestException + catch de P2002 do Prisma
+- Bug corrigido: users.service.ts create() estava tipado especificamente
+  como RegisterDto, quebrando o fluxo separado de criacao manual de
+  usuario pelo Master Admin (CreateUserDto) assim que nickname virou
+  obrigatorio no primeiro. Tipo relaxado para 'any'.
+
+**Pendente:** usuario ainda precisa confirmar visualmente que o toast
+aparece apos o fix do jwt.strategy (F5 necessario para o EventSource
+reconectar com a strategy corrigida) - nao foi re-testado antes do
+encerramento da sessao.
+
+**Aprendizado registrado:** ao adicionar campo obrigatorio em um DTO
+compartilhado indiretamente por dois fluxos diferentes (auto-cadastro
+publico vs criacao manual pelo admin), verificar TODOS os pontos de
+chamada antes de assumir que a mudanca e isolada - o erro de compilacao
+do users.controller.ts so apareceu por acaso ao rodar tsc, poderia ter
+passado despercebido se o watch mode nao estivesse ativo.
+
+**Commits da sessao completa de hoje (do incidente de DB zerado ate aqui):**
+d12e62f, d6612c1, f028c28, 49ea4e5, 5c7452c, e8f9af6, 41f952b, 6f012ef,
+828bdf7, 218ec98, d756f55, 1a4e352, fa17a6f, d4a3554, 2501c11 (15 commits)
