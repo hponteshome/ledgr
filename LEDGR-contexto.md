@@ -3235,3 +3235,46 @@ diagnostico longo por container caido.
 - Validar manualmente os 5 PDFs gerados via puppeteer apos mudanca waitUntil 'load'
 - Reescrita de historico Git (LM/ + backups/ com dados sensiveis ja commitados em 74d2272) -
   ficou pendente quando o login quebrou, retomar decisao de filter-branch + force-push
+
+## Sessao 23/07/2026 (continuacao) - Ficha do Imovel: numero, complemento, CEP obrigatorio
+
+**Escopo:** adicionar campos ao FixedAsset (grupo REAL_ESTATE) - zipCode obrigatorio,
+number (nr predial) e complement, ambos opcionais. Descoberto no caminho que 'street'
+(logradouro) existia no schema/estado do form mas nunca tinha input renderizado - corrigido
+junto por fazer sentido no mesmo escopo.
+
+**Mudancas:**
+- schema.prisma: FixedAsset ganhou number (VarChar 20) e complement (VarChar 255), ambos
+  opcionais - migration manual via docker exec psql
+- zipCode: mantido opcional no schema (campo compartilhado por todos os grupos de asset,
+  nao so REAL_ESTATE) - obrigatoriedade validada na aplicacao: DTO com @ValidateIf(group
+  === REAL_ESTATE) + @IsNotEmpty, e replicado no assets.service.ts create() espelhando o
+  padrao ja existente de landValuePercent
+- create-asset.dto.ts: +number?, +complement?, zipCode agora condicional
+- assets.service.ts: create() persiste number/complement; validacao explicita de zipCode
+  obrigatorio p/ REAL_ESTATE (mesmo padrao do check de landValuePercent ja existente)
+- asset.types.ts: FixedAsset e CreateAssetForm com os novos campos
+- AssetFormModal.tsx: Step 3 (Imovel) reestruturado - Logradouro (novo, full-width) +
+  linha Numero/Complemento/CEP* + linha Municipio/UF. CepInput novo componente (mesmo
+  padrao de NumInput - mascara 00000-000 na exibicao, digitos crus no estado)
+- AssetsView.tsx: ficha exibe endereco completo (rua+numero+complemento+cidade/UF) e CEP
+  mascarado (fmtCep local, mesmo padrao de PersonView.tsx)
+
+**Bug pre-existente encontrado e corrigido (nao relacionado ao escopo original):**
+update() do assets.service.ts faz data: { ...dto } (spread direto), mas o payload do
+frontend sempre carregava assessedValueItbi e landFraction (campos que existem so no
+form, nao no schema/DTO) via ...form no handleSubmit. create() nunca teve esse problema
+porque monta o objeto data campo a campo (ignora lixo extra); update() nao. Toda edicao
+de imovel dava "Internal server error" / Unknown argument assessedValueItbi. Corrigido
+com delete explicito dos 2 campos do payload antes do envio.
+
+**Nota sobre convencao de mascara (CPF/CEP/etc - CLAUDE.md secao 7):** confirmado que
+PersonForm.tsx ARMAZENA o zipCode ja formatado com hifen no estado (desvio da regra
+documentada de 'cru no banco, formatacao so na exibicao'). Nao replicado esse desvio -
+CepInput deste modulo segue a regra correta: estado sempre com digitos crus, mascara
+aplicada apenas visualmente no input (mesmo padrao do NumInput ja usado neste arquivo p/
+valores monetarios). Considerar alinhar PersonForm.tsx no futuro para nao ter 2 padroes
+divergentes de mascara de CEP convivendo no projeto.
+
+**Testado manualmente:** edicao do imovel Conj32 (LM) - CEP exibido mascarado
+(04532-001), Logradouro/Numero/Complemento salvos e recarregados corretamente, sem erro.
