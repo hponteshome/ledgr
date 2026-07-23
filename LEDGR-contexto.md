@@ -3278,3 +3278,37 @@ divergentes de mascara de CEP convivendo no projeto.
 
 **Testado manualmente:** edicao do imovel Conj32 (LM) - CEP exibido mascarado
 (04532-001), Logradouro/Numero/Complemento salvos e recarregados corretamente, sem erro.
+
+## Sessao 23/07/2026 (continuacao 2) - PersonForm: CEP + validacao CPF
+
+**Contexto:** apos alinhar CEP no modulo de imoveis (fixed_assets), aproveitado banco de
+persons vazio para corrigir divergencias equivalentes no PersonForm.tsx.
+
+**Bugs encontrados e corrigidos:**
+1. Input de CEP guardava valor JA FORMATADO (com hifen) no estado - violava a convencao
+   documentada (CLAUDE.md secao 7: "armazenar crus, formatacao so na exibicao"). Corrigido:
+   estado sempre digitos crus, mascara 00000-000 aplicada so na exibicao do input.
+2. buscarCep() NUNCA disparava - comparava cep.length===8 contra string ja formatada com
+   hifen (9 chars quando completa). Autocomplete de endereco via ViaCEP estava quebrado
+   silenciosamente ha tempo indeterminado. Corrigido junto com o item 1 (raw.length===8
+   contra digitos crus).
+3. toPayload(): linha 'payload[k] = v' rodava DEPOIS de 'payload[k===cpf?document:k] = val'
+   e sobrescrevia incondicionalmente o valor tratado (trim + undefined em branco) pelo
+   valor cru original - afetava TODOS os campos string do formulario, nao so CEP. Linha
+   removida. Risco assumido conscientemente pois banco de persons estava vazio no momento.
+4. Validacao de CPF (digito verificador) so acontecia no backend, disparada so no clique
+   de Salvar - usuario descobria erro so depois de preencher form inteiro. Portada a
+   funcao validarCpf() de persons.service.ts (algoritmo identico) para o frontend como
+   isValidCpf(), conectada ao onBlur do CPF titular e do CPF do conjuge (spouseCpf, novo
+   estado spouseCpfError). handleSave tambem bloqueia envio se CPF ou spouseCpf invalidos.
+
+**Pendencia registrada, nao corrigida nesta sessao:** achado de sessao anterior ainda
+valido - PATCH /persons/:id retorna 500 PrismaClientValidationError 'Unknown argument
+document' (persons.service.ts:171) - o campo enviado como 'document' no payload
+(toPayload mapeia cpf->document) nao existe no schema Person, que usa 'taxId'. Nao
+corrigido hoje por estar fora do escopo (CEP/CPF), mas relacionado ao mesmo toPayload
+mexido nesta sessao - avaliar corrigir na proxima por estar no mesmo arquivo/fluxo.
+
+**Testado manualmente:** CEP com mascara correta, autocomplete via ViaCEP disparando
+(antes nunca disparava), CPF invalido bloqueado no blur com mensagem antes do submit,
+CPF valido segue fluxo normal.
