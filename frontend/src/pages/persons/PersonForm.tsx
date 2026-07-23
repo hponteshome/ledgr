@@ -168,6 +168,20 @@ const fmtPhone = (v: string) => {
 
 const fmtCep = (v: string) => { const d = v.replace(/\D/g,'').slice(0,8); return d.length === 8 ? d.replace(/(\d{5})(\d{3})/, d.slice(0,5) + '-' + d.slice(5)) : d; };
 
+// Mesmo algoritmo usado no backend (apps/api/src/core/persons/persons.service.ts)
+// para manter a mesma regra de validacao nos dois lados.
+function isValidCpf(cpf: string): boolean {
+  const d = cpf.replace(/\D/g, '');
+  if (d.length !== 11 || /^(\d)\1{10}$/.test(d)) return false;
+  const calc = (len: number) => {
+    let s = 0;
+    for (let i = 0; i < len; i++) s += parseInt(d[i]) * (len + 1 - i);
+    const r = (s * 10) % 11;
+    return r === 10 ? 0 : r;
+  };
+  return calc(9) === parseInt(d[9]) && calc(10) === parseInt(d[10]);
+}
+
 // ── Helpers de payload - converte strings vazias em undefined ──
 function toPayload(form: FormData): Record<string, any> {
   const payload: Record<string, any> = {};
@@ -191,7 +205,6 @@ function toPayload(form: FormData): Record<string, any> {
     if (typeof v === 'string') {
       const val = v.trim() === '' ? undefined : (k === 'cpf' || k === 'spouseCpf' ? v.replace(/\D/g,'') : v.trim());
       payload[k === 'cpf' ? 'document' : k] = val;
-      payload[k] = v;
     }
   }
   return payload;
@@ -266,6 +279,7 @@ export const PersonForm: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'dados' | 'vinculos'>('dados');
   const [cpfError, setCpfError] = useState('');
+  const [spouseCpfError, setSpouseCpfError] = useState('');
   const { canEdit, allowed, loading: permLoading } = useSidebarPermissions();
   const canEditPersons = canEdit('/app/persons');
   console.log('[DEBUG canEditPersons]', { canEditPersons, permLoading, allowed });
@@ -472,6 +486,8 @@ export const PersonForm: React.FC = () => {
   const handleSave = async () => {
     if (!form.fullName.trim()) { toast.error('Nome completo obrigatório.'); return; }
     if (!form.cpf.trim()) { toast.error('CPF obrigatório.'); return; }
+    if (!isValidCpf(form.cpf)) { setCpfError('CPF invalido.'); toast.error('CPF invalido.'); return; }
+    if (form.spouseCpf.trim() && !isValidCpf(form.spouseCpf)) { setSpouseCpfError('CPF invalido.'); toast.error('CPF do conjuge invalido.'); return; }
 
     setSaving(true);
     setCpfError('');
@@ -622,6 +638,9 @@ export const PersonForm: React.FC = () => {
                   type="text"
                   value={fmtCpf(form.cpf)}
                   onChange={e => { set('cpf', fmtCpf(e.target.value)); setCpfError(''); }}
+                  onBlur={() => {
+                    if (form.cpf.trim() && !isValidCpf(form.cpf)) setCpfError('CPF invalido.');
+                  }}
                   placeholder="000.000.000-00"
                   maxLength={14}
                   className={inputCls + (cpfError ? ' border-red-300 ring-1 ring-red-200' : '')}
@@ -750,8 +769,13 @@ export const PersonForm: React.FC = () => {
                 </Field>
                 <Field label="CPF do Cônjuge">
                   <input type="text" value={form.spouseCpf}
-                    onChange={e => set('spouseCpf', fmtCpf(e.target.value))}
-                    maxLength={14} placeholder="000.000.000-00" className={inputCls} />
+                    onChange={e => { set('spouseCpf', fmtCpf(e.target.value)); setSpouseCpfError(''); }}
+                    onBlur={() => {
+                      if (form.spouseCpf.trim() && !isValidCpf(form.spouseCpf)) setSpouseCpfError('CPF invalido.');
+                    }}
+                    maxLength={14} placeholder="000.000.000-00"
+                    className={inputCls + (spouseCpfError ? ' border-red-300 ring-1 ring-red-200' : '')} />
+                  {spouseCpfError && <p className="text-xs text-red-500 mt-1">{spouseCpfError}</p>}
                 </Field>
               </Grid>
             )}
@@ -951,14 +975,15 @@ export const PersonForm: React.FC = () => {
                 <Field label="CEP">
                   <input
                     type="text"
+                    inputMode="numeric"
                     value={fmtCep(form.zipCode)}
                     onChange={e => {
-                      const v = fmtCep(e.target.value);
-                      set('zipCode', v);
-                      if (v.length === 8) buscarCep(v);
+                      const raw = e.target.value.replace(/\D/g, '').slice(0, 8);
+                      set('zipCode', raw);
+                      if (raw.length === 8) buscarCep(raw);
                     }}
-                    placeholder="00000000"
-                    maxLength={8}
+                    placeholder="00000-000"
+                    maxLength={9}
                     className={inputCls}
                   />
                 </Field>
