@@ -3187,3 +3187,51 @@ Motivo: sessao de 23/07/2026 gastou ~40min investigando causa raiz de erro de lo
 final era so' o container ledgr-postgres ter caido (Exited 255) ~1h antes, sem relacao
 com nenhuma mudanca da sessao. Os outros problemas encontrados no caminho eram reais e
 foram corrigidos corretamente, mas o diagnostico inicial deveria ter comecado por aqui.
+
+## Sessao 23/07/2026 (continuacao) - RESOLVIDO: Login quebrado + drift Prisma v5/v7
+
+**Sintoma:** apos corrigir os ~3.870 erros TS do build da raiz, login parou de funcionar
+com erro generico "Invalid `prisma.user.findUnique()` invocation" sem mensagem clara.
+
+**Investigacao (nesta ordem, todas causas reais encontradas no caminho):**
+1. Prisma Client em apps/api estava desatualizado (08/03/2026) - mas regenerar nao resolveu
+2. Descoberto: apps/api tinha copia ORFA de node_modules/@prisma/client (prisma generate
+   sempre escreve na raiz do monorepo, nunca em apps/api - a copia local nunca era tocada)
+3. Causa maior: apps/api/package.json declarava "@prisma/client": "^5.0.0" e "prisma": "^5.0.0",
+   enquanto a decisao documentada do projeto sempre foi Prisma v7 (raiz ja estava em ^7.4.2).
+   Drift acidental nunca corrigido quando a raiz foi upgradada.
+4. Corrigido: apps/api/package.json alinhado para ^7.4.2 (ambos os pacotes)
+5. npm install completo (raiz+apps/api) necessario para eliminar de vez a v5 - travou em
+   pkcs11js (precisa Visual Studio Build Tools c/ workload C++, nao instalado). Contornado
+   com --ignore-scripts (pkcs11js fica sem binario nativo - so afeta apps/agent, cert A3
+   fisico; PENDENTE instalar Build Tools quando for testar homologacao NFS-e Nacional)
+6. bcrypt (nativo) tambem ficou sem binario apos --ignore-scripts, mas resolvido sozinho via
+   node-pre-gyp (binario pre-compilado baixado do GitHub, sem precisar compilar local)
+7. Prisma v7 mudou mapa de exports do client: "@prisma/client/runtime/library" nao existe
+   mais, virou "@prisma/client/runtime/client". Corrigidos 16 imports de Decimal em 17
+   arquivos (fiscal, hr, corporate, accounting, documents)
+8. npm install trouxe puppeteer-core mais novo (dependencia transitiva, nao fixada em
+   nenhum package.json) que removeu 'networkidle0' das opcoes de waitUntil. Corrigidos 5
+   arquivos de geracao de PDF para usar 'load' (adequado para setContent com HTML estatico
+   - PENDENTE validar manualmente os 5 PDFs gerados, nao so o tsc)
+9. **CAUSA RAIZ FINAL do login:** apos tudo acima corrigido, erro persistia identico.
+   Teste isolado (script Node fora do NestJS, replicando o PrismaService real com adapter)
+   revelou code: ECONNREFUSED - container docker ledgr-postgres tinha caido (Exited 255,
+   ~1h antes, sem relacao com a sessao). docker start ledgr-postgres resolveu.
+
+**Licao registrada:** container caido deveria ter sido o PRIMEIRO diagnostico, nao o
+ultimo. Ver regra permanente registrada logo acima nesta mesma nota de contexto.
+
+**Protecao criada:** scripts/check-docker.js + "predev" no apps/api/package.json - agora
+'npm run dev' verifica ledgr-postgres e ledgr-redis rodando ANTES de subir o Nest, com
+mensagem clara se algum estiver parado. Elimina a possibilidade de repetir esse
+diagnostico longo por container caido.
+
+**Pendencias abertas (nao bloqueantes, registradas para sessao futura):**
+- Visual Studio Build Tools (workload C++) nao instalado - pkcs11js sem binario nativo
+- npm audit: 29 vulnerabilidades (1 critica) - revisar com calma, nao rodar audit fix as pressas
+- puppeteer-core: dependencia transitiva nao fixada, mesmo risco de drift que causou o
+  problema do Prisma - considerar fixar versao explicita
+- Validar manualmente os 5 PDFs gerados via puppeteer apos mudanca waitUntil 'load'
+- Reescrita de historico Git (LM/ + backups/ com dados sensiveis ja commitados em 74d2272) -
+  ficou pendente quando o login quebrou, retomar decisao de filter-branch + force-push
