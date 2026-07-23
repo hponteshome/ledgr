@@ -3,7 +3,7 @@
 // ============================================================
 import {
   IsString, IsEnum, IsOptional, IsNumber, IsDateString,
-  IsBoolean, IsUUID, Min, Max, MaxLength, IsNotEmpty,
+  IsBoolean, IsUUID, Min, Max, MaxLength, IsNotEmpty, ValidateIf,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { PartialType } from '@nestjs/mapped-types';
@@ -217,6 +217,17 @@ export class CreateAssetDto {
   street?: string;
 
   @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  number?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  complement?: string;
+
+  @ValidateIf(o => o.group === AssetGroup.REAL_ESTATE)
+  @IsNotEmpty({ message: 'CEP e obrigatorio para imoveis' })
   @IsString()
   @MaxLength(9)
   zipCode?: string;

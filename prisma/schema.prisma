@@ -1466,6 +1466,8 @@ model FixedAsset {
   landValueAmount  Decimal?         @map("land_value_amount") @db.Decimal(15, 2)
   landValueSource  LandValueSource? @map("land_value_source")
   street           String?          @map("street") @db.VarChar(255)
+  number           String?          @map("number") @db.VarChar(20)
+  complement       String?          @map("complement") @db.VarChar(255)
   zipCode          String?          @map("zip_code") @db.VarChar(9)
   state            String?          @map("state") @db.VarChar(2)
   city             String?          @map("city") @db.VarChar(100)

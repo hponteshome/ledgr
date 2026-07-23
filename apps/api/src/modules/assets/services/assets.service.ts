@@ -106,6 +106,10 @@ export class AssetsService {
       );
     }
 
+    if (dto.group === 'REAL_ESTATE' && !dto.zipCode) {
+      throw new BadRequestException('CEP (zipCode) is required for real estate assets');
+    }
+
     const acquisitionCost = dto.acquisitionCost;
     const landValueAmount = dto.group === 'REAL_ESTATE' && dto.landValuePercent
       ? (acquisitionCost * dto.landValuePercent) / 100
@@ -149,6 +153,8 @@ export class AssetsService {
         builtArea:           builtArea,
         assessedValue:       assessedValue,
         street:              dto.street,
+        number:              dto.number,
+        complement:          dto.complement,
         zipCode:             dto.zipCode,
         state:               dto.state,
         city:                dto.city,

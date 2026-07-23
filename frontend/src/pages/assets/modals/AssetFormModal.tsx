@@ -50,6 +50,21 @@ function NumInput({ value, onChange, placeholder, className }: {
     );
 }
 
+function CepInput({ value, onChange, className, placeholder }: {
+    value: string; onChange: (v: string) => void; className?: string; placeholder?: string;
+}) {
+    const fmt = (v: string) => {
+        const d = v.replace(/\D/g, '').slice(0, 8);
+        return d.length > 5 ? d.replace(/(\d{5})(\d{0,3})/, '$1-$2') : d;
+    };
+    return (
+        <input type="text" inputMode="numeric" className={className}
+            placeholder={placeholder ?? '00000-000'}
+            value={fmt(value)}
+            onChange={e => onChange(e.target.value.replace(/\D/g, '').slice(0, 8))} />
+    );
+}
+
 // ── Lookup de conta contábil ───────────────────────────────
 
 interface AccountResult { id: string; code: string; name: string; }
@@ -166,7 +181,9 @@ export function AssetFormModal({ asset, onClose, onSuccess }: Props) {
         landValuePercent:  asset?.landValuePercent ? fmtNum(asset.landValuePercent) : '',
         landFraction:      '',
         street:            asset?.street  ?? '',
-        zipCode:           asset?.zipCode ?? '',
+        number:            (asset as any)?.number ?? '',
+        complement:        (asset as any)?.complement ?? '',
+        zipCode:           (asset?.zipCode ?? '').replace(/\D/g, ''),
         state:             asset?.state   ?? '',
         city:              asset?.city    ?? '',
         realEstateNotes:   '',
@@ -202,6 +219,11 @@ export function AssetFormModal({ asset, onClose, onSuccess }: Props) {
             setError('Preencha os campos obrigatórios: Código, Descrição, Valor de Aquisição e Vida Útil.');
             return;
         }
+        if (form.group === 'REAL_ESTATE' && !form.zipCode) {
+            setError('CEP é obrigatório para imóveis.');
+            setStep(3);
+            return;
+        }
         try {
             const payload = {
                 ...form,
@@ -217,6 +239,10 @@ export function AssetFormModal({ asset, onClose, onSuccess }: Props) {
                 depreciationAccId: acctDeprec.id || undefined,
                 accumDeprecAccId:  acctAccum.id  || undefined,
             };
+            // Campos existem apenas no estado do formulario (UI), nunca no schema/DTO -
+            // remover antes de enviar, senao o Prisma update() (que faz spread direto do dto) quebra.
+            delete (payload as any).assessedValueItbi;
+            delete (payload as any).landFraction;
             const result = isEdit
                 ? await update(asset!.id, payload)
                 : await create(payload);
@@ -357,7 +383,30 @@ export function AssetFormModal({ asset, onClose, onSuccess }: Props) {
                             </Field>
                         </div>
 
+                        <Field label="Logradouro">
+                            <input className={input} value={form.street}
+                                onChange={e => set('street', e.target.value)}
+                                placeholder="Rua, Avenida, etc." />
+                        </Field>
+
                         <div className="grid grid-cols-3 gap-4">
+                            <Field label="Nº">
+                                <input className={input} value={form.number}
+                                    onChange={e => set('number', e.target.value)}
+                                    placeholder="Ex: 123" />
+                            </Field>
+                            <Field label="Complemento">
+                                <input className={input} value={form.complement}
+                                    onChange={e => set('complement', e.target.value)}
+                                    placeholder="Apto, Sala, Bloco..." />
+                            </Field>
+                            <Field label="CEP *">
+                                <CepInput className={input} value={form.zipCode}
+                                    onChange={v => set('zipCode', v)} />
+                            </Field>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
                             <Field label="Município">
                                 <input className={input} value={form.city}
                                     onChange={e => set('city', e.target.value)} />
@@ -366,11 +415,6 @@ export function AssetFormModal({ asset, onClose, onSuccess }: Props) {
                                 <input className={input} value={form.state}
                                     onChange={e => set('state', e.target.value)}
                                     maxLength={2} placeholder="SP" />
-                            </Field>
-                            <Field label="CEP">
-                                <input className={input} value={form.zipCode}
-                                    onChange={e => set('zipCode', e.target.value)}
-                                    placeholder="00000-000" />
                             </Field>
                         </div>
 

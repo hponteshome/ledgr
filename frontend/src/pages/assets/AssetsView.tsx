@@ -17,6 +17,13 @@ import {
 } from './types/asset.types';
 import type { FixedAsset } from './types/asset.types';
 import { formatCurrency, formatDate, formatPercent } from '../../utils/formatters';
+
+const fmtCep = (v?: string | null) => {
+    if (!v) return '';
+    const d = v.replace(/\D/g, '');
+    if (d.length === 8) return d.replace(/(\d{5})(\d{3})/, '$1-$2');
+    return v;
+};
 import { MaintenanceTab } from './components/MaintenanceTab';
 import { ImprovementTab } from './components/ImprovementTab';
 import { RetrofitTab } from './components/RetrofitTab';
@@ -278,7 +285,8 @@ function ResumoTab({ asset }: { asset: FixedAsset }) {
                         {asset.assessedValue && <InfoRow label="Valor Venal" value={formatCurrency(asset.assessedValue)} />}
                         {asset.landValuePercent && <InfoRow label="% Terreno" value={formatPercent(asset.landValuePercent)} />}
                         {asset.landValueAmount && <InfoRow label="Valor do Terreno" value={formatCurrency(asset.landValueAmount)} />}
-                        {asset.street && <InfoRow label="Endereço" value={`${asset.street}${asset.city ? ' — ' + asset.city : ''}${asset.state ? '/' + asset.state : ''}`} />}
+                        {asset.street && <InfoRow icon={MapPin} label="Endereço" value={`${asset.street}${(asset as any).number ? ', ' + (asset as any).number : ''}${(asset as any).complement ? ' - ' + (asset as any).complement : ''}${asset.city ? ' — ' + asset.city : ''}${asset.state ? '/' + asset.state : ''}`} />}
+                        {asset.zipCode && <InfoRow label="CEP" value={fmtCep(asset.zipCode)} />}
                     </div>
                 </div>
             )}

@@ -162,6 +162,8 @@ export interface FixedAsset {
   landValuePercent?: number;
   landValueAmount?:  number;
   street?:           string;
+  number?:           string;
+  complement?:       string;
   zipCode?:          string;
   state?:            string;
   city?:             string;
@@ -336,6 +338,8 @@ export interface CreateAssetForm {
   assessedValue?:     number | string;
   landValuePercent?:  number | string;
   street?:            string;
+  number?:            string;
+  complement?:        string;
   zipCode?:           string;
   state?:             string;
   city?:              string;
