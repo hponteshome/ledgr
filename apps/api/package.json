@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
+    "predev": "node ../../scripts/check-docker.js",
     "build": "nest build",
     "start": "nest start --watch",
     "dev": "nest start --watch",
@@ -19,7 +20,7 @@
     "@nestjs/platform-express": "^10.4.22",
     "@nestjs/schedule": "^6.1.1",
     "@peculiar/x509": "^1.14.3",
-    "@prisma/client": "^5.0.0",
+    "@prisma/client": "^7.4.2",
     "@types/archiver": "^8.0.0",
     "archiver": "^8.0.0",
     "axios": "^1.13.6",
@@ -58,7 +59,7 @@
     "@types/passport-local": "^1.0.35",
     "@types/pdf-parse": "^1.1.5",
     "module-alias": "^2.3.4",
-    "prisma": "^5.0.0",
+    "prisma": "^7.4.2",
     "ts-loader": "^9.4.3",
     "typescript": "^5.0.0"
   }

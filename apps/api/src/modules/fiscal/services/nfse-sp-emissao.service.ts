@@ -2,7 +2,7 @@
 import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService }  from '../../../prisma/prisma.service';
 import { SigningService }  from '../../../core/certificates/signing.service';
-import { Decimal } from '@prisma/client/runtime/library';
+import { Decimal } from '@prisma/client/runtime/client';
 import * as https from 'https';
 import axios from 'axios';
 

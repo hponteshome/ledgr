@@ -171,7 +171,7 @@ export class NfseSpConsultaService {
             });
             if (dup) { duplicatas++; continue; }
 
-            const { Decimal } = await import('@prisma/client/runtime/library');
+            const { Decimal } = await import('@prisma/client/runtime/client');
             const net = n.valorLiquido || (n.valorServicos - n.valorDeducoes - n.valorIss);
             await this.prisma.fiscalDocument.create({
               data: {
@@ -318,7 +318,7 @@ export class NfseSpConsultaService {
               where: { companyId: params.companyId, documentNumber: n.numero, issuerCnpj: n.prestadorCnpj },
             });
             if (dup) { duplicatas++; continue; }
-            const { Decimal } = await import('@prisma/client/runtime/library');
+            const { Decimal } = await import('@prisma/client/runtime/client');
             const net = n.valorLiquido || (n.valorServicos - n.valorDeducoes - n.valorIss);
             await this.prisma.fiscalDocument.create({
               data: {

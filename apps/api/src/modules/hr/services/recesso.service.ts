@@ -1,6 +1,6 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { Decimal } from '@prisma/client/runtime/library';
+import { Decimal } from '@prisma/client/runtime/client';
 import { FeriasService } from './ferias.service';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const archiver = require('archiver');

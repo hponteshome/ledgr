@@ -1,6 +1,6 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { Decimal } from '@prisma/client/runtime/library';
+import { Decimal } from '@prisma/client/runtime/client';
 import * as puppeteer from 'puppeteer';
 
 @Injectable()
@@ -208,7 +208,7 @@ export class DecimoTerceiroService {
     const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox'] });
     try {
       const page = await browser.newPage();
-      await page.setContent(html, { waitUntil: 'networkidle0' });
+      await page.setContent(html, { waitUntil: 'load' });
       const pdf  = await page.pdf({ format: 'A4',
         margin: { top:'20mm', bottom:'20mm', left:'15mm', right:'15mm' } });
       return Buffer.from(pdf);

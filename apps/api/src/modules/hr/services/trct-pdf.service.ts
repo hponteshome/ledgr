@@ -534,7 +534,7 @@ ${!elegivel ? `<div class="ineligivel">ATENCAO: Motivo "${MOTIVO_DESC[term.motiv
     const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox','--disable-setuid-sandbox'] });
     try {
       const page = await browser.newPage();
-      await page.setContent(html, { waitUntil: 'networkidle0' });
+      await page.setContent(html, { waitUntil: 'load' });
       const pdf = await page.pdf({
         format: 'A4',
         landscape,

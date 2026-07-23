@@ -1,7 +1,7 @@
 // apps/api/src/modules/hr/services/pro-labore.service.ts
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { Decimal } from '@prisma/client/runtime/library';
+import { Decimal } from '@prisma/client/runtime/client';
 
 // ── Tabela INSS 2026 (Contribuinte Individual) ────────────────────────────────
 const INSS_TETO_2026 = 8475.55;

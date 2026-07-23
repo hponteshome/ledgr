@@ -1,7 +1,7 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { NfseSpParserService, NfseParsed } from './nfse-sp-parser.service';
-import { Decimal } from '@prisma/client/runtime/library';
+import { Decimal } from '@prisma/client/runtime/client';
 
 @Injectable()
 export class NfseImportService {
@@ -106,7 +106,7 @@ export class NfseImportService {
             where: { companyId, documentNumber: n.numero, issuerCnpj: n.prestadorCnpj },
           });
           if (dup) { duplicatas++; continue; }
-          const { Decimal } = await import('@prisma/client/runtime/library');
+          const { Decimal } = await import('@prisma/client/runtime/client');
           const net = n.valorLiquido || (n.valorServicos - n.valorDeducoes - n.valorIss);
           await this.prisma.fiscalDocument.create({
             data: {

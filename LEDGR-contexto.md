@@ -3144,3 +3144,46 @@ Select-String -Path "D:\Temp\tsc_errors_full.log" -Pattern "^(.+?\.ts)\(\d+,\d+\
 **Nao tentar corrigir tudo numa sessao so** - avaliar extensao real primeiro,
 e focar no que tem risco de afetar producao antes de limpar ruido cosmetico
 de scripts nunca executados.
+
+## Sessao 23/07/2026 - RESOLVIDO: ~3.870 erros TS do build da raiz
+
+**Causa raiz identificada:** tsconfig.json da raiz divergia do apps/api/tsconfig.json
+(que sempre compilou limpo e e o que roda em producao) em varias flags:
+- Faltava experimentalDecorators/emitDecoratorMetadata -> cascata TS1241/1206/1270
+  em TODO controller Nest do monorepo (~3.400 erros, maior causa isolada)
+- Alias "@/*": ["apps/*/src"] mal formado -> corrigido para ["apps/api/src/*"]
+- strict:true sem strictNullChecks:false -> avalanche de TS18047/TS2564 em DTOs
+- isolatedModules:true sem equivalente no apps/api -> 32x TS1272 (import type)
+- strict:true sem useUnknownInCatchVariables:false -> 7x TS2339 em blocos catch
+
+**Progressao:** 3.870 -> 456 (decorators) -> 72 (alias + strictNull) -> 6 (isolatedModules
++ catch) -> 0 (patches pontuais)
+
+**Bugs reais encontrados (nao relacionados a config, corrigidos):**
+- auth.module.ts: import 'src/prisma/prisma.service' sem alias @ -> corrigido
+- backup.module.ts: import './Backup.controller' (case-sensitive, quebraria em Docker/
+  Linux mesmo funcionando no Windows) -> corrigido para './backup.controller'
+- signing.service.ts: node-signpdf nao publica tipos p/ subpath dist/helpers ->
+  @ts-ignore pontual (import dinamico ja validado funcional em runtime)
+- infra/prisma/fix-auth.ts: removido (script de setup ja cumprido, tinha bug de escopo
+  do prisma alem de nao ter mais utilidade)
+- infra/prisma/seed-Levels.ts: removido (script de setup ja cumprido)
+
+**Build da raiz agora compila limpo (0 erros).** apps/api/tsconfig.json (producao) nao
+foi alterado - risco zero de regressao em producao.
+
+## Regra permanente - Checar Docker ANTES de investigar erros de Prisma/DB
+
+Sempre que aparecer qualquer erro de conexao com banco (ECONNREFUSED, "Invalid invocation",
+timeout, PrismaClientKnownRequestError sem mensagem clara), o PRIMEIRO diagnostico e' rodar:
+
+  docker ps --filter "name=ledgr-postgres"
+
+Confirmar que aparece "Up" (nao "Exited"). So' depois de confirmar o container rodando,
+investigar Prisma Client, versao, tsconfig, schema, etc.
+
+Motivo: sessao de 23/07/2026 gastou ~40min investigando causa raiz de erro de login
+(versao Prisma desalinhada v5/v7, client desatualizado, puppeteer, bcrypt) quando a causa
+final era so' o container ledgr-postgres ter caido (Exited 255) ~1h antes, sem relacao
+com nenhuma mudanca da sessao. Os outros problemas encontrados no caminho eram reais e
+foram corrigidos corretamente, mas o diagnostico inicial deveria ter comecado por aqui.
