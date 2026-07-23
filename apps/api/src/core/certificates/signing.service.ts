@@ -181,7 +181,7 @@ export class SigningService {
     try {
       // Importação dinâmica com tratamento de default export
       const signpdf = await import('node-signpdf');
-      const { plainAddPlaceholder } = await import('node-signpdf/dist/helpers');
+      // @ts-ignore - node-signpdf nao publica tipos para este subpath      const { plainAddPlaceholder } = await import('node-signpdf/dist/helpers');
 
       const pdfWithPlaceholder = plainAddPlaceholder({
         pdfBuffer,
