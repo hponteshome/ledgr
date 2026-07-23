@@ -14,3 +14,7 @@ project_files/revisao_completa*.txt
 *.pem
 *.p12
 *.pfx
+
+# Dados de cliente e backups - nunca versionar
+LM/
+backups/
