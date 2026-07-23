@@ -3312,3 +3312,26 @@ mexido nesta sessao - avaliar corrigir na proxima por estar no mesmo arquivo/flu
 **Testado manualmente:** CEP com mascara correta, autocomplete via ViaCEP disparando
 (antes nunca disparava), CPF invalido bloqueado no blur com mensagem antes do submit,
 CPF valido segue fluxo normal.
+
+## Regra permanente - Onde checar o Prisma Client gerado (Prisma v7)
+
+O client de verdade (tipos especificos do schema.prisma do projeto) fica em:
+  node_modules\.prisma\client\   <- AQUI (pasta com ponto, index.d.ts / client.d.ts)
+
+A pasta node_modules\@prisma\client\ (sem ponto) e' so' um wrapper/dispatcher que
+reexporta o conteudo de cima - o runtime\client.d.ts la' dentro e' codigo GENERICO do
+pacote publicado, nunca contem os models do projeto. Verificar model/campo novo ali
+sempre da falso negativo.
+
+Comando correto de verificacao apos prisma generate:
+  Select-String -Path .\node_modules\.prisma\client\index.d.ts -Pattern "NomeDoModel"
+
+Nao usar mais como referencia: node_modules\@prisma\client\runtime\client.d.ts ou
+node_modules\@prisma\client\default.js (LastWriteTime desse arquivo especifico nao
+muda de forma confiavel entre generates, e' outro sintoma do mesmo engano).
+
+Motivo do registro: sessao 23/07/2026 perdeu tempo tentando "corrigir" um problema
+de Prisma Client que na verdade nunca existiu - o generate sempre funcionou certo,
+so' a verificacao estava checando a pasta errada. Aconteceu em pelo menos 2 momentos
+da mesma sessao (correcao numero/complemento em fixed_assets, e criacao do model
+RentalContract).
