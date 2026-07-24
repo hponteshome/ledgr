@@ -2,6 +2,7 @@
 
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class ExportDataService {
@@ -25,6 +26,58 @@ export class ExportDataService {
     'user_company': 'userId_companyId',  // Composta
     'person_company': 'personId_companyId_role_startDate' // Composta
   };
+
+  // ── Layout dinamico (DMMF) ──────────────────────────────────────────────
+  // Mapa table-id do frontend (TableManager.tsx) -> nome do model no schema.prisma
+  private readonly TABLE_MODEL_MAP: Record<string, string> = {
+    profiles: 'Profile',
+    companies: 'Company',
+    persons: 'Person',
+    users: 'User',
+    user_companies: 'UserCompany',
+    person_companies: 'PersonCompany',
+    employees: 'Employee',
+    chart_of_accounts: 'ChartOfAccounts',
+    journal_entries: 'JournalEntry',
+    journal_entry_items: 'JournalEntryItem',
+    fixed_assets: 'FixedAsset',
+    fixed_income_investments: 'FixedIncomeInvestment',
+    employee_dependents: 'EmployeeDependent',
+    ap_entries: 'ApEntry',
+    bank_statements: 'BankStatement',
+    bank_transactions: 'BankTransaction',
+    fiscal_documents: 'FiscalDocument',
+    agenda_events: 'AgendaEvent',
+    provisao_configs: 'ProvisaoConfig',
+    pro_labore_configs: 'ProLaboreConfig',
+    pro_labore_calculos: 'ProLaboreCalculo',
+    informes_rendimentos: 'InformeRendimentos',
+    ecd_imports: 'EcdImport',
+    documents: 'Document',
+    holidays: 'Holiday',
+    cdi_daily_rates: 'CdiDailyRate',
+  };
+
+  /**
+   * Retorna o layout real (nomes de campo + tipo) de uma tabela, direto do
+   * DMMF do Prisma Client - sempre fiel ao schema.prisma atual, sem lista
+   * hardcoded que possa ficar desatualizada. So campos escalares/enum
+   * (exclui relations, que nao aparecem no TXT de export/import).
+   */
+  getTableLayout(tableId: string): { model: string; fields: { name: string; type: string; required: boolean }[] } {
+    const modelName = this.TABLE_MODEL_MAP[tableId] ?? this.TABLE_MODEL_MAP[tableId.replace(/s$/, '')];
+    if (!modelName) {
+      throw new BadRequestException(`Tabela "${tableId}" nao mapeada para layout.`);
+    }
+    const dmmfModel = Prisma.dmmf.datamodel.models.find(m => m.name === modelName);
+    if (!dmmfModel) {
+      throw new BadRequestException(`Model "${modelName}" nao encontrado no schema.`);
+    }
+    const fields = dmmfModel.fields
+      .filter(f => f.kind === 'scalar' || f.kind === 'enum')
+      .map(f => ({ name: f.name, type: f.type, required: f.isRequired && !f.hasDefaultValue }));
+    return { model: modelName, fields };
+  }
 
   // ── Exportação ────────────────────────────────────────────────────────────
 

@@ -14,6 +14,11 @@ import { JwtAuthGuard } from '../../auth/guards/jwt.guard';
 export class SystemController {
   constructor(private readonly exportService: ExportDataService) {}
 
+  @Get('layout/:table')
+  getLayout(@Param('table') table: string) {
+    return this.exportService.getTableLayout(table);
+  }
+
   @Get('export/:table')
   async exportTable(@Param('table') table: string, @Res() res: Response) {
     try {

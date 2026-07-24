@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import api from "../../services/api";
 // Certifique-se de instalar: npm install lucide-react
-import { Download, Upload, Database, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
+import { Download, Upload, Database, CheckCircle, AlertCircle, Loader2, List, X, Copy, Check } from "lucide-react";
 
 // ── CONSTANTES ──────────────────────────────────────────────────────────────
 
@@ -58,6 +58,12 @@ export const TableManager: React.FC = () => {
   // 🔴 NOVO: Estado para seleção em massa
   const [selectedTables, setSelectedTables] = useState<Set<string>>(new Set());
 
+  // Layout (DMMF) de uma tabela
+  const [layoutTable, setLayoutTable] = useState<string | null>(null);
+  const [layoutData, setLayoutData] = useState<any>(null);
+  const [loadingLayout, setLoadingLayout] = useState(false);
+  const [copied, setCopied] = useState(false);
+
   // ── Handlers de seleção ───────────────────────────────────────────────────
 
   const toggleAll = () => {
@@ -82,6 +88,29 @@ export const TableManager: React.FC = () => {
 
   // ── Handlers de exportação/importação ─────────────────────────────────────
 
+  const handleViewLayout = async (table: string) => {
+    setLayoutTable(table);
+    setLayoutData(null);
+    setCopied(false);
+    setLoadingLayout(true);
+    try {
+      const res = await api.get(`/system/layout/${table}`);
+      setLayoutData(res.data);
+    } catch (err) {
+      console.error('Erro ao buscar layout:', err);
+      setLayoutData({ error: true });
+    } finally {
+      setLoadingLayout(false);
+    }
+  };
+
+  const handleCopyHeader = () => {
+    if (!layoutData?.fields) return;
+    const header = layoutData.fields.map((f: any) => f.name).join(';');
+    navigator.clipboard.writeText(header);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
   const handleExport = async (table: string) => {
     setLoading(`export-${table}`);
     setStatus(null);
@@ -315,6 +344,13 @@ export const TableManager: React.FC = () => {
 
             <div className="flex gap-2">
               <button
+                onClick={() => handleViewLayout(table.id)}
+                disabled={!!loading}
+                className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-600 hover:text-indigo-600 hover:border-indigo-200 hover:shadow-sm disabled:opacity-50 transition-all"
+              >
+                <List size={14} /> Ver Layout
+              </button>
+              <button
                 onClick={() => handleExport(table.id)}
                 disabled={!!loading}
                 className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-600 hover:text-blue-600 hover:border-blue-200 hover:shadow-sm disabled:opacity-50 transition-all"
@@ -343,6 +379,61 @@ export const TableManager: React.FC = () => {
           </div>
         ))}
       </div>
+
+      {/* ── Modal de Layout ─────────────────────────────────── */}
+      {layoutTable && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 16 }}
+          onClick={e => { if (e.target === e.currentTarget) setLayoutTable(null); }}
+        >
+          <div className="bg-white rounded-xl w-full max-w-lg max-h-[85vh] flex flex-col shadow-2xl">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <div>
+                <h3 className="text-sm font-bold text-gray-800">Layout: {TABLES.find(t => t.id === layoutTable)?.name}</h3>
+                {layoutData?.model && <p className="text-[11px] text-gray-400 font-mono mt-0.5">model {layoutData.model} · database: {layoutTable}</p>}
+              </div>
+              <button onClick={() => setLayoutTable(null)} className="text-gray-400 hover:text-gray-700"><X size={18} /></button>
+            </div>
+            <div className="flex-1 overflow-auto px-5 py-4">
+              {loadingLayout ? (
+                <div className="flex justify-center py-10"><Loader2 className="animate-spin text-gray-300" size={28} /></div>
+              ) : layoutData?.error ? (
+                <p className="text-sm text-red-600">Não foi possível carregar o layout desta tabela.</p>
+              ) : (
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-left text-gray-400 uppercase text-[10px]">
+                      <th className="pb-2">Campo (usar no cabeçalho do TXT)</th>
+                      <th className="pb-2">Tipo</th>
+                      <th className="pb-2">Obrigatório</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {layoutData?.fields?.map((f: any) => (
+                      <tr key={f.name} className="border-t border-gray-50">
+                        <td className="py-1.5 font-mono text-gray-700">{f.name}</td>
+                        <td className="py-1.5 text-gray-500">{f.type}</td>
+                        <td className="py-1.5">{f.required ? <span className="text-red-500 font-semibold">sim</span> : <span className="text-gray-300">não</span>}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+            {!loadingLayout && layoutData?.fields && (
+              <div className="px-5 py-3 border-t border-gray-100">
+                <button
+                  onClick={handleCopyHeader}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold transition-all"
+                >
+                  {copied ? <Check size={14} /> : <Copy size={14} />}
+                  {copied ? 'Copiado!' : 'Copiar Linha de Cabeçalho'}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ── Notas de Segurança ──────────────────────────────── */}
       <div className="mt-10 p-5 bg-blue-50/50 border border-blue-100 rounded-2xl">
