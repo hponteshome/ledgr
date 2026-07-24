@@ -3381,3 +3381,115 @@ template literal, sempre Python script em D:\Temp; para .ts/.tsx normais, Select
 edicao por indice e mais confiavel que multi-line .Replace() quando o arquivo e grande/
 teve muitas edicoes anteriores - .Replace() falha por pequenas diferencas de espaco/quebra
 de linha que se acumulam.
+
+---
+
+## Sessão 20/07/2026 (bloco 7) — Contrato de Locação Completo: arquitetura decidida, implementação EM ANDAMENTO
+
+**Contexto:** apos concluir o Quadro Resumo de Locacao (bloco 6), usuario pediu evolucao para
+gerar o CONTRATO COMPLETO (nao so o resumo), a ser arquivado em Arquivos Digitais, com
+templates editaveis alimentados pelos dados do Quadro Resumo.
+
+**Arquitetura aprovada pelo usuario:** usar o model DocumentTemplate ja existente no schema
+(nunca implementado ate hoje - zero uso em codigo, so a definicao), com pipeline ja
+documentado em 'Módulo_de_Gestão_Documental — LEDGR.agent.md' (arquivo de projeto): Dado
+estruturado (Prisma) -> Template HTML/CSS (Handlebars) -> Puppeteer (PDF) -> Hash SHA-256 ->
+Assinatura (ClickSign) -> Storage imutavel. Achado importante: o padrao ja usado hoje para
+Procuracao ('RedigirProcuracaoModal.tsx') e AD-HOC (monta HTML na mao no frontend, ignora
+DocumentTemplate) - o novo fluxo de Locacao sera o PRIMEIRO a usar DocumentTemplate de
+verdade, com merge de variaveis reutilizavel.
+
+**Decisoes de dados tomadas com o usuario:**
+1. Locador = SEMPRE a empresa ativa (Company) - sem PF dona separada por contrato.
+2. Qualificacao completa do locatario (RG, profissao, estado civil, nacionalidade,
+   endereco completo) - EXPANDIDO no schema do RentalContract (nao existia antes).
+3. Multa por infracao/rescisao - campo LIVRE no formulario (usa o penaltyDescription
+   que ja existia no DTO mas nao estava no form rapido de criacao).
+
+**Referencia real usada para o texto juridico:** usuario enviou 2 documentos reais (um
+aditamento de 2023 e o contrato original completo de 2020) do imovel LoftSP, entre
+LM Administracao de Bens Imoveis (como locadora/administradora) e Rafael Tonelli Guaspari
+(locatario) - usados SO como referencia de linguagem/estrutura de clausulas, NENHUM dado
+real de terceiros (CPF/RG/nomes especificos) foi copiado para o template, que usa
+placeholders Handlebars. Discutido com o usuario risco de retencao de dados desses PDFs
+na conversa (30 dias sem opt-in de treinamento, ate 5 anos com opt-in) - usuario optou por
+seguir e depois apagar esta conversa por seguranca.
+
+**IMPLEMENTADO ATE AGORA (commits ainda NAO feitos - branch com mudancas pendentes):**
+1. Schema (prisma/schema.prisma):
+   - RentalContract expandido com campos de qualificacao do locatario: tenantRg,
+     tenantProfession, tenantMaritalStatus (enum MaritalStatus ja existente),
+     tenantNationality, tenantStreet, tenantNumber, tenantComplement, tenantNeighborhood,
+     tenantCity, tenantState, tenantZipCode.
+   - DocumentType enum: adicionado CONTRATO_LOCACAO.
+   - Migracao manual aplicada: 2026-07-24_rental_contract_tenant_qualification.sql
+     (ALTER TABLE rental_contracts + ALTER TYPE DocumentType ADD VALUE) - CONFIRMADO
+     aplicado com sucesso no banco.
+   - 
+px prisma generate rodado apos cada alteracao - client atualizado (v7.9.0).
+2. DTO (pps/api/src/modules/locacao/dto/rental-contract.dto.ts): campos de
+   qualificacao do locatario adicionados ao CreateRentalContractDto (UpdateRentalContractDto
+   ja herda via PartialType, sem mudanca extra necessaria). tsc limpo.
+3. Utilitario (pps/api/src/modules/locacao/utils/extenso.util.ts) - NOVO arquivo,
+   funcao alorPorExtenso(valor: number): string para converter valor monetario em
+   texto por extenso em pt-BR (ex: R\$ 6.916,67 -> 'seis mil e novecentos e dezesseis reais
+   e sessenta e sete centavos'). Escrito na mao (sem dependencia externa), algoritmo
+   bounded/testavel.
+4. handlebars instalado via npm em apps/api (puppeteer ja estava instalado desde antes).
+5. Template HTML/Handlebars do Contrato de Locacao Residencial escrito por completo -
+   baseado na Lei 8.245/91 e na linguagem real dos 2 documentos que o usuario enviou.
+   Clausulas: Objeto, Prazo, Valor+Pagamento+Reajuste (condicional), Despesas (condominio/
+   IPTU pelo locatario, utilidades direto aos fornecedores), Manutencao, Garantia
+   (condicional: Fianca com renuncia CC 827/828/835/838/839 + substituicao por morte/
+   insolvencia, ou generico para outras modalidades, ou dispensa se sem garantia), Multa
+   e Rescisao (usa penaltyDescription se preenchido, senao boilerplate Lei 4o), Foro
+   (cidade da empresa/locadora) + notificacao por AR, assinaturas condicionais (3 vias se
+   tem fiador, 2 se nao tem).
+   SQL de insercao gerado (INSERT INTO document_templates, company_id=NULL = template
+   global/compartilhado entre empresas, type='CONTRATO_LOCACAO', createdById = usuario
+   Master Admin hpontes). Arquivo local:
+   D:\Projetos\Ledgr\prisma\migrations-manuais\2026-07-24_seed_template_contrato_locacao.sql
+   -- CONFIRMAR SE FOI EXECUTADO (aguardando confirmacao do usuario no momento em que
+   este checkpoint foi escrito).
+
+**PENDENTE — proximos passos EXATOS para retomar (nesta ordem):**
+1. Confirmar que o INSERT do template rodou com sucesso no banco (SELECT * FROM
+   document_templates WHERE type='CONTRATO_LOCACAO').
+2. Construir o metodo de geracao no ental-contracts.service.ts:
+   - Buscar RentalContract completo (include fixedAsset + company).
+   - Buscar o DocumentTemplate ativo tipo CONTRATO_LOCACAO (company_id do contrato OU
+     NULL como fallback global).
+   - Montar objeto de dados para o merge: empresa.* (do Company), contrato.* (do
+     RentalContract, incluindo campos computados: prazoMeses = diferenca entre
+     startDate/endDate em meses, rentAmountExtenso = valorPorExtenso(rentAmount),
+     dataAssinatura = data atual formatada, numeroVias = 3 se isFianca senao 2,
+     isFianca = guaranteeType === 'FIANCA'), imovel.* (do FixedAsset).
+   - Compilar com Handlebars.compile(template.content)(dadosMerge).
+   - Calcular hash SHA-256 do HTML resultante.
+   - Criar registro Document (type: CONTRATO_LOCACAO, companyId, title, content: html,
+     contentHash, status: RASCUNHO, visibility: RESERVADO, date: now, createdById).
+   - Atualizar RentalContract.documentId = document.id.
+   - Retornar o Document criado.
+3. Endpoint novo no controller: POST /rental-contracts/:id/generate-document (ou dentro
+   do proprio RentalContractsController, ou um endpoint em documents.controller.ts -
+   decidir onde faz mais sentido ficar).
+4. Frontend: botao 'Gerar Contrato Completo' dentro do RentalContractDetailModal.tsx
+   (o modal que ja existe) - abre um formulario/modal extra so com os campos de
+   qualificacao do locatario que ainda faltarem (RG, profissao, estado civil, endereco)
+   se nao estiverem preenchidos, salva via PATCH, depois chama o endpoint de geracao.
+5. Apos gerar: mostrar o HTML resultante numa preview, ou redirecionar para o documento
+   dentro de Arquivos Digitais (RepositorioPage.tsx, prateleira Fiscal/RH ou nova
+   prateleira 'Locacao' - CONFIRMAR com usuario onde esse tipo de documento deve aparecer
+   no SHELF_CONFIG do RepositorioPage, ja que CONTRATO_LOCACAO e um DocumentType novo que
+   nao tinha mapeamento de prateleira ainda).
+6. PDF via Puppeteer (segunda etapa, conforme pipeline documentado) - gerar
+   Document.pdfUrl a partir do Document.content, quando usuario solicitar (nao
+   necessariamente automatico na criacao).
+7. Tela de administracao de Templates (CRUD do DocumentTemplate) - a parte 'editavel'
+   que o usuario pediu explicitamente ainda NAO foi construida - por ora o template so
+   pode ser editado via UPDATE direto no banco. Avaliar se e prioridade antes ou depois
+   do fluxo de geracao funcionar ponta a ponta.
+
+**Nao commitado ainda** - toda a mudanca deste bloco (schema, DTO, extenso.util.ts,
+handlebars instalado) esta pendente de commit. Fazer isso na proxima sessao apos
+confirmar que o SQL seed do template rodou.
