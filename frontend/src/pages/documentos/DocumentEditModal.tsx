@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { FiX, FiSave } from 'react-icons/fi';
 
-const API = 'http://localhost:3000';
+const API = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3000';
 
 interface Props {
   documentId: string;

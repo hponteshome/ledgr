@@ -27,7 +27,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useCompany } from '../../contexts/CompanyContext';
 import { SmartMonthInput } from '../../components/SmartMonthInput';
 
-const API = 'http://localhost:3000';
+const API = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3000';
 
 const GRUPO_ICONS: Record<string, any> = {
     REAL_ESTATE: Building2, MACHINERY_EQUIPMENT: Package, VEHICLE: Package,
@@ -547,7 +547,7 @@ function DepreciationReportTab({ token, companyId }: { token: string; companyId:
         setLoading(true);
         try {
             const r = await fetch(
-                `http://localhost:3000/assets/depreciation-report?yearFrom=${yearFrom}&yearTo=${yearTo}`,
+                `${API}/assets/depreciation-report?yearFrom=${yearFrom}&yearTo=${yearTo}`,
                 { headers: { Authorization: `Bearer ${token}`, 'x-company-id': companyId } }
             );
             setData(await r.json());
@@ -591,7 +591,7 @@ function DepreciationReportTab({ token, companyId }: { token: string; companyId:
         try {
             const results: Record<number, any[]> = {};
             await Promise.all(years.map(async y => {
-                const r = await fetch(`http://localhost:3000/assets/depreciation-monthly-totals?year=${y}`,
+                const r = await fetch(`${API}/assets/depreciation-monthly-totals?year=${y}`,
                     { headers: { Authorization: `Bearer ${token}`, "x-company-id": companyId } });
                 results[y] = await r.json();
             }));
@@ -603,7 +603,7 @@ function DepreciationReportTab({ token, companyId }: { token: string; companyId:
     const generateJournal = async (yearMonth: string) => {
         setJournalLoading(yearMonth);
         try {
-            const r = await fetch("http://localhost:3000/assets/depreciation-journal", {
+            const r = await fetch(`${API}/assets/depreciation-journal`, {
                 method: "POST",
                 headers: { Authorization: `Bearer ${token}`, "x-company-id": companyId, "Content-Type": "application/json" },
                 body: JSON.stringify({ yearMonth }),

@@ -4,6 +4,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useCompany } from '../../contexts/CompanyContext';
 import { SmartDateInput } from '../../components/SmartDateInput';
 import SearchRFBButton from '../../components/SearchRFBButton';
+const API = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3000';
 interface CompanyFormData {
   taxId: string;
   legalName: string;
@@ -157,7 +158,7 @@ export const CompanyForm: React.FC = () => {
         registerSheet: formData.registerSheet || null,
       };
 
-      const response = await fetch('http://localhost:3000/companies', {
+      const response = await fetch(`${API}/companies`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

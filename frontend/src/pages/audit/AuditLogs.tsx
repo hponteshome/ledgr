@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
+const API = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3000';
 
 export const AuditLogs = () => {
   const [logs, setLogs] = useState([]);
 
   useEffect(() => {
     // Aqui você chamará a rota HTTP que criamos no Gateway
-    fetch('http://localhost:3000/auditoria/logs')
+    fetch(`${API}/auditoria/logs`)
       .then(res => res.json())
       .then(data => setLogs(data));
   }, []);

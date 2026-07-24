@@ -1,6 +1,7 @@
 // frontend/src/pages/documents/signatures/SignatureValidateModal.tsx
 import React, { useState, useRef, useEffect } from 'react';
 import { FiUpload, FiCheckCircle, FiXCircle, FiShield, FiX } from 'react-icons/fi';
+const API = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3000';
 
 interface Props {
   documentId?: string;
@@ -25,11 +26,11 @@ export const SignatureValidateModal: React.FC<Props> = ({ documentId, onClose })
       setLoading(true);
       try {
         // Buscar metadados do documento para verificar se tem fileUrl
-        const metaRes = await fetch(`http://localhost:3000/documents/${documentId}`, { headers });
+        const metaRes = await fetch(`${API}/documents/${documentId}`, { headers });
         const meta = await metaRes.json();
         const pdfUrl = meta.fileUrl
-          ? `http://localhost:3000${meta.fileUrl}`
-          : `http://localhost:3000/documents/${documentId}/pdf`;
+          ? `${API}${meta.fileUrl}`
+          : `${API}/documents/${documentId}/pdf`;
 
         // Baixar PDF
         const pdfRes = await fetch(pdfUrl, { headers });
@@ -40,7 +41,7 @@ export const SignatureValidateModal: React.FC<Props> = ({ documentId, onClose })
         const fd = new FormData();
         fd.append('pdf', blob, 'documento.pdf');
         fd.append('documentId', documentId);
-        const res = await fetch('http://localhost:3000/signatures/validate', {
+        const res = await fetch(`${API}/signatures/validate`, {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${token}`, 'x-company-id': company.id ?? '' },
           body: fd
@@ -62,7 +63,7 @@ export const SignatureValidateModal: React.FC<Props> = ({ documentId, onClose })
       const fd = new FormData();
       fd.append('pdf', file);
       if (documentId) fd.append('documentId', documentId);
-      const res = await fetch('http://localhost:3000/signatures/validate', { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'x-company-id': company.id ?? '' }, body: fd });
+      const res = await fetch(`${API}/signatures/validate`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'x-company-id': company.id ?? '' }, body: fd });
       const data = await res.json();
       setResult(data);
     } catch (e: any) {

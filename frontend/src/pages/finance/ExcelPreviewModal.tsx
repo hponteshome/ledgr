@@ -4,7 +4,7 @@ import { FiX, FiUpload, FiCheckCircle, FiAlertTriangle, FiXCircle, FiFilter } fr
 
 interface Props { onClose: () => void; onSuccess: () => void; companyId: string; token: string; }
 
-const API = 'http://localhost:3000';
+const API = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3000';
 
 function fmtBRL(v: number) { return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
 function fmtDate(s: string) { if (!s) return ''; try { return new Date(s + 'T12:00:00').toLocaleDateString('pt-BR'); } catch { return s; } }

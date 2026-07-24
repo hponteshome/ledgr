@@ -16,7 +16,7 @@ import type { FixedAsset, CreateAssetForm } from '../types/asset.types';
 import { ModalWrapper, Field } from './ModalComponents';
 import { SmartDateInput } from '../../../components/SmartDateInput';
 
-const API = 'http://localhost:3000';
+const API = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3000';
 
 // ── Helpers de formatação ──────────────────────────────────
 

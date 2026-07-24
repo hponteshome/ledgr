@@ -1,6 +1,7 @@
 ﻿// LEDGR — frontend/src/pages/finance/BankImportPage.tsx
 import React, { useState, useEffect, useRef } from 'react';
 import api from '../../services/api';
+const API = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3000';
 import { ExcelPreviewModal } from './ExcelPreviewModal';
 import { useBankImport } from './hooks/useBankImport';
 import { TransactionGroup, BankStatementSummary, UploadResult, BANK_NAME, BANK_COLOR, SUGGESTION_SOURCE_LABEL } from './types/bank-import';
@@ -132,7 +133,7 @@ export default function BankImportPage() {
       const token = localStorage.getItem('@ledgr:token');
       const company = JSON.parse(localStorage.getItem('@ledgr:activeCompany') ?? '{}');
       const fd = new FormData(); fd.append('file', file);
-      const res = await fetch('http://localhost:3000/bank-import/upload-excel', {
+      const res = await fetch(`${API}/bank-import/upload-excel`, {
         method: 'POST',
         headers: { Authorization: 'Bearer ' + token, 'x-company-id': company.id ?? '' },
         body: fd,
@@ -245,7 +246,7 @@ export default function BankImportPage() {
                             try {
                               const token = localStorage.getItem('@ledgr:token');
                               const company = JSON.parse(localStorage.getItem('@ledgr:activeCompany') ?? '{}');
-                              const res = await fetch(`http://localhost:3000/bank-import/statements/${s.id}`, {
+                              const res = await fetch(`${API}/bank-import/statements/${s.id}`, {
                                 method: 'DELETE',
                                 headers: { Authorization: 'Bearer ' + token, 'x-company-id': company.id ?? '' },
                               });

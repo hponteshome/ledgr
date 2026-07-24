@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { mapRFBData, logUnmappedFields } from '../utils/rfbMapper';
+const API = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3000';
 
 interface SearchRFBButtonProps {
   cnpj: string;
@@ -44,7 +45,7 @@ const SearchRFBButton: React.FC<SearchRFBButtonProps> = ({
       console.log(`🏢 [SearchRFB] Company ID: ${companyId}`);
 
       // Chamada para a API na porta 3000 com headers completos
-      const response = await fetch(`http://localhost:3000/rfb/consulta/${cleanCNPJ}`, {
+      const response = await fetch(`${API}/rfb/consulta/${cleanCNPJ}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'x-company-id': companyId || '', // ← ADICIONA O HEADER OBRIGATÓRIO

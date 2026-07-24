@@ -4,7 +4,7 @@ import { FiUpload, FiCheckCircle, FiXCircle, FiAlertTriangle, FiX } from 'react-
 
 interface Props { onClose: () => void; onSuccess?: () => void; }
 
-const API = 'http://localhost:3000';
+const API = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3000';
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 

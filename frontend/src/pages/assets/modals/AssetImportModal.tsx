@@ -6,7 +6,7 @@ import { Upload, FileText, AlertTriangle, CheckCircle, XCircle, Info } from 'luc
 import { useAuth } from '../../../contexts/AuthContext';
 import { useCompany } from '../../../contexts/CompanyContext';
 
-const API = 'http://localhost:3000';
+const API = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3000';
 
 type Step = 'upload' | 'preview' | 'duplicates' | 'result';
 type DuplicateAction = 'overwrite' | 'ignore';

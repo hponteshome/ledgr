@@ -2,6 +2,7 @@
 import React, { useState, useRef } from 'react';
 import { FiUpload, FiX, FiCheckCircle, FiShield, FiFileText } from 'react-icons/fi';
 import { SmartDateInput } from '../../components/SmartDateInput';
+const API = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3000';
 
 const TIPOS = [
   { group: 'Societário', items: [
@@ -85,7 +86,7 @@ export const ImportarDocumentoModal: React.FC<Props> = ({ onClose, onSuccess, de
       fd.append('date', date);
       fd.append('description', description);
       fd.append('validate', validate ? 'true' : 'false');
-      const res = await fetch('http://localhost:3000/documents/import-signed', {
+      const res = await fetch(`${API}/documents/import-signed`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}`, 'x-company-id': company.id ?? '' },
         body: fd,

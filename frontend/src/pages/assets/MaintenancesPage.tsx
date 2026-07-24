@@ -6,7 +6,7 @@ import { MaintenanceModal } from './modals/MaintenanceModal';
 import { MAINTENANCE_TYPE_LABELS, MAINTENANCE_STATUS_LABELS } from './types/asset.types';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 
-const API = 'http://localhost:3000';
+const API = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3000';
 
 const STATUS_COLORS: Record<string, string> = {
   SCHEDULED:   'bg-yellow-50 text-yellow-800',

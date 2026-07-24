@@ -1,6 +1,7 @@
 // frontend/src/pages/finance/ApuracaoImpostosPage.tsx
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../../services/api';
+const API = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3000';
 
 const fmtBR = (v: number | null | undefined) =>
   v == null ? 'R$ 0,00' : v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -128,7 +129,7 @@ export default function ApuracaoImpostosPage() {
   function downloadDarf(tipo: string) {
     const token = localStorage.getItem('@ledgr:token');
     const cid = (window as any).__companyId__ ?? '';
-    window.open('http://localhost:3000/apuracao/darf/' + comp + '/' + tipo + '/pdf', '_blank');
+    window.open(API + '/apuracao/darf/' + comp + '/' + tipo + '/pdf', '_blank');
   }
 
   const load = useCallback(async () => {
@@ -227,7 +228,7 @@ export default function ApuracaoImpostosPage() {
         <span style={{ fontWeight:600, fontSize:14 }}>{previewTitle}</span>
         <div style={{ display:'flex', gap:8 }}>
           <button style={{ height:30, border:'none', borderRadius:6, padding:'0 14px', fontSize:12, cursor:'pointer', background:'#004080', color:'#fff', fontWeight:500 }}
-            onClick={() => window.open('http://localhost:3000/apuracao/darf/' + comp + '/' + (previewTitle.includes('PIS') ? 'PIS_COFINS' : 'IRPJ_CSLL') + '/pdf','_blank')}>
+            onClick={() => window.open(API + '/apuracao/darf/' + comp + '/' + (previewTitle.includes('PIS') ? 'PIS_COFINS' : 'IRPJ_CSLL') + '/pdf','_blank')}>
             Baixar PDF
           </button>
           <button style={{ height:30, border:'0.5px solid #ddd', borderRadius:6, padding:'0 14px', fontSize:12, cursor:'pointer', background:'#fff' }}

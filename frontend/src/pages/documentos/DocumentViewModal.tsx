@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { FiX, FiDownload, FiShield, FiHash, FiCalendar, FiFileText, FiEdit } from 'react-icons/fi';
 
-const API = 'http://localhost:3000';
+const API = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3000';
 
 const STATUS_PILL: Record<string, { bg: string; color: string; label: string }> = {
   RASCUNHO:              { bg: '#F9FAFB', color: '#374151', label: 'Rascunho' },

@@ -8,6 +8,7 @@ import { Sidebar } from './SideBar';
 import { FiLogOut, FiAlertTriangle } from 'react-icons/fi';
 import { Toaster, toast } from 'react-hot-toast';
 import { SidebarPermissionsProvider } from '../contexts/SidebarPermissionsContext';
+const API = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3000';
 
 export const Layout: React.FC = () => {
   const { signOut, user } = useAuth();
@@ -19,7 +20,7 @@ export const Layout: React.FC = () => {
     if (!isMaster) return;
     const token = localStorage.getItem('@ledgr:token');
     if (!token) return;
-    const es = new EventSource(`http://localhost:3000/chat/stream?token=${token}`);
+    const es = new EventSource(`${API}/chat/stream?token=${token}`);
     es.onmessage = (e) => {
       try {
         const event = JSON.parse(e.data);
