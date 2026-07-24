@@ -2,9 +2,10 @@
 // frontend/src/pages/documentos/RepositorioPage.tsx
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { FiFileText, FiCheckCircle, FiClock, FiArchive, FiDownload, FiEye, FiShield, FiFilter, FiUpload } from 'react-icons/fi';
+import { FiFileText, FiCheckCircle, FiClock, FiArchive, FiDownload, FiEye, FiShield, FiFilter, FiUpload, FiEdit2 } from 'react-icons/fi';
 import { SignatureValidateModal } from '../documents/signatures/SignatureValidateModal';
 import { DocumentViewModal } from './DocumentViewModal';
+import { DocumentEditModal } from './DocumentEditModal';
 import { ImportarDocumentoModal } from './ImportarDocumentoModal';
 import { RedigirProcuracaoModal } from './RedigirProcuracaoModal';
 import api from '../../services/api';
@@ -27,6 +28,7 @@ const SHELF_CONFIG: Record<string, { label: string; types: string[] }> = {
   'rh/procuracoes':         { label: 'Procuracoes Trabalhistas', types: ['PROCURACAO'] },
   'rh/acordos':             { label: 'Acordos Coletivos', types: ['TRABALHISTA'] },
   'rh':                     { label: 'Arquivo RH / Trabalhista', types: ['TRABALHISTA'] },
+  'locacao':                { label: 'Contratos de Locacao', types: ['CONTRATO_LOCACAO'] },
 };
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
@@ -48,6 +50,7 @@ export const RepositorioPage: React.FC = () => {
   const [showImport,   setShowImport]   = useState(false);
   const [showRedigir,  setShowRedigir]  = useState(false);
   const [viewDoc, setViewDoc]     = useState<{id:string;title:string} | null>(null);
+  const [editDoc, setEditDoc]     = useState<{id:string;title:string} | null>(null);
 
   const shelf = location.pathname.replace('/app/arquivo/', '');
   const config = SHELF_CONFIG[shelf] ?? { label: 'Arquivo', types: [] };
@@ -143,6 +146,10 @@ export const RepositorioPage: React.FC = () => {
                     <div className="flex gap-2">
                       <button title="Visualizar" onClick={() => setViewDoc({id: doc.id, title: doc.title})}
                         className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded"><FiEye size={14} /></button>
+                      {doc.status === 'RASCUNHO' && (
+                        <button title="Editar" onClick={() => setEditDoc({id: doc.id, title: doc.title})}
+                          className="p-1.5 text-gray-400 hover:text-blue-700 hover:bg-blue-50 rounded"><FiEdit2 size={14} /></button>
+                      )}
                       <button title="Baixar PDF"
                         className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded"><FiDownload size={14} /></button>
                       <button title="Validar Assinatura" onClick={() => setValidateDocId(doc.id)}
@@ -161,6 +168,10 @@ export const RepositorioPage: React.FC = () => {
       {viewDoc !== null && (
         <DocumentViewModal documentId={viewDoc.id} documentTitle={viewDoc.title}
           onClose={() => setViewDoc(null)} onValidate={(id) => { setValidateDocId(id); setViewDoc(null); }} />
+      )}
+      {editDoc !== null && (
+        <DocumentEditModal documentId={editDoc.id} documentTitle={editDoc.title}
+          onClose={() => setEditDoc(null)} onSaved={() => window.location.reload()} />
       )}
       {validateDocId !== null && (
         <SignatureValidateModal documentId={validateDocId} onClose={() => setValidateDocId(null)} />

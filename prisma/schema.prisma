@@ -852,6 +852,7 @@ enum DocumentType {
   LIVRO_ATAS_AGO
   LIVRO_ATAS_AGE
   CONTRATO_SOCIAL
+  CONTRATO_LOCACAO
   ADITIVO_CONTRATUAL
   PROCURACAO
   FISCAL
@@ -1485,6 +1486,7 @@ model FixedAsset {
   street           String?          @map("street") @db.VarChar(255)
   number           String?          @map("number") @db.VarChar(20)
   complement       String?          @map("complement") @db.VarChar(255)
+  neighborhood     String?          @map("neighborhood") @db.VarChar(150)
   zipCode          String?          @map("zip_code") @db.VarChar(9)
   state            String?          @map("state") @db.VarChar(2)
   city             String?          @map("city") @db.VarChar(100)
@@ -2235,6 +2237,19 @@ model RentalContract {
   tenantId     String? @map("tenant_id") @db.Uuid
   tenantName   String  @map("tenant_name") @db.VarChar(200)
   tenantTaxId  String? @map("tenant_tax_id") @db.VarChar(18)
+
+  // -- Qualificacao completa do locatario (para geracao do contrato completo) --
+  tenantRg            String?        @map("tenant_rg") @db.VarChar(20)
+  tenantProfession    String?        @map("tenant_profession") @db.VarChar(100)
+  tenantMaritalStatus MaritalStatus? @map("tenant_marital_status")
+  tenantNationality   String?        @default("Brasileira") @map("tenant_nationality") @db.VarChar
+  tenantStreet        String?        @map("tenant_street") @db.VarChar
+  tenantNumber        String?        @map("tenant_number") @db.VarChar(20)
+  tenantComplement    String?        @map("tenant_complement") @db.VarChar
+  tenantNeighborhood  String?        @map("tenant_neighborhood") @db.VarChar
+  tenantCity          String?        @map("tenant_city") @db.VarChar
+  tenantState         String?        @map("tenant_state") @db.VarChar(2)
+  tenantZipCode       String?        @map("tenant_zip_code") @db.VarChar(9)
 
   // -- Vigencia --------------------------------------------------
   startDate DateTime  @map("start_date") @db.Date

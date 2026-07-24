@@ -10,6 +10,7 @@ import {
   RentalReadjustmentIndex,
   RentalIntermediaryType,
   RentalContractStatus,
+  MaritalStatus,
 } from '@prisma/client';
 
 export class CreateRentalContractDto {
@@ -27,6 +28,28 @@ export class CreateRentalContractDto {
 
   @IsOptional() @IsString() @MaxLength(18)
   tenantTaxId?: string;
+  @IsOptional() @IsString() @MaxLength(20)
+  tenantRg?: string;
+  @IsOptional() @IsString() @MaxLength(100)
+  tenantProfession?: string;
+  @IsOptional() @IsEnum(MaritalStatus)
+  tenantMaritalStatus?: MaritalStatus;
+  @IsOptional() @IsString()
+  tenantNationality?: string;
+  @IsOptional() @IsString()
+  tenantStreet?: string;
+  @IsOptional() @IsString() @MaxLength(20)
+  tenantNumber?: string;
+  @IsOptional() @IsString()
+  tenantComplement?: string;
+  @IsOptional() @IsString()
+  tenantNeighborhood?: string;
+  @IsOptional() @IsString()
+  tenantCity?: string;
+  @IsOptional() @IsString() @MaxLength(2)
+  tenantState?: string;
+  @IsOptional() @IsString() @MaxLength(9)
+  tenantZipCode?: string;
 
   @IsDateString()
   startDate!: string;

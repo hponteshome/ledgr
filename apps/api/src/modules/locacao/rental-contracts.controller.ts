@@ -47,4 +47,12 @@ export class RentalContractsController {
     const companyId = req.headers['x-company-id'] ?? '';
     return this.svc.remove(companyId, id);
   }
+
+  @Post(':id/generate-document')
+  @RequireResourceAccess('rental-contracts', 'EDIT')
+  generateDocument(@Req() req: any, @Param('id') id: string) {
+    const companyId = req.headers['x-company-id'] ?? '';
+    const userId = req.user?.id ?? req.user?.sub ?? '';
+    return this.svc.generateDocument(companyId, userId, id);
+  }
 }

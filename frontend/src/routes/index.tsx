@@ -279,6 +279,7 @@ export const AppRoutes = () => {
                 <Route path="app/arquivo/rh/contratos" element={<ProtectedRoute><RepositorioPage /></ProtectedRoute>} />
                 <Route path="app/arquivo/rh/procuracoes" element={<ProtectedRoute><RepositorioPage /></ProtectedRoute>} />
                 <Route path="app/arquivo/rh/acordos" element={<ProtectedRoute><RepositorioPage /></ProtectedRoute>} />
+                <Route path="app/arquivo/locacao" element={<ProtectedRoute><RepositorioPage /></ProtectedRoute>} />
 
                 {/* Configurações */}
                 <Route path="app/settings/data-management" element={<ProtectedRoute><TableManager /></ProtectedRoute>} />

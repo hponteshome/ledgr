@@ -1,8 +1,22 @@
 // apps/api/src/modules/locacao/rental-contracts.service.ts
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@prisma/prisma.service';
-import { Prisma } from '@prisma/client';
+import { Prisma, DocumentType, DocumentStatus, DocumentVisibility } from '@prisma/client';
 import { CreateRentalContractDto, UpdateRentalContractDto } from './dto/rental-contract.dto';
+import * as crypto from 'crypto';
+import * as Handlebars from 'handlebars';
+import { valorPorExtenso } from './utils/extenso.util';
+import {
+  formatDateBR,
+  formatDateExtenso,
+  formatCurrencyBRL,
+  formatCep,
+  formatCpfCnpj,
+  monthsBetween,
+  maritalStatusLabel,
+  guaranteeTypeLabel,
+  readjustmentIndexLabel,
+} from './utils/contract-format.util';
 
 function toDecimal(value: number | string | undefined | null): Prisma.Decimal | undefined {
   if (value === undefined || value === null || (value as any) === '') return undefined;
@@ -144,5 +158,107 @@ export class RentalContractsService {
       where: { id },
       data: { deletedAt: new Date() },
     });
+  }
+
+  async generateDocument(companyId: string, userId: string, id: string) {
+    const contract = await this.prisma.rentalContract.findFirst({
+      where: { id, companyId, deletedAt: null },
+      include: { fixedAsset: true, company: true },
+    });
+    if (!contract) throw new NotFoundException('Contrato de locacao nao encontrado.');
+
+    let template = await this.prisma.documentTemplate.findFirst({
+      where: { type: DocumentType.CONTRATO_LOCACAO, isActive: true, companyId },
+    });
+    if (!template) {
+      template = await this.prisma.documentTemplate.findFirst({
+        where: { type: DocumentType.CONTRATO_LOCACAO, isActive: true, companyId: null },
+      });
+    }
+    if (!template) {
+      throw new NotFoundException('Nenhum template ativo de Contrato de Locacao encontrado.');
+    }
+
+    const isFianca = contract.guaranteeType === 'FIANCA';
+    const rentAmountNumber = Number(contract.rentAmount);
+
+    const dados = {
+      empresa: {
+        legalName: contract.company.legalName,
+        taxId: formatCpfCnpj(contract.company.taxId),
+        street: contract.company.street,
+        number: contract.company.number,
+        complement: contract.company.complement,
+        neighborhood: contract.company.neighborhood,
+        city: contract.company.city,
+        state: contract.company.state,
+        zipCode: formatCep(contract.company.zipCode),
+      },
+      contrato: {
+        tenantName: contract.tenantName,
+        tenantNationality: contract.tenantNationality,
+        tenantMaritalStatus: maritalStatusLabel(contract.tenantMaritalStatus),
+        tenantProfession: contract.tenantProfession,
+        tenantRg: contract.tenantRg,
+        tenantTaxId: formatCpfCnpj(contract.tenantTaxId),
+        tenantStreet: contract.tenantStreet,
+        tenantNumber: contract.tenantNumber,
+        tenantComplement: contract.tenantComplement,
+        tenantNeighborhood: contract.tenantNeighborhood,
+        tenantZipCode: formatCep(contract.tenantZipCode),
+        tenantCity: contract.tenantCity,
+        tenantState: contract.tenantState,
+        prazoMeses: monthsBetween(contract.startDate, contract.endDate),
+        startDate: formatDateBR(contract.startDate),
+        endDate: formatDateBR(contract.endDate),
+        rentAmount: formatCurrencyBRL(rentAmountNumber),
+        rentAmountExtenso: valorPorExtenso(rentAmountNumber),
+        dueDay: contract.dueDay,
+        readjustmentPeriodMonths: contract.readjustmentPeriodMonths,
+        readjustmentIndex: readjustmentIndexLabel(contract.readjustmentIndex, contract.readjustmentIndexOther),
+        guaranteeType: guaranteeTypeLabel(contract.guaranteeType),
+        isFianca,
+        guaranteeDescription: contract.guaranteeDescription,
+        penaltyDescription: contract.penaltyDescription,
+        numeroVias: isFianca ? 3 : 2,
+        dataAssinatura: formatDateExtenso(new Date()),
+      },
+      imovel: {
+        street: contract.fixedAsset.street,
+        number: contract.fixedAsset.number,
+        complement: contract.fixedAsset.complement,
+        neighborhood: contract.fixedAsset.neighborhood,
+        city: contract.fixedAsset.city,
+        state: contract.fixedAsset.state,
+        zipCode: formatCep(contract.fixedAsset.zipCode),
+        registryNumber: contract.fixedAsset.registryNumber,
+        registryOffice: contract.fixedAsset.registryOffice,
+      },
+    };
+
+    const compiled = Handlebars.compile(template.content);
+    const html = compiled(dados);
+    const contentHash = crypto.createHash('sha256').update(html).digest('hex');
+
+    const document = await this.prisma.document.create({
+      data: {
+        companyId,
+        type: DocumentType.CONTRATO_LOCACAO,
+        status: DocumentStatus.RASCUNHO,
+        visibility: DocumentVisibility.RESERVADO,
+        title: `Contrato de Locacao - ${contract.tenantName}`,
+        date: new Date(),
+        content: html,
+        contentHash,
+        createdById: userId,
+      },
+    });
+
+    await this.prisma.rentalContract.update({
+      where: { id: contract.id },
+      data: { documentId: document.id, updatedById: userId },
+    });
+
+    return document;
   }
 }

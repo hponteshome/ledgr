@@ -3493,3 +3493,13 @@ px prisma generate rodado apos cada alteracao - client atualizado (v7.9.0).
 **Nao commitado ainda** - toda a mudanca deste bloco (schema, DTO, extenso.util.ts,
 handlebars instalado) esta pendente de commit. Fazer isso na proxima sessao apos
 confirmar que o SQL seed do template rodou.
+
+
+## Nota rapida 24/07/2026 - Label "Acervo" reincide pela 2a vez
+
+Label de /app/arquivo reverteu de "Arquivo Digital" para "Acervo" outra vez (1a vez
+registrada em sessao anterior, corrigida via UPDATE direto na ocasiao). Corrigido de
+novo agora via UPDATE. PENDENTE: achar a origem do reset - suspeita de algum seed/
+migracao de sidebar_items rodando com valor antigo hardcoded, ou script de setup
+que roda em algum fluxo (ex: novo ambiente, restart de container, deploy). Se
+reincidir uma 3a vez, vale grep no repo inteiro por "Acervo" para achar a fonte.
