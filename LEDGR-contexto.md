@@ -3563,3 +3563,107 @@ d02c766, push origin/main confirmado.
    HTML completo (caso do contrato de locacao). Nao corrigido nesta sessao
    (fora do escopo), mas anotar para nao confundir com bug se o preview parecer
    com formatacao estranha.
+
+
+## Sessão 24/07/2026 (bloco 8) — Homologação SERVER02: início, PAUSADO na instalação do PostgreSQL
+
+**Contexto:** apos fechar o bloco 7 (Contrato de Locacao) e um bloco extra (Layout dinamico
+em Manutencao de Dados + fix de URLs hardcoded), iniciado o deploy de homologacao no
+SERVER02.
+
+**CORRECAO CRITICA de memoria — registrar como fonte de verdade, a anterior estava ERRADA:**
+- SERVER02 = 192.168.0.10 (nome resolve por DNS/NetBIOS da rede local) — NAO e
+  192.168.0.60 (essa e OUTRA maquina, responde ping mas nao e o SERVER02).
+- Windows Server 2019 Datacenter/Standard, build 10.0.17763.914 (RTM 1809).
+- Login local: usuario "Administrador" via RDP (mstsc /v:SERVER02).
+- Drive H: existe e esta dedicado — 223,4GB livres de 223,6GB total (praticamente
+  intocado). Isso SIM bateu com a memoria anterior.
+- Docker, Node, Git NAO estavam instalados (diferente do que a memoria antiga dizia -
+  possivel confusao com a maquina de DEV, que tem os 3). Tratar este servidor como
+  inventariado pela primeira vez de verdade nesta sessao.
+
+**Decisao de arquitetura tomada (mudanca de plano):** Docker Desktop nao roda em Windows
+Server 2019 (exige WSL2/Hyper-V so disponivel em Windows 10/11). Cogitado LCOW (Linux
+Containers on Windows) para viabilizar Docker mesmo assim - pesquisado e CONFIRMADO que
+LCOW foi descontinuado (removido do Docker a partir da v23.0, ultimo suporte so via Docker
+CE 20.10.24 sem manutencao, projeto linuxkit/lcow arquivado no GitHub). Descartado por
+inviavel/inseguro para homologacao real.
+
+**Decisao final: servicos NATIVOS do Windows, sem Docker no SERVER02:**
+- PostgreSQL nativo (instalador oficial EnterpriseDB), dados em H:\postgresql\data
+- Node.js 24 LTS nativo, API NestJS buildada e rodando como servico Windows
+  (via pm2 + pm2-windows-service, pendente de instalar)
+- Frontend (Vite build) servido via IIS (nativo do Windows Server) - substitui o Nginx
+  que estava no plano original com Docker
+
+**Decisao de dados:** banco de staging sobe VAZIO/LIMPO (nao copiar dados do dev). Motivo:
+evitar levar CPF/CNPJ real de clientes (LM, GRB etc) e os 7 registros soft-deleted
+"fantasma" encontrados (1 person + 6 users) para um ambiente menos protegido.
+
+**Decisao de schema:** usar `npx prisma db push` (nao `prisma migrate deploy`) para
+sincronizar o banco novo contra schema.prisma. Motivo: a pasta prisma/migrations/ (25
+migrations formais) provavelmente NAO reflete 100% o schema atual, porque varias sessoes
+(inclusive esta) aplicaram ALTER TABLE manual via docker exec psql fora do fluxo prisma
+migrate (ex: campo neighborhood em FixedAsset desta mesma sessao). db push le direto do
+schema.prisma, que e a fonte de verdade real.
+
+**Achado colateral corrigido nesta sessao (commit 8a22946):** 21 arquivos do frontend
+tinham `http://localhost:3000` hardcoded (incluindo services/api.ts central) - funcionava
+em dev (front+back na mesma maquina) mas quebraria para qualquer acesso via rede. Todos
+migrados para `(import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3000'`. Um erro
+cometido e corrigido no meio do processo: substituicao "catch-all" aplicada depois da
+insercao da propria constante causou auto-corrupcao em SignatureValidateModal.tsx
+(`?? '${API}'` em vez de `?? 'http://localhost:3000'`) - corrigido na hora, mas serve de
+licao: cuidado com ordem de operacoes quando uma substituicao generica roda depois de uma
+insercao que contem o mesmo padrao.
+
+**EXECUTADO ATE AGORA no SERVER02 (nesta sessao, via RDP):**
+1. C:\Setup criado como pasta de trabalho para instaladores
+2. Node.js 24.18.0 instalado via MSI oficial (nodejs.org/dist/latest-v24.x), hash SHA256
+   verificado e CONFERIU antes de instalar
+3. Git 2.55.0.3 instalado via GitHub API oficial (git-for-windows/git releases/latest)
+4. Confirmado via terminal novo: node --version (v24.18.0), npm --version (11.16.0),
+   git --version (2.55.0.windows.3) - todos OK
+5. PostgreSQL: instrucoes passadas para instalacao MANUAL via GUI (nao scriptado, para a
+   senha do superuser postgres nunca aparecer em texto no chat) - usuario estava no meio
+   do wizard quando pausou. Instrucoes dadas: Data Directory = H:\postgresql\data (NAO o
+   padrao em C:), porta 5432 padrao, desmarcar Launch Stack Builder ao final.
+
+**PENDENTE — retomar exatamente nesta ordem na segunda-feira:**
+1. Confirmar que o instalador do PostgreSQL foi concluido (perguntar ao usuario se ficou
+   pendente no meio do wizard).
+2. Rodar no SERVER02:
+   Get-Service -Name "postgresql*"
+   Get-ChildItem "H:\postgresql\data" -ErrorAction SilentlyContinue | Select-Object -First 5
+   -> confirmar servico rodando E dados realmente em H:\ (nao C:\Program Files\...\data
+   por engano, erro comum se esquecer de mudar o campo no wizard).
+3. Clonar o repo: git clone https://github.com/hponteshome/ledgr.git em H:\ledgr (definir
+   local exato com o usuario - sugestao H:\ledgr, nao C:\).
+4. Criar .env.staging na raiz do repo clonado - variaveis minimas: DATABASE_URL (senha do
+   postgres que o usuario definiu, NUNCA pedir para colar no chat, so confirmar que ele
+   tem anotada em local seguro), JWT_SECRET (gerar novo, nao reusar o de dev),
+   CORS_ORIGINS=http://192.168.0.10:<porta-frontend-a-definir>, FRONTEND_URL idem.
+   Portas do frontend e da API AINDA NAO DEFINIDAS - pendente checar
+   Get-NetTCPConnection -State Listen no servidor antes de fixar (ver bloco anterior desta
+   sessao, pedido mas nao executado ainda por causa do desvio do Docker/LCOW).
+5. npm install na raiz do workspace (D:\... equivalente no server, provavelmente H:\ledgr).
+6. npx prisma generate --schema=prisma/schema.prisma
+7. npx prisma db push --schema=prisma/schema.prisma (schema vazio/limpo, decisao ja
+   tomada - NAO usar migrate deploy).
+8. nest build api (dentro de apps/api) - gerar dist/.
+9. Instalar pm2 + pm2-windows-service globalmente, configurar API para rodar como servico
+   Windows (auto-start, sobrevive a reboot).
+10. vite build no frontend - gerar dist/ estatico.
+11. Configurar IIS (Windows Feature, provavelmente precisa ser instalado - nao confirmado
+    ainda se ja esta presente no SERVER02) para servir o dist/ do frontend.
+12. Firewall do Windows: liberar EXPLICITAMENTE so as portas da API e do frontend -
+    Postgres (5432) NUNCA exposto para fora do localhost.
+13. Testar acesso de outra maquina da rede (nao do proprio servidor) - validacao real via
+    navegador de outro PC.
+
+**Nota de seguranca reforcada pelo usuario nesta sessao ("priorizar seguranca sempre"):**
+manter esse padrao daqui para frente neste deploy - so instaladores oficiais via HTTPS,
+verificar hash quando disponivel (feito para Node.js), senha do Postgres nunca em texto
+no chat, Postgres nunca exposto a rede externa, firewall explicito e minimo, considerar
+usuario de servico dedicado (nao Administrador) para rodar a API - AINDA NAO decidido,
+avaliar na retomada.
