@@ -3335,3 +3335,49 @@ de Prisma Client que na verdade nunca existiu - o generate sempre funcionou cert
 so' a verificacao estava checando a pasta errada. Aconteceu em pelo menos 2 momentos
 da mesma sessao (correcao numero/complemento em fixed_assets, e criacao do model
 RentalContract).
+
+---
+
+## Sessão 20/07/2026 (bloco 5) — Organização do módulo Locação, backend commitado
+
+**Reconstrucao de historico:** revisadas as sessoes '3800 errors encountered' e 'Quadro Resumo
+das Locacoes' (ambas 23/07) para entender trabalho em andamento nao commitado encontrado
+no git status. Decisao arquitetural confirmada dessas sessoes: 'Alugado' NUNCA e campo manual
+- sempre derivado da existencia de RentalContract ATIVO vinculado ao FixedAsset. Estados
+manuais (disponivel, para locacao, em reforma, uso reservado) sao um enum separado
+AssetOccupancyStatus.
+
+**Bug corrigido:** asset.types.ts tinha 'rentalContracts' duplicado (TS2300) - uma copia
+mal colada embaixo do comentario '// Depreciation' (sem nexo com o contexto), outra no
+lugar certo junto de appraisals/history/_count. Removida a duplicata errada. tsc limpo
+tanto no frontend quanto no backend agora.
+
+**COMMITADO (96d0573):** backend completo do modulo Locacao —
+- apps/api/src/modules/locacao/ (dto, controller, module, service) - NOVO
+- app.module.ts - modulo registrado
+- assets.service.ts - retorna rentalContracts (contrato ativo) em findAll/findOne
+- asset.types.ts - AssetOccupancyStatus, RentalContractSummary, duplicata corrigida
+- schema.prisma - RentalContract (5 enums) + AssetOccupancyStatus + campo occupancyStatus
+- sidebar_items - resource 'rental-contracts' cadastrado sob Patrimonio (fecha gap de seguranca)
+- asset-import.service.ts - fix do CEP desta sessao, incluido no mesmo commit
+
+**PENDENTE — proximo passo imediato (usuario pediu explicitamente para avancar):**
+Frontend do AssetsList.tsx (Bens Cadastrados):
+- Nova coluna 'Ocupacao' (separada do 'Status' que ja existe - Status = vida do ativo
+  Ativo/Baixado; Ocupacao = uso do imovel - conceitos diferentes, nao misturar)
+- Badge 'Alugado' com icone de link -> abre MODAL (nao navega) em modo leitura: locatario,
+  valor, vencimento, garantia, reajuste, corretora se houver, link pro documento em
+  Arquivos Digitais se documentId preenchido. Modal segue padrao ja definido (APPayModal,
+  cores FIN)
+- Badges dos outros estados (AssetOccupancyStatus manual) sem link, so indicativo visual
+  (cinza/laranja/roxo)
+
+**Confirmado durante a busca em sessoes passadas:** group do FixedAsset para imoveis usa
+valor 'REAL_ESTATE' (nao 'IMOVEL'/'IMOVEIS') - conferir isso ao filtrar quais assets mostram
+a coluna Ocupacao (so faz sentido para REAL_ESTATE).
+
+**Nota de metodologia (da sessao anterior, vale repetir):** para arquivos com backtick ou
+template literal, sempre Python script em D:\Temp; para .ts/.tsx normais, Select-String +
+edicao por indice e mais confiavel que multi-line .Replace() quando o arquivo e grande/
+teve muitas edicoes anteriores - .Replace() falha por pequenas diferencas de espaco/quebra
+de linha que se acumulam.
