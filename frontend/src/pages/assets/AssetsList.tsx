@@ -13,11 +13,15 @@ import {
     ASSET_GROUP_LABELS,
     ASSET_STATUS_LABELS,
     ASSET_STATUS_COLORS,
+    ASSET_OCCUPANCY_LABELS,
+    ASSET_OCCUPANCY_COLORS,
     AssetGroup
 } from './types/asset.types';
 import type { FixedAsset } from './types/asset.types';
 import { AssetFormModal } from './modals/AssetFormModal';
 import { AssetImportModal } from './modals/AssetImportModal';
+import { RentalContractDetailModal } from './modals/RentalContractDetailModal';
+import { RentalContractFormModal } from './modals/RentalContractFormModal';
 import { formatCurrency } from '../../utils/formatters';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCompany } from '../../contexts/CompanyContext';
@@ -51,6 +55,8 @@ export default function AssetsList() {
     const [status, setStatus] = useState('');
     const [showForm, setShowForm] = useState(false);
     const [showImport, setShowImport] = useState(false);
+    const [rentalModalAsset, setRentalModalAsset] = useState<FixedAsset | null>(null);
+    const [rentFormAsset, setRentFormAsset] = useState<FixedAsset | null>(null);
     const [sortKey, setSortKey] = useState<SortKey>('internalCode');
     const [sortDir, setSortDir] = useState<SortDir>('asc');
 
@@ -319,6 +325,7 @@ export default function AssetsList() {
                             <th className={`${thCls} text-center`} onClick={() => handleSort('status')}>
                                 Status <SortIcon col="status" sortKey={sortKey} sortDir={sortDir} />
                             </th>
+                            <th className="px-3 py-3 text-center font-medium">Ocupação</th>
                             <th className="px-3 py-3 text-center font-medium">OS</th>
                         </tr>
                     </thead>
@@ -386,6 +393,37 @@ export default function AssetsList() {
                                                 {ASSET_STATUS_LABELS[ativo.status]}
                                             </span>
                                         </td>
+                                        <td className="px-3 py-2.5 text-center">
+                                            {ativo.rentalContracts && ativo.rentalContracts.length > 0 ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => { e.stopPropagation(); setRentalModalAsset(ativo); }}
+                                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700 hover:bg-green-200 transition-colors"
+                                                >
+                                                    Alugado
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                                                </button>
+                                            ) : (
+                                                <div className="flex items-center justify-center gap-1.5">
+                                                    {ativo.occupancyStatus ? (
+                                                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${ASSET_OCCUPANCY_COLORS[ativo.occupancyStatus]}`}>
+                                                            {ASSET_OCCUPANCY_LABELS[ativo.occupancyStatus]}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-gray-300 text-xs">—</span>
+                                                    )}
+                                                    {ativo.group === 'REAL_ESTATE' && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => { e.stopPropagation(); setRentFormAsset(ativo); }}
+                                                            className="text-xs text-blue-600 hover:text-blue-800 hover:underline"
+                                                        >
+                                                            Alugar
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </td>
                                         <td className="px-3 py-2.5 text-center" onClick={() => navigate(`/app/assets/${ativo.id}`)}>
                                             {osAbertas > 0 ? (
                                                 <span className="flex items-center justify-center gap-1 text-orange-600 text-xs font-medium">
@@ -420,6 +458,14 @@ export default function AssetsList() {
             </div>
 
             {showForm && <AssetFormModal onClose={() => setShowForm(false)} onSuccess={onCreated} />}
+            {rentalModalAsset && <RentalContractDetailModal asset={rentalModalAsset} onClose={() => setRentalModalAsset(null)} />}
+            {rentFormAsset && (
+                <RentalContractFormModal
+                    asset={rentFormAsset}
+                    onClose={() => setRentFormAsset(null)}
+                    onSuccess={() => { setRentFormAsset(null); fetch({ limit: 1000 }); }}
+                />
+            )}
             {showBackfillModal && (
                 <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
                     <div className="bg-white rounded-xl shadow-xl p-5 w-full max-w-sm">
