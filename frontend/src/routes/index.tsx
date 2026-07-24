@@ -56,6 +56,7 @@ import ImportJournalPage from '../pages/accounting/ImportJournalPage';
 import AssetsList from '../pages/assets/AssetsList';
 import AssetsView from '../pages/assets/AssetsView';
 import MaintenancesPage from '../pages/assets/MaintenancesPage';
+import RentalContractsListPage from '../pages/assets/RentalContractsListPage';
 
 import { BalanceComparisonPage } from '../pages/reports/BalanceComparisonPage';
 import DiarioGeralPage from '../pages/accounting/DiarioGeralPage';
@@ -291,6 +292,7 @@ export const AppRoutes = () => {
                 {/* Ativo Imobilizado */}
                 <Route path="app/assets" element={<ProtectedRoute><AssetsList /></ProtectedRoute>} />
                 <Route path="app/assets/maintenances" element={<ProtectedRoute><MaintenancesPage /></ProtectedRoute>} />
+                <Route path="app/assets/rental-contracts" element={<ProtectedRoute><RentalContractsListPage /></ProtectedRoute>} />
                 <Route path="app/assets/:id" element={<ProtectedRoute><AssetsView /></ProtectedRoute>} />
 
                 {/* Módulos em desenvolvimento */}

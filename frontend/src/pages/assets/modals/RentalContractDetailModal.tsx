@@ -7,7 +7,6 @@ import { Loader } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useCompany } from '../../../contexts/CompanyContext';
 import { ModalWrapper, Field } from './ModalComponents';
-import type { FixedAsset } from '../types/asset.types';
 
 const API = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3000';
 
@@ -51,14 +50,12 @@ function fmtDate(v: string | undefined): string {
     return d.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
 }
 
-export function RentalContractDetailModal({ asset, onClose }: { asset: FixedAsset; onClose: () => void }) {
+export function RentalContractDetailModal({ contractId, title, onClose }: { contractId?: string; title: string; onClose: () => void }) {
     const { token } = useAuth();
     const { activeCompany } = useCompany();
     const [contract, setContract] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-
-    const contractId = asset.rentalContracts?.[0]?.id;
 
     useEffect(() => {
         if (!contractId) { setError('Contrato não encontrado.'); setLoading(false); return; }
@@ -77,7 +74,7 @@ export function RentalContractDetailModal({ asset, onClose }: { asset: FixedAsse
     }, [contractId, token, activeCompany?.id]);
 
     return (
-        <ModalWrapper title={`Quadro Resumo — ${asset.internalCode}`} onClose={onClose}>
+        <ModalWrapper title={title} onClose={onClose}>
             <div className="p-6 space-y-4">
                 {loading && (
                     <div className="flex items-center justify-center py-10 text-gray-400">

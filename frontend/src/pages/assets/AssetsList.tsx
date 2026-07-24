@@ -458,7 +458,13 @@ export default function AssetsList() {
             </div>
 
             {showForm && <AssetFormModal onClose={() => setShowForm(false)} onSuccess={onCreated} />}
-            {rentalModalAsset && <RentalContractDetailModal asset={rentalModalAsset} onClose={() => setRentalModalAsset(null)} />}
+            {rentalModalAsset && (
+                <RentalContractDetailModal
+                    contractId={rentalModalAsset.rentalContracts?.[0]?.id}
+                    title={`Quadro Resumo — ${rentalModalAsset.internalCode}`}
+                    onClose={() => setRentalModalAsset(null)}
+                />
+            )}
             {rentFormAsset && (
                 <RentalContractFormModal
                     asset={rentFormAsset}
