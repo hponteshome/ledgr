@@ -117,6 +117,44 @@ export const WRITE_OFF_REASON_LABELS: Record<WriteOffReason, string> = {
   OTHER:     'Outros',
 };
 
+// Ocupacao MANUAL do imovel quando NAO ha contrato de locacao ativo.
+// "Alugado" NAO existe aqui de proposito - esse estado e sempre derivado
+// da presenca de rentalContracts no FixedAsset (ver AssetsService.findAll).
+export type AssetOccupancyStatus =
+  | 'DISPONIVEL'
+  | 'PARA_LOCACAO'
+  | 'EM_REFORMA'
+  | 'USO_RESERVADO'
+  | 'OUTRO';
+
+export const ASSET_OCCUPANCY_LABELS: Record<AssetOccupancyStatus, string> = {
+  DISPONIVEL:    'Disponível',
+  PARA_LOCACAO:  'Para Locação',
+  EM_REFORMA:    'Em Reforma',
+  USO_RESERVADO: 'Uso Reservado',
+  OUTRO:         'Outro',
+};
+
+export const ASSET_OCCUPANCY_COLORS: Record<AssetOccupancyStatus, string> = {
+  DISPONIVEL:    'bg-gray-100 text-gray-600',
+  PARA_LOCACAO:  'bg-blue-100 text-blue-700',
+  EM_REFORMA:    'bg-orange-100 text-orange-700',
+  USO_RESERVADO: 'bg-purple-100 text-purple-700',
+  OUTRO:         'bg-gray-100 text-gray-600',
+};
+
+export type RentalContractStatus = 'ATIVO' | 'ENCERRADO' | 'RESCINDIDO';
+
+export interface RentalContractSummary {
+  id:           string;
+  tenantName:   string;
+  rentAmount:   number;
+  dueDay:       number;
+  firstDueDate: string;
+  status:       RentalContractStatus;
+  documentId?:  string;
+}
+
 // ── Interfaces ────────────────────────────────────────────────
 
 export interface FixedAsset {
@@ -154,6 +192,7 @@ export interface FixedAsset {
 
   // Real Estate
   iptuRegistration?: string;
+  occupancyStatus?:  AssetOccupancyStatus;
   registryNumber?:   string;
   registryOffice?:   string;
   totalArea?:        number;
@@ -181,6 +220,7 @@ export interface FixedAsset {
   appraisals?:       AssetAppraisal[];
   history?:          AssetHistory[];
   _count?:           { improvements: number; retrofitProjects: number };
+  rentalContracts?:  RentalContractSummary[]; // contrato ATIVO, no maximo 1 (ver AssetsService.findAll)
 
   isActive:  boolean;
   createdAt: string;

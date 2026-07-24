@@ -291,6 +291,7 @@ model Company {
   accountingConfigs      CompanyAccountingConfig[]
   informesRendimentos    InformeRendimentos[]
   arEntries              ArEntry[]
+  rentalContracts        RentalContract[]
   folhasMensais          FolhaMensal[]
   folhaFuncionarios      FolhaFuncionario[]
   folhaBeneficios        FolhaBeneficio[]
@@ -479,6 +480,7 @@ model Person {
   informesRendimentos InformeRendimentos[]
   employees           Employee[]           @relation("EmployeePerson")
   arEntries           ArEntry[]            @relation("ArEntryCustomer")
+  rentalContracts     RentalContract[]     @relation("RentalContractTenant")
   pettyCashFunds      PettyCash[]          @relation("PettyCashResponsible")
 
   @@index([cpf])
@@ -1344,6 +1346,20 @@ enum AssetStatus {
   @@map("asset_status")
 }
 
+/// Ocupacao MANUAL do imovel quando NAO ha contrato de locacao ativo.
+/// "Alugado" NAO existe aqui de proposito - esse estado e sempre derivado
+/// da existencia de um RentalContract com status=ATIVO vinculado ao ativo,
+/// nunca setado a mao (evita duas fontes de verdade divergindo).
+enum AssetOccupancyStatus {
+  DISPONIVEL
+  PARA_LOCACAO
+  EM_REFORMA
+  USO_RESERVADO
+  OUTRO
+
+  @@map("asset_occupancy_status")
+}
+
 enum DepreciationMethod {
   STRAIGHT_LINE
   SUM_OF_DIGITS
@@ -1454,6 +1470,7 @@ model FixedAsset {
   nonDepreciable      Boolean            @default(false) @map("non_depreciable")
 
   // ── Campos específicos de imóveis ─────────────────────────
+  occupancyStatus  AssetOccupancyStatus? @default(DISPONIVEL) @map("occupancy_status")
   propertyId       String?          @map("property_id") @db.Uuid
   iptuRegistration String?          @map("iptu_registration") @db.VarChar(50)
   registryNumber   String?          @map("registry_number") @db.VarChar(60)
@@ -1498,6 +1515,7 @@ model FixedAsset {
   arEntries        ArEntry[]      @relation("ArEntryAsset")
   bankTransactions BankTransaction[] @relation("BankTransactionAsset")
   journalItems     JournalEntryItem[] @relation("JournalEntryItemAsset")
+  rentalContracts  RentalContract[]    @relation("RentalContractAsset")
 
   @@unique([companyId, internalCode])
   @@index([companyId, status])
@@ -2151,6 +2169,140 @@ model ARPayment {
 
   @@index([arEntryId])
   @@map("ar_payments")
+}
+
+// =============================================================================
+// 13 · LOCACAO - QUADRO RESUMO DE CONTRATOS
+// =============================================================================
+
+enum RentalDuePeriodicity {
+  MENSAL
+  BIMESTRAL
+  TRIMESTRAL
+  SEMESTRAL
+  ANUAL
+  OUTRO
+
+  @@map("rental_due_periodicity")
+}
+
+enum RentalGuaranteeType {
+  FIANCA
+  SEGURO_FIANCA
+  CAUCAO
+  OUTROS
+
+  @@map("rental_guarantee_type")
+}
+
+enum RentalReadjustmentIndex {
+  IGPM
+  IPCA
+  INPC
+  IGPDI
+  OUTRO
+
+  @@map("rental_readjustment_index")
+}
+
+enum RentalIntermediaryType {
+  IMOBILIARIA
+  PESSOA_FISICA
+
+  @@map("rental_intermediary_type")
+}
+
+enum RentalContractStatus {
+  ATIVO
+  ENCERRADO
+  RESCINDIDO
+
+  @@map("rental_contract_status")
+}
+
+/// Quadro Resumo do Contrato de Locacao. Consolida os dados essenciais do contrato
+/// para apuracao de impostos mensais, avisos de vencimento/cobranca e avisos de
+/// renovacao. Hoje preenchido manualmente; no futuro sera gerado automaticamente
+/// na validacao/autenticacao do documento do contrato (documentId) - PENDENTE.
+model RentalContract {
+  id        String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId String @map("company_id") @db.Uuid /// Empresa locadora
+
+  contractNumber String? @map("contract_number") @db.VarChar(50)
+
+  // -- Imovel e locatario --------------------------------------
+  fixedAssetId String  @map("fixed_asset_id") @db.Uuid
+  tenantId     String? @map("tenant_id") @db.Uuid
+  tenantName   String  @map("tenant_name") @db.VarChar(200)
+  tenantTaxId  String? @map("tenant_tax_id") @db.VarChar(18)
+
+  // -- Vigencia --------------------------------------------------
+  startDate DateTime  @map("start_date") @db.Date
+  endDate   DateTime? @map("end_date") @db.Date
+
+  // -- Valor e vencimento ----------------------------------------
+  rentAmount       Decimal              @map("rent_amount") @db.Decimal(15, 2)
+  duePeriodicity   RentalDuePeriodicity @default(MENSAL) @map("due_periodicity")
+  dueDay           Int                  @map("due_day")
+  firstDueDate     DateTime             @map("first_due_date") @db.Date
+  explicitDueDates Json?                @map("explicit_due_dates") @db.Json /// Lista explicita de vencimentos previstos no contrato, quando diferente da periodicidade regular
+
+  // -- Garantia ----------------------------------------------------
+  guaranteeType        RentalGuaranteeType? @map("guarantee_type")
+  guaranteeDescription String?              @map("guarantee_description") @db.Text
+
+  // -- Apolice de seguro (guaranteeType = SEGURO_FIANCA) ----------
+  policyNumber    String?   @map("policy_number") @db.VarChar(60)
+  policyStartDate DateTime? @map("policy_start_date") @db.Date
+  policyEndDate   DateTime? @map("policy_end_date") @db.Date
+  policyCoverage  Decimal?  @map("policy_coverage") @db.Decimal(15, 2)
+  policyPremium   Decimal?  @map("policy_premium") @db.Decimal(15, 2)
+
+  // -- Correcao monetaria --------------------------------------------
+  readjustmentPeriodMonths Int?                     @map("readjustment_period_months")
+  readjustmentIndex        RentalReadjustmentIndex? @map("readjustment_index")
+  readjustmentIndexOther   String?                  @map("readjustment_index_other") @db.VarChar(50)
+
+  // -- Multa e rescisao ------------------------------------------------
+  penaltyDescription         String? @map("penalty_description") @db.Text
+  penaltyReleaseDeadlineDays Int?    @map("penalty_release_deadline_days")
+
+  // -- Bonificacao / desconto --------------------------------------------
+  bonusDescription String?   @map("bonus_description") @db.Text
+  bonusStartDate   DateTime? @map("bonus_start_date") @db.Date
+  bonusEndDate     DateTime? @map("bonus_end_date") @db.Date
+
+  // -- Intermediario -----------------------------------------------------
+  hasIntermediary               Boolean                 @default(false) @map("has_intermediary")
+  intermediaryType               RentalIntermediaryType? @map("intermediary_type")
+  intermediaryName                String?                 @map("intermediary_name") @db.VarChar(200)
+  intermediaryTaxId               String?                 @map("intermediary_tax_id") @db.VarChar(18)
+  intermediaryCreci               String?                 @map("intermediary_creci") @db.VarChar(30)
+  intermediaryManagesCollection    Boolean                 @default(false) @map("intermediary_manages_collection")
+  intermediaryAdminFeeAmount       Decimal?                @map("intermediary_admin_fee_amount") @db.Decimal(15, 2)
+  intermediaryCommissionPercent    Decimal?                @map("intermediary_commission_percent") @db.Decimal(5, 2)
+
+  // -- Status e documento --------------------------------------------------
+  status     RentalContractStatus @default(ATIVO) @map("status")
+  documentId String?              @map("document_id") @db.Uuid /// Vinculo futuro (validacao automatica) - PENDENTE
+
+  notes String? @map("notes") @db.Text
+
+  createdById String    @map("created_by_id") @db.Uuid
+  updatedById String?   @map("updated_by_id") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamp(6)
+
+  company    Company    @relation(fields: [companyId], references: [id])
+  fixedAsset FixedAsset @relation("RentalContractAsset", fields: [fixedAssetId], references: [id])
+  tenant     Person?    @relation("RentalContractTenant", fields: [tenantId], references: [id])
+
+  @@index([companyId, status])
+  @@index([fixedAssetId])
+  @@index([tenantId])
+  @@index([companyId, endDate])
+  @@map("rental_contracts")
 }
 
 // =============================================================================

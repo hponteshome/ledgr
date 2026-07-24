@@ -49,6 +49,19 @@ export class AssetsService {
           },
           _count: { select: { improvements: true, retrofitProjects: true } },
           assetAccount: { select: { id: true, code: true, name: true } },
+          rentalContracts: {
+            where: { status: 'ATIVO', deletedAt: null },
+            select: {
+              id: true,
+              tenantName: true,
+              rentAmount: true,
+              dueDay: true,
+              firstDueDate: true,
+              status: true,
+              documentId: true,
+            },
+            take: 1,
+          },
         },
       }),
       this.prisma.fixedAsset.count({ where }),
@@ -86,6 +99,7 @@ export class AssetsService {
         assetAccount:     { select: { id: true, code: true, name: true } },
         depreciationAcc:  { select: { id: true, code: true, name: true } },
         accumDeprecAcc:   { select: { id: true, code: true, name: true } },
+        rentalContracts:  { where: { deletedAt: null }, orderBy: { startDate: 'desc' } },
       },
     });
 

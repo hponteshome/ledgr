@@ -193,7 +193,7 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
         <div className="h-16 flex items-center justify-between px-5 border-b-[0.5px] border-gray-100 flex-shrink-0">
           {open ? (
             <>
-              <span className="text-xl font-black tracking-tighter text-gray-900">LEDGR<span className="text-blue-600">.</span></span>
+              <span className="text-xl font-black tracking-tighter text-gray-900">LEDGR<span className="text-blue-600"></span></span>
               <button onClick={onToggle} className="p-1.5 rounded-lg bg-gray-50 text-gray-400 hover:text-gray-900 transition-colors">
                 <FiChevronLeft size={20} />
               </button>
@@ -220,76 +220,76 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
                   </div>
                 )}
                 <div className="mb-1">
-                {item.children ? (
-                  <button
-                    onClick={() => handleParentClick(item.path)}
-                    title={!open ? item.label : ''}
-                    className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all duration-200 ${active ? 'bg-gray-50 text-gray-900' : 'text-gray-500 hover:bg-gray-50'}`}
-                  >
-                    <item.icon size={20} className={active ? 'text-blue-600' : ''} />
-                    {open && <span className="text-base font-medium flex-1 text-left">{item.label}</span>}
-                    {open && (isExp ? <FiChevronDown size={30} /> : <FiChevronRight size={30} />)}
-                  </button>
-                ) : (
-                  <Link
-                    to={item.path}
-                    title={!open ? item.label : ''}
-                    className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all duration-200 ${active ? 'bg-gray-50 text-gray-900' : 'text-gray-500 hover:bg-gray-50'}`}
-                  >
-                    <item.icon size={20} className={active ? 'text-blue-600' : ''} />
-                    {open && <span className="text-base font-medium flex-1 text-left">{item.label}</span>}
-                  </Link>
-                )}
+                  {item.children ? (
+                    <button
+                      onClick={() => handleParentClick(item.path)}
+                      title={!open ? item.label : ''}
+                      className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all duration-200 ${active ? 'bg-gray-50 text-gray-900' : 'text-gray-500 hover:bg-gray-50'}`}
+                    >
+                      <item.icon size={20} className={active ? 'text-blue-600' : ''} />
+                      {open && <span className="text-base font-medium flex-1 text-left">{item.label}</span>}
+                      {open && (isExp ? <FiChevronDown size={30} /> : <FiChevronRight size={30} />)}
+                    </button>
+                  ) : (
+                    <Link
+                      to={item.path}
+                      title={!open ? item.label : ''}
+                      className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all duration-200 ${active ? 'bg-gray-50 text-gray-900' : 'text-gray-500 hover:bg-gray-50'}`}
+                    >
+                      <item.icon size={20} className={active ? 'text-blue-600' : ''} />
+                      {open && <span className="text-base font-medium flex-1 text-left">{item.label}</span>}
+                    </Link>
+                  )}
 
-                {open && isExp && item.children && (
-                  <div className="ml-6 pl-4 border-l-[0.5px] border-gray-100 mt-1 space-y-1 overflow-hidden transition-all duration-300">
-                    {item.children.map(child => (
-                      child.isImport ? (
-                        <button key="imp" onClick={() => setShowImportModal(true)}
-                          className="w-full flex items-center gap-2 py-2 text-[15px] text-gray-400 hover:text-blue-600 font-medium text-left px-3">
-                          <child.icon size={20} /> {child.label}
-                        </button>
-                      ) : child.children ? (
-                        <div key={child.path}>
-                          <button
-                            onClick={() => setExpanded(prev =>
-                              prev.includes(child.path) ? prev.filter(p => p !== child.path) : [...prev, child.path]
-                            )}
-                            className="w-full flex items-center gap-2 py-2 text-[15px] px-3 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-                          >
-                            <child.icon size={20} />
-                            <span className="flex-1 text-left">{child.label}</span>
-                            {expanded.includes(child.path) ? <FiChevronDown size={12} /> : <FiChevronRight size={12} />}
+                  {open && isExp && item.children && (
+                    <div className="ml-6 pl-4 border-l-[0.5px] border-gray-100 mt-1 space-y-1 overflow-hidden transition-all duration-300">
+                      {item.children.map(child => (
+                        child.isImport ? (
+                          <button key="imp" onClick={() => setShowImportModal(true)}
+                            className="w-full flex items-center gap-2 py-2 text-[15px] text-gray-400 hover:text-blue-600 font-medium text-left px-3">
+                            <child.icon size={20} /> {child.label}
                           </button>
-                          {expanded.includes(child.path) && (
-                            <div className="ml-4 pl-3 border-l-[0.5px] border-gray-100 space-y-1">
-                              {child.children.map(gc => (
-                                <Link key={gc.path} to={gc.path}
-                                  className={`flex items-center gap-2 py-2 text-[14px] px-3 rounded-lg transition-all ${location.pathname === gc.path
-                                    ? 'text-blue-600 font-bold bg-blue-50'
-                                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-                                    }`}>
-                                  <gc.icon size={16} /> {gc.label}
-                                </Link>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <Link
-                          key={child.path}
-                          to={child.disabled ? '#' : child.path}
-                          className={`flex items-center gap-2 py-2 text-[15px] px-3 rounded-lg transition-all ${child.disabled ? 'opacity-30 cursor-not-allowed'
-                            : (location.pathname + location.search) === child.path
-                              ? 'text-blue-600 font-bold bg-blue-50'
-                              : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-                            }`}>
-                          <child.icon size={20} /> {child.label}
-                        </Link>
-                      )
-                    ))}
-                  </div>
-                )}
+                        ) : child.children ? (
+                          <div key={child.path}>
+                            <button
+                              onClick={() => setExpanded(prev =>
+                                prev.includes(child.path) ? prev.filter(p => p !== child.path) : [...prev, child.path]
+                              )}
+                              className="w-full flex items-center gap-2 py-2 text-[15px] px-3 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                            >
+                              <child.icon size={20} />
+                              <span className="flex-1 text-left">{child.label}</span>
+                              {expanded.includes(child.path) ? <FiChevronDown size={12} /> : <FiChevronRight size={12} />}
+                            </button>
+                            {expanded.includes(child.path) && (
+                              <div className="ml-4 pl-3 border-l-[0.5px] border-gray-100 space-y-1">
+                                {child.children.map(gc => (
+                                  <Link key={gc.path} to={gc.path}
+                                    className={`flex items-center gap-2 py-2 text-[14px] px-3 rounded-lg transition-all ${location.pathname === gc.path
+                                      ? 'text-blue-600 font-bold bg-blue-50'
+                                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                                      }`}>
+                                    <gc.icon size={16} /> {gc.label}
+                                  </Link>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <Link
+                            key={child.path}
+                            to={child.disabled ? '#' : child.path}
+                            className={`flex items-center gap-2 py-2 text-[15px] px-3 rounded-lg transition-all ${child.disabled ? 'opacity-30 cursor-not-allowed'
+                              : (location.pathname + location.search) === child.path
+                                ? 'text-blue-600 font-bold bg-blue-50'
+                                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                              }`}>
+                            <child.icon size={20} /> {child.label}
+                          </Link>
+                        )
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             );

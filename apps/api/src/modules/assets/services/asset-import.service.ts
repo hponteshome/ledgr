@@ -15,6 +15,7 @@ export interface ImportRow {
     registryNumber?: string;
     city?: string;
     state?: string;
+    zipCode?: string;
     assetAccountCode?: string;
     depreciationAccCode?: string;
     accumDeprecAccCode?: string;
@@ -87,10 +88,12 @@ export class AssetImportService {
         const header = lines[0].split('|').map(h => h.replace(/\t/g, '').trim().toLowerCase());
         const expectedHeader = [
             'codigo', 'grupo', 'descricao', 'data_aquisicao', 'valor_aquisicao',
-            'land_pct', 'matricula', 'municipio', 'uf', 'conta_ativo', 'conta_deprec',
+            'land_pct', 'matricula', 'municipio', 'uf', 'cep', 'conta_ativo', 'conta_deprec',
             'conta_acum', 'cartorio', 'area_construida', 'area_total',
             'valor_venal_itbi', 'fracao_ideal', 'inscricao iptu', 'pais',
         ];
+
+
 
         // Validação básica do cabeçalho
         if (header[0] !== 'codigo' || header[1] !== 'grupo') {
@@ -136,17 +139,18 @@ export class AssetImportService {
                 registryNumber: cols[6] || undefined,
                 city: cols[7] || undefined,
                 state: cols[8] || undefined,
-                assetAccountCode: cols[9] || undefined,
-                depreciationAccCode: cols[10] || undefined,
-                accumDeprecAccCode: cols[11] || undefined,
-                registryOffice: cols[12] || undefined,
-                builtArea: parseDecimal(cols[13]),
-                totalArea: parseDecimal(cols[14]),
-                assessedValue: parseDecimal(cols[15]),
-                landFraction: parseDecimal(cols[16]),
-                iptuRegistration: cols[17] || undefined,
-                depreciationStart: parseDate(cols[18]) || undefined,
-                country: cols[19] || undefined,
+                zipCode: cols[9] || undefined,
+                assetAccountCode: cols[10] || undefined,
+                depreciationAccCode: cols[11] || undefined,
+                accumDeprecAccCode: cols[12] || undefined,
+                registryOffice: cols[13] || undefined,
+                builtArea: parseDecimal(cols[14]),
+                totalArea: parseDecimal(cols[15]),
+                assessedValue: parseDecimal(cols[16]),
+                landFraction: parseDecimal(cols[17]),
+                iptuRegistration: cols[18] || undefined,
+                depreciationStart: parseDate(cols[19]) || undefined,
+                country: cols[20] || undefined,
             });
         }
 
@@ -244,6 +248,7 @@ export class AssetImportService {
                     registryOffice: row.registryOffice ?? null,
                     city: row.city ?? null,
                     state: row.state ?? null,
+                    zipCode: row.zipCode ?? null,
                     builtArea: row.builtArea ?? null,
                     totalArea: row.totalArea ?? null,
                     assessedValue: row.assessedValue ?? null,
