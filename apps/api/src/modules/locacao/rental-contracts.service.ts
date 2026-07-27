@@ -1,5 +1,5 @@
 // apps/api/src/modules/locacao/rental-contracts.service.ts
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '@prisma/prisma.service';
 import { Prisma, DocumentType, DocumentStatus, DocumentVisibility } from '@prisma/client';
 import { CreateRentalContractDto, UpdateRentalContractDto } from './dto/rental-contract.dto';
@@ -54,6 +54,13 @@ export class RentalContractsService {
       include: { fixedAsset: true, tenant: true },
     });
     if (!found) throw new NotFoundException('Contrato de locacao nao encontrado.');
+    if (found.documentId) {
+      const doc = await this.prisma.document.findUnique({
+        where: { id: found.documentId },
+        select: { id: true, status: true, currentVersion: true },
+      });
+      return { ...found, document: doc };
+    }
     return found;
   }
 
@@ -67,6 +74,17 @@ export class RentalContractsService {
         tenantId: dto.tenantId,
         tenantName: dto.tenantName,
         tenantTaxId: dto.tenantTaxId,
+        tenantRg: dto.tenantRg,
+        tenantProfession: dto.tenantProfession,
+        tenantMaritalStatus: dto.tenantMaritalStatus,
+        tenantNationality: dto.tenantNationality,
+        tenantStreet: dto.tenantStreet,
+        tenantNumber: dto.tenantNumber,
+        tenantComplement: dto.tenantComplement,
+        tenantNeighborhood: dto.tenantNeighborhood,
+        tenantCity: dto.tenantCity,
+        tenantState: dto.tenantState,
+        tenantZipCode: dto.tenantZipCode,
         startDate: toDate(dto.startDate)!,
         endDate: toDate(dto.endDate),
         rentAmount: toDecimal(dto.rentAmount)!,
@@ -115,6 +133,17 @@ export class RentalContractsService {
         tenantId: dto.tenantId,
         tenantName: dto.tenantName,
         tenantTaxId: dto.tenantTaxId,
+        tenantRg: dto.tenantRg,
+        tenantProfession: dto.tenantProfession,
+        tenantMaritalStatus: dto.tenantMaritalStatus,
+        tenantNationality: dto.tenantNationality,
+        tenantStreet: dto.tenantStreet,
+        tenantNumber: dto.tenantNumber,
+        tenantComplement: dto.tenantComplement,
+        tenantNeighborhood: dto.tenantNeighborhood,
+        tenantCity: dto.tenantCity,
+        tenantState: dto.tenantState,
+        tenantZipCode: dto.tenantZipCode,
         startDate: toDate(dto.startDate),
         endDate: toDate(dto.endDate),
         rentAmount: toDecimal(dto.rentAmount),
@@ -179,6 +208,19 @@ export class RentalContractsService {
       throw new NotFoundException('Nenhum template ativo de Contrato de Locacao encontrado.');
     }
 
+    let existingDoc: { id: string; status: string; currentVersion: number } | null = null;
+    if (contract.documentId) {
+      existingDoc = await this.prisma.document.findUnique({
+        where: { id: contract.documentId },
+        select: { id: true, status: true, currentVersion: true },
+      });
+      if (existingDoc && existingDoc.status !== 'RASCUNHO') {
+        throw new BadRequestException(
+          `Este contrato ja possui um documento com status ${existingDoc.status}. Nao e possivel gerar novamente. Para reiniciar, exclua o documento em Arquivos Digitais primeiro.`,
+        );
+      }
+    }
+
     const isFianca = contract.guaranteeType === 'FIANCA';
     const rentAmountNumber = Number(contract.rentAmount);
 
@@ -240,24 +282,46 @@ export class RentalContractsService {
     const html = compiled(dados);
     const contentHash = crypto.createHash('sha256').update(html).digest('hex');
 
-    const document = await this.prisma.document.create({
-      data: {
-        companyId,
-        type: DocumentType.CONTRATO_LOCACAO,
-        status: DocumentStatus.RASCUNHO,
-        visibility: DocumentVisibility.RESERVADO,
-        title: `Contrato de Locacao - ${contract.tenantName}`,
-        date: new Date(),
-        content: html,
-        contentHash,
-        createdById: userId,
-      },
-    });
-
-    await this.prisma.rentalContract.update({
-      where: { id: contract.id },
-      data: { documentId: document.id, updatedById: userId },
-    });
+    let document;
+    if (existingDoc) {
+      const newVersion = existingDoc.currentVersion + 1;
+      await this.prisma.documentVersion.create({
+        data: {
+          documentId: existingDoc.id,
+          version: newVersion,
+          content: html,
+          contentHash,
+          changeNote: `Contrato regerado a partir dos dados atuais - v${newVersion}`,
+          createdById: userId,
+        },
+      });
+      document = await this.prisma.document.update({
+        where: { id: existingDoc.id },
+        data: { content: html, contentHash, currentVersion: newVersion, updatedAt: new Date() },
+      });
+      await this.prisma.rentalContract.update({
+        where: { id: contract.id },
+        data: { updatedById: userId },
+      });
+    } else {
+      document = await this.prisma.document.create({
+        data: {
+          companyId,
+          type: DocumentType.CONTRATO_LOCACAO,
+          status: DocumentStatus.RASCUNHO,
+          visibility: DocumentVisibility.RESERVADO,
+          title: `Contrato de Locacao - ${contract.tenantName}`,
+          date: new Date(),
+          content: html,
+          contentHash,
+          createdById: userId,
+        },
+      });
+      await this.prisma.rentalContract.update({
+        where: { id: contract.id },
+        data: { documentId: document.id, updatedById: userId },
+      });
+    }
 
     return document;
   }

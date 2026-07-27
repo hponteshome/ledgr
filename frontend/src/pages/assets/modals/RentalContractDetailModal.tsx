@@ -7,6 +7,7 @@ import { Loader, FileText, CheckCircle } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useCompany } from '../../../contexts/CompanyContext';
 import { ModalWrapper, Field } from './ModalComponents';
+import { DocumentViewModal } from '../../documentos/DocumentViewModal';
 
 const API = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3000';
 
@@ -45,6 +46,16 @@ const MARITAL_STATUS_OPTIONS = [
     { value: 'DIVORCIADO', label: 'Divorciado(a)' },
     { value: 'VIUVO', label: 'Viúvo(a)' },
 ];
+
+const DOC_STATUS_LABELS: Record<string, string> = {
+    RASCUNHO: 'Rascunho',
+    EM_REVISAO: 'Em Revisão',
+    AGUARDANDO_ASSINATURA: 'Aguardando Assinatura',
+    ASSINADO: 'Assinado',
+    REGISTRADO: 'Registrado',
+    ARQUIVADO: 'Arquivado',
+    CANCELADO: 'Cancelado',
+};
 
 type QualField = { key: string; label: string; type: 'text' | 'select' | 'cep'; maxLength?: number };
 
@@ -97,6 +108,7 @@ export function RentalContractDetailModal({ contractId, title, onClose }: { cont
     const [saving, setSaving] = useState(false);
     const [genError, setGenError] = useState('');
     const [genSuccess, setGenSuccess] = useState(false);
+    const [viewDoc, setViewDoc] = useState(false);
 
     function loadContract() {
         if (!contractId) { setError('Contrato não encontrado.'); setLoading(false); return; }
@@ -137,13 +149,16 @@ export function RentalContractDetailModal({ contractId, title, onClose }: { cont
                     'x-company-id': activeCompany?.id ?? '',
                 },
             });
-            if (!res.ok) throw new Error();
+            if (!res.ok) {
+                const errBody = await res.json().catch(() => null);
+                throw new Error(errBody?.message ?? '');
+            }
             await res.json();
             setGenSuccess(true);
             setQualifying(false);
             loadContract();
-        } catch {
-            setGenError('Não foi possível gerar o contrato. Verifique os dados e tente novamente.');
+        } catch (e: any) {
+            setGenError(e?.message || 'Não foi possível gerar o contrato. Verifique os dados e tente novamente.');
         } finally {
             setSaving(false);
         }
@@ -151,6 +166,21 @@ export function RentalContractDetailModal({ contractId, title, onClose }: { cont
 
     async function handleStartGenerate() {
         setGenError('');
+        if (contract.documentId) {
+            const docStatus = contract.document?.status;
+            if (docStatus && docStatus !== 'RASCUNHO') {
+                setGenError(
+                    `Este contrato já possui um documento ${DOC_STATUS_LABELS[docStatus] ?? docStatus}. ` +
+                    'Não é possível gerar novamente. Para reiniciar, exclua o documento em Arquivos Digitais primeiro.'
+                );
+                return;
+            }
+            const initial: Record<string, string> = {};
+            QUALIFICATION_FIELDS.forEach(f => { initial[f.key] = contract[f.key] ?? ''; });
+            setFormValues(initial);
+            setQualifying(true);
+            return;
+        }
         const missing = missingQualificationFields();
         if (missing.length === 0) {
             await handleGenerate();
@@ -160,6 +190,12 @@ export function RentalContractDetailModal({ contractId, title, onClose }: { cont
         missing.forEach(f => { initial[f.key] = ''; });
         setFormValues(initial);
         setQualifying(true);
+    }
+
+    function handleClearAll() {
+        const cleared: Record<string, string> = {};
+        Object.keys(formValues).forEach(k => { cleared[k] = ''; });
+        setFormValues(cleared);
     }
 
     async function handleSaveAndGenerate() {
@@ -188,6 +224,7 @@ export function RentalContractDetailModal({ contractId, title, onClose }: { cont
     }
 
     return (
+        <>
         <ModalWrapper title={title} onClose={onClose}>
             <div className="p-6 space-y-4">
                 {loading && (
@@ -268,9 +305,18 @@ export function RentalContractDetailModal({ contractId, title, onClose }: { cont
 
                         <div className="pt-3 border-t border-gray-100 space-y-3">
                             {contract.documentId && !qualifying && (
-                                <div className="flex items-center gap-2 text-xs text-green-700 bg-green-50 rounded-md px-3 py-2">
-                                    <CheckCircle className="w-4 h-4 flex-shrink-0" />
-                                    Contrato completo já gerado e arquivado em Arquivos Digitais.
+                                <div className="flex items-center justify-between gap-2 text-xs text-green-700 bg-green-50 rounded-md px-3 py-2">
+                                    <span className="flex items-center gap-2">
+                                        <CheckCircle className="w-4 h-4 flex-shrink-0" />
+                                        Contrato completo já gerado e arquivado em Arquivos Digitais.
+                                    </span>
+                                    <button
+                                        type="button"
+                                        onClick={() => setViewDoc(true)}
+                                        className="text-green-800 font-medium underline hover:text-green-900 whitespace-nowrap"
+                                    >
+                                        Ver contrato
+                                    </button>
                                 </div>
                             )}
 
@@ -299,8 +345,19 @@ export function RentalContractDetailModal({ contractId, title, onClose }: { cont
 
                             {qualifying && (
                                 <div className="space-y-3 bg-gray-50 rounded-lg p-4">
-                                    <div className="text-xs text-gray-600">
-                                        Para gerar o contrato completo, preencha os dados do locatário que ainda faltam:
+                                    <div className="flex items-center justify-between gap-2">
+                                        <div className="text-xs text-gray-600">
+                                            {contract.documentId
+                                                ? 'Revise os dados do locatário antes de gerar o contrato novamente:'
+                                                : 'Para gerar o contrato completo, preencha os dados do locatário que ainda faltam:'}
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={handleClearAll}
+                                            className="text-[11px] text-gray-400 hover:text-red-600 underline whitespace-nowrap"
+                                        >
+                                            Limpar Tudo
+                                        </button>
                                     </div>
 
                                     {QUALIFICATION_FIELDS.filter(f => f.key in formValues).map(f => (
@@ -355,5 +412,13 @@ export function RentalContractDetailModal({ contractId, title, onClose }: { cont
                 )}
             </div>
         </ModalWrapper>
+        {viewDoc && contract.documentId && (
+            <DocumentViewModal
+                documentId={contract.documentId}
+                documentTitle={`Contrato de Locação - ${contract.tenantName}`}
+                onClose={() => setViewDoc(false)}
+            />
+        )}
+        </>
     );
 }
