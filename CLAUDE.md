@@ -11,13 +11,18 @@ contabilidade, RH/folha de pagamento, compliance fiscal (SPED: ECD, EFD-Contribu
 ativo imobilizado, financeiro (AP/AR, fluxo de caixa, fechamento mensal, agenda) e gestao
 documental com assinatura eletronica (ClickSign).
 
-### Empresas de teste
-- LM  = LM Administracao de Bens Imoveis Ltda (f00af1b1-d50b-4ae6-aa17-4c2262e058db)
-- KPL = Kipstone Servicos e Tecnologia Ltda (671d09ef-bb23-4159-a360-fd1d37466a1a)
-- KSA = Kipstone Tecnologia S/A (9047fcd8-...)
-- Advocacia Gomes = d85731d7-..., CNPJ 06190032000183, Lucro Presumido cumulativo
+### Empresas de teste (UUIDs confirmados em 27/07/2026, apos recriacao do banco)
+- LM  = LM Administracao de Bens Imoveis Ltda (ea4a443c-a351-4243-ae00-e7d70f126d5a), CNPJ 17970759000108
+- KPL = Kipstone Servicos e Tecnologia Ltda (7100666c-1e74-4480-b533-4675ea90a774), CNPJ 28300920000144
+- Advocacia Gomes, Rossetti e Barelli (d0d70dc6-446c-430b-9f62-3f6e73db3874), CNPJ 06190032000183, Lucro Presumido cumulativo
+- Jose Silva Sociedade Individual de Advocacia (ca9ba513-06ae-4579-b546-ebc457f33452), CNPJ 35416962000100
+- Pontes Contabilidade (632ce73b-5024-4fee-97bb-70d27b0cce51), CNPJ 07705010000171
 
-"Kipstone" sem sigla e ambiguo -> sempre confirmar KPL ou KSA.
+NOTA: KSA (Kipstone Tecnologia S/A) NAO existe mais neste banco - removida do
+registro. Se precisar recriar, o UUID antigo (9047fcd8-...) e historico, invalido.
+Antes de usar qualquer UUID de empresa citado em sessoes anteriores a 24/07/2026,
+confirmar contra o banco atual (SELECT id, legal_name, tax_id FROM companies) -
+o banco foi recriado nessa data e todos os UUIDs anteriores ficaram invalidos.
 
 ## 2. Estrutura do monorepo - ATIVO vs OBSOLETO
 
