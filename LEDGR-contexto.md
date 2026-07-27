@@ -3667,3 +3667,73 @@ verificar hash quando disponivel (feito para Node.js), senha do Postgres nunca e
 no chat, Postgres nunca exposto a rede externa, firewall explicito e minimo, considerar
 usuario de servico dedicado (nao Administrador) para rodar a API - AINDA NAO decidido,
 avaliar na retomada.
+
+
+## TÓPICO: Decisões de Infraestrutura — Homologação/Staging (25/07/2026)
+
+**STATUS: POSTERGADO — decisão consciente, não pendência esquecida.**
+
+### Tentativa 1 — SERVER02 (192.168.0.10) — ABORTADA
+- Investigação revelou que SERVER02 é **Controlador de Domínio Active Directory**
+  (domínio AJS.Local) — confirmado via `Get-WindowsFeature AD-Domain-Services`
+  (Installed) e `whoami /fqdn` (CN=Administrador,CN=Users,DC=AJS,DC=Local).
+- Portas em escuta confirmaram o padrão clássico de DC: 88 (Kerberos), 389 (LDAP),
+  636 (LDAPS), 3268/3269 (Global Catalog), 464 (kpasswd).
+- Servidor também hospeda produção de terceiros: Intelbras Incontrol (controle de
+  acesso/CFTV — Postgres próprio em 127.0.0.1:4440, 12 processos rodando) e SQL Server
+  instância SAGE (porta 1433).
+- Docker Desktop confirmado inviável em Windows Server 2019 nesse host (sem WSL2).
+  LCOW (Linux Containers on Windows) pesquisado e confirmado DESCONTINUADO — removido
+  do Docker a partir da v23.0, ultima opcao viavel seria Docker CE 20.10.24 (sem
+  manutencao/suporte, projeto linuxkit/lcow arquivado). Descartado por inviavel.
+- **Decisão: NUNCA instalar aplicações de terceiros (LEDGR incluso) num Domain
+  Controller de produção.** Risco desproporcional ao benefício — superfície de ataque
+  no ativo mais crítico da rede, raio de impacto de qualquer falha/reboot afeta
+  autenticação de toda a empresa, contraria hardening padrão da Microsoft.
+- Software (Node 24.18.0, Git 2.55.0.3) já instalado nesse servidor durante a
+  tentativa — AVALIAR NO FUTURO se deve ser desinstalado/revertido, já que não vai
+  ser usado ali. Não removido ainda nesta sessão.
+
+### Tentativa 2 — ThinkServer TS150-70UB-A008BN (Lenovo) — PLANEJADA, EXECUÇÃO
+### POSTERGADA
+- Hardware: Xeon E3-1225 v6 (4 núcleos), 8GB RAM, HD 1TB (nao SSD), DVD-RW, vem com
+  FreeDOS (disco limpo, sem SO herdado).
+- Máquina NOVA, sem vínculo com o domínio AJS.Local — decisão deliberada de NÃO
+  entrar no AD, para manter o servidor de homologação totalmente isolado/independente.
+- SO escolhido: **Ubuntu Server 26.04 LTS** ("Resolute Raccoon", lançado 23/04/2026,
+  suporte de seguranca ate abril/2031). Decisao do usuario apos eu apresentar a
+  alternativa mais conservadora (24.04 LTS).
+- Plano de infra (não executado ainda):
+  - Conectado por cabo Ethernet na mesma rede local 192.168.0.0/24 (mesmo switch do
+    SERVER02 e das estacoes de trabalho).
+  - IP fixo a definir (ex: 192.168.0.11, checar disponibilidade quando retomar).
+  - SEM entrada no dominio AD — servidor Linux independente.
+  - Docker real (Linux nativo, sem gambiarra) rodando 3 containers: Postgres, API
+    NestJS, frontend (build Vite + Nginx).
+  - Postgres NUNCA exposto a rede - so acesso interno via rede Docker.
+  - Acesso de teste: navegador de qualquer maquina da rede interna em
+    http://<ip-fixo>:<porta-a-definir> - SEM exposicao a internet (deliberado, mais
+    seguro para homologacao).
+  - Administracao remota via SSH apos instalacao inicial (que exige tela/teclado uma
+    unica vez, incluindo habilitar "Install OpenSSH server" na tela de instalacao -
+    critico, sem isso fica sem acesso remoto).
+- Preparação já orientada (nao confirmado se o usuario executou): download da ISO
+  oficial via ubuntu.com/download/server, criacao de pendrive bootavel via Rufus
+  (rufus.ie), checklist de instalacao passo a passo entregue por escrito.
+
+### PENDENTE para retomar (quando o usuário tiver acesso físico ao ThinkServer):
+1. Confirmar que ISO foi baixada e pendrive criado.
+2. Guiar instalacao fisica via checklist ja escrito (boot USB, Ubuntu Server tipo
+   completo, disco entire-disk/LVM, usuario ledgradmin, HABILITAR OpenSSH server,
+   pular server snaps).
+3. Apos reboot, coletar o IP atribuido por DHCP.
+4. Conectar via SSH da maquina de DEV, dali em diante tudo remoto (fixar IP estatico
+   via netplan, instalar Docker Engine oficial, clonar repo, etc - retomar dai o
+   roteiro original de docker-compose.staging.yml que nunca chegou a ser escrito).
+5. Dockerfile API + Dockerfile frontend + docker-compose.staging.yml + .env.staging.example
+   AINDA NAO FORAM ESCRITOS (a tentativa 1 foi abortada antes de chegar nesse ponto,
+   por causa do pivot Windows->nativo->descoberta do DC). Retomar do zero quando a
+   maquina Ubuntu estiver pronta - mais simples agora, ja que sera Docker de verdade.
+
+**Enquanto isso, desenvolvimento segue em DEV normalmente** - infra de homologacao nao
+bloqueia trabalho de features.
