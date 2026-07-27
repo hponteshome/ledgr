@@ -329,3 +329,34 @@ project_knowledge_search como fonte de verdade — ir direto ao Select-String/Ge
 terminal real do usuario. A busca do projeto continua sendo o primeiro passo correto para
 arquivos AINDA NAO tocados na sessao atual (evita pedir de novo algo que ja esta disponivel),
 mas perde confiabilidade a partir da primeira edicao do dia.
+
+
+## Licao — Regra 7 (27/07/2026): nunca colocar JSON/aspas escapadas em mensagem de commit -m inline
+
+Um `git commit -m "..."` com um trecho de exemplo tipo `{\"0\":37,\"1\":80,...}` dentro da
+mensagem quebrou o parser de string do PowerShell (aspas escapadas com \" nao sao
+interpretadas como o esperado dentro de uma string de aspas duplas do PowerShell -
+diferente de bash). O `git commit` recebeu um pathspec invalido em vez da mensagem
+completa e FALHOU SILENCIOSAMENTE (sem erro visualmente alarmante, so uma linha de
+"did not match any file(s) known to git" facil de nao perceber no meio de um output
+grande). O `git add` anterior, porem, tinha funcionado - os arquivos ficaram staged
+sem commit. O commit seguinte (de outro bloco de trabalho) acabou absorvendo esses
+arquivos junto, resultando num commit com 7 arquivos mas mensagem descrevendo so
+metade do conteudo real.
+
+**Regra pratica adotada:**
+1. NUNCA usar -m "..." inline no PowerShell quando a mensagem contiver: aspas duplas
+   aninhadas/escapadas, chaves {}/JSON literal, colchetes, ou qualquer caractere
+   especial de shell.
+2. Para qualquer mensagem de commit com mais de ~3 linhas OU qualquer caractere
+   especial, usar sempre o padrao: heredoc @'...'@ -> Set-Content num arquivo .txt em
+   D:\Temp\ -> git commit -F <arquivo>. Nunca -m inline para mensagens longas,
+   independente de conterem caractere especial ou nao (reduz a chance de erro por
+   padrao, nao so quando ja se sabe que tem risco).
+3. Apos qualquer `git commit`, SEMPRE conferir a saida antes de seguir - um commit
+   que falha silenciosamente nao gera nenhum erro auto-evidente se o -m
+   simplesmente virou um pathspec: aparece so como "did not match any file(s) known
+   to git", facil de rolar pra baixo sem notar quando ha muito output de -m
+   multi-linha acima. Verificar sempre `git log --oneline -1` logo apos qualquer
+   commit para confirmar o hash mudou e a mensagem bate com o esperado, antes de
+   seguir para o proximo passo (push, etc).
