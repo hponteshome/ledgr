@@ -389,3 +389,56 @@ dessa deteccao. Aplica-se tambem ao escrever o arquivo de volta:
 funciona corretamente se o conteudo interno (o `content` em memoria) usar o
 separador certo de forma consistente - dai a necessidade de usar `nl` tambem nos
 literais `new_lines` que estao sendo inseridos, nao so nos `old_lines` de busca.
+
+
+## Licao — Regra 9 (27/07/2026): Puppeteer headerTemplate/footerTemplate tem
+## comportamento de margem proprio, INDEPENDENTE do @page CSS e do margin do page.pdf()
+
+Ao implementar papel timbrado (logo+endereco+CNPJ no cabecalho, nome+paginacao no
+rodape) via `page.pdf({ displayHeaderFooter: true, headerTemplate, footerTemplate,
+margin })`, varias rodadas de tentativa-erro foram necessarias ate entender a
+mecanica real (confirmada via issue oficial do repo puppeteer/puppeteer #3672):
+
+1. **Tres fontes de margem coexistem e NAO se cancelam automaticamente:**
+   - A regra `@page { margin: ... }` no `<style>` do HTML - e IGNORADA pelo
+     Chromium sempre que a opcao `margin` e passada para `page.pdf()`. Vira
+     codigo morto, sem efeito, mas nao gera erro nem aviso - facil de esquecer
+     que esta la e ficar tentando debugar algo que nunca mais roda.
+   - A opcao `margin: {top,bottom,left,right}` do `page.pdf()` - controla o
+     recuo do CORPO do documento (a area onde `doc.content` e renderizado).
+   - O CSS `margin`/`padding` inline dentro do proprio `headerTemplate`/
+     `footerTemplate` - controla o recuo do cabecalho/rodape. Esses templates
+     SEMPRE ocupam a largura total da pagina fisica (nao respeitam left/right
+     de `page.pdf()`), entao o alinhamento com o corpo tem que ser replicado
+     manualmente aqui.
+
+2. **Bug documentado do Chromium: `margin` dentro do header/footer template tem
+   valores padrao embutidos que nao sao totalmente sobrescritos** por um
+   `margin` inline declarado no HTML - o valor customizado SOMA com o default
+   em vez de substituir, causando desalinhamentos de poucos milimetros dificeis
+   de diagnosticar so olhando o codigo. Fix: usar `padding` em vez de `margin`
+   no elemento raiz do header/footer template, com `box-sizing: border-box` e
+   `margin: 0` explicito - `padding` nao tem esse comportamento problemático.
+
+3. **`position: fixed` dentro do BODY do documento (nao do header/footer
+   template) e medido relativo a AREA DE CONTEUDO** (depois da margem definida
+   em `page.pdf({margin})`), nao a borda fisica da pagina - diferente do que se
+   intuiria por analogia com CSS normal de navegador. Confirmado empiricamente:
+   a marca d'agua (`top:50%; left:50%`) sempre ficou centralizada corretamente
+   porque 50% e proporcional e nao depende dessa distincao, mas um valor fixo
+   tipo `left: 2cm` para uma tarja lateral caiu em lugares diferentes dependendo
+   de qual das duas margens (page.pdf ou @page, veja item 1) estava efetivamente
+   ativa no momento.
+
+**Regra pratica adotada:** ao posicionar qualquer elemento fixo relativo a
+margem/borda em PDF gerado via Puppeteer, testar SEMPRE com um print real do
+resultado (nunca assumir matematicamente sem confirmar visualmente) - a mecanica
+de margens do Puppeteer tem comportamento suficientemente contraintuitivo
+(3 fontes de margem, 2 delas com pegadinhas documentadas) para tornar calculo
+por raciocinio puro pouco confiavel nesse caso especifico.
+
+**Regra de grafia adotada para todos os templates futuros:** enderecos
+(logradouro, bairro, cidade) sempre em Title Case (primeira letra maiuscula de
+cada palavra) via helper `toTitleCase()`, nao em CAIXA ALTA nem minusculo puro.
+UF mantida em maiusculas (abreviacao padrao). Razao Social mantida como
+cadastrada (convencao juridica).
