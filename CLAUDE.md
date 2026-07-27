@@ -360,3 +360,32 @@ metade do conteudo real.
    multi-linha acima. Verificar sempre `git log --oneline -1` logo apos qualquer
    commit para confirmar o hash mudou e a mensagem bate com o esperado, antes de
    seguir para o proximo passo (push, etc).
+
+
+## Licao — Regra 8 (27/07/2026): sempre detectar separador de linha automaticamente
+
+Confirmado repetidas vezes nesta sessao: o separador de linha (CRLF vs LF) NAO e
+uniforme no repositorio - cada arquivo pode ter o seu, dependendo de qual
+ferramenta/editor o criou ou tocou por ultimo (schema.prisma e a maioria dos
+arquivos legados = CRLF; varios arquivos criados/editados via Claude Code ou npm
+scripts recentes = LF puro). Assumir um dos dois sem checar causou pelo menos 5
+abortos de script nesta sessao (rental-contracts.service.ts, RepositorioPage.tsx,
+DocumentViewModal.tsx, documents.service.ts, entre outros).
+
+**Regra pratica adotada:** todo script Python de edicao de arquivo deve SEMPRE
+detectar o separador real antes de montar qualquer ancora multi-linha:
+
+```python
+with open(path, "rb") as f:
+    raw = f.read()
+nl = "\r\n" if b"\r\n" in raw else "\n"
+```
+
+E usar `nl.join([...])` para montar `old`/`new` de ancoras multi-linha - nunca
+`"\n".join(...)` ou `"\r\n".join(...)` fixo. Ancoras de uma linha so nao sofrem
+com isso (nao ha separador envolvido), mas ancoras de 2+ linhas SEMPRE precisam
+dessa deteccao. Aplica-se tambem ao escrever o arquivo de volta:
+`open(path, "w", encoding="utf-8", newline="")` preserva o que foi lido, mas so
+funciona corretamente se o conteudo interno (o `content` em memoria) usar o
+separador certo de forma consistente - dai a necessidade de usar `nl` tambem nos
+literais `new_lines` que estao sendo inseridos, nao so nos `old_lines` de busca.
