@@ -3737,3 +3737,68 @@ avaliar na retomada.
 
 **Enquanto isso, desenvolvimento segue em DEV normalmente** - infra de homologacao nao
 bloqueia trabalho de features.
+
+
+## TÓPICO: Acesso Remoto Externo (Home Office) — Inventário Inicial (25/07/2026)
+
+**STATUS: IDEIA EM AVALIAÇÃO — não é plano executável ainda, é levantamento inicial
+para decisão futura com calma.**
+
+**Objetivo do usuário:** liberar acesso ao LEDGR para usuários externos (home office),
+via servidor totalmente novo e independente do SERVER02 (que já foi descartado para
+qualquer instalação de aplicação, por ser DC de producao - ver topico anterior).
+
+**Inventário levantado (Claude, a pedido do usuário) por camada:**
+
+1. **Internet/Provedor:** link empresarial dedicado (nao residencial), IP publico fixo
+   (ou DDNS como alternativa), redundancia de link recomendada se orcamento permitir.
+
+2. **Hardware de rede/seguranca:** firewall dedicado obrigatorio para exposicao externa
+   - opcoes: pfSense/OPNsense (gratis, x86) ou appliance comercial (Ubiquiti, Mikrotik,
+   Fortinet). Funcoes: terminar VPN, NAT minimo, segmentacao via DMZ/VLAN separada da
+   rede interna onde fica o SERVER02/AD.
+
+3. **Servidor:** ThinkServer TS150 (ja planejado para staging interno) e adequado para
+   TESTE, mas para producao remota real com carga de usuarios simultaneos recomenda-se
+   dimensionar mais (16-32GB RAM, SSD, 6+ nucleos) - avaliar se o TS150 e so uma etapa
+   intermediaria ou se um servidor de producao separado sera necessario depois. Nobreak
+   (UPS) dedicado tambem recomendado. Backup fora da maquina (regra 3-2-1).
+
+4. **Modelo de acesso remoto - 3 opcoes discutidas, da mais para menos segura:**
+   A) VPN mesh moderna (Tailscale/WireGuard) - RECOMENDACAO do Claude. Nenhuma porta
+      exposta publicamente, conexao sempre iniciada de dentro. Padrao-ouro para
+      empresas pequenas/medias hoje.
+   B) VPN tradicional (OpenVPN/IPsec em firewall corporativo) - expoe so 1 porta UDP,
+      mais estabelecido mas menos moderno que A.
+   C) Exposicao direta da aplicacao (reverse proxy + HTTPS + dominio) - NAO recomendado
+      como primeira opcao pelo Claude, maior superficie de ataque (visivel a qualquer
+      scanner da internet, nao so a quem foi autorizado).
+
+5. **Camadas adicionais necessarias independente da opcao de VPN escolhida:**
+   - MFA no login do LEDGR - **NAO EXISTE HOJE no sistema, seria trabalho de dev
+     separado** (achado importante: login atual e so usuario/senha).
+   - HTTPS/TLS obrigatorio mesmo dentro de VPN.
+   - Logs/monitoramento de acesso (quem, quando, de onde).
+   - Patching regular do SO e containers.
+
+**"Servicos de telefonia" mencionado pelo usuario:** esclarecido que nao e
+pre-requisito para acesso remoto ao LEDGR (VoIP e assunto separado, so relevante se
+decidirem integrar depois).
+
+**PENDENTE — retomar com sessao dedicada, decisoes que faltam:**
+1. Confirmar orcamento/porte antes de escolher hardware de firewall (pfSense caseiro
+   vs. appliance comercial).
+2. Decidir modelo de acesso (A/B/C acima) - Tailscale como ponto de partida sugerido,
+   mas nao decidido pelo usuario ainda.
+3. Avaliar se TS150 e suficiente ou se sera necessario servidor de producao separado
+   do servidor de homologacao/staging.
+4. Se avancar: MFA precisa entrar no roadmap de desenvolvimento do LEDGR (nao existe
+   hoje).
+5. Definir se acesso remoto e uma fase POS-homologacao interna (abordagem sequencial
+   logica: validar staging interno primeiro, so depois expor externamente) ou se
+   corre em paralelo.
+
+**Relacao com o topico anterior (SERVER02/ThinkServer):** esta e uma camada DIFERENTE
+e ADICIONAL - o ThinkServer planejado e para homologacao NA REDE INTERNA (sem acesso
+externo). Acesso remoto e uma decisao de infraestrutura maior, separada, que pode ou
+nao reusar o mesmo hardware fisico dependendo do que for decidido.
