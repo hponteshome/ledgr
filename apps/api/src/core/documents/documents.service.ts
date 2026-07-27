@@ -336,8 +336,76 @@ export class DocumentsService {
 
   // ── Exportação ─────────────────────────────────────────────
 
+  private toTitleCase(value: string | null | undefined): string {
+    if (!value) return '';
+    return value.toLowerCase().replace(/(^|\s)([a-zà-ú])/g, (_m, sep, c) => sep + c.toUpperCase());
+  }
+
+  private async buildLetterheadInfo(doc: any): Promise<{ logoImg: string; enderecoLine1: string; enderecoLine2: string; cnpjFmt: string; legalName: string } | null> {
+    if (doc.type !== 'CONTRATO_LOCACAO' || !doc.companyId) return null;
+    const company = await this.prisma.company.findUnique({ where: { id: doc.companyId } });
+    if (!company) return null;
+    let logoImg = '';
+    if (company.logoUrl) {
+      try {
+        const fs = require('fs');
+        const path = require('path');
+        const relPath = company.logoUrl.replace(/^\/+/, '');
+        const fullPath = path.join(process.cwd(), relPath);
+        const buf = fs.readFileSync(fullPath);
+        const ext = path.extname(fullPath).slice(1).toLowerCase();
+        const mime = ext === 'svg' ? 'image/svg+xml' : `image/${ext === 'jpg' ? 'jpeg' : ext}`;
+        const base64 = buf.toString('base64');
+        logoImg = `<img src="data:${mime};base64,${base64}" style="height:36px;max-width:160px;object-fit:contain;" />`;
+      } catch {
+        logoImg = '';
+      }
+    }
+    const cepDigits = (company.zipCode ?? '').replace(/\D/g, '');
+    const cepFmt = cepDigits.length === 8 ? `${cepDigits.slice(0,5)}-${cepDigits.slice(5)}` : company.zipCode;
+    const enderecoLine1 = [
+      [this.toTitleCase(company.street), company.number].filter(Boolean).join(', '),
+      this.toTitleCase(company.neighborhood),
+    ].filter(Boolean).join(' — ');
+    const enderecoLine2 = [
+      [this.toTitleCase(company.city), company.state].filter(Boolean).join(' - '),
+      cepFmt ?? '',
+    ].filter(Boolean).join(', ');
+    const cnpjDigits = (company.taxId ?? '').replace(/\D/g, '');
+    const cnpjFmt = cnpjDigits.length === 14
+      ? `${cnpjDigits.slice(0,2)}.${cnpjDigits.slice(2,5)}.${cnpjDigits.slice(5,8)}/${cnpjDigits.slice(8,12)}-${cnpjDigits.slice(12)}`
+      : company.taxId;
+    return { logoImg, enderecoLine1, enderecoLine2, cnpjFmt: cnpjFmt ?? '', legalName: company.legalName ?? '' };
+  }
+
   async generatePdf(id: string): Promise<Buffer> {
     const doc = await this.getDocumentOrFail(id);
+    const letterhead = await this.buildLetterheadInfo(doc);
+
+    let headerTemplate: string | undefined;
+    let footerTemplate: string | undefined;
+    let letterheadMargin: { top: string; bottom: string; left: string; right: string } | undefined;
+
+    if (letterhead) {
+      const pdfFileName = await this.buildDownloadFilename(id);
+      headerTemplate = `
+        <div style="font-size:9px; width:100%; margin:0; box-sizing:border-box; padding:10mm 20mm 10mm 30mm; display:flex; align-items:center; justify-content:space-between; font-family:Arial,sans-serif; color:#333; border-bottom:1px solid #ddd;">
+          <div>${letterhead.logoImg}</div>
+          <div style="text-align:right; line-height:1.4;">
+            <div style="font-weight:bold; font-size:1em;">${letterhead.legalName}</div>
+            <div style="font-size:0.8em;">${letterhead.enderecoLine1}<br>${letterhead.enderecoLine2}</div>
+            <div style="font-size:0.8em;">CNPJ: ${letterhead.cnpjFmt}</div>
+          </div>
+        </div>
+      `;
+      footerTemplate = `
+        <div style="font-size:8px; width:100%; margin:0; box-sizing:border-box; padding:4px 20mm 0 30mm; display:flex; justify-content:space-between; font-family:Arial,sans-serif; color:#888; border-top:1px solid #ddd;">
+          <span>${pdfFileName}</span>
+          <span>Página <span class="pageNumber"></span> de <span class="totalPages"></span></span>
+        </div>
+      `;
+      letterheadMargin = { top: '35mm', bottom: '22mm', left: '30mm', right: '20mm' };
+    }
 
     const visibilityWatermark: Record<string, string> = {
       PUBLICO:     '',
@@ -356,7 +424,7 @@ export class DocumentsService {
       <head>
         <meta charset="UTF-8">
         <style>
-          @page { size: A4; margin: 25mm 30mm 25mm 30mm; }
+          @page { size: A4; margin: 25mm 20mm 25mm 30mm; }
           body { font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.8; color: #000; }
           h1 { text-align: center; font-size: 14pt; text-transform: uppercase; letter-spacing: 2px; }
           h2 { text-align: center; font-size: 12pt; text-transform: uppercase; letter-spacing: 1px; margin-top: 24pt; }
@@ -374,10 +442,17 @@ export class DocumentsService {
             font-size: 8pt; text-align: center; padding: 3pt;
             letter-spacing: 2px;
           }
+          .vertical-tarja {
+            position: fixed; left: 2cm; top: 50%;
+            transform: translateY(-50%) rotate(-90deg);
+            transform-origin: center;
+            font-size: 8pt; font-weight: bold; letter-spacing: 3px; color: #666; white-space: nowrap;
+          }
         </style>
       </head>
       <body>
         ${watermarkText ? `<div class="watermark">${watermarkText}</div>` : ''}
+        ${(doc.visibility !== 'PUBLICO' && doc.type === 'CONTRATO_LOCACAO') ? `<div class="vertical-tarja">CLASSIFICAÇÃO: ${doc.visibility}</div>` : ''}
         ${doc.content.split('\n\n').map((p: string) => `<p>${p.trim()}</p>`).join('\n')}
         ${doc.signatures?.length > 0 ? `
           <div class="signature-block">
@@ -387,7 +462,7 @@ export class DocumentsService {
             `).join('')}
           </div>
         ` : ''}
-        ${doc.visibility !== 'PUBLICO'
+        ${(doc.visibility !== 'PUBLICO' && doc.type !== 'CONTRATO_LOCACAO')
           ? `<div class="classification-bar">LEDGR — CLASSIFICAÇÃO: ${doc.visibility}</div>`
           : ''}
       </body>
@@ -397,7 +472,14 @@ export class DocumentsService {
     const browser = await puppeteer.launch({ args: ['--no-sandbox'] });
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: 'load' });
-    const pdfBytes = await page.pdf({ format: 'A4', printBackground: true });
+    const pdfBytes = await page.pdf({
+      format: 'A4',
+      printBackground: true,
+      displayHeaderFooter: !!headerTemplate,
+      headerTemplate: headerTemplate ?? '<span></span>',
+      footerTemplate: footerTemplate ?? '<span></span>',
+      margin: letterheadMargin,
+    });
     const pdfBuffer = Buffer.from(pdfBytes);
     await browser.close();
 
@@ -428,6 +510,7 @@ export class DocumentsService {
 
   async generateHtml(id: string): Promise<string> {
     const doc = await this.getDocumentOrFail(id);
+    const letterhead = await this.buildLetterheadInfo(doc);
     const visibilityLabel: Record<string, string> = {
       PUBLICO: '', RESERVADO: 'RESERVADO',
       RESTRITO: 'RESTRITO', CONTROLADO: 'CONTROLADO — CONFIDENCIAL',
@@ -440,6 +523,99 @@ export class DocumentsService {
           <p>✓ ${s.signerName} — ${s.method === 'GOVBR' ? 'gov.br' : 'Certificado ICP-Brasil'} — ${new Date(s.signedAt).toLocaleDateString('pt-BR')}</p>
         `).join('')}
       </div>` : '';
+
+    if (letterhead) {
+      const pdfFileName = await this.buildDownloadFilename(id);
+      const headerHtmlEsc = JSON.stringify(`
+        <div class="letterhead-header">
+          <div>${letterhead.logoImg}</div>
+          <div style="text-align:right; line-height:1.4;">
+            <div style="font-weight:bold; font-size:1em;">${letterhead.legalName}</div>
+            <div style="font-size:0.8em;">${letterhead.enderecoLine1}<br>${letterhead.enderecoLine2}</div>
+            <div style="font-size:0.8em;">CNPJ: ${letterhead.cnpjFmt}</div>
+          </div>
+        </div>
+      `);
+      const footerHtmlEsc = JSON.stringify(`
+        <div class="letterhead-footer">
+          <span>${pdfFileName}</span>
+          <span>Página <span class="page-number"></span></span>
+        </div>
+      `);
+      const watermarkEsc = JSON.stringify(watermark ?? '');
+      const bodyFragment = (doc.content ?? '<p><em>Sem conteúdo</em></p>') + signaturesHtml;
+
+      return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin:0; padding:0; background:#787878; font-family:'Times New Roman', serif; font-size:12pt; line-height:1.8; color:#000; }
+    .pages-wrap { padding:20px 0; }
+    .page { position:relative; width:210mm; min-height:297mm; background:#fff; margin:0 auto 16px auto; box-shadow:0 2px 10px rgba(0,0,0,0.35); overflow:hidden; }
+    .page-header { position:absolute; top:0; left:0; right:0; padding:14mm 20mm 0 30mm; }
+    .page-footer { position:absolute; bottom:0; left:0; right:0; padding:0 20mm 8mm 30mm; }
+    .page-content { position:absolute; top:38mm; bottom:22mm; left:30mm; right:20mm; overflow:hidden; }
+    .page-watermark { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%) rotate(-35deg); font-size:72pt; color:rgba(0,0,0,0.04); font-weight:bold; white-space:nowrap; pointer-events:none; }
+    .page-tarja { position:absolute; left:5mm; top:50%; transform:translateY(-50%) rotate(-90deg); transform-origin:center; font-size:8pt; font-weight:bold; letter-spacing:3px; color:#999; white-space:nowrap; }
+    .letterhead-header { display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #ddd; padding-bottom:10px; font-family: Arial, sans-serif; font-size: 9pt; color:#333; }
+    .letterhead-footer { display:flex; justify-content:space-between; border-top:1px solid #ddd; padding-top:6px; font-family: Arial, sans-serif; font-size: 8pt; color:#888; }
+    p { text-align: justify; margin: 6pt 0; }
+    h1 { text-align: center; font-size: 14pt; text-transform: uppercase; letter-spacing: 2px; }
+    h2 { text-align: center; font-size: 12pt; text-transform: uppercase; letter-spacing: 1px; margin-top: 24pt; }
+  </style>
+</head>
+<body>
+  <div id="source" style="display:none">${bodyFragment}</div>
+  <div class="pages-wrap" id="pages"></div>
+  <script>
+    (function () {
+      var headerHtml = ${headerHtmlEsc};
+      var footerHtml = ${footerHtmlEsc};
+      var watermarkText = ${watermarkEsc};
+      var source = document.getElementById('source');
+      var pagesContainer = document.getElementById('pages');
+      var nodes = Array.prototype.slice.call(source.childNodes);
+      var pages = [];
+      var currentContent = null;
+
+      function newPage() {
+        var page = document.createElement('div');
+        page.className = 'page';
+        var wm = watermarkText ? '<div class="page-watermark">' + watermarkText + '</div>' : '';
+        var tarja = '<div class="page-tarja">CLASSIFICAÇÃO: ' + watermarkText + '</div>';
+        page.innerHTML =
+          wm +
+          '<div class="page-header">' + headerHtml + '</div>' +
+          '<div class="page-content"></div>' +
+          '<div class="page-footer">' + footerHtml + '</div>';
+        pagesContainer.appendChild(page);
+        pages.push(page);
+        currentContent = page.querySelector('.page-content');
+        return page;
+      }
+
+      newPage();
+      nodes.forEach(function (node) {
+        currentContent.appendChild(node);
+        if (currentContent.scrollHeight > currentContent.clientHeight + 1) {
+          currentContent.removeChild(node);
+          newPage();
+          currentContent.appendChild(node);
+        }
+      });
+
+      pages.forEach(function (page, i) {
+        var pn = page.querySelector('.page-number');
+        if (pn) pn.textContent = (i + 1) + ' de ' + pages.length;
+      });
+    })();
+  </script>
+</body>
+</html>`;
+    }
 
     return `<!DOCTYPE html>
 <html lang="pt-BR">

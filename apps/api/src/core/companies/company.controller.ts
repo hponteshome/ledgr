@@ -12,7 +12,12 @@ import {
   NotFoundException,
   Request,
   Query,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { extname } from 'path';
 import { JwtAuthGuard } from '../../auth/guards/jwt.guard';
 import { SidebarResourceGuard } from '../../auth/guards/sidebar-resource.guard';
 import { RequireResourceAccess } from '../../auth/decorators/require-resource-access.decorator';
@@ -144,6 +149,39 @@ export class CompanyController {
   @Delete(':id')
   async remove(@Param('id') id: string, @CurrentUser('object') user: any) {
     return this.companyService.remove(id, user.id);
+  }
+
+  // ── Logo (papel timbrado) ────────────────────────────────────────────────
+  @RequireResourceAccess('companies', 'EDIT')
+  @Post(':id/logo')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: './uploads/logos',
+        filename: (_req, file, cb) => {
+          const unique = Date.now() + '-' + Math.round(Math.random() * 1e9);
+          cb(null, `logo-${unique}${extname(file.originalname)}`);
+        },
+      }),
+      fileFilter: (_req, file, cb) => {
+        const allowed = ['image/png', 'image/jpeg', 'image/svg+xml', 'image/webp'];
+        if (!allowed.includes(file.mimetype)) {
+          return cb(new Error('Formato invalido. Use PNG, JPEG, SVG ou WEBP.'), false);
+        }
+        cb(null, true);
+      },
+      limits: { fileSize: 2 * 1024 * 1024 },
+    }),
+  )
+  async uploadLogo(
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
+    @CurrentUser('object') user: any,
+  ) {
+    if (!file) throw new NotFoundException('Arquivo nao enviado.');
+    const logoUrl = '/uploads/logos/' + file.filename;
+    const result = await this.companyService.update(id, { logoUrl }, user.id);
+    return new CompanyDto(result);
   }
 
   // ── Rota de audit ────────────────────────────────────────────────────────────

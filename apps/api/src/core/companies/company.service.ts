@@ -165,7 +165,8 @@ export class CompanyService {
       'simplesData', 'meiData', 'partners', 'lastRfbSync',
       'nire', 'registerOrg', 'codMun', 'natLivro', 'ieEstadual',
       'indEscCons', 'indCentralizada', 'tipEcd', 'indMoedaFunc',
-      'indNire', 'indSitEsp', 'codPlanRef', 'hashAnterior', 'tabelasRfbPath'
+      'indNire', 'indSitEsp', 'codPlanRef', 'hashAnterior', 'tabelasRfbPath',
+      'logoUrl'
     ];
 
     allowedFields.forEach(field => {

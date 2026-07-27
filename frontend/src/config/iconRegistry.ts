@@ -5,7 +5,7 @@ import {
   FiCalendar, FiRepeat, FiLock, FiFileText, FiSettings, FiPercent, FiPackage,
   FiCheckCircle, FiFilePlus, FiArrowDown, FiUsers, FiClock, FiUserCheck,
   FiBriefcase, FiDatabase, FiArchive, FiClipboard, FiEdit2, FiAlertCircle,
-  FiTool, FiShield, FiCircle,
+  FiTool, FiShield, FiCircle, FiImage,
 } from 'react-icons/fi';
 
 export const iconRegistry: Record<string, React.ElementType> = {
@@ -14,5 +14,5 @@ export const iconRegistry: Record<string, React.ElementType> = {
   FiCalendar, FiRepeat, FiLock, FiFileText, FiSettings, FiPercent, FiPackage,
   FiCheckCircle, FiFilePlus, FiArrowDown, FiUsers, FiClock, FiUserCheck,
   FiBriefcase, FiDatabase, FiArchive, FiClipboard, FiEdit2, FiAlertCircle,
-  FiTool, FiShield, FiCircle,
+  FiTool, FiShield, FiCircle, FiImage,
 };

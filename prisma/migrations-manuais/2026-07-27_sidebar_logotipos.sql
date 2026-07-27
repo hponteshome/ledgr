@@ -1,0 +1,2 @@
+INSERT INTO sidebar_items (id, path, label, module, icon, parent_id, ordem, action_type)
+VALUES (gen_random_uuid(), '/app/arquivo/templates/logotipos', 'Logotipos', 'arquivo', 'FiImage', '5d15f2f0-ee7f-4f87-bc06-2c8585dd1a6c', 1, 'link');

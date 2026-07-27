@@ -207,6 +207,9 @@ model Company {
   registerBook   String?   @map("register_book") @db.VarChar(30)
   registerSheet  String?   @map("register_sheet") @db.VarChar(10)
 
+  // ── Papel timbrado (Fase 1: Contrato de Locacao) ──────────
+  logoUrl String? @map("logo_url") @db.VarChar(500)
+
   // ── Atividades econômicas (CNAE) ──────────────────────────
   mainActivity        String? @map("main_activity") @db.VarChar
   secondaryActivities Json?   @map("secondary_activities") @db.Json

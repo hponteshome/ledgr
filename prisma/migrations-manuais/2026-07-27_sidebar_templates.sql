@@ -1,0 +1,2 @@
+INSERT INTO sidebar_items (id, path, label, module, icon, parent_id, ordem, action_type)
+VALUES (gen_random_uuid(), '/app/arquivo/templates', 'Templates', 'arquivo', 'FiLayers', 'caab53b5-dccb-4683-9afc-b4c44c7b698d', 6, 'link');

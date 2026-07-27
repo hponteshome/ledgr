@@ -38,6 +38,7 @@ export class CompanyDto {
   hashAnterior?: string;
   tabelasRfbPath?: string;
   cnaes?: any;
+  logoUrl?: string;
   
   constructor(company: any) {
     this.id = company.id;
@@ -73,6 +74,7 @@ export class CompanyDto {
     this.statusDate = company.statusDate;
     this.partners = company.partners;
     this.cnaes = company.cnaes;
+    this.logoUrl = company.logoUrl;
     this.nire           = company.nire;
     this.registerOrg    = company.registerOrg;
     this.codMun         = company.codMun;

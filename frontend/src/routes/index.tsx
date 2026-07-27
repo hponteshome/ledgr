@@ -99,6 +99,7 @@ import { TabelasLegaisPage } from '../pages/sistema/TabelasLegaisPage';
 import SidebarPermissionsPage from '../pages/sistema/SidebarPermissionsPage';
 import ShareholdersPage from '../pages/corporate/shareholders/ShareholdersPage';
 import { RepositorioPage } from '../pages/documentos/RepositorioPage';
+import { LogotiposPage } from '../pages/documentos/LogotiposPage';
 import { CertificatesPage } from '../pages/certificates/CertificatesPage';
 import VisoesContabeisPage from '../pages/sped/VisoesContabeisPage';
 import CalculadoraCorrecaoPage from '../pages/sistema/CalculadoraCorrecaoPage';
@@ -280,6 +281,7 @@ export const AppRoutes = () => {
                 <Route path="app/arquivo/rh/procuracoes" element={<ProtectedRoute><RepositorioPage /></ProtectedRoute>} />
                 <Route path="app/arquivo/rh/acordos" element={<ProtectedRoute><RepositorioPage /></ProtectedRoute>} />
                 <Route path="app/arquivo/locacao" element={<ProtectedRoute><RepositorioPage /></ProtectedRoute>} />
+                <Route path="app/arquivo/templates/logotipos" element={<ProtectedRoute><LogotiposPage /></ProtectedRoute>} />
 
                 {/* Configurações */}
                 <Route path="app/settings/data-management" element={<ProtectedRoute><TableManager /></ProtectedRoute>} />
