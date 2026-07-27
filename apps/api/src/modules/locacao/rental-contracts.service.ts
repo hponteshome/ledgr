@@ -26,7 +26,15 @@ function toDecimal(value: number | string | undefined | null): Prisma.Decimal | 
 
 function toDate(value: string | undefined | null): Date | undefined {
   if (!value) return undefined;
-  return new Date(value);
+  // Campos DATE-only (sem hora): o driver pg le/grava usando getters LOCAIS do
+  // processo Node (documentado em node-postgres), nao UTC. Construir via
+  // new Date(ano, mes-1, dia) (construtor local) garante que o dia gravado no
+  // Postgres seja exatamente o dia pretendido, independente do fuso do processo
+  // (desde que TZ esteja fixado corretamente - ver main.ts).
+  const parts = value.split('-').map(Number);
+  const [y, m, d] = parts;
+  if (!y || !m || !d) return undefined;
+  return new Date(y, m - 1, d);
 }
 
 @Injectable()

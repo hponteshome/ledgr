@@ -397,10 +397,33 @@ export class DocumentsService {
     const browser = await puppeteer.launch({ args: ['--no-sandbox'] });
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: 'load' });
-    const pdfBuffer = await page.pdf({ format: 'A4', printBackground: true }) as Buffer;
+    const pdfBytes = await page.pdf({ format: 'A4', printBackground: true });
+    const pdfBuffer = Buffer.from(pdfBytes);
     await browser.close();
 
     return pdfBuffer;
+  }
+
+  async buildDownloadFilename(id: string): Promise<string> {
+    const doc = await this.getDocumentOrFail(id);
+    if (doc.type === 'CONTRATO_LOCACAO') {
+      const contract = await this.prisma.rentalContract.findFirst({
+        where: { documentId: id, deletedAt: null },
+        include: { fixedAsset: { select: { internalCode: true } } },
+      });
+      if (contract && contract.fixedAsset?.internalCode) {
+        const ddmmyy = (d: Date) => {
+          const dd = String(d.getUTCDate()).padStart(2, '0');
+          const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+          const yy = String(d.getUTCFullYear()).slice(-2);
+          return `${dd}${mm}${yy}`;
+        };
+        const inicio = ddmmyy(contract.startDate);
+        const fim = contract.endDate ? ddmmyy(contract.endDate) : 'indeterminado';
+        return `Locação_${contract.fixedAsset.internalCode}_${inicio}a${fim}.pdf`;
+      }
+    }
+    return `documento-${id}.pdf`;
   }
 
   async generateHtml(id: string): Promise<string> {

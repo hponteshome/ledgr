@@ -3,11 +3,12 @@
 // Quadro Resumo do Contrato de Locação — visualização + geração do Contrato Completo
 // ============================================================
 import { useState, useEffect } from 'react';
-import { Loader, FileText, CheckCircle } from 'lucide-react';
+import { Loader, FileText, CheckCircle, Edit3, Lock } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useCompany } from '../../../contexts/CompanyContext';
 import { ModalWrapper, Field } from './ModalComponents';
 import { DocumentViewModal } from '../../documentos/DocumentViewModal';
+import { RentalContractFormModal } from './RentalContractFormModal';
 
 const API = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3000';
 
@@ -86,6 +87,63 @@ function fmtDate(v: string | undefined): string {
     return d.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
 }
 
+function daysInMonth(year: number, month1to12: number): number {
+    return new Date(year, month1to12, 0).getDate();
+}
+
+// Prazo de vigencia por extenso (anos/meses/dias), contagem INCLUSIVA -
+// um contrato configurado como '12 meses' (que grava endDate = inicio + 12
+// meses - 1 dia, convencao ja validada) deve aparecer aqui como '1 ano', nao
+// '11 meses e 30 dias' - por isso soma-se 1 dia ao endDate antes do calculo.
+function formatVigencia(startStr: string | undefined, endStr: string | undefined | null): string {
+    if (!startStr || !endStr) return 'Indeterminado';
+    const [y1, m1, d1] = startStr.slice(0, 10).split('-').map(Number);
+    let [y2, m2, d2] = endStr.slice(0, 10).split('-').map(Number);
+    if (!y1 || !m1 || !d1 || !y2 || !m2 || !d2) return '—';
+
+    d2 += 1;
+    if (d2 > daysInMonth(y2, m2)) {
+        d2 = 1;
+        m2 += 1;
+        if (m2 > 12) { m2 = 1; y2 += 1; }
+    }
+
+    let years = y2 - y1;
+    let months = m2 - m1;
+    let days = d2 - d1;
+
+    if (days < 0) {
+        months -= 1;
+        const prevMonth = m2 - 1 <= 0 ? 12 : m2 - 1;
+        const prevMonthYear = m2 - 1 <= 0 ? y2 - 1 : y2;
+        days += daysInMonth(prevMonthYear, prevMonth);
+    }
+    if (months < 0) {
+        years -= 1;
+        months += 12;
+    }
+
+    const totalMonths = years * 12 + months;
+    const parts: string[] = [];
+    if (totalMonths > 0) parts.push(`${totalMonths} ${totalMonths === 1 ? 'mês' : 'meses'}`);
+    if (days > 0) parts.push(`${days} ${days === 1 ? 'dia' : 'dias'}`);
+    if (parts.length === 0) return '0 dias';
+    if (parts.length === 1) return parts[0];
+    return parts.join(' e ');
+}
+
+function formatCpfCnpj(value: string | undefined | null): string {
+    if (!value) return '';
+    const digits = value.replace(/\D/g, '');
+    if (digits.length === 11) {
+        return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
+    }
+    if (digits.length === 14) {
+        return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8, 12)}-${digits.slice(12)}`;
+    }
+    return value;
+}
+
 function onlyDigits(v: string): string {
     return v.replace(/\D/g, '');
 }
@@ -104,6 +162,7 @@ export function RentalContractDetailModal({ contractId, title, onClose }: { cont
     const [error, setError] = useState('');
 
     const [qualifying, setQualifying] = useState(false);
+    const [editingContract, setEditingContract] = useState(false);
     const [formValues, setFormValues] = useState<Record<string, string>>({});
     const [saving, setSaving] = useState(false);
     const [genError, setGenError] = useState('');
@@ -241,13 +300,32 @@ export function RentalContractDetailModal({ contractId, title, onClose }: { cont
                     <>
                         <div className="flex items-center justify-between">
                             <span className="text-sm font-semibold text-gray-900">{contract.tenantName}</span>
-                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[contract.status] ?? 'bg-gray-100 text-gray-600'}`}>
-                                {STATUS_LABELS[contract.status] ?? contract.status}
-                            </span>
+                            <div className="flex items-center gap-2">
+                                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[contract.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                                    {STATUS_LABELS[contract.status] ?? contract.status}
+                                </span>
+                                {(!contract.document?.status || contract.document.status === 'RASCUNHO') ? (
+                                    <button
+                                        type="button"
+                                        title="Editar Contrato"
+                                        onClick={() => setEditingContract(true)}
+                                        className="p-1 text-gray-400 hover:text-blue-700 hover:bg-blue-50 rounded"
+                                    >
+                                        <Edit3 className="w-4 h-4" />
+                                    </button>
+                                ) : (
+                                    <span
+                                        title={`Documento já ${DOC_STATUS_LABELS[contract.document.status] ?? contract.document.status} — não é possível editar o contrato. Exclua o documento em Arquivos Digitais para reiniciar.`}
+                                        className="p-1 text-gray-300 cursor-not-allowed"
+                                    >
+                                        <Lock className="w-4 h-4" />
+                                    </span>
+                                )}
+                            </div>
                         </div>
 
                         {contract.tenantTaxId && (
-                            <div className="text-xs text-gray-500">CPF/CNPJ: {contract.tenantTaxId}</div>
+                            <div className="text-xs text-gray-500">CPF/CNPJ: {formatCpfCnpj(contract.tenantTaxId)}</div>
                         )}
 
                         <div className="grid grid-cols-2 gap-4 pt-2 border-t border-gray-100">
@@ -267,6 +345,10 @@ export function RentalContractDetailModal({ contractId, title, onClose }: { cont
                                 <div className="text-sm text-gray-900">{contract.endDate ? fmtDate(contract.endDate) : 'Indeterminado'}</div>
                             </Field>
                         </div>
+
+                        <Field label="Prazo de Vigência">
+                            <div className="text-sm text-gray-900">{formatVigencia(contract.startDate, contract.endDate)}</div>
+                        </Field>
 
                         {contract.guaranteeType && (
                             <div className="grid grid-cols-2 gap-4">
@@ -412,6 +494,15 @@ export function RentalContractDetailModal({ contractId, title, onClose }: { cont
                 )}
             </div>
         </ModalWrapper>
+        {editingContract && (
+            <RentalContractFormModal
+                asset={contract.fixedAsset}
+                contractId={contractId}
+                documentStatus={contract.document?.status ?? null}
+                onClose={() => setEditingContract(false)}
+                onSuccess={() => { setEditingContract(false); loadContract(); }}
+            />
+        )}
         {viewDoc && contract.documentId && (
             <DocumentViewModal
                 documentId={contract.documentId}

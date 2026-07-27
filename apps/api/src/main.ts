@@ -1,3 +1,10 @@
+// Fixa o fuso do processo Node em America/Sao_Paulo (UTC-3), independente do
+// fuso do SO/container. O driver pg (node-postgres) le/grava colunas DATE e
+// TIMESTAMP usando o fuso local do processo - sem isso, mover o backend para
+// um ambiente com fuso diferente (ex: container Linux padrao em UTC) reintroduz
+// o bug de -1 dia em datas de vigencia de contrato, vencimento, etc.
+process.env.TZ = 'America/Sao_Paulo';
+
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { ConsoleLogger } from '@nestjs/common';

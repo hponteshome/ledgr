@@ -109,9 +109,13 @@ export class DocumentsController {
     @Res() res: Response,
   ) {
     const pdfBuffer = await this.documentsService.generatePdf(id);
+    const fileName = await this.documentsService.buildDownloadFilename(id);
+    const asciiFileName = fileName
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^\x20-\x7E]/g, '_');
     res.set({
       'Content-Type': 'application/pdf',
-      'Content-Disposition': `attachment; filename="documento-${id}.pdf"`,
+      'Content-Disposition': `attachment; filename="${asciiFileName}"; filename*=UTF-8''${encodeURIComponent(fileName)}`,
     });
     res.send(pdfBuffer);
   }

@@ -1,6 +1,7 @@
 // frontend/src/pages/documentos/DocumentViewModal.tsx
 import React, { useState, useEffect } from 'react';
 import { FiX, FiDownload, FiShield, FiHash, FiCalendar, FiFileText, FiEdit } from 'react-icons/fi';
+import { toast } from 'react-hot-toast';
 
 const API = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3000';
 
@@ -55,12 +56,26 @@ export const DocumentViewModal: React.FC<Props> = ({ documentId, documentTitle, 
 
   const handleDownload = () => {
     fetch(API + '/documents/' + documentId + '/pdf', { headers })
-      .then(r => r.blob())
-      .then(blob => {
+      .then(async r => {
+        if (!r.ok) {
+          const err = await r.json().catch(() => null);
+          throw new Error(err?.message ?? 'Não foi possível gerar o PDF.');
+        }
+        const disposition = r.headers.get('Content-Disposition') ?? '';
+        const utfMatch = disposition.match(/filename\*=UTF-8''([^;]+)/);
+        const asciiMatch = disposition.match(/filename="([^"]+)"/);
+        const filename = utfMatch ? decodeURIComponent(utfMatch[1]) : (asciiMatch ? asciiMatch[1] : documentTitle + '.pdf');
+        const blob = await r.blob();
+        return { blob, filename };
+      })
+      .then(({ blob, filename }) => {
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = documentTitle + '.pdf';
+        a.download = filename;
         a.click();
+      })
+      .catch(err => {
+        toast.error(err.message || 'Não foi possível baixar o PDF.');
       });
   };
 
