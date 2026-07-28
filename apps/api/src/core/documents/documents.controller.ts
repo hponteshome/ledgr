@@ -3,7 +3,7 @@ import {
   Controller, Get, Post, Patch, Delete,
   Param, Body, Query, Request, Req,
   UseGuards, UseInterceptors, UploadedFile,
-  Res, HttpCode, HttpStatus,
+  Res, HttpCode, HttpStatus, BadRequestException,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/guards/jwt.guard';
 import { DocumentsService } from './documents.service';
@@ -201,6 +201,42 @@ export class DocumentsController {
   @Get(':id/signatures')
   getSignatures(@Param('id') id: string) {
     return this.documentsService.getSignatures(id);
+  }
+
+  // POST /documents/:id/signers/:signerId/sign-physical — marca signatario como
+  // assinado fisicamente (sem certificado/gov.br), com auditoria
+  @Post(':id/signers/:signerId/sign-physical')
+  @HttpCode(HttpStatus.OK)
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: require('multer').diskStorage({
+        destination: './uploads/signatures',
+        filename: (_req: any, file: any, cb: any) => {
+          const unique = Date.now() + '-' + Math.round(Math.random() * 1e9);
+          const ext = file.originalname.split('.').pop();
+          cb(null, `evidencia-${unique}.${ext}`);
+        },
+      }),
+      limits: { fileSize: 5 * 1024 * 1024 },
+    }),
+  )
+  async signPhysical(
+    @Param('id') id: string,
+    @Param('signerId') signerId: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Request() req: any,
+  ) {
+    if (!file) throw new BadRequestException('Arquivo de evidencia nao enviado.');
+    const evidenceUrl = '/uploads/signatures/' + file.filename;
+    return this.documentsService.signPhysical(id, signerId, evidenceUrl, req.user?.id);
+  }
+
+  // POST /documents/:id/reopen — reabre documento (EM_REVISAO ou
+  // AGUARDANDO_ASSINATURA -> RASCUNHO), apaga assinaturas/signatarios existentes
+  @Post(':id/reopen')
+  @HttpCode(HttpStatus.OK)
+  reopen(@Param('id') id: string, @Request() req: any) {
+    return this.documentsService.reopenDocument(id, req.user?.id);
   }
 
   // ── Status e Visibilidade ────────────────────────────────────

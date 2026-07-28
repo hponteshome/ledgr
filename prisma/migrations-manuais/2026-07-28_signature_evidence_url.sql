@@ -1,0 +1,1 @@
+ALTER TABLE document_signatures ADD COLUMN IF NOT EXISTS evidence_url VARCHAR(500);

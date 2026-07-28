@@ -11,6 +11,13 @@ import { CreateRentalContractDto, UpdateRentalContractDto } from './dto/rental-c
 export class RentalContractsController {
   constructor(private svc: RentalContractsService) {}
 
+  @Post('by-document/:documentId/prepare-signers')
+  @RequireResourceAccess('rental-contracts', 'EDIT')
+  prepareSignersByDocument(@Req() req: any, @Param('documentId') documentId: string) {
+    const companyId = req.headers['x-company-id'] ?? '';
+    return this.svc.prepareSignersByDocument(companyId, documentId);
+  }
+
   @Get()
   @RequireResourceAccess('rental-contracts', 'VIEW')
   findAll(@Req() req: any, @Query('status') status?: string) {
@@ -54,5 +61,12 @@ export class RentalContractsController {
     const companyId = req.headers['x-company-id'] ?? '';
     const userId = req.user?.id ?? req.user?.sub ?? '';
     return this.svc.generateDocument(companyId, userId, id);
+  }
+
+  @Post(':id/prepare-signers')
+  @RequireResourceAccess('rental-contracts', 'EDIT')
+  prepareSigners(@Req() req: any, @Param('id') id: string) {
+    const companyId = req.headers['x-company-id'] ?? '';
+    return this.svc.prepareSigners(companyId, id);
   }
 }

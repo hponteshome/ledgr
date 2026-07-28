@@ -294,11 +294,29 @@ export class DocumentsService {
     });
   }
 
+  private readonly ALLOWED_STATUS_TRANSITIONS: Record<string, string[]> = {
+    RASCUNHO: ['EM_REVISAO', 'ARQUIVADO', 'CANCELADO'],
+    EM_REVISAO: ['AGUARDANDO_ASSINATURA', 'ARQUIVADO', 'CANCELADO'],
+    AGUARDANDO_ASSINATURA: ['ASSINADO', 'ARQUIVADO', 'CANCELADO'],
+    ASSINADO: ['REGISTRADO', 'ARQUIVADO'],
+    REGISTRADO: ['ARQUIVADO'],
+    ARQUIVADO: [],
+    CANCELADO: [],
+  };
+
   async updateStatus(id: string, status: string, userId?: string) {
     const before = await this.prisma.document.findUnique({
       where: { id },
       select: { status: true },
     });
+    if (before) {
+      const allowed = this.ALLOWED_STATUS_TRANSITIONS[before.status] ?? [];
+      if (!allowed.includes(status)) {
+        throw new BadRequestException(
+          `Transicao invalida: ${before.status} -> ${status}. Para retroceder, use o endpoint de reabertura (POST /documents/:id/reopen), que remove assinaturas/signatarios de forma consistente.`,
+        );
+      }
+    }
     const updated = await this.prisma.document.update({
       where: { id },
       data: { status: status as DocumentStatus, updatedAt: new Date() },
@@ -392,6 +410,12 @@ export class DocumentsService {
     return { logoImg, enderecoLine1, enderecoLine2, cnpjFmt: cnpjFmt ?? '', legalName: company.legalName ?? '' };
   }
 
+  private signatureMethodLabel(method: string): string {
+    if (method === 'GOVBR') return 'gov.br';
+    if (method === 'FISICO') return 'Assinatura Física (evidência anexada)';
+    return 'Certificado ICP-Brasil';
+  }
+
   async generatePdf(id: string): Promise<Buffer> {
     const doc = await this.getDocumentOrFail(id);
     const letterhead = await this.buildLetterheadInfo(doc);
@@ -472,7 +496,7 @@ export class DocumentsService {
           <div class="signature-block">
             <p><strong>ASSINATURAS DIGITAIS</strong></p>
             ${(doc.signatures as any[]).map(s => `
-              <p>✓ ${s.signerName} — ${s.method === 'GOVBR' ? 'gov.br' : 'Certificado ICP-Brasil'} — ${new Date(s.signedAt).toLocaleDateString('pt-BR')}</p>
+              <p>✓ ${s.signerName} — ${this.signatureMethodLabel(s.method)} — ${new Date(s.signedAt).toLocaleDateString('pt-BR')}</p>
             `).join('')}
           </div>
         ` : ''}
@@ -500,26 +524,28 @@ export class DocumentsService {
     return pdfBuffer;
   }
 
+  private async buildLocacaoBaseFilename(doc: any): Promise<string | null> {
+    if (doc.type !== 'CONTRATO_LOCACAO') return null;
+    const contract = await this.prisma.rentalContract.findFirst({
+      where: { documentId: doc.id, deletedAt: null },
+      include: { fixedAsset: { select: { internalCode: true } } },
+    });
+    if (!contract || !contract.fixedAsset?.internalCode) return null;
+    const ddmmyy = (d: Date) => {
+      const dd = String(d.getUTCDate()).padStart(2, '0');
+      const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+      const yy = String(d.getUTCFullYear()).slice(-2);
+      return `${dd}${mm}${yy}`;
+    };
+    const inicio = ddmmyy(contract.startDate);
+    const fim = contract.endDate ? ddmmyy(contract.endDate) : 'indeterminado';
+    return `Locação_${contract.fixedAsset.internalCode}_${inicio}a${fim}`;
+  }
+
   async buildDownloadFilename(id: string): Promise<string> {
     const doc = await this.getDocumentOrFail(id);
-    if (doc.type === 'CONTRATO_LOCACAO') {
-      const contract = await this.prisma.rentalContract.findFirst({
-        where: { documentId: id, deletedAt: null },
-        include: { fixedAsset: { select: { internalCode: true } } },
-      });
-      if (contract && contract.fixedAsset?.internalCode) {
-        const ddmmyy = (d: Date) => {
-          const dd = String(d.getUTCDate()).padStart(2, '0');
-          const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
-          const yy = String(d.getUTCFullYear()).slice(-2);
-          return `${dd}${mm}${yy}`;
-        };
-        const inicio = ddmmyy(contract.startDate);
-        const fim = contract.endDate ? ddmmyy(contract.endDate) : 'indeterminado';
-        return `Locação_${contract.fixedAsset.internalCode}_${inicio}a${fim}.pdf`;
-      }
-    }
-    return `documento-${id}.pdf`;
+    const base = await this.buildLocacaoBaseFilename(doc);
+    return base ? `${base}.pdf` : `documento-${id}.pdf`;
   }
 
   async generateHtml(id: string): Promise<string> {
@@ -534,7 +560,7 @@ export class DocumentsService {
       <div style="margin-top:48pt;border-top:1px solid #000;padding-top:16pt;">
         <p><strong>ASSINATURAS DIGITAIS</strong></p>
         ${(doc.signatures as any[]).map(s => `
-          <p>✓ ${s.signerName} — ${s.method === 'GOVBR' ? 'gov.br' : 'Certificado ICP-Brasil'} — ${new Date(s.signedAt).toLocaleDateString('pt-BR')}</p>
+          <p>✓ ${s.signerName} — ${this.signatureMethodLabel(s.method)} — ${new Date(s.signedAt).toLocaleDateString('pt-BR')}</p>
         `).join('')}
       </div>` : '';
 
@@ -728,6 +754,118 @@ if (!(dto as any).certId && !dto.signatureHash) {
       where: { documentId },
       orderBy: { signedAt: 'asc' },
     });
+  }
+
+  async signPhysical(documentId: string, signerId: string, evidenceUrl: string, userId?: string) {
+    if (!evidenceUrl) {
+      throw new BadRequestException('E necessario anexar a evidencia (foto/scan) da assinatura fisica.');
+    }
+    const signer = await this.prisma.documentSigner.findFirst({
+      where: { id: signerId, documentId },
+    });
+    if (!signer) throw new NotFoundException('Signatario nao encontrado.');
+
+    const docForFilename = await this.prisma.document.findUnique({ where: { id: documentId } });
+    const baseFilename = docForFilename ? await this.buildLocacaoBaseFilename(docForFilename) : null;
+    let finalEvidenceUrl = evidenceUrl;
+    if (baseFilename) {
+      try {
+        const fs = require('fs');
+        const path = require('path');
+        const cpfDigits = (signer.cpf ?? '').replace(/\D/g, '') || 'semdocumento';
+        const oldRel = evidenceUrl.replace(/^\/+/, '');
+        const oldFull = path.join(process.cwd(), oldRel);
+        const ext = path.extname(oldFull);
+        const safeBase = baseFilename.replace(/[\\/:*?"<>|]/g, '_');
+        const newFileName = `${safeBase}_signed_${cpfDigits}${ext}`;
+        const newFull = path.join(path.dirname(oldFull), newFileName);
+        fs.renameSync(oldFull, newFull);
+        finalEvidenceUrl = '/uploads/signatures/' + newFileName;
+      } catch {
+        finalEvidenceUrl = evidenceUrl;
+      }
+    }
+
+    await this.prisma.documentSigner.update({
+      where: { id: signerId },
+      data: { status: 'ASSINADO' },
+    });
+
+    await this.prisma.documentSignature.create({
+      data: {
+        documentId,
+        signerId,
+        method: 'FISICO',
+        status: 'ASSINADO',
+        signerName: signer.name,
+        signerCpf: signer.cpf,
+        signerEmail: signer.email,
+        signerRole: signer.role,
+        signatureFormat: 'FISICO',
+        evidenceUrl: finalEvidenceUrl,
+        signedAt: new Date(),
+      },
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        actorId: userId ?? null,
+        action: 'DOCUMENT_SIGNER_SIGNED_PHYSICAL',
+        targetId: documentId,
+        after: { signerId, signerName: signer.name, role: signer.role },
+      },
+    });
+
+    const before = await this.prisma.document.findUnique({ where: { id: documentId }, select: { status: true } });
+    await this.checkAndUpdateDocumentStatus(documentId);
+    const after = await this.prisma.document.findUnique({ where: { id: documentId }, select: { status: true } });
+
+    if (before?.status !== after?.status) {
+      await this.prisma.auditLog.create({
+        data: {
+          actorId: userId ?? null,
+          action: 'DOCUMENT_STATUS_CHANGED',
+          targetId: documentId,
+          before: { status: before?.status ?? null },
+          after: { status: after?.status ?? null },
+        },
+      });
+    }
+
+    return after;
+  }
+
+  async reopenDocument(documentId: string, userId?: string) {
+    const doc = await this.prisma.document.findUnique({
+      where: { id: documentId },
+      select: { status: true },
+    });
+    if (!doc) throw new NotFoundException('Documento nao encontrado.');
+    if (doc.status !== 'EM_REVISAO' && doc.status !== 'AGUARDANDO_ASSINATURA') {
+      throw new BadRequestException(
+        `Nao e possivel reabrir um documento com status ${doc.status}. Qualquer edicao apos assinatura (fisica ou digital) invalida a assinatura - reabertura so e permitida antes da conclusao da assinatura.`,
+      );
+    }
+
+    await this.prisma.documentSignature.deleteMany({ where: { documentId } });
+    await this.prisma.documentSigner.deleteMany({ where: { documentId } });
+
+    const updated = await this.prisma.document.update({
+      where: { id: documentId },
+      data: { status: 'RASCUNHO', updatedAt: new Date() },
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        actorId: userId ?? null,
+        action: 'DOCUMENT_REOPENED',
+        targetId: documentId,
+        before: { status: doc.status },
+        after: { status: 'RASCUNHO' },
+      },
+    });
+
+    return updated;
   }
 
   private async persistSignature(documentId: string, data: {

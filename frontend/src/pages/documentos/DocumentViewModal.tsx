@@ -29,6 +29,17 @@ export const DocumentViewModal: React.FC<Props> = ({ documentId, documentTitle, 
   const [loading, setLoading] = useState(true);
   const [error, setError]   = useState('');
   const [tab, setTab]       = useState<'documento' | 'assinaturas'>('documento');
+  const [signingId, setSigningId] = useState<string | null>(null);
+  const [addingSigner, setAddingSigner] = useState(false);
+  const [newSignerName, setNewSignerName] = useState('');
+  const [newSignerCpf, setNewSignerCpf] = useState('');
+  const [newSignerRole, setNewSignerRole] = useState('');
+  const [signersError, setSignersError] = useState('');
+  const [sendingReview, setSendingReview] = useState(false);
+  const [approving, setApproving] = useState(false);
+  const [reopening, setReopening] = useState(false);
+  const [workflowError, setWorkflowError] = useState('');
+  const evidenceInputRef = React.useRef<{ [key: string]: HTMLInputElement | null }>({});
 
   const token   = localStorage.getItem('@ledgr:token');
   const company = JSON.parse(localStorage.getItem('@ledgr:activeCompany') ?? '{}');
@@ -79,6 +90,131 @@ export const DocumentViewModal: React.FC<Props> = ({ documentId, documentTitle, 
       });
   };
 
+  const reloadDoc = async () => {
+    try {
+      const docRes = await fetch(API + '/documents/' + documentId, { headers });
+      const d = await docRes.json();
+      setDoc(d);
+      if (d.fileUrl) {
+        setPdfUrl(API + d.fileUrl);
+      } else {
+        const res = await fetch(API + '/documents/' + documentId + '/preview', { headers });
+        if (res.ok) setHtml(await res.text());
+      }
+    } catch {
+      // silencioso - status/lista de signatarios ja atualizaram via setDoc acima
+    }
+  };
+
+  const handleSendToReview = () => {
+    setSendingReview(true);
+    setWorkflowError('');
+    fetch(API + '/documents/' + documentId + '/status', {
+      method: 'PATCH',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'EM_REVISAO' }),
+    })
+      .then(async r => {
+        if (!r.ok) {
+          const err = await r.json().catch(() => null);
+          throw new Error(err?.message ?? 'Não foi possível enviar para revisão.');
+        }
+        reloadDoc();
+      })
+      .catch(err => setWorkflowError(err.message))
+      .finally(() => setSendingReview(false));
+  };
+
+  const handleApprove = () => {
+    setApproving(true);
+    setWorkflowError('');
+    fetch(API + '/documents/' + documentId + '/status', {
+      method: 'PATCH',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'AGUARDANDO_ASSINATURA' }),
+    })
+      .then(async r => {
+        if (!r.ok) {
+          const err = await r.json().catch(() => null);
+          throw new Error(err?.message ?? 'Não foi possível aprovar o contrato.');
+        }
+        return fetch(API + '/rental-contracts/by-document/' + documentId + '/prepare-signers', {
+          method: 'POST',
+          headers,
+        }).catch(() => {});
+      })
+      .then(() => reloadDoc())
+      .catch(err => setWorkflowError(err.message))
+      .finally(() => setApproving(false));
+  };
+
+  const handleReopen = () => {
+    const confirmed = window.confirm(
+      'Reabrir o documento apaga todas as assinaturas ja registradas (fisicas ou digitais) e volta para Rascunho, liberando edicao. Esta acao nao pode ser desfeita. Continuar?'
+    );
+    if (!confirmed) return;
+    setReopening(true);
+    setWorkflowError('');
+    fetch(API + '/documents/' + documentId + '/reopen', {
+      method: 'POST',
+      headers,
+    })
+      .then(async r => {
+        if (!r.ok) {
+          const err = await r.json().catch(() => null);
+          throw new Error(err?.message ?? 'Não foi possível reabrir o documento.');
+        }
+        reloadDoc();
+      })
+      .catch(err => setWorkflowError(err.message))
+      .finally(() => setReopening(false));
+  };
+
+  const handleMarkPhysical = (signerId: string, file: File) => {
+    setSigningId(signerId);
+    setSignersError('');
+    const fd = new FormData();
+    fd.append('file', file);
+    fetch(API + '/documents/' + documentId + '/signers/' + signerId + '/sign-physical', {
+      method: 'POST',
+      headers,
+      body: fd,
+    })
+      .then(async r => {
+        if (!r.ok) {
+          const err = await r.json().catch(() => null);
+          throw new Error(err?.message ?? 'Não foi possível marcar como assinado.');
+        }
+        reloadDoc();
+      })
+      .catch(err => setSignersError(err.message))
+      .finally(() => setSigningId(null));
+  };
+
+  const handleAddSigner = () => {
+    if (!newSignerName.trim()) { setSignersError('Informe o nome do signatário.'); return; }
+    setSignersError('');
+    fetch(API + '/documents/' + documentId + '/signers', {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: newSignerName.trim(),
+        cpf: newSignerCpf.replace(/\D/g, '') || undefined,
+        role: newSignerRole.trim() || undefined,
+      }),
+    })
+      .then(async r => {
+        if (!r.ok) {
+          const err = await r.json().catch(() => null);
+          throw new Error(err?.message ?? 'Não foi possível adicionar o signatário.');
+        }
+        setNewSignerName(''); setNewSignerCpf(''); setNewSignerRole('');
+        setAddingSigner(false);
+        reloadDoc();
+      })
+      .catch(err => setSignersError(err.message));
+  };
+
   const pill = doc ? (STATUS_PILL[doc.status] ?? STATUS_PILL.RASCUNHO) : null;
 
   return (
@@ -98,6 +234,24 @@ export const DocumentViewModal: React.FC<Props> = ({ documentId, documentTitle, 
               {doc && <p style={{ margin: '3px 0 0', fontSize: 11, color: '#6B7280' }}>{doc.type?.replace(/_/g, ' ')} · v{doc.currentVersion}</p>}
             </div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              {doc?.status === 'RASCUNHO' && (
+                <button onClick={handleSendToReview} disabled={sendingReview}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', fontSize: 12, border: '0.5px solid #FDE68A', color: '#92400E', background: '#FFFBEB', borderRadius: 8, cursor: 'pointer', opacity: sendingReview ? 0.5 : 1 }}>
+                  {sendingReview ? 'Enviando...' : 'Enviar para Revisão'}
+                </button>
+              )}
+              {doc?.status === 'EM_REVISAO' && (
+                <button onClick={handleApprove} disabled={approving}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', fontSize: 12, border: '0.5px solid #BFDBFE', color: '#1E40AF', background: '#EFF6FF', borderRadius: 8, cursor: 'pointer', opacity: approving ? 0.5 : 1 }}>
+                  {approving ? 'Aprovando...' : 'Aprovar'}
+                </button>
+              )}
+              {(doc?.status === 'EM_REVISAO' || doc?.status === 'AGUARDANDO_ASSINATURA') && (
+                <button onClick={handleReopen} disabled={reopening}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', fontSize: 12, border: '0.5px solid #FECACA', color: '#B91C1C', background: '#FEF2F2', borderRadius: 8, cursor: 'pointer', opacity: reopening ? 0.5 : 1 }}>
+                  {reopening ? 'Reabrindo...' : 'Reabrir'}
+                </button>
+              )}
               {onValidate && (
                 <button onClick={() => onValidate(documentId)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', fontSize: 12, border: '0.5px solid #C4B5FD', color: '#7C3AED', background: '#F5F3FF', borderRadius: 8, cursor: 'pointer' }}>
                   <FiShield size={12} /> Validar
@@ -170,12 +324,53 @@ export const DocumentViewModal: React.FC<Props> = ({ documentId, documentTitle, 
                     </div>
                     <span style={{ fontSize: 11, padding: '2px 10px', borderRadius: 20, background: s.status === 'ASSINADO' ? '#F0FDF4' : '#FEFCE8', color: s.status === 'ASSINADO' ? '#15803D' : '#854D0E' }}>{s.status}</span>
                   </div>
+                  {s.status !== 'ASSINADO' && (
+                    <>
+                      <input
+                        type='file' accept='image/*,application/pdf' style={{ display: 'none' }}
+                        ref={el => { evidenceInputRef.current[s.id] = el; }}
+                        onChange={e => {
+                          const file = e.target.files?.[0];
+                          if (file) handleMarkPhysical(s.id, file);
+                          e.target.value = '';
+                        }}
+                      />
+                      <button onClick={() => evidenceInputRef.current[s.id]?.click()} disabled={signingId === s.id}
+                        style={{ marginTop: 8, width: '100%', fontSize: 11, padding: '6px 10px', border: '0.5px solid #D1D5DB', color: '#374151', background: '#fff', borderRadius: 8, cursor: 'pointer', opacity: signingId === s.id ? 0.5 : 1 }}>
+                        {signingId === s.id ? 'Enviando evidência...' : 'Anexar Evidência e Marcar como Assinado (Físico)'}
+                      </button>
+                    </>
+                  )}
                 </div>
               )) : (
                 <div style={{ textAlign: 'center', padding: '40px 0', color: '#9CA3AF' }}>
                   <FiEdit size={32} style={{ marginBottom: 12, opacity: 0.4 }} />
                   <p style={{ fontSize: 13 }}>Nenhum signatário cadastrado</p>
                 </div>
+              )}
+
+              {signersError && <p style={{ color: '#EF4444', fontSize: 12, marginTop: 8 }}>{signersError}</p>}
+
+              {addingSigner ? (
+                <div style={{ background: '#fff', border: '0.5px solid #E5E7EB', borderRadius: 10, padding: '12px 16px', marginTop: 10 }}>
+                  <input placeholder='Nome' value={newSignerName} onChange={e => setNewSignerName(e.target.value)}
+                    style={{ width: '100%', fontSize: 12, border: '0.5px solid #D1D5DB', borderRadius: 8, padding: '6px 8px', marginBottom: 6 }} />
+                  <input placeholder='CPF' value={newSignerCpf} onChange={e => setNewSignerCpf(e.target.value)}
+                    style={{ width: '100%', fontSize: 12, border: '0.5px solid #D1D5DB', borderRadius: 8, padding: '6px 8px', marginBottom: 6 }} />
+                  <input placeholder='Papel (ex: FIADOR)' value={newSignerRole} onChange={e => setNewSignerRole(e.target.value)}
+                    style={{ width: '100%', fontSize: 12, border: '0.5px solid #D1D5DB', borderRadius: 8, padding: '6px 8px', marginBottom: 10 }} />
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={() => setAddingSigner(false)}
+                      style={{ flex: 1, fontSize: 12, padding: '6px 10px', border: '0.5px solid #D1D5DB', color: '#374151', background: '#fff', borderRadius: 8, cursor: 'pointer' }}>Cancelar</button>
+                    <button onClick={handleAddSigner}
+                      style={{ flex: 1, fontSize: 12, padding: '6px 10px', border: 'none', color: '#fff', background: '#111', borderRadius: 8, cursor: 'pointer' }}>Salvar</button>
+                  </div>
+                </div>
+              ) : (
+                <button onClick={() => setAddingSigner(true)}
+                  style={{ width: '100%', marginTop: 10, fontSize: 12, padding: '8px 10px', border: '1px dashed #D1D5DB', color: '#6B7280', background: '#fff', borderRadius: 8, cursor: 'pointer' }}>
+                  + Adicionar Signatário
+                </button>
               )}
             </div>
           )}

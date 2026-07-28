@@ -290,6 +290,16 @@ export class RentalContractsService {
     const html = compiled(dados);
     const contentHash = crypto.createHash('sha256').update(html).digest('hex');
 
+    const ddmmyy = (d: Date) => {
+      const dd = String(d.getUTCDate()).padStart(2, '0');
+      const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+      const yy = String(d.getUTCFullYear()).slice(-2);
+      return `${dd}${mm}${yy}`;
+    };
+    const inicio = ddmmyy(contract.startDate);
+    const fim = contract.endDate ? ddmmyy(contract.endDate) : 'indeterminado';
+    const documentTitle = `Locação_${contract.fixedAsset.internalCode}_${inicio}a${fim}.pdf`;
+
     let document;
     if (existingDoc) {
       const newVersion = existingDoc.currentVersion + 1;
@@ -305,7 +315,7 @@ export class RentalContractsService {
       });
       document = await this.prisma.document.update({
         where: { id: existingDoc.id },
-        data: { content: html, contentHash, currentVersion: newVersion, updatedAt: new Date() },
+        data: { title: documentTitle, content: html, contentHash, currentVersion: newVersion, updatedAt: new Date() },
       });
       await this.prisma.rentalContract.update({
         where: { id: contract.id },
@@ -318,7 +328,7 @@ export class RentalContractsService {
           type: DocumentType.CONTRATO_LOCACAO,
           status: DocumentStatus.RASCUNHO,
           visibility: DocumentVisibility.RESERVADO,
-          title: `Contrato de Locacao - ${contract.tenantName}`,
+          title: documentTitle,
           date: new Date(),
           content: html,
           contentHash,
@@ -332,5 +342,46 @@ export class RentalContractsService {
     }
 
     return document;
+  }
+
+  async prepareSigners(companyId: string, id: string) {
+    const contract = await this.findOne(companyId, id);
+    if (!contract.documentId) {
+      throw new BadRequestException('Este contrato ainda nao possui um documento gerado.');
+    }
+    const existing = await this.prisma.documentSigner.findMany({
+      where: { documentId: contract.documentId },
+    });
+    if (existing.length > 0) {
+      return existing;
+    }
+    const company = await this.prisma.company.findUnique({ where: { id: companyId } });
+    const locador = await this.prisma.documentSigner.create({
+      data: {
+        documentId: contract.documentId,
+        name: company?.legalName ?? '',
+        cpf: (company?.taxId ?? '').replace(/\D/g, '') || null,
+        role: 'LOCADOR',
+        order: 1,
+      },
+    });
+    const locatario = await this.prisma.documentSigner.create({
+      data: {
+        documentId: contract.documentId,
+        name: contract.tenantName,
+        cpf: (contract.tenantTaxId ?? '').replace(/\D/g, '') || null,
+        role: 'LOCATARIO',
+        order: 2,
+      },
+    });
+    return [locador, locatario];
+  }
+
+  async prepareSignersByDocument(companyId: string, documentId: string) {
+    const contract = await this.prisma.rentalContract.findFirst({
+      where: { documentId, companyId, deletedAt: null },
+    });
+    if (!contract) throw new NotFoundException('Contrato nao encontrado para este documento.');
+    return this.prepareSigners(companyId, contract.id);
   }
 }

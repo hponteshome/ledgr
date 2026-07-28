@@ -878,6 +878,7 @@ enum SignatureMethod {
   GOVBR
   CERT_A1
   CERT_A3
+  FISICO
 }
 
 enum SignatureStatus {
@@ -999,6 +1000,7 @@ model DocumentSignature {
   signatureHash   String? @map("signature_hash") @db.Text
   signatureFormat String? @map("signature_format") @db.VarChar
   certificateData Json?   @map("certificate_data") @db.Json
+  evidenceUrl     String? @map("evidence_url") @db.VarChar(500)
 
   govbrTransactionId String? @map("govbr_transaction_id") @db.VarChar
   govbrAccountLevel  String? @map("govbr_account_level") @db.VarChar

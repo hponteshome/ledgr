@@ -10,6 +10,8 @@ import { ImportarDocumentoModal } from './ImportarDocumentoModal';
 import { RedigirProcuracaoModal } from './RedigirProcuracaoModal';
 import api from '../../services/api';
 
+const API = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3000';
+
 const SHELF_CONFIG: Record<string, { label: string; types: string[] }> = {
   'societario/contratos':   { label: 'Contratos Sociais / Estatutos', types: ['CONTRATO_SOCIAL','ESTATUTO_SOCIAL','ADITIVO_CONTRATUAL'] },
   'societario/atas':        { label: 'Atas Assinadas', types: ['ATA_AGO','ATA_AGE','ATA_DIRETORIA'] },
@@ -51,6 +53,9 @@ export const RepositorioPage: React.FC = () => {
   const [showRedigir,  setShowRedigir]  = useState(false);
   const [viewDoc, setViewDoc]     = useState<{id:string;title:string} | null>(null);
   const [editDoc, setEditDoc]     = useState<{id:string;title:string} | null>(null);
+  const [expandedDoc, setExpandedDoc] = useState<string | null>(null);
+  const [evidences, setEvidences] = useState<Record<string, any[]>>({});
+  const [loadingEvidences, setLoadingEvidences] = useState(false);
 
   const shelf = location.pathname.replace('/app/arquivo/', '');
   const config = SHELF_CONFIG[shelf] ?? { label: 'Arquivo', types: [] };
@@ -76,6 +81,25 @@ export const RepositorioPage: React.FC = () => {
     if (!d) return '-';
     const dt = new Date(d);
     return dt.toLocaleDateString('pt-BR') + ' ' + dt.toLocaleTimeString('pt-BR');
+  };
+
+  const toggleExpand = async (docId: string) => {
+    if (expandedDoc === docId) {
+      setExpandedDoc(null);
+      return;
+    }
+    setExpandedDoc(docId);
+    if (!evidences[docId]) {
+      setLoadingEvidences(true);
+      try {
+        const res = await api.get(`/documents/${docId}/signatures`);
+        setEvidences(prev => ({ ...prev, [docId]: res.data ?? [] }));
+      } catch {
+        setEvidences(prev => ({ ...prev, [docId]: [] }));
+      } finally {
+        setLoadingEvidences(false);
+      }
+    }
   };
 
   return (
@@ -129,10 +153,15 @@ export const RepositorioPage: React.FC = () => {
               </td></tr>
             ) : docs.map(doc => {
               const st = STATUS_CONFIG[doc.status] ?? STATUS_CONFIG['RASCUNHO'];
+              const isExpanded = expandedDoc === doc.id;
               return (
-                <tr key={doc.id} className="hover:bg-gray-50 border-b border-gray-100 last:border-0">
+                <React.Fragment key={doc.id}>
+                <tr className="hover:bg-gray-50 border-b border-gray-100 last:border-0">
                   <td className="px-4 py-3">
-                    <p className="text-[14px] font-medium text-gray-900">{doc.title}</p>
+                    <button onClick={() => toggleExpand(doc.id)}
+                      className="text-[14px] font-medium text-gray-900 hover:text-blue-600 hover:underline text-left">
+                      {doc.title}
+                    </button>
                     {doc.description && <p className="text-[12px] text-gray-400 mt-0.5">{doc.description}</p>}
                   </td>
                   <td className="px-4 py-3"><span className="text-[12px] text-gray-500">{doc.type?.replace(/_/g,' ')}</span></td>
@@ -157,6 +186,35 @@ export const RepositorioPage: React.FC = () => {
                     </div>
                   </td>
                 </tr>
+                {isExpanded && (
+                  <tr className="bg-gray-50 border-b border-gray-100">
+                    <td colSpan={5} className="px-4 py-3">
+                      {loadingEvidences && !evidences[doc.id] ? (
+                        <p className="text-[12px] text-gray-400">Carregando evidencias...</p>
+                      ) : (evidences[doc.id]?.length ?? 0) === 0 ? (
+                        <p className="text-[12px] text-gray-400">Nenhuma assinatura/evidencia registrada ainda.</p>
+                      ) : (
+                        <div className="space-y-1.5">
+                          {evidences[doc.id].map((sig: any) => (
+                            <div key={sig.id} className="flex items-center justify-between text-[12px]">
+                              <span className="text-gray-600">
+                                {sig.signerName} - {sig.method === 'FISICO' ? 'Assinatura Fisica' : sig.method === 'GOVBR' ? 'gov.br' : 'Certificado ICP-Brasil'}
+                                {sig.signedAt ? ' - ' + new Date(sig.signedAt).toLocaleDateString('pt-BR') : ''}
+                              </span>
+                              {sig.evidenceUrl ? (
+                                <a href={API + sig.evidenceUrl} target="_blank" rel="noreferrer"
+                                  className="text-blue-600 hover:underline">Ver evidencia</a>
+                              ) : (
+                                <span className="text-gray-300">Sem evidencia anexada</span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                )}
+                </React.Fragment>
               );
             })}
           </tbody>
@@ -167,7 +225,7 @@ export const RepositorioPage: React.FC = () => {
       {showImport  && <ImportarDocumentoModal onClose={() => setShowImport(false)}  onSuccess={() => window.location.reload()} />}
       {viewDoc !== null && (
         <DocumentViewModal documentId={viewDoc.id} documentTitle={viewDoc.title}
-          onClose={() => setViewDoc(null)} onValidate={(id) => { setValidateDocId(id); setViewDoc(null); }} />
+          onClose={() => { setViewDoc(null); window.location.reload(); }} onValidate={(id) => { setValidateDocId(id); setViewDoc(null); }} />
       )}
       {editDoc !== null && (
         <DocumentEditModal documentId={editDoc.id} documentTitle={editDoc.title}

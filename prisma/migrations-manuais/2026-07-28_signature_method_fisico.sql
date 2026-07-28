@@ -1,0 +1,1 @@
+ALTER TYPE "SignatureMethod" ADD VALUE IF NOT EXISTS 'FISICO';
