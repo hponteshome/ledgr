@@ -210,8 +210,9 @@ export class DocumentsController {
   updateStatus(
     @Param('id') id: string,
     @Body() body: { status: string },
+    @Request() req: any,
   ) {
-    return this.documentsService.updateStatus(id, body.status);
+    return this.documentsService.updateStatus(id, body.status, req.user?.id);
   }
 
   // PATCH /documents/:id/visibility — altera classificação de visibilidade

@@ -294,11 +294,25 @@ export class DocumentsService {
     });
   }
 
-  async updateStatus(id: string, status: string) {
-    return this.prisma.document.update({
+  async updateStatus(id: string, status: string, userId?: string) {
+    const before = await this.prisma.document.findUnique({
+      where: { id },
+      select: { status: true },
+    });
+    const updated = await this.prisma.document.update({
       where: { id },
       data: { status: status as DocumentStatus, updatedAt: new Date() },
     });
+    await this.prisma.auditLog.create({
+      data: {
+        actorId: userId ?? null,
+        action: 'DOCUMENT_STATUS_CHANGED',
+        targetId: id,
+        before: { status: before?.status ?? null },
+        after: { status: updated.status },
+      },
+    });
+    return updated;
   }
 
   async updateVisibility(id: string, visibility: string) {

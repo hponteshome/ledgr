@@ -168,6 +168,7 @@ export function RentalContractDetailModal({ contractId, title, onClose }: { cont
     const [genError, setGenError] = useState('');
     const [genSuccess, setGenSuccess] = useState(false);
     const [viewDoc, setViewDoc] = useState(false);
+    const [sendingReview, setSendingReview] = useState(false);
 
     function loadContract() {
         if (!contractId) { setError('Contrato não encontrado.'); setLoading(false); return; }
@@ -220,6 +221,32 @@ export function RentalContractDetailModal({ contractId, title, onClose }: { cont
             setGenError(e?.message || 'Não foi possível gerar o contrato. Verifique os dados e tente novamente.');
         } finally {
             setSaving(false);
+        }
+    }
+
+    async function handleSendToReview() {
+        if (!contract.documentId) return;
+        setSendingReview(true);
+        setGenError('');
+        try {
+            const res = await fetch(`${API}/documents/${contract.documentId}/status`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                    'x-company-id': activeCompany?.id ?? '',
+                },
+                body: JSON.stringify({ status: 'EM_REVISAO' }),
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => null);
+                throw new Error(err?.message ?? 'Não foi possível enviar para revisão.');
+            }
+            loadContract();
+        } catch (e: any) {
+            setGenError(e.message ?? 'Não foi possível enviar para revisão.');
+        } finally {
+            setSendingReview(false);
         }
     }
 
@@ -400,6 +427,18 @@ export function RentalContractDetailModal({ contractId, title, onClose }: { cont
                                         Ver contrato
                                     </button>
                                 </div>
+                            )}
+
+                            {contract.documentId && contract.document?.status === 'RASCUNHO' && !qualifying && (
+                                <button
+                                    type="button"
+                                    onClick={handleSendToReview}
+                                    disabled={sendingReview}
+                                    className="w-full flex items-center justify-center gap-2 text-sm font-medium text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 disabled:opacity-50 rounded-lg px-4 py-2 transition-colors"
+                                >
+                                    {sendingReview ? <Loader className="w-4 h-4 animate-spin" /> : null}
+                                    {sendingReview ? 'Enviando...' : 'Enviar para Revisão'}
+                                </button>
                             )}
 
                             {genSuccess && !contract.documentId && (
