@@ -447,3 +447,42 @@ por raciocinio puro pouco confiavel nesse caso especifico.
 cada palavra) via helper `toTitleCase()`, nao em CAIXA ALTA nem minusculo puro.
 UF mantida em maiusculas (abreviacao padrao). Razao Social mantida como
 cadastrada (convencao juridica).
+
+
+## Licao — Extensao da Regra 8 (28/07/2026): separadores de linha podem ser MISTOS
+## dentro do MESMO arquivo, nao so diferentes entre arquivos
+
+A Regra 8 (27/07) assumia que cada ARQUIVO tem um separador uniforme (CRLF ou LF),
+bastando detectar uma vez no inicio do script. Confirmado hoje que isso e falso em
+alguns casos: DocumentViewModal.tsx tem b'\r\n' em algumas partes E b'\n' puro em
+outras, DENTRO do mesmo arquivo (provavelmente resultado de edicoes por
+ferramentas/sessoes diferentes ao longo do tempo, cada uma preservando o separador
+que encontrou localmente em vez de normalizar o arquivo inteiro).
+
+Sintoma: uma ancora multi-linha que devia bater (cada linha individual confere,
+count()==1 para cada uma isoladamente) falha com count()==0 quando as linhas sao
+juntadas com nl.join(), mesmo com nl "corretamente" detectado no topo do arquivo -
+porque a deteccao pegou o separador PREDOMINANTE do arquivo todo, nao o da REGIAO
+especifica que esta sendo editada.
+
+**Regra pratica adotada:** quando uma ancora multi-linha falhar mesmo com cada linha
+individualmente confirmada (count()==1 para cada uma via teste separado), NAO
+assumir erro de digitacao - testar o PAR de linhas adjacentes com os dois
+separadores (nl.join dessas duas linhas em CRLF e em LF, count() dos dois) para
+descobrir qual separador vale NAQUELA regiao especifica antes de reconstruir a
+ancora completa. Nao confiar na deteccao global de separador do arquivo para
+prever o separador de uma regiao especifica quando ha evidencia de edicoes
+historicas heterogeneas no mesmo arquivo (arquivos tocados por muitas sessoes/
+ferramentas diferentes ao longo do tempo sao os mais suscetiveis a isso).
+
+
+## Licao — Regra 11 (28/07/2026): nao pedir confirmacao para passos que ja seguem
+## protocolo estabelecido - so perguntar decisoes realmente importantes
+
+Pedir "posso seguir?" antes de cada patch mecanico (que ja segue o padrao Regra 8:
+detectar separador, testar ancora, abortar com seguranca se nao bater) e ruido
+desnecessario - o script ja e seguro por construcao (aborta sem gravar se a ancora
+nao bater). Perguntar confirmacao deveria ser reservado para decisoes de
+arquitetura/escopo genuinas (ex: schema novo, endpoint novo, mudanca de
+comportamento visivel ao usuario) - nao para "vou editar o arquivo X da forma Y que
+ja alinhamos".
