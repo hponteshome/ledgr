@@ -448,15 +448,15 @@ export class ChartOfAccountsService {
     return this.buildTree(accountsWithBalances);
   }
 
-  private buildTree(accounts: any[], parentCode: string | null = null): any[] {
-    const children = accounts.filter(a => {
-      const parts = a.code.split('.');
-      if (parts.length === 1) return parentCode === null;
-      return parts.slice(0, -1).join('.') === parentCode;
-    });
+  private buildTree(accounts: any[], parentId: string | null = null): any[] {
+    // Hierarquia por parentId (FK real, ja populada pelo ChartImporterService) - conforme
+    // o proprio comentario do model no schema.prisma: "Hierarquia via parentId (nao por
+    // codigo)". Substitui a resolucao por prefixo de codigo usada num patch anterior desta
+    // sessao, que funcionava mas nao seguia a arquitetura documentada.
+    const children = accounts.filter(a => (a.parentId ?? null) === parentId);
 
     return children.map(a => {
-      const builtChildren = this.buildTree(accounts, a.code);
+      const builtChildren = this.buildTree(accounts, a.id);
 
       const calculatedBalance = builtChildren.length > 0
         ? builtChildren.reduce((sum, c) => sum + (c.calculatedBalance ?? 0), 0)

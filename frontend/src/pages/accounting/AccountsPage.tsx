@@ -70,28 +70,6 @@ export default function AccountsPage() {
         return count(treeData);
     }, [treeData]);
 
-    const fmt = (value: number | null) => {
-        if (value === null) return <span className="text-slate-300 text-xs">—</span>;
-        const abs = Math.abs(value).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
-        const neg = value < 0;
-        return (
-            <span className={neg ? 'text-red-500' : ''}>
-                {neg ? `(${abs})` : abs}
-            </span>
-        );
-    };
-
-    const fmtDiff = (value: number | null) => {
-        if (value === null) return <span className="text-slate-300 text-xs">—</span>;
-        if (Math.abs(value) < 0.01) return <span className="text-green-500 text-xs font-bold">✓</span>;
-        const abs = Math.abs(value).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
-        return (
-            <span className="text-amber-600 font-bold text-xs">
-                {value > 0 ? '+' : '-'}{abs}
-            </span>
-        );
-    };
-
     if (loading && treeData.length === 0) {
         return (
             <div className="flex h-screen items-center justify-center">
@@ -150,15 +128,6 @@ export default function AccountsPage() {
             </header>
 
             <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-                {/* Cabeçalho das colunas */}
-                <div className="grid grid-cols-12 bg-slate-50 border-b border-slate-100 px-4 py-3 text-xs font-bold text-slate-400 uppercase tracking-widest">
-                    <div className="col-span-6">Conta / Descrição</div>
-                    <div className="col-span-2 text-right">Saldo Calculado</div>
-                    <div className="col-span-2 text-right">Saldo ECD</div>
-                    <div className="col-span-2 text-right">Diferença</div>
-                </div>
-
-                {/* Legenda */}
                 <div className="flex items-center gap-6 px-4 py-2 bg-slate-50/50 border-b border-slate-100 text-[10px] text-slate-400">
                     <span>✓ = sem divergência</span>
                     <span className="text-amber-500">±valor = divergência</span>
@@ -167,22 +136,7 @@ export default function AccountsPage() {
 
                 <div className="p-2">
                     {treeData.length > 0 ? (
-                        <AccountTree
-                            nodes={treeData}
-                            renderBalances={(node: Account) => (
-                                <>
-                                    <div className="col-span-2 text-right font-mono text-sm pr-2">
-                                        {fmt(node.calculatedBalance)}
-                                    </div>
-                                    <div className="col-span-2 text-right font-mono text-sm text-slate-400 pr-2">
-                                        {fmt(node.ecdBalance)}
-                                    </div>
-                                    <div className="col-span-2 text-right font-mono pr-2">
-                                        {fmtDiff(node.difference)}
-                                    </div>
-                                </>
-                            )}
-                        />
+                        <AccountTree nodes={treeData} />
                     ) : (
                         <div className="py-20 text-center text-slate-400">
                             <p>Nenhuma conta encontrada até {new Date(referenceDate).toLocaleDateString('pt-BR')}.</p>

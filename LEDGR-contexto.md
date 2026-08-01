@@ -4046,3 +4046,178 @@ sessao, entrega voltou a ser 100% via blocos PowerShell/Python.
 - Fluxo de "nova empresa" ainda nao chama o importador automaticamente -
   hoje exige acao manual (upload do .txt em AccountsPage apos criar a
   empresa).
+
+
+## Sessao 01/08/2026 (continuacao) - Auditoria de posicao/tipo na matriz + reescrita AccountTree/buildTree + mapeamento do terreno para ECD
+
+### Correcoes adicionais na matriz (alem das 8 do primeiro lote desta sessao)
+Apos alerta do usuario ("considerar tambem os niveis e a posicao patrimonial - mutuo pode
+estar no ativo OU passivo, INSS pode estar no passivo OU resultado"), reauditei os 165
+spedCode analiticos cruzando classe (codigo[0] vs sped[0]) e posicao circulante/nao-circulante
+(grupo 11x/12x vs sped 1.01/1.02, 21x/22x vs sped 2.01/2.02). Achados e corrigidos via patch
+cirurgico (old_ref/new_ref por codigo, nunca replace global):
+
+- `11307010001` Lucros/PLR - conta do ATIVO referenciava codigo do PASSIVO (2.01.01.17.13 ->
+  1.01.02.09.10) - erro de classe, o mais grave da leva.
+- `11308010002` Empregados - conta circulante (grupo 113) referenciava longo prazo
+  (1.02.01.01.02 -> 1.01.02.09.10).
+- `12101030001`/`12101030002` Mutuo Nao Ligadas/Outros - referenciavam codigo de "partes
+  relacionadas" quando o nome diz "nao ligadas" (1.02.01.01.03 -> 1.02.01.01.02).
+- `12101050002` Depositos Judiciais - codigo 1.02.01.02.14 NAO EXISTE na P100 -> corrigido
+  para 1.02.01.07.01 (Depositos em Contencioso).
+- `12101050006` Outros Depositos e Caucoes - apontava pra secao errada (Titulos Mobiliarios)
+  -> 1.02.01.15.01 (Outros Creditos LP).
+- `22101020001` Obrig Partes Nao Relacionadas - apontava pra parcelamento fiscal (secao
+  errada) -> 2.02.01.11.01.
+- `123` (sintetica Permanente) - apontava pra Realizavel a Longo Prazo (1.02.01) em vez de
+  Imobilizado (1.02.03).
+- `32101010001` Receitas Aplic.Financeiras - conta de RECEITA referenciava linha de DESPESA
+  ("(-) Multas") -> 3.01.01.05.01.05.
+- `21101120011` Jose Rozinei - nome de pessoa fisica, removido do nucleo universal (291 -> 290
+  linhas antes das duas novas analiticas abaixo).
+
+### Contas analiticas novas: Receita/Custo de Locacao
+`3110101`/`3110102` estavam SINTETICAS mas carregavam spedCode de 6 segmentos (folha do
+P150) - exatamente a inconsistencia nivel-x-referencial que o usuario apontou. Criadas as
+analiticas reais:
+- `31101010001` Receita de Locacao de Imoveis -> 3.01.01.01.01.08 (natureza herdada do pai)
+- `31101020001` Custo com Imoveis em Locacao -> 3.01.01.03.01.03 ("Custo dos Servicos
+  Prestados" - decisao do usuario, locacao tratada como prestacao de servico; nao existe
+  leaf especifico de "custo de locacao" na P150)
+
+Bug proprio cometido e corrigido no processo: calculo do proximo reduced_code livre da
+classe 3 checava `reduced[0]` (sempre '0', string com zero-padding) em vez do digito de
+milhar (`reduced[3]`) - gerou 0003001/0003002 duplicados com contas ja existentes.
+Corrigido para checar o digito certo; reduced codes finais: 0003010/0003011.
+
+Matriz final: **292 contas**, 0 erros, 0 duplicatas (codigo e reduced_code), toda conta
+resolve pai. Arquivo em `D:\Projetos\Ledgr\uploads\PlanoContasMatrizLEDGR.txt`.
+
+### Teste real end-to-end (nao so simulacao Python)
+Descoberto durante o teste: o botao "Importar IOB" da AccountsPage NAO e o
+`ChartImporterService` que validamos - bate em `iob-import.controller.ts`
+(`/accounting/iob/import-plano`), um servico DIFERENTE de reconciliacao de codigo reduzido
+contra plano ja existente. O `ChartImporterService` real fica em
+`chart-importer.controller.ts` -> `POST /accounting/chart-of-accounts/import` (e `/preview`).
+
+Existe uma pagina dedicada pra esse import - `ImportChartOfAccountsPage.tsx`, rota
+`app/accounting/accounts/import` - mas **sem nenhum botao/link apontando pra ela** em
+nenhuma tela (confirmado via grep, unica ocorrencia e a declaracao da rota). Rota orfa,
+pendencia de UX registrada abaixo.
+
+Testado via `curl` direto (token JWT do localStorage) contra a empresa "Pontes
+Contabilidade" (632ce73b-5024-4fee-97bb-70d27b0cce51, 0 lancamentos, empresa real
+pre-existente desde 21/07, nao criada nesta sessao):
+- `preview` (dryRun): hasErrors=false, issues=[]
+- `import`: inserted=292, errors=[]
+- Confirmado no banco: 4 raizes (so 1/2/3/4), 0 analiticas sem sped_code, 0 reduced_code
+  duplicado, as 2 contas de locacao com parent_id correto.
+- Achado cosmetico (nao real): PowerShell no codepage 850 mostrava "NÃ£o Circulante"
+  mojibake - sumiu com `chcp 65001` + `[Console]::OutputEncoding =
+  [System.Text.Encoding]::UTF8`. Dado no banco sempre esteve correto.
+
+### buildTree - bug real + correcao alinhada a arquitetura documentada
+`chart-of-accounts.service.ts` `buildTree()` fazia `a.code.split('.')` - codigo real nunca
+tem ponto (`"11101010001"`), entao `parts.length === 1` sempre verdadeiro, TODA conta virava
+raiz. Arvore da AccountsPage ia renderizar 292 contas achatadas assim que a matriz fosse
+importada.
+
+Primeira correcao (funcional, mas nao ideal): resolucao de pai por maior prefixo de codigo
+existente (mesma logica do ChartImporterService). Validada com sucesso.
+
+**Correcao final aplicada**: o comentario do proprio `schema.prisma` no model
+`ChartOfAccounts` diz explicitamente "Hierarquia via parentId (nao por codigo)". Reescrito
+`buildTree` para usar `parentId` (FK real, ja populada pelo importer) em vez de reprocessar
+codigo por prefixo - mais simples, mais barato (O(n) vs O(n^2)) e alinhado a arquitetura
+documentada. Revalidado no banco, mesmo resultado.
+
+### AccountTree.tsx - reescrita completa (grid Tailwind -> table HTML)
+Achado antes da reescrita: o grid-cols-12 antigo estourava - AccountsPage passava
+`renderBalances` que ADICIONAVA colunas (2+2+2) em cima das que o AccountTree ja desenhava
+(5+2+2), somando 15 numa grade de 12. Essa prop `renderBalances` era, ela mesma, uma
+"divergencia de arquitetura aceita" de uma sessao anterior (08/07: "ganhou prop
+renderBalances real, antes era passada sem nenhum efeito") - o bug de estouro nasceu
+justamente quando a tornaram funcional sem ajustar a matematica de colunas.
+
+Reescrita completa como `<table>` semantica (`table-fixed` + `colgroup` com larguras
+percentuais fixas), a pedido do usuario. `renderBalances` manteve-se como prop opcional,
+mas agora SUBSTITUI as 3 celulas de saldo em vez de somar.
+
+Colunas novas (a pedido do usuario, todas sempre visiveis): Nivel, Tipo (badge colorido por
+classe: Ativo=azul, Passivo=ambar, PL=roxo, Receita=verde, Despesa=vermelho), Natureza (D/C),
+Status (Ativa/Inativa). Mantidas: Codigo/Nome (com indentacao recursiva), Codigo Reduzido,
+Ref. SPED, Saldo Calculado, Saldo ECD, Diferenca.
+
+AccountsPage.tsx tambem limpo: removido o header duplicado (`grid-cols-12` proprio acima da
+arvore) e as funcoes `fmt`/`fmtDiff` orfas (a tabela agora desenha seu proprio cabecalho e
+formata os proprios saldos).
+
+Confirmado visualmente pelo usuario: hierarquia renderizando com indentacao real
+(1 -> 11 -> 111 -> 11101 -> 1110101 -> 11101010001 Caixa), badges de Tipo/Status/Nat.
+aparecendo corretos.
+
+### AccountMaintenanceModal.tsx - campo Conta Referencial destacado
+Nos dois modais (edicao e criacao), o campo "Codigo SPED" saiu do grid generico com
+IFRS/USGAAP/eSocial e ganhou secao propria com texto de ajuda sobre nivel sintetico vs
+analitico (bloco azul claro, borda indigo).
+
+### IFRS/USGAAP/eSocial - campos sem consumidor hoje
+Confirmado via grep (`apps/api/src`): `ifrsCode`/`usgaapCode`/`eSocialCode` aparecem apenas
+em DTOs e no create/update do `chart-of-accounts.service.ts` (escrita/leitura crua) - nenhum
+relatorio, exportador ou integracao os consome ainda. Nao vale investir tempo preenchendo
+agora.
+
+### ACHADO CRITICO para quando retomarmos ECD - documentado no LEDGR-ECD-Aprendizado.md
+Duas tabelas de "conta referencial" DIFERENTES e SEM ligacao automatica entre si:
+
+1. **`spedCode`** (o que ajustamos a sessao inteira) = registro **I051**, usa o "plano
+   referencial" L100A/L300A oficial (945 codigos, 5-6 niveis) - **essa tabela completa NAO
+   esta importada no banco do LEDGR**, so foi consultada externamente (arquivos
+   SPEDECF_DINAMICO fornecidos pelo usuario) pra validar os codigos que gravamos.
+2. **`aglutinationCode`** (`AccountingViewMapping`, usado por VisoesContabeisPage.tsx) =
+   registros **I052/J100/J150**, usa a tabela `rfb_aglutination_codes` (76 codigos,
+   leiaute 9, **essa sim ja importada**).
+
+**Armadilha documentada (LEDGR-ECD-Aprendizado.md secao 2.10):** se `COD_PLAN_REF` for
+preenchido no formulario de geracao de ECD sem a tabela L100A/L300A completa importada,
+o PGE rejeita com "I051 obrigatorio" para TODAS as contas analiticas (centenas de erros).
+**Regra: nunca marcar/preencher COD_PLAN_REF ate a tabela L100A/L300A ser importada de
+verdade.** Os spedCode que gravamos hoje estao corretos, mas isso sozinho nao habilita
+COD_PLAN_REF nem avanca a geracao de ECD.
+
+### VisoesContabeisPage.tsx - revisada, mapeamento do terreno
+Tela em `frontend/src/pages/sped/VisoesContabeisPage.tsx` (rota provavel `/app/sped/...`,
+nao confirmada). Fluxo: seleciona ano-base + tipo (BP/DRE) -> carrega ou cria
+`AccountingView` -> busca `GET /sped/visoes/views/:id/mappings/grouped` (retorna
+`GroupRow[]`, contas analiticas agrupadas por pai sintetico) -> usuario mapeia cada grupo/
+conta pra um `aglutinationCode` via select -> `POST .../mappings/bulk` + `DELETE
+.../mappings/:accountId`. Tem auto-match (`POST .../auto-match`) que sugere codigos por
+grupo/tipo - logica do backend nao vista ainda.
+
+`ChildRow`/`GroupRow` NAO tem nenhum campo `spedCode` - confirma que o agrupamento roda
+inteiramente sobre `aglutinationCode`, sem qualquer leitura do spedCode/referencial que
+ajustamos hoje. Os dois sistemas sao mesmo independentes na pratica, nao so na teoria.
+
+**PENDENCIA CRITICA antes de mexer em ECD**: nao localizamos ainda o controller/service por
+tras de `/sped/visoes/*` (provavel `apps/api/src/modules/sped/services/*.ts`, nome exato
+nao confirmado). Se o metodo que monta `mappings/grouped` resolver hierarquia pai/filho por
+PREFIXO DE CODIGO (mesma classe de bug que achamos e corrigimos no buildTree do
+chart-of-accounts.service.ts hoje) em vez de por `parentId`, ele pode estar silenciosamente
+quebrado com a matriz nova - contas analiticas podem nao agrupar sob o pai sintetico certo,
+sem gerar nenhum erro visivel, so agrupamento errado. **Verificar isso e pre-requisito antes
+de configurar Visoes Contabeis pra qualquer empresa que use a matriz nova.**
+
+### Pendencias que ficam para a proxima sessao (ECD)
+1. Localizar e revisar o controller/service de `/sped/visoes/*` - confirmar parentId vs
+   prefixo de codigo na resolucao de `mappings/grouped`.
+2. Se usar prefixo: aplicar o mesmo tipo de correcao que fizemos no buildTree (trocar por
+   parentId).
+3. Revisar a logica de auto-match (`POST .../auto-match`) - verificar se ela usa spedCode
+   como dica pra sugerir aglutinationCode (os dois sao baseados na mesma estrutura RFB,
+   so em granularidades diferentes - pode fazer sentido cruzar).
+4. Mapear as Visoes Contabeis (BP e DRE) pra Pontes Contabilidade usando a matriz nova, como
+   teste real do fluxo completo antes de tentar gerar um ECD de verdade.
+5. NUNCA marcar COD_PLAN_REF na geracao ate a tabela L100A/L300A completa ser importada.
+6. Resolver a rota orfa do `ImportChartOfAccountsPage.tsx` (`app/accounting/accounts/import`
+   sem nenhum link/botao apontando pra ela em nenhuma tela) - decidir se cria um botao na
+   AccountsPage ou se mantem so a documentada em help/artigo.
