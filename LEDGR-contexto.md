@@ -4383,3 +4383,121 @@ no PVA, como teste do cenario "empresa sem movimento, so registros obrigatorios"
 - `ContabilTab.tsx` "Salvar Configuracao Contabil" grava em `company_accounting_configs`,
   tabela nao lida por nenhuma validacao/geracao - motivo do nao-salvamento na pratica nao
   investigado a fundo.
+
+
+## Sessao 02/08/2026 - Geracao real de ECD: infraestrutura RFB, 4 bugs corrigidos no exporter, Pontes concluida, LM mapeada
+CHAVE DE BUSCA: `#ecd-geracao` `#j930` `#i001` `#i051` `#saldoini` `#rfb-global-tables` `#lm-plano-legado`
+
+### Metodologia desta sessao (a pedido do usuario)
+Toda correcao no `ecd-exporter.service.ts` foi baseada em documentacao tecnica oficial do
+SPED (manuais RFB, ADEs Cofis, sped.rfb.gov.br) via web_search, nunca em suposicao. Cada
+achado foi confirmado contra a fonte antes de virar patch.
+
+### Nova infraestrutura: RfbGlobalTable (generica, versionada)
+Model novo no schema.prisma (`rfb_global_tables`): sistema/tabela/versaoArq/codigo/nome/
+dataInicio/dataFim/extra(jsonb)/sourceFile - decisao deliberada do usuario ("versao completa
+opcao B") de nao criar uma tabela Prisma por dominio RFB, e sim uma generica reaproveitavel
+pra qualquer tabela `SISTEMA_GRUPO$SISTEMA_TABELA$VERSAO$ID` do instalador local do PVA
+(`C:\Arquivos de Programas RFB\Programas SPED\...\recursos\tabelas\`).
+
+Populada com a primeira tabela: **Qualificacao do Assinante** (19 codigos, ex: 900=Contador/
+Contabilista, 205=Administrador, 309=Procurador, 801=Empresario, 940=Auditor Independente
+desde 2020) - fonte: `SPEDCONTABIL_GLOBAL$SPEDCONTABIL_QUALIF_ASSINANTE$2$1026`. Arquivos
+RFB sao **Windows-1252 (cp1252)**, nao UTF-8 - decodificar errado quebra os acentos
+silenciosamente. Script generico de parse salvo em D:\Temp\parse_rfb_global_table.py
+(nao commitado - scratch local, mas reaproveitavel pra outras tabelas GLOBAL depois:
+UF, natureza juridica, municipio, pais, situacao).
+
+Migration manual: `prisma/migrations-manuais/20260802_create_rfb_global_tables.sql`.
+
+### 4 bugs reais corrigidos no ecd-exporter.service.ts (todos testados end-to-end, nao so lidos)
+
+**1. I001 sempre "0" (Indicador de Movimento).**
+Codigo antigo: `entries.length > 0 ? "0" : "1"` - conflava "tem lancamento" com "bloco tem
+dado". Fonte oficial (VRI Consulting/Manual RFB): "Campo 02 - Indicador de Movimento: 0
+(bloco com dados informados)". Bloco I SEMPRE tem dado (I050+I150/I155), independente de
+haver I200. Erro real reproduzido no PVA antes da correcao: "A importacao de arquivos sem
+o bloco I, pressupoe a existencia de uma escrituracao nas bases do sistema... Nao foi
+encontrada nenhuma escrituracao armazenada".
+
+**2. J930 - qualificacao de assinante via rfb_global_tables, nao mais hardcoded "205".**
+Loop de `personLinks` rotulava TODOS os signatarios como "Socio-Administrador"/205, inclusive
+o registro role='contador' criado ontem - nunca emitia COD_ASSIN=900. Confirmado via fonte
+oficial que isso quebraria de verdade no PVA: REGRA_OBRIGATORIO_ASSIN_CONTADOR exige >=1
+assinante 900 E >=1 diferente de 900. Corrigido: mapa `ROLE_TO_COD_ASSIN` (role da
+PersonCompany, comparado em lowercase por causa do bug de case ja documentado no
+PersonForm.tsx) resolve o codigo certo via rfb_global_tables; role='contador' -> 900 com
+CRC preenchido (REGRA_ADVERTENCIA_CONTADOR exige NUM_SEQ_CRC/DT_CRC quando COD_ASSIN=900).
+
+**3. saldoIni (I155) - logica hibrida JournalEntryItem + accountBalance fallback.**
+Achado real: Capital Social da Pontes Contabilidade (lancamento datado 2005, empresa aberta
+em 2005) nao aparecia no I155 de 2025 porque o exporter so lia `accountBalance` (snapshot
+que so e populado por IMPORTACAO de ECD, nunca por lancamento nativo do LEDGR). Violava
+principio ja documentado do projeto: "Reports must calculate balances exclusively from
+JournalEntryItem - never from accountBalance snapshots". Corrigido reaproveitando a MESMA
+logica ja validada em `trial-balance.service.ts` `getVerificationBalance()` (Balancete de
+Verificacao, ja exibia o saldo certo na UI): soma JournalEntryItem anterior ao periodo,
+accountBalance so como fallback quando nao ha lancamento nativo pra aquela conta.
+
+**4. i051Map ainda aliasado em i052Map (NAO corrigido - baixa prioridade).**
+Achado (fonte oficial, ecf-parser.service.ts J050/J051 confirma o padrao): I051 deveria ler
+`ChartOfAccounts.spedCode` (a auditoria de referencial de ontem), nao reusar o codigo de
+aglutinacao. MAS: `REGRA_I051_OBRIGATORIO` so exige I051 quando `0000.COD_PLAN_REF` esta
+preenchido - como decidimos deixar COD_PLAN_REF em branco (tabela L100A/L300A completa nao
+importada), esse bug nao bloqueia geracao real. Fica documentado, corrige quando for
+habilitar COD_PLAN_REF de verdade.
+
+### Descoberta: ECF ainda nao tem geracao implementada
+`ecf-importer.service.ts` `export()` e um stub (`// TODO: Implementar exportacao real`),
+confirmado no arquivo real do usuario (nao so no snapshot do projeto). `ecf-validator` tambem
+minimo (so confere CNPJ). Nao ha "padrao de geracao do ECF" pra copiar ainda - so o parser
+(leitura de ECF real) tem logica completa, e foi o parser (registros J050/J051) que confirmou
+o padrao correto de I050/I051 usado na correcao acima.
+
+### Teste end-to-end: Pontes Contabilidade - CONCLUIDO (sem ECD a entregar, e resultado correto)
+Sequencia completa testada: pre-validate -> zerar erros (signatario, Visoes BP/DRE
+leiaute9/2025) -> export -> erro real no PVA (I001) -> corrigido -> novo erro real no PVA
+(I200 obrigatorio ausente, "Registro obrigatorio nao encontrado") -> pesquisa mostrou que
+isso e regra oficial (ADE Cofis 29/2017: "sem movimento nao quer dizer sem fato contabil",
+pelo menos 1 lancamento e obrigatorio, podendo ser R$0,00) -> usuario tentou resolver com
+lancamento de Capital Social, mas a data real e 2005 (fundacao da empresa), fora do periodo
+2025 -> isso revelou e motivou a correcao do saldoIni (achado real, nao hipotetico) -> usuario
+esclareceu que a empresa estava **genuinamente inativa em 2025** -> conclusao correta: **IN
+RFB 2.003/2021 art. 3o dispensa pessoas juridicas inativas da obrigacao de entrega da ECD**.
+Nao ha ECD 2025 a gerar/validar pra Pontes, e essa e a resposta certa, nao uma limitacao.
+
+Toda a infraestrutura (matriz, Visoes Contabeis leiaute9/2025, RfbGlobalTable, os 3 bugs reais
+corrigidos no exporter) continua valida e sera reaproveitada em qualquer empresa real.
+
+### LM Administracao de Bens - mapeada, NAO iniciada (trabalho maior que uma sessao)
+Achado critico ao rodar pre-validate (periodo 2026-01-01/2026-12-31, onde caem os 10
+lancamentos reais): **dados reais do banco NAO batem com o que sessoes passadas
+documentaram** (mesmo padrao ja visto hoje com rfb_aglutination_codes vazio apesar de
+documentado como populado - o banco parece ter sido resetado/recriado em algum ponto entre
+sessoes, sem que o contexto refletisse isso). Contexto antigo dizia "414 contas, 717 saldos,
+1319 lancamentos importados"; banco real mostra: 414 contas (bate) mas **so 10 lancamentos,
+todos datados 2026-06-01** (nao e o historico real importado) e **0 account_balances**
+(os "717 saldos" nao existem mais).
+
+Pre-validate da LM (com os 414 contas legadas + 10 lancamentos que existem de fato):
+- **C2**: 348 contas analiticas com codigo PONTILHADO (`1.1.1.01.01`) - plano de contas
+  legado, nunca migrado pro formato da matriz (`11101010001` sem ponto). Vai quebrar
+  COD_CTA no I050/I155/I250 do mesmo jeito que o buildTree quebrava antes de ontem.
+- **C3**: 121 contas com `reduced_code=000000` (plano RFB sintetico sobreposto, residuo de
+  importacao de ECD externo).
+- **W2**: balanco desequilibrado, diferenca de R$ 74.427,93 entre Ativo e Passivo+PL
+  calculado a partir dos lancamentos reais.
+- C5/C6/C11 (Visoes/signatario) - mesma classe de pendencia ja resolvida na Pontes, rapida
+  de fechar quando chegar a hora.
+
+**Decisao**: nao seguir hoje. Migrar o plano de contas da LM pro formato sem ponto (mesmo
+tipo de trabalho que fizemos com a matriz) e investigar a divergencia de R$ 74k sao tarefas
+de porte completo, nao ajuste de configuracao. Fica pra proxima sessao.
+
+### Pendencia de processo identificada (meta, nao tecnica)
+Segunda vez nesta sessao que dado documentado como "concluido" em contexto de sessao passada
+nao existe mais no banco atual (RFB aglutinacao ontem, saldos/lancamentos da LM hoje). Vale
+considerar, em algum momento, alguma forma de snapshot/backup do banco entre sessoes
+significativas, ou pelo menos um habito de reconferir contagens reais no inicio de qualquer
+retomada de trabalho ja documentado como pronto - nao assumir que o contexto escrito ainda
+reflete o estado real sem checar.

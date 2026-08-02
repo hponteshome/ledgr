@@ -542,6 +542,31 @@ model PersonCompany {
   @@map("person_companies")
 }
 
+/// Tabela generica de dominio da RFB/SPED (Codigo|Nome|DataInicio|DataFim + extras),
+/// carregada a partir dos arquivos SPEDCONTABIL_GLOBAL$.../SPEDECF_GLOBAL$... do
+/// instalador local do PVA. Cobre qualificacao de assinante, UF, natureza juridica,
+/// municipio, pais, situacao etc. - qualquer tabela nova de dominio entra aqui sem
+/// precisar de migration nova.
+model RfbGlobalTable {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sistema     String    @map("sistema") @db.VarChar(20)
+  tabela      String    @map("tabela") @db.VarChar(60)
+  versaoArq   Int       @map("versao_arq")
+  codigo      String    @map("codigo") @db.VarChar(20)
+  nome        String    @map("nome") @db.VarChar(200)
+  dataInicio  DateTime? @map("data_inicio") @db.Date
+  dataFim     DateTime? @map("data_fim") @db.Date
+  extra       Json?     @map("extra")
+  sourceFile  String?   @map("source_file") @db.VarChar(200)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  @@unique([sistema, tabela, codigo, dataInicio])
+  @@index([sistema, tabela])
+  @@map("rfb_global_tables")
+}
+
 // =============================================================================
 // 04 · IMÓVEIS, RH E SOCIETÁRIO
 // =============================================================================

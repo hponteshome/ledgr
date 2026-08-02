@@ -71,15 +71,45 @@ export class EcdExporterService {
       orderBy: { date: "asc" },
     });
 
-    // Saldo inicial por conta (account_balance)
+    // Saldo inicial por conta: mesma logica hibrida do TrialBalanceService
+    // .getVerificationBalance (ja validada no Balancete de Verificacao) - prioriza
+    // soma real de JournalEntryItem anterior ao periodo; accountBalance (snapshot
+    // de ECD importado) so entra como fallback quando nao ha lancamento nativo.
+    // Corrige achado real de 02/08/2026: lancamento de Capital Social da Pontes
+    // Contabilidade (data 2005) nao aparecia no I155 porque accountBalance so e
+    // populado por importacao de ECD, nunca por lancamento feito no proprio LEDGR.
+    const historicalItems = await this.prisma.journalEntryItem.findMany({
+      where: { journalEntry: { companyId, date: { lt: periodStart }, deletedAt: null } },
+      select: { accountId: true, type: true, value: true },
+    });
+    const historicalMov = new Map<string, { deb: number; cre: number }>();
+    for (const item of historicalItems) {
+      if (!analyticIds.has(item.accountId)) continue;
+      const cur = historicalMov.get(item.accountId) ?? { deb: 0, cre: 0 };
+      if (item.type === "DEBIT") cur.deb += Number(item.value);
+      else cur.cre += Number(item.value);
+      historicalMov.set(item.accountId, cur);
+    }
+
     const i155Rows = await this.prisma.accountBalance.findMany({
       where: { companyId, referenceDate: { lt: new Date(periodStart) } },
       orderBy: { referenceDate: "desc" },
     });
-    const saldoIni = new Map<string, number>();
+    const i155Snapshot = new Map<string, number>();
     for (const row of i155Rows) {
-      if (!saldoIni.has(row.accountId) && analyticIds.has(row.accountId))
-        saldoIni.set(row.accountId, Number(row.balance));
+      if (!i155Snapshot.has(row.accountId) && analyticIds.has(row.accountId))
+        i155Snapshot.set(row.accountId, Number(row.balance));
+    }
+
+    const saldoIni = new Map<string, number>();
+    for (const aid of analyticIds) {
+      const mov = historicalMov.get(aid);
+      const fromMov = mov ? mov.deb - mov.cre : 0;
+      if (fromMov !== 0) {
+        saldoIni.set(aid, fromMov);
+      } else if (i155Snapshot.has(aid)) {
+        saldoIni.set(aid, i155Snapshot.get(aid)!);
+      }
     }
 
     // Movimentos do periodo por mes e conta
@@ -154,7 +184,14 @@ export class EcdExporterService {
     add(P+"C990"+P+"2"+P);
 
     // ── BLOCO I ──────────────────────────────────────────────────────────
-    add(P+"I001"+P+(entries.length > 0 ? "0" : "1")+P);
+    // I001 campo 02 = "Indicador de Movimento": 0 = bloco COM dados informados,
+    // 1 = bloco sem nenhum dado (usado so quando a ECD depende de escrituracao ja
+    // armazenada no PVA para o mesmo CNPJ/periodo - NAO e sobre ter ou nao lancamento).
+    // Erro real de PVA (02/08/2026): "A importacao de arquivos sem o bloco I,
+    // pressupoe a existencia de uma escrituracao nas bases do sistema" - o exporter
+    // sempre gera I050 (plano de contas) e I150/I155 (saldos), entao o Bloco I
+    // SEMPRE tem dados, independente de haver lancamento (I200/I250) ou nao.
+    add(P+"I001"+P+"0"+P);
     // |I010|IND_ESC|COD_VER_LC|
     add(P+"I010"+P+bookType+P+layoutVersion+P);
     // |I030|DESC_ESC|NR_LIVRO|NR_ORD|TIPO_LIVRO|QTD_PAG|NOME|NIRE|CNPJ|DT_ARQ|NOM_COM|CIDADE|DT_FIN|
@@ -432,16 +469,43 @@ export class EcdExporterService {
       const crcFormatado = crcUf + "/" + new Date().getFullYear() + "/" + crcVal;
       add(P+"J930"+P+(accConfig.accountantName||"")+P+cpfContador+P+"Contador"+P+"900"+P+crcVal+P+emailContador+P+foneContador+P+crcUf+P+crcFormatado+P+P+"N"+P);
     }
-    // J930 linhas 3+: socios/administradores que assinam ECD/ECF
+    // J930 linhas 3+: socios/administradores/contador que assinam ECD/ECF.
+    // COD_ASSIN resolvido pela Tabela de Qualificacao do Assinante oficial da RFB
+    // (rfb_global_tables, tabela=QUALIF_ASSINANTE), carregada de
+    // SPEDCONTABIL_GLOBAL$SPEDCONTABIL_QUALIF_ASSINANTE - nao mais hardcoded "205"
+    // para todo mundo. role='contador' -> 900 (com CRC, exigido pela
+    // REGRA_ADVERTENCIA_CONTADOR); demais roles -> mapa abaixo; sem match -> 999 Outros.
+    const qualifRows = await this.prisma.rfbGlobalTable.findMany({
+      where: { sistema: "SPEDCONTABIL", tabela: "QUALIF_ASSINANTE" },
+    });
+    const qualifByCodigo = new Map(qualifRows.map(q => [q.codigo, q.nome]));
+    const ROLE_TO_COD_ASSIN: Record<string, string> = {
+      contador: "900",
+      diretor_presidente: "203", diretor_vice_presidente: "203",
+      diretor_financeiro: "203", diretor_operacional: "203",
+      procurador: "309",
+      socio: "801", acionista: "801",
+      representante_legal: "205",
+      secretario: "999", responsavel_tecnico: "999", outro: "999",
+    };
     const personLinks = await this.prisma.personCompany.findMany({
       where: { companyId, OR: [{ assinaEcd: true }, { assinaEcf: true }] },
       include: { person: { select: { fullName: true, cpf: true, crcNumber: true, crcState: true } } },
     });
     for (const link of personLinks) {
-      const cpf = (link.person?.cpf||"").replace(/\D/g,"");
+      const cpf  = (link.person?.cpf||"").replace(/\D/g,"");
       const nome = link.person?.fullName || "";
-      const crcP = link.person?.crcNumber ? (link.person.crcNumber + (link.person.crcState ? "/"+link.person.crcState : "")) : "";
-      add(P+"J930"+P+nome+P+cpf+P+"Socio-Administrador"+P+"205"+P+P+P+P+P+P+P+"N"+P);
+      const roleKey  = (link.role || "").toLowerCase();
+      const codAssin = ROLE_TO_COD_ASSIN[roleKey] ?? "999";
+      const nomeQualif = qualifByCodigo.get(codAssin) ?? "Outros";
+      if (codAssin === "900") {
+        // REGRA_ADVERTENCIA_CONTADOR: NUM_SEQ_CRC e DT_CRC devem vir preenchidos.
+        const crcVal = (link.person?.crcNumber || "").replace(/\D/g,"");
+        const crcUf  = link.person?.crcState || "";
+        add(P+"J930"+P+nome+P+cpf+P+nomeQualif+P+codAssin+P+crcVal+P+P+P+crcUf+P+(crcUf?crcUf+"/"+crcVal:"")+P+P+"N"+P);
+      } else {
+        add(P+"J930"+P+nome+P+cpf+P+nomeQualif+P+codAssin+P+P+P+P+P+P+P+"N"+P);
+      }
     }
 
     const idxJ001   = lines.findIndex(l => l === P+"J001"+P+"0"+P);
