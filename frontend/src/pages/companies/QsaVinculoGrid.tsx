@@ -47,8 +47,14 @@ export const QsaVinculoGrid: React.FC<Props> = ({ companyId, partners, readOnly 
     });
     if (!socio) return;
     const isPJ = digits.length === 14;
-    const endpoint = isPJ ? '/companies/taxid/' + digits : '/persons/cpf/' + digits;
-    api.get(endpoint).then(({ data: entity }) => {
+    // CPF do QSA vem mascarado pela RFB (so o miolo visivel, ex: 240219 de
+    // 565.240.219-91) - nunca bate igualdade exata, precisa busca parcial.
+    const lookup = isPJ
+      ? api.get('/companies/taxid/' + digits).then(r => r.data)
+      : api.get('/persons', { params: { search: digits } })
+          .then(r => (r.data?.data ?? []).find((p: any) =>
+            (p.cpf || '').replace(/\D/g, '').includes(digits)) ?? null);
+    lookup.then((entity) => {
       if (!entity?.id) return;
       return api.post('/companies/' + companyId + '/shareholders', {
         shareholderType: isPJ ? 'PJ' : 'PF',
@@ -115,9 +121,13 @@ export const QsaVinculoGrid: React.FC<Props> = ({ companyId, partners, readOnly 
   const handleVincular = async (socio: QsaSocio) => {
     const digits = cpfDigits(socio.cpfCnpj);
     const isPJ = digits.length === 14;
-    const endpoint = isPJ ? '/companies/taxid/' + digits : '/persons/cpf/' + digits;
     try {
-      const { data: entity } = await api.get(endpoint);
+      // CPF do QSA vem mascarado pela RFB (so o miolo visivel) - busca parcial via
+      // /persons?search=, nao igualdade exata em /persons/cpf/:cpf.
+      const entity = isPJ
+        ? (await api.get('/companies/taxid/' + digits)).data
+        : (await api.get('/persons', { params: { search: digits } }))
+            .data?.data?.find((p: any) => (p.cpf || '').replace(/\D/g, '').includes(digits));
       if (entity?.id) {
         setSaving('linking');
         await api.post('/companies/' + companyId + '/shareholders', {

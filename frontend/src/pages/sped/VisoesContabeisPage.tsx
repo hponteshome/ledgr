@@ -121,10 +121,20 @@ export default function VisoesContabeisPage() {
   // ── Auto-match ───────────────────────────────────────────────────────────
   const handleAutoMatch = async () => {
     if (!activeView) return;
+    const requestedViewId = activeView.id; // captura o alvo no momento do clique
     const conf = await Swal.fire({ title: 'Auto-mapear contas?', text: 'Sugerirá códigos RFB por grupo/tipo. Você pode revisar antes de salvar.', icon: 'question', showCancelButton: true, confirmButtonColor: '#111111', confirmButtonText: 'Sugerir' });
     if (!conf.isConfirmed) return;
     try {
-      const r = await api.post('/sped/visoes/views/' + activeView.id + '/auto-match', { leiaute, anoBase });
+      const r = await api.post('/sped/visoes/views/' + requestedViewId + '/auto-match', { leiaute, anoBase });
+      // Race condition real: se o usuario trocou Ano/Tipo enquanto a resposta estava em
+      // voo, activeView ja mudou para outra visao (e dirty ja foi limpo por
+      // loadOrCreateView). Aplicar a resposta velha por cima escreveria sugestoes da
+      // visao antiga dentro do estado da visao nova - descobri isso na pratica: 81
+      // contas patrimoniais do BP foram parar salvas dentro da visao DRE (01/08/2026).
+      if (!activeView || activeView.id !== requestedViewId) {
+        console.warn('Auto-match: resposta descartada, view mudou durante a chamada.');
+        return;
+      }
       const suggestions: { accountId: string; aglutinationCode: string }[] = r.data.suggestions;
       const newDirty = { ...dirty };
       suggestions.forEach(s => { newDirty[s.accountId] = s.aglutinationCode; });

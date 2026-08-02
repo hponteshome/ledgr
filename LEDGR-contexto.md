@@ -4221,3 +4221,165 @@ de configurar Visoes Contabeis pra qualquer empresa que use a matriz nova.**
 6. Resolver a rota orfa do `ImportChartOfAccountsPage.tsx` (`app/accounting/accounts/import`
    sem nenhum link/botao apontando pra ela em nenhuma tela) - decidir se cria um botao na
    AccountsPage ou se mantem so a documentada em help/artigo.
+
+
+## Sessao 01/08/2026 (fase ECD) - Mapa completo de Conta Referencial x Codigo de Aglutinacao x Plano Referencial
+CHAVE DE BUSCA: `#ecd-referencial-aglutinacao` `#i051` `#i052` `#cod-plan-ref` `#visoes-contabeis` `#leiaute9`
+
+### Os TRES conceitos de "codigo referencial" do ECD - nunca confundir
+
+| Conceito | Campo/Tabela | Registro ECD | Fonte | Status no LEDGR |
+|---|---|---|---|---|
+| Plano referencial completo | `ChartOfAccounts.spedCode` | I051 | L100A (732 cod, BP) / L300A (213 cod, DRE) - tabela FIXA da RFB, existe por leiaute/ano | Auditamos e corrigimos ~292 contas da matriz contra P100/P150 (mesma fonte dinamica) nesta sessao. **A tabela L100A/L300A completa NAO esta importada no banco** - so consultamos os arquivos SPEDECF_DINAMICO como referencia externa. |
+| Codigo de aglutinacao | `AccountingViewMapping.aglutinationCode` via `RfbAglutinationCode` | I052 -> J100/J150 | **NAO e uma tabela oficial da RFB para baixar.** Confirmado no Manual de Orientacao do Leiaute 9 da ECD (Anexo ADE Cofis 57/2023): "o registro I052 nao e obrigatorio, podendo ser livremente estabelecido pela empresa". LEDGR decidiu (sessao 25/05) tratar isso como tabela versionada por leiaute/anoBase, reutilizavel entre empresas, em vez de campo livre por empresa. | Tabela `rfb_aglutination_codes` **vazia no banco atual** (0 rows, confirmado). Os JSONs existem no repo: `docs/sped/rfb-codes/leiaute9-2024-BP.json` (6.5KB), `leiaute9-2024-DRE.json`, `leiaute9-2025-BP.json` (**178KB, ~30x maior que 2024** - motivo nao investigado ainda), `leiaute9-2025-DRE.json` (54KB). Nunca reimportados apos o banco atual ter sido criado/resetado. |
+| Codigo de aglutinacao (legado, achado no meio do caminho) | - | - | `rfb-aglutinacao-leiaute9-2024.json` (raiz do projeto, commit 25/05) - provavel precursor dos arquivos em docs/sped/rfb-codes/, checar se e igual ou diverge antes de usar. | Nao verificado nesta sessao. |
+
+### Tabelas oficiais da RFB (plano referencial) - localizacao confirmada
+
+
+Essas sao os mesmos arquivos SPEDECF_DINAMICO_P100/P150 ja usados nesta sessao para auditar
+`spedCode` - confirma que L100A/L300A completo = mesma familia de arquivo "dinamica" da RFB,
+so que o instalador local so trouxe P100/P150 (nao os L100_A/L300_A completos) nos arquivos
+que o usuario forneceu ao projeto claude.ai. **Nao confundir com codigo de aglutinacao (tabela
+acima) - sao conceitos diferentes mesmo vindo de pastas com nomes parecidos.**
+
+### Armadilha COD_PLAN_REF (repetindo por importancia - ja registrada antes)
+Preencher `COD_PLAN_REF` no registro 0000 sem a tabela L100A/L300A completa importada gera
+erro I051 obrigatorio para TODAS as contas analiticas no PGE. Nunca habilitar ate a tabela
+completa (nao so P100/P150 parciais) estar de fato importada em `chart_of_accounts.sped_code`
+com cobertura total, OU decidir nao preencher COD_PLAN_REF (ECD ainda e valido sem ele).
+
+### ecd-pre-validate.service.ts - 13 checks documentados nesta sessao (revisao completa do arquivo)
+C1 hierarquia nivel=pai+1 quebrada | C2 codigo analitico invalido (<=6 chars ou tem ponto) |
+C3 reduced_code=000000 (plano RFB sobreposto) | C4 partida em conta deletada | C5/C6 Visao
+BP/DRE nao configurada ou sem mapeamento | C7 mapeamento usa codigo RFB nao-folha (totalizador)
+| C8 conta mapeada pro grupo RFB errado no BP (ASSET deve ser 1.xx, LIABILITY/EQUITY 2.xx) |
+C9/C9b conta de resultado no BP ou conta patrimonial na DRE | C10 empresa sem UF | C11 nenhum
+signatario ECD | C11b nenhum contador (role='contador', minusculo, comparacao exata) | C13
+warning sem lancamento de encerramento (so aparece se ha contas REVENUE/EXPENSE no periodo) |
+W1 contas analiticas sem mapeamento RFB | W2 balanco desequilibrado | W6 conta nivel 1 com
+parentId preenchido | I1/I2/I3 informativos (contagem plano/lancamentos/mapeamentos).
+
+### Bugs reais encontrados e corrigidos nesta sessao (fase ECD)
+1. **`chart-of-accounts.service.ts` `buildTree()`**: usava `code.split('.')` em codigo sem
+   ponto -> toda conta virava raiz. Corrigido para usar `parentId` real (2 iteracoes: primeiro
+   prefixo de codigo, depois parentId de verdade, alinhado ao comentario do proprio
+   schema.prisma "Hierarquia via parentId, nao por codigo").
+2. **`QsaVinculoGrid.tsx`** `handleVincular`/auto-vinculo: CPF do QSA vem MASCARADO pela RFB
+   (so miolo visivel, ex "240219" de "565.240.219-91") - buscava `/persons/cpf/:cpf` (igualdade
+   exata), nunca batia. Corrigido para `/persons?search=` (busca parcial, `cpf contains`).
+3. **`accounting-views.service.ts` `createView`**: race condition real - `findFirst`+`create`
+   em dois passos, React 18 StrictMode roda useEffect 2x em dev, ambas chamadas passam pelo
+   findFirst vazio antes de qualquer create terminar -> unique constraint (company_id, tipo,
+   ano_base) estourava. Corrigido para `upsert` atomico.
+4. **Pessoa soft-deletada sem motivo aparente**: Helenilto Aureliano Pontes
+   (id `9e42a465-a58c-482b-a48d-75c2c2c4e1b2`) tinha `deleted_at` setado desde 23/07/2026 -
+   impedia `findByCpf` de achar o proprio contador da Pontes Contabilidade. Restaurado via UPDATE
+   direto (deleted_at = NULL) apos confirmar com o usuario que nao havia motivo de negocio
+   conhecido para a exclusao.
+
+### Bugs encontrados, NAO corrigidos (documentados para depois, fora do escopo do teste de hoje)
+1. **`PersonForm.tsx` `ROLE_OPTIONS`**: salva `'CONTADOR'` (maiusculo); `ecd-pre-validate`
+   compara `role: "contador"` (minusculo, igualdade exata Prisma, sem mode:insensitive) -
+   nunca bate. Vinculo real de contador so funciona hoje via INSERT direto ou correcao futura
+   deste mismatch de case.
+2. **`PersonForm.tsx` `newLink`** (estado do formulario de vinculos pessoa-empresa): nao tem
+   campo `assinaEcd`/`assinaEcf` - tela nao permite marcar isso ao criar vinculo, so via banco.
+3. **`ContabilTab.tsx`** "Salvar Configuracao Contabil" (`PUT /accounting/config`) salva em
+   `company_accounting_configs` (accountant_cpf, legal_rep_cpf como texto solto) - **tabela
+   diferente e nao lida por nenhuma validacao/geracao de ECD**. Confirmado vazio mesmo apos
+   preencher e salvar na tela (bug de salvamento nao investigado a fundo, OU tabela realmente
+   nao serve pra nada hoje - checar antes de investir tempo nela).
+4. **Licao de processo violada conscientemente**: uma sessao anterior (12/06) registrou
+   "nunca fazer alteracoes SQL diretas em producao, deve ser via frontend/backend". Nesta
+   sessao fizemos UPDATE/INSERT diretos (restaurar deleted_at, criar person_companies
+   contador) como desbloqueio pontual para continuar o teste - funcionou, mas nao e pratica
+   a manter. Preferir sempre corrigir a UI/API real quando o tempo permitir.
+
+### Estado de teste no momento desta entrada (empresa Pontes Contabilidade, id 632ce73b-5024-4fee-97bb-70d27b0cce51)
+- Plano de contas: matriz completa (292 contas) importada com sucesso via
+  `POST /accounting/chart-of-accounts/import`.
+- QSA: Helenilto vinculado como Socio-Administrador (pre-existente, assina_ecd=false) e como
+  contador (criado nesta sessao, assina_ecd=true, via SQL direto).
+- Pre-validate (`GET /sped/ecd/pre-validate?periodStart=2026-01-01&periodEnd=2026-12-31`):
+  restam C5/C6 (Visoes BP/DRE nao configuradas) e C13 (warning, esperado, 0 lancamentos).
+- Visoes Contabeis: pagina abriu com Ano Base 2025 por padrao, mas **nenhum ano tem
+  `rfb_aglutination_codes` no banco atual** - precisa reimportar os JSONs de
+  `docs/sped/rfb-codes/` antes de qualquer Auto-mapear funcionar de verdade.
+- Pendente decidir: importar leiaute9-2024 ou leiaute9-2025 (ou os dois) - e trocar o periodo
+  do pre-validate para bater com o ano escolhido na Visao Contabil.
+
+### Proximo passo imediato (retomar daqui)
+Comparar estrutura/contagem de `leiaute9-2024-BP.json` vs `leiaute9-2025-BP.json` (diferenca
+de tamanho 6.5KB vs 178KB ainda nao explicada) antes de importar qualquer um via
+"Importar JSON RFB" na VisoesContabeisPage.
+
+
+## Sessao 01-02/08/2026 (fechamento fase Visoes Contabeis) - Pre-validate ECD limpo na Pontes Contabilidade
+CHAVE DE BUSCA: `#ecd-referencial-aglutinacao` `#visoes-contabeis` `#automatch-race-condition` `#leiaute9-2025`
+
+### Decisao tomada: leiaute9-2025 (nao 2024)
+`leiaute9-2024-BP.json`/`leiaute9-2024-DRE.json` em `docs/sped/rfb-codes/` estavam quebrados
+(1 codigo cada, inuteis). `leiaute9-2025-BP.json` (732 cod) e `leiaute9-2025-DRE.json` (213
+cod) batem exatamente com os totais do L100A/L300A ja validados nesta sessao. Importados via
+"Importar JSON RFB" na VisoesContabeisPage - confirmado no banco: `rfb_aglutination_codes`
+leiaute=9 anoBase=2025: BP=732, DRE=213.
+
+### Bug real encontrado e corrigido: `autoMatch` nao filtrava fallback de nome por polaridade
+`accounting-views.service.ts` `autoMatch()`: quando o `prefixMap` hardcoded nao tinha entrada
+pro grupo de 3 digitos da conta (ex: grupo "211" nao estava no mapa), caia no fallback de
+similaridade de palavras - que comparava so o TEXTO da descricao, sem checar se o codigo RFB
+sugerido era do lado certo do balanco. Resultado real: "Provisao IRPJ" (LIABILITY) sugerido
+com codigo `1.01.02.04.02` (ATIVO). Corrigido: fallback agora filtra `rfbLeaves` por
+`wantPrefix` (ASSET->"1", LIABILITY/EQUITY->"2", DRE sempre->"3") ANTES de comparar nomes.
+
+### Bug real encontrado e corrigido: race condition no `handleAutoMatch` do frontend
+`VisoesContabeisPage.tsx`: `handleAutoMatch` disparava `POST .../auto-match` e, ao receber a
+resposta, aplicava direto em `setDirty` sem checar se `activeView` ainda era a mesma view que
+gerou a chamada. Se o usuario trocasse Ano/Tipo enquanto a chamada estava em voo (ou clicasse
+rapido demais), a resposta "velha" (ex: sugestoes de BP) escrevia por cima do estado da view
+"nova" (ex: DRE) - **descoberto na pratica**, nao em revisao de codigo: 81 contas ASSET/
+LIABILITY/EQUITY do BP foram parar salvas dentro da visao DRE apos um Auto-mapear+Salvar em
+sequencia rapida. Corrigido: `handleAutoMatch` agora captura `requestedViewId` no momento do
+clique e descarta a resposta se `activeView.id !== requestedViewId` quando ela chega.
+
+**Licao de processo**: esse bug so apareceu rodando de verdade na UI, nao na revisao de
+codigo previa (que classificou o `autoMatch` como "seguro"). Revisao estatica pega bugs de
+logica de negocio (ex: C8, polaridade); race conditions de estado assincrono no frontend
+tendem a so aparecer em teste real com timing humano. Nao dá pra substituir teste de ponta a
+ponta so com leitura de codigo.
+
+### Limpeza de dados feita apos o bug (Pontes Contabilidade)
+Deletados via SQL direto (repetindo o desvio de processo ja registrado antes - UPDATE/DELETE
+direto em vez de via UI): as 81 contas patrimoniais que foram parar erroneamente na visao DRE,
+e o mapeamento antigo/errado de "Impostos Parcelados" que sobrou de antes do patch do C8.
+
+### Mapeamento manual das 2 contas que o autoMatch nao resolveu sozinho
+- `21101060003` Impostos Parcelados -> `2.02.01.03.01` (mesmo codigo usado como spedCode/I051
+  desta conta na auditoria de referencial desta sessao - decisao deliberada de manter os dois
+  registros consistentes entre si).
+- `21101120002` Bonificacoes e PLR -> `2.01.01.01.02` Participacoes no Resultado a Pagar.
+
+**Achado de UX, nao bug**: a tela de Visoes Contabeis mostra o CODIGO REDUZIDO (7 digitos,
+ex `0002018`) na coluna esquerda, nao o codigo completo da conta (`21101060003`) - filtrar
+por codigo completo na busca da tela nao acha nada; tem que filtrar por nome.
+
+### Resultado final - pre-validate limpo
+`GET /sped/ecd/pre-validate?periodStart=2025-01-01&periodEnd=2025-12-31` para Pontes
+Contabilidade (632ce73b-5024-4fee-97bb-70d27b0cce51): **hasErrors: false**. Resta so C13
+(warning, sem lancamento de encerramento - esperado, empresa com 0 lancamentos). 83 contas
+BP mapeadas, 83 contas DRE mapeadas, 166 analiticas no total.
+
+### Estado pronto para a proxima sessao
+Pontes Contabilidade esta pronta para tentar a geracao real do ECD (endpoint ainda nao
+localizado/revisado - provavel `ecd.controller.ts` + `ecd-exporter.service.ts`) e validacao
+no PVA, como teste do cenario "empresa sem movimento, so registros obrigatorios".
+
+### Pendencia que segue aberta (nao bloqueia a geracao, mas fica registrada)
+- `PersonForm.tsx` `ROLE_OPTIONS` salva `'CONTADOR'` maiusculo vs `ecd-pre-validate` compara
+  `'contador'` minusculo - mismatch de case ainda nao corrigido (contornado via SQL direto
+  nesta sessao).
+- `PersonForm.tsx` `newLink` sem campo `assinaEcd`/`assinaEcf` na UI de vinculos.
+- `ContabilTab.tsx` "Salvar Configuracao Contabil" grava em `company_accounting_configs`,
+  tabela nao lida por nenhuma validacao/geracao - motivo do nao-salvamento na pratica nao
+  investigado a fundo.

@@ -37,16 +37,15 @@ export class AccountingViewsService {
   }
 
   async createView(companyId: string, dto: any) {
-    const existing = await this.prisma.accountingView.findFirst({
-      where: { companyId, tipo: dto.tipo, anoBase: dto.anoBase },
+    // upsert atomico - findFirst+create em dois passos e uma race condition real:
+    // o React 18 StrictMode roda o useEffect da tela duas vezes em dev, e duas
+    // chamadas concorrentes podem passar pelo findFirst vazio antes de qualquer
+    // uma terminar o create, estourando unique constraint (company_id, tipo, ano_base).
+    return this.prisma.accountingView.upsert({
+      where: { companyId_tipo_anoBase: { companyId, tipo: dto.tipo, anoBase: dto.anoBase } },
+      create: { companyId, ...dto },
+      update: { isActive: true, deletedAt: null, ...(dto.name ? { name: dto.name } : {}) },
     });
-    if (existing) {
-      return this.prisma.accountingView.update({
-        where: { id: existing.id },
-        data: { isActive: true, deletedAt: null, name: dto.name ?? existing.name },
-      });
-    }
-    return this.prisma.accountingView.create({ data: { companyId, ...dto } });
   }
 
   async deleteView(id: string) {
@@ -171,7 +170,15 @@ export class AccountingViewsService {
       if (!bestCode) {
         const accWords = norm(acc.name).split(" ").filter(w => w.length > 3);
         let bestScore = -1;
-        for (const rfb of rfbLeaves) {
+        // Filtra candidatos pela mesma polaridade da conta antes de comparar nomes -
+        // sem isso, o fallback por similaridade de palavra pode casar uma conta do
+        // PASSIVO (ex: "Provisao IRPJ") com um codigo RFB do ATIVO (1.xx) so por
+        // parecenca textual, gerando IND_GRP_BAL incorreto no J100 (achado real via C8
+        // do pre-validate, 01/08/2026). So se aplica ao BP (ASSET=1.xx, LIABILITY/
+        // EQUITY=2.xx); na DRE todo codigo comeca com 3.xx, sem essa ambiguidade.
+        const wantPrefix = view.tipo === "BP" ? (acc.type === "ASSET" ? "1" : "2") : "3";
+        const candidates = rfbLeaves.filter(c => c.codigo.startsWith(wantPrefix));
+        for (const rfb of candidates) {
           const rfbWords = norm(rfb.descricao).split(" ").filter(w => w.length > 3);
           const exact = accWords.filter(w => rfbWords.includes(w)).length;
           const partial = rfbWords.some(w => accWords.some(a => a.includes(w) || w.includes(a))) ? 0.5 : 0;
