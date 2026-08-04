@@ -285,7 +285,7 @@ export const PersonForm: React.FC = () => {
   console.log('[DEBUG canEditPersons]', { canEditPersons, permLoading, allowed });
 
   // Novo vínculo
-  const [newLink, setNewLink] = useState({ companyId: '', role: '', startDate: '', notes: '' });
+  const [newLink, setNewLink] = useState({ companyId: '', role: '', startDate: '', notes: '', assinaEcd: false, assinaEcf: false });
   const [companies, setCompanies] = useState<Array<{ id: string; tradeName: string }>>([]);
 
   // ── Load ──────────────────────────────────────────────────
@@ -522,7 +522,7 @@ export const PersonForm: React.FC = () => {
     try {
       const { data } = await api.post('/persons/links', { personId, ...newLink });
       setLinks(prev => [...prev, data]);
-      setNewLink({ companyId: '', role: '', startDate: '', notes: '' });
+      setNewLink({ companyId: '', role: '', startDate: '', notes: '', assinaEcd: false, assinaEcf: false });
     } catch {
       toast.error('Erro ao adicionar vínculo.');
     }
@@ -1312,6 +1312,29 @@ export const PersonForm: React.FC = () => {
                       className={inputCls}
                     />
                   </Field>
+                </div>
+                {/* Achado real (03/08/2026): nao existia forma de marcar assinaEcd/assinaEcf
+                    ao criar o vinculo pela tela - so via SQL direto. J930 do ECD e o C11/C11b
+                    do pre-validate dependem exatamente desses dois campos. */}
+                <div className="flex gap-6 mt-3">
+                  <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={newLink.assinaEcd}
+                      onChange={e => setNewLink(p => ({ ...p, assinaEcd: e.target.checked }))}
+                      className="w-4 h-4 accent-blue-600"
+                    />
+                    Assina ECD
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={newLink.assinaEcf}
+                      onChange={e => setNewLink(p => ({ ...p, assinaEcf: e.target.checked }))}
+                      className="w-4 h-4 accent-blue-600"
+                    />
+                    Assina ECF
+                  </label>
                 </div>
                 <button
                   onClick={handleAddLink}

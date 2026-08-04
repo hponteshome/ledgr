@@ -264,8 +264,12 @@ export class EcdPreValidateService {
     });
 
     // Tambem verifica PersonCompany para contador (role='contador')
+    // Comparacao case-insensitive: ROLE_OPTIONS do PersonForm.tsx salva 'CONTADOR'
+    // (maiusculo), mas o padrao de dado usado aqui e minusculo - bug de case documentado
+    // em 01/08/2026, corrigido aqui na query em vez de mudar o valor salvo (evita
+    // invalidar vinculos ja existentes gravados com qualquer uma das duas grafias).
     const contadorLink = await this.prisma.personCompany.findFirst({
-      where: { companyId, assinaEcd: true, role: "contador" },
+      where: { companyId, assinaEcd: true, role: { equals: "contador", mode: "insensitive" } },
       include: { person: { select: { fullName: true, cpf: true } } },
     });
 

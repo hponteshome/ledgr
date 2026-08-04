@@ -56,7 +56,7 @@ export class PersonsService {
         include: {
           companyLinks: {
             where: { endDate: null },
-            include: { company: { select: { id: true, tradeName: true, legalName: true } } },
+            include: { company: { select: { id: true, tradeName: true, legalName: true, taxId: true } } },
           },
         },
       }),

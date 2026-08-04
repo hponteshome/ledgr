@@ -145,6 +145,36 @@ export default function VisoesContabeisPage() {
     }
   };
 
+  // ── Copiar do ano anterior ──────────────────────────────────────────────
+  const handleClonePreviousYear = async () => {
+    if (!activeView) return;
+    const conf = await Swal.fire({
+      title: 'Copiar mapeamentos do ano anterior?',
+      text: 'Herda os codigos RFB ja usados no ano-base anterior, revalidando cada um contra a tabela RFB deste ano. Contas cujo codigo mudou ou deixou de existir NAO sao copiadas - ficam para revisao manual.',
+      icon: 'question', showCancelButton: true,
+      confirmButtonColor: '#111111', confirmButtonText: 'Copiar',
+    });
+    if (!conf.isConfirmed) return;
+    try {
+      const r = await api.post('/sped/visoes/views/' + activeView.id + '/clone-previous-year');
+      if (r.data.message) {
+        Swal.fire({ icon: 'info', title: r.data.message, confirmButtonColor: '#111111' });
+        return;
+      }
+      Swal.fire({
+        icon: 'success',
+        title: r.data.cloned + ' de ' + r.data.total + ' mapeamento(s) copiados de ' + r.data.fromAnoBase,
+        text: r.data.needsReview.length > 0
+          ? r.data.needsReview.length + ' conta(s) precisam de revisao manual (codigo mudou ou nao existe mais neste ano).'
+          : 'Todos os codigos do ano anterior ainda sao validos.',
+        confirmButtonColor: '#111111',
+      });
+      await loadOrCreateView();
+    } catch (e: any) {
+      Swal.fire('Erro', e?.response?.data?.message ?? 'Falha ao copiar do ano anterior', 'error');
+    }
+  };
+
   // ── Import RFB ───────────────────────────────────────────────────────────
   const handleImportRfb = async () => {
     const { value: file } = await Swal.fire({ title: 'Importar tabela RFB', input: 'file', inputAttributes: { accept: '.json' }, confirmButtonColor: '#111111', showCancelButton: true });
@@ -205,7 +235,7 @@ export default function VisoesContabeisPage() {
       <div style={{ marginBottom: 24 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
           <span style={{ background: '#7C3AED', color: '#fff', borderRadius: 6, padding: '2px 10px', fontSize: 11, fontWeight: 700, letterSpacing: 1 }}>SPED</span>
-          <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>Visões Contábeis (I052)</h1>
+          <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>Aglutinação RFB (Bloco J)</h1>
         </div>
         <p style={{ margin: 0, color: '#6B7280', fontSize: 13 }}>Mapeie grupos de contas analíticas aos códigos de aglutinação RFB — gera I051/I052 para o Bloco J do ECD.</p>
       </div>
@@ -244,6 +274,7 @@ export default function VisoesContabeisPage() {
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button onClick={handleAutoMatch} style={btnSec} disabled={loading}>Auto-mapear</button>
+          <button onClick={handleClonePreviousYear} style={btnSec} disabled={loading}>Copiar do ano anterior</button>
           <button onClick={handleSave} style={btnPri} disabled={saving || loading || Object.keys(dirty).length === 0}>
             {saving ? 'Salvando...' : `Salvar${dirtyCount > 0 ? ' (' + dirtyCount + ')' : ''}`}
           </button>

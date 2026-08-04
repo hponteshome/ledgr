@@ -102,9 +102,10 @@ export class IobLotdImportService {
       idMap.set(e.identifier, list);
     }
 
+    let entriesUsed = 0;
     for (const [, grpEntries] of idMap) {
       const g = this.buildGroup(grpEntries, batchDate, resolve, isZero, notFoundSet);
-      if (g) groups.push(g);
+      if (g) { groups.push(g); entriesUsed += grpEntries.length; }
     }
 
     // Entradas sem identificador
@@ -117,7 +118,7 @@ export class IobLotdImportService {
 
       if (hasDeb && hasCred) {
         const g = this.buildGroup([e], batchDate, resolve, isZero, notFoundSet);
-        if (g) groups.push(g);
+        if (g) { groups.push(g); entriesUsed += 1; }
       } else {
         pending.push(e);
       }
@@ -127,7 +128,17 @@ export class IobLotdImportService {
     while (pending.length >= 2) {
       const pair = pending.splice(0, 2);
       const g = this.buildGroup(pair, batchDate, resolve, isZero, notFoundSet);
-      if (g) groups.push(g);
+      if (g) { groups.push(g); entriesUsed += pair.length; }
+    }
+    // Achado real (04/08/2026): se sobrar 1 linha sem par (pending.length impar), ela era
+    // descartada em silencio - nao contava em skipped, nao aparecia em notFound, so
+    // desaparecia. Agora fica registrada explicitamente.
+    if (pending.length === 1) {
+      const leftover = pending[0];
+      notFoundSet.add(
+        "Linha sem par (nao pode ser agrupada): " +
+        (leftover.debitAccount || leftover.creditAccount || leftover.classDeb || leftover.classCred || "linha vazia")
+      );
     }
 
     // ── Calcular totais ───────────────────────────────────────────
@@ -139,10 +150,14 @@ export class IobLotdImportService {
     }
     const balanced = Math.abs(totalDebit - totalCredit) < 0.01;
 
+    // skipped = linhas do arquivo que NAO viraram parte de um lancamento valido.
+    // Bug real corrigido (04/08/2026): a formula anterior subtraia ITENS (debito+credito,
+    // sempre >=2 por lancamento) de LINHAS do arquivo - unidades diferentes, dava numero
+    // negativo sempre que uma linha unica gerava 2 itens (debito+credito na mesma linha).
     const stats = {
       total:       entries.length,
       imported:    0,
-      skipped:     entries.length - groups.reduce((s, g) => s + g.items.length, 0),
+      skipped:     entries.length - entriesUsed,
       totalDebit,
       totalCredit,
       balanced,

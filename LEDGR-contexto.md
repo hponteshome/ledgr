@@ -4501,3 +4501,286 @@ considerar, em algum momento, alguma forma de snapshot/backup do banco entre ses
 significativas, ou pelo menos um habito de reconferir contagens reais no inicio de qualquer
 retomada de trabalho ja documentado como pronto - nao assumir que o contexto escrito ainda
 reflete o estado real sem checar.
+
+
+## Sessao 03/08/2026 - Clone/valida mapeamento RFB por ano, reorganizacao SPED no menu, LIMPEZA GERAL de lancamentos contabeis
+CHAVE DE BUSCA: `#limpeza-lancamentos` `#docker-comprometido` `#clone-ano-anterior` `#backup-pre-limpeza`
+
+### 1) cloneFromPreviousYear - herda mapeamento RFB do ano anterior, revalidando
+Decisao de arquitetura (conversa com usuario): NAO fixar aglutinationCode permanentemente
+(a tabela RFB e versionada por ano, confirmado ontem com leiaute9-2024 quebrado vs
+leiaute9-2025 completo - fixar arriscaria propagar codigo que deixou de existir/de ser
+folha, sem ninguem perceber). Tambem NAO simplificar pra "aglutinationCode = spedCode"
+(conferido: poucos `t` na comparacao entre os dois campos na Pontes, entao sao
+genuinamente independentes na pratica, nao so na teoria).
+
+Implementado: `accounting-views.service.ts` `cloneFromPreviousYear(viewId)` - acha a
+AccountingView mais recente do mesmo tipo/empresa com anoBase menor, revalida cada
+mapeamento contra `rfbLeaves` do ano NOVO (mesma logica ja usada no autoMatch), clona os
+que ainda sao folha valida, lista em `needsReview` os que mudaram/sumiram. Rota
+`POST /sped/visoes/views/:id/clone-previous-year` no controller real (confirmado via
+arquivo colado pelo usuario - o service usa `req.companyId`, nao `dto.companyId`, diferente
+do que eu tinha assumido). Botao "Copiar do ano anterior" no VisoesContabeisPage.tsx, ao
+lado do Auto-mapear existente. NAO testado end-to-end ainda - so existe Ano Base 2025 hoje,
+precisa de um ano novo criado pra validar o clone de verdade na pratica.
+
+### 2) Reorganizacao do menu SPED (dado de banco, sidebar_items - nao e codigo)
+"Visoes Contabeis (I052)" (menu de Contabilidade) renomeado para "Aglutinacao RFB
+(Bloco J)" e movido pra dentro de "SPED & Entregas", que tambem foi renomeado para
+"SPED & Obrigacoes Acessorias" (nome tecnico mais correto - SPED ja significa "Sistema
+Publico de Escrituracao Digital", "& Entregas" era redundante). Titulo dentro da propria
+pagina (`VisoesContabeisPage.tsx`) tambem atualizado pra bater com o menu. Mudanca de
+dado (tabela `sidebar_items`), nao ha arquivo de codigo pra commitar por essa parte
+alem do titulo da pagina.
+
+### 3) LM Administracao de Bens - achado sobre o plano de contas legado (nao resolvido ainda)
+Confirmado a estrutura real do plano pontilhado da LM: 6 niveis reais (`1.1.1.01.01.0001`),
+COM hierarquia `parent_id` coerente (diferente do que se temia) - as 348 contas com "codigo
+invalido" (C2 do pre-validate) tem estrutura logica boa, so o FORMATO do codigo (com ponto)
+que e incompativel com o COD_CTA exigido no I050/I155/I250. Ainda nao decidido se
+migra os codigos in-place (preservando os journal_entry_items ja vinculados) ou substitui
+pela matriz nova - decisao adiada porque o proximo item (limpeza geral) mudou o cenario:
+sem lancamento vinculado a essas contas, substituir pela matriz fica mais simples.
+
+### 4) ACHADO CRITICO: incidente de infraestrutura anterior, nao documentado ate hoje
+Usuario relatou: "o docker foi comprometido" em algum momento entre sessoes passadas e
+hoje - explica TODAS as divergencias entre "documentado como pronto" e "banco real" que
+apareceram ao longo desta sessao E da sessao de ontem (rfb_aglutination_codes vazio apesar
+de documentado; LM com "717 saldos/1319 lancamentos" documentados mas 0 saldos e so 10
+lancamentos de um unico dia no banco real). NAO e falha de processo de documentacao -
+foi perda de dado real por incidente de infraestrutura. Recomendacao registrada:
+implementar rotina de backup periodico do banco (nao existia nenhuma antes de hoje).
+
+### 5) LIMPEZA GERAL - todos os lancamentos contabeis do sistema apagados (todas as empresas)
+Decisao deliberada do usuario: "a casa limpa pra testar com dados reais" - depois do
+incidente do item 4, decidiu-se nao tentar reconstruir/confiar no que sobrou (13
+lancamentos que sobreviveram ao incidente), e sim zerar tudo de proposito, pra reconstruir
+os dados de producao de forma controlada dai pra frente.
+
+**Backup gerado ANTES da limpeza** (obrigatorio, sem excecao, dado o escopo = sistema
+inteiro): `D:\Projetos\Ledgr\backups\backup_pre_limpeza_20260803_091902.dump` (formato
+custom do pg_dump, 782.883 bytes, restauravel seletivamente via `pg_restore`). Pasta
+`backups\` nao existia antes de hoje - criada nesta sessao.
+
+**Verificacao de FK feita antes do DELETE** (Regra de nunca apagar as cegas):
+`ap_entries.journal_entry_id` e `petty_cash_closures.journal_entry_id` apontam pra
+`journal_entries` com `confdeltype='n'` (SET NULL, nao cascade nem restrict) - risco de
+orfandade silenciosa checado e confirmado ZERO linhas vinculadas hoje (`ap_entries`:
+0, `petty_cash_closures`: 0). `journal_entry_items` e cascade de verdade, apagou junto
+sem necessidade de DELETE explicito. `ar_entries` (contratos de locacao, gerador dos
+lancamentos da LM) NAO tem FK de volta pra journal_entries - vinculo e so de geracao,
+sem risco de orfandade.
+
+**Os 13 lancamentos apagados (evidencia capturada antes do DELETE, para referencia se
+algo "sumido" aparecer como sintoma mais adiante):**
+
+| Empresa | Data | Descricao | Modulo origem | Itens |
+|---|---|---|---|---|
+| F5 Participacoes S/A | 2019-05-17 | Capital Social Integralizado sob Custodia dos socios | ACCOUNTING | 2 |
+| Jose Silva Sociedade Individual de Advocacia | 2026-01-31 | Pro-labore Jose Rozinei da Silva - 2026-01 | HR | 6 |
+| LM Administracao de Bens Imoveis Ltda | 2026-06-01 | Reembolso condominio Mare88 - Jun/2026 (repasse) | FINANCE | 2 |
+| LM Administracao de Bens Imoveis Ltda | 2026-06-01 | Receita de competencia: Aluguel Conj32 - Jun/2026 | FINANCE | 2 |
+| LM Administracao de Bens Imoveis Ltda | 2026-06-01 | Receita de competencia: Aluguel Mare88 - Jun/2026 | FINANCE | 2 |
+| LM Administracao de Bens Imoveis Ltda | 2026-06-01 | Receita de competencia: Aluguel LoftSP - Jun/2026 | FINANCE | 2 |
+| LM Administracao de Bens Imoveis Ltda | 2026-06-01 | Receita de competencia: Aluguel Ecoville - Jun/2026 | FINANCE | 2 |
+| LM Administracao de Bens Imoveis Ltda | 2026-06-01 | Receita de competencia: Aluguel NorthYork - Jun/2026 | FINANCE | 2 |
+| LM Administracao de Bens Imoveis Ltda | 2026-06-01 | Receita de competencia: Aluguel Landmark (137/138/139-A) - Jun/2026 | FINANCE | 2 |
+| LM Administracao de Bens Imoveis Ltda | 2026-06-01 | Receita de competencia: Aluguel Mare62 - Jun/2026 | FINANCE | 2 |
+| LM Administracao de Bens Imoveis Ltda | 2026-06-01 | Receita de competencia: Aluguel Guaruja - Jun/2026 | FINANCE | 2 |
+| LM Administracao de Bens Imoveis Ltda | 2026-06-01 | Reembolso condominio Mare62 - Jun/2026 (repasse) | FINANCE | 2 |
+| Pontes Contabilidade | 2005-11-10 | Capital Social sob custodia do socio | ACCOUNTING | 2 |
+
+**Tabelas zeradas**: `journal_entries` (13->0), `journal_entry_items` (cascade, junto),
+`account_balances` (ja estava 0 - "717 saldos" da LM ja tinham sido perdidos no incidente
+do item 4), `ecd_imports` (ja estava 0).
+
+**Efeito colateral direto no trabalho de ontem**: o Capital Social da Pontes Contabilidade
+(o lancamento que motivou a correcao do `saldoIni` no ecd-exporter.service.ts, e que levou
+a conclusao de que a Pontes nao tinha ECD 2025 a entregar) foi apagado. A correcao de
+codigo continua valida e correta - so o dado de teste que a validou nao existe mais,
+precisara ser relancado se quiserem reconfirmar aquele fluxo especifico.
+
+### Pendencias para a proxima sessao
+1. Implementar rotina de backup periodico do banco (nao existia antes de hoje).
+2. LM: decidir migrar plano legado in-place vs substituir pela matriz (ficou mais simples
+   agora, sem lancamento vinculado as 414 contas antigas).
+3. Reconstruir lancamentos de producao de forma controlada (usuario vai relancar dados
+   reais, nao reimportar de arquivo).
+4. Testar `cloneFromPreviousYear` de verdade quando existir um segundo ano-base configurado.
+5. Investigar como/quando o "docker foi comprometido" para evitar recorrencia (fora do
+   escopo desta sessao, mas registrado como risco real e ja materializado 2x).
+
+
+## Registro de horizonte (03/08/2026) - Mapeamento "de/para" entre plano historico e matriz LEDGR
+CHAVE DE BUSCA: `#mapeamento-de-para` `#plano-historico` `#migracao-empresa-existente`
+
+### Situacao futura identificada, NAO implementar agora
+Ao integrar empresas ao LEDGR cujo plano de contas historico (o que o contador ja pratica
+de verdade, fora do sistema) tem estrutura DIFERENTE da matriz padrao (`PlanoContasMatrizLEDGR.txt`),
+substituir o plano pela matriz nao e suficiente - o contador precisa de uma "traducao" entre
+o codigo/nome que ele esta acostumado a usar na pratica e a conta correspondente na matriz,
+para nao ter que memorizar de cabeca toda vez que for lancar.
+
+Isso e conceitualmente da mesma familia dos outros dois "de-para" ja implementados no sistema
+(spedCode/I051 - conta x plano referencial RFB; aglutinationCode/I052 - conta x codigo de
+aglutinacao Bloco J): um TERCEIRO tipo de correlacao, desta vez entre o plano historico
+praticado pelo contador e o plano interno do LEDGR.
+
+**Distincao importante confirmada com o usuario**: isso NAO se aplica a GRB (Advocacia Gomes,
+Rossetti e Barelli) - o plano de contas dela hoje no sistema (351 contas, formato legado
+pontilhado) E o plano real historicamente praticado, e sera substituido pela matriz sem
+necessidade de mapeamento (sem lancamento vinculado para preservar/traduzir). O cenario
+descrito aqui e para empresas FUTURAS, ainda nao identificadas, cujo plano historico diverge
+estruturalmente da matriz.
+
+### Quando essa necessidade aparecer de verdade, considerar:
+- Tela/fluxo de "traducao": contador informa conta antiga (codigo/nome historico) -> sistema
+  sugere/mapeia a conta correspondente na matriz, sem migrar dado historico, so criar o
+  vinculo de referencia para uso ao lancar.
+- Reaproveitar o padrao ja estabelecido nesta sessao para RfbGlobalTable/AccountingViewMapping
+  (correlacao versionada, nunca fixada as cegas, sempre com um caminho de revisao manual)
+  como inspiracao de design, ja que e o mesmo tipo de problema (correlacao entre dois planos
+  de codigos que podem divergir com o tempo).
+
+Fica registrado como HORIZONTE - nao ha trabalho tecnico a fazer agora, so este registro
+para quando a situacao real aparecer.
+
+
+## Sessao 04/08/2026 - Clone de mapeamento por ano, sincronizacao automatica de contador, GRB avancada, bugs reais no IOB LOTD
+CHAVE DE BUSCA: `#clone-ano-anterior` `#sync-contador-vinculo` `#iob-lotd-bugs` `#de-para-plano-historico` `#leiaute9-2024` `#grb`
+
+### 1) cloneFromPreviousYear - implementado, ainda NAO testado end-to-end
+`accounting-views.service.ts` `cloneFromPreviousYear(viewId)`: acha a AccountingView mais
+recente do mesmo tipo/empresa com anoBase menor, revalida cada mapeamento contra
+`rfbLeaves` do ano NOVO antes de clonar (nunca herda cegamente). Rota
+`POST /sped/visoes/views/:id/clone-previous-year`. Botao "Copiar do ano anterior" no
+VisoesContabeisPage.tsx. So sera testado de verdade quando houver 2 anos-base mapeados
+para a mesma empresa - a GRB (2024 mapeado hoje) e boa candidata para testar isso na
+proxima sessao contra 2025.
+
+### 2) Importacao de Person via CSV - investigado, NAO implementado (ja existe: Manutencao de Dados)
+Comecei a construir `POST /persons/import` (DTO + service + controller) antes de descobrir
+que ja existe `/app/settings/data-management` (`export-data.service.ts`
+`importTableFromTxt`), generico para qualquer tabela via layout dinamico do DMMF do
+Prisma. Codigo novo revertido por completo (git-limpo, sem rastro) para nao duplicar
+caminho de importacao.
+
+**2 bugs reais encontrados e corrigidos no `export-data.service.ts` generico** (afetam
+QUALQUER tabela importada por ele, nao so persons):
+- `deletedAt`/`deleted_at` nao estava na lista de campos ignorados - reimportar um
+  arquivo .txt desatualizado reaplicava soft-delete antigo silenciosamente. Incidente
+  real: o cadastro do Helenilto Aureliano Pontes (persons.cpf 56524021991) foi
+  soft-deletado e teve o nome sobrescrito para um valor de teste ("sddfds dsfasdfdfd")
+  DUAS vezes nesta sessao pelo mesmo motivo, ate a causa ser encontrada e corrigida.
+- `id` vazio (registro novo, sem id no arquivo) virava `record.id = null` explicito -
+  Prisma recebia `id: null` no `.create()` e quebrava com "Argument id must not be
+  null". Bloqueava TODA importacao de pessoa nova via essa tela. Corrigido: `if
+  (!record.id) delete record.id;`. Confirmado end-to-end: 6 pessoas novas da GRB
+  importadas com sucesso apos o fix (Adriana Montagna Barelli, Claudia Gomes, Priscila
+  Baldez Bolognesi Rossetti, Julie Cristine Delinski, Eulo Corradi Junior, Ivone Vaz
+  Machado).
+
+### 3) PersonList.tsx - coluna "Vinculos Ativos" mostra raiz de CNPJ, deduplicada
+A pedido do usuario: em vez de "NomeEmpresa · Papel" repetido por vinculo, mostra so a
+raiz do CNPJ (8 digitos) de cada empresa com que a pessoa tem vinculo, uma vez por
+empresa (independente de ter mais de um papel na mesma empresa - ex: Helenilto e
+Socio-Administrador E contador na Pontes, aparece 1x so). Separador "; " entre as
+raizes, a pedido do usuario. `persons.service.ts` `findAll()`: adicionado `taxId: true`
+no select de `companyLinks.company` (faltava para a coluna funcionar).
+
+### 4) PersonForm.tsx - checkboxes assinaEcd/assinaEcf no formulario de Adicionar Vinculo
+Bug documentado desde ontem (01/08), corrigido hoje: nao existia forma de marcar
+`assinaEcd`/`assinaEcf` ao criar um vinculo pela tela de Vinculos - so via SQL direto.
+Agora o formulario "Adicionar Vinculo" tem os dois checkboxes.
+
+### 5) ecd-pre-validate.service.ts - role case-insensitive + textos de menu atualizados
+`contadorLink` query: `role: "contador"` (comparacao exata) trocado por `role: {
+equals: "contador", mode: "insensitive" }` - corrige o mismatch de case ja documentado
+(`PersonForm.tsx` `ROLE_OPTIONS` salva `'CONTADOR'` maiusculo). Textos de `action` dos
+checks C5/C6/W1 atualizados de "Contabilidade > Visoes Contabeis" para "SPED >
+Aglutinacao RFB (Bloco J)", refletindo a reorganizacao de menu de ontem.
+
+### 6) accounting-config.service.ts - sincronizacao automatica contador -> person_companies
+**Decisao do usuario**: ao salvar o Contador Responsavel na aba Contabil da empresa
+(`company_accounting_configs`, tabela de texto solto ja documentada como desconectada
+do ECD real), o sistema agora cria/atualiza automaticamente o vinculo real
+(`person_companies`, role='contador', assinaEcd=true) a partir do CPF informado - SE a
+Person ja existir (nunca inventa cadastro novo, mesmo principio do QsaVinculoGrid.tsx).
+Elimina a necessidade de cadastrar o mesmo dado duas vezes (aba Contabil + tela de
+Vinculos).
+
+**Saga de debug relevante para o futuro**: essa logica ja tinha sido escrita ontem
+(03/08) mas o arquivo `accounting-config.service.ts` estava de volta ao estado original
+(sem a sincronizacao) quando testamos hoje - a logica havia sumido, causa nao
+identificada (nao foi commitada ontem, possivelmente perdida em alguma reescrita
+anterior). Diagnostico levou tempo porque perseguimos uma pista falsa: o campo
+`updated_at` da tabela NAO tem `@updatedAt` no schema, entao nunca mudava mesmo quando
+o save funcionava de verdade - parecia confirmar "nada foi salvo" quando na verdade
+o dado estava sendo salvo normalmente. Licao: nao usar `updated_at` como proxy de
+"salvou ou nao" sem confirmar que o campo tem `@updatedAt` no model.
+
+**Regra de patch reforcada nesta sessao**: tentativas de patch cirurgico (`old_block`/
+`new_block` com match exato de texto multi-linha) falharam repetidas vezes neste
+arquivo pequeno (ate 4x seguidas, mesmo texto, sempre abortando por diferenca invisivel
+de quebra de linha/whitespace). Para arquivos pequenos (<50 linhas), reescrita completa
+do arquivo e mais confiavel que patch cirurgico - adotado como pratica a partir de
+agora para arquivos desse porte.
+
+### 7) leiaute9-2024 - JSONs de aglutinacao RFB gerados a partir de fonte real
+`docs/sped/rfb-codes/leiaute9-2024-BP.json` (732 codigos) e `leiaute9-2024-DRE.json`
+(212 codigos) gerados via parser Python a partir de
+`SPEDCONTABIL_DINAMICO_2021$SPEDECF_DINAMICA_P100$8$1499` e `...P150$5$1500`
+(instalador local do PVA, mesma fonte ja usada para auditar spedCode). Os arquivos
+antigos desses nomes estavam quebrados (1 registro cada) - substituidos. Layout
+confirmado antes de gerar: `CODIGO|DESCRICAO|DT_INI|DT_FIM|ORDEM|TIPO|COD_SUP|NIVEL|
+NATUREZA`, encoding cp1252. Importados com sucesso na GRB: BP=732, DRE=212 (numeros
+praticamente identicos ao leiaute9-2025, diferenca de 1 codigo no DRE - plausivel,
+nao investigado).
+
+### 8) GRB (Advocacia Gomes, Rossetti e Barelli) - avancada significativamente
+- Matriz importada (292 contas, mesmo resultado da Pontes ontem - inserted=292,
+  errors=[]).
+- 6 pessoas novas cadastradas via Manutencao de Dados (apos fix do bug id-null).
+- 3 socias vinculadas via QSA (Adriana, Priscila, Claudia - ja "Ok" no QSA).
+- Contador (Helenilto) vinculado via sincronizacao automatica nova (item 6).
+- Visoes Contabeis 2024 mapeadas (leiaute9-2024, item 7): 81 BP + 83 DRE automaticos,
+  sobrando as MESMAS 2 contas da Pontes sem mapeamento (Impostos Parcelados,
+  Bonificacoes e PLR - mesma matriz, mesmo buraco no autoMatch). Pre-validate 2024:
+  **hasErrors=false**, so C13 warning (sem encerramento) e W1 (as 2 contas).
+- Tentativa de importar lancamentos reais via IOB LOTD (12 arquivos mensais,
+  LOTD24015 a LOTD24125) revelou 2 bugs reais no `iob-lotd-import.service.ts` (item 9)
+  E confirmou a necessidade real de mapeamento "de/para" entre reducedCode antigo (do
+  sistema de origem da GRB) e a matriz nova - 7 contas nao encontradas
+  (001071, 001101, 001139, 001120, ...). **Decisao do usuario**: nao construir o de/para
+  agora, mapear essas 7 manualmente fora do sistema (ajustando reducedCode na tela de
+  Plano de Contas) antes de reimportar.
+
+### 9) iob-lotd-import.service.ts - 2 bugs reais corrigidos
+- `stats.skipped` calculado como `entries.length - groups.reduce(items.length)` -
+  subtraia ITENS (debito+credito, sempre >=2 por lancamento) de LINHAS do arquivo,
+  unidades diferentes. Confirmado na pratica: GRB LOTD24125 mostrou "Nao Encontrados: -2"
+  (24 linhas, 26 itens gerados). Corrigido: `entriesUsed` contado explicitamente em cada
+  ramo de agrupamento (idMap, linha unica com debito+credito, pareamento sequencial),
+  `skipped = entries.length - entriesUsed`.
+- Linha orfa no pareamento sequencial (`pending.length` impar) era descartada em
+  silencio - nao contava em skipped, nao aparecia em notFound, simplesmente
+  desaparecia. Corrigido: sobra registrada em notFoundSet com mensagem explicita.
+
+### 10) Limpeza de dados da GRB (fim de sessao)
+`journal_entries` da GRB em 2024 ja estava zerado (0 rows) quando verificado - o
+usuario ja tinha excluido pelo frontend antes de pedir ajuda. `lote_imports`: 12
+registros (LOTD24015 a LOTD24125, todos status='done') estavam sem `deleted_at`,
+bloqueando reimportacao pela checagem de duplicata (`WHERE fileName, deletedAt: null`).
+Soft-deletados via UPDATE direto (12 registros) para permitir reimportar apos corrigir
+o mapeamento das 7 contas.
+
+### Pendencias para a proxima sessao
+1. Mapear as 7 contas (reducedCode antigo -> conta nova) e reimportar os 12 LOTD da GRB.
+2. Zerar W1 da GRB 2024 (mesmas 2 contas de sempre - Impostos Parcelados / Bonificacoes
+   e PLR, ja sabemos os codigos certos de ontem).
+3. Testar cloneFromPreviousYear de verdade (GRB 2024 -> 2025, quando 2025 for mapeada).
+4. Cenario "de/para plano historico vs matriz" (registrado como horizonte ontem)
+   materializou-se mais cedo que esperado nas 7 contas da GRB - considerar se ainda faz
+   sentido deixar para depois ou se vale adiantar dado o padrao repetindo em empresas
+   novas.
+5. Gerar ECD 2024 de verdade para a GRB apos os lancamentos reais estarem importados.

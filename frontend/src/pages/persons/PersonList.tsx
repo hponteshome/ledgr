@@ -25,7 +25,7 @@ interface Person {
     id: string;
     role: string;
     endDate: string | null;
-    company: { id: string; tradeName: string; legalName: string };
+    company: { id: string; tradeName: string; legalName: string; taxId?: string };
   }>;
 }
 
@@ -35,6 +35,12 @@ const fmtCpf = (v: string) =>
     .replace(/(\d{3})(\d)/, '$1.$2')
     .replace(/(\d{3})(\d{1,2})$/, '$1-$2')
     .slice(0, 14);
+
+// Raiz do CNPJ (8 primeiros digitos) - usada na coluna "Vinculos ativos" para
+// identificar a empresa independente do papel (socio, administrador, contador etc.),
+// a pedido do usuario (03/08/2026): o que importa ali e "com quais empresas a pessoa
+// tem vinculo", nao "com qual papel em cada uma".
+const raizCnpj = (taxId?: string) => (taxId ? taxId.replace(/\D/g, '').slice(0, 8) : '—');
 
 const MARITAL: Record<string, string> = {
   SOLTEIRO: 'Solteiro(a)', CASADO: 'Casado(a)', UNIAO_ESTAVEL: 'União estável',
@@ -151,6 +157,12 @@ export const PersonList: React.FC = () => {
               {persons.map(p => {
                 const reg = registroPrincipal(p);
                 const ativos = p.companyLinks.filter(l => !l.endDate);
+                // Deduplica por empresa - uma pessoa pode ter mais de um vinculo ativo
+                // na mesma empresa (ex: socio-administrador E contador), mas so deve
+                // aparecer uma vez na coluna.
+                const empresasMap = new Map<string, { id: string; tradeName: string; taxId?: string }>();
+                ativos.forEach(l => { if (!empresasMap.has(l.company.id)) empresasMap.set(l.company.id, l.company); });
+                const empresasUnicas = Array.from(empresasMap.values());
                 return (
                   <tr key={p.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-4 py-3">
@@ -174,15 +186,15 @@ export const PersonList: React.FC = () => {
                     </td>
                     <td className="px-4 py-3 hidden lg:table-cell">
                       <div className="flex flex-wrap gap-1">
-                        {ativos.length === 0
+                        {empresasUnicas.length === 0
                           ? <span className="text-gray-300 text-xs">—</span>
-                          : ativos.slice(0, 2).map(l => (
-                            <span key={l.id} className="px-2 py-0.5 bg-green-50 text-green-700 rounded text-xs">
-                              {l.company.tradeName} · {l.role}
+                          : empresasUnicas.slice(0, 4).map(c => (
+                            <span key={c.id} className="px-2 py-0.5 bg-green-50 text-green-700 rounded text-xs font-mono" title={c.tradeName}>
+                              {raizCnpj(c.taxId)}
                             </span>
-                          ))}
-                        {ativos.length > 2 && (
-                          <span className="text-xs text-gray-400">+{ativos.length - 2}</span>
+                          )).reduce((acc, el, i) => i === 0 ? [el] : [...acc, '; ', el], [] as React.ReactNode[])}
+                        {empresasUnicas.length > 4 && (
+                          <span className="text-xs text-gray-400">+{empresasUnicas.length - 4}</span>
                         )}
                       </div>
                     </td>

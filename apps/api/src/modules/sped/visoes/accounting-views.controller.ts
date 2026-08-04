@@ -86,4 +86,9 @@ export class AccountingViewsController {
   ) {
     return this.svc.autoMatch(viewId, req.companyId, body.leiaute, body.anoBase);
   }
+
+  @Post('views/:id/clone-previous-year')
+  clonePreviousYear(@Param('id') viewId: string) {
+    return this.svc.cloneFromPreviousYear(viewId);
+  }
 }

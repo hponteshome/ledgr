@@ -192,6 +192,56 @@ export class AccountingViewsService {
     return { suggestions, total: suggestions.length };
   }
 
+        async cloneFromPreviousYear(viewId: string) {
+          // Herda mapeamentos do ano anterior mais recente do mesmo tipo/empresa, revalidando
+          // cada codigo contra a tabela RFB do ano NOVO antes de aceitar - nunca clona em
+          // silencio. Decisao de arquitetura (02/08/2026): as tabelas RFB sao versionadas por
+          // ano (confirmado com leiaute9-2024 vs leiaute9-2025), entao herdar cegamente sem
+          // revalidar arriscaria propagar um codigo que nao existe mais, ou que deixou de ser
+          // folha, sem ninguem perceber.
+          const view = await this.prisma.accountingView.findUnique({ where: { id: viewId } });
+          if (!view) throw new NotFoundException("Visao nao encontrada");
+          
+          const prevView = await this.prisma.accountingView.findFirst({
+            where: { companyId: view.companyId, tipo: view.tipo, anoBase: { lt: view.anoBase }, isActive: true, deletedAt: null },
+            orderBy: { anoBase: "desc" },
+          });
+          if (!prevView) return { cloned: 0, needsReview: [], total: 0, message: "Nenhuma visao anterior encontrada." };
+          
+          const prevMappings = await this.prisma.accountingViewMapping.findMany({ where: { viewId: prevView.id } });
+          if (prevMappings.length === 0) return { cloned: 0, needsReview: [], total: 0, message: "Visao anterior nao tem mapeamentos." };
+          
+          const rfbCodes = await this.prisma.rfbAglutinationCode.findMany({
+            where: { leiaute: view.leiaute, anoBase: view.anoBase, tipo: view.tipo },
+          });
+          const codigosComFilho = new Set(rfbCodes.filter(c => c.codigoPai).map(c => c.codigoPai as string));
+          const rfbLeafCodes = new Set(rfbCodes.filter(c => !codigosComFilho.has(c.codigo)).map(c => c.codigo));
+          
+          const toClone: { accountId: string; aglutinationCode: string }[] = [];
+          const needsReview: { accountId: string; oldCode: string; reason: string }[] = [];
+          for (const m of prevMappings) {
+            if (rfbLeafCodes.has(m.aglutinationCode)) {
+              toClone.push({ accountId: m.accountId, aglutinationCode: m.aglutinationCode });
+            } else {
+              const reason = rfbCodes.some(c => c.codigo === m.aglutinationCode)
+                ? "codigo virou totalizador (nao-folha) no ano novo"
+                : "codigo nao existe na tabela RFB do ano novo";
+              needsReview.push({ accountId: m.accountId, oldCode: m.aglutinationCode, reason });
+            }
+          }
+          
+          if (toClone.length > 0) {
+            await this.bulkUpsertMappings(viewId, toClone);
+          }
+          
+          return {
+            cloned: toClone.length,
+            needsReview,
+            total: prevMappings.length,
+            fromAnoBase: prevView.anoBase,
+          };
+        }
+        
         async findMappingsGrouped(viewId: string) {
           const view = await this.prisma.accountingView.findUnique({ where: { id: viewId } });
           if (!view) throw new NotFoundException("Visao nao encontrada");

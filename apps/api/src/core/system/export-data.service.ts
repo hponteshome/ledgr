@@ -227,11 +227,29 @@ export class ExportDataService {
         record[header] = val;
       });
 
-      // ── Remover campos gerados automaticamente ───────────────
+      // ── Remover campos gerados/controlados pelo sistema ───────
+      // deletedAt adicionado apos incidente real (03/08/2026): reimportar um arquivo
+      // .txt desatualizado reaplicou soft-delete antigo em cima de um registro que ja
+      // tinha sido restaurado, silenciosamente (Helenilto Aureliano Pontes, persons.cpf
+      // 56524021991) - a importacao generica sobrescreve TODOS os campos do arquivo sem
+      // excecao, entao um dado antigo no arquivo sempre vence o dado atual do banco.
       delete record.createdAt;
       delete record.updatedAt;
       delete record.created_at;
       delete record.updated_at;
+      delete record.deletedAt;
+      delete record.deleted_at;
+
+      // id vazio no arquivo (registro NOVO, ainda sem id) virava record.id = null apos
+      // a normalizacao de string vazia acima, e a chave "id" continuava presente no
+      // objeto - Prisma recebia "id: null" explicito no create() e tentava gravar NULL
+      // na chave primaria em vez de aplicar o default gen_random_uuid(), quebrando com
+      // "Argument id must not be null". Achado real (03/08/2026): 6 pessoas novas da
+      // Advocacia Gomes/AJS (Adriana Montagna Barelli, Claudia Gomes, Priscila Baldez
+      // Bolognesi Rossetti, Julie Cristine Delinski, Eulo Corradi Junior, Ivone Vaz
+      // Machado) todas ignoradas silenciosamente por esse motivo. So remove quando
+      // vazio - id preenchido (fluxo de atualizacao por id) continua funcionando igual.
+      if (!record.id) delete record.id;
       
       // ── Processamento específico por modelo ──────────────────
 
