@@ -164,6 +164,7 @@ export class EcdController {
     @Query('indSitEsp') indSitEsp: string,
     @Query('codPlanRef') codPlanRef: string,
     @Query('hashAnterior') hashAnterior: string,
+    @Query('includeBlocoJ') includeBlocoJ: string,
     @Req() req: any,
     @Res() res: Response,
   ) {
@@ -181,6 +182,7 @@ export class EcdController {
       indSitEsp:    indSitEsp || '',
       codPlanRef:   codPlanRef || '',
       hashAnterior: hashAnterior || '',
+      includeBlocoJ: includeBlocoJ !== 'false',
       bookNumber:  bookNumber || undefined,
       bookType:    (bookType as any) || 'G',
     });

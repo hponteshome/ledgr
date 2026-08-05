@@ -4784,3 +4784,274 @@ o mapeamento das 7 contas.
    sentido deixar para depois ou se vale adiantar dado o padrao repetindo em empresas
    novas.
 5. Gerar ECD 2024 de verdade para a GRB apos os lancamentos reais estarem importados.
+
+
+## Sessao 05/08/2026 - ECD exporter validado end-to-end contra o PVA real (GRB 2024)
+CHAVE DE BUSCA: `#ecd-exporter-pva-validado` `#registro-0000-real` `#j150-hierarquia` `#dt-ex-social` `#i051-cod-plan-ref` `#j930-crc-fallback`
+
+### Resultado final da sessao
+`ecd-exporter.service.ts` testado em ~21 rodadas reais contra o PVA (Programa Validador do
+Sped Contabil), nao so leitura de codigo. Resultado final: **4 erros, todos com causa raiz
+identificada e nao relacionados a bug** - falta de encerramento contabil real de 2024 na GRB
+(decisao deliberada: teste de fluxo, sem saldo de abertura). Estrutura do arquivo (todos os
+registros, campos, hierarquias) confirmada correta pelo proprio PVA.
+
+### Bugs reais corrigidos hoje (confirmados um a um pelo PVA, nao por inspecao)
+
+**1. Registro 0000 - completamente desalinhado, corrigido usando um ECD real como prova.**
+Apos varias tentativas fracassadas de reconstruir a ordem dos 23 campos via documentacao
+(PDF oficial RFB de 234 paginas - extracao sempre recomecava do inicio, impossivel alcancar
+a secao do registro 0000 sem consumir volume impraticavel; doc local
+`ECD-Leiaute9-Referencia.md` da sessao de maio provou estar incompleto - faltava o campo
+`IND_GRANDE_PORTE` por completo, unico modo de descobrir isso foi o proprio erro do PVA;
+PDF local `SPEDContabil-LayoutII-HELP_layout.pdf` era de leiaute ANTIGO, 16 campos, nao
+serve para leiaute 9), a solucao definitiva veio de **usar um registro 0000 real de um ECD
+ja aceito pelo PVA** (fornecido pelo usuario) como gabarito de campo a campo. Corrigido:
+NRE (campo 9) usa `company.nire` real (sempre mandava vazio antes); NAT_LIV nao existe
+separado no 0000 (so no I010); total de 23 campos (nao 24 nem 25 como tentativas anteriores).
+**Licao para o futuro: quando documentacao secundaria for ambigua/insuficiente para um
+registro SPED, um arquivo real ja aceito pelo PVA e a fonte mais rapida e confiavel -
+deveria ter sido o primeiro recurso, nao o ultimo.**
+
+**2. I051 - condicionado a COD_PLAN_REF, nao mais sempre gerado quando spedCode existe.**
+Confirmado no PVA: com `codPlanRef` vazio (decisao de 01/08 - L100A/L300A nao importado),
+gerar I051 e **proibido**, nao so desnecessario (169 erros reais: "Registro nao deve
+existir... Nao houve informacao de plano referencial no registro 0000"). i051Map tambem
+foi corrigido antes (usa spedCode real, nao mais alias de i052Map) - ambas as correcoes sao
+necessarias e complementares.
+
+**3. J150 (DRE) - reescrito com hierarquia real, layout oficial confirmado por fonte externa.**
+Implementacao anterior tinha COD_AGL_SUP como string fixa sem sentido, NIVEL_AGL sempre
+"2", sem campo IND_GRP_DRE. Reescrito espelhando o J100 (ja correto): totalizadores com
+propagacao real via codigoPai, IND_GRP_DRE (R=Receita/D=Despesa, confirmado via changelog
+"novo leiaute ECD 2019") posicionado logo apos COD_AGL_SUP, mesma posicao relativa do
+IND_GRP_BAL no J100. Erro real corrigido em 2 rodadas (13 campos, nao 14 - o campo
+IND_GRP_DRE ja existia disfarcado de indicador D/C duplicado, nao era campo faltando).
+
+**4. J930 - contador duplicado removido; qualificacao/CRC/email/fone corrigidos.**
+- Linha 2 (via `company_accounting_configs`) removida - duplicava com o loop de
+  `personLinks` desde a sincronizacao automatica de ontem.
+- Qualificacao do texto importado da tabela oficial ("Contador/Contabilista") NAO
+  reconhecida pelo PVA - trocado para "Contador" simples (mesmo texto dos exemplos do
+  manual oficial).
+- CRC tem fallback: `person.crcNumber` (global) pode ficar vazio mesmo com o CRC
+  cadastrado na aba Contabil da empresa (`company_accounting_configs.accountantCrc`) -
+  agora usa esse fallback quando o global estiver vazio.
+- EMAIL/FONE do contador (campos 7/8 do J930) sao obrigatorios de verdade - vinham vazios,
+  agora usam a mesma fonte (`company_accounting_configs`).
+
+**5. DT_EX_SOCIAL (I030 campo 12) - SEMPRE obrigatorio, regra real confirmada 2x.**
+Tentativa de condicionar a `hasEncerramento`/`includeBlocoJ` estava errada nos dois
+sentidos: campo vazio -> "obrigatorio nao preenchido"; campo preenchido -> exige Bloco J
+com I350 correspondente. A condicionalidade real (manual oficial, ja citado em sessao
+anterior) e sobre a data cair DENTRO ou FORA do periodo da ECD - para um ECD de ano
+completo (jan-dez), a data de encerramento do exercicio social SEMPRE cai dentro do
+periodo, entao o Bloco J e inescapavelmente obrigatorio nesse caso. Revertido para sempre
+usar `dtFin` (que ja vem corretamente da tela "Fim do periodo", confirmado pelo usuario).
+
+**6. NAT_LIV (I030... nao, campo do proprio 0000) usava bookNature (texto descritivo
+"Livro Diario Geral") em vez de bookType (codigo curto G/R/A/Z/B) - corrigido.**
+
+**7. IND_NIRE usava variavel inexistente `indNireVal` (nunca declarada) - corrigido para
+`company.nire ? "1" : "0"`.**
+
+### Feature nova: includeBlocoJ (parametro opcional na exportacao)
+`GET /sped/ecd/export?...&includeBlocoJ=false` - permite gerar sem J005/J100/J150/J210,
+para casos onde nao ha encerramento contabil real no periodo. **Descoberta importante
+durante a implementacao**: so e util quando o periodo da ECD NAO cobre a data de
+encerramento do exercicio social (ex: ECD parcial/trimestral). Para ano completo, nao
+resolve nada (DT_EX_SOCIAL sempre cai dentro do periodo) - ficou implementado e disponivel
+mesmo assim, para uso futuro em cenarios de periodo parcial.
+
+### Metodologia desta sessao (registrar para sessoes futuras de SPED)
+Varias tentativas de reconstruir layout via documentacao externa (web search, PDF oficial,
+doc local desatualizado) consumiram tempo sem convergir. O que efetivamente funcionou,
+em ordem de eficacia:
+1. **Um arquivo real ja aceito pelo PVA** (gabarito) - resolveu o registro 0000 em 1 tentativa
+   apos varias tentativas fracassadas por outras fontes.
+2. **O proprio PVA, iterativamente** - cada rodada de teste real reduziu erros de forma
+   monotonica (131 -> 43 -> 15 -> 12 -> 11 -> 9 -> 4 -> 1 -> 4 novamente ao reverter uma
+   correcao errada) e deu posicoes/nomes de campo exatos via mensagem de erro.
+3. Fontes externas (web search, PDF completo) - uteis para confirmar CONCEITOS (regras de
+   negocio, significado de campos como IND_GRP_DRE) mas nao confiaveis para POSICOES exatas
+   de campo sem verificacao cruzada.
+**Recomendacao para o futuro**: ao integrar um registro SPED novo, pedir um exemplo real
+validado ANTES de tentar reconstruir via documentacao - economiza varias rodadas.
+
+### Pendencia de processo (nao resolvida, so documentada)
+`ecd.controller.ts`: 3 tentativas de inserir `@Query('includeBlocoJ')` falharam
+silenciosamente (script reportava "OK" mas nada mudava) antes da 4a funcionar - mesma
+classe de problema ja visto varias vezes nesta sessao (match de string multi-linha falhando
+por diferenca invisivel de espaco/quebra). Confirmado hoje: para insercoes pontuais de uma
+linha, buscar uma ANCORA UNICA de linha inteira e inserir via indice de lista e mais
+confiavel que tentar casar um bloco multi-linha exato.
+
+### Estado final da GRB (Advocacia Gomes, Rossetti e Barelli) apos a sessao
+ECD 2024 gerado e validado no PVA: 4 erros remanescentes, causa raiz = ausencia de
+encerramento contabil real (decisao deliberada do usuario de aceitar como limitacao
+conhecida deste teste, nao perseguir mais). Pronta para receber lancamento de encerramento
+real numa sessao futura, se/quando fizer sentido fechar isso de vez.
+
+### Pendencias para a proxima sessao
+1. Se quiser fechar a GRB 2024 sem nenhum erro: lancar encerramento contabil real (zerar
+   contas de resultado contra o PL) e testar de novo.
+2. `PersonForm.tsx` `ROLE_OPTIONS` continua salvando 'CONTADOR' maiusculo (bug de case
+   documentado desde 01/08, ainda nao corrigido - contornado via comparacao
+   case-insensitive no pre-validate, mas nao na origem).
+3. Testar `cloneFromPreviousYear` de verdade quando houver 2 anos-base mapeados pra mesma
+   empresa.
+4. Investigar por que `person.crcNumber`/`crcState` do Helenilto voltaram a ficar vazios
+   durante o dia (mesmo padrao do incidente de `deletedAt` de sessoes anteriores) - possivel
+   efeito colateral de alguma operacao ainda nao identificada.
+5. Considerar migrar o padrao de patch cirurgico multi-linha para o metodo de ancora unica +
+   indice de lista de forma mais sistematica, dado quantas vezes isso causou retrabalho hoje.
+
+
+## Sessao 05/08/2026 - ECD exporter validado end-to-end contra o PVA real (GRB 2024)
+CHAVE DE BUSCA: `#ecd-exporter-pva-validado` `#registro-0000-real` `#j150-hierarquia` `#dt-ex-social` `#i051-cod-plan-ref` `#j930-crc-fallback` `#j930-aba-sped-cia`
+
+### Resultado final da sessao
+`ecd-exporter.service.ts` testado em ~21 rodadas reais contra o PVA (Programa Validador do
+Sped Contabil), nao so leitura de codigo. Resultado final: **4 erros, todos com causa raiz
+identificada e nao relacionados a bug** - falta de encerramento contabil real de 2024 na GRB
+(decisao deliberada: teste de fluxo, sem saldo de abertura). Estrutura do arquivo (todos os
+registros, campos, hierarquias) confirmada correta pelo proprio PVA.
+
+### Bugs reais corrigidos hoje (confirmados um a um pelo PVA, nao por inspecao)
+
+**1. Registro 0000 - completamente desalinhado, corrigido usando um ECD real como prova.**
+Apos varias tentativas fracassadas de reconstruir a ordem dos 23 campos via documentacao
+(PDF oficial RFB de 234 paginas - extracao sempre recomecava do inicio, impossivel alcancar
+a secao do registro 0000 sem consumir volume impraticavel; doc local
+`ECD-Leiaute9-Referencia.md` da sessao de maio provou estar incompleto - faltava o campo
+`IND_GRANDE_PORTE` por completo, unico modo de descobrir isso foi o proprio erro do PVA;
+PDF local `SPEDContabil-LayoutII-HELP_layout.pdf` era de leiaute ANTIGO, 16 campos, nao
+serve para leiaute 9), a solucao definitiva veio de **usar um registro 0000 real de um ECD
+ja aceito pelo PVA** (fornecido pelo usuario) como gabarito de campo a campo. Corrigido:
+NRE (campo 9) usa `company.nire` real (sempre mandava vazio antes); NAT_LIV nao existe
+separado no 0000 (so no I010); total de 23 campos (nao 24 nem 25 como tentativas anteriores).
+**Licao para o futuro: quando documentacao secundaria for ambigua/insuficiente para um
+registro SPED, um arquivo real ja aceito pelo PVA e a fonte mais rapida e confiavel -
+deveria ter sido o primeiro recurso, nao o ultimo.**
+
+**2. I051 - condicionado a COD_PLAN_REF, nao mais sempre gerado quando spedCode existe.**
+Confirmado no PVA: com `codPlanRef` vazio (decisao de 01/08 - L100A/L300A nao importado),
+gerar I051 e **proibido**, nao so desnecessario (169 erros reais: "Registro nao deve
+existir... Nao houve informacao de plano referencial no registro 0000"). i051Map tambem
+foi corrigido antes (usa spedCode real, nao mais alias de i052Map) - ambas as correcoes sao
+necessarias e complementares.
+
+**3. J150 (DRE) - reescrito com hierarquia real, layout oficial confirmado por fonte externa.**
+Implementacao anterior tinha COD_AGL_SUP como string fixa sem sentido, NIVEL_AGL sempre
+"2", sem campo IND_GRP_DRE. Reescrito espelhando o J100 (ja correto): totalizadores com
+propagacao real via codigoPai, IND_GRP_DRE (R=Receita/D=Despesa, confirmado via changelog
+"novo leiaute ECD 2019") posicionado logo apos COD_AGL_SUP, mesma posicao relativa do
+IND_GRP_BAL no J100. Erro real corrigido em 2 rodadas (13 campos, nao 14 - o campo
+IND_GRP_DRE ja existia disfarcado de indicador D/C duplicado, nao era campo faltando).
+
+**4. J930 (Signatarios) - DUAS FONTES DE DADO DIFERENTES na aba SPED/Contabil da Cia,
+   formacao completa do registro documentada aqui pela primeira vez com detalhe:**
+
+O J930 tem hoje 3 tipos de linha, cada uma com sua propria logica de geracao:
+
+- **Linha 1 - Pessoa Juridica (e-CNPJ), COD_QUALIF=001**: sempre gerada, usa
+  `company.legalName`/`taxId` direto. Marcada como responsavel pela assinatura (IND_RESP=S).
+  Fonte: tabela `companies`.
+
+- **Linha 2 (removida hoje) - vinha de `company_accounting_configs`** (a tabela por tras da
+  aba Contabil da empresa, campos "Contador Responsavel"/CRC/e-mail/telefone do contador).
+  Foi removida do LOOP DE GERACAO DE LINHA porque duplicava com a linha 3 (mesmo contador,
+  2x como COD_ASSIN=900) - mas a TABELA continua sendo consultada, so que agora como
+  **fallback de CRC/e-mail/telefone** dentro do loop da linha 3, nao mais como fonte de
+  uma linha propria. Ver `accConfigForCrc` no codigo.
+
+- **Linha 3+ (socios/administradores/contador) - vem de `person_companies`** (vinculos
+  reais Pessoa-Empresa, campo `role` + `assinaEcd`/`assinaEcf`). Para cada vinculo:
+  - `role` (minusculo, comparado case-insensitive) mapeado para COD_ASSIN via
+    `ROLE_TO_COD_ASSIN` (contador->900, socio->801, diretor->203, etc - tabela completa no
+    codigo).
+  - Para `role='contador'` (COD_ASSIN=900) especificamente: **CRC, e-mail e telefone NAO
+    vem de `person.crcNumber`/etc (cadastro global da Pessoa Fisica) quando esses campos
+    estao vazios la** - usam FALLBACK para os mesmos campos em `company_accounting_configs`
+    (aba Contabil da empresa especifica). Achado real hoje (GRB): o CRC do Helenilto estava
+    vazio no cadastro GLOBAL de Pessoa Fisica, mas preenchido na aba Contabil da GRB - o
+    exporter so olhava a fonte global antes da correcao de hoje.
+  - Qualificacao (nome textual, campo entre COD_ASSIN e CRC): usa **sempre "Contador"** para
+    role=contador (nao o texto importado de `rfb_global_tables`, "Contador/Contabilista",
+    que o PVA rejeita como IDENT_QUALIF invalido) e o nome real de `rfb_global_tables` para
+    os demais papeis.
+  - EMAIL (campo 7) e FONE (campo 8) sao **obrigatorios de verdade** quando COD_ASSIN=900,
+    nao condicionais - vinham vazios, corrigido hoje.
+
+**Resumo pratico**: se um contador nao aparecer corretamente qualificado/documentado no
+J930, checar NESTA ORDEM: (1) `person_companies` tem o vinculo com `role='contador'` e
+`assinaEcd=true`? (2) `persons.crc_number`/`crc_state` (cadastro global) estao preenchidos?
+Se nao, (3) `company_accounting_configs.accountant_crc`/`accountant_email`/
+`accountant_phone` (aba Contabil da empresa especifica) estao preenchidos? O exporter tenta
+(2) primeiro, cai para (3) se vazio.
+
+**5. DT_EX_SOCIAL (I030 campo 12) - SEMPRE obrigatorio, regra real confirmada 2x.**
+Tentativa de condicionar a `hasEncerramento`/`includeBlocoJ` estava errada nos dois
+sentidos: campo vazio -> "obrigatorio nao preenchido"; campo preenchido -> exige Bloco J
+com I350 correspondente. A condicionalidade real (manual oficial, ja citado em sessao
+anterior) e sobre a data cair DENTRO ou FORA do periodo da ECD - para um ECD de ano
+completo (jan-dez), a data de encerramento do exercicio social SEMPRE cai dentro do
+periodo, entao o Bloco J e inescapavelmente obrigatorio nesse caso. Revertido para sempre
+usar `dtFin` (que ja vem corretamente da tela "Fim do periodo", confirmado pelo usuario).
+
+**6. NAT_LIV (campo do proprio registro 0000) usava bookNature (texto descritivo "Livro
+Diario Geral") em vez de bookType (codigo curto G/R/A/Z/B) - corrigido.**
+
+**7. IND_NIRE usava variavel inexistente `indNireVal` (nunca declarada) - corrigido para
+`company.nire ? "1" : "0"`.**
+
+### Feature nova: includeBlocoJ (parametro opcional na exportacao)
+`GET /sped/ecd/export?...&includeBlocoJ=false` - permite gerar sem J005/J100/J150/J210,
+para casos onde nao ha encerramento contabil real no periodo. **Descoberta importante
+durante a implementacao**: so e util quando o periodo da ECD NAO cobre a data de
+encerramento do exercicio social (ex: ECD parcial/trimestral). Para ano completo, nao
+resolve nada (DT_EX_SOCIAL sempre cai dentro do periodo) - ficou implementado e disponivel
+mesmo assim, para uso futuro em cenarios de periodo parcial.
+
+### Metodologia desta sessao (registrar para sessoes futuras de SPED)
+Varias tentativas de reconstruir layout via documentacao externa (web search, PDF oficial,
+doc local desatualizado) consumiram tempo sem convergir. O que efetivamente funcionou,
+em ordem de eficacia:
+1. **Um arquivo real ja aceito pelo PVA** (gabarito) - resolveu o registro 0000 em 1 tentativa
+   apos varias tentativas fracassadas por outras fontes.
+2. **O proprio PVA, iterativamente** - cada rodada de teste real reduziu erros de forma
+   monotonica (131 -> 43 -> 15 -> 12 -> 11 -> 9 -> 4 -> 1 -> 4 novamente ao reverter uma
+   correcao errada) e deu posicoes/nomes de campo exatos via mensagem de erro.
+3. Fontes externas (web search, PDF completo) - uteis para confirmar CONCEITOS (regras de
+   negocio, significado de campos como IND_GRP_DRE) mas nao confiaveis para POSICOES exatas
+   de campo sem verificacao cruzada.
+**Recomendacao para o futuro**: ao integrar um registro SPED novo, pedir um exemplo real
+validado ANTES de tentar reconstruir via documentacao - economiza varias rodadas.
+
+### Pendencia de processo (nao resolvida, so documentada)
+`ecd.controller.ts`: 3 tentativas de inserir `@Query('includeBlocoJ')` falharam
+silenciosamente (script reportava "OK" mas nada mudava) antes da 4a funcionar - mesma
+classe de problema ja visto varias vezes nesta sessao (match de string multi-linha falhando
+por diferenca invisivel de espaco/quebra). Confirmado hoje: para insercoes pontuais de uma
+linha, buscar uma ANCORA UNICA de linha inteira e inserir via indice de lista e mais
+confiavel que tentar casar um bloco multi-linha exato.
+
+### Estado final da GRB (Advocacia Gomes, Rossetti e Barelli) apos a sessao
+ECD 2024 gerado e validado no PVA: 4 erros remanescentes, causa raiz = ausencia de
+encerramento contabil real (decisao deliberada do usuario de aceitar como limitacao
+conhecida deste teste, nao perseguir mais). Pronta para receber lancamento de encerramento
+real numa sessao futura, se/quando fizer sentido fechar isso de vez.
+
+### Pendencias para a proxima sessao
+1. Se quiser fechar a GRB 2024 sem nenhum erro: lancar encerramento contabil real (zerar
+   contas de resultado contra o PL) e testar de novo.
+2. `PersonForm.tsx` `ROLE_OPTIONS` continua salvando 'CONTADOR' maiusculo (bug de case
+   documentado desde 01/08, ainda nao corrigido - contornado via comparacao
+   case-insensitive no pre-validate, mas nao na origem).
+3. Testar `cloneFromPreviousYear` de verdade quando houver 2 anos-base mapeados pra mesma
+   empresa.
+4. Investigar por que `person.crcNumber`/`crcState` do Helenilto voltaram a ficar vazios
+   durante o dia (mesmo padrao do incidente de `deletedAt` de sessoes anteriores) - possivel
+   efeito colateral de alguma operacao ainda nao identificada.
+5. Considerar migrar o padrao de patch cirurgico multi-linha para o metodo de ancora unica +
+   indice de lista de forma mais sistematica, dado quantas vezes isso causou retrabalho hoje.
