@@ -70,7 +70,7 @@ export class JournalEntryService {
   }) {
 
     const { dateFrom, dateTo, search, sources, accountCode, page = 1, limit = 50, orderBy = 'date', orderDir = 'asc' } = params;
-    const where: any = { companyId };
+    const where: any = { companyId, deletedAt: null };
 
     // ── Filtro de período ───────────────────────────────────────
     // Usa toUTC/toUTCEnd para garantir comparação correta independente do fuso
@@ -377,7 +377,7 @@ async bulkDelete(companyId: string, filters: BulkDeleteFilters) {
   const { dryRun = false } = filters;
 
   // ── Monta filtro base ───────────────────────────────────────
-  const where: any = { companyId };
+  const where: any = { companyId, deletedAt: null };
 
   if (filters.dateFrom || filters.dateTo) {
     where.date = {};

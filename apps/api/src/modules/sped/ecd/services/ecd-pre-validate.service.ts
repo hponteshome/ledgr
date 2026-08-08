@@ -292,7 +292,7 @@ export class EcdPreValidateService {
     }
 
     const entryCount = await this.prisma.journalEntry.count({
-      where: { companyId, date: { gte: ps, lte: pe } },
+      where: { companyId, date: { gte: ps, lte: pe }, deletedAt: null },
     });
 
     const hasEncerramento = await this.prisma.journalEntry.findFirst({
@@ -325,6 +325,7 @@ export class EcdPreValidateService {
       JOIN chart_of_accounts ca ON ca.id = jei.account_id
       WHERE je.company_id = ${companyId}::uuid
         AND je.date <= ${pe}
+        AND je.deleted_at IS NULL
         AND ca.deleted_at IS NULL
         AND ca.is_analytic = true
       GROUP BY ca.type
@@ -334,11 +335,11 @@ export class EcdPreValidateService {
     const totalAsset = byType.get("ASSET") ?? 0;
     const totalLiab = byType.get("LIABILITY") ?? 0;
     const totalEquity = byType.get("EQUITY") ?? 0;
-    const diff = Math.abs(totalAsset - (totalLiab + totalEquity));
+    const diff = Math.abs(totalAsset + totalLiab + totalEquity);
     if (diff > 0.01 && entryCount > 0) {
       checks.push({
         id: "W2", level: "WARNING",
-        title: "Balanco desequilibrado - diferenca de R$ " + diff.toFixed(2),
+        title: "Balanco desequilibrado - diferenca de R$ " + diff.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
         description: "Ativo diferente de Passivo + PL calculado a partir dos lancamentos. Pode indicar lancamentos incorretos ou encerramento nao realizado.",
         action: "Verifique o Razao Analitico e o Balancete de Verificacao.",
       });

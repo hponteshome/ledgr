@@ -8,8 +8,44 @@ import { QsaVinculoGrid } from './QsaVinculoGrid';
 
 interface Props { companyId: string; labelCls: string; inputCls: string; partners?: any[]; }
 
+// ── AccountPicker simples (mesmo padrao usado em FolhaPage.tsx) ─────────────
+function AccountPicker({ label, value, onChange, accounts }: { label:string; value:string; onChange:(id:string)=>void; accounts:any[] }) {
+  const [q, setQ] = React.useState('');
+  const [open, setOpen] = React.useState(false);
+  const safe = Array.isArray(accounts) ? accounts : [];
+  const selected = safe.find(a => a.id === value);
+  const display = selected ? (selected.reducedCode ?? selected.code) + ' — ' + selected.name : '';
+  const qNorm = q.replace(/\./g, '');
+  const filtered = qNorm.length >= 1
+    ? safe.filter(a => a.code.includes(qNorm) || (a.reducedCode??'').replace(/\./g,'').includes(qNorm) || a.name.toLowerCase().includes(q.toLowerCase())).slice(0, 10)
+    : [];
+  return (
+    <div style={{position:'relative',marginBottom:10}}>
+      <label style={{fontSize:10,textTransform:'uppercase' as const,color:'#6B7280',display:'block',marginBottom:3}}>{label}</label>
+      <input style={{height:34,border:'0.5px solid #E5E7EB',borderRadius:6,padding:'0 9px',fontSize:13,width:'100%',boxSizing:'border-box' as const}}
+        value={open ? q : display} placeholder="Codigo ou nome..."
+        onFocus={()=>{setOpen(true);setQ('');}}
+        onBlur={()=>setTimeout(()=>setOpen(false),200)}
+        onChange={e=>setQ(e.target.value)} />
+      {value && !open && <button onClick={()=>onChange('')} style={{position:'absolute',right:6,top:24,background:'none',border:'none',cursor:'pointer',color:'#9CA3AF',fontSize:13}}>×</button>}
+      {open && filtered.length > 0 && (
+        <div style={{position:'absolute',zIndex:999,background:'#fff',border:'0.5px solid #E5E7EB',borderRadius:6,width:'100%',maxHeight:180,overflowY:'auto' as const,boxShadow:'0 4px 12px rgba(0,0,0,.08)'}}>
+          {filtered.map(a=>(
+            <div key={a.id} onMouseDown={()=>{onChange(a.id);setOpen(false);setQ('');}}
+              style={{padding:'6px 10px',fontSize:12,cursor:'pointer',borderBottom:'0.5px solid #F5F5F5'}}>
+              <span style={{fontWeight:500,color:'#1D4ED8'}}>{a.reducedCode??a.code}</span>
+              <span style={{color:'#6B7280',marginLeft:8}}>{a.name}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export const ContabilTab: React.FC<Props> = ({ companyId, labelCls, inputCls, partners }) => {
   const [config, setConfig] = useState<any>({});
+  const [accounts, setAccounts] = useState<any[]>([]);
   const [searchParams] = useSearchParams();
   const [saving, setSaving] = useState(false);
   useEffect(() => {
@@ -20,6 +56,14 @@ export const ContabilTab: React.FC<Props> = ({ companyId, labelCls, inputCls, pa
       if (cnpjParam && !base.escritorioCnpj) base.escritorioCnpj = cnpjParam;
       setConfig(base);
     })
+  }, [companyId]);
+  useEffect(() => {
+    api.get('/chart-of-accounts/tree', { headers: { 'x-company-id': companyId } }).then(r => {
+      const flat: any[] = [];
+      function walk(nodes: any[]) { for (const n of (nodes||[])) { if (n.isAnalytic===true) flat.push(n); if (n.children) walk(n.children); } }
+      walk(Array.isArray(r.data) ? r.data : (r.data?.items ?? []));
+      setAccounts(flat);
+    }).catch(() => {});
   }, [companyId]);
 
   const upd = (field: string, value: string) => setConfig((p: any) => ({ ...p, [field]: value }));
@@ -95,6 +139,17 @@ export const ContabilTab: React.FC<Props> = ({ companyId, labelCls, inputCls, pa
               setConfig((p: any) => ({...p, accountantPhone: fmt}));
             }} placeholder="(41) 99999-9999" className={inputCls} />
           </div>
+        </div>
+      </div>
+
+      {/* Encerramento de Exercicio */}
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4">
+        <div className="text-xs font-bold text-gray-500 uppercase tracking-widest border-l-4 border-emerald-500 pl-3">Encerramento de Exercício</div>
+        <p className="text-xs text-gray-500">Configure as contas usadas para zerar Receitas/Despesas no encerramento anual. Todas são necessárias para o encerramento ser gerado.</p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <AccountPicker label="Apuração do Resultado (ARE)" value={config.encerramentoContaApuracaoResultadoId||''} onChange={v=>upd('encerramentoContaApuracaoResultadoId', v)} accounts={accounts} />
+          <AccountPicker label="Lucro do Exercício" value={config.encerramentoContaLucroExercicioId||''} onChange={v=>upd('encerramentoContaLucroExercicioId', v)} accounts={accounts} />
+          <AccountPicker label="Prejuízo do Exercício" value={config.encerramentoContaPrejuizoExercicioId||''} onChange={v=>upd('encerramentoContaPrejuizoExercicioId', v)} accounts={accounts} />
         </div>
       </div>
 

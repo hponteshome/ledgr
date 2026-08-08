@@ -1,5 +1,6 @@
 // frontend/src/pages/accounting/JournalPage.tsx
 import { BulkDeleteModal } from './BulkDeleteModal';
+import { EncerramentoExercicioModal } from './EncerramentoExercicioModal';
 
 import { IobLotdImportModal } from './IobLotdImportModal';
 import EcdOpeningModal from '../../components/accounting/EcdOpeningModal';
@@ -329,6 +330,7 @@ const JournalPage: React.FC = () => {
     const [editEntry, setEditEntry] = useState<JournalEntry | null>(null);
     const [actionLoading, setActionLoading] = useState(false);
     const [showBulkDelete, setShowBulkDelete] = useState(false);
+    const [showEncerramento, setShowEncerramento] = useState(false);
     const [showEcdOpening, setShowEcdOpening] = useState(false);
     const [showLotdModal, setShowLotdModal] = useState(false);
     const [showRecent, setShowRecent] = useState(true);
@@ -616,6 +618,10 @@ const JournalPage: React.FC = () => {
                         <input type="checkbox" checked={showRecent} onChange={e => setShowRecent(e.target.checked)} className="accent-blue-600" />
                         Mostrar Lançamentos
                     </label>
+                    <button onClick={() => setShowEncerramento(true)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-emerald-700 border border-emerald-200 bg-emerald-50 rounded-lg hover:bg-emerald-100">
+                        Encerrar Exercício
+                    </button>
                     <button className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50">
                         <FiLogOut size={14} /> Sair do modo lançamento
                     </button>
@@ -821,6 +827,14 @@ const JournalPage: React.FC = () => {
                 <BulkDeleteModal companyId={activeCompany.id} defaultFrom={currentMonth.from} defaultTo={currentMonth.to}
                     onClose={() => setShowBulkDelete(false)}
                     onDeleted={() => { setShowBulkDelete(false); loadEntries(); loadTotals(); }} />
+            )}
+
+            {showEncerramento && (
+                <EncerramentoExercicioModal
+                    defaultYear={new Date(currentMonth.from).getFullYear() || new Date().getFullYear()}
+                    onClose={() => setShowEncerramento(false)}
+                    onDone={() => { setShowEncerramento(false); loadEntries(); loadTotals(); }}
+                />
             )}
 
             {/* Grid de lançamentos */}

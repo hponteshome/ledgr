@@ -3223,6 +3223,11 @@ model CompanyAccountingConfig {
   hrContaFgtsPassId       String? @map("hr_conta_fgts_pass_id") @db.Uuid       // C FGTS a Recolher
   accountantPhone    String? @map("accountant_phone") @db.VarChar(20)
 
+  // Contas contabeis — Encerramento de Exercicio
+  encerramentoContaApuracaoResultadoId String? @map("encerramento_conta_apuracao_resultado_id") @db.Uuid // Conta transitoria ARE
+  encerramentoContaLucroExercicioId    String? @map("encerramento_conta_lucro_exercicio_id") @db.Uuid    // Lucro do Exercicio (resultado positivo)
+  encerramentoContaPrejuizoExercicioId String? @map("encerramento_conta_prejuizo_exercicio_id") @db.Uuid // Prejuizo do Exercicio (resultado negativo)
+
   // Configuracao contabil
   moeda         String? @default("BRL") @map("moeda") @db.VarChar(3)
   casasDecimais Int?    @default(2) @map("casas_decimais")

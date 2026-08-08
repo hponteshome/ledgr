@@ -9,6 +9,14 @@ import toast from "react-hot-toast";
 import { SmartDateInput } from "../../components/SmartDateInput";
 import { useCompany } from "../../contexts/CompanyContext";
 
+const ECD_PREVALIDATE_LAST_YEAR_KEY = "ledgr_ecd_prevalidate_last_year";
+
+function getDefaultEcdYear(): number {
+  const stored = localStorage.getItem(ECD_PREVALIDATE_LAST_YEAR_KEY);
+  const parsed = stored ? parseInt(stored, 10) : NaN;
+  return Number.isFinite(parsed) ? parsed : new Date().getFullYear();
+}
+
 interface Check {
   id: string;
   level: "ERROR" | "WARNING" | "INFO";
@@ -100,8 +108,17 @@ export default function EcdPreValidatePage() {
   const navigate = useNavigate();
   const { activeCompany: currentCompany } = useCompany();
 
-  const [periodStart, setPeriodStart] = useState("");
-  const [periodEnd, setPeriodEnd]     = useState("");
+  const [periodStart, setPeriodStart] = useState(() => `${getDefaultEcdYear()}-01-01`);
+  const [periodEnd, setPeriodEnd]     = useState(() => `${getDefaultEcdYear()}-12-31`);
+
+  const handlePeriodStartChange = (v: string) => {
+    setPeriodStart(v);
+    const year = v?.slice(0, 4);
+    if (year && /^\d{4}$/.test(year)) {
+      setPeriodEnd(`${year}-12-31`);
+      localStorage.setItem(ECD_PREVALIDATE_LAST_YEAR_KEY, year);
+    }
+  };
   const [result, setResult]           = useState<PreValidateResult | null>(null);
   const [loading, setLoading]         = useState(false);
 

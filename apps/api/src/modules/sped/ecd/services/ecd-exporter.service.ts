@@ -123,7 +123,7 @@ export class EcdExporterService {
     // Movimentos do periodo por mes e conta
     const periodItems = await this.prisma.journalEntryItem.findMany({
       where: { journalEntry: { companyId, date: { gte: periodStart, lte: periodEnd }, deletedAt: null } },
-      select: { accountId: true, type: true, value: true, journalEntry: { select: { date: true } } },
+      select: { accountId: true, type: true, value: true, journalEntry: { select: { date: true, description: true } } },
     });
     const byMonthAcc = new Map<string, Map<string, { deb: number; cre: number }>>();
     for (const item of periodItems) {
@@ -154,15 +154,21 @@ export class EcdExporterService {
       rollupMap.set(acc.parentId, (rollupMap.get(acc.parentId) ?? 0) + child);
     }
 
-    // Movimentos DRE por conta
+    // Movimentos DRE por conta -- exclui os proprios lancamentos de encerramento.
+    // Bug real encontrado 08/2026 (GRB): o saldo anual de Receita/Despesa fechava em
+    // ~0 (I355 e J150/DRE saiam zerados) porque o encerramento, lancado dentro do
+    // mesmo ano, ja zera cada conta -- inclui-lo aqui esconde o saldo real pre-fechamento.
     const dreMap = new Map<string, { deb: number; cre: number }>();
-    for (const [, accMap] of byMonthAcc) {
-      for (const [aid, mv] of accMap) {
-        const acc = accounts.find(a => a.id === aid);
-        if (!acc || !["REVENUE","EXPENSE"].includes(acc.type.toString())) continue;
-        const cur = dreMap.get(aid) ?? { deb: 0, cre: 0 };
-        dreMap.set(aid, { deb: cur.deb + mv.deb, cre: cur.cre + mv.cre });
-      }
+    for (const item of periodItems) {
+      if (!analyticIds.has(item.accountId)) continue;
+      const acc = accounts.find(a => a.id === item.accountId);
+      if (!acc || !["REVENUE","EXPENSE"].includes(acc.type.toString())) continue;
+      const desc = ((item.journalEntry as any)?.description ?? "").toLowerCase();
+      if (desc.includes("encerr") || desc.includes("zeramento")) continue;
+      const cur = dreMap.get(item.accountId) ?? { deb: 0, cre: 0 };
+      if (item.type === "DEBIT") cur.deb += Number(item.value);
+      else                       cur.cre += Number(item.value);
+      dreMap.set(item.accountId, cur);
     }
     const dreRollup = new Map<string, { deb: number; cre: number }>(dreMap);
     for (const acc of sorted) {
@@ -276,7 +282,14 @@ export class EcdExporterService {
     }
     const accountsFiltered = accounts.filter(a => activeIds.has(a.id));
     for (const acc of accountsFiltered) {
-      const dtAlt      = this.fmtDate(acc.createdAt);
+      // DT_ALT nao pode ser posterior ao fim do periodo da ECD -- o plano de
+      // contas foi reconstruido em 24/07/2026 e a maioria das contas tem
+      // createdAt posterior a qualquer periodo historico. Usa o menor entre
+      // createdAt e o fim do periodo (achado real no PVA, 08/2026, GRB: 309
+      // advertencias "data de alteracao maior que o fim do periodo").
+      const createdAtDate = acc.createdAt instanceof Date ? acc.createdAt : new Date(acc.createdAt);
+      const periodEndDate = periodEnd instanceof Date ? periodEnd : new Date(periodEnd);
+      const dtAlt      = this.fmtDate(createdAtDate > periodEndDate ? periodEndDate : createdAtDate);
       const natCode    = this.typeToNat(acc.type.toString());
       const indCta     = acc.isAnalytic ? "A" : "S";
       const parentCode = acc.parentId ? (codeById.get(acc.parentId) ?? "") : "";
@@ -349,7 +362,13 @@ export class EcdExporterService {
         .replace(/[^a-zA-Z0-9 \-]/g, " ")
         .replace(/\s+/g, " ").trim().substring(0, 40);
       // |I200|NUM_ORD|DT_LCTO|VL_LCTO|IND_LCTO|DSC_COMPL|NR_DOC|
-      add(P+"I200"+P+numLcto+P+this.fmtDate(dt)+P+this.fmtDec(totalDeb)+P+"N"+P+P);
+      // IND_LCTO: "E" para lancamentos de encerramento (zeramento de Receita/
+      // Despesa), "N" para os demais. Sem isso o PVA nao consegue casar o I355
+      // (saldo antes do encerramento) com o lancamento que efetivamente fecha a
+      // conta -- bug real encontrado no PVA (08/2026, GRB).
+      const descLower = (entry.description || "").toLowerCase();
+      const indLcto = (descLower.includes("encerr") || descLower.includes("zeramento")) ? "E" : "N";
+      add(P+"I200"+P+numLcto+P+this.fmtDate(dt)+P+this.fmtDec(totalDeb)+P+indLcto+P+P);
       for (const item of entry.items) {
         const sign    = item.type === "DEBIT" ? "D" : "C";
         const codCta  = item.account.code;

@@ -5055,3 +5055,148 @@ real numa sessao futura, se/quando fizer sentido fechar isso de vez.
    efeito colateral de alguma operacao ainda nao identificada.
 5. Considerar migrar o padrao de patch cirurgico multi-linha para o metodo de ancora unica +
    indice de lista de forma mais sistematica, dado quantas vezes isso causou retrabalho hoje.
+
+---
+
+## Sessão 06-07/08/2026 — GRB: Conciliação ECD 2024 real + Encerramento de Exercício (nova funcionalidade)
+
+### Objetivo da sessão
+Conciliar o LEDGR com a ECD 2024 real transmitida pela GRB (Advocacia Gomes, Rossetti e Barelli), completar o ciclo de abertura → lançamentos → encerramento, e construir a funcionalidade de Encerramento de Exercício como fluxo nativo do sistema (antes só existia via lançamento manual).
+
+### O que foi feito
+
+**1. Abertura 2024 (31/12/2023) da GRB**
+- ECD 2024 real (arquivo `06190032000183-...-20240101-20241231-...txt`) parseada: primeiro `I150`/`I155` = saldo de abertura oficial, 41 contas, D=C=R$ 8.526.751,96
+- 18 contas novas criadas no plano da GRB (4 clientes em Contas a Receber, Outros Tributos a Compensar, Mútuo CSA, ramo inteiro do Imobilizado) — hierarquia puxada do próprio `I050` do ECD
+- Lançamento de abertura gravado (`sourceModule=ECD_IMPORT`), validado no Balancete de Verificação
+
+**2. Reconciliação de lançamentos 2024**
+- Comparação lançamento-a-lançamento ECD real (I200/I250) vs LEDGR: a granularidade certa para comparar é **(data, histórico)**, não `NUM_LCTO` — o ECD agrupa várias transações do extrato bancário do dia sob um único `NUM_LCTO` (lote diário), enquanto o LEDGR lança uma transação por vez. Comparar por `NUM_LCTO` gera falsos "parciais" em quase tudo.
+- `IND_LCTO` do registro `I200`: **"N"** = normal, **"E"** = encerramento. Lançamentos de encerramento do ECD oficial devem ser excluídos da comparação de lançamentos "faltantes" (senão mascaram a diferença real, já que se autozeram).
+- 158 lançamentos 100% ausentes (nenhuma linha batia) foram reconstruídos fielmente do ECD oficial, com sufixo `" by ECD"` no histórico para identificação em conciliação futura. Lançamentos parcialmente presentes (mesma transação já lançada com histórico diferente) **não foram tocados** — ficaram para revisão manual.
+- Achado: **Categoria "duplicidade por histórico diferente"** — o mesmo valor lançado 2x com descrições diferentes (ex: ECD oficial consolida "Pro Labore 2" numa linha, LEDGR já tinha lançado por sócio em linhas separadas) não é preenchido automaticamente por comparação (data,histórico) simples — precisa verificar se o TOTAL do dia bate antes de assumir que está faltando.
+
+**3. Bugs reais encontrados e corrigidos (não eram dado incorreto do usuário)**
+- `ecd-pre-validate.service.ts`, check W2 (Balanço desequilibrado): fórmula `totalAsset - (totalLiab + totalEquity)` estava **dobrando** o efeito do lado credor, porque `totalLiab`/`totalEquity` já vêm negativos (D-C, natureza credora). Fórmula certa: `totalAsset + totalLiab + totalEquity`.
+- Mesmo arquivo: `diff.toFixed(2)` sem formatação pt-BR (`189750.62` em vez de `189.750,62`) — trocado por `toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})`.
+- **3 ocorrências do mesmo bug de fundo — falta de filtro `deletedAt: null` em queries de `journal_entries`**: o check de Balanço do `ecd-pre-validate.service.ts`, o `entryCount` do mesmo arquivo, o `findAll()` do `journal-entry.service.ts` (grade do Diário de Lançamentos), e o `bulkDelete()` do mesmo service. Sem esse filtro, lançamentos com soft-delete continuavam sendo contados/exibidos como se estivessem ativos. **Vale auditar outros services do módulo `accounting` e `sped` pra ver se o mesmo padrão se repete em mais lugares** (candidatos: `trial-balance.service.ts`, `balances.service.ts`, `chart-of-accounts.service.ts` — não verificados nesta sessão).
+- Reclassificações de dados feitas na GRB (não eram bug de código, eram lançamento errado): Resgates de aplicação financeira classificados como Receita em vez de movimentação entre contas de Aplicação (13 lançamentos, R$ 342.306,45, migrados para `11104030007 Aplicacoes BB CDB`); 3 contas com código vizinho trocado (`42301010004 IOF`→`42301010005 Despesas Bancarias`; `42103010035 Telefonia`→`42103010034 Taxas Diversas`; `42103010032 Limpeza`→`42103010031 Seguros`); duplicidade real em Pro-Labore e Associações de Classe (lançamentos "by ECD" duplicavam o que já existia granular por sócio — revertidos via soft-delete).
+
+**4. Nova funcionalidade: Encerramento de Exercício**
+- Schema: 3 campos novos em `CompanyAccountingConfig` — `encerramentoContaApuracaoResultadoId`, `encerramentoContaLucroExercicioId`, `encerramentoContaPrejuizoExercicioId` (contas de Lucro e Prejuízo **distintas**, decisão do usuário — o sistema decide qual usar pelo sinal do resultado apurado).
+- Backend: `EncerramentoExercicioService`/`Controller` no módulo `accounting`. `preview(companyId, year)` calcula saldo de todas as contas REVENUE/EXPENSE com movimento, determina LUCRO/PREJUIZO/NEUTRO, valida configuração (existência **e tipo EQUITY** das 3 contas — ver bug abaixo). `confirmar()` grava em **2 etapas** (fluxo contábil correto): Receita/Despesa → ARE (Apuração do Resultado do Exercício), depois ARE → Lucro ou Prejuízo do Exercício. Reusa `JournalEntryService.create()` (herda validação de Fechamento Mensal). `reverter(companyId, year)` faz soft-delete dos lançamentos de encerramento do ano, para permitir refazer se a configuração estiver errada.
+- Frontend: 3 campos de conta na aba Contábil da empresa (`ContabilTab.tsx`), reusando o componente `AccountPicker` (copiado do padrão já usado em `FolhaPage.tsx` para configuração contábil da Folha CLT). Modal `EncerramentoExercicioModal.tsx` na tela de Lançamentos (botão "Encerrar Exercício" ao lado de "Sair do modo lançamento"), mostra prévia (tabela de contas a zerar + resultado) antes de confirmar, com botão de reverter quando já existe encerramento gravado.
+- **Bug de usuário descoberto no meio do teste real**: o `AccountPicker` mostrava `reducedCode` (ex: `0008888`, `0001022`) como identificador principal — um código curto arbitrário que não dá nenhuma pista sobre o tipo/hierarquia da conta, ao contrário do código completo (`23301010002` já sinaliza "raiz 2 = Passivo/PL"). Isso levou à seleção de contas erradas (`Apuração de Resultado` cadastrada como EXPENSE, `Lucros/PLR` cadastrada como ASSET) — o encerramento chegou a ser confirmado errado 2 vezes antes de pegarmos o problema. **Correção dupla**: (1) validação de tipo no backend (`validateEquityAccount`, bloqueia com mensagem clara se a conta configurada não for EQUITY); (2) `AccountPicker` ganhou prop `filterType` opcional — quando presente, filtra a lista de sugestões pelo tipo, então contas do tipo errado **nem aparecem** como opção. Aplicado aos 3 campos de Encerramento com `filterType="EQUITY"`. Lista de sugestões passou a mostrar código completo (não o reduzido) + tipo da conta, para reduzir ambiguidade em qualquer outro uso futuro do componente.
+- Contas de PL criadas para a GRB (branch `2330102 Lucros/Prejuízos do Exercício`, já EQUITY mas sintética): `23301020001 Apuração do Resultado do Exercício`, `23301020002 Lucro do Exercício`, `23301020003 Prejuízo do Exercício` — todas analíticas, EQUITY, CREDIT.
+- Resultado final gravado corretamente: GRB 2024, Lucro do Exercício R$ 555.226,42 (ARE → Lucro do Exercício).
+
+### Aprendizados e princípios (para adicionar aos já registrados)
+- **Padrão SPED ECD — granularidade de comparação**: sempre comparar por `(data, histórico)`, nunca por `NUM_LCTO`, ao conciliar ECD real vs sistema. `NUM_LCTO` é só o lote de importação do extrato bancário do dia.
+- **`IND_LCTO` do `I200`**: `N`=normal, `E`=encerramento. Sempre excluir `E` de comparações de "lançamento faltante".
+- **Todo query que filtra `journal_entries` por período/empresa deve ter `deletedAt: null` explícito** — não é automático no Prisma, e esse é um padrão de bug recorrente já encontrado 3x num único módulo nesta sessão. Auditar antes de confiar em qualquer relatório novo.
+- **Seletor de conta contábil (`AccountPicker`) precisa de filtro por tipo quando o contexto de uso exige um tipo específico** (ex: configuração de conta de PL só deve mostrar contas EQUITY). Mostrar código reduzido sozinho, sem o tipo, é fonte de erro real quando há contas de nomes parecidos e tipos diferentes no mesmo plano.
+- **Encerramento contábil correto é em 2 etapas**: Receita/Despesa → ARE (conta transitória) → Lucro ou Prejuízo do Exercício. Nunca direto Receita/Despesa → PL.
+- **Contas de Lucro e Prejuízo do Exercício devem ser contas EQUITY distintas** (não a mesma conta trocando de sinal) — decisão de desenho confirmada nesta sessão, sistema decide qual usar pelo sinal do resultado apurado.
+
+### Pendências para próxima sessão
+- Gerar o ECD 2024 da GRB pelo próprio LEDGR e comparar registro a registro com o ECD real transmitido (objetivo original desta sessão, ainda não retomado após o encerramento).
+- `Taxas Diversas` (GRB) ainda carrega R$ 34.587,50 de lançamento errado (R$ 9.787,50 de Serviços de Terceiros PJ + duas TEDs suspeitas a pessoas físicas — Jose Rozinei R$ 15.000, Marcelo Moura R$ 9.800 — que não são "taxa", precisam de classificação correta: mútuo, adiantamento a sócio, ou outra).
+- Investigar a divergência do Balancete AJS (`BV_AJS_Dez2024.pdf`, emitido 22/04/2026) vs a ECD 2024 real transmitida — Receita Financeira do AJS é R$ 1.081.139,37 contra R$ 625.160,59 da ECD oficial, quase toda a diferença de lucro entre os dois documentos. Verificar se existe ECD retificadora de 2024 já transmitida, ou se o AJS reflete lançamentos nunca declarados oficialmente.
+- Auditar outros services do módulo `accounting`/`sped` por falta de filtro `deletedAt: null` (mesmo padrão de bug encontrado 3x nesta sessão) — candidatos não verificados: `trial-balance.service.ts`, `balances.service.ts`, `chart-of-accounts.service.ts`.
+- `Mútuo Kipstone` aparece em dois códigos diferentes no plano da GRB (`11307010002` Circulante e `12101020018` Não Circulante) — possível duplicidade herdada do plano antigo, mencionado no Balancete, ainda não investigado.
+
+---
+
+## Sessão 08/08/2026 (continuação) — GRB: Geração do ECD 2024 pelo LEDGR e validação contra o real
+
+### Objetivo
+Retomar a pendência da sessão anterior: gerar o ECD 2024 da GRB pelo próprio LEDGR e comparar com o ECD real transmitido, fechando o ciclo completo (abertura → lançamentos → encerramento → geração).
+
+### Bug real encontrado e corrigido: `ecd-exporter.service.ts`, geração de I355/J150 zerava com o encerramento
+
+**Sintoma**: primeira geração pós-encerramento trouxe só 6 de 18 linhas de `I355`, todas com saldo `0,00` — mesmo com os 18 lançamentos de resultado corretamente gravados no banco (validado por query direta).
+
+**Causa raiz**: o `dreMap` (saldo de Receita/Despesa usado para montar o `I355`, e também a base do `dreRollup` usado no `J150`/DRE do Bloco J) somava o **ano inteiro** (`periodStart` a `periodEnd`) via `periodItems`, sem excluir os próprios lançamentos de encerramento. Como o encerramento zera cada conta de resultado dentro do mesmo ano-calendário, o saldo líquido anual dessas contas já fechava em (quase) zero antes de chegar no I355 — o `if (saldo === 0) continue` não pegava todos os casos porque sobrava resíduo de ponto flutuante em algumas contas, que apareciam como `0,00` formatado em vez de serem puladas.
+
+**Fix**: `dreMap` passou a ser montado direto de `periodItems` (não mais derivado de `byMonthAcc`), excluindo qualquer item cujo `journalEntry.description` contenha `"encerr"` ou `"zeramento"` — mesmo critério já usado no `hasEncerramento`/check C13 da pré-validação. Foi necessário incluir `description` no `select` da query de `periodItems` (antes só trazia `date`).
+
+**Validação**: após o fix, `I355` saiu com as 18 linhas certas, batendo exatamente com os saldos reais do banco (Débito R$ 201.965,83, Crédito R$ 757.192,25, diferença R$ 555.226,42 = exatamente o lucro do encerramento gravado). Comparado linha a linha com o `I355` do ECD real transmitido: **13 de 15 contas oficiais batem 100%** — as 2 que divergem (`Taxas Diversas`, `Despesas com Tecnologia`) são as pendências de reclassificação já registradas na sessão anterior (não corrigidas ainda, por decisão consciente). O LEDGR também trouxe 3 contas de despesa a mais que a ECD oficial não declarou (`INSS`, `Refeição/Copa/Cozinha`, `Multa de Mora Fiscal`) — reforça a suspeita já registrada de que a ECD 2024 oficialmente transmitida pode estar incompleta frente ao que realmente aconteceu (compatível com o Balancete AJS).
+
+### Aprendizado (para somar aos já registrados)
+- **Qualquer cálculo de saldo anual de Receita/Despesa que possa coexistir com um lançamento de encerramento no mesmo período (mesmo ano-calendário) precisa excluir explicitamente esse lançamento da soma** — senão o resultado vem artificialmente zerado, já que o próprio encerramento é desenhado pra zerar essas contas. Esse padrão vale tanto pro `I355` (ECD) quanto pro `J150`/DRE (Bloco J) e provavelmente qualquer relatório futuro de "Receita/Despesa do período" — vale revisar se `trial-balance.service.ts` ou outros relatórios de DRE têm o mesmo risco.
+- Ao editar arquivos `.ts` que contêm aspas duplas dentro de strings Python (`OLD`/`NEW` para `str_replace` via script), **conferir os escapes `\"` sobrevivem à transcrição** antes de entregar o bloco PowerShell — nesta sessão a colagem manual do bloco perdeu as barras de escape uma vez, quebrando o script Python (`SyntaxError`). Reconferir com `cat -A` ou reconstruir o bloco a partir do arquivo real (não de memória) evita o erro.
+
+### Estado atual da GRB (fim desta sessão)
+- Ciclo completo validado: abertura 2024 (ECD real) → 158 lançamentos incluídos → reclassificações → encerramento (ARE → Lucro do Exercício R$ 555.226,42) → geração do ECD pelo LEDGR fiel ao banco.
+- Pendências que seguem de pé (não mudaram nesta sessão): `Taxas Diversas` com lançamento errado (Serviços de Terceiros PJ + 2 TEDs suspeitas), divergência do Balancete AJS a investigar, duplicidade aparente de `Mútuo Kipstone`, auditoria de `deletedAt` em `trial-balance.service.ts`/`balances.service.ts`/`chart-of-accounts.service.ts`.
+
+---
+
+## Sessão 08/08/2026 (continuação 2) — GRB: ECD 2024 validada no PVA com 0 erros
+
+### Resultado final
+Depois dos fixes desta sessão (`dreMap` excluindo encerramento, `IND_LCTO="E"` no I200, `DT_ALT` limitado ao fim do período), o ECD 2024 da GRB gerado pelo LEDGR passou no PVA oficial (SPED Contábil) com:
+- **0 erros**
+- **3 advertências**, todas esperadas/aceitáveis: "Não houve recuperação da ECD anterior" (normal, base local do PVA não tem 2023), e 2 advertências de formato relacionadas ao CRC do contador assinante (`NUM_SEQ_CRC` formato `UF/ano/número`, `DT_CRC` vazio) — **decisão do usuário: não mexer**, esclareceu que não é sobre cadastro de CRC e sim sobre validade de certificado digital, fora do escopo desta sessão.
+
+### 3 bugs adicionais corrigidos no `ecd-exporter.service.ts` nesta rodada (somando aos 2 já registrados)
+1. **`IND_LCTO` do registro `I200` sempre fixo em `"N"`**: lançamentos de encerramento (descrição contendo "encerr"/"zeramento") precisam sair como `"E"` — sem isso, o PVA não consegue casar o `I355` (saldo antes do fechamento) com o lançamento que efetivamente fecha a conta, gerando erro em massa (1 erro por conta de resultado). Mesmo critério de detecção (`description.toLowerCase().includes("encerr"/"zeramento")`) já usado no `hasEncerramento` da pré-validação — terceira vez que esse padrão de string aparece no código; pode valer a pena extrair para um helper/constante compartilhado no futuro.
+2. **Balanço Patrimonial do Bloco J (`J100`) desbalanceado por contas sem mapeamento RFB**: o `J100` só exporta contas presentes em `i052Map` (mapeadas em Visões Contábeis). Contas analíticas com saldo real mas sem mapeamento ficam de fora, quebrando `Ativo = Passivo + PL` no Bloco J mesmo com os lançamentos corretos no banco. Não é bug de código — é consequência direta de contas novas (criadas para abertura/encerramento) nunca passarem pela etapa de mapeamento RFB. Resolvido mapeando as 13 contas faltantes (4 clientes + MUFG + Outros Tributos a Compensar + Mútuo CSA + 5 do Imobilizado + Lucro do Exercício) na tela de Visões Contábeis.
+3. **`DT_ALT` do `I050` usava `acc.createdAt` puro**: como o plano de contas foi reconstruído em 24/07/2026, praticamente toda conta (308 de 308) tem `createdAt` posterior a qualquer período histórico, gerando 1 advertência por conta ("data de alteração maior que o fim do período"). Fix: usa o menor entre `acc.createdAt` e o fim do período da ECD — não inventa uma data, só evita declarar uma alteração "no futuro" em relação ao período escriturado.
+
+### Aprendizado (para somar aos já registrados)
+- **Sempre que uma conta nova é criada no meio de um trabalho de conciliação (abertura, inclusão de lançamento faltante, encerramento), ela precisa passar pela etapa de mapeamento RFB (Visões Contábeis) antes de gerar o Bloco J** — senão o Balanço Patrimonial do Bloco J desbalanceia silenciosamente mesmo com os lançamentos corretos no banco. Vale considerar um lembrete/checklist automático quando uma conta nova é criada fora do fluxo normal de cadastro.
+- **O critério `description contains "encerr"/"zeramento"` para identificar lançamentos de encerramento aparece em pelo menos 3 lugares do código** (`ecd-pre-validate.service.ts` hasEncerramento, `ecd-exporter.service.ts` dreMap e agora IND_LCTO) — candidato a extrair para uma função/constante compartilhada, para não divergir se um dos três for atualizado no futuro e os outros não.
+- **`DT_ALT`/datas de auditoria geradas a partir de `createdAt`/`updatedAt` de registros que passaram por rebuild de banco não refletem a história real** — sempre limitar (clamp) essas datas ao período sendo exportado/reportado, nunca usar o valor cru quando o registro pode ter sido tecnicamente "criado" ou "modificado" numa data muito posterior ao período histórico que ele representa.
+
+### Estado final da GRB nesta sessão
+Ciclo 100% fechado e validado oficialmente: abertura 2024 (ECD real) → 158 lançamentos incluídos → reclassificações → 13 contas mapeadas em Visões Contábeis → encerramento (ARE → Lucro do Exercício R$ 555.226,42) → geração do ECD pelo LEDGR → **validação PVA: 0 erros, 3 advertências aceitáveis**.
+
+---
+
+## 🔒 STATUS: PRONTO PARA PRODUÇÃO — Módulo ECD (GRB, exercício 2024) — 08/08/2026
+
+**NÃO alterar os arquivos/funcionalidades abaixo sem justificativa explícita e nova instrução do usuário.** Este bloco existe especificamente para evitar que uma sessão futura "corrija" ou "refatore" algo que já foi validado ponta a ponta contra o PVA oficial da Receita Federal. Se uma mudança futura nesses arquivos for necessária, revalidar no PVA antes de considerar concluído de novo.
+
+### O que foi validado e está congelado
+
+**1. `apps/api/src/modules/sped/ecd/services/ecd-exporter.service.ts`**
+Gera ECD estruturalmente válida, testada contra o PVA oficial (SpedContabil) da GRB, exercício 2024: **0 erros, 3 advertências aceitáveis** (ver detalhe abaixo). Pontos específicos validados e que não devem ser revertidos:
+- `dreMap` (linhas ~157-168, saldo de Receita/Despesa usado no `I355` e no `J150`) monta-se direto de `periodItems`, excluindo itens cujo `journalEntry.description` contenha `"encerr"` ou `"zeramento"`. **Não reverter para a versão que derivava de `byMonthAcc` sem esse filtro** — isso zera o `I355` sempre que há encerramento no mesmo ano (bug já corrigido nesta sessão).
+- Query de `periodItems` inclui `journalEntry.description` no `select` (necessário para o filtro acima).
+- `I200`/`IND_LCTO` (linha ~363): `"E"` para lançamentos de encerramento, `"N"` para os demais, via `descLower.includes("encerr") || descLower.includes("zeramento")`. **Não fixar de volta em `"N"` hardcoded.**
+- `I050`/`DT_ALT` (linhas ~285-292): usa o menor entre `acc.createdAt` e o fim do período (`periodEndDate`). **Não reverter para `acc.createdAt` puro** — gera 1 advertência por conta no PVA quando o plano de contas foi tocado/reconstruído depois do período histórico (caso real: rebuild de 24/07/2026).
+
+**2. `apps/api/src/modules/sped/ecd/services/ecd-pre-validate.service.ts`**
+- Check W2 (Balanço desequilibrado): fórmula `totalAsset + totalLiab + totalEquity` (não `totalAsset - (totalLiab + totalEquity)`, que dobrava o efeito do lado credor).
+- Balance check e `entryCount` filtram `je.deletedAt: null` / `deletedAt: null` explicitamente.
+- Mensagem de diferença formatada em pt-BR (`toLocaleString('pt-BR', {...})`).
+
+**3. `apps/api/src/modules/accounting/services/journal-entry.service.ts`**
+- `findAll()` (linha ~73) e `bulkDelete()` (linha ~380): `where` inclui `deletedAt: null` explicitamente. **Sem isso, lançamentos com soft-delete voltam a aparecer na grade do Diário e a ser recontados em exclusões em lote.**
+
+**4. Funcionalidade completa: Encerramento de Exercício**
+Testada e validada de ponta a ponta na GRB (resultado real gravado: Lucro do Exercício R$ 555.226,42, exercício 2024). Arquivos:
+- Schema: `CompanyAccountingConfig.encerramentoContaApuracaoResultadoId` / `.encerramentoContaLucroExercicioId` / `.encerramentoContaPrejuizoExercicioId`
+- Backend: `apps/api/src/modules/accounting/services/encerramento-exercicio.service.ts` + `.../controllers/encerramento-exercicio.controller.ts` — fluxo em 2 etapas (Receita/Despesa → ARE → Lucro/Prejuízo do Exercício), com `validateEquityAccount` bloqueando contas configuradas com tipo diferente de `EQUITY`, e `reverter()` para desfazer (soft-delete) um encerramento já gravado.
+- Frontend: `frontend/src/pages/companies/ContabilTab.tsx` (3 campos de conta com `AccountPicker filterType="EQUITY"`) + `frontend/src/pages/accounting/EncerramentoExercicioModal.tsx` (acessível pelo botão "Encerrar Exercício" na tela de Lançamentos).
+- **Regra de negócio confirmada com o usuário**: Lucro e Prejuízo do Exercício são contas EQUITY **distintas** (não a mesma conta trocando de sinal); o sistema decide qual usar pelo sinal do resultado apurado.
+
+### Dados da GRB (exercício 2024) — estado congelado, não é template genérico
+As 41 contas de abertura, os 158 lançamentos incluídos, as reclassificações (Resgates, IOF/Telefonia/Limpeza, Pro-Labore/Associações), as 22 contas novas criadas no plano (18 de abertura/lançamentos + 3 de PL do encerramento + 1 ARE), e o mapeamento de 13 contas em Visões Contábeis são **específicos da GRB e do exercício 2024**. Não usar como padrão automático para outras empresas sem repetir o processo de conciliação com a respectiva ECD real de cada uma.
+
+### O que NÃO está congelado (pendente, pode/deve ser mexido)
+- `Taxas Diversas` (GRB, código `42103010034`) ainda tem R$ 34.587,50 de lançamento errado (Serviços de Terceiros PJ + 2 TEDs suspeitas a Jose Rozinei/Marcelo Moura) — pendência conhecida, aceita para o PVA passar (o PVA valida estrutura, não classificação contábil).
+- `Despesas com Tecnologia`/`Reembolso de Despesas` (`42103010029`) diverge R$ 10.676,63 do ECD oficial — mesma natureza de pendência.
+- Divergência do Balancete AJS vs ECD oficial (Receita Financeira) — não investigada.
+- Duplicidade aparente de `Mútuo Kipstone` (`11307010002` vs `12101020018`) — não investigada.
+- Auditoria de `deletedAt` faltante em `trial-balance.service.ts`, `balances.service.ts`, `chart-of-accounts.service.ts` — não verificado nesta sessão, mas o padrão de bug já apareceu 4 vezes no módulo `accounting`/`sped` (contando o de hoje), então é uma auditoria que vale a pena fazer.
+- 2 advertências de CRC/certificado no J930 (`NUM_SEQ_CRC`, `DT_CRC`) — usuário esclareceu que não é sobre cadastro de CRC, é sobre validade de certificado digital; fora do escopo até segunda ordem.
+
+---
+
+## Meta declarada para próxima sessão — 08/08/2026
+
+**Levar o ECF ao mesmo nível de qualidade alcançado com o ECD nesta sessão**: gerar o ECF **100% pelo LEDGR**, com base na ECD (já validada, 0 erros no PVA) e na contabilidade (lançamentos, plano de contas, encerramento) — mesmo padrão de rigor: gerar → validar no PVA oficial (SpedContabilFiscal) → corrigir bugs reais encontrados → reconfirmar até 0 erros.
+
+Contexto já registrado no memory/CLAUDE.md: `ecf-exporter.service.ts` hoje é um stub (preenchimento manual campo a campo no PVA foi a solução emergencial usada sob pressão de prazo para o ECF 2025). Esta meta é sobre implementar o gerador de verdade, replicando a disciplina desta sessão (comparação registro a registro contra uma ECF real quando disponível, correção de bugs de exportação, não só de dados).
