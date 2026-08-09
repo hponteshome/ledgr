@@ -5226,3 +5226,33 @@ Contexto já registrado no memory/CLAUDE.md: `ecf-exporter.service.ts` hoje é u
 **Commits:** `d703f69` (driver adapter + idempotência + try/catch por query + usuário QA) e `9c4b0c0` (status_date da query 3) — ambos pushed para `origin/main`.
 
 **Preferência de colaboração registrada (memory, não CLAUDE.md):** para comandos que o usuário precisa rodar manualmente no terminal, preferir um-liners diretos (sem heredoc/`@'...'@`) — um heredoc colado quebrou por corrupção de quebra de linha no PowerShell interativo. Assumir sempre que o terminal do usuário já está com cwd em `D:\Projetos\Ledgr` (não prefixar `cd`/`Set-Location`).
+
+---
+
+## Sessão 09/08/2026 15:30 — Testes automatizados (Playwright) nos módulos Financeiro e Contábil
+
+**Continuação da sessão 09/08/2026 11:28** (setup do Playwright + fixes no `seed.ts`). Login usado em todos os testes: usuário QA `teste.qa@ledgr.local` (perfil Master Admin), empresa ativa ADVOCACIA GOMES, ROSSETTI E BARELLI.
+
+### Financeiro — 9 rotinas testadas, 5 bugs reais encontrados e corrigidos (commit `7bb2733`, pushed)
+
+1. **`ContasAReceberPage.tsx` chamava rota inexistente** (`/accounting/chart-of-accounts` em vez de `/chart-of-accounts`) — dropdown "Conta Contábil (Débito)" do modal de "Receber" ficava sempre vazio, quebrando silenciosamente a integração contábil automática do recebimento.
+2. **`ValidationPipe` global nunca foi registrado em `apps/api/src/main.ts`** — achado maior, sistêmico: todos os decorators `class-validator` de todos os DTOs do backend eram código morto, nunca executados. Dado inválido/faltante chegava direto na lógica de negócio/Prisma, que estourava exceção crua virando **500 genérico** em vez do 400 com mensagem clara que os DTOs já foram escritos pra produzir. Registrado com `transform: true` + `transformOptions: { enableImplicitConversion: true }` (necessário pros DTOs de filtro `@Query` com campo boolean/number que chegam como string na querystring).
+3. **`AccountFilterDto` tinha `@Max(100)` em `limit`**, mas 3 páginas (Provisões, Fundo Fixo, Bank Import) pedem `limit` 500–1000 pra popular dropdown/picker com o plano de contas completo — regressão real causada pelo item 2 (só não quebrava antes porque nada validava). Subido pra `@Max(1000)`.
+4. **UUID opcional vazio (`''`) rejeitado pelo `class-validator`** em `CreateFiscalDocumentDto.expenseAccountId` — `@IsOptional()` só pula validação quando o valor é `undefined`, não `''`, e o frontend sempre manda `''` quando nenhuma conta é selecionada. Corrigido com `@Transform` tratando `''` como `undefined` antes do `@IsUUID` — mesmo padrão já documentado no CLAUDE.md (`dto.field || null` pra UUID opcional).
+5. **Modal "Lançar Documento Fiscal" deixava avançar do Passo 1 pro Passo 2 sem validar nenhum campo obrigatório** (CNPJ, Razão Social, Vencimento) — só descoberto pq o item 2 começou a devolver erro real do backend em vez de silenciosamente aceitar. Adicionada validação client-side no botão "Próximo" (`goToStep2`), reaproveitando o banner de erro já existente no componente.
+
+Todas as 9 rotinas reconfirmadas limpas (0 erros de console/página) após os 5 fixes.
+
+### Contábil — 15 rotinas testadas, 0 bugs funcionais encontrados
+
+Plano de Contas, Saldos, Balancete, Lançamentos, Visões Contábeis, Validador ECD, DRE, Balanço Patrimonial, Diário Geral, Razão Analítico, Investimentos (Renda Fixa/Simulador CDB/Tabela CDI), Importação de Plano de Contas e de Lançamentos. **0 erros de console/página em todas**, e os fixes do Financeiro (ValidationPipe/limit) não causaram nenhuma regressão aqui.
+
+Fui além do smoke test onde era seguro (relatório = só leitura): gerei DRE e Balanço Patrimonial reais da ADVOCACIA GOMES — totais batem exatamente entre as duas telas e com o Balancete (**R$ 8.948.521,70**, "Balanço equilibrado"). Boa consistência cruzada entre telas.
+
+**Cuidado deliberado — dados congelados da GRB:** a tela de Lançamentos mostra os dados reais da GRB 2024 (encerramento de exercício documentado como "PRONTO PARA PRODUÇÃO" na seção de 08/08/2026 deste arquivo, com o valor R$ 555.226,42 visível na grade). Não cliquei em "Encerrar Exercício", "Excluir período" nem "Importar" nessa tela — só naveguei e li, pra não arriscar mexer em algo já validado ponta a ponta no PVA.
+
+### PENDÊNCIA registrada — Visões Contábeis (Aglutinação RFB / Bloco J) sem mapeamento para ano-base 2025
+
+Ao abrir `/app/accounting/visoes-contabeis` (ADVOCACIA GOMES, ano base 2025, tipo BP — Balanço Patrimonial) a tela mostrou **107 contas analíticas · 0 mapeadas · 107 sem mapear**, com 945 códigos RFB importados disponíveis mas nenhum vínculo conta→código feito ainda para esse ano. Não tentei "Auto-mapear" nem "Copiar do ano anterior" (ações que gravam dado) — só registrando o estado como observado, sem alterar nada.
+
+**Não necessariamente um bug** — pode ser simplesmente que o mapeamento RFB ainda não foi feito pra 2025 (ano seguinte ao exercício já fechado/validado de 2024). Registrando aqui como **pendência de adesão/adequação ao Referencial RFB** para as próximas sessões que mexerem em SPED/ECD da GRB: antes de gerar um ECD real do exercício 2025, confirmar se esse mapeamento (Bloco J / I051-I052) precisa ser refeito ano a ano manualmente ou se existe/deveria existir um fluxo de "copiar do ano anterior" mais automático — ver também a nota já existente na seção 7 do CLAUDE.md (`AccountingView / I051: nunca filtrar por anoBase`) antes de investigar, já que esse é exatamente o ponto sensível dessa tela.
