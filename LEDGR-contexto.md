@@ -5441,3 +5441,18 @@ Fix: `UPDATE sidebar_items SET disabled = true` pro item quebrado, seguindo o me
 - ECF exporter é stub conhecido (gera arquivo, conteúdo provavelmente incompleto) — já documentado como meta de sessão futura antes desta rodada.
 
 **Fora do escopo desta varredura (não testado):** conteúdo real dos arquivos SPED gerados (só confirmado que o mecanismo não quebra), certificados A3 físicos via LEDGR Agent, integração real ClickSign/SEFAZ/RFB (dependem de credencial externa), fluxos de eSocial/RAIS/DCTFWeb (sem botão de ação encontrado nas telas testadas).
+
+---
+
+## Sessão 09/08/2026 18:57 — Novo documento de referência: docs/LEDGR-benchmark-ux-navegacao.md
+
+**Registrando existência de documento trazido pelo usuário (não gerado nesta sessão), de leitura obrigatória antes de qualquer trabalho futuro em navegação/sidebar do LEDGR.**
+
+`docs/LEDGR-benchmark-ux-navegacao.md` — benchmark de UX (Conta Azul, Omie, Nibo) aplicado à arquitetura de navegação do LEDGR. Propõe um roadmap em 3 estágios:
+- **Estágio 1 — Fundação (imediato):** sidebar de dois níveis (módulo fixo + sub-navegação contextual da rotina) + seletor de empresa persistente na barra superior.
+- **Estágio 2 — Produtividade (próximo ciclo):** command palette (Ctrl/Cmd+K), favoritos por usuário, breadcrumbs em hierarquias profundas.
+- **Estágio 3 — Escala e Governança (contínuo):** navegação configurável por perfil/permissão, auditoria periódica de uso do menu.
+
+**Guardrail explícito do documento, citado pelo usuário ao pedir a implementação:** implementar um estágio de cada vez, nunca os 3 juntos — evita reescrita grande/arriscada de uma vez só, permite testar cada etapa (via skill `webapp-testing`) antes de avançar. Também vale o guardrail do próprio doc: nunca remover atalho de produtividade existente como efeito colateral do redesign (foi o gatilho mais citado nas reclamações do redesign da Conta Azul Pro).
+
+**Próximo passo desta sessão:** implementar o Estágio 1 no frontend do LEDGR.
