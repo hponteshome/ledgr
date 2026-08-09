@@ -45,14 +45,33 @@ const FIN_LIGHT = '#E8F5EE';
 export function FiscalDocumentModal({ open, onClose, onSuccess }: Props) {
   const [form, setForm] = useState<FiscalDocumentFormData>(EMPTY_FORM);
   const [step, setStep] = useState<1 | 2>(1);
+  const [step1Error, setStep1Error] = useState<string | null>(null);
   const { createDocument, loading, error } = useFiscalDocuments();
 
   useEffect(() => {
     if (!open) {
       setForm(EMPTY_FORM);
       setStep(1);
+      setStep1Error(null);
     }
   }, [open]);
+
+  const goToStep2 = () => {
+    if (!/^\d{14}$/.test(form.issuerCnpj.replace(/\D/g, ''))) {
+      setStep1Error('CNPJ do emitente/fornecedor é obrigatório e deve ter 14 dígitos.');
+      return;
+    }
+    if (!form.issuerName.trim()) {
+      setStep1Error('Razão Social do emitente/fornecedor é obrigatória.');
+      return;
+    }
+    if (!form.dueDate) {
+      setStep1Error('Data de Vencimento é obrigatória.');
+      return;
+    }
+    setStep1Error(null);
+    setStep(2);
+  };
 
   // Recalcula netAmount automaticamente
   useEffect(() => {
@@ -139,13 +158,13 @@ export function FiscalDocumentModal({ open, onClose, onSuccess }: Props) {
         <div style={{ padding: 20, overflowY: 'auto', flex: 1 }}>
 
           {/* Error */}
-          {error && (
+          {(step1Error || error) && (
             <div style={{
               background: '#FCEBEB', color: '#A32D2D', borderRadius: 8,
               padding: '10px 14px', fontSize: 13, marginBottom: 16,
               border: '1px solid #F09595',
             }}>
-              ⚠ {error}
+              ⚠ {step1Error || error}
             </div>
           )}
 
@@ -351,7 +370,7 @@ export function FiscalDocumentModal({ open, onClose, onSuccess }: Props) {
               }}>← Voltar</button>
             )}
             {step === 1 ? (
-              <button onClick={() => setStep(2)} style={{
+              <button onClick={goToStep2} style={{
                 background: FIN_COLOR, color: '#fff', border: 'none',
                 borderRadius: 7, padding: '8px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
               }}>Próximo →</button>

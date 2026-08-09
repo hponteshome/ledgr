@@ -80,7 +80,7 @@ export default function ContasAReceberPage() {
   useEffect(() => { if (tab === 'aging') loadAging(); }, [tab, loadAging]);
   useEffect(() => { loadFixedAssets(); }, [loadFixedAssets]);
   useEffect(() => {
-    api.get('/accounting/chart-of-accounts', { params: { isAnalytic: true } })
+    api.get('/chart-of-accounts', { params: { isAnalytic: true } })
       .then(r => setAccounts((r.data?.data ?? r.data ?? []).filter((a: any) => ['ASSET','LIABILITY'].includes(a.type))))
       .catch(() => {});
   }, []);

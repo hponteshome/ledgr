@@ -15,6 +15,7 @@ import {
   Matches,
   IsNotEmpty
 } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { FiscalDocumentType, IntegrationStatus } from '@prisma/client';
 
 export class CreateFiscalDocumentDto {
@@ -102,6 +103,7 @@ export class CreateFiscalDocumentDto {
 
   // Classificação contábil
   @IsOptional()
+  @Transform(({ value }) => (value === '' ? undefined : value))
   @IsUUID()
   expenseAccountId?: string;
 

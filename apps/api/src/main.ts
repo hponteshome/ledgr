@@ -7,7 +7,7 @@ process.env.TZ = 'America/Sao_Paulo';
 
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import { ConsoleLogger } from '@nestjs/common';
+import { ConsoleLogger, ValidationPipe } from '@nestjs/common';
 import { join } from 'path';
 import { AppModule } from './app.module';
 
@@ -40,6 +40,15 @@ async function bootstrap() {
   });
   // 2. Global Prefix (Opcional, mas comum em refatorações de microserviços)
   // app.setGlobalPrefix('api');
+  // ValidationPipe global - sem isso os decorators class-validator dos DTOs nunca
+  // eram executados (dado invalido/faltante chegava direto no Prisma e virava 500
+  // generico em vez do 400 com mensagem que os DTOs ja foram escritos pra produzir).
+  // enableImplicitConversion e necessario pq varios DTOs de filtro (@Query) tem
+  // campos boolean/number que chegam como string na querystring.
+  app.useGlobalPipes(new ValidationPipe({
+    transform: true,
+    transformOptions: { enableImplicitConversion: true },
+  }));
   (app as any).useStaticAssets(join(__dirname, '..', 'uploads'), { prefix: '/uploads' });
   console.log('📁 Uploads servidos em http://localhost:3000/uploads');
   app.use(require('express').json({
