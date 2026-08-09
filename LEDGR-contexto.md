@@ -5389,3 +5389,55 @@ Os poucos "falha ao clicar botão de submit" registrados pelo script (Novo Perfi
 - **Commits desta sessão (todos pushed):** `d703f69`, `9c4b0c0`, `b7d2b94`, `e98106a`, `7bb2733`, `44d726c`, `fade498`, `d587aa1`, `13db782`, `6f951a7`, `f4e8d36`, `b8e7db2`, `3244f87`, `4dd2cdc`, `9a75aba`.
 - **Pendências registradas (não corrigidas):** Visões Contábeis/Aglutinação RFB sem mapeamento pro ano-base 2025; wizard "Novo Ativo Imobilizado" sem validação por passo (severidade baixa).
 - **Ainda sem passe profundo:** Assinaturas/ClickSign, SPED (ECD/ECF/EFD), Arquivo Digital — smoke test raso feito em todos, nenhum com abertura de modal/submit ainda.
+
+---
+
+## Sessão 09/08/2026 18:47 — Teste profundo Assinaturas/ClickSign, SPED e Arquivo Digital (18 rotinas) + 1 bug corrigido — FECHAMENTO DA VARREDURA COMPLETA
+
+**Continuação da sessão 18:09.** Último bloco pendente da varredura de teste profundo iniciada às 11:28.
+
+### Assinaturas/ClickSign (4) + Arquivo Digital (7) — 11/11 limpas, sem submeter de verdade
+
+Abertos os modais "Nova Solicitação" (confirmado badge "Powered by ClickSign" — integração real), "Importar Certificado", "Importar Documento" (7 categorias do Arquivo Digital). **Deliberadamente não submetidos** — enviar de verdade dispararia e-mail/API real do ClickSign. 0 erros de console/rede na abertura de todos.
+
+### SPED — cuidado especial (empresa ativa = GRB, ECD 2024 congelado/validado)
+
+A empresa ativa durante toda a sessão de testes é ADVOCACIA GOMES, ROSSETTI E BARELLI = a própria GRB citada no bloco "PRONTO PARA PRODUÇÃO" de 08/08/2026. **Nenhuma ação de geração foi testada contra o período 2024** — confirmado antes de cada clique que o formulário de Exportar vinha com período padrão diferente (2025 ou 2026) antes de interagir:
+- **ECD — Exportar:** período padrão 01/01/2026. Testado "Validar e Gerar ECD" pra 2026 — 0 erros, disparou download normalmente.
+- **ECF — Exportar:** período padrão 01/01/2025. Testado "Gerar ECF" pra 2025 — 0 erros, download real (`ECF_2025.txt`) disparado. Confere com a limitação já documentada (exporter é stub) — mecanismo funciona sem quebrar, conteúdo provavelmente incompleto (não investigado o conteúdo do arquivo em si, fora de escopo desta rodada).
+- **EFD-Contribuições:** UI diferente (Mês/Ano/Regime/Incidência + Pré-visualizar/Lote), não testado o clique de geração real por precaução extra (não fazia parte do escopo mínimo necessário pra validar a tela).
+
+### 1 bug real encontrado e corrigido (commit `8e26910`, pushed)
+
+**Item de menu "ECD — Histórico" (sidebar) quebrado:** clicar nele carregava o Dashboard em vez de um histórico. Causa: `sidebar_items.path = /app/sped/ecd/History` mas o import de `EcdHistoryPage` está comentado em `routes/index.tsx` e não há `<Route>` registrada — página nunca foi implementada, só o item de menu ficou órfão, com `disabled=false` (habilitado/clicável) no banco. **Não confundir com a aba "Histórico" dentro da própria tela de ECD** (Importar/Exportar/Histórico) — essa outra feature funciona normalmente, não foi tocada.
+
+Fix: `UPDATE sidebar_items SET disabled = true` pro item quebrado, seguindo o mesmo padrão já usado pra EFD-Contribuições (feature incompleta = desabilitada no menu, não removida). Migração SQL registrada em `prisma/migrations-manuais/2026-08-09_sidebar_disable_ecd_historico.sql` pra sobreviver a uma recriação futura do banco. Confirmado visualmente: item aparece acinzentado/desabilitado na sidebar depois do fix.
+
+---
+
+## ENCERRAMENTO DA VARREDURA COMPLETA DE TESTES (09/08/2026, 11:28–18:47)
+
+**136+ rotinas testadas** em 9 áreas do sistema — passe profundo (abrir modais, testar wizards, submeter formulários, checar 404/500/validação) em: Financeiro, Contábil, Patrimônio, Investimentos, Fiscal, RH, Societário, Cadastros Base, Administração do Sistema, Parâmetros Globais, Assinaturas/ClickSign, SPED, Arquivo Digital.
+
+**12 bugs reais encontrados e corrigidos:**
+1. Rota errada em `ContasAReceberPage.tsx` (`/accounting/` a mais)
+2. `ValidationPipe` global nunca registrado no backend inteiro
+3. `@Max(100)` insuficiente em `AccountFilterDto.limit`
+4. UUID opcional vazio rejeitado em `CreateFiscalDocumentDto`
+5. Wizard "Lançar Documento Fiscal" sem validação client-side por passo
+6. `FilterAPDto.status` quebrado pelo próprio ValidationPipe novo (multi-status)
+7. `CompanyList.tsx` inteira em inglês
+8. `ProfileList.tsx` em inglês + coluna "Level" órfã desalinhando tabela
+9. "Nova OS" (Manutenção de Ativo) sem rota POST no backend — feature nunca funcionou
+10. `DocumentsService.findAll` status como cast direto — 500 em filtro multi-valor (Pró-labore)
+11. Escape unicode `ú` cru vazando na UI de Tabelas Legais (IRRF)
+12. Item de menu "ECD — Histórico" órfão, sem página implementada
+
+**Commits desta sessão (todos pushed):** `d703f69`, `9c4b0c0`, `b7d2b94`, `e98106a`, `7bb2733`, `44d726c`, `fade498`, `d587aa1`, `13db782`, `6f951a7`, `f4e8d36`, `b8e7db2`, `3244f87`, `4dd2cdc`, `9a75aba`, `e075156`, `8e26910`.
+
+**Pendências registradas, não corrigidas (baixa severidade ou fora de escopo):**
+- Visões Contábeis/Aglutinação RFB sem mapeamento pro ano-base 2025 na ADVOCACIA GOMES.
+- Wizard "Novo Ativo Imobilizado" sem validação por passo (já bloqueia no clique final, só fricção de UX).
+- ECF exporter é stub conhecido (gera arquivo, conteúdo provavelmente incompleto) — já documentado como meta de sessão futura antes desta rodada.
+
+**Fora do escopo desta varredura (não testado):** conteúdo real dos arquivos SPED gerados (só confirmado que o mecanismo não quebra), certificados A3 físicos via LEDGR Agent, integração real ClickSign/SEFAZ/RFB (dependem de credencial externa), fluxos de eSocial/RAIS/DCTFWeb (sem botão de ação encontrado nas telas testadas).
