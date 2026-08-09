@@ -5200,3 +5200,29 @@ As 41 contas de abertura, os 158 lançamentos incluídos, as reclassificações 
 **Levar o ECF ao mesmo nível de qualidade alcançado com o ECD nesta sessão**: gerar o ECF **100% pelo LEDGR**, com base na ECD (já validada, 0 erros no PVA) e na contabilidade (lançamentos, plano de contas, encerramento) — mesmo padrão de rigor: gerar → validar no PVA oficial (SpedContabilFiscal) → corrigir bugs reais encontrados → reconfirmar até 0 erros.
 
 Contexto já registrado no memory/CLAUDE.md: `ecf-exporter.service.ts` hoje é um stub (preenchimento manual campo a campo no PVA foi a solução emergencial usada sob pressão de prazo para o ECF 2025). Esta meta é sobre implementar o gerador de verdade, replicando a disciplina desta sessão (comparação registro a registro contra uma ECF real quando disponível, correção de bugs de exportação, não só de dados).
+
+---
+
+## Sessão 09/08/2026 11:28 — Setup de teste automatizado (Playwright) + 4 bugs reais corrigidos em `infra/prisma/seed.ts`
+
+**Contexto:** sessão focada em infraestrutura de teste, não em feature nova. Instalado plugin `example-skills` (marketplace `anthropics/skills`) e a skill `webapp-testing`, além de Playwright (`pip install playwright` + `playwright install`, Python) para permitir testes automatizados de UI do frontend LEDGR daqui pra frente.
+
+**1. Smoke test da landing page (não autenticado)** — `http://localhost:5173`: título, formulário de login, Agenda Fiscal renderizam corretamente. **0 erros de console, 0 erros de página** (só avisos benignos de React Router v7 future-flags).
+
+**2. Usuário de teste QA criado** — `teste.qa@ledgr.local` / `TesteQA@2026` (hash bcrypt, custo 10), anexado ao perfil real **Master Admin** (`profile_id = 61a30be0-010d-4b8e-8470-f775bfd871ee`). Precisou também de uma linha em `access_schedules` com `mode = 'EXEMPT'` — **regra de negócio confirmada em código** (`apps/api/src/auth/auth.service.ts`, método `login()`): usuário sem `AccessSchedule` próprio nem `ProfileAccessSchedule` do perfil é **bloqueado no login por padrão** (`ForbiddenException`), a menos que o perfil tenha `permissions.all = true` (Master Admin fica isento dessa checagem).
+
+**3. Confirmado via Playwright**: login → `POST /auth/login` retorna `201`, redireciona para `/app/dashboard`, sidebar completo carrega (Financeiro/Contabilidade/Fiscal/DP/Societário/Patrimônio/SPED/Assinaturas/Cadastros/Administração), 6 empresas carregadas. **0 erros de console, 0 erros de página.**
+
+**4. Quatro bugs reais e pré-existentes encontrados e corrigidos em `infra/prisma/seed.ts`** (não relacionados ao usuário QA — o script já estava quebrado assim antes desta sessão, provavelmente desde a recriação do banco em 27/07/2026):
+   - **`PrismaClient` sem driver adapter**: Prisma 7 exige adapter explícito (`@prisma/adapter-pg`) — sem ele, o script quebrava na primeira linha, `npm run seed` nunca executava nenhuma query de fato. Corrigido replicando o padrão de `apps/api/src/prisma/prisma.service.ts`.
+   - **`ON CONFLICT (id) DO NOTHING` insuficiente**: após a recriação do banco (27/07/2026), várias linhas existem com `id` diferente dos hardcoded no seed mas mesmo `email`/`cpf`/`tax_id` (que também são `@unique`) — o INSERT estourava violação de unicidade em vez de ser ignorado. Trocado para `ON CONFLICT DO NOTHING` (sem coluna-alvo), que captura conflito em qualquer constraint única da tabela.
+   - **Loop sem isolamento de erro**: uma query falhando abortava (`process.exit(1)`) todas as queries seguintes do array — por isso o usuário QA (adicionado como queries 6/7) nunca era criado. Agora cada query roda em `try/catch` individual (`console.warn` + segue pra próxima).
+   - **Query 3 (`companies`, empresa fictícia "HALLO") faltava `status_date`**, coluna `NOT NULL` no schema atual mas ausente do INSERT original. Adicionada (mesma data de `opening_date`).
+   - Query 5 (`user_companies`) também reescrita para resolver `user_id` via `SELECT ... WHERE email = 'hpontes@ledgr.com'` em vez de id fixo, pelo mesmo motivo do bug de `ON CONFLICT`.
+   - **Resultado:** `npm run seed` roda 100% limpo agora, sem nenhum warning, idempotente (pode rodar quantas vezes quiser).
+
+**5. Confirmado nesta sessão — drift de UUIDs pós-recriação do banco (27/07/2026):** o perfil real "Master Admin" tem id `61a30be0-010d-4b8e-8470-f775bfd871ee` (não `ad8e026c-...`, que é o id hardcoded legado no seed — hoje existe como perfil duplicado "Administrador Master", sem uso real). O usuário real `hpontes@ledgr.com` tem id `421642c8-e981-49c9-996c-b4bfabc22b52` (não `177e026c-...`). Reforça o aviso já existente no topo deste arquivo/CLAUDE.md: **nunca reutilizar UUID de sessão anterior a 27/07/2026 sem confirmar contra o banco atual.**
+
+**Commits:** `d703f69` (driver adapter + idempotência + try/catch por query + usuário QA) e `9c4b0c0` (status_date da query 3) — ambos pushed para `origin/main`.
+
+**Preferência de colaboração registrada (memory, não CLAUDE.md):** para comandos que o usuário precisa rodar manualmente no terminal, preferir um-liners diretos (sem heredoc/`@'...'@`) — um heredoc colado quebrou por corrupção de quebra de linha no PowerShell interativo. Assumir sempre que o terminal do usuário já está com cwd em `D:\Projetos\Ledgr` (não prefixar `cd`/`Set-Location`).
