@@ -5367,3 +5367,25 @@ Renda Fixa (modal "Novo Investimento" abre limpo), Simulador CDB (cálculo real 
 - **Commits desta sessão (todos pushed):** `d703f69`, `9c4b0c0`, `b7d2b94`, `e98106a`, `7bb2733`, `44d726c`, `fade498`, `d587aa1`, `13db782`, `6f951a7`, `f4e8d36`, `b8e7db2`, `3244f87`.
 - **Pendências registradas (não corrigidas):** Visões Contábeis/Aglutinação RFB sem mapeamento pro ano-base 2025; wizard "Novo Ativo Imobilizado" sem validação por passo (severidade baixa, ja bloqueia no clique final).
 - **Ainda não testado a fundo:** Assinaturas/ClickSign, SPED (ECD/ECF/EFD), Cadastros Base/Administração/Parâmetros Globais, Arquivo Digital — todos com smoke test raso feito, nenhum com passe profundo (abrir modal + submit) ainda.
+
+---
+
+## Sessão 09/08/2026 18:09 — Teste profundo Cadastros Base, Administração e Parâmetros Globais (9 rotinas) + 1 bug corrigido
+
+**Continuação da sessão 17:45.** Persons, Users, Profiles, Sidebar Permissions, Indicadores Econômicos, Calculadora de Correção, Calendário, Obrigações, Tabelas Legais — modais de criação abertos, submit vazio testado.
+
+### Resultado: 0 erros de console/rede em todas as 9 rotinas
+
+Os poucos "falha ao clicar botão de submit" registrados pelo script (Novo Perfil, Indicadores) são botões corretamente desabilitados até campo obrigatório ser preenchido — mesmo padrão de validação correta já confirmado nas sessões anteriores, não são bugs.
+
+### 1 bug real encontrado e corrigido (commit `9a75aba`, pushed)
+
+**`/app/sistema/tabelas` (modal "Tabela IRRF"):** cabeçalho de coluna mostrava literalmente **`999999 = última faixa`** na tela, em vez de "última faixa". Causa: `TabelasLegaisPage.tsx` tinha a sequência de escape `ú` escrita direto como texto JSX (fora de uma string JS entre aspas) — JSX não processa escapes unicode em texto solto, trata como 6 caracteres literais. Corrigido substituindo pelo caractere UTF-8 real ("ú"). Confirmado renderizando certo no navegador (“LIMITE ATÉ (R$) — 999999 = ÚLTIMA FAIXA”) e 0 erros.
+
+### Estado acumulado da sessão de testes (09/08/2026, 11:28–18:09)
+
+- **118+ rotinas testadas.** Passe profundo (não só smoke) completo em: Financeiro, Patrimônio, Investimentos, Fiscal, RH, Societário, Cadastros Base, Administração do Sistema, Parâmetros Globais.
+- **11 bugs reais corrigidos no total.**
+- **Commits desta sessão (todos pushed):** `d703f69`, `9c4b0c0`, `b7d2b94`, `e98106a`, `7bb2733`, `44d726c`, `fade498`, `d587aa1`, `13db782`, `6f951a7`, `f4e8d36`, `b8e7db2`, `3244f87`, `4dd2cdc`, `9a75aba`.
+- **Pendências registradas (não corrigidas):** Visões Contábeis/Aglutinação RFB sem mapeamento pro ano-base 2025; wizard "Novo Ativo Imobilizado" sem validação por passo (severidade baixa).
+- **Ainda sem passe profundo:** Assinaturas/ClickSign, SPED (ECD/ECF/EFD), Arquivo Digital — smoke test raso feito em todos, nenhum com abertura de modal/submit ainda.
