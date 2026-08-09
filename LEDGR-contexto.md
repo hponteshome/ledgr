@@ -5484,3 +5484,31 @@ Fix: `UPDATE sidebar_items SET disabled = true` pro item quebrado, seguindo o me
 **Commit:** `d48474f`, pushed (confirmado com o usuário antes do push, dado o impacto visível/amplo da mudança).
 
 **Próximo passo (quando solicitado):** Estágio 2 — command palette (Ctrl/Cmd+K), favoritos por usuário, breadcrumbs em hierarquias profundas.
+
+---
+
+## Sessão 09/08/2026 19:59 — Navegação Estágio 2 implementado: command palette, favoritos, breadcrumbs
+
+**Implementa o Estágio 2 (Produtividade) do roadmap de `docs/LEDGR-benchmark-ux-navegacao.md`**, só depois do Estágio 1 (sessão 19:34) testado e pushed - guardrail seguido de novo. Estágio 3 (navegação por perfil, auditoria de menu) continua pra quando for pedido.
+
+### O que foi feito
+
+- **`SidebarTreeContext.tsx` (novo):** extraía a lógica de árvore/permissão/itens dinâmicos de Societário que antes vivia só dentro do `SideBar.tsx`, compartilhada agora entre SideBar, CommandPalette e Breadcrumbs (evita 3 fetches duplicados da mesma árvore). Expõe uma lista achatada com o "trail" (módulo > rotina > sub-rotina) de cada item, usada tanto na busca quanto nos breadcrumbs.
+- **`CommandPalette.tsx` (novo), Ctrl/Cmd+K:** busca global sobre todas as rotinas e também sobre empresas (trocar empresa direto pela busca). Sem digitar, mostra recentes. Navegação por teclado (setas/Enter/Esc). Botão "Buscar... Ctrl K" visivel no Header, ao lado do seletor de empresa.
+- **`useFavorites.ts` (novo):** estrela em cada rotina do painel de Nível 2 + entrada fixa "Favoritos" no topo do rail (painel cross-módulo). LocalStorage por usuário - preferência pessoal, não precisa de endpoint de backend nesta 1ª versão (diferente de sidebar_items, que é dado compartilhado).
+- **`Breadcrumbs.tsx` (novo):** só renderiza quando a rota bate com um item de 3+ níveis na árvore (ex: Contabilidade > Investimentos > Renda Fixa) - em níveis mais rasos o cabeçalho do painel de Nível 2 já dá esse contexto, conforme o próprio roadmap especifica.
+
+### Bug real pego no próprio teste desta sessão (corrigido antes do commit)
+
+`useRecentNav` (leitura dos itens recentes) só recarregava do localStorage no *mount* do `CommandPalette` - mas esse componente fica sempre montado (só alterna visibilidade com Ctrl+K), então navegações feitas depois da 1ª abertura nunca apareciam na lista de recentes ao reabrir. Corrigido passando `open` como chave de refresh pro hook, forçando releitura toda vez que o palette abre. Achado no teste com Playwright: abri o palette, busquei e naveguei pra "Contas a Pagar", fechei, reabri sem digitar - "Contas a Pagar" não aparecia nos recentes até o fix.
+
+### Testado (skill `webapp-testing`)
+
+- Ctrl+K abre, busca "contas a pagar", Enter navega corretamente; reabrir sem digitar mostra os recentes (incluindo o item recém-navegado, após o fix acima).
+- Favoritar "Contas a Pagar" pelo painel do módulo, abrir o painel "Favoritos" no rail e confirmar que aparece lá.
+- Breadcrumb aparece corretamente em rota de 3 níveis (Contabilidade > Investimentos > Renda Fixa) e **não** aparece em rota rasa de 2 níveis (Contas a Pagar) - comportamento certo conforme o requisito.
+- **81 rotinas já cobertas nesta sessão reexecutadas, 0 regressões.**
+
+**Commit:** `c89f6a6`, pushed (confirmado com o usuário antes do push, mesmo padrão do Estágio 1).
+
+**Próximo passo (quando solicitado):** Estágio 3 — navegação configurável por perfil/permissão (já parcialmente coberto pelo filtro `canView` existente, mas o roadmap pede algo mais explícito), auditoria periódica de uso do menu.
