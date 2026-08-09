@@ -67,29 +67,29 @@ export const ProfileList: React.FC = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-black text-gray-800">Profile Maintenance</h1>
+          <h1 className="text-2xl font-black text-gray-800">Manutenção de Perfis</h1>
           <p className="text-sm text-gray-500 font-medium">
-            Define access levels, permissions, and system roles
+            Defina níveis de acesso, permissões e papéis do sistema
           </p>
         </div>
         <button
           onClick={() => navigate('/app/profiles/new')}
           className="flex items-center gap-2 bg-blue-600 text-white px-6 py-2 rounded-xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-100"
         >
-          <FiPlus size={20} /> New Profile
+          <FiPlus size={20} /> Novo Perfil
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6" max-Width='100'>
-        <UserCard title="Total Profiles" value={profiles.length} icon={FiShield} color="bg-blue-600" />
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <UserCard title="Total de Perfis" value={profiles.length} icon={FiShield} color="bg-blue-600" />
         <UserCard
-          title="Master Admins"
+          title="Admins Master"
           value={profiles.filter(p => p.name === 'Administrador Master' || p.permissions?.all === true).length}
           icon={FiActivity}
           color="bg-amber-500"
         />
         <UserCard
-          title="Full Access"
+          title="Acesso Total"
           value={profiles.filter(p => p.permissions?.all === true).length}
           icon={FiLock}
           color="bg-purple-600"
@@ -97,26 +97,25 @@ export const ProfileList: React.FC = () => {
       </div>
 
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto" max-Width='100'>
-          <table className="w-full text-left border-collapse" max-Width='100'>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
             <thead className="bg-gray-50/50 border-b border-gray-100">
               <tr>
-                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase">Profile Name / ID</th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase">Level</th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase">Active Permissions</th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase text-right">Actions</th>
+                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase">Nome do Perfil / ID</th>
+                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase">Permissões Ativas</th>
+                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase text-right">Ações</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100" max-Width='100'>
+            <tbody className="divide-y divide-gray-100">
               {isLoading ? (
                 <tr>
                   <td colSpan={3} className="p-10 text-center text-gray-400 animate-pulse font-bold">
-                    Loading profiles from database...
+                    Carregando perfis...
                   </td>
                 </tr>
               ) : profiles.map(profile => (
                 <tr key={profile.id} className="hover:bg-gray-50/50 transition-colors group">
-                  <td className="px-6 py-4" max-Width='100'>
+                  <td className="px-6 py-4">
                     <div className="font-bold text-gray-800">{profile.name}</div>
                     <div className="text-[10px] text-slate-400 font-mono tracking-tighter">{profile.id}</div>
                   </td>
@@ -132,7 +131,7 @@ export const ProfileList: React.FC = () => {
                             </span>
                           ))
                       ) : (
-                        <span className="text-gray-400 text-[10px] italic">No specific permissions</span>
+                        <span className="text-gray-400 text-[10px] italic">Nenhuma permissão específica</span>
                       )}
                     </div>
                   </td>
@@ -163,7 +162,7 @@ export const ProfileList: React.FC = () => {
 
         {!isLoading && profiles.length === 0 && (
           <div className="p-10 text-center text-gray-500 italic font-medium">
-            No profiles found in the database.
+            Nenhum perfil cadastrado.
           </div>
         )}
       </div>
