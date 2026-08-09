@@ -97,6 +97,7 @@ import { CalendarioPage } from '../pages/sistema/CalendarioPage';
 import { ObrigacoesPage } from '../pages/sistema/ObrigacoesPage';
 import { TabelasLegaisPage } from '../pages/sistema/TabelasLegaisPage';
 import SidebarPermissionsPage from '../pages/sistema/SidebarPermissionsPage';
+import MenuUsageAuditPage from '../pages/sistema/MenuUsageAuditPage';
 import ShareholdersPage from '../pages/corporate/shareholders/ShareholdersPage';
 import { RepositorioPage } from '../pages/documentos/RepositorioPage';
 import { LogotiposPage } from '../pages/documentos/LogotiposPage';
@@ -178,6 +179,7 @@ export const AppRoutes = () => {
                 <Route path="app/sistema/obrigacoes" element={<ProtectedRoute><ObrigacoesPage /></ProtectedRoute>} />
                 <Route path="app/sistema/tabelas" element={<ProtectedRoute><TabelasLegaisPage /></ProtectedRoute>} />
                     <Route path="app/sistema/sidebar-permissions" element={<ProtectedRoute><SidebarPermissionsPage /></ProtectedRoute>} />
+                    <Route path="app/sistema/menu-usage" element={<ProtectedRoute><MenuUsageAuditPage /></ProtectedRoute>} />
                 <Route path="app/finance/fechamento" element={<ProtectedRoute><FechamentoPage /></ProtectedRoute>} />
                 <Route path="app/fiscal/apuracao" element={<ProtectedRoute><ApuracaoImpostosPage /></ProtectedRoute>} />
                 <Route path="app/fiscal/lalur-config" element={<ProtectedRoute><LalurConfigPage /></ProtectedRoute>} />

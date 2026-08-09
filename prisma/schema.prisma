@@ -4827,3 +4827,20 @@ model ChatAttachment {
   @@index([messageId])
   @@map("chat_attachments")
 }
+
+/// Contador agregado de uso por rota de menu (Estagio 3 do roadmap de
+/// navegacao - docs/LEDGR-benchmark-ux-navegacao.md: "auditoria periodica
+/// de uso do menu, reordenando/reagrupando itens conforme o produto cresce").
+/// Global (nao por empresa/usuario) - e sobre o catalogo de rotinas em si,
+/// nao preferencia pessoal (isso ja e coberto por favoritos, localStorage).
+model MenuUsageStat {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  path        String   @unique @db.VarChar(160)
+  label       String?  @db.VarChar(100)
+  moduleLabel String?  @map("module_label") @db.VarChar(100)
+  hitCount    Int      @default(0) @map("hit_count")
+  lastUsedAt  DateTime @default(now()) @map("last_used_at") @db.Timestamp(6)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+
+  @@map("menu_usage_stats")
+}

@@ -32,6 +32,7 @@ import { BankImportModule } from './modules/finance/bank-import.module';
 import { CorporateModule } from './modules/corporate/corporate.module'; 
 import { SignaturesModule } from './modules/signatures/signatures.module';
 import { SidebarPermissionsModule } from './modules/sidebar-permissions/sidebar-permissions.module';
+import { MenuUsageModule } from './modules/menu-usage/menu-usage.module';
 import { ChatModule } from './chat/chat.module';
 
 
@@ -68,6 +69,7 @@ import { ChatModule } from './chat/chat.module';
     CorporateModule,
     SignaturesModule,
         SidebarPermissionsModule,
+        MenuUsageModule,
         ChatModule,
     
   ],

@@ -54,7 +54,32 @@ async function main() {
     // 7. QA Test User - Access Schedule (EXEMPT, senao login fica bloqueado por padrao)
     `INSERT INTO "access_schedules" ("id", "user_id", "mode")
      VALUES ('06eff271-0149-4913-96c7-4b7c91a177a5', 'f0cd3522-bae7-46a7-90f8-f48ccf9c5aad', 'EXEMPT')
-     ON CONFLICT (id) DO NOTHING;`
+     ON CONFLICT (id) DO NOTHING;`,
+
+    // 8. QA Test User - perfil restrito (Visualizador), pra testar navegacao por
+    // permissao (Estagio 3 do roadmap de navegacao). Resolve o profile_id pelo
+    // nome via SELECT, nao id fixo - perfil "Visualizador" nao e criado por este
+    // seed, pode nao existir/ter id diferente numa recriacao de banco; nesse caso
+    // a query so nao insere nada (SELECT sem linha), sem quebrar o resto do seed.
+    `INSERT INTO "users" ("id", "document", "document_type", "email", "password_hash", "full_name", "profile_id", "status", "is_active")
+     SELECT 'f0cd3522-bae7-46a7-90f8-f48ccf9c5ad2', '00099988877', 'CPF', 'teste.visualizador@ledgr.local', '$2b$10$pqrQ6PpXNM4jCSkO3t2sy.8821ZaPt5OWD.pTwvGavyNx97NrD5ZW', 'QA Visualizador (automatizado)', p.id, 'active', true
+     FROM "profiles" p WHERE p.name = 'Visualizador'
+     ON CONFLICT DO NOTHING;`,
+
+    // 9. QA Test User (Visualizador) - Access Schedule (EXEMPT)
+    `INSERT INTO "access_schedules" ("id", "user_id", "mode")
+     SELECT '2bbbfbfc-81b3-4b3b-8513-9e629b7b3c79', u.id, 'EXEMPT'
+     FROM "users" u WHERE u.email = 'teste.visualizador@ledgr.local'
+     ON CONFLICT DO NOTHING;`,
+
+    // 10. QA Test User (Visualizador) - User Companies (sem isso o login nao
+    // acha empresa nenhuma e a navegacao/rail nunca carrega). Resolve ambos os
+    // lados por coluna estavel (email / tax_id), nao id fixo.
+    `INSERT INTO "user_companies" ("id", "user_id", "company_id", "role")
+     SELECT '5a30bab4-07d7-46b9-bf4a-983136d93308', u.id, c.id, 'VISUALIZADOR'
+     FROM "users" u, "companies" c
+     WHERE u.email = 'teste.visualizador@ledgr.local' AND c.tax_id = '06190032000183'
+     ON CONFLICT DO NOTHING;`
   ];
 
   for (const [i, query] of queries.entries()) {

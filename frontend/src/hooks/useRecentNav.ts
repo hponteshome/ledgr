@@ -2,11 +2,13 @@
 // Rastreia as ultimas rotinas navegadas (por usuario, via localStorage) para
 // alimentar a lista de "recentes" do Command Palette (Estagio 2 do roadmap de
 // navegacao) - preenchida em qualquer navegacao, nao so pelas acionadas via
-// Ctrl/Cmd+K.
+// Ctrl/Cmd+K. Tambem envia um contador global de uso pro backend (Estagio 3 -
+// auditoria de uso do menu), best-effort/fire-and-forget.
 import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useSidebarTree, FlatMenuEntry } from '../contexts/SidebarTreeContext';
+import api from '../services/api';
 
 const MAX_RECENT = 8;
 
@@ -43,6 +45,11 @@ export function useTrackRecentNav() {
     const current = readRecent(userId).filter(p => p !== match.path);
     current.unshift(match.path);
     writeRecent(userId, current.slice(0, MAX_RECENT));
+
+    // Auditoria de uso do menu (Estagio 3) - best-effort, nao bloqueia navegacao
+    // nem trata falha (rede instavel/backend fora nao deve afetar o usuario).
+    api.post('/menu-usage/track', { path: match.path, label: match.label, moduleLabel: match.moduleLabel })
+      .catch(() => {});
   }, [location.pathname, userId, flat]);
 }
 
