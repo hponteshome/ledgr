@@ -5316,3 +5316,30 @@ Assinaturas/ClickSign (4: signatures, certificates, request, validate) · SPED r
 - **Commits desta sessão (todos pushed):** `d703f69`, `9c4b0c0`, `b7d2b94`, `e98106a`, `7bb2733`, `44d726c`, `fade498`, `d587aa1`, `13db782`.
 - **Pendência registrada (não corrigida):** Visões Contábeis/Aglutinação RFB sem mapeamento pro ano-base 2025 na ADVOCACIA GOMES (ver seção 15:30).
 - **Não testado:** fluxos de escrita reais (criar/editar/excluir de fato, fora dos casos já exercitados com cancel no meio do caminho), upload de arquivo de verdade (bank-import, importação de plano/lançamentos, certificados A3), integração real com ClickSign/SEFAZ/RFB (dependem de credencial externa).
+
+---
+
+## Sessão 09/08/2026 16:38 — Teste profundo Patrimônio/Investimentos + feature faltante implementada (Ordem de Serviço)
+
+**Gatilho:** usuário perguntou se Patrimônio e Investimentos tinham sido testados "de verdade" — resposta honesta foi não (só smoke test raso na varredura anterior). Fez-se então um passe profundo (abrir modais, testar wizards, submeter) nos dois, igual ao nível já aplicado ao Financeiro.
+
+### Investimentos — tudo certo, sem achados
+
+Renda Fixa (modal "Novo Investimento" abre limpo), Simulador CDB (cálculo real funcionando — capital, IRRF, saldo líquido, gráfico, extrato mensal com dados pré-preenchidos) e Tabela CDI (série real do BCB, Série 12). Nenhum bug.
+
+### Patrimônio — 2 achados
+
+1. **Menor, não corrigido:** wizard "Novo Ativo Imobilizado" (3 passos) deixa avançar sem preencher Código/Descrição — mesmo padrão do bug já corrigido no Financeiro, mas aqui **já existe validação no clique final** ("Preencha os campos obrigatórios: Código, Descrição, Valor de Aquisição e Vida Útil") que bloqueia o envio antes de chamar a API — nenhum dado sujo é criado, só fricção de UX (descobre só no passo 3 qual campo falta). Deixado como está por ora.
+2. **Maior, corrigido (commit `f4e8d36`, pushed):** botão **"Nova OS" em `/app/assets/maintenances` estava completamente quebrado.** Causa raiz dupla:
+   - `MaintenancesPage.tsx` sempre abria o modal com `assetId=""` fixo (página global, sem contexto de ativo especifico, sem nenhum seletor).
+   - **Não existia rota `POST` no backend pra criar manutenção** (`assets.controller.ts` só tinha `GET`/`PATCH`/`DELETE` de manutenções) — confirmado que `MaintenanceService.create()` já estava 100% implementado (valida ativo, muda status pra `UNDER_MAINTENANCE` em corretiva/emergencial, grava histórico) mas nunca foi exposto via controller. Testado direto via API: `POST /assets/maintenances` retornava **404**.
+   - **Fix:** adicionada `@Post('maintenances')` no controller ligando ao service já existente; `MaintenanceModal.tsx` ganhou um seletor "Ativo *" (via `useAssetsList()`) que só aparece quando `assetId` não é passado pelo caller (a página global). `MaintenanceTab.tsx` (usado dentro do detalhe do ativo, `/app/assets/:id`) continua passando `assetId` explicito, comportamento inalterado ali.
+   - **Testado end-to-end de verdade:** criado um registro real via API na empresa LM (ativo real "CJ" — Casa Campos do Jordão) e imediatamente excluído (soft-delete) em seguida, sem deixar rastro no banco. Ciclo completo confirmado funcionando.
+
+### Estado acumulado da sessão de testes (09/08/2026, 11:28–16:38)
+
+- **81+ rotinas testadas**, agora com passe profundo (não só smoke) em Financeiro, Patrimônio e Investimentos; smoke test em todo o resto.
+- **9 bugs reais corrigidos no total** (8 da varredura anterior + a Ordem de Serviço faltante).
+- **Commits desta sessão (todos pushed):** `d703f69`, `9c4b0c0`, `b7d2b94`, `e98106a`, `7bb2733`, `44d726c`, `fade498`, `d587aa1`, `13db782`, `6f951a7`, `f4e8d36`.
+- **Pendências registradas (não corrigidas):** Visões Contábeis/Aglutinação RFB sem mapeamento pro ano-base 2025 (ver 15:30); wizard "Novo Ativo Imobilizado" sem validação por passo (ver acima, severidade baixa).
+- **Ainda não testado a fundo** (só smoke raso): Fiscal, RH, Societário, Assinaturas, SPED, Cadastros/Admin/Parâmetros, Arquivo Digital — se o padrão se repetir, pode haver mais features com UI pronta mas endpoint faltante como a de Manutenções.
