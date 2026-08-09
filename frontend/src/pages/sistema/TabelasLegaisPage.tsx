@@ -495,7 +495,7 @@ export function TabelasLegaisPage() {
             <div style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', marginBottom: 8, letterSpacing: 0.5 }}>Tabela Progressiva</div>
             <table style={{ width: '100%', borderCollapse: 'collapse', border: '0.5px solid #E5E7EB', borderRadius: 8, overflow: 'hidden', marginBottom: 16 }}>
               <thead><tr style={{ background: '#F9FAFB' }}>
-                <th style={S.th}>Limite Até (R$) — 999999 = \u00faltima faixa</th>
+                <th style={S.th}>Limite Até (R$) — 999999 = última faixa</th>
                 <th style={S.th}>Alíquota (%)</th>
                 <th style={S.th}>Dedução (R$)</th>
                 <th style={{ ...S.th, width: 40 }}></th>
