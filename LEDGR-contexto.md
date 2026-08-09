@@ -5456,3 +5456,31 @@ Fix: `UPDATE sidebar_items SET disabled = true` pro item quebrado, seguindo o me
 **Guardrail explícito do documento, citado pelo usuário ao pedir a implementação:** implementar um estágio de cada vez, nunca os 3 juntos — evita reescrita grande/arriscada de uma vez só, permite testar cada etapa (via skill `webapp-testing`) antes de avançar. Também vale o guardrail do próprio doc: nunca remover atalho de produtividade existente como efeito colateral do redesign (foi o gatilho mais citado nas reclamações do redesign da Conta Azul Pro).
 
 **Próximo passo desta sessão:** implementar o Estágio 1 no frontend do LEDGR.
+
+---
+
+## Sessão 09/08/2026 19:34 — Navegação Estágio 1 implementado: sidebar de dois níveis + confirmação do seletor de empresa
+
+**Implementa o Estágio 1 (Fundação) do roadmap de `docs/LEDGR-benchmark-ux-navegacao.md`** (registrado na sessão 18:57). Guardrail seguido à risca: só o Estágio 1, não os 3 juntos — Estágios 2 (command palette, favoritos, breadcrumbs) e 3 (navegação por perfil, auditoria de menu) ficam pra sessões futuras.
+
+### O que mudou
+
+**`SideBar.tsx` reescrito por completo** — saiu do modelo de accordion de coluna única (clicar num módulo empurrava os itens abaixo pra baixo) pra duas colunas fixas:
+- **Nível 1 (rail, 80px, sempre visível):** ícones dos módulos de topo, sem rótulo de texto (testado com rótulo truncado primeiro - "Arquivo Di...", "Departam..." - ficava feio; trocado pra ícone + tooltip, padrão comum de rail estreito tipo VSCode/Slack).
+- **Nível 2 (painel contextual, 240px, toggle-ável):** rotinas do módulo selecionado, aparece ao lado do rail. O toggle que antes colapsava a sidebar inteira agora só controla a visibilidade desse painel.
+- **Estado visual diferenciado:** rota atual = fundo azul + barra de destaque lateral; módulo com painel aberto mas fora da rota atual = fundo cinza sutil. Sem isso os dois módulos apareciam destacados igual quando o usuário abria o painel de um módulo diferente do que estava navegando — corrigido depois do primeiro teste visual.
+
+**Preservado 100% do comportamento existente** (nada removido, só realocado): permissões (`canView`), itens dinâmicos de Societário (Estatuto/Contrato Social dependem da empresa ativa), botão de importação inline, sub-accordion de 3º nível (ex: Contabilidade > Investimentos > Renda Fixa/Simulador/CDI), itens desabilitados, sincronização automática com a rota atual via URL direta.
+
+**`Layout.tsx`:** margem do conteúdo recalculada pra nova largura (rail+painel = 320px aberto, só rail = 80px colapsado). **Removido bloco duplicado de botão "Sign Out"** fixo no canto inferior esquerdo — já existia um "Sair" funcional na sidebar (agora no rodapé do rail); o duplicado colidia visualmente com a nova estrutura e nunca foi um atalho distinto (mesma ação, botão redundante pré-existente).
+
+**Seletor de empresa (`Header.tsx`): nenhuma mudança feita.** Já atendia o requisito do Estágio 1 antes desta sessão — persistente em toda página autenticada (renderizado pelo Header, fora da sidebar), empresa ativa em destaque no botão + highlight no dropdown, busca por nome/CNPJ. Confirmado que independe da largura da sidebar (prop `sidebarOpen` recebida mas nunca usada no componente).
+
+### Testado (skill `webapp-testing`)
+
+- **81 rotinas já cobertas nesta sessão reconfirmadas sem regressão** (0 erros de console/página em todas, reexecutando os scripts de smoke test já existentes).
+- Testes dirigidos de interação com a nova sidebar: abrir painel de módulo (Financeiro), navegar por rotina (Contas a Pagar), accordion de 3º nível (Investimentos > Renda Fixa), itens dinâmicos do Societário (Estatuto/Contrato Social), colapsar/expandir o painel, abrir dropdown de empresa — todos 0 erros.
+
+**Commit:** `d48474f`, pushed (confirmado com o usuário antes do push, dado o impacto visível/amplo da mudança).
+
+**Próximo passo (quando solicitado):** Estágio 2 — command palette (Ctrl/Cmd+K), favoritos por usuário, breadcrumbs em hierarquias profundas.
