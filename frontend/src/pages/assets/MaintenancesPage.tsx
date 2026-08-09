@@ -137,7 +137,6 @@ export default function MaintenancesPage() {
 
       {showModal && (
         <MaintenanceModal
-          assetId=""
           onClose={() => setShowModal(false)}
           onSuccess={() => { setShowModal(false); load(); }}
         />

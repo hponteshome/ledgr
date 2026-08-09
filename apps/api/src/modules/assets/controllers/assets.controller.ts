@@ -61,6 +61,12 @@ export class AssetsController {
     return this.maintenanceService.findAll(req.companyId);
   }
 
+  @RequireResourceAccess('asset-maintenances', 'EDIT')
+  @Post('maintenances')
+  createMaintenance(@Req() req: any, @Body() dto: CreateMaintenanceDto) {
+    return this.maintenanceService.create(req.companyId, dto, req.user?.id);
+  }
+
   @RequireResourceAccess('asset-maintenances', 'VIEW')
   @Get('maintenances/overdue')
   findOverdueMaintenance(@Req() req: any) {

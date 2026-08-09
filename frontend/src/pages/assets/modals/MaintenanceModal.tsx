@@ -2,20 +2,26 @@
 // LEDGR — frontend/src/pages/assets/modals/MaintenanceModal.tsx
 // ============================================================
 import { MAINTENANCE_TYPE_LABELS, MAINTENANCE_STATUS_LABELS } from '../types/asset.types';
-import { useState } from 'react';
-import { useAssetMutations } from '../hooks/useAssets';
+import { useState, useEffect } from 'react';
+import { useAssetMutations, useAssetsList } from '../hooks/useAssets';
 import { ModalWrapper, ModalFooter, Field } from './ModalComponents';
 import { SmartDateInput } from '../../../components/SmartDateInput';
 
 export function MaintenanceModal({ assetId, maintenance, onClose, onSuccess }: {
-    assetId: string; maintenance?: any; onClose: () => void; onSuccess: () => void;
+    assetId?: string; maintenance?: any; onClose: () => void; onSuccess: () => void;
 }) {
     const { createMaintenance, updateMaintenance, loading } = useAssetMutations();
     const [error, setError] = useState('');
     const isEdit = !!maintenance;
+    const needsAssetPicker = !assetId && !isEdit;
+
+    const { data: assetsData, fetch: fetchAssets } = useAssetsList();
+    useEffect(() => {
+        if (needsAssetPicker) fetchAssets({ limit: 500 });
+    }, [needsAssetPicker, fetchAssets]);
 
     const [form, setForm] = useState({
-        assetId,
+        assetId: assetId ?? '',
         type: maintenance?.type ?? 'PREVENTIVE',
         title: maintenance?.title ?? '',
         description: maintenance?.description ?? '',
@@ -37,6 +43,10 @@ export function MaintenanceModal({ assetId, maintenance, onClose, onSuccess }: {
 
     async function handleSubmit() {
         setError('');
+        if (needsAssetPicker && !form.assetId) {
+            setError('Selecione o ativo.');
+            return;
+        }
         if (!form.title || !form.description || !form.scheduledDate) {
             setError('Preencha título, descrição e data prevista.');
             return;
@@ -53,6 +63,16 @@ export function MaintenanceModal({ assetId, maintenance, onClose, onSuccess }: {
     return (
         <ModalWrapper title={isEdit ? 'Editar OS' : 'Nova Ordem de Serviço'} onClose={onClose}>
             <div className="space-y-4 p-6">
+                {needsAssetPicker && (
+                    <Field label="Ativo *">
+                        <select className={input} value={form.assetId} onChange={e => set('assetId', e.target.value)}>
+                            <option value="">Selecione o ativo...</option>
+                            {(assetsData?.data ?? []).map(a => (
+                                <option key={a.id} value={a.id}>{a.internalCode} — {a.description}</option>
+                            ))}
+                        </select>
+                    </Field>
+                )}
                 <div className="grid grid-cols-2 gap-4">
                     <Field label="Tipo *">
                         <select className={input} value={form.type} onChange={e => set('type', e.target.value)}>
