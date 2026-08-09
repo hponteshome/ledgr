@@ -30,8 +30,8 @@ async function main() {
      ON CONFLICT DO NOTHING;`,
 
     // 3. Companies
-    `INSERT INTO "companies" ("id", "tax_id", "legal_name", "trade_name", "opening_date", "street", "number", "neighborhood", "zip_code", "state", "city", "status", "legal_nature", "size", "tax_regime", "equity")
-     VALUES ('06a88dfa-d4cf-4c5c-8dc1-83538d6b8b7c', '07432458000169', 'HALLO ADMINISTRACAO E PARTICIPACOES LTDA', 'HALLO', '2004-07-13', 'BANDEIRA PAULISTA', '600', 'ITAIM BIBI', '04532001', 'SP', 'SAO PAULO', 'active', 'Sociedade Simples Limitada', 'DEMAIS', 'LUCRO_PRESUMIDO', 10000.00)
+    `INSERT INTO "companies" ("id", "tax_id", "legal_name", "trade_name", "opening_date", "street", "number", "neighborhood", "zip_code", "state", "city", "status", "status_date", "legal_nature", "size", "tax_regime", "equity")
+     VALUES ('06a88dfa-d4cf-4c5c-8dc1-83538d6b8b7c', '07432458000169', 'HALLO ADMINISTRACAO E PARTICIPACOES LTDA', 'HALLO', '2004-07-13', 'BANDEIRA PAULISTA', '600', 'ITAIM BIBI', '04532001', 'SP', 'SAO PAULO', 'active', '2004-07-13', 'Sociedade Simples Limitada', 'DEMAIS', 'LUCRO_PRESUMIDO', 10000.00)
      ON CONFLICT DO NOTHING;`,
 
     // 4. Users
