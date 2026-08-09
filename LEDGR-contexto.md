@@ -5512,3 +5512,26 @@ Fix: `UPDATE sidebar_items SET disabled = true` pro item quebrado, seguindo o me
 **Commit:** `c89f6a6`, pushed (confirmado com o usuário antes do push, mesmo padrão do Estágio 1).
 
 **Próximo passo (quando solicitado):** Estágio 3 — navegação configurável por perfil/permissão (já parcialmente coberto pelo filtro `canView` existente, mas o roadmap pede algo mais explícito), auditoria periódica de uso do menu.
+
+---
+
+## 2026-08-09 20:52 — Roadmap de navegacao: Estagio 3 (Governanca) concluido
+
+Fecha docs/LEDGR-benchmark-ux-navegacao.md (Fundacao -> Produtividade -> Governanca), todos os 3 estagios implementados nesta sessao. Commit 65e0c33, pushed para origin/main.
+
+**Verificacao de navegacao por permissao (sem mudanca de codigo necessaria):**
+- Criado usuario de teste real `teste.visualizador@ledgr.local` (perfil Visualizador, com `profile_sidebar_permissions` configurado = default-deny para o que nao estiver explicitamente listado), anexado a empresa Advocacia Gomes via `user_companies`.
+- Testado via Playwright: login, navegacao normal (rail so mostra o que o perfil permite) e acesso direto por URL a uma rota fora do escopo do perfil.
+- Confirmado que o `ProtectedRoute` local (definido dentro de `frontend/src/routes/index.tsx`, distinto do `components/ProtectedRoute.tsx` que so checa autenticacao) ja protege TODAS as novas superficies dos Estagios 1/2 (sidebar de dois niveis, resultados do command palette, breadcrumbs) sem nenhum codigo adicional — o `canView(pathname)` do `SidebarPermissionsContext` e generico o suficiente para cobrir rotas novas automaticamente. Acesso direto por URL renderiza um `AccessDenied` inline ("Acesso Restrito"), confirmado via screenshot.
+- Conclusao: nao havia gap de seguranca a corrigir neste item do roadmap — o mecanismo existente ja e correto e completo.
+
+**Feature nova — Auditoria de Uso do Menu (ultimo item do roadmap, escopo "completo" escolhido pelo usuario ao inves da alternativa so-localStorage):**
+- Novo model `MenuUsageStat` (prisma/schema.prisma) — contador GLOBAL por rota (path unico, hitCount, lastUsedAt), nao por usuario/empresa (e sobre o catalogo de rotinas em si, favoritos pessoais ja sao cobertos por localStorage no Estagio 2). Migration manual `prisma/migrations-manuais/2026-08-09_menu_usage_stats.sql` aplicada ao banco.
+- Novo modulo backend `apps/api/src/modules/menu-usage/` (controller+service+module, com `JwtAuthGuard`): `POST /menu-usage/track` (upsert-increment, fire-and-forget) e `GET /menu-usage/report` (cruza o catalogo `sidebar_items` ativo — `disabled=false`, `actionType='link'` — com os contadores, retornando tambem as rotas nunca usadas).
+- `frontend/src/hooks/useRecentNav.ts` estendido: a cada navegacao real (nao so via Ctrl+K), alem de gravar em localStorage, dispara o tracking pro backend (`.catch(() => {})`, nunca bloqueia nem afeta o usuario).
+- Nova pagina `frontend/src/pages/sistema/MenuUsageAuditPage.tsx` — KPIs (total no catalogo / ja utilizadas / nunca utilizadas), tabela "Mais utilizadas" e nuvem "Nunca utilizadas — candidatas a revisao/poda". Rota `/app/sistema/menu-usage` registrada em `routes/index.tsx`; item de sidebar inserido via migration manual `2026-08-09_sidebar_menu_usage_audit.sql` (modulo admin, icone FiBarChart2).
+- `infra/prisma/seed.ts`: queries 8/9/10 adicionadas para o usuario Visualizador de teste (users + access_schedule EXEMPT + user_companies), todas resolvendo por coluna estavel (email/tax_id/nome de perfil via SELECT), nunca por ID fixo — seguindo o padrao ja usado para `teste.qa@ledgr.local` e `hpontes@ledgr.com`.
+
+**Regressao:** suite completa (5 scripts Playwright, ~81+ rotas cobertas nas sessoes anteriores de todos os modulos) reexecutada apos as mudancas de schema/backend/frontend deste estagio — login OK em todos, zero erros de console/falhas reportadas.
+
+**Estado final do roadmap de navegacao:** os 3 estagios (sidebar de dois niveis + seletor de empresa persistente; command palette + favoritos + breadcrumbs; verificacao de permissao + auditoria de uso do menu) estao implementados, testados e em producao (pushed). Nenhuma pendencia aberta deste documento.
