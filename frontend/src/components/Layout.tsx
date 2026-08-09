@@ -1,17 +1,17 @@
 // src/components/Layout.tsx
 import React, { useState, useEffect } from 'react';
-import { Outlet, useNavigate } from 'react-router-dom';
+import { Outlet } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useCompany } from '../contexts/CompanyContext';
 import { Header } from './Header';
-import { Sidebar } from './SideBar';
-import { FiLogOut, FiAlertTriangle } from 'react-icons/fi';
+import { Sidebar, SIDEBAR_RAIL_WIDTH, SIDEBAR_PANEL_WIDTH } from './SideBar';
+import { FiAlertTriangle } from 'react-icons/fi';
 import { Toaster, toast } from 'react-hot-toast';
 import { SidebarPermissionsProvider } from '../contexts/SidebarPermissionsContext';
 const API = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3000';
 
 export const Layout: React.FC = () => {
-  const { signOut, user } = useAuth();
+  const { user } = useAuth();
   const { loading } = useCompany();
 
   // Listener global SSE para notificacoes de sistema (Master Admin apenas)
@@ -31,13 +31,7 @@ export const Layout: React.FC = () => {
     };
     return () => es.close();
   }, [user]);
-  const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(true);
-
-  const handleLogout = () => {
-    signOut();
-    navigate('/login');
-  };
 
   if (loading) {
     return (
@@ -58,34 +52,25 @@ export const Layout: React.FC = () => {
     );
   }
 
+  const contentMargin = sidebarOpen ? SIDEBAR_RAIL_WIDTH + SIDEBAR_PANEL_WIDTH : SIDEBAR_RAIL_WIDTH;
+
   return (
     <SidebarPermissionsProvider>
     <div className="flex h-screen bg-[#F8FAFC] overflow-hidden">
       <Sidebar open={sidebarOpen} onToggle={() => setSidebarOpen(prev => !prev)} />
       <div
-        className={`fixed bottom-0 left-0 z-50 p-4 border-t border-gray-100 bg-white transition-all duration-300 ${sidebarOpen ? 'w-64' : 'w-20'}`}
-      >
-        <button
-          onClick={handleLogout}
-          className={`w-full flex items-center ${sidebarOpen ? 'gap-3 px-4' : 'justify-center'} py-3 text-sm font-bold text-red-500 hover:bg-red-50 rounded-xl transition-colors group`}
-        >
-          <FiLogOut size={20} className="group-hover:translate-x-1 transition-transform" />
-          {sidebarOpen && <span>Sign Out</span>}
-        </button>
-      </div>
-      <div
-        className={`flex-1 flex flex-col h-full transition-all duration-300 ${sidebarOpen ? 'ml-64' : 'ml-20'}`}
-        style={{ marginLeft: sidebarOpen ? '16rem' : '5rem' }}
+        className="flex-1 flex flex-col h-full transition-all duration-200"
+        style={{ marginLeft: contentMargin }}
       >
         <Header sidebarOpen={sidebarOpen} />
 
         {/* Banner de aviso quando não autenticado */}
         {!user && (
           <div style={{
-            position: 'fixed', top: 64, left: sidebarOpen ? '16rem' : '5rem', right: 0,
+            position: 'fixed', top: 64, left: contentMargin, right: 0,
             background: '#FEF3C7', borderBottom: '1px solid #F59E0B',
             padding: '10px 20px', display: 'flex', alignItems: 'center', gap: 10,
-            zIndex: 40, transition: 'left 0.3s',
+            zIndex: 40, transition: 'left 0.2s',
           }}>
             <FiAlertTriangle size={16} color="#D97706" />
             <span style={{ fontSize: 13, color: '#92400E', fontWeight: 500 }}>
