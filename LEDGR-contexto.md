@@ -5256,3 +5256,34 @@ Fui além do smoke test onde era seguro (relatório = só leitura): gerei DRE e 
 Ao abrir `/app/accounting/visoes-contabeis` (ADVOCACIA GOMES, ano base 2025, tipo BP — Balanço Patrimonial) a tela mostrou **107 contas analíticas · 0 mapeadas · 107 sem mapear**, com 945 códigos RFB importados disponíveis mas nenhum vínculo conta→código feito ainda para esse ano. Não tentei "Auto-mapear" nem "Copiar do ano anterior" (ações que gravam dado) — só registrando o estado como observado, sem alterar nada.
 
 **Não necessariamente um bug** — pode ser simplesmente que o mapeamento RFB ainda não foi feito pra 2025 (ano seguinte ao exercício já fechado/validado de 2024). Registrando aqui como **pendência de adesão/adequação ao Referencial RFB** para as próximas sessões que mexerem em SPED/ECD da GRB: antes de gerar um ECD real do exercício 2025, confirmar se esse mapeamento (Bloco J / I051-I052) precisa ser refeito ano a ano manualmente ou se existe/deveria existir um fluxo de "copiar do ano anterior" mais automático — ver também a nota já existente na seção 7 do CLAUDE.md (`AccountingView / I051: nunca filtrar por anoBase`) antes de investigar, já que esse é exatamente o ponto sensível dessa tela.
+
+---
+
+## Sessão 09/08/2026 15:56 — Testes automatizados nos módulos Fiscal, RH e Societário (27 rotinas) + 2 regressões corrigidas
+
+**Continuação da sessão 09/08/2026 15:30** (Financeiro/Contábil). Mesmo usuário QA, mesma empresa ativa (ADVOCACIA GOMES).
+
+### Fiscal (8 rotinas) + RH (11 rotinas) + Societário (9 rotinas, incl. `statute`/`atas`/`contratos` com id real) — 27/27 limpas
+
+documentos-fiscais, nfse-nacional, nfe, nfse-sp-emissão, nfse-sp-csv, nfse-sp, apuração, lalur-config · pro-labore, informe-rendimentos, employees, esocial, férias, banco-horas, recesso, décimo-terceiro, rais, dctfweb, folha · companies (list/new/show), statute, atas, contratos, livros acionistas/transferências, arquivo societário. **0 erros de console/página em todas.**
+
+Confirmado também: o filtro `MM/AAAA` da tela Documentos Fiscais é `input type="text"` mascarado (padrão `SmartMonthInput`), não o `input type="month"` banido pelo CLAUDE.md — sem violação.
+
+### 2 achados corrigidos (commit `fade498`, pushed)
+
+1. **Regressão real causada pelo `ValidationPipe` global** (introduzido na sessão das 15:30, commit `7bb2733`): `FilterAPDto.status` usava `@IsEnum(ApEntryStatus)`, mas `accounts-payable.service.ts` (~linha 302) sempre fez `filters.status.split(',')` de propósito, pra suportar multi-status na mesma chamada (ex: `status=OPEN,OVERDUE`, usado pelo widget "próximos vencimentos" do dashboard/header). Com validação ativa isso virou 400 (“OPEN,OVERDUE” não é um valor único válido do enum). Trocado pra `@IsString()`, que é o que o service de fato espera.
+   - **Audit feito:** os outros 2 usos de `.split(',')` sobre query params no backend (`journal-entry.service.ts` findAll, `fiscal.controller.ts` documentos) usam `@Query('campo')` individual sem DTO de classe — nunca passam pelo `ValidationPipe`, não sofreram a mesma regressão. `FilterAPDto.status` era o único caso real.
+   - **Lição pra próximas sessões que mexerem em DTOs de filtro:** antes de trocar `@IsEnum` por `@IsString`/apertar validação em qualquer filtro `@Query`, checar no service correspondente se o campo already sofre `.split(',')` ou outro parsing manual de multi-valor — esse padrão pode se repetar em outros modulos ainda não testados (HR, Fiscal, SPED).
+2. **`CompanyList.tsx` (`/app/companies`) estava inteira em inglês** (title "Companies", "New Company", placeholder de busca, headers de coluna, badges Active/Inactive, tooltips View/Edit/Delete, rodapé "Showing X of Y registered units") — única tela do sistema sem localização pt-BR. Traduzida por completo.
+
+### Investigado e descartado — não é bug
+
+A tela de Empresas mostrou 4 toasts duplicados "N empresas carregadas com sucesso." ao navegar via URL direta (`page.goto`). Testado de novo via clique real no menu lateral (navegação SPA client-side, sem reload de página): **apenas 2 toasts**, que é o comportamento padrão do React 18 StrictMode (double-invoke de effects em dev) — não acontece em build de produção. Os outros 2 toasts extras eram artefato do meu método de teste (URL direta causa bootstrap completo do app 2x), não do código da página. Nada foi alterado por causa disso.
+
+### Estado acumulado da sessão de testes (09/08/2026, 11:28–15:56)
+
+- **51 rotinas testadas** no total: Financeiro (9), Contábil (15), Fiscal (8), RH (11), Societário (9, incluindo sub-rotas com id real) — **0 erros de console/página remanescentes em qualquer uma**, reconfirmado após todos os fixes.
+- **7 bugs reais corrigidos no total:** rota errada em Contas a Receber, `ValidationPipe` global ausente, `@Max` de limit insuficiente, UUID opcional vazio rejeitado, wizard sem validação client-side, `FilterAPDto.status` quebrado pela própria validação nova, `CompanyList.tsx` em inglês.
+- **Commits:** `7bb2733`, `44d726c`, `fade498` (todos pushed pra `origin/main`).
+- **Pendência registrada (não corrigida):** Visões Contábeis/Aglutinação RFB sem mapeamento pro ano-base 2025 na ADVOCACIA GOMES (ver seção 15:30 acima).
+- **Não testado ainda:** módulos Assinaturas/ClickSign, SPED (ECD/EFD/ECF alem do Validador ja coberto), Patrimônio/Ativo Imobilizado, Cadastros Base, Administração do Sistema, Arquivo Digital.
