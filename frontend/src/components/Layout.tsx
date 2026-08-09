@@ -5,10 +5,19 @@ import { useAuth } from '../contexts/AuthContext';
 import { useCompany } from '../contexts/CompanyContext';
 import { Header } from './Header';
 import { Sidebar, SIDEBAR_RAIL_WIDTH, SIDEBAR_PANEL_WIDTH } from './SideBar';
+import { CommandPalette } from './CommandPalette';
+import { Breadcrumbs } from './Breadcrumbs';
 import { FiAlertTriangle } from 'react-icons/fi';
 import { Toaster, toast } from 'react-hot-toast';
 import { SidebarPermissionsProvider } from '../contexts/SidebarPermissionsContext';
+import { SidebarTreeProvider } from '../contexts/SidebarTreeContext';
+import { useTrackRecentNav } from '../hooks/useRecentNav';
 const API = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3000';
+
+const RecentNavTracker: React.FC = () => {
+  useTrackRecentNav();
+  return null;
+};
 
 export const Layout: React.FC = () => {
   const { user } = useAuth();
@@ -56,7 +65,10 @@ export const Layout: React.FC = () => {
 
   return (
     <SidebarPermissionsProvider>
+    <SidebarTreeProvider>
     <div className="flex h-screen bg-[#F8FAFC] overflow-hidden">
+      {user && <RecentNavTracker />}
+      {user && <CommandPalette />}
       <Sidebar open={sidebarOpen} onToggle={() => setSidebarOpen(prev => !prev)} />
       <div
         className="flex-1 flex flex-col h-full transition-all duration-200"
@@ -82,6 +94,7 @@ export const Layout: React.FC = () => {
         <main className="flex-1 overflow-y-auto" style={{ marginTop: !user ? 104 : 64 }}>
           <div className="h-full w-full p-6 lg:p-10">
             <div className="max-w-[1600px] mx-auto">
+              <Breadcrumbs />
               <Outlet />
             </div>
           </div>
@@ -89,6 +102,7 @@ export const Layout: React.FC = () => {
       </div>
       <Toaster position="top-right" toastOptions={{ duration: 4000 }} />
     </div>
+    </SidebarTreeProvider>
     </SidebarPermissionsProvider>
   );
 };

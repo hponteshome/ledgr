@@ -11,6 +11,7 @@ import { useCompany } from '../contexts/CompanyContext';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { UserPen } from 'lucide-react';
+import { OPEN_COMMAND_PALETTE_EVENT } from './CommandPalette';
 
 // ── DEV: Controle de versão do seed/bcrypt ────────────────────
 const DEV_SEED_VERSION = 'seed-v3-bcryptjs';
@@ -381,6 +382,17 @@ export const Header: React.FC<{ sidebarOpen: boolean }> = ({ sidebarOpen }) => {
                   </div>
                 )}
               </div>
+
+              {/* BUSCA GLOBAL / COMMAND PALETTE - Ctrl/Cmd+K (Estagio 2 do roadmap de navegacao) */}
+              <button
+                onClick={() => window.dispatchEvent(new CustomEvent(OPEN_COMMAND_PALETTE_EVENT))}
+                className="flex items-center gap-2 px-3.5 py-2 text-sm text-gray-400 bg-gray-50 hover:bg-gray-100 hover:text-gray-600 rounded-lg transition-all border border-transparent hover:border-gray-200"
+                title="Buscar rotina ou empresa"
+              >
+                <FiSearch size={15} />
+                <span className="hidden md:inline">Buscar...</span>
+                <kbd className="hidden md:inline text-[10px] font-mono bg-white border border-gray-200 rounded px-1.5 py-0.5 text-gray-400">Ctrl K</kbd>
+              </button>
             </div>
           ) : (
             <div className="text-center">
