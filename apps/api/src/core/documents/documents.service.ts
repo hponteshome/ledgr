@@ -86,9 +86,10 @@ export class DocumentsService {
       where.type = filters.type as DocumentType;
     }
 
-    // Status
+    // Status (aceita 1 valor ou varios separados por virgula, ex: "ASSINADO,REGISTRADO")
     if (filters.status) {
-      where.status = filters.status as DocumentStatus;
+      const statuses = filters.status.split(',').map(s => s.trim()) as DocumentStatus[];
+      where.status = statuses.length === 1 ? statuses[0] : { in: statuses };
     }
 
     // Visibilidade
