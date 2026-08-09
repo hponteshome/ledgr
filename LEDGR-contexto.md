@@ -5343,3 +5343,27 @@ Renda Fixa (modal "Novo Investimento" abre limpo), Simulador CDB (cálculo real 
 - **Commits desta sessão (todos pushed):** `d703f69`, `9c4b0c0`, `b7d2b94`, `e98106a`, `7bb2733`, `44d726c`, `fade498`, `d587aa1`, `13db782`, `6f951a7`, `f4e8d36`.
 - **Pendências registradas (não corrigidas):** Visões Contábeis/Aglutinação RFB sem mapeamento pro ano-base 2025 (ver 15:30); wizard "Novo Ativo Imobilizado" sem validação por passo (ver acima, severidade baixa).
 - **Ainda não testado a fundo** (só smoke raso): Fiscal, RH, Societário, Assinaturas, SPED, Cadastros/Admin/Parâmetros, Arquivo Digital — se o padrão se repetir, pode haver mais features com UI pronta mas endpoint faltante como a de Manutenções.
+
+---
+
+## Sessão 09/08/2026 17:45 — Teste profundo Fiscal, RH e Societário (28 rotinas) + 1 bug real corrigido
+
+**Continuação da sessão 16:38.** Mesmo nível de profundidade já aplicado a Financeiro/Patrimônio/Investimentos: abrir modais de criação, submeter vazio, checar se aparece o padrão do bug de Manutenções (endpoint faltando) em algum lugar.
+
+### 1 bug real encontrado e corrigido (commit `3244f87`, pushed)
+
+**RH — Pró-labore (config):** abrir o modal "+ Nova configuração" disparava **500** em `GET /documents?limit=50&status=ASSINADO,REGISTRADO` (usado pra popular um picker de documento vinculado). Causa: `DocumentsService.findAll()` fazia `where.status = filters.status as DocumentStatus` — um cast de tipo sem parsing real. Com valor multiplo separado por vírgula, vira string inválida pro enum do Prisma, que estoura em runtime. **Diferente do bug já corrigido em `FilterAPDto`:** essa rota usa `@Query()` individual, não DTO de classe — nunca passou pelo `ValidationPipe`, e portanto **não é regressão desta sessão, sempre esteve quebrado**. Corrigido com o mesmo padrão já usado em `accounts-payable.service.ts` (`split(',')` + Prisma `{ in: [...] }`).
+
+### Investigados e descartados — não são bugs
+
+- **`lalur-config` mostrou 49 erros de console** na primeira passada, mas **não reproduziu em 3 reexecuções limpas** — tratado como ruído transitório (possível coincidência com hot-reload do backend de uma edição anterior na mesma sessão).
+- **`nfse-sp` deu timeout de navegação (20s)** — a página mostra "LEDGR Agent online" e faz polling contínuo com o agente local de certificado A3 (porta 7778, ver CLAUDE.md secao 3), entao `networkidle` nunca dispara por design. Página carrega normalmente, era limitação da estratégia de espera do teste, não bug do produto.
+- **Vários "falha ao clicar botao de submit"** (livros de acionistas/transferências, arquivo societário, recesso) — investigado manualmente o wizard "Movimento de Quotas": o botão "Próximo" fica corretamente desabilitado até o usuário selecionar **dois** campos obrigatórios (tipo de operação + subtipo específico) — meu script só preenchia o primeiro. Validação do produto está correta; era limitação do script de teste, não bug real. Os outros casos (arquivo societário exige arquivo selecionado antes de habilitar o envio) seguem o mesmo padrão.
+
+### Estado acumulado da sessão de testes (09/08/2026, 11:28–17:45)
+
+- **109+ rotinas testadas**, agora com passe profundo (não só smoke) em Financeiro, Patrimônio, Investimentos, Fiscal, RH e Societário.
+- **10 bugs reais corrigidos no total.**
+- **Commits desta sessão (todos pushed):** `d703f69`, `9c4b0c0`, `b7d2b94`, `e98106a`, `7bb2733`, `44d726c`, `fade498`, `d587aa1`, `13db782`, `6f951a7`, `f4e8d36`, `b8e7db2`, `3244f87`.
+- **Pendências registradas (não corrigidas):** Visões Contábeis/Aglutinação RFB sem mapeamento pro ano-base 2025; wizard "Novo Ativo Imobilizado" sem validação por passo (severidade baixa, ja bloqueia no clique final).
+- **Ainda não testado a fundo:** Assinaturas/ClickSign, SPED (ECD/ECF/EFD), Cadastros Base/Administração/Parâmetros Globais, Arquivo Digital — todos com smoke test raso feito, nenhum com passe profundo (abrir modal + submit) ainda.
