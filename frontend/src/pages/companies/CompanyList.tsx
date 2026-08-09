@@ -43,7 +43,7 @@ export const CompanyList: React.FC = () => {
 
       const normalizedCompanies: Company[] = response.data.map((emp: any) => ({
         id: emp.id,
-        legalName: emp.legalName || emp.razao_social || 'NO LEGAL NAME',
+        legalName: emp.legalName || emp.razao_social || 'SEM RAZÃO SOCIAL',
         tradeName: emp.tradeName || emp.nome_fantasia || '',
         taxId: emp.taxId || emp.cnpj || '',
         status: (emp.status || emp.situacao || 'INACTIVE').toUpperCase(),
@@ -178,15 +178,15 @@ export const CompanyList: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800 tracking-tight">Companies</h1>
-          <p className="text-sm text-gray-500">Manage registered business units and headquarters</p>
+          <h1 className="text-2xl font-bold text-gray-800 tracking-tight">Empresas</h1>
+          <p className="text-sm text-gray-500">Gerencie as unidades de negócio e matrizes cadastradas</p>
         </div>
         <button
           onClick={() => navigate('/app/companies/new')}
           className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-sm font-semibold"
         >
           <FiPlus size={20} />
-          New Company
+          Nova Empresa
         </button>
       </div>
 
@@ -195,7 +195,7 @@ export const CompanyList: React.FC = () => {
         <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors" size={18} />
         <input
           type="text"
-          placeholder="Search by legal name, trade name or Tax ID..."
+          placeholder="Buscar por razão social, nome fantasia ou CNPJ..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all bg-white"
@@ -206,13 +206,13 @@ export const CompanyList: React.FC = () => {
       {loading ? (
         <div className="flex flex-col items-center justify-center py-20 gap-3">
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
-          <span className="text-gray-500 font-medium">Loading units...</span>
+          <span className="text-gray-500 font-medium">Carregando empresas...</span>
         </div>
       ) : filteredAndSorted.length === 0 ? (
         <div className="bg-white rounded-2xl border border-dashed border-gray-300 p-16 text-center">
           <FiBriefcase className="mx-auto text-gray-200 mb-4" size={64} />
           <p className="text-gray-500 font-medium">
-            {search ? 'No results match your search' : 'No companies found in the database'}
+            {search ? 'Nenhum resultado para sua busca' : 'Nenhuma empresa cadastrada'}
           </p>
         </div>
       ) : (
@@ -222,10 +222,10 @@ export const CompanyList: React.FC = () => {
               <thead className="bg-gray-50/50 border-b border-gray-100">
                 <tr>
                   {[
-                    { label: 'Company Details', key: 'legalName' },
-                    { label: 'Tax ID', key: 'taxId' },
+                    { label: 'Empresa', key: 'legalName' },
+                    { label: 'CNPJ', key: 'taxId' },
                     { label: 'Status', key: 'status' },
-                    { label: 'Created At', key: 'createdAt' }
+                    { label: 'Criada em', key: 'createdAt' }
                   ].map((col) => (
                     <th
                       key={col.key}
@@ -240,7 +240,7 @@ export const CompanyList: React.FC = () => {
                       </div>
                     </th>
                   ))}
-                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-widest text-right">Actions</th>
+                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-widest text-right">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -271,7 +271,7 @@ export const CompanyList: React.FC = () => {
                       <span className={`px-2.5 py-1 text-[10px] rounded-full font-black uppercase tracking-wide ${company.status === 'ACTIVE' || company.status === 'ATIVA'
                         ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
                         }`}>
-                        {company.status === 'ACTIVE' || company.status === 'ATIVA' ? 'Active' : 'Inactive'}
+                        {company.status === 'ACTIVE' || company.status === 'ATIVA' ? 'Ativa' : 'Inativa'}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-500">
@@ -282,14 +282,14 @@ export const CompanyList: React.FC = () => {
                         <Link
                           to={`/app/companies/show/${company.id}`}
                           className="p-2 text-gray-400 hover:text-blue-600 hover:bg-white rounded-lg transition-all"
-                          title="View"
+                          title="Ver"
                         >
                           <FiEye size={18} />
                         </Link>
                         <Link
                           to={`/app/companies/edit/${company.id}`}
                           className="p-2 text-gray-400 hover:text-blue-600 hover:bg-white rounded-lg transition-all"
-                          title="Edit"
+                          title="Editar"
                         >
                           <FiEdit2 size={18} />
                         </Link>
@@ -297,7 +297,7 @@ export const CompanyList: React.FC = () => {
                           <button
                             onClick={() => handleDelete(company.id, company.legalName)}
                             className="p-2 text-gray-400 hover:text-red-600 hover:bg-white rounded-lg transition-all"
-                            title="Delete"
+                            title="Excluir"
                           >
                             <FiTrash2 size={18} />
                           </button>
@@ -313,7 +313,7 @@ export const CompanyList: React.FC = () => {
           {/* Table Footer */}
           <div className="px-6 py-4 bg-gray-50/50 border-t border-gray-100 flex justify-between items-center text-xs text-gray-500">
             <span>
-              Showing <strong>{filteredAndSorted.length}</strong> of <strong>{companies.length}</strong> registered units
+              Mostrando <strong>{filteredAndSorted.length}</strong> de <strong>{companies.length}</strong> empresas cadastradas
             </span>
           </div>
         </div>

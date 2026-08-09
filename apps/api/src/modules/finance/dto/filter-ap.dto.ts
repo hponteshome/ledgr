@@ -3,16 +3,18 @@
 // SUBSTITUIR o arquivo existente — adiciona dueDateFrom/dueDateTo/aging
 // ============================================================
 import { IsOptional, IsEnum, IsString } from 'class-validator';
-import { ApEntryStatus, APOrigin } from '@prisma/client';
+import { APOrigin } from '@prisma/client';
 
 export class FilterAPDto {
   @IsOptional()
   @IsString()
   search?: string;
 
+  // String (nao enum): aceita 1 status ou varios separados por virgula
+  // (ex: "OPEN,OVERDUE"), ver split(',') em accounts-payable.service.ts
   @IsOptional()
-  @IsEnum(ApEntryStatus)
-  status?: ApEntryStatus;
+  @IsString()
+  status?: string;
 
   @IsOptional()
   @IsEnum(APOrigin)
