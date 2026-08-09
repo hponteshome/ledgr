@@ -5287,3 +5287,32 @@ A tela de Empresas mostrou 4 toasts duplicados "N empresas carregadas com sucess
 - **Commits:** `7bb2733`, `44d726c`, `fade498` (todos pushed pra `origin/main`).
 - **Pendência registrada (não corrigida):** Visões Contábeis/Aglutinação RFB sem mapeamento pro ano-base 2025 na ADVOCACIA GOMES (ver seção 15:30 acima).
 - **Não testado ainda:** módulos Assinaturas/ClickSign, SPED (ECD/EFD/ECF alem do Validador ja coberto), Patrimônio/Ativo Imobilizado, Cadastros Base, Administração do Sistema, Arquivo Digital.
+
+---
+
+## Sessão 09/08/2026 16:10 — Testes finais: Assinaturas, SPED, Patrimônio, Cadastros/Admin/Parâmetros, Arquivo Digital (30 rotinas) + 1 bug corrigido
+
+**Continuação da sessão 09/08/2026 15:56.** Encerra a varredura completa de rotinas do LEDGR nesta sessão.
+
+### 30 rotinas testadas — 29/30 limpas de primeira
+
+Assinaturas/ClickSign (4: signatures, certificates, request, validate) · SPED restante (4: ecd/pre-validate, ecd, ecf, efd) · Patrimônio (3: assets, maintenances, rental-contracts) · Cadastros Base + Administração + Parâmetros Globais (12: persons, users, profiles, sidebar-permissions, indicadores, calculadora, calendário, obrigações, tabelas) · Arquivo Digital (7 rotinas representativas — `RepositorioPage` é reusado por ~20 sub-rotas, testadas apenas as categorias-topo).
+
+### 1 achado corrigido (commit `13db782`, pushed)
+
+**`/app/profiles` (`ProfileList.tsx`) — dois problemas na mesma tela:**
+- Warning do React por atributo JSX inválido `max-Width='100'` (não é `style`, nunca fez nada visualmente — código morto copiado 5x pelo arquivo).
+- **Bug estrutural real:** cabeçalho da tabela declarava 4 colunas (Profile Name/ID, Level, Active Permissions, Actions) mas o corpo só renderizava 3 `<td>` por linha — confirmado que `Profile` não tem campo `level` no schema (só `User` tem), a coluna nunca teve dado. Isso desalinhava "Actions" com os botões reais. Coluna órfã removida.
+- Tela inteira estava em inglês (mesmo padrão do `CompanyList.tsx` corrigido às 15:56) — traduzida.
+
+### Observação cosmética, não corrigida
+
+`/app/arquivo/societario` mostra "Arquivo Societario" sem o acento (deveria ser "Societário"). Não investigado se é ocorrência única ou padrão repetido em `RepositorioPage.tsx` — puramente cosmético, fora de escopo por ora.
+
+### ENCERRAMENTO — varredura completa do sistema (09/08/2026, 11:28–16:10)
+
+- **81 rotinas testadas no total** em 9 áreas: Financeiro (9), Contábil (15), Fiscal (8), RH (11), Societário (9), Assinaturas (4), SPED (4), Patrimônio (3), Cadastros/Admin/Parâmetros (12), Arquivo Digital (7, amostra representativa de ~20 sub-rotas do mesmo componente). **0 erros de console/página remanescentes em qualquer rota.**
+- **8 bugs reais corrigidos:** rota errada em Contas a Receber, `ValidationPipe` global ausente, `@Max` de limit insuficiente, UUID opcional vazio rejeitado, wizard sem validação client-side, `FilterAPDto.status` quebrado pela própria validação nova, `CompanyList.tsx` em inglês, `ProfileList.tsx` em inglês + coluna órfã desalinhando a tabela.
+- **Commits desta sessão (todos pushed):** `d703f69`, `9c4b0c0`, `b7d2b94`, `e98106a`, `7bb2733`, `44d726c`, `fade498`, `d587aa1`, `13db782`.
+- **Pendência registrada (não corrigida):** Visões Contábeis/Aglutinação RFB sem mapeamento pro ano-base 2025 na ADVOCACIA GOMES (ver seção 15:30).
+- **Não testado:** fluxos de escrita reais (criar/editar/excluir de fato, fora dos casos já exercitados com cancel no meio do caminho), upload de arquivo de verdade (bank-import, importação de plano/lançamentos, certificados A3), integração real com ClickSign/SEFAZ/RFB (dependem de credencial externa).
