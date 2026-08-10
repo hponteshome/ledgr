@@ -5555,3 +5555,15 @@ Fecha docs/LEDGR-benchmark-ux-navegacao.md (Fundacao -> Produtividade -> Governa
 2. `apps/api/src/modules/accounting/investments/CdbProjecaoPage.tsx` — arquivo `.tsx` de frontend aparentemente extraviado dentro da arvore do backend (`apps/api/src`), quebra `tsc --noEmit` por falta de flag `--jsx`. Nao investigado se e usado/importado por algo ou e so lixo de copia — candidato a limpeza de arquivo obsoleto (ver secao 2 do CLAUDE.md, padrao ATIVO vs OBSOLETO).
 
 **Vulnerabilidades ainda abertas, nao tratadas (exigem `--force`/breaking change, decisao futura):** `uuid` <11.1.1 (moderada, fix requer `@nestjs/typeorm@11.0.3` — projeto usa Prisma, nao TypeORM, vale confirmar se essa dependencia e realmente necessaria antes de forcar); `@nestjs/cli`/`webpack`/`tmp`/`inquirer` (apenas devDependencies, nao afeta producao).
+
+---
+
+## 2026-08-10 00:15 — npm audit: uuid/@nestjs/typeorm investigada e resolvida por remocao (dependencia morta)
+
+**Investigacao antes de decidir (mesmo padrao ja usado pro bcrypt/tar):** grep completo em `apps/api/src` confirmou que `TypeOrmModule.forRoot()`/`forFeature()` **nunca e chamado** em nenhum modulo do app — o projeto usa Prisma exclusivamente (confirma o que ja estava documentado no CLAUDE.md). As unicas referencias a `typeorm` eram 2 arquivos `AuditLog` `@Entity()` orfaos (`apps/api/src/core/audit/audit_log.entity.ts` e uma duplicata em `apps/api/src/core/audit_log.entity.ts`), nunca importados por nada. O `AuditService` real e ativo (usado por `UsersService` e outros modulos) ja usa so `this.prisma.auditLog.*` — a entidade TypeORM nunca foi conectada. So `package.json` da raiz declarava `@nestjs/typeorm`/`typeorm`; `apps/api/package.json` nem listava.
+
+**Decisao:** em vez de forcar upgrade pra `@nestjs/typeorm@11.0.3` (exigiria `@nestjs/common@^11`, conflito de peer-dep com o resto do app pinado em `^10` — mesmo tipo de problema ja visto no fix do valibot), removidas as dependencias mortas inteiras: `@nestjs/typeorm` e `typeorm` do `package.json`, mais os 2 arquivos `audit_log.entity.ts` orfaos (protótipo anterior a migracao pra Prisma). Confirmado zero referencias remanescentes apos a remocao.
+
+**Resultado:** vulnerabilidade do `uuid` eliminada pela raiz (nao so mitigada) — a instancia vulneravel (`uuid@9.0.1`, via `@nestjs/typeorm`) sumiu da arvore, so resta `uuid@11.1.1` (seguro, via `exceljs`/`overrides` ja existente). Vulnerabilidades de producao (`npm audit --omit=dev`): 13 -> 11. Commit `63cb96c`, pushed.
+
+**Estado acumulado da rodada de `npm audit` (valibot + bcrypt/tar + uuid/typeorm, 09-10/08/2026):** producao 24 -> 11 vulnerabilidades (0 criticas). Restam apenas itens de `devDependencies` (`@nestjs/cli`/`webpack`/`tmp`/`inquirer`, nao afeta producao) e os 2 problemas de build pre-existentes ja registrados na sessao anterior (pg/NodeNext em `seed.ts`, `.tsx` orfao em `apps/api/src`) — nenhum dos dois relacionado a dependencias/audit.
