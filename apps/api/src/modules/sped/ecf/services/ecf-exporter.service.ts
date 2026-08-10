@@ -11,7 +11,13 @@ export interface EcfExportOptions {
   companyId: string;
   periodStart: Date;
   periodEnd: Date;
-  formaTributacao?: "1" | "2" | "3" | "4" | "5"; // 1=Real 2=Presumido 3=Arbitrado 4=Imune 5=Isenta
+  // Codigos oficiais (Manual de Orientacao ECF, registro 0010.FORMA_TRIB):
+  // 1=Real 2=Real/Arbitrado 3=Presumido/Real 4=Presumido/Real/Arbitrado
+  // 5=Presumido (puro) 6=Arbitrado 7=Presumido/Arbitrado 8=Imune 9=Isenta.
+  // Achado real no PVA (10/08/2026, GRB): "2" (copiado do gabarito LM sem
+  // verificar) e Real/Arbitrado, nao Presumido - causou erro "trimestre nao
+  // permite a forma de tributacao P". Presumido puro e sempre "5".
+  formaTributacao?: "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9";
   tipEcf?: "0" | "1" | "2" | "3";
 }
 
@@ -23,7 +29,7 @@ export class EcfExporterService {
   async export(options: EcfExportOptions): Promise<{ buffer: Buffer; warnings: string[] }> {
     const {
       companyId, periodStart, periodEnd,
-      formaTributacao = "2", // Lucro Presumido - default pra GRB, ajustar via cadastro no futuro
+      formaTributacao = "5", // 5=Lucro Presumido (puro) - default pra GRB, ajustar via cadastro no futuro
       tipEcf = "0",
     } = options;
     const warnings: string[] = [];
@@ -49,7 +55,12 @@ export class EcfExporterService {
     // nao o numero de FORMA_TRIB. Achado real no PVA (ECF, 10/08/2026, GRB):
     // "RRRR" copiado do gabarito LM/ECF_2024_LM.TXT sem verificar - a LM e
     // Lucro Real (tem blocos L/M de LALUR), R = Real. Presumido = P.
-    const FORMA_TRIB_LETTER: Record<string, string> = { "1": "R", "2": "P", "3": "A", "4": "I", "5": "E" };
+    // Letras validas por trimestre (Manual ECF, 0010.FORMA_TRIB_PER): R=Real,
+    // P=Presumido, A=Arbitrado, E=Real Estimativa, 0=fora do periodo. So cobre
+    // aqui as formas "puras" (1,5,6) - formas mistas (2,3,4,7) exigiriam
+    // FORMA_TRIB_PER variando por trimestre real, fora de escopo enquanto so
+    // GRB (Presumido puro) e o alvo.
+    const FORMA_TRIB_LETTER: Record<string, string> = { "1": "R", "5": "P", "6": "A" };
     const formaTribPer = (FORMA_TRIB_LETTER[formaTributacao] ?? "P").repeat(quarters.length);
 
     if (!company.street || !company.zipCode) {

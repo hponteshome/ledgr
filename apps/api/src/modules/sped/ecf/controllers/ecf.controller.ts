@@ -143,7 +143,7 @@ export class EcfController {
       companyId,
       periodStart: new Date(periodStart),
       periodEnd: new Date(periodEnd),
-      formaTributacao: (formaTributacao as any) || '2',
+      formaTributacao: (formaTributacao as any) || '5',
     });
 
     const companyForName = await this.prisma.company.findUnique({ where: { id: companyId }, select: { taxId: true } });
