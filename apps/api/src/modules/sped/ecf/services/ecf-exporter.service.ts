@@ -73,10 +73,17 @@ export class EcfExporterService {
     // gabarito real (empresa em situacao regular, nao retificadora, sem desenquadramento).
     add(P+"0000"+P+"LECF"+P+"0011"+P+cnpj+P+company.legalName+P+"0"+P+"0"+P+P+P+dtIni+P+dtFin+P+"N"+P+P+tipEcf+P+P);
     add(P+"0001"+P+"0"+P);
-    // |0010|IND_ALTER|IND_SIT_ESP|FORMA_TRIB|FORMA_APUR|CENTRO_LOOP|CENTRO_LUCRO|FORMA_TRIB_PER|
+    // |0010|HASH_ECF_ANTERIOR|OPT_REFIS_PAES|FORMA_TRIB|FORMA_APUR|COD_QUALIF_PJ|
+    //       FORMA_TRIB_PER|MES_BAL_RED|TIP_ESC_PRE|TIP_ENT|FORMA_APUR_I|APUR_CSLL|OPT_EXT_RTT|
     // FORMA_APUR: Lucro Presumido e sempre trimestral ("T"), Real pode ser T ou A.
-    // Campos finais vazios copiados do gabarito real.
-    add(P+"0010"+P+P+"N"+P+formaTributacao+P+"T"+P+"01"+P+formaTribPer+P+P+P+P+P+P+P);
+    // MES_BAL_RED: so quando FORMA_APUR=Anual (nao aplicavel, GRB e trimestral).
+    // TIP_ESC_PRE: obrigatorio quando FORMA_TRIB abrange Lucro Presumido (3,4,5,7,10) -
+    // achado real no PVA (10/08/2026, GRB): campo vazio rejeitado. L=Livro Caixa,
+    // C=Contabil - GRB tem escrituracao contabil completa (ECD ja validada em
+    // partidas dobradas), entao "C".
+    const mesBalRed = "";
+    const tipEscPre = "C";
+    add(P+"0010"+P+P+"N"+P+formaTributacao+P+"T"+P+"01"+P+formaTribPer+P+mesBalRed+P+tipEscPre+P+P+P+P+P);
     // |0930|NOME|CPF|COD_QUALIF|CRC|EMAIL|FONE| — mesmo padrao do J930 do ECD:
     // sinatarios via CompanyShareholder/PersonCompany com assinaEcf=true.
     const accConfigForCrc = await this.prisma.companyAccountingConfig.findUnique({ where: { companyId } });
