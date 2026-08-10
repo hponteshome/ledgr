@@ -5615,3 +5615,28 @@ npm run start:dev
 `--include-workspace-root` (flag nativa do npm, documentada em `npm help install`) instala as dependencias da raiz + `apps/api` sem tocar em `apps/agent` - mais limpo que a abordagem manual usada durante a investigacao original (editar temporariamente o array `workspaces` do `package.json`).
 
 **Regra pratica adotada: nunca rodar `npm install` sem escopo (bare, sem `-w apps/api --include-workspace-root`) neste repositorio enquanto o Visual Studio Build Tools nao estiver instalado na maquina** - vai sempre falhar da mesma forma. So necessario reinstalar Build Tools se algum dia for preciso trabalhar de fato em `apps/agent` (LEDGR Agent, certificados A3 fisicos via `pkcs11js`).
+
+---
+
+## 2026-08-10 01:55 — npm audit: multer/qs investigados e corrigidos via override (vulns HIGH de DoS em upload)
+
+**Investigacao (mesmo padrao das rodadas anteriores):** `express`/`qs` vem via `@nestjs/platform-express@10.4.22` — o servidor HTTP core de toda a API, todo request passa por ele (diferente do `bcrypt`/`typeorm`, que eram uso pontual/morto). Achado mais serio: `multer` (usado internamente pelo `platform-express` pros decorators `FileInterceptor`/`FilesInterceptor`) resolvia pra uma versao nested vulneravel (`2.0.2`, varias CVEs **HIGH** de DoS — exaustao de recursos, recursao descontrolada, nomes de campo profundamente aninhados, cleanup incompleto de upload abortado). Confirmado uso real e extenso via grep: **17 controllers** usam `FileInterceptor`/`FilesInterceptor` (documentos, bank-import, RH, importacao contabil/SPED, certificados) — superficie de ataque real, nao teorica.
+
+**Por que nao foi upgrade direto:** fix completo exigiria `@nestjs/platform-express@11.1.28` (breaking change — puxaria `@nestjs/common`/`@nestjs/core` pra `^11` em toda a aplicacao, mesma familia de problema do `@nestjs/axios` investigado antes, mas em escala muito maior: `@nestjs/core`/`common` sao usados em literalmente todos os controllers/guards/modulos do app. Migracao grande, fora de escopo de um audit fix pontual — fica registrada como possibilidade futura, nao como pendencia urgente, ja que o override abaixo resolve o risco real sem precisar dela.
+
+**Fix aplicado — `overrides` no `package.json` (raiz):**
+```json
+"overrides": {
+  "@nestjs/platform-express": { "multer": "^2.2.0" },
+  "qs": "^6.15.2"
+}
+```
+Forca a versao nested de `multer` dentro do `platform-express` pra `2.2.0` (mesma major version — so patches de seguranca, sem breaking change de API) e `qs` (via `body-parser`/`express`, tambem nested) pra acima do range vulneravel. Confirmado que `apps/api` ja usa `multer@2.2.0` diretamente (tipos/config de storage pros proprios `FileInterceptor`) — versao ja comprovadamente compativel com o app antes deste fix, so nao propagava pra dentro do `platform-express`.
+
+**Testado:** reinstalacao completa do zero (`npm install --legacy-peer-deps -w apps/api --include-workspace-root`), `npx prisma generate`, `nest build api` volta ao baseline conhecido (1 erro pre-existente e nao relacionado, `seed.ts`/`pg`), sanity check via `require()` direto confirma `@nestjs/platform-express` carrega normalmente com `multer@2.2.0`. **Nao foi possivel testar o boot completo do `start:dev`** (bloqueado pelo bug `seed.ts`/`pg` ja registrado como pendente) — verificacao ficou no nivel de build + require, mesmo criterio ja aceito nas rodadas anteriores quando o boot completo nao era possivel.
+
+**Resultado:** vulnerabilidades de producao (`npm audit --omit=dev`): 11 -> 8 (0 criticas). Commit `922e721`, pushed.
+
+**Restam abertas (nao investigadas nesta rodada):** `@nestjs/core` (injection, GHSA-36xv-jgw5-4q75, moderada — mesma familia do problema `platform-express`/v11 acima), `lodash` (via `@nestjs/config`, high — fix exige `@nestjs/config@4.0.4`, breaking change), `file-type` (nao investigado ainda a fonte).
+
+**Estado acumulado da rodada completa de `npm audit` (09-10/08/2026):** producao 24 -> 8 vulnerabilidades (0 criticas), aplicado com seguranca: valibot, bcrypt/tar, uuid/typeorm, webpack/tmp (via fix do split @nestjs/axios), multer/qs.
