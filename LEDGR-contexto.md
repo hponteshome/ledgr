@@ -5567,3 +5567,21 @@ Fecha docs/LEDGR-benchmark-ux-navegacao.md (Fundacao -> Produtividade -> Governa
 **Resultado:** vulnerabilidade do `uuid` eliminada pela raiz (nao so mitigada) — a instancia vulneravel (`uuid@9.0.1`, via `@nestjs/typeorm`) sumiu da arvore, so resta `uuid@11.1.1` (seguro, via `exceljs`/`overrides` ja existente). Vulnerabilidades de producao (`npm audit --omit=dev`): 13 -> 11. Commit `63cb96c`, pushed.
 
 **Estado acumulado da rodada de `npm audit` (valibot + bcrypt/tar + uuid/typeorm, 09-10/08/2026):** producao 24 -> 11 vulnerabilidades (0 criticas). Restam apenas itens de `devDependencies` (`@nestjs/cli`/`webpack`/`tmp`/`inquirer`, nao afeta producao) e os 2 problemas de build pre-existentes ja registrados na sessao anterior (pg/NodeNext em `seed.ts`, `.tsx` orfao em `apps/api/src`) — nenhum dos dois relacionado a dependencias/audit.
+
+---
+
+## 2026-08-10 00:35 — npm audit: webpack/tmp do @nestjs/cli investigado, upgrade tentado e revertido (regressao real)
+
+**Investigacao (mesmo padrao das rodadas anteriores):** `webpack`/`tmp`/`inquirer` sao `devDependencies` do `@nestjs/cli` (nunca vao pro `dist/` de producao). Risco real baixo hoje: a vuln do `webpack` (SSRF via `buildHttp.allowedUris`) exige config explicita que nao existe no repo (nao ha `nest-cli.json`, builder padrao e `tsc`); a vuln do `tmp` (via `inquirer`, usado so por `nest generate` interativo) exige acesso local ja existente pra explorar.
+
+**Tentativa de upgrade (`@nestjs/cli@11.0.24` + `@nestjs/schematics@^11.0.1`, raiz e `apps/api`) — REVERTIDA apos regressao real confirmada:**
+- Peer-deps do `@nestjs/cli@11` sao limpos (so `@swc/cli`/`@swc/core`, opcionais) — nao deveria conflitar com `@nestjs/common@^10` do resto do app.
+- Mas expos um problema mais profundo e pre-existente: **`apps/api/package.json` declara `@nestjs/axios@^4.0.1` enquanto a raiz declara `@nestjs/axios@^3.0.0`** — duas major versions da mesma lib convivendo no monorepo (essa e a causa original do `--legacy-peer-deps` ja ser necessario desde o primeiro `npm audit fix` desta sessao, antes de qualquer mudanca de hoje).
+- Com as dependencias novas do `@nestjs/cli` tambem pedindo `rxjs`, o `--legacy-peer-deps` parou de deduplicar corretamente e instalou uma copia aninhada em `apps/api/node_modules/rxjs` (separada da raiz) — quebra a checagem de tipos do NestJS (`Observable`/`Subscriber` de 2 instancias diferentes de rxjs deixam de ser o mesmo tipo nominal). Gerou 6 erros novos em `company.interceptor.ts` e `multi-company.guard.ts` no `nest build api`.
+- Confirmado, revertido (`git checkout` + reinstall) e reconfirmado que o build volta exatamente ao estado anterior (so o erro pre-existente do `seed.ts`/`pg`, ja registrado). **Nada foi commitado — o repositorio ficou limpo.**
+
+**Decisao do usuario:** deixar como esta por ora — risco real e baixo o suficiente pra nao justificar mexer no split de `@nestjs/axios` (v3 raiz vs v4 apps/api) sem uma sessao dedicada.
+
+**Pendencia registrada para sessao futura (pre-requisito pro upgrade seguro do `@nestjs/cli`):** unificar `@nestjs/axios` numa unica major version entre raiz e `apps/api` — investigar por que `apps/api` precisa da v4 (features usadas) antes de decidir se e seguro rebaixar pra v3 (alinhar com a raiz) ou subir a raiz pra v4 (exigiria tambem subir `@nestjs/common`/`@nestjs/core` pra ^11 em todo o app, mudanca maior).
+
+**Estado final da rodada de `npm audit` (09-10/08/2026):** producao 24 -> 11 vulnerabilidades (0 criticas), aplicado com seguranca: valibot, bcrypt/tar, uuid/typeorm. Webpack/tmp (devDependency, baixo risco real) fica pendente ate o split de `@nestjs/axios` ser resolvido.
