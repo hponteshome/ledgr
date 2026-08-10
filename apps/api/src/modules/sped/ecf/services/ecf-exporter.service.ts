@@ -44,6 +44,13 @@ export class EcfExporterService {
     const P = "|";
     const lines: string[] = [];
     const add = (l: string) => lines.push(l);
+    const quarters = this.quarterRange(periodStart, periodEnd);
+    // FORMA_TRIB_PER (0010, campo 7): 1 letra por trimestre do ano-calendario,
+    // nao o numero de FORMA_TRIB. Achado real no PVA (ECF, 10/08/2026, GRB):
+    // "RRRR" copiado do gabarito LM/ECF_2024_LM.TXT sem verificar - a LM e
+    // Lucro Real (tem blocos L/M de LALUR), R = Real. Presumido = P.
+    const FORMA_TRIB_LETTER: Record<string, string> = { "1": "R", "2": "P", "3": "A", "4": "I", "5": "E" };
+    const formaTribPer = (FORMA_TRIB_LETTER[formaTributacao] ?? "P").repeat(quarters.length);
 
     if (!company.street || !company.zipCode) {
       warnings.push("Endereco fiscal da empresa incompleto (0030) - preencher cadastro.");
@@ -55,10 +62,10 @@ export class EcfExporterService {
     // gabarito real (empresa em situacao regular, nao retificadora, sem desenquadramento).
     add(P+"0000"+P+"LECF"+P+"0011"+P+cnpj+P+company.legalName+P+"0"+P+"0"+P+P+P+dtIni+P+dtFin+P+"N"+P+P+tipEcf+P+P);
     add(P+"0001"+P+"0"+P);
-    // |0010|IND_ALTER|IND_SIT_ESP|FORMA_TRIB|FORMA_APUR|CENTRO_LOOP|CENTRO_LUCRO|
+    // |0010|IND_ALTER|IND_SIT_ESP|FORMA_TRIB|FORMA_APUR|CENTRO_LOOP|CENTRO_LUCRO|FORMA_TRIB_PER|
     // FORMA_APUR: Lucro Presumido e sempre trimestral ("T"), Real pode ser T ou A.
     // Campos finais vazios copiados do gabarito real.
-    add(P+"0010"+P+P+"N"+P+formaTributacao+P+"T"+P+"01"+P+"RRRR"+P+P+P+P+P+P+P);
+    add(P+"0010"+P+P+"N"+P+formaTributacao+P+"T"+P+"01"+P+formaTribPer+P+P+P+P+P+P+P);
     // |0930|NOME|CPF|COD_QUALIF|CRC|EMAIL|FONE| — mesmo padrao do J930 do ECD:
     // sinatarios via CompanyShareholder/PersonCompany com assinaEcf=true.
     const accConfigForCrc = await this.prisma.companyAccountingConfig.findUnique({ where: { companyId } });
@@ -126,7 +133,6 @@ export class EcfExporterService {
     // proprio ecf-parser.service.ts. Candidato prioritario a corrigir na
     // primeira rodada de validacao PVA.
     add(P+"K001"+P+"0"+P);
-    const quarters = this.quarterRange(periodStart, periodEnd);
     const analyticIds = new Set(accounts.filter(a => a.isAnalytic).map(a => a.id));
     const historicalItems = await this.prisma.journalEntryItem.findMany({
       where: { journalEntry: { companyId, date: { lt: periodStart }, deletedAt: null } },
