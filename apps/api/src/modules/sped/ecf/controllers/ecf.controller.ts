@@ -7,14 +7,16 @@
 // ============================================================
 import {
   Controller, Delete, Post, Get, UploadedFile, UseInterceptors,
-  UseGuards, Req, BadRequestException, Query, Param, ParseUUIDPipe,
+  UseGuards, Req, Res, BadRequestException, Query, Param, ParseUUIDPipe,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '@auth/guards/jwt.guard';
 import { CompanyGuard } from '@multi-company/multi-company.guard';
 import { EcfParserService } from '../services/ecf-parser.service';
 import { EcfValidatorService } from '../services/ecf-validator.service';
 import { EcfImporterService } from '../services/ecf-importer.service';
+import { EcfExporterService } from '../services/ecf-exporter.service';
 import { Company } from '@multi-company/company.decorator';
 import { CurrentUser } from '../../../../shared/decorators/current-user.decorator';
 import { PrismaService } from '../../../../prisma/prisma.service';
@@ -26,6 +28,7 @@ export class EcfController {
     private parser: EcfParserService,
     private validator: EcfValidatorService,
     private importer: EcfImporterService,
+    private exporter: EcfExporterService,   // ← INJETADO
     private prisma: PrismaService,   // ← INJETADO
   ) {}
 
@@ -130,10 +133,32 @@ export class EcfController {
     @Company() companyId: string,
     @Query('periodStart') periodStart: string,
     @Query('periodEnd')   periodEnd: string,
+    @Query('formaTributacao') formaTributacao: string,
+    @Res() res: Response,
   ) {
     if (!periodStart || !periodEnd)
       throw new BadRequestException('Período de exportação não informado');
-    return this.importer.export(companyId, periodStart, periodEnd);
+
+    const result = await this.exporter.export({
+      companyId,
+      periodStart: new Date(periodStart),
+      periodEnd: new Date(periodEnd),
+      formaTributacao: (formaTributacao as any) || '2',
+    });
+
+    const companyForName = await this.prisma.company.findUnique({ where: { id: companyId }, select: { taxId: true } });
+    const cnpj = companyForName?.taxId?.replace(/\D/g, '') || 'ECF';
+    const year     = new Date(periodEnd).getFullYear();
+    const raiz     = cnpj.substring(0, 8);
+    const filename = `ECF_${year}_${raiz}.txt`;
+
+    res.setHeader('Content-Type', 'text/plain; charset=iso-8859-1');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    if (result.warnings?.length) {
+      res.setHeader('X-Ecf-Warnings', JSON.stringify(result.warnings));
+      res.setHeader('Access-Control-Expose-Headers', 'X-Ecf-Warnings');
+    }
+    res.end(result.buffer);
   }
 
   // ── Histórico ────────────────────────────────────────────────

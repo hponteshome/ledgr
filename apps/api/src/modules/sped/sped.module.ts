@@ -26,6 +26,7 @@ import { EfdModule } from './efd/efd.module';
 import { EcfParserService } from './ecf/services/ecf-parser.service';
 import { EcfValidatorService } from './ecf/services/ecf-validator.service';
 import { EcfImporterService } from './ecf/services/ecf-importer.service';
+import { EcfExporterService } from './ecf/services/ecf-exporter.service';
 import { EcfController } from './ecf/controllers/ecf.controller';
 
 @Module({
@@ -58,6 +59,7 @@ import { EcfController } from './ecf/controllers/ecf.controller';
     EcfParserService,   // ← ADICIONADO
     EcfValidatorService, // ← ADICIONADO
     EcfImporterService,  // ← ADICIONADO
+    EcfExporterService,
   ],
   exports: [
     EcdParserService,
@@ -65,6 +67,7 @@ import { EcfController } from './ecf/controllers/ecf.controller';
     EcdPreValidateService,
     AccountingViewsService,
     EcfParserService,   // ← ADICIONADO
+    EcfExporterService,
   ],
 })
 export class SpedModule {}
