@@ -5535,3 +5535,23 @@ Fecha docs/LEDGR-benchmark-ux-navegacao.md (Fundacao -> Produtividade -> Governa
 **Regressao:** suite completa (5 scripts Playwright, ~81+ rotas cobertas nas sessoes anteriores de todos os modulos) reexecutada apos as mudancas de schema/backend/frontend deste estagio — login OK em todos, zero erros de console/falhas reportadas.
 
 **Estado final do roadmap de navegacao:** os 3 estagios (sidebar de dois niveis + seletor de empresa persistente; command palette + favoritos + breadcrumbs; verificacao de permissao + auditoria de uso do menu) estao implementados, testados e em producao (pushed). Nenhuma pendencia aberta deste documento.
+
+---
+
+## 2026-08-09 23:59 — npm audit: valibot corrigido, bcrypt critica investigada e eliminada
+
+**valibot (moderada, sem breaking change):** `npm audit fix` simples corrigiu `valibot` 1.4.1 -> 1.4.2 (dependencia transitiva de `prisma`/`@prisma/dev`, vuln em `record()`/`flatten()` com nomes de propriedade herdados). Commit `499a8d5`, pushed.
+
+**bcrypt/tar (critica, investigada antes de decidir):**
+- Confirmado onde `bcrypt` nativo (nao `bcryptjs`) e realmente usado: `POST /users` (`UsersService.create()`, `apps/api/src/core/users/users.service.ts`) — rota real e ativa, usada por Cadastros > Usuarios ao criar usuario via admin. `resetPassword()` no mesmo arquivo usa bcrypt mas nao esta ligado a nenhum controller (parece codigo morto — o reset real e `AuthService.resetPassword()`, que usa `bcryptjs`). `infra/prisma/gerar.ts` e script solto de dev, fora do app.
+- Cadeia vulneravel era `bcrypt@5.1.1 -> @mapbox/node-pre-gyp -> tar` (path traversal via symlink/hardlink, DoS) — `tar` so e usado pelo `node-pre-gyp` para extrair o binario nativo pre-compilado durante `npm install` (build-time), nenhuma rota da API extrai tar de input de usuario em runtime. Risco real de exploracao remota era baixo, mas ainda assim decidimos corrigir a causa em vez de so mitigar.
+- `bcrypt@6.0.0` remove `@mapbox/node-pre-gyp`/`tar` inteiramente da arvore (troca por `node-gyp-build`), eliminando a vulnerabilidade em vez de so corrigir sintoma. Unico requisito novo e `engines.node >= 18` (era >= 10) — ambiente ja roda Node v24.14.0, sem impacto.
+- Verificado manualmente (`node -e` com `bcrypt.hash`/`bcrypt.compare`) que a API publica nao mudou e que hashes gerados pela nova versao sao compativeis com hashes ja existentes no banco (gerados via `bcryptjs`, usado no resto do app) — nenhum usuario perderia acesso.
+- Instalado via `npm install bcrypt@6.0.0 --legacy-peer-deps` (nao `npm audit fix --force`, que tambem tocaria `uuid`/`@nestjs/typeorm` e `@nestjs/cli`/`webpack`/`tmp` — dependencias nao investigadas nesta rodada, ficam pra decisao futura separada).
+- Vulnerabilidades de producao (`npm audit --omit=dev`): 24 -> 16 (apos valibot) -> 13 (apos bcrypt, criticas zeradas). Commit `ddd7c51`, pushed.
+
+**2 problemas de build pre-existentes descobertos (nao corrigidos, fora do escopo desta investigacao, nao relacionados ao bcrypt):**
+1. `infra/prisma/seed.ts` quebra `npm run build`/`nest build api`: `import { Pool } from 'pg'` incompativel com `moduleResolution: NodeNext` do `tsconfig.json` raiz (que inclui `infra/prisma/**/*.ts` no build do Nest). Nao afeta `npm run seed` (roda via `ts-node`, resolucao mais permissiva) nem `nest start --watch` (dev), so o build de producao completo.
+2. `apps/api/src/modules/accounting/investments/CdbProjecaoPage.tsx` — arquivo `.tsx` de frontend aparentemente extraviado dentro da arvore do backend (`apps/api/src`), quebra `tsc --noEmit` por falta de flag `--jsx`. Nao investigado se e usado/importado por algo ou e so lixo de copia — candidato a limpeza de arquivo obsoleto (ver secao 2 do CLAUDE.md, padrao ATIVO vs OBSOLETO).
+
+**Vulnerabilidades ainda abertas, nao tratadas (exigem `--force`/breaking change, decisao futura):** `uuid` <11.1.1 (moderada, fix requer `@nestjs/typeorm@11.0.3` — projeto usa Prisma, nao TypeORM, vale confirmar se essa dependencia e realmente necessaria antes de forcar); `@nestjs/cli`/`webpack`/`tmp`/`inquirer` (apenas devDependencies, nao afeta producao).
