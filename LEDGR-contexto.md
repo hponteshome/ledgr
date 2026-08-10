@@ -5597,3 +5597,21 @@ Fecha docs/LEDGR-benchmark-ux-navegacao.md (Fundacao -> Produtividade -> Governa
 **CORRECAO de registro anterior (09/08 23:59, secao "2 problemas de build pre-existentes descobertos"):** eu tinha escrito que o erro `infra/prisma/seed.ts` (`import { Pool } from 'pg'` incompativel com `moduleResolution: NodeNext`) "nao afeta... `nest start --watch` (dev), so o build de producao completo" — **isso estava ERRADO.** Testado agora (`npm run start:dev` do zero, apos a reinstalacao completa): o processo compila, reporta o erro, imprime "Found 1 error. Watching for file changes." e **para ai — a porta 3000 nunca fica disponivel** (`curl localhost:3000` sem resposta). Ou seja, esse bug pre-existente **bloqueia o boot do backend a frio**, nao e so um problema cosmetico do `npm run build`. So nao tinha sido notado antes porque o servidor de dev provavelmente estava rodando continuamente desde antes desse bug aparecer, sem reinicio a frio durante toda a maratona de testes Playwright (09/08). **Usuario optou por so corrigir o registro por agora, nao o bug em si** (fica pendente, fora do escopo da investigacao de dependencias) — fix e trivial (import do `Pool` via namespace em vez de named import, ou excluir `infra/prisma` do `tsconfig.json` raiz que o Nest build usa).
 
 **PENDENCIA ATUALIZADA (severidade elevada):** corrigir `infra/prisma/seed.ts` import de `Pool`/`pg` — bloqueia `npm run start:dev` a frio (nao so `npm run build`). Prioridade alta pra proxima sessao caso o backend precise ser reiniciado do zero (ex: apos crash, reboot da maquina, `npm install` completo).
+
+---
+
+## 2026-08-10 01:30 — Procedimento de recuperacao confirmado: `npm install` quebrado por `apps/agent`/`pkcs11js`
+
+Usuario rodou um `npm install` sem escopo apos os fixes de dependencias desta sessao (axios/rxjs/@nestjs/cli) e bateu no mesmo problema identificado durante a investigacao: `apps/agent` depende de `pkcs11js` (certificados A3 fisicos), que exige Visual Studio Build Tools pra compilar nativamente - ausente na maquina. Isso derrubou `node_modules` inteiro (nao so `apps/agent`), causando `Cannot find module '@nestjs/common'` e `$connect`/`$disconnect` ausentes em `PrismaService` (client do Prisma nao gerado).
+
+**Procedimento de recuperacao confirmado (funcionou, `start:dev` subiu limpo):**
+```powershell
+npm install --legacy-peer-deps -w apps/api --include-workspace-root
+$env:DATABASE_URL="postgresql://ledgr:ledgr123@localhost:5432/ledgr_app"
+npx prisma generate --schema=prisma/schema.prisma
+npm run start:dev
+```
+
+`--include-workspace-root` (flag nativa do npm, documentada em `npm help install`) instala as dependencias da raiz + `apps/api` sem tocar em `apps/agent` - mais limpo que a abordagem manual usada durante a investigacao original (editar temporariamente o array `workspaces` do `package.json`).
+
+**Regra pratica adotada: nunca rodar `npm install` sem escopo (bare, sem `-w apps/api --include-workspace-root`) neste repositorio enquanto o Visual Studio Build Tools nao estiver instalado na maquina** - vai sempre falhar da mesma forma. So necessario reinstalar Build Tools se algum dia for preciso trabalhar de fato em `apps/agent` (LEDGR Agent, certificados A3 fisicos via `pkcs11js`).
