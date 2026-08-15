@@ -5672,6 +5672,7 @@ bash_tool, so leitura via view. Manter vigilancia nas proximas sessoes.
 - Avaliar se buscarPontesPeriodo precisa de paginacao/limite se o usuario
   escolher um range muito longo (ex: 5+ anos), hoje sem limite superior
 
+
 ---
 
 ## 2026-08-10 (recuperado em 15/08/2026) — ECF: primeiro exportador real + 4 rodadas de validacao PVA (GRB 2024/2025)
