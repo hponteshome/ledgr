@@ -5671,3 +5671,163 @@ bash_tool, so leitura via view. Manter vigilancia nas proximas sessoes.
   com anos muito distantes)
 - Avaliar se buscarPontesPeriodo precisa de paginacao/limite se o usuario
   escolher um range muito longo (ex: 5+ anos), hoje sem limite superior
+
+---
+
+## 2026-08-10 (recuperado em 15/08/2026) — ECF: primeiro exportador real + 4 rodadas de validacao PVA (GRB 2024/2025)
+
+**Nota de protocolo:** esta sessao aconteceu em 10/08/2026 (5 commits, `258d10c`
+a `0e9ee70`) mas nunca foi apendada aqui - gap de protocolo descoberto e
+corrigido na sessao de 15/08/2026 (abaixo), reconstruido a partir dos
+commit messages reais (`git log`) e de scripts/notas deixados em `D:\Temp\`.
+
+**Commit `258d10c` — primeiro exportador real, substitui o stub.** Ate entao
+`EcfImporterService.export()` so retornava `{success:true, message:'Exportacao
+em desenvolvimento'}`, nenhum arquivo era gerado. Novo
+`ecf-exporter.service.ts`, arquitetura espelhada do `ecd-exporter.service.ts`
+(helper `add()`/`P` delimitador, `journal_entry_items` com `deletedAt:null`,
+`Promise<{buffer,warnings}>`, latin1). Referencia usada: `LM/ECF_2024_LM.TXT`
+(gabarito generico ja existente no repo, empresa diferente/Lucro Real).
+Confirmados 2 bugs de leitura no `ecf-parser.service.ts` nao corrigidos nessa
+rodada (fora de escopo, so afeta importacao): 0000 com dtIni/dtFin lidos 1
+posicao adiantada; J050 campo 3 tratado como `codCcus` quando e `COD_NAT`;
+Y600 com cpf/nome desalinhados.
+
+**3 rodadas de fix pontual no registro 0010, cada uma a partir de erro real
+do PVA (GRB 2024):**
+1. `f706d42` — `FORMA_TRIB_PER` (campo 7) vinha `"RRRR"` copiado do gabarito
+   LM sem verificar; PVA acusou "forma de tributacao do trimestre nao contem
+   todas as formas definidas no campo FORMA_TRIB". Corrigido pra calculo
+   dinamico (`FORMA_TRIB_LETTER` a partir de `formaTributacao`).
+2. `ff00ebb` — `FORMA_TRIB` (campo 4) vinha fixo `"2"` (Real/Arbitrado,
+   tambem copiado do gabarito LM sem verificar); PVA acusou "trimestre nao
+   permite a forma de tributacao P". GRB e Presumido puro = `"5"`.
+3. `076a7b3` — `TIP_ESC_PRE` (campo 9) vinha vazio; PVA exige preenchido
+   quando `FORMA_TRIB` in {3,4,5,7,10}. GRB tem escrituracao contabil
+   completa (mesma base do ECD ja validado) = `"C"`.
+
+**Commit `0e9ee70` — reescrita estrutural apos usuario fornecer um ECF REAL
+ja transmitido da propria GRB** (exercicio 2025, `D:\Temp\ECF_2025_00020_Gerada.TXT`).
+Comparacao campo a campo revelou que o gap remanescente nao era mais um
+campo isolado, era estrutural - Bloco C inteiro (copia retagueada do Bloco I
+do ECD: C040/C050+C051/C150+C155/C350+C355) estava omitido; Bloco N tinha a
+apuracao de Lucro Presumido inteira no lugar errado (pertence ao Bloco P,
+N e exclusivo de Lucro Real); blocos L/M/Q/S/T/U/V/W/X sem marcadores de
+bloco vazio; J050/C050 gerando as 323 contas do plano sem filtro de
+atividade (real so declara 163); K155 sem companion K156/K355/K356; 0020
+sem nenhum flag; Y720 ausente. Todos corrigidos nessa rodada. **Essa
+reescrita NAO chegou a ser revalidada no PVA antes da sessao encerrar** -
+ficou pendente pra proxima rodada (retomado na sessao de 15/08/2026 abaixo).
+
+Gaps deliberadamente nao resolvidos, documentados no cabecalho do proprio
+arquivo: Bloco E (plano referencial completo, exige tabela L100A/L300A nao
+importada - mesmo gap ja aceito no I051 do ECD), Y570 (retencoes de
+terceiros, nao modelado), Y750 (demonstrativo informativo Lucro Real,
+baixa prioridade).
+
+---
+
+## 2026-08-15 — ECF: auditoria completa + correcao de bugs reais achados contra ECF real da GRB, handoff pra rodada de PVA
+
+**Contexto:** usuario pediu pra levar o ECF ao mesmo padrao do ECD (GRB 2024,
+🔒 PRONTO PARA PRODUCAO). Descrevia o exporter como stub - auditoria mostrou
+que na verdade ja tinha sido reescrito e parcialmente validado em 10/08/2026
+(recuperado acima), so nunca documentado aqui. Retomado do estado real, nao
+do zero.
+
+**Achados e fixes aplicados nesta sessao (todos verificados campo a campo
+contra `D:\Temp\ECF_2025_00020_Gerada.TXT`, o ECF real transmitido da GRB):**
+
+1. **Registro 0020 com contagem de campo errada.** `Array(28).fill("N")`
+   deveria ser `Array(27)` + 2 campos vazios finais antes do terminador -
+   confirmado via `split('|')` do arquivo real (27 N's, 33 pipes, nao 28/32).
+   Havia tambem um diff local nao commitado que tinha "corrigido" na direcao
+   errada (removido os 2 campos finais em vez de ajustar a contagem de N's) -
+   revertido e corrigido certo.
+
+2. **`normSpedText()` criado** (`apps/api/src/utils/normalize-sped-text.ts`) -
+   NFC direto pra acentuacao portuguesa (que ja e um code point <= 0xFF,
+   dentro do range Latin-1 Supplement, passa intacta), com fallback NFD +
+   remocao de combining marks so pro que sobra fora desse range (aspas
+   curvas, travessao longo, etc. coladas de Word/Google Docs) - evita a
+   truncagem silenciosa que `Buffer.from(str,'latin1')` faz pra qualquer
+   code point > 0xFF (vira byte de controle invisivel, corrompe sem erro).
+   Aplicado em razao social, nomes de signatario/socio, nomes de conta.
+   Pendencia: mesma funcao ainda nao existe no ECD/EFD - so ECF foi coberto
+   nesta rodada (escopo pedido pelo usuario).
+
+3. **Registro 0030 (endereco + NAT_JUR + CNAE) nunca era emitido** - so
+   existia um warning generico sobre endereco incompleto, o registro em si
+   (obrigatorio no Bloco 0) estava ausente por completo. Confirmado layout
+   de 11 campos contra o arquivo real: `NAT_JUR|CNAE|LOGRADOURO|NUMERO|
+   COMPLEMENTO|BAIRRO|UF|COD_MUN|CEP|FONE|EMAIL`. Implementado com os campos
+   que o cadastro ja tem (endereco/telefone/email); `NAT_JUR`/`CNAE` saem
+   vazios com warning explicito - `companies.legal_nature` guarda texto
+   livre ("Sociedade Simples Pura", nao o codigo RFB "2232"), `main_activity`
+   vazio pra GRB, e nao existe tabela `rfb_global_tables` de
+   NATUREZA_JURIDICA/CNAE importada (so `QUALIF_ASSINANTE` existe hoje).
+   **Decisao do usuario:** gerar assim mesmo por ora, resolver
+   NAT_JUR/CNAE como pendencia de cadastro futura.
+
+4. **`COD_QUALIF` do 0930 tinha um "205" hardcoded que nao existe no arquivo
+   real** (real usa 900-Contador e 309-Procurador, nunca 205). Removido o
+   fallback fabricado - agora so gera a linha do contador (`900`, ja validado
+   campo a campo); signatarios com `role != 'contador'` sao pulados com
+   warning explicito em vez de gerar um codigo inventado. **Pendencia
+   registrada:** o arquivo real tem uma 2a linha 0930 pro mesmo Helenilto
+   como 309-Procurador - origem dessa qualificacao (papel/cadastro) ainda
+   nao investigada, nao ha hoje fonte confiavel (nem `PersonCompany.role`
+   nem `rfb_global_tables`) pra resolver automaticamente. **Decisao do
+   usuario:** investigar quando rodar o PVA de verdade e ver se ele exige.
+
+5. **Modulo reorganizado:** `ecf.module.ts` estava vazio (0 bytes,
+   mal posicionado dentro de `ecf/services/`) - tudo era registrado direto
+   em `sped.module.ts`. Criado `apps/api/src/modules/sped/ecf/ecf.module.ts`
+   de verdade (mesmo padrao do `efd.module.ts` ja existente), `SpedModule`
+   agora importa `EcfModule` e reexporta (em vez de declarar
+   controller/providers do ECF diretamente).
+
+6. **`ecf-validator.service.ts` expandido** (antes so conferia CNPJ) -
+   mesmo padrao do `ecd-validator.service.ts`: bloco 0 (CNPJ/periodo),
+   hierarquia do plano de contas J050 (conta-pai existe), saldos K155
+   presentes e balanceados por periodo, erros de parse repassados.
+
+7. **`import()`/`export()` morto do `ecf-importer.service.ts`:** `export()`
+   era codigo morto (nunca chamado pelo controller, que usa
+   `EcfExporterService` direto) - removido. `import()` real (gravar plano de
+   contas/saldos no banco, como o `ecd-importer.service.ts` faz) foi
+   **adiado por decisao do usuario** - exigiria um model `EcfImport` novo
+   (hoje so existe `EcdImport`) + migration manual, fora do escopo do
+   objetivo principal desta rodada (exportador validado no PVA). Fica
+   documentado como gap conhecido, mesma categoria do Bloco E/Y570/Y750.
+
+**Todos os fixes confirmados com `npx tsc --noEmit -p apps/api/tsconfig.json`
+limpo apos cada mudanca** (fluxo direto de Edit/Bash nesta sessao - usuario
+autorizou explicitamente abandonar o padrao de blocos PowerShell manuais do
+CLAUDE.md pra esta sessao no Claude Code, dado que cada chamada ja passa por
+aprovacao dele).
+
+**ECF 2024 da GRB regenerado com o codigo corrigido** via `GET
+/sped/ecf/export` real (servidor ja rodando com hot-reload, sem precisar de
+restart a frio) - salvo em `D:\Temp\ECF_2024_LEDGR_novo.txt` (2339 linhas).
+Confirmado visualmente: 0020/0030/0930 saem com a estrutura certa agora.
+
+**PROXIMO PASSO (bloqueado em acao do usuario):** rodar
+`D:\Temp\ECF_2024_LEDGR_novo.txt` no PVA SpedContabilFiscal real e reportar
+os erros de volta - mesmo ciclo iterativo ja usado no ECD (~21 rodadas) e
+nas 3 primeiras rodadas do ECF em 10/08. Sem essa rodada real nao da pra
+confirmar "0 erros" - os fixes desta sessao sao baseados em comparacao
+campo a campo contra um arquivo real ja transmitido, mas ainda nao passaram
+pelo validador oficial da Receita.
+
+**Atualizacao - 1a rodada real de PVA desta sessao (mesmo dia, 15/08/2026):**
+usuario rodou o arquivo acima no PVA (12.2.2/descritor 11003.1) e reportou
+de volta: **1 erro - "Quantidade de campos incorreta" no registro 0020**
+(32 campos gerados, 31 esperados, linha 4). Confirma que o fix de contagem
+de N's (27, nao 28) estava certo, mas os "2 campos finais vazios" copiados
+do arquivo real de 2025 sao 1 a mais do que o leiaute vigente aceita pro
+exercicio 2024 - **divergencia real de leiaute entre exercicios**, achado
+direto do validador oficial, nao suposicao. Corrigido pra 27 N's + so 1
+campo final vazio. Arquivo regenerado (mesmo path, `D:\Temp\ECF_2024_LEDGR_novo.txt`,
+2339 linhas). Proxima rodada de PVA ainda pendente de confirmacao do
+usuario.

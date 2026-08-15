@@ -23,26 +23,21 @@ import { EcdViewerController } from './ecd/controllers/ecd-viewer.controller';
 // EFD
 import { EfdModule } from './efd/efd.module';
 // ECF
-import { EcfParserService } from './ecf/services/ecf-parser.service';
-import { EcfValidatorService } from './ecf/services/ecf-validator.service';
-import { EcfImporterService } from './ecf/services/ecf-importer.service';
-import { EcfExporterService } from './ecf/services/ecf-exporter.service';
-import { EcfController } from './ecf/controllers/ecf.controller';
+import { EcfModule } from './ecf/ecf.module';
 
 @Module({
   imports: [
     PrismaModule,
     EfdModule,
+    EcfModule,
     MulterModule.register({
       limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
     }),
   ],
   controllers: [
     AccountingViewsController,
-    EcdController,    
-    EcfController,   // ← ADICIONADO
+    EcdController,
     EcdViewerController,
-
   ],
   providers: [
     PrismaService,
@@ -54,20 +49,13 @@ import { EcfController } from './ecf/controllers/ecf.controller';
     EcdPreValidateService,
     AccountingViewsService,
     EcdValidatorService,
-
-    // ECF
-    EcfParserService,   // ← ADICIONADO
-    EcfValidatorService, // ← ADICIONADO
-    EcfImporterService,  // ← ADICIONADO
-    EcfExporterService,
   ],
   exports: [
     EcdParserService,
     EcdExporterService,
     EcdPreValidateService,
     AccountingViewsService,
-    EcfParserService,   // ← ADICIONADO
-    EcfExporterService,
+    EcfModule,
   ],
 })
 export class SpedModule {}

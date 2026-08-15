@@ -71,16 +71,6 @@ export class EcfImporterService {
     }
   }
 
-  async export(companyId: string, periodStart: string, periodEnd: string): Promise<any> {
-    this.logger.log(`Exportando ECF para período ${periodStart} a ${periodEnd}`);
-    
-    // TODO: Implementar exportação real
-    return {
-      success: true,
-      message: 'Exportação em desenvolvimento',
-      data: null,
-    };
-  }
 
   async getImports(companyId: string): Promise<any[]> {
     // TODO: Buscar histórico do banco

@@ -17,6 +17,7 @@
 //   deve bloquear validacao por si so.
 import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "@prisma/prisma.service";
+import { normSpedText } from "../../../../utils/normalize-sped-text";
 
 export interface EcfExportOptions {
   companyId: string;
@@ -52,7 +53,8 @@ export class EcfExporterService {
       where: { id: companyId },
       select: {
         taxId: true, legalName: true, state: true, city: true, nire: true, codMun: true,
-        street: true, number: true, neighborhood: true, zipCode: true,
+        street: true, number: true, complement: true, neighborhood: true, zipCode: true,
+        phone1: true, email: true, mainActivity: true, legalNature: true,
       },
     });
     if (!company) throw new Error("Empresa nao encontrada.");
@@ -73,6 +75,19 @@ export class EcfExporterService {
     if (!company.street || !company.zipCode) {
       warnings.push("Endereco fiscal da empresa incompleto (0030) - preencher cadastro.");
     }
+    if (!company.codMun) {
+      warnings.push("Codigo do municipio (IBGE, campo COD_MUN do 0030) nao cadastrado - registro sai sem esse campo.");
+    }
+    // NAT_JUR/CNAE (codigos numericos RFB) nao tem campo dedicado no cadastro
+    // hoje: legal_nature guarda texto livre ("Sociedade Simples Pura", nao
+    // "2232"), main_activity fica vazio na pratica. Sem tabela
+    // NATUREZA_JURIDICA/CNAE importada (rfb_global_tables so tem
+    // QUALIF_ASSINANTE hoje) nao ha como resolver por nome - gerar vazio com
+    // warning explicito em vez de inventar um codigo.
+    if (!company.mainActivity) {
+      warnings.push("CNAE (codigo RFB, ex: 6911701) nao cadastrado em Atividade Principal - registro 0030 sai sem esse campo.");
+    }
+    warnings.push("Natureza Juridica (codigo RFB do 0030, ex: 2232) nao tem campo de codigo numerico no cadastro hoje (so texto livre) - registro sai sem esse campo ate essa pendencia ser resolvida.");
 
     // ── Dados base compartilhados por varios blocos ─────────────────────────
     const accounts = await this.prisma.chartOfAccounts.findMany({
@@ -157,7 +172,7 @@ export class EcfExporterService {
     }
 
     // ── BLOCO 0 ──────────────────────────────────────────────────────────
-    add(P+"0000"+P+"LECF"+P+"0011"+P+cnpj+P+company.legalName+P+"0"+P+"0"+P+P+P+dtIni+P+dtFin+P+"N"+P+P+tipEcf+P+P);
+    add(P+"0000"+P+"LECF"+P+"0011"+P+cnpj+P+normSpedText(company.legalName)+P+"0"+P+"0"+P+P+P+dtIni+P+dtFin+P+"N"+P+P+tipEcf+P+P);
     add(P+"0001"+P+"0"+P);
     // TIP_ESC_PRE=C: GRB tem escrituracao contabil completa (ECD ja validada em
     // partidas dobradas). Confirmado campo a campo contra o ECF real 2025 da
@@ -168,9 +183,22 @@ export class EcfExporterService {
     add(P+"0010"+P+P+"N"+P+formaTributacao+P+"T"+P+"01"+P+formaTribPer+P+mesBalRed+P+tipEscPre+P+P+P+P+campoFinal0010+P);
     // 0020: flags operacionais (S/N) - todas "N" pra GRB (escritorio de
     // advocacia domestico, sem operacoes especiais). IND_ALIQ_CSLL=1 (9%, a
-    // aliquota que GRB de fato paga). Confirmado campo a campo contra o ECF
-    // real 2025 da GRB.
-    add(P+"0020"+P+"1"+P+"0"+P+Array(28).fill("N").join(P)+P+P+P);
+    // aliquota que GRB de fato paga). 27 flags "N" confirmados contra o ECF
+    // real 2025 da GRB (D:\Temp\ECF_2025_00020_Gerada.TXT). Achado real no
+    // PVA (12.2.2/descritor 11003.1, GRB 2024, rodada 15/08/2026):
+    // "Quantidade de campos incorreta" - 32 gerado, 31 esperado. O arquivo
+    // real de 2025 tem 2 campos finais vazios antes do terminador, mas o
+    // leiaute vigente pro exercicio 2024 so aceita 1 - divergencia real
+    // entre exercicios, nao suposicao (achado direto do validador oficial).
+    add(P+"0020"+P+"1"+P+"0"+P+Array(27).fill("N").join(P)+P+P);
+    // 0030: dados cadastrais (endereco + NAT_JUR/CNAE) - registro obrigatorio
+    // do Bloco 0 que nunca era emitido antes (so existia um warning
+    // generico). Confirmado campo a campo contra o ECF real 2025 da GRB:
+    // NAT_JUR|CNAE|LOGRADOURO|NUMERO|COMPLEMENTO|BAIRRO|UF|COD_MUN|CEP|FONE|
+    // EMAIL (11 campos). NAT_JUR/CNAE ficam vazios quando o cadastro nao tem
+    // o codigo RFB numerico - ver warnings acima.
+    const cnaeCode = (company.mainActivity || "").replace(/\D/g, "");
+    add(P+"0030"+P+P+cnaeCode+P+normSpedText(company.street)+P+company.number+P+normSpedText(company.complement || "")+P+normSpedText(company.neighborhood)+P+company.state+P+(company.codMun || "")+P+(company.zipCode || "")+P+(company.phone1 || "").replace(/\D/g, "")+P+(company.email || "")+P);
     // 0930: signatarios via CompanyShareholder/PersonCompany com assinaEcf=true.
     const accConfigForCrc = await this.prisma.companyAccountingConfig.findUnique({ where: { companyId } });
     const signers = await this.prisma.personCompany.findMany({
@@ -181,10 +209,20 @@ export class EcfExporterService {
       warnings.push("Nenhum signatario com assinaEcf=true cadastrado - registro 0930 ficara vazio.");
     }
     for (const s of signers) {
-      const cpf  = (s.person?.cpf || "").replace(/\D/g, "");
-      const nome = s.person?.fullName || "";
       const isContador = (s.role || "").toLowerCase() === "contador";
-      const codQualif = isContador ? "900" : "205";
+      if (!isContador) {
+        // Achado real (ECF 2025 GRB): o arquivo real tem uma 2a linha 0930
+        // pra qualificacao 309-Procurador, mas nao ha em rfb_global_tables
+        // nem em PersonCompany.role uma fonte confiavel pra resolver esse
+        // codigo por papel - "205" hardcoded anterior nao aparece no arquivo
+        // real, era invencao. Pulando ate essa regra de negocio ser
+        // confirmada com o usuario (ver pendencia registrada em contexto).
+        warnings.push(`Signatario ${s.person?.fullName ?? s.id} marcado assinaEcf mas role != contador - qualificacao (COD_QUALIF) do 0930 ainda nao resolvida para este papel, linha nao gerada.`);
+        continue;
+      }
+      const cpf  = (s.person?.cpf || "").replace(/\D/g, "");
+      const nome = normSpedText(s.person?.fullName || "");
+      const codQualif = "900";
       const crcVal = isContador ? (s.person?.crcNumber || accConfigForCrc?.accountantCrc || "").replace(/\D/g, "") : "";
       const crcUf  = isContador ? (s.person?.crcState || accConfigForCrc?.accountantCrcState || "") : "";
       const email  = isContador ? (accConfigForCrc?.accountantEmail || accConfigForCrc?.escritorioEmail || "") : "";
@@ -328,7 +366,7 @@ export class EcfExporterService {
         warnings.push(`Socio ${sh.person?.fullName ?? sh.id} sem participacaoPercent cadastrado - Y600 gerado com 0,00.`);
       }
       const cpf = (sh.person?.cpf || "").replace(/\D/g, "");
-      const nome = sh.person?.fullName || "";
+      const nome = normSpedText(sh.person?.fullName || "");
       const dtEntrada = sh.dataEntrada ? this.fmtDate(sh.dataEntrada) : "";
       const dtRetirada = sh.dataRetirada ? this.fmtDate(sh.dataRetirada) : "";
       const perc = this.fmtDec(sh.participacaoPercent ? Number(sh.participacaoPercent) : 0);
@@ -378,7 +416,7 @@ export class EcfExporterService {
       const natCode    = this.typeToNat(acc.type.toString());
       const indCta     = acc.isAnalytic ? "A" : "S";
       const parentCode = acc.parentId ? (codeById.get(acc.parentId) ?? "") : "";
-      add(P+tagPlano+P+dtAlt+P+natCode+P+indCta+P+acc.level+P+acc.code+P+parentCode+P+acc.name+P);
+      add(P+tagPlano+P+dtAlt+P+natCode+P+indCta+P+acc.level+P+acc.code+P+parentCode+P+normSpedText(acc.name)+P);
       if (acc.isAnalytic) {
         const codRef = i052Map.get(acc.id) ?? "";
         if (codRef) add(P+tagRef+P+P+codRef+P);
