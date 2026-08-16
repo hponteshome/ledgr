@@ -5863,3 +5863,27 @@ Checks C1-C11 (endereço fiscal, CNAE, UF, signatário ECF, contador+CRC, sócio
 2. Testar geração ECF para outras empresas (Pontes Contabilidade, LM) — GRB foi a única validada até aqui.
 3. Bloco E (plano referencial completo, requer L100A/L300A importado) e Y570/Y750 seguem como gap conhecido, não bloqueiam geração — mesmo princípio já aceito no ECD para COD_PLAN_REF.
 4. Opcional: remover os textos descritivos redundantes de P200/P300/P400/P500 para silenciar as 28 advertências (puramente cosmético, não corrige nada real).
+
+
+---
+
+## Nota (16/08/2026) — Registro Y730 (leiaute 12) ainda não implementado
+
+Confirmado via Manual de Orientação do Leiaute 12 da ECF (ADE Cofis no 2/2026,
+sped.rfb.gov.br) e fontes secundarias (Jornal Contabil, CIGAM): o leiaute 12
+criou o **Registro Y730** - "Identificacao de donatarios/destinatarios de
+deducoes do IRPJ/CSLL". Obrigatorio para empresas que usam deducoes na
+apuracao (ex: PAT - Programa de Alimentacao do Trabalhador).
+
+O `ecf-exporter.service.ts` atual (bloco Y) nao gera Y730. Nao bloqueou a
+validacao da GRB porque ela e Lucro Presumido sem deducoes declaradas.
+**Pendencia para quando alguma empresa Lucro Real com deducoes for testada.**
+
+Confirmado tambem pelas mesmas fontes: leiaute 12 alterou blocos L100B,
+L300B, P100B, P150B, P200, P400, U100B, U150B - consistente com as 28
+advertencias cosmeticas "Dados atualizados na Linha de acordo com a tabela
+da RFB" vistas em P200/P300/P400/P500 na validacao real da GRB.
+
+Fonte oficial para consulta futura de mudancas de leiaute: Manual de
+Orientacao do Leiaute [N] da ECF, publicado em sped.rfb.gov.br/pasta/show/1644
+a cada ano (Anexo II do manual documenta as alteracoes campo a campo).
