@@ -3,6 +3,7 @@
 > Referencia estatica do projeto, lida automaticamente por sessoes de IA (Claude Code, etc).
 > Estado da sessao / pendencias / historico: ver LEDGR-contexto.md (raiz, append-only).
 > Aprendizados especificos de SPED/ECD: ver LEDGR-ECD-Aprendizado (1).md.
+> Claude Code deve responder, sempre que possível em Pt-br.
 
 ## 1. Visao geral
 
@@ -153,11 +154,6 @@ de usar.
   com plano historico ECD (.00)
 - EFD M205/M605 sao filhos de nivel 3 de M200/M600 (nao de M210/M610); M400/M800 omitidos
   p/ CST=01
-
-
-- Primeira linha de cada arquivo de codigo: comentario com caminho absoluto completo
-  ex: `// apps/api/src/modules/fiscal/services/nfse-sp-consulta.service.ts`
-  ex: `// frontend/src/pages/finance/NfseImportPage.tsx`
 
 
 - Primeira linha de cada arquivo de codigo: comentario com caminho absoluto completo

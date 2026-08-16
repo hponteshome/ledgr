@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import api from '../../services/api';
 import { SmartDateInput } from '../../components/SmartDateInput';
+import { SmartMonthInput } from '../../components/SmartMonthInput';
 
 const toYMD = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -11,6 +12,7 @@ const fmtBR = (s: any) => parseDate(s).toLocaleDateString('pt-BR');
 const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
                'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 const SEMANA = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+const fmtDia = (s: any) => `${fmtBR(s)} ${SEMANA[parseDate(s).getDay()].toLowerCase()}`;
 const UF_LIST = ['AC','AL','AM','AP','BA','CE','DF','ES','GO','MA','MG','MS','MT','PA','PB','PE','PI','PR','RJ','RN','RO','RR','RS','SC','SE','SP','TO'];
 
 const TYPE_COLOR: Record<string,{bg:string,fg:string}> = {
@@ -55,6 +57,11 @@ export function CalendarioPage() {
   const [form, setForm] = useState({
     date:'', name:'', type:'MUNICIPAL', state:'', city:'', recurring:false
   });
+  const [filtroOpen, setFiltroOpen]       = useState(false);
+  const [filtroInicio, setFiltroInicio]   = useState('');
+  const [filtroFim, setFiltroFim]         = useState('');
+  const [filtroLoading, setFiltroLoading] = useState(false);
+  const [holidaysExtra, setHolidaysExtra] = useState<any[]>([]);
 
 
   const load = async () => {
@@ -178,6 +185,87 @@ export function CalendarioPage() {
     return map;
   }, [holidays, recessos, ferias]);
 
+  const todasHolidaysPeriodo = useMemo(() => {
+    const seen = new Set<string>();
+    return [...holidays, ...holidaysExtra].filter((h:any) => {
+      const k = String(h.date).slice(0,10)+'|'+h.type+'|'+h.name;
+      return seen.has(k) ? false : (seen.add(k), true);
+    });
+  }, [holidays, holidaysExtra]);
+
+  const buscarPontesPeriodo = async () => {
+    if (!filtroInicio || !filtroFim) return;
+    setFiltroLoading(true);
+    try {
+      const anoIni = parseInt(filtroInicio.slice(0,4));
+      const anoFim = parseInt(filtroFim.slice(0,4));
+      const anosNecessarios: number[] = [];
+      for (let a=anoIni; a<=anoFim; a++) anosNecessarios.push(a);
+      const anosCarregados = new Set([year, ...holidaysExtra.map((h:any)=>parseDate(h.date).getFullYear())]);
+      const anosFaltantes = anosNecessarios.filter(a => !anosCarregados.has(a));
+      if (anosFaltantes.length) {
+        const respostas = await Promise.all(
+          anosFaltantes.map(a => api.get('/calendar/holidays', { params:{ year:a } }))
+        );
+        const novos = respostas.flatMap(r => r.data ?? []);
+        setHolidaysExtra(prev => [...prev, ...novos]);
+      }
+    } catch(e:any) {
+      alert('Erro ao buscar feriados do período: ' + (e?.response?.data?.message ?? e.message));
+    } finally {
+      setFiltroLoading(false);
+    }
+  };
+
+  const pontesPeriodo = useMemo(() => {
+    if (!filtroInicio || !filtroFim) return [];
+    const ini = parseDate(filtroInicio + '-01');
+    const [fy, fm] = filtroFim.split('-').map(Number);
+    const fim = new Date(fy, fm, 0);
+    const dentroDoPeriodo = (d: Date) => d >= ini && d <= fim;
+
+    const rangesRegistrados = recessos
+      .filter((r:any) => r.tipo === 'PONTE')
+      .map((r:any) => ({ inicio: parseDate(r.dataInicio), fim: parseDate(r.dataFim) }));
+    const jaRegistrada = (d: Date) =>
+      rangesRegistrados.some(rr => d >= rr.inicio && d <= rr.fim);
+
+    const sugeridas: {data:Date,tipo:'SUGERIDA'|'REGISTRADA',descricao:string,detalhe:string,tip:string}[] = [];
+    todasHolidaysPeriodo.forEach((h:any) => {
+      if (!['NACIONAL','ESTADUAL','FACULTATIVO'].includes(h.type)) return;
+      const d = parseDate(h.date);
+      const dow = d.getDay();
+      if (dow === 4) {
+        const fri = new Date(d); fri.setDate(fri.getDate()+1);
+        if (dentroDoPeriodo(fri) && !jaRegistrada(fri)) {
+          sugeridas.push({data:fri, tipo:'SUGERIDA', descricao:`Ponte — ${h.name}`,
+            detalhe:'Sugerida', tip:`Ponte sugerida — ${h.name} cai na quinta`});
+        }
+      }
+      if (dow === 2) {
+        const mon = new Date(d); mon.setDate(mon.getDate()-1);
+        if (dentroDoPeriodo(mon) && !jaRegistrada(mon)) {
+          sugeridas.push({data:mon, tipo:'SUGERIDA', descricao:`Ponte — ${h.name}`,
+            detalhe:'Sugerida', tip:`Ponte sugerida — ${h.name} cai na terça`});
+        }
+      }
+    });
+
+    const registradas: typeof sugeridas = [];
+    recessos.filter((r:any) => r.tipo === 'PONTE').forEach((r:any) => {
+      const cur = parseDate(r.dataInicio), fimR = parseDate(r.dataFim);
+      while (cur <= fimR) {
+        if (dentroDoPeriodo(cur)) {
+          registradas.push({data:new Date(cur), tipo:'REGISTRADA', descricao:r.descricao,
+            detalhe:r.status, tip:`${r.descricao} — ${r.status}`});
+        }
+        cur.setDate(cur.getDate()+1);
+      }
+    });
+
+    return [...registradas, ...sugeridas].sort((a,b)=>a.data.getTime()-b.data.getTime());
+  }, [filtroInicio, filtroFim, todasHolidaysPeriodo, recessos]);
+
   const grade = useMemo(() => {
     const cells: (Date|null)[] = [];
     const ini = new Date(year, month, 1);
@@ -236,6 +324,12 @@ export function CalendarioPage() {
               background:'#FFF7ED',color:'#C2410C',cursor:'pointer',fontSize:12,fontWeight:600}}>
             + Ponte
           </button>
+          <button onClick={()=>setFiltroOpen(o=>!o)}
+            style={{padding:'5px 12px',border:'1px solid '+(filtroOpen?'#6C63FF':'#E5E7EB'),
+              borderRadius:6,background:filtroOpen?'#EEF2FF':'#fff',
+              color:filtroOpen?'#6C63FF':'#374151',cursor:'pointer',fontSize:12,fontWeight:600}}>
+            🔍 Filtrar Período
+          </button>
         </>}
         <div style={{marginLeft:'auto',display:'flex',gap:8,flexWrap:'wrap'}}>
           {LEGENDA.map(l=>(
@@ -247,6 +341,63 @@ export function CalendarioPage() {
           ))}
         </div>
       </div>
+
+      {filtroOpen && (
+        <div style={{background:'#F9FAFB',borderBottom:'1px solid #E5E7EB',padding:'14px 20px',
+          flexShrink:0}}>
+          <div style={{display:'flex',alignItems:'flex-end',gap:12,flexWrap:'wrap'}}>
+            <div style={{width:150}}>
+              <Lbl>De</Lbl>
+              <SmartMonthInput value={filtroInicio} onChange={v=>setFiltroInicio(v)}/>
+            </div>
+            <div style={{width:150}}>
+              <Lbl>Até</Lbl>
+              <SmartMonthInput value={filtroFim} onChange={v=>setFiltroFim(v)}/>
+            </div>
+            <button onClick={buscarPontesPeriodo} disabled={!filtroInicio||!filtroFim||filtroLoading}
+              style={{padding:'7px 16px',border:'none',borderRadius:6,background:'#6C63FF',
+                color:'#fff',cursor:'pointer',fontSize:12,fontWeight:600,
+                opacity:(!filtroInicio||!filtroFim)?0.5:1}}>
+              {filtroLoading ? 'Buscando...' : 'Buscar'}
+            </button>
+            <button onClick={()=>{setFiltroOpen(false);setFiltroInicio('');setFiltroFim('');}}
+              style={{padding:'7px 14px',border:'1px solid #E5E7EB',borderRadius:6,
+                background:'#fff',cursor:'pointer',fontSize:12}}>
+              Fechar
+            </button>
+          </div>
+
+          {filtroInicio && filtroFim && !filtroLoading && (
+            <div style={{marginTop:14,maxHeight:260,overflow:'auto',
+              border:'1px solid #E5E7EB',borderRadius:8,background:'#fff'}}>
+              {pontesPeriodo.length === 0 ? (
+                <div style={{padding:'16px',fontSize:12,color:'#9CA3AF',textAlign:'center'}}>
+                  Nenhuma ponte encontrada no período selecionado.
+                </div>
+              ) : pontesPeriodo.map((p,i)=>(
+                <div key={i} onClick={()=>{
+                    if (p.tipo==='SUGERIDA') {
+                      setPendYMD(toYMD(p.data)); setPendTip(p.tip); setModal('confirm');
+                    }
+                  }}
+                  style={{display:'flex',alignItems:'center',gap:10,padding:'8px 12px',
+                    borderBottom:i<pontesPeriodo.length-1?'1px solid #F3F4F6':'none',
+                    cursor:p.tipo==='SUGERIDA'?'pointer':'default',fontSize:12}}>
+                  <span style={{width:10,height:10,borderRadius:2,flexShrink:0,
+                    background:p.tipo==='SUGERIDA'?'#FED7AA':'#F97316',
+                    border:p.tipo==='SUGERIDA'?'1px solid #F97316':'none'}}/>
+                  <span style={{width:108,fontWeight:600,color:'#374151'}}>{fmtDia(toYMD(p.data))}</span>
+                  <span style={{flex:1,color:'#374151'}}>{p.descricao}</span>
+                  <span style={{fontSize:11,color:p.tipo==='SUGERIDA'?'#9A3412':'#6B7280',
+                    fontWeight:600}}>
+                    {p.tipo==='SUGERIDA' ? '🌉 Sugerida — clique p/ confirmar' : `✓ ${p.detalhe}`}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Grade */}
       <div style={{flex:1,overflow:'auto',padding:'0 20px 20px'}}>
