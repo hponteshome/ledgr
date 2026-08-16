@@ -1,119 +1,50 @@
-// scripts/fix-existing-accounts.ts
+# infra/docker/docker-compose.yml
+#
+# RECRIADO em 16/08/2026 - o arquivo original estava corrompido desde o
+# commit inicial do projeto (continha conteudo de scripts/fix-existing-accounts.ts
+# em vez de config docker-compose valida). Ver LEDGR-contexto.md, secao
+# "INCIDENTE CRITICO (16/08/2026)" para o contexto completo.
+#
+# Os volumes abaixo sao EXTERNAL (external: true) apontando para os volumes
+# anonimos que ja existem e contem os dados reais do ambiente - isso e
+# DELIBERADO, para nao criar volumes novos vazios e nao arriscar perda de
+# dados adicional. NUNCA remover "external: true" nem trocar o "name:" sem
+# confirmar antes com docker volume inspect.
+#
+# ALERTA DE SEGURANCA (aceito para ambiente local, NAO usar em producao):
+# credenciais do Postgres estao em texto claro abaixo. Antes de qualquer
+# deploy em producao, migrar para variaveis de ambiente (.env, nao commitado)
+# ou um gerenciador de segredos.
 
-import { PrismaClient } from '@prisma/client';
-import { normalizeAccountCode } from '../apps/api/src/utils/normalize-account-code';
+services:
+  postgres:
+    image: postgres:16
+    container_name: ledgr-postgres
+    restart: unless-stopped
+    stop_grace_period: 60s
+    environment:
+      POSTGRES_USER: ledgr
+      POSTGRES_PASSWORD: ledgr123
+      POSTGRES_DB: ledgr_app
+    ports:
+      - "5432:5432"
+    volumes:
+      - ledgr_postgres_data:/var/lib/postgresql/data
 
-// 🔴 Inicializa o Prisma Client da forma mais simples possível
-const prisma = new PrismaClient();
+  redis:
+    image: redis:7-alpine
+    container_name: ledgr-redis
+    restart: unless-stopped
+    stop_grace_period: 30s
+    ports:
+      - "6379:6379"
+    volumes:
+      - ledgr_redis_data:/data
 
-/**
- * Script para corrigir códigos de contas existentes
- * Exemplo: "111" → "1.1.1", "11101" → "1.1.1.01"
- * 
- * Uso: npx ts-node scripts/fix-existing-accounts.ts
- */
-
-async function fixExistingAccounts() {
-  console.log('🔧 Iniciando correção de códigos de contas...');
-  console.log('='.repeat(60));
-
-  try {
-    // ── Testar conexão ────────────────────────────────────────────
-    await prisma.$connect();
-    console.log('✅ Conectado ao banco com sucesso!');
-    console.log('='.repeat(60));
-
-    // ── Buscar contas com código sem pontos ─────────────────────────
-    const accounts = await prisma.chartOfAccounts.findMany({
-      where: {
-        NOT: {
-          code: {
-            contains: '.'
-          }
-        }
-      },
-      include: {
-        company: {
-          select: { tradeName: true }
-        }
-      }
-    });
-    
-    console.log(`📊 Encontradas ${accounts.length} contas para normalizar`);
-    console.log('='.repeat(60));
-    
-    if (accounts.length === 0) {
-      console.log('✅ Nenhuma conta precisa ser normalizada!');
-      return;
-    }
-    
-    let fixed = 0;
-    let skipped = 0;
-    let errors = 0;
-    
-    for (const account of accounts) {
-      try {
-        // 🔴 NORMALIZAR
-        const normalizedCode = normalizeAccountCode(account.code);
-        
-        if (normalizedCode === account.code) {
-          console.log(`⏭️  [${account.company?.tradeName || 'N/A'}] ${account.code} já está normalizado`);
-          skipped++;
-          continue;
-        }
-        
-        // 🔴 VERIFICAR duplicata
-        const existing = await prisma.chartOfAccounts.findFirst({
-          where: {
-            companyId: account.companyId,
-            code: normalizedCode
-          }
-        });
-        
-        if (existing) {
-          console.log(`⚠️  [${account.company?.tradeName || 'N/A'}] ${account.code} → ${normalizedCode} JÁ EXISTE`);
-          skipped++;
-          continue;
-        }
-        
-        // 🔴 ATUALIZAR
-        await prisma.chartOfAccounts.update({
-          where: { id: account.id },
-          data: { 
-            code: normalizedCode,
-            spedCode: account.code,
-          }
-        });
-        
-        console.log(`✅ [${account.company?.tradeName || 'N/A'}] ${account.code} → ${normalizedCode}`);
-        fixed++;
-        
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
-        console.error(`❌ Erro: ${account.code} - ${errorMessage}`);
-        errors++;
-      }
-    }
-    
-    // ── Resumo ─────────────────────────────────────────────────────
-    console.log('='.repeat(60));
-    console.log('📊 RESUMO');
-    console.log('='.repeat(60));
-    console.log(`Total: ${accounts.length}`);
-    console.log(`✅ Normalizadas: ${fixed}`);
-    console.log(`⏭️  Puladas: ${skipped}`);
-    console.log(`❌ Erros: ${errors}`);
-    console.log('='.repeat(60));
-
-  } catch (error) {
-    console.error('❌ Erro de conexão:', error);
-  }
-}
-
-// ── Executar ─────────────────────────────────────────────────────
-
-fixExistingAccounts()
-  .finally(async () => {
-    await prisma.$disconnect();
-    console.log('🔌 Conexão encerrada');
-  });
+volumes:
+  ledgr_postgres_data:
+    external: true
+    name: 06d621c5fbd0fcaae7c4eed16a07e8e553c4b9433df49126142e78341c08cb6f
+  ledgr_redis_data:
+    external: true
+    name: 9cb64c618f1e580ceacfc7741b14eb6b88f0ac7cae74a3d2147df0d716f87480
