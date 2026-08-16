@@ -5832,3 +5832,34 @@ direto do validador oficial, nao suposicao. Corrigido pra 27 N's + so 1
 campo final vazio. Arquivo regenerado (mesmo path, `D:\Temp\ECF_2024_LEDGR_novo.txt`,
 2339 linhas). Proxima rodada de PVA ainda pendente de confirmacao do
 usuario.
+
+
+---
+
+## 🔒 STATUS: PRONTO PARA PRODUÇÃO — Módulo ECF (GRB, ano-calendário 2025) — 15/08/2026
+
+**NÃO alterar os arquivos/funcionalidades abaixo sem justificativa explícita e nova instrução do usuário.** Validado ponta a ponta contra o PVA oficial (12.2.2, leiaute 0012). Se alteração futura for necessária, revalidar no PVA antes de considerar concluído de novo.
+
+### O que foi validado e está congelado
+
+**1. `apps/api/src/modules/sped/ecf/services/ecf-exporter.service.ts`**
+Gera ECF estruturalmente válida, testada contra o PVA oficial (GRB, ano-calendário 2025): **0 erros, 28 advertências aceitáveis** (ver detalhe abaixo). Pontos específicos validados nesta sessão que não devem ser revertidos:
+- `codVer` (registro 0000, campo 3): dinâmico por ano — `anoBase >= 2025 ? "0012" : "0011"`. RFB exige leiaute 12 para ano-calendário 2025 (entrega 2026). **Não fixar de volta em "0011" hardcoded.**
+- Registro 0020: 32 campos (leiaute 12 acrescentou 1 campo novo ao final em relação ao leiaute 11 — confirmado 2x pelo PVA, primeira tentativa foi na direção errada).
+- `emitSaldosPeriodicosComReferencial` (K155/K156) e `emitPreEncerramentoComReferencial` (K355/K356): cada tag monta seu próprio `rest` (`restSaldo` para K155/K355, `restRef` para K156/K356). **Não voltar a reaproveitar um único `rest` compartilhado** — o K156/K356 (referencial) não tem o campo `COD_CCUS` que o K155/K355 tem; compartilhar o `rest` desloca todos os campos seguintes e quebra `IND_VL_SLD_INI`/`IND_VL_SLD_FIN` (achado real: "Quantidade de campos incorreta", 9 vs 8 esperados, ~103 páginas de erro repetido por conta).
+
+**2. `apps/api/src/modules/sped/ecf/controllers/ecf.controller.ts`**
+- Nome do arquivo exportado: `ECF_${year}_${raiz}_${hh}${mm}${ss}.txt`. **Não remover o HHMMSS** — evita colisão/renomeio automático do Chrome entre gerações repetidas na mesma sessão de teste.
+- Endpoint `GET /sped/ecf/pre-validate` (novo) — espelha `EcdPreValidateService`, mesmo contrato `PreValidateCheck`/`PreValidateResult`.
+
+**3. `apps/api/src/modules/sped/ecf/services/ecf-pre-validate.service.ts` (NOVO)**
+Checks C1-C11 (endereço fiscal, CNAE, UF, signatário ECF, contador+CRC, sócios, código de conta inválido), W1 (mapeamento RFB), I1-I4 (informativos, incluindo qual leiaute está em uso). **Ainda sem tela** (`EcfPreValidatePage.tsx` pendente — próxima sessão).
+
+### Advertências aceitas (não são bugs)
+28 advertências em `P200`/`P300`/`P400`/`P500` ("Dados atualizados na Linha de acordo com a tabela da RFB", campo CODIGO): o PVA substitui o texto descritivo desses quadros pela tabela oficial RFB automaticamente — `CODIGO` e `VALOR` enviados pelo LEDGR já estão corretos, é comportamento esperado do validador, não uma falha de geração.
+
+### Pendências para a próxima sessão
+1. `EcfPreValidatePage.tsx` — tela de pré-validação (frontend), no padrão do `EcdPreValidatePage.tsx`, incluindo entrada no menu lateral SPED → ECF — Pré-Validação.
+2. Testar geração ECF para outras empresas (Pontes Contabilidade, LM) — GRB foi a única validada até aqui.
+3. Bloco E (plano referencial completo, requer L100A/L300A importado) e Y570/Y750 seguem como gap conhecido, não bloqueiam geração — mesmo princípio já aceito no ECD para COD_PLAN_REF.
+4. Opcional: remover os textos descritivos redundantes de P200/P300/P400/P500 para silenciar as 28 advertências (puramente cosmético, não corrige nada real).
