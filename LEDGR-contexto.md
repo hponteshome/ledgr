@@ -5969,3 +5969,29 @@ Backup de seguranca do estado atual do banco criado em 16/08/2026:
 5. Reconstruir os lancamentos de 2025 da GRB usando o ECF_2025_06190032_212603.txt como
    referencia de saldo, cruzando com fontes externas reais (extratos, notas) - trabalho do
    contador, nao so tecnico.
+
+
+---
+
+## Correcoes aplicadas apos o incidente critico (16/08/2026)
+
+1. **`infra/docker/docker-compose.yml` recriado** - estava corrompido desde o commit
+   inicial (`ef0a6c2`). Agora valido, aponta para os volumes EXTERNOS ja existentes
+   (`ledgr_postgres_data` = volume `06d621c5...`, `ledgr_redis_data` = volume
+   `9cb64c618f...`) - nao criou volume novo, nao arriscou dado nenhum. Alerta registrado
+   no proprio arquivo: credenciais em texto claro, aceitavel para ambiente local, migrar
+   para .env antes de qualquer producao.
+2. **Backup automatico implementado**: `scripts/backup-postgres.ps1` (pg_dump para
+   D:\Backups\ledgr-postgres, FORA do disco gerenciado por WSL2/Docker, retencao de 14
+   dias). Tarefa Agendada do Windows "LEDGR-Postgres-Backup" criada, roda a cada 1 hora,
+   com StartWhenAvailable (cobre cenario de maquina dormindo no horario agendado - o
+   mesmo padrao que causou o incidente original).
+3. Testado manualmente: primeiro backup gerado com sucesso, 916KB
+   (`D:\Backups\ledgr-postgres\backup_20260816_104559.dump`).
+
+### Ainda pendente (nao resolvido nesta sessao)
+- Investigar/ajustar config do Docker Desktop (WSL2 integration) para reduzir
+  interrupcoes abruptas na origem, nao so mitigar com backup.
+- Recuperar/reconstruir os lancamentos de 2025 da GRB (usando
+  `D:\temp\ECF_2025_06190032_212603.txt` como referencia de saldo por conta/mes) -
+  adiado deliberadamente para sessao futura, por decisao do usuario.
