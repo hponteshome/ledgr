@@ -48,6 +48,7 @@ import EcdValidationPage from '../pages/accounting/EcdValidationPage';
 import EcdPage from '../pages/sped/EcdPage';
 import EcdPreValidatePage from '../pages/sped/EcdPreValidatePage';
 import EcfPage from '../pages/sped/EcfPage';
+import EcfPreValidatePage from '../pages/sped/EcfPreValidatePage';
 import EfdPage from '../pages/sped/EfdPage';
 import { EcdViewerPage } from '../pages/sped/EcdViewerPage';
 //import { EcdHistoryPage } from '../pages/sped/EcdHistoryPage';
@@ -207,6 +208,7 @@ export const AppRoutes = () => {
                 {/* SPED */}
                 <Route path="app/sped/ecd/pre-validate" element={<ProtectedRoute><EcdPreValidatePage /></ProtectedRoute>} />
                 <Route path="app/sped/ecd" element={<ProtectedRoute><EcdPage /></ProtectedRoute>} />
+                <Route path="app/sped/ecf/pre-validate" element={<ProtectedRoute><EcfPreValidatePage /></ProtectedRoute>} />
                 <Route path="app/sped/ecf" element={<ProtectedRoute><EcfPage /></ProtectedRoute>} />
                 <Route path="app/sped/efd" element={<ProtectedRoute><EfdPage /></ProtectedRoute>} />
                 <Route path="app/sped/ecd/viewer/:id" element={<ProtectedRoute> <EcdViewerPage /></ProtectedRoute>} />
