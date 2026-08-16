@@ -34,7 +34,7 @@ async function bootstrap() {
   app.enableCors({
     origin: corsOrigins,
     credentials: true,
-      exposedHeaders: ['x-company-id', 'Content-Disposition'], // ← ISSO ESTÁ FALTANDO
+      exposedHeaders: ['x-company-id', 'Content-Disposition', 'X-Ecf-Warnings', 'X-Ecd-Warnings'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-company-id'],
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   });

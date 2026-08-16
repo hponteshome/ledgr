@@ -19,6 +19,34 @@ import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "@prisma/prisma.service";
 import { normSpedText } from "../../../../utils/normalize-sped-text";
 
+// ── Tabela central de leiaute ECF por ano-calendario ─────────────────────
+// A RFB nao publica tabela local para os leiautes atuais (10/11/12) - o
+// motor dinamico baseado em tabela (recursos/tabelas/SPEDECF_DINAMICO_*)
+// so cobre 2014-2021, confirmado por inspecao da pasta local do PVA em
+// 16/08/2026. Por isso, cada linha abaixo foi confirmada contra um erro
+// REAL do PVA (nao suposicao/documentacao) - metodologia ja validada no
+// ECD. Ao aparecer o leiaute 13 (esperado ano-calendario 2026), adicionar
+// uma entrada nova aqui, testando campo a campo do mesmo jeito.
+interface EcfLayoutConfig {
+  codVer: string;
+  campo0020ExtrasCount: number; // quantos pipes extras alem dos 27 flags "N"
+}
+const ECF_LAYOUT_BY_YEAR: Record<number, EcfLayoutConfig> = {
+  // leiaute 0011 - ano-calendario 2024 (entrega 2025)
+  2024: { codVer: "0011", campo0020ExtrasCount: 2 },
+  // leiaute 0012 - ano-calendario >= 2025 (entrega 2026) - confirmado
+  // contra PVA 12.2.2 real em 15-16/08/2026 (GRB 2025)
+  2025: { codVer: "0012", campo0020ExtrasCount: 3 },
+};
+function getEcfLayout(anoBase: number): EcfLayoutConfig {
+  // Anos nao mapeados usam a config do leiaute conhecido mais recente -
+  // arriscado (ver pendencia), mas melhor que travar a geracao. Loga um
+  // aviso explicito na lista de warnings via warnings.push no export().
+  const known = Object.keys(ECF_LAYOUT_BY_YEAR).map(Number).sort((a, b) => b - a);
+  const match = known.find((y) => anoBase >= y) ?? known[known.length - 1];
+  return ECF_LAYOUT_BY_YEAR[match];
+}
+
 export interface EcfExportOptions {
   companyId: string;
   periodStart: Date;
@@ -69,7 +97,11 @@ export class EcfExporterService {
     // rejeitado: "O periodo da escrituracao nao possui um leiaute
     // valido"). Leiautes 1-11 continuam aceitos p/ anos anteriores no
     // mesmo PVA - nao mexer no valor para anoBase < 2025.
-    const codVer = anoBase >= 2025 ? "0012" : "0011";
+    const ecfLayout = getEcfLayout(anoBase);
+    const codVer = ecfLayout.codVer;
+    if (!(anoBase in ECF_LAYOUT_BY_YEAR)) {
+      warnings.push("Ano-calendario " + anoBase + " nao tem leiaute ECF confirmado no exporter - usando config do leiaute " + codVer + " como aproximacao. Validar campo a campo no PVA antes de considerar correto.");
+    }
     const P = "|";
     const lines: string[] = [];
     const add = (l: string) => lines.push(l);
@@ -212,7 +244,12 @@ export class EcfExporterService {
     // vazio (nao "N") ate confirmar o significado/valor esperado dele -
     // se o PVA reclamar do conteudo desse campo especifico na proxima
     // rodada, isso revela o que ele realmente representa.
-    add(P+"0020"+P+"1"+P+"0"+P+Array(27).fill("N").join(P)+P+P+P);
+    // CORRIGIDO 16/08/2026: o campo extra do 0020 (32 vs 31) e exclusivo
+    // do leiaute 0012 (ano-calendario >= 2025) - erro real do PVA na GRB
+    // 2024 confirmou que o leiaute 0011 continua exigindo 31 campos.
+    // Nao fixar o numero de pipes finais - condicionar sempre por anoBase,
+    // mesmo criterio ja usado em codVer.
+    add(P+"0020"+P+"1"+P+"0"+P+Array(27).fill("N").join(P)+P.repeat(ecfLayout.campo0020ExtrasCount));
     // 0030: dados cadastrais (endereco + NAT_JUR/CNAE) - registro obrigatorio
     // do Bloco 0 que nunca era emitido antes (so existia um warning
     // generico). Confirmado campo a campo contra o ECF real 2025 da GRB:

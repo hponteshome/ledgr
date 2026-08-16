@@ -397,10 +397,16 @@ const EcfPage: React.FC = () => {
                 params: { periodStart: exportPeriodStart, periodEnd: exportPeriodEnd },
                 responseType: 'blob',
             });
+            // CORRIGIDO 15/08/2026: nome do arquivo estava fixo no frontend
+            // (ECF_${ano}.txt), ignorando o Content-Disposition real que o
+            // backend ja monta com raiz do CNPJ + HHMMSS. Le o header real.
+            const cd = r.headers['content-disposition'] || '';
+            const match = cd.match(/filename="([^"]+)"/);
+            const filename = match ? match[1] : `ECF_${new Date(exportPeriodEnd).getFullYear()}.txt`;
             const url = window.URL.createObjectURL(new Blob([r.data]));
             const a = document.createElement('a');
             a.href = url;
-            a.download = `ECF_${new Date(exportPeriodEnd).getFullYear()}.txt`;
+            a.download = filename;
             a.click();
             window.URL.revokeObjectURL(url);
         } catch (e: any) {

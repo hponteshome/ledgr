@@ -174,7 +174,10 @@ export class EcfController {
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     if (result.warnings?.length) {
       res.setHeader('X-Ecf-Warnings', JSON.stringify(result.warnings));
-      res.setHeader('Access-Control-Expose-Headers', 'X-Ecf-Warnings');
+      // CORRIGIDO 16/08/2026: setHeader SUBSTITUI o valor inteiro, apagando
+      // Content-Disposition/x-company-id ja definidos pelo CORS global (main.ts).
+      // Precisa listar TODOS os headers que devem ficar visiveis ao frontend.
+      res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition, X-Ecf-Warnings');
     }
     res.end(result.buffer);
   }
