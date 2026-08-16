@@ -63,6 +63,13 @@ export class EcfExporterService {
     const dtIni = this.fmtDate(periodStart);
     const dtFin = this.fmtDate(periodEnd);
     const anoBase = periodStart.getUTCFullYear();
+    // Leiaute ECF: RFB exige leiaute 0012 para ano-calendario >= 2025
+    // (entrega 2026) e situacoes especiais de 2026 - confirmado por erro
+    // real do PVA 12.2.2 em 15/08/2026 (GRB periodo 2025, COD_VER=0011
+    // rejeitado: "O periodo da escrituracao nao possui um leiaute
+    // valido"). Leiautes 1-11 continuam aceitos p/ anos anteriores no
+    // mesmo PVA - nao mexer no valor para anoBase < 2025.
+    const codVer = anoBase >= 2025 ? "0012" : "0011";
     const P = "|";
     const lines: string[] = [];
     const add = (l: string) => lines.push(l);
@@ -105,6 +112,9 @@ export class EcfExporterService {
     const i052Map = new Map<string, string>();
     for (const view of viewsI052) {
       for (const m of view.mappings) i052Map.set(m.accountId, m.aglutinationCode);
+    }
+    if (anoBase >= 2025) {
+      warnings.push("Leiaute 0012 (ano-calendario " + anoBase + ") em uso - layout novo para este exporter, sem gabarito real ECF confirmado campo a campo neste leiaute ainda. Validar cada erro do PVA nesta rodada antes de assumir os demais blocos corretos.");
     }
     if (i052Map.size === 0) {
       warnings.push("Nenhuma conta mapeada em Visoes Contabeis - referencial (J051/C051/K156) ficara vazio.");
@@ -172,7 +182,7 @@ export class EcfExporterService {
     }
 
     // ── BLOCO 0 ──────────────────────────────────────────────────────────
-    add(P+"0000"+P+"LECF"+P+"0011"+P+cnpj+P+normSpedText(company.legalName)+P+"0"+P+"0"+P+P+P+dtIni+P+dtFin+P+"N"+P+P+tipEcf+P+P);
+    add(P+"0000"+P+"LECF"+P+codVer+P+cnpj+P+normSpedText(company.legalName)+P+"0"+P+"0"+P+P+P+dtIni+P+dtFin+P+"N"+P+P+tipEcf+P+P);
     add(P+"0001"+P+"0"+P);
     // TIP_ESC_PRE=C: GRB tem escrituracao contabil completa (ECD ja validada em
     // partidas dobradas). Confirmado campo a campo contra o ECF real 2025 da
@@ -190,7 +200,19 @@ export class EcfExporterService {
     // real de 2025 tem 2 campos finais vazios antes do terminador, mas o
     // leiaute vigente pro exercicio 2024 so aceita 1 - divergencia real
     // entre exercicios, nao suposicao (achado direto do validador oficial).
-    add(P+"0020"+P+"1"+P+"0"+P+Array(27).fill("N").join(P)+P+P);
+        // CORRIGIDO 15/08/2026: erro real do PVA no export GRB periodo 2025
+    // ("Quantidade de campos incorreta", 32 gerado / 31 esperado) mostrou
+    // que so 1 campo final vazio e aceito no leiaute atual (nao 2, como
+    // o gabarito real de 2025 sugeria) - removido 1 P final.
+        // CORRECAO 15/08/2026 (rodada 2): erro anterior foi na direcao
+    // errada - PVA reportou 31 campos (2 pipes finais, leiaute 11) e eu
+    // removi 1 pipe achando que sobrava, gerando 30 (piorou). Erro real
+    // seguinte confirmou: leiaute 12 exige 32 campos, ou seja, 1 campo A
+    // MAIS que o leiaute 11 tinha (nao a menos). Adicionado como campo
+    // vazio (nao "N") ate confirmar o significado/valor esperado dele -
+    // se o PVA reclamar do conteudo desse campo especifico na proxima
+    // rodada, isso revela o que ele realmente representa.
+    add(P+"0020"+P+"1"+P+"0"+P+Array(27).fill("N").join(P)+P+P+P);
     // 0030: dados cadastrais (endereco + NAT_JUR/CNAE) - registro obrigatorio
     // do Bloco 0 que nunca era emitido antes (so existia um warning
     // generico). Confirmado campo a campo contra o ECF real 2025 da GRB:
@@ -488,10 +510,19 @@ export class EcfExporterService {
         if (sldIni === 0 && mv.deb === 0 && mv.cre === 0 && sldFin === 0) continue;
         const dcIni = sldIni >= 0 ? "D" : "C";
         const dcFin = sldFin >= 0 ? "D" : "C";
-        const rest = P+P+this.fmtDec(sldIni)+P+dcIni+P+this.fmtDec(mv.deb)+P+this.fmtDec(mv.cre)+P+this.fmtDec(sldFin)+P+dcFin+P;
-        add(P+tagSaldo+P+acc.code+rest);
+        // CORRIGIDO 15/08/2026: erro real do PVA (GRB 2025) - K156 estava
+        // reaproveitando o "rest" do K155, que tem um campo vazio extra
+        // (COD_CCUS) logo apos o codigo da conta. O K156 (referencial) nao
+        // tem esse campo - e so COD_CTA_REF + valores direto. Isso gerava
+        // 9 campos em vez de 8 e deslocava VL_SLD_INI para a posicao de
+        // IND_VL_SLD_INI. Agora cada tag monta seu proprio "rest".
+        const restSaldo = P+P+this.fmtDec(sldIni)+P+dcIni+P+this.fmtDec(mv.deb)+P+this.fmtDec(mv.cre)+P+this.fmtDec(sldFin)+P+dcFin+P;
+        add(P+tagSaldo+P+acc.code+restSaldo);
         const codRef = i052Map.get(aid);
-        if (codRef) add(P+tagRef+P+codRef+rest);
+        if (codRef) {
+          const restRef = P+this.fmtDec(sldIni)+P+dcIni+P+this.fmtDec(mv.deb)+P+this.fmtDec(mv.cre)+P+this.fmtDec(sldFin)+P+dcFin+P;
+          add(P+tagRef+P+codRef+restRef);
+        }
         saldoCorrente.set(aid, sldFin);
       }
     }
@@ -536,10 +567,16 @@ export class EcfExporterService {
       const saldo = mv ? mv.cre - mv.deb : 0;
       if (saldo === 0) continue;
       const dc = saldo >= 0 ? "C" : "D";
-      const rest = P+P+this.fmtDec(saldo)+P+dc+P;
-      add(P+tagSaldo+P+acc.code+rest);
+      // CORRIGIDO 15/08/2026 (preventivo): mesmo bug do K156 - o registro
+      // referencial (K356) nao deve reaproveitar o "rest" do K355 (tem
+      // campo COD_CCUS extra que K356 nao tem).
+      const restSaldo = P+P+this.fmtDec(saldo)+P+dc+P;
+      add(P+tagSaldo+P+acc.code+restSaldo);
       const codRef = i052Map.get(acc.id);
-      if (codRef) add(P+tagRef+P+codRef+rest);
+      if (codRef) {
+        const restRef = P+this.fmtDec(saldo)+P+dc+P;
+        add(P+tagRef+P+codRef+restRef);
+      }
     }
   }
 

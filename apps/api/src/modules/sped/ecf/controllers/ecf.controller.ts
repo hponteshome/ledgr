@@ -17,6 +17,7 @@ import { EcfParserService } from '../services/ecf-parser.service';
 import { EcfValidatorService } from '../services/ecf-validator.service';
 import { EcfImporterService } from '../services/ecf-importer.service';
 import { EcfExporterService } from '../services/ecf-exporter.service';
+import { EcfPreValidateService } from '../services/ecf-pre-validate.service';
 import { Company } from '@multi-company/company.decorator';
 import { CurrentUser } from '../../../../shared/decorators/current-user.decorator';
 import { PrismaService } from '../../../../prisma/prisma.service';
@@ -29,6 +30,7 @@ export class EcfController {
     private validator: EcfValidatorService,
     private importer: EcfImporterService,
     private exporter: EcfExporterService,   // ← INJETADO
+    private preValidate: EcfPreValidateService,
     private prisma: PrismaService,   // ← INJETADO
   ) {}
 
@@ -84,6 +86,18 @@ export class EcfController {
       // Flag explícita de divergência de CNPJ
       cnpjMismatch: !!cnpjError,
     };
+  }
+
+  // ── Pre-validacao ────────────────────────────────────────────
+  @Get('pre-validate')
+  async preValidateCompany(
+    @Company() companyId: string,
+    @Query('periodStart') periodStart: string,
+    @Query('periodEnd') periodEnd: string,
+  ) {
+    if (!periodStart || !periodEnd)
+      throw new BadRequestException('Periodo nao informado');
+    return this.preValidate.validate(companyId, periodStart, periodEnd);
   }
 
   // ── Importação ───────────────────────────────────────────────
@@ -150,7 +164,11 @@ export class EcfController {
     const cnpj = companyForName?.taxId?.replace(/\D/g, '') || 'ECF';
     const year     = new Date(periodEnd).getFullYear();
     const raiz     = cnpj.substring(0, 8);
-    const filename = `ECF_${year}_${raiz}.txt`;
+        const now = new Date();
+    const hh = String(now.getHours()).padStart(2, '0');
+    const mm = String(now.getMinutes()).padStart(2, '0');
+    const ss = String(now.getSeconds()).padStart(2, '0');
+    const filename = `ECF_${year}_${raiz}_${hh}${mm}${ss}.txt`;
 
     res.setHeader('Content-Type', 'text/plain; charset=iso-8859-1');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
