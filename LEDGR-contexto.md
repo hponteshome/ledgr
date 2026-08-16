@@ -5887,3 +5887,85 @@ da RFB" vistas em P200/P300/P400/P500 na validacao real da GRB.
 Fonte oficial para consulta futura de mudancas de leiaute: Manual de
 Orientacao do Leiaute [N] da ECF, publicado em sped.rfb.gov.br/pasta/show/1644
 a cada ano (Anexo II do manual documenta as alteracoes campo a campo).
+
+
+---
+
+## 🔴 INCIDENTE CRITICO (16/08/2026) — Perda de dados reais: lancamentos GRB 2025
+
+### Resumo
+Todos os lancamentos contabeis de 2025 da GRB (Advocacia Gomes, Rossetti e Barelli,
+company_id d0d70dc6-446c-430b-9f62-3f6e73db3874) desapareceram do banco entre o fim da
+sessao de 15/08/2026 (ECF gerado e validado no PVA com 0 erros, usando esses dados reais -
+receita de R$ 386.602,56+ visivel no P200) e a manha de 16/08/2026. Confirmado: 0 registros
+em journal_entries para 2025, ativos ou soft-deletados. Dados de 2024 (504 lancamentos)
+permanecem intactos.
+
+### Causa raiz identificada (alta confianca, nao 100% certeza absoluta)
+
+**O container ledgr-postgres NUNCA foi desligado de forma limpa, em nenhum momento
+registrado nos logs (01/08 a 16/08/2026).** Toda entrada de log de reinicio mostra:
+Nao existe UMA UNICA linha de shutdown limpo (`database system is shut down`) em 15+ dias
+de log. Isso indica que o container e sempre interrompido de forma abrupta - consistente
+com o comportamento do Docker Desktop/WSL2 no Windows quando a maquina hiberna/dorme ou o
+Docker Desktop reinicia por gerenciamento de recursos, sem enviar SIGTERM ao Postgres.
+
+**Mecanismo provavel da perda:** o WAL (write-ahead log) do Postgres protege contra crash
+DESDE QUE as escritas realmente tenham chegado ao disco fisico antes da interrupcao. Em
+ambientes WSL2, o disco virtualizado (.vhdx) pode ter uma camada de cache que reporta
+gravacao concluida ao Postgres sem persistir de fato no disco fisico - se a VM for
+interrompida abruptamente nesse intervalo (sono da maquina, restart do Docker Desktop), os
+dados "commitados" do ponto de vista do Postgres se perdem antes de tocar o disco real. O
+Postgres volta consistente apos o crash, mas consistente com um estado MAIS ANTIGO que o
+ultimo commit real - exatamente o padrao observado aqui (2024 sobrevive, 2025 nao).
+
+O restart registrado as 2026-08-15 19:46:06 UTC e o candidato mais provavel ao momento da
+perda, dado que o ECF 2025 foi gerado e validado com dados reais ANTES desse restart.
+
+### Evidencias que descartam outras causas
+- Volume do Postgres e o MESMO desde 20/07/2026 (`docker volume inspect`, CreatedAt
+  confirmado) - nao houve troca/recriacao de volume.
+- Nenhum script SQL rodado em D:\Temp entre 06/08 e 16/08 que explicasse um reset.
+- Nenhuma tarefa agendada do Windows relacionada a postgres/docker/backup do banco (so
+  tarefas de backup do proprio Windows, nao relacionadas).
+- Um volume anonimo antigo (`docker_postgres-data`, dados de 18/02/2026) foi inspecionado e
+  descartado - e de antes da empresa GRB existir no sistema (21/07/2026), sem relacao.
+
+### Achado adicional (nao a causa direta, mas agravante estrutural)
+**`infra/docker/docker-compose.yml` esta corrompido desde o commit inicial do projeto**
+(`ef0a6c2`, confirmado via `git show`) - o arquivo contem o conteudo de
+`scripts/fix-existing-accounts.ts` em vez de config docker-compose valida. Isso significa
+que o ambiente nunca pode ser recriado de forma confiavel via `docker-compose up`, e explica
+por que so `docker start`/`docker stop` no container ja existente sao usados ate hoje.
+
+**NAO EXISTE NENHUM BACKUP AUTOMATICO DO BANCO CONFIGURADO.** Confirmado via
+`Get-ScheduledTask` - as unicas tarefas de "Backup" existentes sao do proprio Windows, nao
+relacionadas ao Postgres/LEDGR.
+
+### Recuperacao parcial disponivel
+Arquivo `D:\temp\ECF_2025_06190032_212603.txt` (gerado e validado no PVA em 15/08/2026)
+contem os registros C150/C155 (saldos periodicos mensais por conta) derivados dos
+lancamentos perdidos. Nao contem o lancamento individual completo (data exata, historico,
+contrapartida), mas permite reconstruir SALDO por conta por mes - ponto de partida real para
+reconciliacao contra fontes externas (extratos bancarios, notas fiscais) se for necessario
+reconstruir a escrituracao de 2025.
+
+Backup de seguranca do estado atual do banco criado em 16/08/2026:
+`D:\Temp\backup_emergencial_16082026.dump` (pg_dump formato custom, 919kB).
+
+### Acoes corretivas necessarias (pendencia critica, nao adiar)
+1. **Configurar backup automatico real do Postgres** (pg_dump diario agendado, salvando fora
+   do disco gerenciado pelo WSL2/Docker Desktop - ex: D:\Backups, fora da VM). Prioridade
+   maxima - sem isso, o mesmo incidente pode se repetir a qualquer momento.
+2. **Corrigir `infra/docker/docker-compose.yml`** para ter conteudo valido, com volume
+   NOMEADO explicito (nao anonimo) - permite `docker-compose up` funcionar de verdade e da
+   rastreabilidade ao volume usado.
+3. Investigar configuracao do Docker Desktop (WSL2 integration, "Use the WSL 2 based engine")
+   e considerar desabilitar hibernacao automatica da VM, ou configurar o Windows para nao
+   dormir enquanto os containers estao rodando com escritas pendentes.
+4. Considerar migrar para PITR (point-in-time recovery) com WAL archiving se o volume de
+   dados justificar - hoje o Postgres roda sem archive_mode, entao nao ha como recuperar
+   alem do ultimo checkpoint persistido.
+5. Reconstruir os lancamentos de 2025 da GRB usando o ECF_2025_06190032_212603.txt como
+   referencia de saldo, cruzando com fontes externas reais (extratos, notas) - trabalho do
+   contador, nao so tecnico.
