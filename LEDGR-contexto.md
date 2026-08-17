@@ -5998,7 +5998,6 @@ Backup de seguranca do estado atual do banco criado em 16/08/2026:
 
 
 ---
-
 ## FECHAMENTO DE SESSAO — 16/08/2026
 
 ### 1. Tela de Pre-Validacao do ECF — CONCLUIDA
@@ -6068,68 +6067,39 @@ incidente crítico") para o relato completo. Resumo executivo:
 
 ---
 
-## FECHAMENTO DE SESSAO — 16/08/2026
+## Correcao adicional (17/08/2026) — Tarefa Agendada de backup nao disparava sozinha
 
-### 1. Tela de Pre-Validacao do ECF — CONCLUIDA
-- `EcfPreValidatePage.tsx` criada (copia adaptada do `EcdPreValidatePage.tsx`),
-  rota `app/sped/ecf/pre-validate` registrada, item de menu "ECF — Pré-Validação"
-  inserido em `sidebar_items` (ordem 6, entre ECF e EFD-Contribuições — os itens
-  de ordem 6+ do grupo SPED foram deslocados +1).
-- Testado com a GRB: avisos (endereço fiscal, natureza jurídica sem código RFB,
-  sócios sem participacaoPercent) e informações renderizando corretamente.
-- Y730 (segunda pendência do dia anterior) permanece condicional — não implementado,
-  só necessário quando houver empresa Lucro Real com deduções para testar contra.
+### Problema encontrado
+A Tarefa Agendada `LEDGR-Postgres-Backup`, criada em 16/08/2026, nunca disparou de forma
+recorrente de verdade - so um unico disparo registrado (17/08 09:05, via
+`StartWhenAvailable` ao ligar a maquina apos ela ter ficado desligada a noite). Um teste
+manual de disparo imediato (`Start-ScheduledTask`) retornou `LastTaskResult: 2147946720`
+(hex `0x80070520` - "a sessao de logon especificada nao existe").
 
-### 2. INCIDENTE CRITICO descoberto e mitigado — perda de dados reais (GRB 2025)
-Ver blocos detalhados acima ("INCIDENTE CRITICO" e "Correções aplicadas após o
-incidente crítico") para o relato completo. Resumo executivo:
+### Causa
+A tarefa original foi criada com `Register-ScheduledTask` sem especificar um `-Principal`
+explicito, o que resultou num tipo de logon (`LogonType`) que depende de uma sessao
+interativa/token de autenticacao persistente - inadequado para tarefas recorrentes em
+segundo plano, especialmente apos a maquina dormir/reiniciar.
 
-- **O que aconteceu**: todos os lançamentos contábeis de 2025 da GRB (dados reais
-  de cliente, usados no ECF validado no PVA em 15/08) desapareceram do banco entre
-  o fim daquela sessão e a manhã de 16/08.
-- **Causa raiz (alta confiança)**: o container `ledgr-postgres` nunca foi desligado
-  de forma limpa em 15+ dias de logs — sempre interrompido abruptamente, padrão
-  consistente com hibernação/interrupção da VM WSL2 do Docker Desktop. Dados
-  "commitados" do ponto de vista do Postgres podem não ter sido persistidos no
-  disco físico antes da interrupção.
-- **Recuperação de dados**: ADIADA deliberadamente por decisão do usuário. Fonte
-  de reconstrução disponível: `D:\temp\ECF_2025_06190032_212603.txt` (saldos
-  mensais por conta via C150/C155). Backup de segurança do estado atual:
-  `D:\Temp\backup_emergencial_16082026.dump`.
-- **Mitigação estrutural aplicada** (para não repetir o incidente):
-  1. `infra/docker/docker-compose.yml` corrigido (estava corrompido desde o
-     commit inicial do projeto, `ef0a6c2` — continha código de
-     `fix-existing-accounts.ts` em vez de config docker-compose válida). Agora
-     aponta para os volumes EXTERNOS já existentes, sem risco de recriação.
-  2. `scripts/backup-postgres.ps1` criado — pg_dump automático salvo em
-     `D:\Backups\ledgr-postgres` (fora do disco gerenciado por WSL2/Docker),
-     retenção de 14 dias.
-  3. Tarefa Agendada do Windows `LEDGR-Postgres-Backup` registrada, roda a cada
-     1 hora, com `StartWhenAvailable` (cobre o cenário de máquina fora do ar no
-     horário programado — exatamente o padrão do incidente original). Confirmada
-     como "Ready" após registro como Administrador.
+### Correcao aplicada
+Tarefa recriada com `New-ScheduledTaskPrincipal -LogonType S4U` explicito (nao depende de
+sessao interativa ativa). Testado com intervalo reduzido de 2 minutos primeiro (5 disparos
+consecutivos confirmados, `LastTaskResult: 0` em todos, arquivos gerados a cada ~2min sem
+falha), depois revertido para o intervalo definitivo de 1 hora conforme planejado
+originalmente. Confirmacao do disparo horario real ainda pendente (proximo disparo previsto
+17/08 10:26) - verificar em sessao futura se nao houver confirmacao manual antes disso.
 
-### Commits desta sessao (todos locais, branch a frente do origin em 11 commits — fazer push quando conveniente)
-- `f9ebf6a` (sessão anterior, ECF fixes diversos)
-- `fb277d2` (sessão anterior, referência de leiautes)
-- `9a42a8e` (sessão anterior, limpeza CLAUDE.md)
-- `94a1a9a` docs: registra incidente crítico
-- `33096cb` fix(infra): recria docker-compose.yml
-- `ec4430e` feat(infra): script de backup automático
-- `95cd0ee` docs: correções pós-incidente
-- `[hash do commit da EcfPreValidatePage, ver git log]` feat(ecf): tela de pré-validação
+### Organizacao dos backups
+Encontrado um backup manual orfao anterior (`backup_pre_limpeza_20260803_091902.dump`,
+03/08/2026) em `D:\Projetos\Ledgr\Backups\` (pasta DENTRO do repositorio - protegida por
+`.gitignore` linha 20 `backups/`, sem risco de ter sido commitada). Movido para o local
+canonico `D:\Backups\ledgr-postgres\` (fora do repositorio, disco fisico D:), junto com
+todos os demais backups. Pasta antiga removida. Todos os backups do Postgres agora ficam
+exclusivamente em `D:\Backups\ledgr-postgres\`.
 
-### Pendencias para proxima sessao
-1. **Recuperar/reconstruir os lançamentos de 2025 da GRB** — usar o ECF gerado
-   como referência de saldo, cruzar com fontes externas reais (extratos, notas
-   fiscais). Trabalho do contador tanto quanto técnico.
-2. **Verificar se o backup automático de fato disparou sozinho** (checar
-   `D:\Backups\ledgr-postgres\` daqui a algumas horas, sem intervenção manual) —
-   confirma se a Tarefa Agendada funciona de verdade em produção, não só no
-   registro.
-3. Investigar configuração do Docker Desktop/WSL2 para reduzir interrupções
-   abruptas na origem (mitigação atual é reativa via backup, não resolve a causa).
-4. Registro Y730 (ECF leiaute 12) — implementar quando houver empresa Lucro Real
-   com deduções para testar.
-5. Migrar credenciais do `docker-compose.yml` para `.env` antes de qualquer
-   deploy em produção (aceito em texto claro só para ambiente local).
+### Pendencia
+Confirmar (proxima sessao ou verificacao manual) se o disparo horario continuo esta
+funcionando sem intervencao, checando `Get-ChildItem D:\Backups\ledgr-postgres` por
+arquivos espacados em ~1h sem gaps inesperados (especialmente apos a maquina dormir/acordar
+de novo, cenario que causou o incidente original).
