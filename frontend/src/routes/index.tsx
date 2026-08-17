@@ -103,7 +103,7 @@ import ShareholdersPage from '../pages/corporate/shareholders/ShareholdersPage';
 import { RepositorioPage } from '../pages/documentos/RepositorioPage';
 import { LogotiposPage } from '../pages/documentos/LogotiposPage';
 import { CertificatesPage } from '../pages/certificates/CertificatesPage';
-import VisoesContabeisPage from '../pages/sped/VisoesContabeisPage';
+import AglutinacaoRfbPage from '../pages/sped/AglutinacaoRfbPage';
 import CalculadoraCorrecaoPage from '../pages/sistema/CalculadoraCorrecaoPage';
 
 
@@ -167,7 +167,7 @@ export const AppRoutes = () => {
                 <Route path="app/accounting/journal" element={<ProtectedRoute><JournalPage /></ProtectedRoute>} />
                 <Route path="app/accounting/journal/import" element={<ProtectedRoute><ImportJournalPage /></ProtectedRoute>} />
                 <Route path="app/reports/balance-comparison" element={<ProtectedRoute><BalanceComparisonPage /></ProtectedRoute>} />
-                <Route path="app/accounting/visoes-contabeis" element={<ProtectedRoute><VisoesContabeisPage /></ProtectedRoute>} />
+                <Route path="app/sped/aglutinacao-rfb" element={<ProtectedRoute><AglutinacaoRfbPage /></ProtectedRoute>} />
                 <Route path="app/accounting/validate-ecd" element={<ProtectedRoute><EcdValidationPage /></ProtectedRoute>} />
                 <Route path="app/accounting/dre" element={<ProtectedRoute><DrePage /></ProtectedRoute>} /><Route path="app/accounting/balanco" element={<ProtectedRoute><BalancoPatrimonialPage /></ProtectedRoute>} />
                 <Route path="app/accounting/diario" element={<ProtectedRoute><DiarioGeralPage /></ProtectedRoute>} />
