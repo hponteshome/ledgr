@@ -6103,3 +6103,33 @@ Confirmar (proxima sessao ou verificacao manual) se o disparo horario continuo e
 funcionando sem intervencao, checando `Get-ChildItem D:\Backups\ledgr-postgres` por
 arquivos espacados em ~1h sem gaps inesperados (especialmente apos a maquina dormir/acordar
 de novo, cenario que causou o incidente original).
+
+
+---
+
+## PENDENCIA RESOLVIDA (17/08/2026) — Aglutinacao RFB (Bloco J) sem mapeamento 2025
+
+Testado de ponta a ponta pela primeira vez o fluxo "Copiar do ano anterior"
+(`cloneFromPreviousYear`), que estava implementado desde 02/08/2026 mas nunca exercitado
+(so existia um ano no banco na epoca). Com GRB tendo 2024 (dados reais, ECD validado) e 2025
+(vazio) coexistindo, foi possivel validar o caso de uso real:
+
+- **BP 2025**: view ja existia, 0 mapeamentos -> clonado 107/107 de 2024, todos os codigos
+  ainda validos na tabela RFB 2025.
+- **DRE 2025**: view NAO existia -> `loadOrCreateView` no frontend criou automaticamente ao
+  trocar o seletor Tipo -> clonado 83/83 de 2024, todos os codigos ainda validos.
+
+Confirmado tambem que `rfb_aglutination_codes` para leiaute 9/anoBase 2025 estava intacto
+(732 BP + 213 DRE) - o achado critico de infraestrutura anterior (rfb_aglutination_codes
+vazio, documentado em sessao anterior) NAO se repetiu aqui; essa tabela sobreviveu ao
+incidente de 15-16/08.
+
+**Nao resolve a reconstrucao dos lancamentos de 2025** (pendencia separada, ainda em aberto)
+- isso so prepara a INFRAESTRUTURA de mapeamento contas->codigo RFB, que e pre-requisito
+independente de a escrituracao do periodo existir ou nao.
+
+### Pendencia decorrente (nao critica, decidida para depois)
+Renomear `VisoesContabeisPage.tsx` para nome consistente com a UI atual (ja renomeada para
+"Aglutinacao RFB (Bloco J)" desde a sessao de 02/08) - adiado deliberadamente ate confirmar
+que a funcionalidade central funciona, por decisao do usuario. Nome novo sugerido a definir:
+algo como `AglutinacaoRfbPage.tsx`, atualizando import em `routes/index.tsx` junto.
