@@ -6133,3 +6133,32 @@ Renomear `VisoesContabeisPage.tsx` para nome consistente com a UI atual (ja reno
 "Aglutinacao RFB (Bloco J)" desde a sessao de 02/08) - adiado deliberadamente ate confirmar
 que a funcionalidade central funciona, por decisao do usuario. Nome novo sugerido a definir:
 algo como `AglutinacaoRfbPage.tsx`, atualizando import em `routes/index.tsx` junto.
+
+
+---
+
+## CORRECAO DE REGISTRO (17/08/2026) — Tabela de UUIDs de empresas de teste
+
+A tabela "Empresas de teste" documentada anteriormente neste arquivo tinha um erro real:
+Jose Silva Sociedade Individual de Advocacia estava registrada com UUID `c188b188-de58-
+4fbd-8aa0-fcf07c35e65e`, mas o UUID real confirmado no banco (17/08/2026) e
+`ca9ba513-06ae-4579-b546-ebc457f33452`. Origem provavel do erro: divergencia entre
+sessoes, nunca reconferida contra o banco real ate hoje.
+
+**Tabela corrigida e confirmada via SELECT direto no banco em 17/08/2026 (fonte de
+verdade, substitui qualquer tabela anterior neste arquivo):**
+
+| Empresa | CNPJ | UUID |
+|---|---|---|
+| ADVOCACIA GOMES, ROSSETTI E BARELLI (GRB) | 06190032000183 | d0d70dc6-446c-430b-9f62-3f6e73db3874 |
+| F5 PARTICIPACOES S/A | 33652701000164 | e274dfc0-0a9a-4af1-8141-f35ff73fac93 |
+| HALLO ADMINISTRACAO E PARTICIPACOES LTDA | 07432458000169 | 06a88dfa-d4cf-4c5c-8dc1-83538d6b8b7c |
+| JOSE SILVA SOCIEDADE INDIVIDUAL DE ADVOCACIA | 35416962000100 | ca9ba513-06ae-4579-b546-ebc457f33452 |
+| KIPSTONE SERVICOS E TECNOLOGIA LTDA (KPL) | 28300920000144 | 7100666c-1e74-4480-b533-4675ea90a774 |
+| LM ADMINISTRACAO DE BENS IMOVEIS LTDA | 17970759000108 | ea4a443c-a351-4243-ae00-e7d70f126d5a |
+| PONTES CONTABILIDADE | 07705010000171 | 632ce73b-5024-4fee-97bb-70d27b0cce51 |
+
+**Licao de processo**: mesmo tabelas de referencia "estaveis" (UUIDs de empresa) podem
+divergir entre sessoes, especialmente apos os incidentes de infraestrutura ja documentados.
+Reconferir contra o banco antes de usar um UUID de memoria/contexto para qualquer operacao
+que grave dado - nao assumir que ficou correto so porque parece estavel.
