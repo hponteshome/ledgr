@@ -482,3 +482,26 @@ nao bater). Perguntar confirmacao deveria ser reservado para decisoes de
 arquitetura/escopo genuinas (ex: schema novo, endpoint novo, mudanca de
 comportamento visivel ao usuario) - nao para "vou editar o arquivo X da forma Y que
 ja alinhamos".
+
+
+## Licao — Regra 10 (21/08/2026): comparacao de data em SQL ad-hoc precisa de ::date, nunca so BETWEEN/< literal
+
+Ao investigar dados gravados via `referenceDate`/`reference_date` (ou qualquer coluna
+`@db.Timestamp`), uma query `WHERE data BETWEEN '2016-12-01' AND '2017-12-31'` ou
+`WHERE data < '2018-01-02'` pode CORTAR silenciosamente a ultima linha do periodo se o
+valor gravado tiver componente de hora diferente de 00:00:00 (confirmado nesta sessao:
+`account_balances.reference_date` de 31/12/2017 gravado como `2017-12-31 02:00:00` -
+efeito do mesmo bug de fuso ja documentado em outro lugar do projeto, Windows UTC-3
+fazendo `new Date(dateStr)` produzir horario != meia-noite). Isso gerou um falso alarme
+nesta sessao: pareceu que dezembro/2017 tinha sumido do balancete (so 12 de 13 pontos
+esperados), quando na verdade o dado estava intacto - so a query de conferencia que
+excluiu a linha por causa do horario.
+
+**Regra pratica adotada:** toda query ad-hoc de investigacao/conferencia que compara
+uma coluna de timestamp contra uma data literal DEVE aplicar `::date` na coluna antes
+de comparar - `WHERE data::date BETWEEN '2016-12-31' AND '2017-12-31'`, nunca comparar
+o timestamp bruto contra string de data. Vale tanto para `BETWEEN` quanto para `<`/`<=`
+com bound exclusivo (o caso mais perigoso, ja que corta sem nenhum erro ou aviso).
+Isso e alem/independente da regra ja existente sobre `new Date()`/`getUTC*()` no
+CODIGO da aplicacao (secao 7) - aqui o contexto e especificamente queries manuais de
+diagnostico/conferencia rodadas direto no terminal durante investigacao.

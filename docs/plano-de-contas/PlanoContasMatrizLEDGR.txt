@@ -290,3 +290,58 @@
 43101010001         0005101IRPJ                                                                                                6     D   3.02.01.01.01.02
 43101010002         0005102CSLL                                                                                                6     D   3.02.01.01.01.01
 49101010001         0008888Apuração de Resultado                                                                               6     D   3.01.01.09.01.99
+11101010002         0001049Fundo Fixo Diretor Geral                                                                            6    D    1.01.01.01.01
+11102010007         0001050Banco Conta Movimento (Nao Identificado)                                                            6    D    1.01.01.02.01
+11104030007         0001051Aplicacao Financeira (Nao Identificado)                                                             6    D    
+11310010001         0001052Parcelas Refis                                                                                      6    D    
+11305010007         0001053Adiantamentos a Empregados                                                                          6    D    
+11305010008         0001054Adiantamento Quinzenal                                                                              6    D    
+11304010008         0001055Adiantamentos para Despesas                                                                         6    D    
+12201010001         0001056Consorcios                                                                                          6    D    1.02.02.01.01
+12301100002         0001057Central Telefonica                                                                                  6    D    1.02.03.01.06
+1230112             0000000Imobilizacoes em Andamento                                                                          5    D    1.02.03.01
+12301120001         0001058Imobilizacoes em Andamento                                                                          6    D    1.02.03.01
+12301030004         0001059Utensilios de Cozinha                                                                               6    D    1.02.03.01.07
+114                 0000000Antecipacoes                                                                                        3    D    1.01.06
+11401               0000000Despesas Antecipadas                                                                                4    D    1.01.06
+1140101             0000000Despesas Antecipadas                                                                                5    D    1.01.06
+11401010001         0001060IPTU Antecipado                                                                                     6    D    1.01.06
+11401010002         0001061Seguros a Apropriar                                                                                 6    D    1.01.06
+11401010003         0001062Encargos Financeiros a Apropriar                                                                    6    D    1.01.06
+11401010004         0001063SPU - Tx.Ocupacao e Foro a Apropriar                                                                6    D    1.01.06
+115                 0000000Estoques                                                                                            3    D    1.01.04
+11501               0000000Estoques                                                                                            4    D    1.01.04
+1150101             0000000Estoques                                                                                            5    D    1.01.04
+11501010001         0001064Alimentos                                                                                           6    D    1.01.04
+11501010002         0001065Bebidas Nao Alcoolica                                                                               6    D    1.01.04
+11501010003         0001066Bebidas Alcoolica                                                                                   6    D    1.01.04
+11501010004         0001067Vinhos e Champanhe                                                                                  6    D    1.01.04
+11501010005         0001068Material de Limpeza e Descartaveis                                                                  6    D    1.01.04
+11501010006         0001069Material de Escritorio, Impressos e Formularios                                                     6    D    1.01.04
+11501010007         0001070Material de Manutencao                                                                              6    D    1.01.04
+11501010008         0001071Material para Hospedes                                                                              6    D    1.01.04
+11501010009         0001072Utensilios de Copa, Cozinha e Saloes                                                                6    D    1.01.04
+11501010010         0001073Material de Propaganda                                                                              6    D    1.01.04
+11501010011         0001074Materiais Diversos                                                                                  6    D    1.01.04
+11501010012         0001075Equipamentos de Protecao Individual - EPIs                                                          6    D    1.01.04
+11301010002         0001076Hospedes na Casa                                                                                    6    D    1.01.02.02.01
+11301010003         0001077Notas a Faturar                                                                                     6    D    1.01.02.02.01
+11301010004         0001078Cartao de Credito                                                                                   6    D    1.01.02.02.01
+11301010005         0001079Duplicatas a Receber - Internacional                                                                6    D    1.01.02.02.01
+11301010006         0001080(-) Duplicatas Descontadas                                                                          6    D    1.01.02.02.01
+11301010007         0001081Cobranca Judicial                                                                                   6    D    1.01.02.02.01
+11301010008         0001082(-) Provisao para Devedores Duvidosos                                                               6    D    1.01.02.02.01
+1230113             0000000Depreciacao Acumulada                                                                               5    D    1.02.03.02
+12301130001         0001083Edificios e Benfeitorias                                                                            6    D    1.02.03.02
+12301130002         0001084Maquinas e Equipamentos                                                                             6    D    1.02.03.02
+12301130003         0001085Instalacoes                                                                                         6    D    1.02.03.02
+12301130004         0001086Moveis e Utensilios                                                                                 6    D    1.02.03.02
+12301130005         0001087Utensilios de Cozinha                                                                               6    D    1.02.03.02
+12301130006         0001088Computadores e Perifericos                                                                          6    D    1.02.03.02
+12301130007         0001089Central Telefonica                                                                                  6    D    1.02.03.02
+12301130008         0001090Software                                                                                            6    D    1.02.03.02
+12401010001         0001091Estudos, Projetos e Detalhamentos                                                                   6    D    1.02.06.01.01
+12401010002         0001092Gastos Pre-Operacionais                                                                             6    D    1.02.06.01.01
+1240102             0000000Amortizacao Acumulada                                                                               5    D    1.02.06.02
+12401020001         0001093Gastos Pre-Operacionais                                                                             6    D    1.02.06.02
+12401020002         0001094Estudos, Projetos e Detalhamentos                                                                   6    D    1.02.06.02

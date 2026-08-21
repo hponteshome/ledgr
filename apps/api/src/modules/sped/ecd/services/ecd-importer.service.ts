@@ -221,7 +221,15 @@ export class EcdImporterService {
 
     for (const acc of sorted) {
       try {
-        const normalizedCode = acc.code;
+        // CORRIGIDO 17/08/2026: variavel se chamava "normalizedCode" mas nao
+        // normalizava nada - so reatribuia acc.code, que vem PONTILHADO direto
+        // do registro I050 do SPED ("1.1.1.04"). Violava a regra do projeto de
+        // sempre armazenar codigo bruto (mascara so na exibicao/digitacao) -
+        // achado real: 410 de 414 contas da LM importadas com ponto no campo
+        // code apos reimportacao em 17/08/2026. O ponto original do SPED ja e
+        // preservado corretamente em spedCode (linha abaixo, acc.code sem
+        // alteracao) - aqui precisamos so do codigo BRUTO para o campo code.
+        const normalizedCode = acc.code.replace(/\./g, "");
 
         let parentId: string | null = null;
         if (acc.parentCode) {
@@ -300,8 +308,16 @@ export class EcdImporterService {
       // Para o primeiro período, salvar saldo de abertura como referenceDate = periodStart - 1 dia
       const openingDate = new Date(periodStart.getTime() - 24 * 60 * 60 * 1000);
 
+      // CORRIGIDO 21/08/2026: deleteMany usava range [openingDate, periodEnd],
+      // mas como openingDate de um periodo == referenceDate (periodEnd) do periodo
+      // anterior (meses contiguos), cada iteracao do loop apagava o saldo que a
+      // iteracao ANTERIOR tinha acabado de gravar - so o ultimo periodo processado
+      // com sucesso sobrevivia. Achado real: ECD 2017 da Hotelsys (05736256000185)
+      // ficou so com outubro/2017 em account_balances, novembro e dezembro
+      // desapareceram. Corrigido para apagar so o proprio referenceDate deste
+      // periodo - o upsert logo abaixo ja cobre reimportacao do mesmo mes.
       const deleted = await this.prisma.accountBalance.deleteMany({
-        where: { companyId, referenceDate: { gte: openingDate, lte: periodEnd } },
+        where: { companyId, referenceDate },
       });
       if (deleted.count > 0) stats.balancesReplaced += deleted.count;
 

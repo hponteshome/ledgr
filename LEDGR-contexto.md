@@ -6162,3 +6162,53 @@ verdade, substitui qualquer tabela anterior neste arquivo):**
 divergir entre sessoes, especialmente apos os incidentes de infraestrutura ja documentados.
 Reconferir contra o banco antes de usar um UUID de memoria/contexto para qualquer operacao
 que grave dado - nao assumir que ficou correto so porque parece estavel.
+
+---
+
+### Sessao 21/08/2026 - Bug real corrigido: ecd-importer.service.ts perdia balancetes mensais
+
+**Achado:** \importBalances()\ fazia \deleteMany({ referenceDate: { gte: openingDate, lte: periodEnd } })\
+por periodo, dentro do loop. Como \openingDate\ de um mes == \eferenceDate\ (periodEnd) do mes anterior
+(meses contiguos), cada iteracao apagava o saldo que a iteracao ANTERIOR acabara de gravar - so o
+ultimo periodo processado sobrevivia. Reproduzido com dado real: ECD 2017 da Hotelsys
+(05736256000185, empresa c2d48edc-28b7-4fd8-9272-b486449ab2cc) so tinha outubro/2017 em
+\ccount_balances\ antes da correcao. Mesma causa raiz provavel da pendencia antiga
+"Reimport LM Administracao ECD - validar Balancete saldo anterior 2023-12-31", nunca
+rastreada ate agora.
+
+**Correcao:** \deleteMany\ trocado para filtrar so pelo proprio \eferenceDate\ do periodo
+(\where: { companyId, referenceDate }\), sem o range. Validado: reimportacao do ECD 2017
+da Hotelsys trouxe os 12 meses + abertura intactos (13 \eference_date\ distintos em
+\ccount_balances\), zero erro no \cd_imports.errors\.
+
+**Decisao de arquitetura tomada na mesma sessao:** dado historico de ECD (arvore com
+\sped_code\ preenchido) NUNCA mais sera remapeado destrutivamente (mover FK de
+journal_entry_items/account_balances pra conta matriz + soft-delete da origem) - decisao
+anterior (Passivo Hotelsys 2025) fica como excecao documentada, nao repetir. Cada ano de
+ECD fica intacto, pronto pra retificacao futura. A matriz vira o livro operativo via
+lancamento de abertura em 31/12/2016 (nao remapeamento), populado ano a ano comparando
+BP/DRE da matriz contra a abertura do ECD do ano seguinte (ciclo completo: import ECD-N ->
+de/para documentado -> lancamento de abertura/ajuste na matriz -> apurar BP/DRE ->
+comparar com abertura ECD N+1 -> repete). Objetivo final: gerar ECD/ECF retificadoras
+a partir da matriz quando necessario.
+
+**PlanoContasMatrizLEDGR.txt atualizado**: 292 -> 347 contas (Estoques, Duplicatas a
+Receber detalhado, Depreciacao/Amortizacao Acumulada, Antecipacoes - grupos que faltavam
+inteiros pro Ativo de empresa hoteleira). Arquivo v2 no repo, reduced_code 0001049-0001094.
+
+**Estado atual Hotelsys**: matriz limpa (347 contas) + ECD 2017 importado e validado
+(13 pontos de saldo). Faltam: ECD 2018-2025 (arquivos ja disponiveis), de/para
+ECD-2017 x Matriz documentado, lancamento de abertura 31/12/2016, ciclo de comparacao
+ano a ano ate 2025.
+
+
+### Licao rapida (21/08/2026) - falso alarme de "dezembro/2017 sumiu"
+
+Durante a validacao do fix do deleteMany (ver entrada anterior), uma query de conferencia
+comparando `ab.reference_date BETWEEN '2016-12-01' AND '2017-12-31'` (sem `::date`) deu
+12 pontos de saldo em vez dos 13 esperados, parecendo confirmar um SEGUNDO bug (dezembro
+faltando). Investigacao mostrou que o dado estava correto - `reference_date` de 31/12/2017
+foi gravado como `2017-12-31 02:00:00`, e o BETWEEN com bound literal excluiu essa linha.
+Corrigido aplicando `::date` na coluna antes de comparar - resultado real: 13/13 pontos,
+fix do deleteMany 100% validado, sem bug adicional. Registrado tambem como Regra 10 no
+CLAUDE.md (comparacao de data em SQL ad-hoc sempre com ::date).
