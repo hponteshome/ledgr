@@ -345,3 +345,37 @@
 1240102             0000000Amortizacao Acumulada                                                                               5    D    1.02.06.02
 12401020001         0001093Gastos Pre-Operacionais                                                                             6    D    1.02.06.02
 12401020002         0001094Estudos, Projetos e Detalhamentos                                                                   6    D    1.02.06.02
+21101030012         0001095Emprestimos Bancarios                                                                               6    C    2.01.01.07.02
+21101030013         0001096Conta Bancaria - Limite Usado                                                                       6    C    2.01.01.07.02
+21101030014         0001097(-) Encargos Emprestimos/Financiamentos                                                             6    C    2.01.01.07.02
+21101020005         0001098SPU - Foro/Laudemio a Pagar                                                                         6    C    
+21101060008         0001099ISS Proprio a Pagar                                                                                 6    C    2.01.01.09.04
+21101060009         0001100ISS Retido s/Servicos PJ                                                                            6    C    2.01.01.09.04
+21101060010         0001101INSS Retido s/Servicos PJ                                                                           6    C    2.01.01.01.03
+21101060011         0001102INSS Retido s/Servicos PF                                                                           6    C    2.01.01.01.03
+21101060012         0001103IPTU a Pagar                                                                                        6    C    2.01.01.09.28
+21101060013         0001104Multas Fiscais a Pagar                                                                              6    C    2.01.01.09.28
+21101060014         0001105Outros Impostos e Taxas a Pagar                                                                     6    C    2.01.01.09.28
+21101040006         0001106Pontos a Pagar                                                                                      6    C    2.01.01.01.01
+21101040007         0001107Pensao Alimenticia a Recolher                                                                       6    C    2.01.01.01.03
+21101040008         0001108Contribuicao Sindical a Recolher                                                                    6    C    2.01.01.01.03
+21101040009         0001109Descontos Diversos                                                                                  6    C    2.01.01.01.03
+21101040010         0001110Indenizacoes Trabalhistas a Pagar                                                                   6    C    2.01.01.01.60
+2110113             0000000Outras Obrigacoes                                                                                   5    C    2.01.01
+21101130001         0001111Adiantamentos de Clientes                                                                           6    C    2.01.01
+21101130002         0001112Taxa de Turismo a Pagar                                                                             6    C    2.01.01
+21101130003         0001113Deposito Bancario Nao Identificado                                                                  6    C    2.01.01
+2110114             0000000Provisoes Trabalhistas                                                                              5    C    2.01.01.15
+21101140001         0001114Provisao de Ferias                                                                                  6    C    2.01.01.15
+21101140002         0001115Provisao INSS s/Ferias                                                                              6    C    2.01.01.15
+21101140003         0001116Provisao FGTS s/Ferias                                                                              6    C    2.01.01.15
+2210105             0000000Socios e Empresas Ligadas                                                                           5    C    2.02.01.11
+22101050001         0001117Socios e Diretores                                                                                  6    C    2.02.01.11
+22101050002         0001118Conta Corrente Matriz                                                                               6    C    2.02.01.11
+2210106             0000000Emprestimos e Financiamentos                                                                        5    C    2.02.01.07
+22101060001         0001119Emprestimos Bancarios                                                                               6    C    2.02.01.07
+22101060002         0001120Impostos Parcelados                                                                                 6    C    2.02.01.03
+22101060003         0001121(-) Encargos Emprestimos/Financiamentos                                                             6    C    2.02.01.07
+2210107             0000000Provisoes Diferidas                                                                                 5    C    2.02.01
+22101070001         0001122Imposto de Renda Diferido                                                                           6    C    2.02.01
+22101070002         0001123CSLL Diferida                                                                                       6    C    2.02.01

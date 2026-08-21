@@ -356,15 +356,28 @@ const ClosingPanel: React.FC<ClosingPanelProps> = ({
             ? collectByType(verRoots)
             : collectByTypeMonthly(monthlyRoots);
 
-    const ativo = Math.abs(byType['ASSET'] ?? 0);
-    const passivo = Math.abs(byType['LIABILITY'] ?? 0);
-    const pl = Math.abs(byType['EQUITY'] ?? 0);
-    const receita = Math.abs(byType['REVENUE'] ?? 0);
-    const despesa = Math.abs(byType['EXPENSE'] ?? 0);
-    const passivoTotal = passivo + pl;
-    const resultado = receita - despesa;
-    // Diferença Apurada: Ativo - Passivo - Resultado do Exercício
-    const diferenca = ativo - passivoTotal - resultado;
+    const ativoRaw    = byType['ASSET']     ?? 0;
+    const passivoRaw  = byType['LIABILITY'] ?? 0;
+    const plRaw       = byType['EQUITY']    ?? 0;
+    const receitaRaw  = byType['REVENUE']   ?? 0;
+    const despesaRaw  = byType['EXPENSE']   ?? 0;
+    // CORRIGIDO 21/08/2026: Math.abs() aplicado em CADA classe antes de somar
+    // dobrava o efeito quando Passivo ou PL tinha saldo "invertido" (ex: PL
+    // negativo por prejuizo acumulado > capital, achado real na abertura da
+    // Hotelsys) - mesmo padrao de bug ja corrigido antes em
+    // ecd-pre-validate.service.ts (check W2). Agora soma-se SEMPRE com o sinal
+    // contabil original (D positivo / C negativo), Math.abs() so no final p/ exibicao.
+    const ativo        = Math.abs(ativoRaw);
+    const passivo      = Math.abs(passivoRaw);
+    const pl           = Math.abs(plRaw);
+    const receita      = Math.abs(receitaRaw);
+    const despesa      = Math.abs(despesaRaw);
+    const passivoTotal = Math.abs(passivoRaw + plRaw);
+    const resultado    = -(receitaRaw + despesaRaw);
+    // Diferenca Apurada: Ativo + Passivo + PL + Resultado (tudo com sinal contabil)
+    // deve fechar em zero - resultado entra com o mesmo sinal D-C que teria se ja
+    // estivesse incorporado ao PL (ainda nao esta, antes do encerramento)
+    const diferenca = ativoRaw + passivoRaw + plRaw + (receitaRaw + despesaRaw);
     const temDiferenca = Math.abs(diferenca) >= 0.01;
 
     // Estilo base da linha
