@@ -6212,3 +6212,78 @@ foi gravado como `2017-12-31 02:00:00`, e o BETWEEN com bound literal excluiu es
 Corrigido aplicando `::date` na coluna antes de comparar - resultado real: 13/13 pontos,
 fix do deleteMany 100% validado, sem bug adicional. Registrado tambem como Regra 10 no
 CLAUDE.md (comparacao de data em SQL ad-hoc sempre com ::date).
+
+
+### Fechamento da sessao 21/08/2026 — Hotelsys: bug do importer + abertura 2016 completa
+
+**Resumo do que foi entregue nesta sessao (uma so, longa):**
+
+1. **Bug real corrigido e validado**: `ecd-importer.service.ts` perdia balancetes
+   mensais (deleteMany com range errado apagava o mes anterior a cada iteracao). Fix
+   aplicado, validado com reimportacao real do ECD 2017 da Hotelsys (13/13 pontos de
+   saldo). Commit anterior desta sessao.
+
+2. **Decisao de arquitetura**: dado historico de ECD nunca mais e remapeado
+   destrutivamente (mover FK + soft-delete). Cada ano de ECD fica intacto para
+   retificacao futura. A matriz vira livro operativo via lancamento de abertura NATIVO
+   (nao remapeamento), populado ano a ano comparando BP/DRE da matriz contra a abertura
+   do ECD do ano seguinte.
+
+3. **Hotelsys totalmente resetada e reconstruida do zero** nessa nova logica: matriz
+   limpa (347 -> depois 381 contas) + ECD 2017 reimportado (12 meses + abertura,
+   intacto) + ECD 2025 (nao reimportado ainda nesta sessao, fica para 2a etapa do
+   ciclo).
+
+4. **De/para completo do Ativo e Passivo/PL construido a partir do ECD 2017** (fonte
+   mais rica que 2025 - mais categorias de estoque, adiantamentos, etc). Balanco de
+   31/12/2016 validado matematicamente ANTES de lancar: Ativo = Passivo+PL =
+   R\$ 41.334.784,26, diferenca 0,00.
+
+5. **55 contas novas do Ativo + 34 contas novas de Passivo/PL adicionadas ao
+   PlanoContasMatrizLEDGR.txt** (matriz universal, beneficia empresas futuras): 292 ->
+   347 -> 381 contas. Grupos que nao existiam: Estoques, Duplicatas a Receber
+   detalhado, Depreciacao/Amortizacao Acumulada, Antecipacoes (Ativo); Outras
+   Obrigacoes, Provisoes Trabalhistas, Socios e Empresas Ligadas LP, Emprestimos e
+   Financiamentos LP, Provisoes Diferidas (Passivo/PL). reduced_code final: 0001123.
+
+6. **Lancamento de abertura Hotelsys aplicado** (referencia ABERTURA-2016, 97 itens,
+   31/12/2016, R\$ 153.929.998,55 debito = credito). Achado real sobre a empresa (nao
+   bug): PL genuinamente negativo em R\$ 29.173.119,10 (Prejuizos Acumulados > Capital
+   Social).
+
+7. **Bug real corrigido e validado**: `TrialBalanceView.tsx` aplicava Math.abs() em
+   cada classe (Ativo/Passivo/PL/Receita/Despesa) ANTES de somar, dobrando o efeito
+   quando Passivo/PL tem saldo invertido (exatamente o caso da Hotelsys, PL negativo).
+   Mesmo padrao ja corrigido antes em ecd-pre-validate.service.ts (check W2), nunca
+   verificado neste arquivo apesar de ja estar listado como candidato pendente.
+   Corrigido: soma sempre com sinal contabil original, Math.abs() so na exibicao final.
+   Validado: Balancete e Balanco Patrimonial fecham identicos para o periodo de
+   abertura.
+
+8. **2 ocorrencias do mesmo bug de patch (Regra 11 nova no CLAUDE.md)**: script Python
+   de correcao duplicando \r ao reconverter \n->\r\n num arquivo que ja era CRLF -
+   aconteceu no ecd-importer.service.ts E no TrialBalanceView.tsx, ambos corrigidos via
+   normalizacao `\r+\n -> \r\n` + `git commit --amend`.
+
+**Estado atual Hotelsys (c2d48edc-28b7-4fd8-9272-b486449ab2cc):**
+- Matriz: 381 contas, com lancamento de abertura 31/12/2016 (97 itens) balanceado
+- ECD 2017: importado e intacto (12 meses + abertura, 22.150 lancamentos)
+- ECD 2025: NAO reimportado nesta sessao (Passivo tinha sido remapeado destrutivamente
+  numa sessao anterior - descartado no wipe total, precisa reimportar do zero quando
+  chegar a vez no ciclo)
+- ECD 2018-2024: nao importados ainda (arquivos ja disponiveis com o usuario)
+
+**Proximo passo do ciclo** (retomar direto por aqui na proxima sessao):
+- Importar ECD 2018
+- De/para ECD-2018 x Matriz (deve reaproveitar boa parte do de/para de 2017)
+- Apurar BP/DRE da matriz em 31/12/2017 (ainda vazio de movimento alem da abertura -
+  precisa decidir/lancar a movimentacao real de 2017 na matriz antes, ou aceitar que
+  o BP/DRE de 2017 da matriz sera so a abertura carregada, sem movimento proprio, e
+  comparar mesmo assim contra a abertura do ECD 2018 para ver se ainda bate)
+- Repetir o ciclo ate 2025
+- Reimportar ECD 2025 do zero (ficou pendente, era a base do remap destrutivo
+  abandonado)
+
+**Nota**: PlanoContasMatrizLEDGR.txt local do usuario e a fonte de verdade agora -
+qualquer nova sessao deve confirmar que esta em 381 linhas antes de reimportar
+matriz em qualquer empresa nova.

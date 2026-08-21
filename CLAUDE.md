@@ -505,3 +505,32 @@ com bound exclusivo (o caso mais perigoso, ja que corta sem nenhum erro ou aviso
 Isso e alem/independente da regra ja existente sobre `new Date()`/`getUTC*()` no
 CODIGO da aplicacao (secao 7) - aqui o contexto e especificamente queries manuais de
 diagnostico/conferencia rodadas direto no terminal durante investigacao.
+
+
+## Licao — Regra 11 (21/08/2026): reconversao \n -> \r\n em arquivo ja CRLF duplica o \r
+
+Aconteceu 2x na mesma sessao (ecd-importer.service.ts e TrialBalanceView.tsx): um
+script Python que le o arquivo, detecta CRLF original, monta o replacement como string
+Python normal (com \n), e no final faz `content.replace("\n", "\r\n")` para "restaurar"
+o CRLF - mas se o `content` en memoria ainda tinha os \r\n ORIGINAIS do resto do
+arquivo (fora do trecho editado) preservados como \r\n (porque foi lido com
+`decode("utf-8")` sem normalizar), esse replace final transforma TODO \r\n existente em
+\r\r\n, corrompendo o arquivo inteiro (nao so o trecho novo). Sintoma: `git diff --stat`
+mostra o arquivo INTEIRO como alterado (ex: 3189 linhas modificadas para um fix de 10
+linhas), mesmo o codigo estando funcionalmente correto e compilando.
+
+**Regra pratica adotada:** NUNCA fazer `content.replace("\n", "\r\n")` como passo final
+de normalizacao quando o `content` foi obtido via `raw.decode("utf-8")` de um arquivo
+que ja continha CRLF - o \r original ja esta la, decode() so decodifica bytes pra
+string, nao normaliza quebra de linha. Duas alternativas seguras:
+1. Trabalhar SEMPRE com \n internamente: normalizar no load (`raw.decode("utf-8").
+   replace("\r\n", "\n")`) e reconverter uma unica vez no final (`content.replace(
+   "\n", "\r\n")`) - NUNCA misturar os dois (ler sem normalizar E converter no final).
+2. Ou, se for so inserir um trecho novo pontual (via re.sub/replace), montar o
+   `replacement` usando o MESMO separador que o resto do arquivo ja usa (`\r\n` direto
+   nas f-strings do replacement, sem `\n` solto) e NAO fazer nenhum replace global no
+   final - so escrever `content.encode("utf-8")` direto.
+Apos qualquer patch em arquivo CRLF, validar sempre com
+`raw.count(b"\r\r\n")` antes de considerar o patch concluido - deve ser sempre 0.
+Ver tambem Regra 8 (deteccao de separador), da qual esta e uma extensao especifica
+para o caso de RE-conversao, nao so deteccao inicial.
