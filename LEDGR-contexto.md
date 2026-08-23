@@ -6287,3 +6287,73 @@ CLAUDE.md (comparacao de data em SQL ad-hoc sempre com ::date).
 **Nota**: PlanoContasMatrizLEDGR.txt local do usuario e a fonte de verdade agora -
 qualquer nova sessao deve confirmar que esta em 381 linhas antes de reimportar
 matriz em qualquer empresa nova.
+
+
+### Conceito definido (22/08/2026) — Tabela Comparativa ECD x Matriz (multi-ano)
+
+**Necessidade:** tabela tipo balancete que mostra, para cada conta da matriz, as
+contas ECD de origem (de qualquer ano ate 2025) que alimentaram aquele saldo,
+lado a lado por ano - visualizando de forma imediata quando uma conta foi
+renumerada de um ano pro outro (uma origem zera, outra "nasce" com valor
+parecido) versus quando e movimento real.
+
+**Escopo decidido:**
+- So contas ECD com saldo/movimento (nao popula com contas vazias)
+- Limitado a 2017-2025 (2026+ e nativo na matriz, sem origem ECD)
+- Multiplas linhas de origem por conta matriz, inclusive mais de uma ATIVA no
+  mesmo ano (ex real ja visto: "Encargos Legais" + "Multas e Encargos Legais
+  CLT" de 2025, ambas mapeando pra mesma conta matriz)
+- Todo o periodo (9 anos de colunas), nao so 2
+
+**Modelo de dados (conceito, ainda sem schema.prisma real):**
+
+1. Tabela de VINCULO conta-ECD <-> EcdImport (N-pra-N). Cada conta da arvore ECD
+   se liga a todo import que a "tocou" (apareceu naquele ano). Vigencia sai
+   automatica: primeiro ano = import mais antigo ligado, ultimo ano = mais
+   recente. Codigo que muda todo ano => vinculo com 1 import so (vigencia de 1
+   ano). Codigo que se mantem => mesma linha acumula varios imports (vigencia
+   estica, ex "2017-2020").
+
+2. Tabela de MAPEAMENTO conta ECD -> conta matriz (o de/para em si, virando
+   dado persistido em vez de so markdown/SQL como vinhamos fazendo). Campos
+   conceituais: sourceAccountId, targetAccountId, matchType (MANUAL vs
+   SUGGESTED_CONFIRMED), notes (justificativa de julgamento contabil, mesmo
+   padrao das notas que já registramos no hotelsys.md), createdBy, createdAt.
+
+**Sugestao automatica de mapeamento** (auxilio, nunca aplica sozinho - sempre
+precisa confirmacao humana): filtra candidatas da matriz por
+(a) mesmo `type` (ASSET/LIABILITY/...),
+(b) mesma `nature` (DEBIT/CREDIT),
+(c) mesmo GRUPO HIERARQUICO - resolvido subindo os pais ate achar
+    Circulante/Nao Circulante-LP/Permanente/Diferido, pra nao sugerir ex.
+    "Emprestimos Bancarios" do Circulante pra versao Longo Prazo so por
+    similaridade de nome,
+(d) pontuacao de similaridade textual do nome (apos normalizar acento/caixa).
+Atalho de confianca maxima: se o mesmo nome ja foi mapeado e CONFIRMADO antes
+(qualquer ano/empresa), reaproveita a decisao direto sem precisar do algoritmo
+de similaridade.
+
+**Melhoria complementar no escopo**: adicionar `ecdImportId` (ou a tabela de
+vinculo do item 1) no proprio `ChartOfAccounts` resolve de quebra a pendencia
+ja identificada nesta sessao de nao existir nenhuma "area de consulta do SPED"
+no LEDGR hoje (dado so acessivel via API/banco).
+
+**Layout de saida (exemplo fictício ilustrativo, 3 anos por caber na tela -
+real teria 9 colunas 2017-2025):**
+
+LinhaConta201720182019
+Matriz111010001 - Caixa50.000,0052.000,0055.500,00
+origem1110101 - Caixa Matriz50.000,000,000,00
+origem111110001 - Caixa Geral0,0052.000,0055.500,00
+
+Caso com 2 origens ativas no mesmo ano (colisao real ja vista):
+LinhaConta201720182019
+Matriz423010010 - Encargos e Multas Trab.1.200,003.400,003.400,00
+origem4301001411 - Encargos Legais200,00200,000,00
+origem4301001412 - Multas Enc. CLT1.000,003.200,003.400,00
+
+
+Linha matriz = sempre a soma das linhas de origem daquele ano.
+
+**Status:** conceito fechado nesta sessao, ainda SEM implementacao (schema.prisma,
+algoritmo de sugestao, tela) - retomar com codigo quando solicitado.
