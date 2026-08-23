@@ -6357,3 +6357,46 @@ Linha matriz = sempre a soma das linhas de origem daquele ano.
 
 **Status:** conceito fechado nesta sessao, ainda SEM implementacao (schema.prisma,
 algoritmo de sugestao, tela) - retomar com codigo quando solicitado.
+
+
+### Sessao 23/08/2026 — Hotelsys: 9 anos de ECD importados (2017-2025), licao sobre sufixo -DA
+
+**Importacao completa:** todos os 9 ECDs da Hotelsys (2017-2025) importados com o
+ecd-importer.service.ts ja corrigido (deleteMany). 0 erros em todos, 12 pontos de
+saldo mensal em todos os anos (13 em 2017 por causa do saldo de abertura).
+
+**Licao pratica - sufixo "-DA" no nome do arquivo SPED nao e confiavel por padrao:**
+alguns anos vieram entregues em 2 versoes: uma com sufixo "-SPED-ECD-DA.txt" e outra
+"-SPED-ECD.txt" (sem sufixo). Descoberta em 2022: a versao "-DA" era MENOR (179
+contas, 0 lancamentos) e a sem-sufixo era a completa e correta (357 contas, 66
+lancamentos) - situacao especial nao intencional na importacao. Mesma coisa
+confirmada em 2021 e 2023 (tambem tinham "-DA" no banco, precisaram ser trocados
+pelo "G" sem sufixo). IMPORTANTE: nao e regra universal que "-DA" = errado -
+2019 tinha "-DA" tambem, mas ao trocar pelo arquivo sem sufixo o resultado
+continuou "enxuto" (179 contas), so que com lancamentos reais (61, antes 0) -
+ou seja, para 2019 o arquivo sem sufixo era so mais completo no MESMO padrao de
+plano, nao uma declaracao inteiramente diferente. Conclusao pratica: ao importar
+ECD de qualquer empresa, se existir mais de uma versao do arquivo do mesmo ano
+(com/sem sufixo tipo -DA), sempre preferir a versao SEM sufixo primeiro e comparar
+contentType/contagem de contas/lancamentos contra os anos vizinhos antes de aceitar
+como definitivo - divergencia grande do padrao dos anos ao redor e sinal de alerta.
+
+**Limpeza de dado orfao (padrao de script reaproveitavel para o futuro):** ao trocar
+o arquivo errado por um certo no mesmo periodo, contas com codigo exclusivo do
+arquivo errado ficam orfas em chart_of_accounts (zero balance, zero journal_entry_
+items) mesmo depois do saldo/lancamento correto ja estar batendo (o deleteMany do
+importer so limpa account_balances pelo proprio referenceDate, nao apaga contas).
+Script de limpeza usado: DELETE em ecd_imports pelo id do arquivo errado + DELETE
+em journal_entries/account_balances pelo periodo + loop bottom-up em chart_of_
+accounts (apaga folhas orfas, repete ate estabilizar) para nao violar a FK
+parent_id. SEMPRE conferir antes que os containers restantes tem qtd_filhos_com_
+uso_real = qtd_filhos_total (ou seja, sao containers legitimos compartilhados com
+outro ano, nao resto esquecido).
+
+**Estado final Hotelsys (c2d48edc-28b7-4fd8-9272-b486449ab2cc) ao fim desta etapa:**
+9 ecd_imports (2017-2025), 809 contas em chart_of_accounts (381 matriz + arvore ECD
+legitima dos 9 anos, sem orfaos), matriz com abertura 31/12/2016 lancada e validada.
+
+**Proximo passo:** testar a Tabela Comparativa ECD x Matriz (conceito ja registrado
+na entrada anterior) com dado real dos 9 anos - ainda sem implementacao de codigo,
+proximo passo e desenhar o mockup/schema real quando solicitado.
