@@ -6400,3 +6400,47 @@ legitima dos 9 anos, sem orfaos), matriz com abertura 31/12/2016 lancada e valid
 **Proximo passo:** testar a Tabela Comparativa ECD x Matriz (conceito ja registrado
 na entrada anterior) com dado real dos 9 anos - ainda sem implementacao de codigo,
 proximo passo e desenhar o mockup/schema real quando solicitado.
+
+
+### Sessao 23/08/2026 (continuacao) — isClosingEntry: campo estruturado substitui deteccao por texto, revalidado no PVA
+
+**Motivacao:** durante o desenho da Tabela Comparativa ECD x Matriz, o calculo de
+movimento de contas de Resultado (Receita/Despesa) precisava saber excluir
+lancamentos de encerramento - a mesma logica ja usada em 3 lugares conhecidos
+(nota antiga), mas a auditoria completa (grep em todo apps/api/src) revelou
+**8 pontos reais**, espalhados por 4 arquivos, incluindo ecf-exporter.service.ts
+que nem constava na nota original.
+
+**Solucao implementada:** `JournalEntry.isClosingEntry` (boolean, default false).
+Migracao manual (`prisma/migrations-manuais/2026-08-23-add-is-closing-entry.sql`):
+ALTER TABLE + backfill textual (mesmo criterio sendo substituido) aplicado 1x a
+todo o historico, todas as empresas - resultado: 2 lancamentos marcados (GRB 2024,
+unico encerramento ja feito no sistema ate hoje).
+
+**8 pontos corrigidos:**
+1-3. `encerramento-exercicio.service.ts`: confirmar() grava o campo; preview()/
+   reverter() buscam por ele em vez de description.contains (um TERCEIRO padrao
+   de texto que nem estava na auditoria original de "3 lugares").
+4-7. `ecd-exporter.service.ts`: dreMap, hasEncerramentoDT030 (I030), indLcto (I200),
+   hasEncerramento (gate I350/I355). Removido cast "as any" que so existia por
+   causa do select anterior nao declarar description tipado.
+8. `ecd-pre-validate.service.ts`: check C13. Aproveitado para adicionar
+   deletedAt:null que faltava na query.
+9-11. `ecf-exporter.service.ts` (helper isEncerramento, removido, usado em 3
+   pontos): dreMap, hasEncerramentoReal (gate C350/C355 e K355/K356), receitaBruta
+   trimestral (P030).
+
+**REVALIDADO NO PVA OFICIAL (23/08/2026):** ECD 2024 da GRB reexportado e validado
+de novo no SpedContabil - resultado IDENTICO ao anterior: 0 erros, 3 advertencias
+(mesmas de sempre: recuperacao ECD anterior, formato CRC, DT_CRC - todas ja
+documentadas como aceitas, nao sao bugs de codigo). Confirma que a refatoracao
+nao alterou nenhum comportamento de output, so a origem interna da decisao.
+
+**Status ecd-exporter.service.ts: reafirmado 🔒 PRONTO PARA PRODUCAO (23/08/2026)**
+- ver secao "STATUS: PRONTO PARA PRODUCAO" mais acima no historico para o restante
+  das regras congeladas daquele arquivo, que continuam valendo.
+
+**Retomando o objetivo original:** a Tabela Comparativa ECD x Matriz agora pode
+calcular movimento de contas de Resultado usando `journalEntryItem.journalEntry.
+isClosingEntry = false` como filtro, em vez de replicar mais uma vez a logica de
+texto - exatamente o motivo que disparou essa refatoracao.
