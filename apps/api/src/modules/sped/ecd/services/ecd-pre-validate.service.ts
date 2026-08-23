@@ -295,14 +295,16 @@ export class EcdPreValidateService {
       where: { companyId, date: { gte: ps, lte: pe }, deletedAt: null },
     });
 
+    // CORRIGIDO 23/08/2026: OR de texto (contains "encerr"/"zeramento") trocado
+    // por isClosingEntry (campo estruturado). Aproveitado tambem para adicionar
+    // deletedAt: null, que estava faltando aqui (regra do projeto: toda query
+    // de journal_entries deve filtrar soft-delete explicitamente).
     const hasEncerramento = await this.prisma.journalEntry.findFirst({
       where: {
         companyId,
         date: { gte: ps, lte: pe },
-        OR: [
-          { description: { contains: "encerr", mode: "insensitive" } },
-          { description: { contains: "zeramento", mode: "insensitive" } },
-        ],
+        isClosingEntry: true,
+        deletedAt: null,
       },
     });
 

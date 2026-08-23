@@ -123,7 +123,7 @@ export class EcdExporterService {
     // Movimentos do periodo por mes e conta
     const periodItems = await this.prisma.journalEntryItem.findMany({
       where: { journalEntry: { companyId, date: { gte: periodStart, lte: periodEnd }, deletedAt: null } },
-      select: { accountId: true, type: true, value: true, journalEntry: { select: { date: true, description: true } } },
+      select: { accountId: true, type: true, value: true, journalEntry: { select: { date: true, description: true, isClosingEntry: true } } },
     });
     const byMonthAcc = new Map<string, Map<string, { deb: number; cre: number }>>();
     for (const item of periodItems) {
@@ -163,8 +163,11 @@ export class EcdExporterService {
       if (!analyticIds.has(item.accountId)) continue;
       const acc = accounts.find(a => a.id === item.accountId);
       if (!acc || !["REVENUE","EXPENSE"].includes(acc.type.toString())) continue;
-      const desc = ((item.journalEntry as any)?.description ?? "").toLowerCase();
-      if (desc.includes("encerr") || desc.includes("zeramento")) continue;
+      // CORRIGIDO 23/08/2026: isClosingEntry (campo estruturado) substitui o
+      // cast "as any" + comparacao de texto - causa raiz do "as any" era
+      // justamente o select nao declarar description tipado; agora nao
+      // precisa mais de description aqui.
+      if (item.journalEntry.isClosingEntry) continue;
       const cur = dreMap.get(item.accountId) ?? { deb: 0, cre: 0 };
       if (item.type === "DEBIT") cur.deb += Number(item.value);
       else                       cur.cre += Number(item.value);
@@ -237,9 +240,7 @@ export class EcdExporterService {
     // Campo 12 = DT_EX_SOCIAL (data de encerramento FORMAL do exercicio social, nao o
     // fim do periodo da ECD). Preencher exige um I350 correspondente - bug real
     // confirmado no PVA (GRB) ate 04/08/2026. So preenche se houve encerramento real.
-    const hasEncerramentoDT030 = entries.some(e =>
-      e.description?.toLowerCase().includes("encerr") || e.description?.toLowerCase().includes("zeramento")
-    );
+    const hasEncerramentoDT030 = entries.some(e => e.isClosingEntry);
     // Campo 12 = DT_EX_SOCIAL - SEMPRE obrigatorio (confirmado 2x no PVA hoje, 05/08/2026,
     // GRB: preenchido demais -> exige Bloco J; vazio -> "Campo obrigatorio nao preenchido").
     // A condicionalidade real (manual oficial) e sobre essa data cair DENTRO ou FORA do
@@ -366,8 +367,7 @@ export class EcdExporterService {
       // Despesa), "N" para os demais. Sem isso o PVA nao consegue casar o I355
       // (saldo antes do encerramento) com o lancamento que efetivamente fecha a
       // conta -- bug real encontrado no PVA (08/2026, GRB).
-      const descLower = (entry.description || "").toLowerCase();
-      const indLcto = (descLower.includes("encerr") || descLower.includes("zeramento")) ? "E" : "N";
+      const indLcto = entry.isClosingEntry ? "E" : "N";
       add(P+"I200"+P+numLcto+P+this.fmtDate(dt)+P+this.fmtDec(totalDeb)+P+indLcto+P+P);
       for (const item of entry.items) {
         const sign    = item.type === "DEBIT" ? "D" : "C";
@@ -380,10 +380,7 @@ export class EcdExporterService {
             // I350/I355 — saldos de contas de resultado antes do encerramento
             // I350 apenas se ha lancamentos de encerramento reais (zeramento de resultado)
             const dreTypes = new Set(["REVENUE","EXPENSE"]);
-            const hasEncerramento = entries.some(e =>
-              e.description?.toLowerCase().includes("encerr") ||
-              e.description?.toLowerCase().includes("zeramento")
-            );
+            const hasEncerramento = entries.some(e => e.isClosingEntry);
             const dreAccounts = (hasEncerramento ? accounts : []).filter(a => {
               if (!a.isAnalytic || !dreTypes.has(a.type.toString())) return false;
               const mv = dreMap.get(a.id);

@@ -1223,6 +1223,13 @@ model JournalEntry {
   createdAt    DateTime     @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt    DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
   deletedAt    DateTime?    @map("deleted_at") @db.Timestamp(6)
+  // CRIADO 23/08/2026: substitui a deteccao por texto ("encerr"/"zeramento" na
+  // description) usada em 8 lugares diferentes (ecd-exporter, ecd-pre-validate,
+  // ecf-exporter, encerramento-exercicio.service) para identificar lancamentos
+  // de encerramento de exercicio. Gravado pelo EncerramentoExercicioService no
+  // momento da criacao; lancamentos antigos ja passaram por backfill via UPDATE
+  // textual (mesmo criterio que esta sendo substituido), 1x, em 23/08/2026.
+  isClosingEntry Boolean @default(false) @map("is_closing_entry")
 
   company Company            @relation(fields: [companyId], references: [id])
   items   JournalEntryItem[]

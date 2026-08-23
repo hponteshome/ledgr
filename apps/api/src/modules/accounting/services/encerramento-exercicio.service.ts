@@ -85,11 +85,13 @@ export class EncerramentoExercicioService {
     if (resultadoTipo === 'LUCRO' && !config.encerramentoContaLucroExercicioId) missingConfig.push('Lucro do Exercício');
     if (resultadoTipo === 'PREJUIZO' && !config.encerramentoContaPrejuizoExercicioId) missingConfig.push('Prejuízo do Exercício');
 
+    // CORRIGIDO 23/08/2026: description-match trocado por isClosingEntry (campo
+    // estruturado) - texto era fragil e ja se repetia em 8 lugares do codigo.
     const existing = await this.prisma.journalEntry.findFirst({
       where: {
         companyId,
         date: { gte: this.toUTC(periodEnd), lte: this.toUTCEnd(periodEnd) },
-        description: { contains: `Encerramento do Exercício ${year}` },
+        isClosingEntry: true,
         deletedAt: null,
       },
     });
@@ -176,6 +178,14 @@ export class EncerramentoExercicioService {
       ],
     });
 
+    // CRIADO 23/08/2026: marca os 2 lancamentos como encerramento via campo
+    // estruturado, em vez de depender so do texto da description (que continua
+    // existindo para leitura humana, mas nao e mais a fonte de verdade).
+    await this.prisma.journalEntry.updateMany({
+      where: { id: { in: [entry1.id, entry2.id] } },
+      data: { isClosingEntry: true },
+    });
+
     return { entry1, entry2, resultado: prev.resultado, resultadoTipo: prev.resultadoTipo };
   }
 
@@ -183,11 +193,12 @@ export class EncerramentoExercicioService {
 
   async reverter(companyId: string, year: number) {
     const periodEnd = `${year}-12-31`;
+    // CORRIGIDO 23/08/2026: description-match trocado por isClosingEntry.
     const entries = await this.prisma.journalEntry.findMany({
       where: {
         companyId,
         date: { gte: this.toUTC(periodEnd), lte: this.toUTCEnd(periodEnd) },
-        description: { contains: `Encerramento do Exercício ${year}` },
+        isClosingEntry: true,
         deletedAt: null,
       },
     });

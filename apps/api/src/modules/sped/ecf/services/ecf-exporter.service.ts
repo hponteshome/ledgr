@@ -171,14 +171,12 @@ export class EcfExporterService {
 
     const periodItems = await this.prisma.journalEntryItem.findMany({
       where: { journalEntry: { companyId, date: { gte: periodStart, lte: periodEnd }, deletedAt: null } },
-      select: { accountId: true, type: true, value: true, journalEntry: { select: { date: true, description: true } } },
+      select: { accountId: true, type: true, value: true, journalEntry: { select: { date: true, description: true, isClosingEntry: true } } },
     });
 
-    const isEncerramento = (desc: string | null | undefined) => {
-      const d = (desc || "").toLowerCase();
-      return d.includes("encerr") || d.includes("zeramento");
-    };
-
+    // CORRIGIDO 23/08/2026: helper isEncerramento(desc) removido - substituido
+    // por leitura direta de journalEntry.isClosingEntry (campo estruturado)
+    // nos 3 pontos que o usavam.
     // Saldo final acumulado ate o fim do periodo, por conta (pra rollup de sinteticas)
     const saldoFinalMap = new Map<string, number>(saldoAberturaPeriodo);
     for (const it of periodItems) {
@@ -207,7 +205,7 @@ export class EcfExporterService {
       if (!analyticIds.has(it.accountId)) continue;
       const acc = accountById.get(it.accountId);
       if (!acc || !dreTypes.has(acc.type.toString())) continue;
-      if (isEncerramento(it.journalEntry.description)) continue;
+      if (it.journalEntry.isClosingEntry) continue;
       const cur = dreMap.get(it.accountId) ?? { deb: 0, cre: 0 };
       if (it.type === "DEBIT") cur.deb += Number(it.value); else cur.cre += Number(it.value);
       dreMap.set(it.accountId, cur);
@@ -304,7 +302,7 @@ export class EcfExporterService {
       while (cur?.parentId) { activeIds.add(cur.parentId); cur = accountById.get(cur.parentId); }
     }
     const accountsAtivas = accounts.filter(a => activeIds.has(a.id));
-    const hasEncerramentoReal = periodItems.some(it => isEncerramento(it.journalEntry.description));
+    const hasEncerramentoReal = periodItems.some(it => it.journalEntry.isClosingEntry);
 
     // ── BLOCO C (escrituracao contabil - copia fiel da ECD vinculada) ───────
     // Mesma estrutura do Bloco I do ECD (I010/I030->C040, I050/I051->C050/C051,
@@ -374,7 +372,7 @@ export class EcfExporterService {
         .filter(it => {
           const acc = accountById.get(it.accountId);
           if (!acc || acc.type.toString() !== "REVENUE") return false;
-          if (isEncerramento(it.journalEntry.description)) return false;
+          if (it.journalEntry.isClosingEntry) return false;
           const d = it.journalEntry.date instanceof Date ? it.journalEntry.date : new Date(it.journalEntry.date);
           return d >= q.firstDay && d <= q.lastDay;
         })
