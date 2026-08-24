@@ -379,3 +379,94 @@
 2210107             0000000Provisoes Diferidas                                                                                 5    C    2.02.01
 22101070001         0001122Imposto de Renda Diferido                                                                           6    C    2.02.01
 22101070002         0001123CSLL Diferida                                                                                       6    C    2.02.01
+313              0000000Receita Operacional Hoteleira                                                                       3    C    
+31301            0000000Hospedagem                                                                                          4    C    
+3130101          0000000Diarias                                                                                             5    C    
+31301010001       0001124Receita de Diarias                                                                                  6    C    
+3130102          0000000Requerimentos                                                                                       5    C    
+31301020001       0001125Receita de Requerimentos                                                                            6    C    
+31302            0000000Locacao de Espacos e Equipamentos                                                                   4    C    
+3130201          0000000Aluguel de Sala                                                                                     5    C    
+31302010001       0001126Receita Aluguel de Sala                                                                             6    C    
+3130202          0000000Aluguel Espacos p Negocios                                                                          5    C    
+31302020001       0001127Receita Aluguel Espacos p Negocios                                                                  6    C    
+3130203          0000000Aluguel Cadeiras de Praia                                                                           5    C    
+31302030001       0001128Receita Aluguel Cadeiras de Praia                                                                   6    C    
+3130204          0000000Locacao de Equipamento                                                                              5    C    
+31302040001       0001129Receita Locacao de Equipamento                                                                      6    C    
+31303            0000000Servicos ao Hospede                                                                                 4    C    
+3130301          0000000Lavanderia                                                                                          5    C    
+31303010001       0001130Receita de Lavanderia                                                                               6    C    
+3130302          0000000Academia e SPA                                                                                      5    C    
+31303020001       0001131Receita de Academia e SPA                                                                           6    C    
+3130303          0000000Telecomunicacoes                                                                                    5    C    
+31303030001       0001132Receita de Telecomunicacoes                                                                         6    C    
+3130304          0000000Estacionamento                                                                                      5    C    
+31303040001       0001133Receita de Estacionamento                                                                           6    C    
+31304            0000000Deducoes da Receita Hoteleira                                                                       4    D    
+3130401          0000000Vendas Canceladas                                                                                   5    D    
+31304010001       0001134Vendas Canceladas                                                                                   6    D    
+424                 0000000Custos Diretos de Hospedagem                                                                        3    D    
+42401               0000000Custos de A e B e Suprimentos                                                                       4    D    
+4240101             0000000Alimentos e Bebidas                                                                                 5    D    
+42401010001         0001135Alimentos                                                                                           6    D    
+42401010002         0001136Bebidas Alcoolica                                                                                   6    D    
+42401010003         0001137Bebidas Nao Alcoolica                                                                               6    D    
+42401010004         0001138Vinhos e Champanhe                                                                                  6    D    
+42401010005         0001139Produtos Diversos A e B                                                                             6    D    
+4240102             0000000Suprimentos Operacionais                                                                            5    D    
+42401020001         0001140Material de Limpeza e Descartaveis                                                                  6    D    
+42401020002         0001141Material para Hospedes                                                                              6    D    
+42401020003         0001142Utensilios de Copa Cozinha e Saloes                                                                 6    D    
+42401020004         0001143Loucas e Vidros                                                                                     6    D    
+42401020005         0001144Rouparia Cama Mesa e Banho                                                                          6    D    
+42401020006         0001145Uniformes                                                                                           6    D    
+42401020007         0001146Equipamentos de Protecao Individual EPIs                                                            6    D    
+42402               0000000Custos Diretos Operacionais                                                                         4    D    
+4240201             0000000Custos Diretos Operacionais                                                                         5    D    
+42402010001         0001147Custo de Hospedagem                                                                                 6    D    
+42402010002         0001148Custo de Telecomunicacao                                                                            6    D    
+42402010003         0001149Bens de Uso Permanente                                                                              6    D    
+42402010004         0001150Consumo Interno A e B                                                                               6    D    
+425                 0000000Despesas Operacionais Hoteleiras                                                                    3    D    
+42501               0000000Despesas Operacionais Hoteleiras                                                                    4    D    
+4250101             0000000Despesas Operacionais Hoteleiras                                                                    5    D    
+42501010001         0001151Lavanderia Terceirizada                                                                             6    D    
+42501010002         0001152Assinatura TV e Video                                                                               6    D    
+42501010003         0001153Transfer e Taxi                                                                                     6    D    
+42501010004         0001154Musica e Entretenimento                                                                             6    D    
+42501010005         0001155Frete e Carretos                                                                                    6    D    
+42501010006         0001156Decoracao                                                                                           6    D    
+42501010007         0001157Comissoes Agencias de Viagens                                                                       6    D    
+42501010008         0001158Comissoes Sistemas de Reservas                                                                      6    D    
+42501010009         0001159Gas                                                                                                 6    D    
+42501010010         0001160Links e Circuitos Tel e Internet                                                                    6    D    
+42501010011         0001161Medicamentos                                                                                        6    D    
+42501010012         0001162Indenizacoes e Sinistros                                                                            6    D    
+42501010013         0001163Multas Infracionarias                                                                               6    D    
+42501010014         0001164Royalty por Uso de Marca de Terceiros                                                               6    D    
+42501010015         0001165Comissao e Despesas de Cartao de Credito                                                            6    D    
+42501010016         0001166Despesa de Gerentes                                                                                 6    D    
+426                 0000000Depreciacao e Amortizacao Operacional                                                               3    D    
+42601               0000000Depreciacao                                                                                         4    D    
+4260101             0000000Depreciacao                                                                                         5    D    
+42601010001         0001167Depreciacao Edificios e Benfeitorias                                                                6    D    
+42601010002         0001168Depreciacao Maquinas e Equipamentos                                                                 6    D    
+42601010003         0001169Depreciacao Instalacoes                                                                             6    D    
+42601010004         0001170Depreciacao Moveis e Utensilios                                                                     6    D    
+42601010005         0001171Depreciacao Utensilios de Cozinha                                                                   6    D    
+42601010006         0001172Depreciacao Computadores e Perifericos                                                              6    D    
+42601010007         0001173Depreciacao Central Telefonica                                                                      6    D    
+42602               0000000Amortizacao                                                                                         4    D    
+4260201             0000000Amortizacao                                                                                         5    D    
+42602010001         0001174Amortizacao Gastos Pre-Operacionais                                                                 6    D    
+42602010002         0001175Amortizacao Estudos Projetos e Detalhamentos                                                        6    D    
+4310102             0000000IRPJ e CSLL Diferidos                                                                               5    D    
+43101020001         0001176IRPJ Diferido                                                                                       6    D    
+43101020002         0001177CSLL Diferida Despesa                                                                               6    D    
+21101060015         0001178ICMS a Pagar                                                                                        6    C    
+23301010004         0001179Ajustes de Exercicios Anteriores                                                                    6    C    
+42301010008         0001180Atualizacao Monetaria                                                                               6    D    
+42301010009         0001181Multa CLT                                                                                           6    D    
+42301010010         0001182Encargos e Multas Trabalhistas (CLT)                                                                6    D    
+42301010011         0001183Juros e Encargos MAED                                                                               6    D    
