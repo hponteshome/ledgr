@@ -6461,3 +6461,80 @@ importar."), separado da lista generica de erros de arquivo - e um problema de
 contexto/selecao do usuario, nao um problema no arquivo em si. Achado real: gerou
 confusao na sessao de 23/08/2026 ao tentar importar ECD 2017 da Hotelsys com a
 GRB ainda selecionada como empresa ativa.
+
+
+### Sessao 23/08/2026 (continuacao 2) — Algoritmo de sugestao + de/para completo Hotelsys (370 contas) + 3o bloco matriz
+
+**Motivacao:** construir e testar o algoritmo de sugestao de mapeamento da Tabela
+Comparativa ECD x Matriz (conceito 22/08/2026) com dado real da Hotelsys.
+
+**Algoritmo final:** filtro duro por type + nature + grupo binario (CIRCULANTE vs
+NAO_CIRCULANTE para Balanco, resolvido subindo a cadeia de pais ate achar
+substring "CIRCULANTE"/"LONGO PRAZO"/"PERMANENTE"/"DIFERIDO"/"IMOBILIZADO"/
+"INVESTIMENTO"; sem filtro de grupo para RESULTADO - Receita/Despesa, dado que a
+estrutura de DRE diverge estruturalmente entre fontes) + similaridade de nome
+(difflib.SequenceMatcher) para ranquear candidatos dentro do grupo. Atalho de
+confianca maxima: reaproveita diretamente decisoes ja tomadas manualmente em
+sessoes anteriores (ex: IRPJ/CSLL/PIS/COFINS/IPTU/SPU/CIM ja mapeados na abertura
+2016) em vez de re-derivar por texto.
+
+**3 bugs reais adicionais encontrados e corrigidos durante a construcao/validacao
+do algoritmo** (nenhum deles do algoritmo em si - todos no importer):
+
+1. `normalizedParentCode` (ecd-importer.service.ts): mesmo bug ja corrigido em
+   17/08/2026 para `normalizedCode`, so que na busca do PAI - nunca recebeu a
+   mesma normalizacao (remover pontos). 308 de 627 contas ECD da Hotelsys
+   ficaram orfas (parent_id nulo) no import de 2025 especificamente (COD_CTA_SUP
+   daquele arquivo vem pontilhado). Corrigido, validado com reimportacao completa
+   dos 9 anos: 0 orfas.
+
+2. `resolveNature()` (ecd-importer.service.ts): natureCode "04" (Resultado,
+   compartilhado por Receita e Despesa no SPED) nunca tinha case proprio - caia
+   no default DEBIT, certo por acidente para Despesa, sistematicamente errado
+   para Receita. Corrigido: nature agora depende do type ja resolvido.
+
+3. `resolveAccountType()` (ecd-importer.service.ts): keywords de reconhecimento
+   de Receita ("VENDAS","RENDA") com falso positivo - "COMISSOES SOBRE VENDAS" e
+   "IMPOSTO DE RENDA" classificados como Receita ao inves de Despesa. Corrigido
+   com lista de exclusao verificada antes.
+
+Os 3 fixes exigiram reimportacao completa dos 9 anos da Hotelsys (2018-2025 tinham
+ficado zerados num wipe intermediario de teste - registrar como licao: rodar
+`SELECT count(*) FROM chart_of_accounts_ecd_imports` OU o check de contas orfas
+ANTES de declarar um fix "pronto" evita descobrir isso tarde).
+
+**Achado nao corrigido (registrado, nao mexer):** container "422 DEPRECIACOES E
+AMORTIZACOES" da matriz universal (arquivo original, anterior a esta sessao) tem
+leaves mislabeled - "4220101"/"4220201" mostram nomes tipo "Salarios e Comissoes"/
+"Despesas Comerciais Gerais", claramente copiados/colados de outra secao, nao sao
+depreciacao/amortizacao de verdade. NAO corrigido porque pode ter lancamento real
+de empresa em producao (GRB) apontando pra essas contas - renomear quebraria
+retroativamente. Criado container NOVO (426 Depreciacao e Amortizacao Operacional)
+para uso real, container antigo fica intocado.
+
+**Terceiro bloco de expansao da matriz universal** (apos Ativo e Passivo/PL em
+sessoes anteriores): 381 -> 472 contas. Grupos: 313 Receita Operacional Hoteleira,
+424 Custos Diretos de Hospedagem, 425 Despesas Operacionais Hoteleiras, 426
+Depreciacao e Amortizacao Operacional (novo), 4310102 IRPJ/CSLL Diferidos
+(despesa) + 6 contas isoladas que faltavam de tentativas anteriores (ICMS a Pagar,
+Ajustes de Exercicios Anteriores, Atualizacao Monetaria, Multa CLT, Encargos e
+Multas Trabalhistas CLT, Juros e Encargos MAED). reduced_code final: 0001183.
+
+**Licao de processo:** ao escolher codigo novo pra conta, sempre validar colisao
+contra a base COMPLETA da empresa (as duas arvores, ECD + matriz), nao so contra
+o arquivo mestre da matriz - achado real: codigo "312" colidiu com "Deducoes da
+Receita Bruta" da propria arvore ECD da Hotelsys, precisou renumerar pra "313"
+depois do SQL ja ter sido gerado.
+
+**De/para completo gravado:** 370 contas ECD da Hotelsys mapeadas em
+`ecd_account_mappings` (196 SUGGESTED_CONFIRMED, reaproveitando decisao anterior ou
+score >=0.75; 174 MANUAL, julgamento contabil caso a caso). Vigencia automatica
+(`chart_of_accounts_ecd_imports`) populada corretamente para os 9 anos apos os
+fixes do importer - vinculo agora gravado no MOMENTO da importacao (nao mais
+inferido retroativamente por data de saldo, que dava falso positivo em fronteira
+de ano).
+
+**Status da Tabela Comparativa ECD x Matriz:** schema completo + dado real
+populado para Hotelsys. Falta: a tela/query final que renderiza a tabela
+(agrupando por conta matriz, uma linha por origem ECD, colunas por ano, usando
+isClosingEntry para excluir encerramento do movimento de Resultado).
