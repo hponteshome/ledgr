@@ -150,7 +150,7 @@ export class EcdImporterService {
     try {
       // 4. Plano de Contas — só se tiver I050
       if (parsed.regI050.length > 0) {
-        await this.importChartOfAccounts(companyId, parsed.regI050, stats, errors);
+        await this.importChartOfAccounts(companyId, parsed.regI050, stats, errors, ecdImport.id);
       }
 
       // 5. Saldos — só se tiver I155
@@ -206,10 +206,11 @@ export class EcdImporterService {
   // ── Plano de Contas ───────────────────────────────────────────
 
   private async importChartOfAccounts(
-    companyId: string,
-    accounts:  EcdRegI050[],
-    stats:     any,
-    errors:    any[],
+    companyId:   string,
+    accounts:    EcdRegI050[],
+    stats:       any,
+    errors:      any[],
+    ecdImportId: string,
   ): Promise<void> {
     this.logger.log(`Importando ${accounts.length} contas para empresa ${companyId}`);
 
@@ -233,7 +234,16 @@ export class EcdImporterService {
 
         let parentId: string | null = null;
         if (acc.parentCode) {
-          const normalizedParentCode = acc.parentCode;
+          // CORRIGIDO 23/08/2026: mesmo bug do "normalizedCode" ja corrigido em
+          // 17/08/2026 (variavel se chamava normalizada mas so reatribuia o
+          // valor cru) - aqui na busca do PAI a mesma falta de normalizacao
+          // nunca tinha sido corrigida. Achado real: 308 de 627 contas ECD da
+          // Hotelsys ficaram orfas (parent_id nulo) no import de 2025, porque
+          // o COD_CTA_SUP daquele arquivo vem pontilhado e a busca comparava
+          // contra o code do pai ja gravado SEM ponto (normalizado desde
+          // 17/08) - nunca casava. 2017 funcionava por coincidencia (aquele
+          // arquivo entrega COD_CTA_SUP sem ponto).
+          const normalizedParentCode = acc.parentCode.replace(/\./g, "");
           const parent = await this.prisma.chartOfAccounts.findFirst({
             where:  { companyId, code: normalizedParentCode },
             select: { id: true },
@@ -248,6 +258,7 @@ export class EcdImporterService {
           where: { companyId_code: { companyId, code: normalizedCode } },
         });
 
+        let accountId: string;
         if (existing) {
           await this.prisma.chartOfAccounts.update({
             where: { id: existing.id },
@@ -261,8 +272,9 @@ export class EcdImporterService {
               spedCode: acc.code,
             },
           });
+          accountId = existing.id;
         } else {
-          await this.prisma.chartOfAccounts.create({
+          const created = await this.prisma.chartOfAccounts.create({
             data: {
               code:        normalizedCode,
               name:        acc.name,
@@ -277,7 +289,20 @@ export class EcdImporterService {
               companyId,
             } as any,
           });
+          accountId = created.id;
         }
+
+        // CRIADO 23/08/2026: vinculo conta-ECD <-> import, base da vigencia
+        // automatica da Tabela Comparativa ECD x Matriz (conceito 22/08/2026).
+        // Registra que esse codigo apareceu no I050 DESTE arquivo especifico -
+        // criterio mais preciso que inferir por data de account_balance (essa
+        // abordagem foi tentada e descartada no backfill retroativo por dar
+        // falso positivo em fronteira de ano - ver LEDGR-contexto.md 23/08/2026).
+        await this.prisma.chartOfAccountsEcdImport.upsert({
+          where: { accountId_ecdImportId: { accountId, ecdImportId } },
+          create: { accountId, ecdImportId },
+          update: {},
+        });
 
         stats.accounts++;
       } catch (err) {
