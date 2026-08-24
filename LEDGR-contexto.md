@@ -6444,3 +6444,20 @@ nao alterou nenhum comportamento de output, so a origem interna da decisao.
 calcular movimento de contas de Resultado usando `journalEntryItem.journalEntry.
 isClosingEntry = false` como filtro, em vez de replicar mais uma vez a logica de
 texto - exatamente o motivo que disparou essa refatoracao.
+
+
+### Pendencia de UX (23/08/2026) - mensagem de "empresa ativa errada" no import ECD
+
+Ao tentar importar um ECD cujo CNPJ nao bate com a empresa ativa selecionada, o
+validador do LEDGR corretamente BLOQUEIA a importacao (comportamento certo, nao
+mexer nisso) - mas a mensagem hoje aparece generica, dentro do bloco "Arquivo com
+erros bloqueantes": "[0000] CNPJ do arquivo (X) difere da empresa ativa (Y).",
+misturada visualmente com erros de parse/conteudo do proprio arquivo.
+
+Melhoria sugerida: destacar esse caso especifico com um alerta proprio, mais
+explicito ("Empresa errada selecionada - o arquivo pertence a [nome/CNPJ], mas a
+empresa ativa e [nome/CNPJ]. Troque a empresa no seletor do topo antes de
+importar."), separado da lista generica de erros de arquivo - e um problema de
+contexto/selecao do usuario, nao um problema no arquivo em si. Achado real: gerou
+confusao na sessao de 23/08/2026 ao tentar importar ECD 2017 da Hotelsys com a
+GRB ainda selecionada como empresa ativa.
