@@ -6538,3 +6538,54 @@ de ano).
 populado para Hotelsys. Falta: a tela/query final que renderiza a tabela
 (agrupando por conta matriz, uma linha por origem ECD, colunas por ano, usando
 isClosingEntry para excluir encerramento do movimento de Resultado).
+
+
+### Sessao 23/08/2026 (fechamento) — Tabela Comparativa ECD x Matriz: implementacao completa
+
+**Tabela Comparativa ECD x Matriz 100% concluida** (conceito 22/08 -> algoritmo +
+de/para 23/08 -> tela 23/08). Backend (TabelaComparativaService +
+TabelaComparativaController, registrados em accounting.module.ts) + frontend
+(TabelaComparativaPage.tsx, rota em routes/index.tsx, item no sidebar via
+sidebar_items) testados end-to-end com dado real da Hotelsys - tela carrega,
+195 contas matriz, 9 anos, valores conferem com a validacao SQL previa
+(caso real: Encargos e Multas Trabalhistas CLT = soma de 2 origens,
+4.763,65/2024 e 186.059,46/2025).
+
+Acesso: Contabilidade -> Tabela Comparativa ECD (sidebar), rota
+/app/accounting/tabela-comparativa.
+
+**Pendencia aberta (nao resolvida, decisao adiada):** sidebar tem dois itens
+com nome parecido - "Comparativo de Saldos" (/app/accounting/balance-comparison,
+BalanceComparisonPage.tsx, 10KB, feature real e anterior a esta sessao - saldo
+contabil x ECD, conceito diferente da Tabela Comparativa) e a nova "Tabela
+Comparativa ECD". Usuario decidiu adiar a decisao (renomear vs excluir) para
+proxima sessao - NAO mexer no BalanceComparisonPage.tsx sem instrucao explicita
+nova.
+
+**Ciclo de aprendizado tecnico da sessao completa (23/08), resumo executivo:**
+1. deleteMany do importer perdia balancetes mensais - corrigido
+2. isClosingEntry (campo estruturado) substitui deteccao por texto em 8 lugares -
+   corrigido e revalidado no PVA (GRB 2024)
+3. normalizedParentCode nunca normalizava - 308 contas orfas na Hotelsys 2025 -
+   corrigido
+4. resolveNature/resolveAccountType classificavam Receita errado (nature E type) -
+   corrigido
+5. Algoritmo de sugestao de mapeamento construido e validado (type+nature+grupo
+   binario+similaridade de nome+reaproveitamento de decisao anterior)
+6. 3o bloco da matriz universal (Receita/Despesa Operacional Hoteleira, 381->472
+   contas)
+7. De/para completo da Hotelsys (370 contas) persistido em ecd_account_mappings
+8. Tela completa (backend+frontend+sidebar) entregue e testada com dado real
+
+**Proximos passos possiveis** (nenhum obrigatorio, todos opcionais para retomar
+quando fizer sentido):
+- Resolver a pendencia do "Comparativo de Saldos" (renomear ou excluir)
+- Continuar o ciclo original da Hotelsys: comparar BP/DRE da matriz por ano
+  contra a abertura do ECD do ano seguinte, lancando ajustes onde divergir
+- Revisar os itens MANUAL de baixa confianca do de/para (alguns foram decisao
+  pragmatica rapida, vale reconferir com mais calma numa sessao dedicada)
+- Corrigir o container "422 Depreciacoes e Amortizacoes" mislabeled da matriz
+  (achado, nao corrigido - ver entrada anterior desta mesma sessao)
+- Auditar outras empresas (GRB, LM, etc) pelo mesmo bug do normalizedParentCode
+  (fix e generico, mas nunca foi checado se essas empresas ja tem contas orfas
+  no historico)
