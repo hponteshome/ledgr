@@ -1,10 +1,10 @@
-// apps/api/src/modules/accounting/services/iob-import.service.ts
+// apps/api/src/modules/accounting/services/matriz-import.service.ts
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { AccountNature, AccountType } from '@prisma/client';
-import { IobPlanoParserService, IobPlanoRecord } from './iob-plano-parser.service';
+import { MatrizPlanoParserService, MatrizPlanoRecord } from './matriz-plano-parser.service';
 
-export interface IobImportResult {
+export interface MatrizImportResult {
   status:   'done' | 'partial' | 'dry-run';
   stats: {
     total:    number;
@@ -12,6 +12,7 @@ export interface IobImportResult {
     created:  number;
     notFound: number;
   };
+  blocosDisponiveis: string[]; // blocos opcionais encontrados no arquivo (informativo)
   notFound: string[];
   errors:   Array<{ line: number; message: string }>;
 }
@@ -59,15 +60,22 @@ function inferNature(raw: string, natureChar: string): AccountNature {
   return (d === '1' || d === '4') ? AccountNature.DEBIT : AccountNature.CREDIT;
 }
 
-// ──────────────────────────────────────────────────────────────────────────
+const BLOCO_NUCLEO = 'NUCLEO';
 
+// ──────────────────────────────────────────────────────────────────────────
+// RENOMEADO 24/08/2026 (de IobImportService): este importa o Plano de Contas
+// MATRIZ (PlanoContasMatrizLEDGR.txt) - nao tem mais relacao com o sistema
+// externo IOB, e um formato proprio do LEDGR. O grupo LOTD (import-lotd,
+// iob-lotd-import.service.ts/iob-lotd-parser.service.ts) continua com o nome
+// IOB de proposito - la sim e o layout real de exportacao do sistema IOB,
+// mantido para compatibilidade com arquivos gerados por aquele sistema.
 @Injectable()
-export class IobImportService {
-  private readonly logger = new Logger(IobImportService.name);
+export class MatrizImportService {
+  private readonly logger = new Logger(MatrizImportService.name);
 
   constructor(
     private prisma:  PrismaService,
-    private parser:  IobPlanoParserService,
+    private parser:  MatrizPlanoParserService,
   ) {}
 
   async importPlano(
@@ -75,12 +83,24 @@ export class IobImportService {
     fileContent: string,
     dryRun: boolean,
     userId: string,
-  ): Promise<IobImportResult> {
+    blocosIncluidos: string[] = [],
+  ): Promise<MatrizImportResult> {
     const mask = '0.0.0.00.00.0000';
-    const parsed = this.parser.parse(fileContent);
+    const parsedFull = this.parser.parse(fileContent);
+
+    // CRIADO 24/08/2026: filtra por bloco opcional. NUCLEO sempre entra;
+    // blocos opcionais (ex: HOTELARIA) so entram se explicitamente pedidos.
+    const blocosSet = new Set(blocosIncluidos.map(b => b.toUpperCase()));
+    const parsed = {
+      ...parsedFull,
+      records: parsedFull.records.filter(
+        r => r.bloco === BLOCO_NUCLEO || blocosSet.has(r.bloco),
+      ),
+    };
+
     const stats  = { total: parsed.records.length, matched: 0, created: 0, notFound: 0 };
     const notFound: string[] = [];
-    const errors:   Array<{ line: number; message: string }> = [...parsed.errors];
+    const errors:   Array<{ line: number; message: string }> = [...parsedFull.errors];
 
     // ── 1. Garantir CompanyMaskConfig ──────────────────────────────────────
     if (!dryRun) {
@@ -96,12 +116,12 @@ export class IobImportService {
             createdById: userId,
           },
         });
-        this.logger.log(`[IOB] Máscara criada: ${mask}`);
+        this.logger.log(`[Matriz] Máscara criada: ${mask}`);
       }
     }
 
     // ── 2. Construir mapa de códigos formatados → record ───────────────────
-    const recordMap = new Map<string, IobPlanoRecord>();
+    const recordMap = new Map<string, MatrizPlanoRecord>();
     for (const rec of parsed.records) {
       const formatted = applyMask(stripDots(rec.classification), mask);
       recordMap.set(formatted, rec);
@@ -112,7 +132,9 @@ export class IobImportService {
       where: { companyId, deletedAt: null },
       select: { id: true, code: true },
     });
-    const codeToId = new Map<string, string>(existing.map(a => [a.code, a.id]));
+    const codeToId = new Map<string, string>(
+      existing.map(a => [applyMask(stripDots(a.code), mask), a.id]),
+    );
 
     // ── 4. Ordenar por nível (pai antes de filho) ──────────────────────────
     const sorted = [...recordMap.entries()].sort((a, b) => {
@@ -149,7 +171,7 @@ export class IobImportService {
           const created = await this.prisma.chartOfAccounts.create({
             data: {
               companyId,
-              code:        formatted,
+              code:        raw,
               name:        rec.description,
               level,
               type:        inferType(raw),
@@ -171,13 +193,15 @@ export class IobImportService {
     }
 
     this.logger.log(
-      `IOB Plano [${dryRun ? 'DRY-RUN' : 'CONFIRM'}] ` +
-      `total=${stats.total} matched=${stats.matched} created=${stats.created} notFound=${stats.notFound}`,
+      `Matriz Plano [${dryRun ? 'DRY-RUN' : 'CONFIRM'}] ` +
+      `total=${stats.total} matched=${stats.matched} created=${stats.created} notFound=${stats.notFound} ` +
+      `blocos=${blocosIncluidos.join(',') || '(so nucleo)'}`,
     );
 
     return {
       status:   dryRun ? 'dry-run' : stats.notFound > 0 ? 'partial' : 'done',
       stats,
+      blocosDisponiveis: parsedFull.blocos,
       notFound,
       errors,
     };

@@ -18,6 +18,7 @@ import { AccountingMaskController }     from './controllers/accounting-mask.cont
 import { AccountingImportController }   from './controllers/accounting-import.controller';
 import { BalanceComparisonController }  from './controllers/balance-comparison.controller';
 import { IobImportController }          from './controllers/iob-import.controller';
+import { MatrizImportController }       from './controllers/matriz-import.controller';
 import { ChartImporterController }   from './controllers/chart-importer.controller';
 import { JournalImporterController } from './controllers/journal-importer.controller';
 import { EncerramentoExercicioController } from './controllers/encerramento-exercicio.controller';
@@ -32,8 +33,8 @@ import { BankImportService }        from './services/bank-import.service';
 import { ChartOfAccountsService }   from './services/chart-of-accounts.service';
 import { JournalEntryService }      from './services/journal-entry.service';
 import { AccountingMaskService }    from './services/accounting-mask.service';
-import { IobImportService }         from './services/iob-import.service';
-import { IobPlanoParserService }    from './services/iob-plano-parser.service';
+import { MatrizImportService }      from './services/matriz-import.service';
+import { MatrizPlanoParserService }  from './services/matriz-plano-parser.service';
 import { ChartImporterService }       from './services/chart-importer.service';
 import { JournalImporterService }    from './services/journal-importer.service';
 import { EncerramentoExercicioService } from './services/encerramento-exercicio.service';
@@ -65,6 +66,7 @@ import { SidebarResourceGuard } from '../../auth/guards/sidebar-resource.guard';
     AccountingImportController,
     BalanceComparisonController,
     IobImportController,
+    MatrizImportController,
     ChartImporterController,
     JournalImporterController,
     EncerramentoExercicioController,
@@ -81,12 +83,12 @@ import { SidebarResourceGuard } from '../../auth/guards/sidebar-resource.guard';
     ChartOfAccountsService,
     JournalEntryService,
     AccountingMaskService,
-    IobImportService,
+    MatrizImportService,
     ChartImporterService,
     JournalImporterService,
     EncerramentoExercicioService,
     TabelaComparativaService,
-    IobPlanoParserService,
+    MatrizPlanoParserService,
     IobLotdParserService,
     IobLotdImportService,
     SidebarResourceGuard,

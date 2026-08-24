@@ -1,4 +1,7 @@
-// frontend/src/pages/accounting/IobImportModal.tsx
+// frontend/src/pages/accounting/MatrizImportModal.tsx
+// RENOMEADO 24/08/2026 (de IobImportModal.tsx): importa o Plano de Contas
+// MATRIZ (formato proprio LEDGR). O modal de LOTD (IobLotdImportModal.tsx)
+// continua com o nome IOB de proposito - layout real do sistema IOB.
 import React, { useState, useRef } from 'react';
 import { FiUpload, FiCheckCircle, FiXCircle, FiAlertTriangle, FiX } from 'react-icons/fi';
 
@@ -6,25 +9,34 @@ interface Props { onClose: () => void; onSuccess?: () => void; }
 
 const API = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3000';
 
-export const IobImportModal: React.FC<Props> = ({ onClose, onSuccess }) => {
+export const MatrizImportModal: React.FC<Props> = ({ onClose, onSuccess }) => {
   const [step, setStep]       = useState<'upload' | 'preview' | 'done'>('upload');
   const [file, setFile]       = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState<any>(null);
   const [result, setResult]   = useState<any>(null);
-  const fileRef               = useRef<HTMLInputElement>(null);
+  // CRIADO 24/08/2026: bloco opcional "Operacao Hoteleira" (Receita/Custos/
+  // Despesas de hotel) - so entra se marcado, ja que nao se aplica a maioria
+  // das empresas. Ver matriz-plano-parser.service.ts (marcador de bloco).
+  const [incluirHotelaria, setIncluirHotelaria] = useState(false);
+  const fileRef                = useRef<HTMLInputElement>(null);
 
   const token   = localStorage.getItem('@ledgr:token');
   const company = JSON.parse(localStorage.getItem('@ledgr:activeCompany') ?? '{}');
   const headers = { Authorization: `Bearer ${token}`, 'x-company-id': company.id ?? '' };
 
+  function buildFormData() {
+    const fd = new FormData();
+    fd.append('file', file as File);
+    if (incluirHotelaria) fd.append('blocos', 'HOTELARIA');
+    return fd;
+  }
+
   async function handleValidate() {
     if (!file) return;
     setLoading(true);
     try {
-      const fd = new FormData();
-      fd.append('file', file);
-      const res = await fetch(`${API}/accounting/iob/import-plano?dryRun=true`, { method: 'POST', headers, body: fd });
+      const res = await fetch(`${API}/accounting/matriz/import-plano?dryRun=true`, { method: 'POST', headers, body: buildFormData() });
       const data = await res.json();
       setPreview(data);
       setStep('preview');
@@ -36,9 +48,7 @@ export const IobImportModal: React.FC<Props> = ({ onClose, onSuccess }) => {
     if (!file) return;
     setLoading(true);
     try {
-      const fd = new FormData();
-      fd.append('file', file);
-      const res = await fetch(`${API}/accounting/iob/import-plano?dryRun=false`, { method: 'POST', headers, body: fd });
+      const res = await fetch(`${API}/accounting/matriz/import-plano?dryRun=false`, { method: 'POST', headers, body: buildFormData() });
       const data = await res.json();
       setResult(data);
       setStep('done');
@@ -56,7 +66,7 @@ export const IobImportModal: React.FC<Props> = ({ onClose, onSuccess }) => {
         <div style={{ padding: '16px 20px', borderBottom: '0.5px solid #E5E7EB', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#EFF6FF' }}>
           <div>
             <span style={{ fontSize: 11, fontWeight: 600, color: '#1D4ED8' }}>◆ Contábil</span>
-            <h2 style={{ margin: '2px 0 0', fontSize: 15, fontWeight: 500, color: '#111' }}>Importar Plano de Contas IOB</h2>
+            <h2 style={{ margin: '2px 0 0', fontSize: 15, fontWeight: 500, color: '#111' }}>Importar Plano de Contas Matriz</h2>
           </div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6B7280' }}><FiX size={18} /></button>
         </div>
@@ -67,7 +77,7 @@ export const IobImportModal: React.FC<Props> = ({ onClose, onSuccess }) => {
           {step === 'upload' && (
             <div>
               <p style={{ fontSize: 13, color: '#6B7280', marginBottom: 16 }}>
-                Selecione o arquivo <strong>PLANO.TXT</strong> exportado do sistema IOB. O código reduzido de cada conta será mapeado automaticamente para o plano de contas existente.
+                Selecione o arquivo <strong>PlanoContasMatrizLEDGR.txt</strong>. O código reduzido de cada conta será mapeado automaticamente para o plano de contas existente.
               </p>
               <div
                 onClick={() => fileRef.current?.click()}
@@ -75,11 +85,18 @@ export const IobImportModal: React.FC<Props> = ({ onClose, onSuccess }) => {
               >
                 <FiUpload size={24} style={{ color: file ? '#15803D' : '#9CA3AF', marginBottom: 8 }} />
                 <p style={{ fontSize: 13, color: file ? '#15803D' : '#6B7280', margin: 0 }}>
-                  {file ? file.name : 'Clique para selecionar o arquivo PLANO.TXT'}
+                  {file ? file.name : 'Clique para selecionar o arquivo da Matriz'}
                 </p>
                 {file && <p style={{ fontSize: 11, color: '#9CA3AF', margin: '4px 0 0' }}>{(file.size / 1024).toFixed(1)} KB</p>}
               </div>
               <input ref={fileRef} type="file" accept=".txt,.TXT" style={{ display: 'none' }} onChange={e => setFile(e.target.files?.[0] ?? null)} />
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 16, padding: '10px 12px', background: '#FFFBEB', border: '0.5px solid #FDE68A', borderRadius: 8, cursor: 'pointer' }}>
+                <input type="checkbox" checked={incluirHotelaria} onChange={e => setIncluirHotelaria(e.target.checked)} />
+                <span style={{ fontSize: 12, color: '#92400E' }}>
+                  Incluir grupo de <strong>Operação Hoteleira</strong> (Receita, Custos e Despesas de hotel) — marque só se esta empresa for do ramo hoteleiro.
+                </span>
+              </label>
             </div>
           )}
 
@@ -118,7 +135,7 @@ export const IobImportModal: React.FC<Props> = ({ onClose, onSuccess }) => {
                 <div style={{ background: '#F0FDF4', border: '0.5px solid #BBF7D0', borderRadius: 8, padding: 12 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <FiCheckCircle size={13} color="#15803D" />
-                    <span style={{ fontSize: 12, color: '#15803D' }}>{preview.stats.matched} contas terão o código reduzido IOB atualizado.</span>
+                    <span style={{ fontSize: 12, color: '#15803D' }}>{preview.stats.matched} contas terão o código reduzido atualizado.</span>
                   </div>
                 </div>
               )}
@@ -131,7 +148,7 @@ export const IobImportModal: React.FC<Props> = ({ onClose, onSuccess }) => {
               {result.status === 'done' || result.status === 'partial' ? (
                 <><FiCheckCircle size={40} color="#15803D" style={{ marginBottom: 12 }} />
                 <h3 style={{ fontSize: 16, fontWeight: 500, color: '#111', margin: '0 0 8px' }}>Importação concluída</h3>
-                <p style={{ fontSize: 13, color: '#6B7280' }}>{result.stats?.created > 0 ? `${result.stats.created} contas criadas. ` : ""}{result.stats?.matched > 0 ? `${result.stats.matched} contas atualizadas com código reduzido IOB.` : ""}</p>
+                <p style={{ fontSize: 13, color: '#6B7280' }}>{result.stats?.created > 0 ? `${result.stats.created} contas criadas. ` : ""}{result.stats?.matched > 0 ? `${result.stats.matched} contas atualizadas com código reduzido.` : ""}</p>
                 {result.stats?.notFound > 0 && <p style={{ fontSize: 12, color: '#B91C1C' }}>{result.stats.notFound} contas não encontradas.</p>}</>
               ) : (
                 <><FiXCircle size={40} color="#B91C1C" style={{ marginBottom: 12 }} />
@@ -161,6 +178,3 @@ export const IobImportModal: React.FC<Props> = ({ onClose, onSuccess }) => {
     </div>
   );
 };
-
-
-

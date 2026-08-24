@@ -9,7 +9,7 @@ import { useCompany } from '../../contexts/CompanyContext';
 import { Calendar, Edit } from 'lucide-react';
 import { AccountTree } from '../../components/accounting/AccountTree';
 import { AccountMaintenanceModal } from './AccountMaintenanceModal';
-import { IobImportModal } from './IobImportModal';
+import { MatrizImportModal } from './MatrizImportModal';
 
 import { IobLotdImportModal } from './IobLotdImportModal';
 interface Account {
@@ -41,7 +41,7 @@ export default function AccountsPage() {
     // 🔴 ESTADO PARA CONTROLAR O MODAL
     const [showMaintenanceModal, setShowMaintenanceModal] = useState(false);
 
-    const [showIobModal, setShowIobModal] = useState(false);
+    const [showMatrizModal, setShowMatrizModal] = useState(false);
     const [showLotdModal, setShowLotdModal] = useState(false);
     const [referenceDate, setReferenceDate] = useState(
         new Date().toISOString().split('T')[0]
@@ -97,11 +97,11 @@ export default function AccountsPage() {
                                 <span>Alterar Plano</span>
                             </button>
                             <button
-                                onClick={() => setShowIobModal(true)}
+                                onClick={() => setShowMatrizModal(true)}
                                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-purple-600 bg-purple-50 hover:bg-purple-100 rounded-full transition-colors border border-purple-200"
-                                title="Importar Plano de Contas IOB"
+                                title="Importar Plano de Contas Matriz LEDGR"
                             >
-                                <span>Importar IOB</span>
+                                <span>Importar Matriz</span>
                             </button>
                         </div>
                         <p className="text-slate-500 text-sm">
@@ -166,10 +166,10 @@ export default function AccountsPage() {
                     fetchTree();
                 }}
             />
-            {showIobModal && (
-                <IobImportModal
-                    onClose={() => setShowIobModal(false)}
-                    onSuccess={() => { setShowIobModal(false); fetchTree(); }}
+            {showMatrizModal && (
+                <MatrizImportModal
+                    onClose={() => setShowMatrizModal(false)}
+                    onSuccess={() => { setShowMatrizModal(false); fetchTree(); }}
                 />
             )}
         </div>

@@ -379,6 +379,7 @@
 2210107             0000000Provisoes Diferidas                                                                                 5    C    2.02.01
 22101070001         0001122Imposto de Renda Diferido                                                                           6    C    2.02.01
 22101070002         0001123CSLL Diferida                                                                                       6    C    2.02.01
+### BLOCO: HOTELARIA
 313              0000000Receita Operacional Hoteleira                                                                       3    C    
 31301            0000000Hospedagem                                                                                          4    C    
 3130101          0000000Diarias                                                                                             5    C    
@@ -447,6 +448,7 @@
 42501010014         0001164Royalty por Uso de Marca de Terceiros                                                               6    D    
 42501010015         0001165Comissao e Despesas de Cartao de Credito                                                            6    D    
 42501010016         0001166Despesa de Gerentes                                                                                 6    D    
+### BLOCO: NUCLEO
 426                 0000000Depreciacao e Amortizacao Operacional                                                               3    D    
 42601               0000000Depreciacao                                                                                         4    D    
 4260101             0000000Depreciacao                                                                                         5    D    
