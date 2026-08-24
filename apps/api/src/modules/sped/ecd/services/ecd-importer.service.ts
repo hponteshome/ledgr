@@ -252,7 +252,7 @@ export class EcdImporterService {
         }
 
         const type   = this.resolveAccountType(acc.natureCode, acc.name);
-        const nature = this.resolveNature(acc.natureCode);
+        const nature = this.resolveNature(acc.natureCode, type);
 
         const existing = await this.prisma.chartOfAccounts.findUnique({
           where: { companyId_code: { companyId, code: normalizedCode } },
@@ -586,7 +586,13 @@ export class EcdImporterService {
       case '02': return 'LIABILITY';
       case '03': return 'EQUITY';
       case '04': {
-        const upper   = name.toUpperCase();
+        const upper = name.toUpperCase();
+        // CORRIGIDO 23/08/2026: falso positivo achado com dado real (Hotelsys) -
+        // "COMISSOES SOBRE VENDAS" batia em "VENDAS" e "IMPOSTO DE RENDA" batia
+        // em "RENDA", classificando despesas como receita. Exclusao verificada
+        // ANTES do match de receita.
+        const expenseOverride = ['IMPOSTO', 'COMISSAO', 'COMISSOES', 'DESPESA', 'CUSTO', 'ENCARGO'];
+        if (expenseOverride.some(k => upper.includes(k))) return 'EXPENSE';
         const revenue = ['RECEITA', 'FATURAMENTO', 'VENDAS', 'RECEBI', 'RENDA'];
         return revenue.some(k => upper.includes(k)) ? 'REVENUE' : 'EXPENSE';
       }
@@ -595,11 +601,22 @@ export class EcdImporterService {
     }
   }
 
-  private resolveNature(natureCode: string): 'DEBIT' | 'CREDIT' {
+  private resolveNature(
+    natureCode: string,
+    type?: 'ASSET' | 'LIABILITY' | 'EQUITY' | 'REVENUE' | 'EXPENSE',
+  ): 'DEBIT' | 'CREDIT' {
     switch (natureCode) {
       case '01': return 'DEBIT';
       case '02': return 'CREDIT';
       case '03': return 'CREDIT';
+      // CORRIGIDO 23/08/2026: natureCode "04" (Resultado) nunca tinha case
+      // proprio - caia no default (DEBIT) para TODA conta de resultado,
+      // certo por acidente para Despesa, errado sistematicamente para
+      // Receita (que deveria ser CREDIT). Achado real: 11 de 14 contas de
+      // Receita da Hotelsys vieram com natureza invertida. Receita e Despesa
+      // compartilham natureCode "04" no SPED - so o "type" ja resolvido
+      // (via resolveAccountType) diferencia os dois aqui.
+      case '04': return type === 'REVENUE' ? 'CREDIT' : 'DEBIT';
       case '05': return 'DEBIT';
       default:   return 'DEBIT';
     }
