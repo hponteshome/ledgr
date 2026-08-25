@@ -6589,3 +6589,47 @@ quando fizer sentido):
 - Auditar outras empresas (GRB, LM, etc) pelo mesmo bug do normalizedParentCode
   (fix e generico, mas nunca foi checado se essas empresas ja tem contas orfas
   no historico)
+
+
+### Sessao 25/08/2026 (manha) — Encoding UTF-8 do import de Matriz + separacao ECD x Matriz nas telas de rotina
+
+**Contexto:** revisao com o usuario da tela de Plano de Contas (Sunsys), apos a
+correcao de ontem (desalinhamento/constraint/getTree). Corrupcao de "313"
+confirmada resolvida - mas 2 problemas novos identificados na revisao:
+
+**1. Encoding UTF-8/Latin-1:** MatrizImportController lia o arquivo como
+'latin1', herdado sem revisao do antigo IobImportController (onde faz sentido -
+layout real do sistema IOB para LOTD). PlanoContasMatrizLEDGR.txt sempre foi
+UTF-8, inclusive conteudo pre-existente a esta sessao inteira (achado real:
+linha antiga "Nao Circulante" decodifica certo em UTF-8, vira mojibake em
+Latin-1 - ou seja, o bug e antigo, nao foi introduzido pelas minhas edicoes).
+Corrigido para 'utf-8' - so no controller de Matriz, LOTD nao mexido.
+
+**2. Visibilidade ECD x Matriz:** decisao explicita do usuario - ECD nunca
+apagado (preserva para uso futuro em outras tarefas), mas nao deve aparecer em
+telas de rotina (lancamento corrente) se nao for especificamente sobre
+conteudo ECD. getTree()/validateStructure() (chart-of-accounts.service.ts)
+agora filtram `ecdImportLinks: { none: {} }` - exclui qualquer conta vinculada
+a um import ECD real, containers de raiz inclusive (o vinculo criado ontem no
+importer cobre toda conta do I050, nao so folhas). Raizes ECD nativas (ex: "7
+ATIVO", "630 PASSIVO E PATRIMONIO LIQUIDO" da Sunsys) somem do Plano de Contas,
+continuam intactas no banco.
+
+**Reparo de dado historico:** 184 contas com nome corrompido (mojibake) em
+Hotelsys (86) e Sunsys (98) - unicas empresas que passaram pelo import de
+matriz desde que o arquivo ja tinha acento. Corrigidas via
+`convert_from(convert_to(name, 'LATIN1'), 'UTF8')` com tratamento de erro por
+linha (protege contra double-corromper texto ja correto - a func da erro
+sozinha se aplicada a texto ja certo, entao so aplica onde realmente
+corrompido). GRB/LM/Pontes nao afetadas - nunca passaram pelo import de matriz
+recente.
+
+**Pendencia registrada (nao auditada nesta sessao):** outras telas de rotina
+(seletor de conta em lancamento, Balancete, relatorios) podem ter o mesmo
+problema de nao filtrar ecdImportLinks - so o Plano de Contas foi corrigido
+ate agora.
+
+**Nota de processo:** usuario perguntou sobre o pager do git (`git log`
+sempre abrindo modo interativo, precisando "q" pra sair) - orientado a rodar
+`git config --global core.pager cat` (ou `pager.log false` so pro log) pra
+desabilitar. Vou usar `git --no-pager log` nos comandos futuros tambem.
