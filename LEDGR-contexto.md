@@ -6633,3 +6633,49 @@ ate agora.
 sempre abrindo modo interativo, precisando "q" pra sair) - orientado a rodar
 `git config --global core.pager cat` (ou `pager.log false` so pro log) pra
 desabilitar. Vou usar `git --no-pager log` nos comandos futuros tambem.
+
+
+### Sessao 25/08/2026 (continuacao) — Plano de Contas Matriz migrado para tabela + CRUD
+
+**Motivacao:** usuario pediu tela em Administracao do Sistema pra atualizar o
+Plano de Contas Matriz. Aproveitado para resolver definitivamente a fragilidade
+do arquivo texto PlanoContasMatrizLEDGR.txt (fonte de multiplos bugs reais
+nesta mesma sessao - desalinhamento de coluna na renumeracao 312->313,
+encoding UTF-8/Latin-1).
+
+**Nova tabela:** MatrizMasterAccount (matriz_master_accounts) - template
+global (sem companyId), hierarquia por parentId real (FK), nao mais por
+prefixo de codigo. Indice unico parcial (WHERE deleted_at IS NULL) desde a
+criacao. Campo bloco (NUCLEO/HOTELARIA) substitui o marcador de texto do
+arquivo antigo.
+
+**Migracao de dado:** 472 registros (404 NUCLEO + 68 HOTELARIA) migrados do
+arquivo para a tabela via script Python (gera UUIDs, resolve parentId por
+prefixo de codigo uma ultima vez). Validado: 0 registros sem pai fora dos 4
+esperados (niveis 1).
+
+**MatrizImportService reescrito:** le direto da tabela, elimina totalmente a
+logica de mascara/prefixo (applyMask/stripDots/parentFormatted) que so existia
+para simular hierarquia a partir de codigo formatado - fonte historica de
+varios bugs de alinhamento. Import nao precisa mais de upload de arquivo.
+
+**CRUD completo:** MatrizMasterAccountController/Service (list/create/update/
+deactivate/reactivate - nunca hard-delete, contas ja usadas por empresas
+continuam intactas mesmo se desativadas no template) + MatrizMasterAccountsPage.tsx
+em Administracao do Sistema -> Plano de Contas Matriz (ordem 6). Destaque
+visual: grupos em negrito/maiusculo/fundo cinza, contas analiticas com
+marcador verde lateral e codigo reduzido destacado - facilita escanear a
+arvore visualmente.
+
+**Erros de processo cometidos e corrigidos durante a sessao** (documentados
+para aprendizado, nao afetaram o resultado final):
+- Script combinado (2 edicoes) abortou na segunda e eu assumi que a primeira
+  tinha sido descartada tambem (comportamento correto do script) - mas depois
+  tentei "consertar" rodando so a segunda edicao separadamente, que na verdade
+  JA tinha sido salva numa tentativa anterior nao percebida, causando duplicata
+  que precisou de correcao adicional. Licao: apos qualquer ABORTADO, sempre
+  reconferir o estado real do arquivo antes de decidir o proximo passo, nunca
+  assumir com base em mensagem anterior.
+- `PlanoContasMatrizLEDGR.txt` fica como artefato legado (nao mais lido por
+  nenhum fluxo do sistema) - pode ser arquivado ou removido do repo numa
+  proxima sessao se confirmado que nada mais depende dele.
