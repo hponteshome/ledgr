@@ -1,42 +1,39 @@
 // frontend/src/pages/accounting/MatrizImportModal.tsx
 // RENOMEADO 24/08/2026 (de IobImportModal.tsx): importa o Plano de Contas
-// MATRIZ (formato proprio LEDGR). O modal de LOTD (IobLotdImportModal.tsx)
-// continua com o nome IOB de proposito - layout real do sistema IOB.
-import React, { useState, useRef } from 'react';
-import { FiUpload, FiCheckCircle, FiXCircle, FiAlertTriangle, FiX } from 'react-icons/fi';
+// MATRIZ (formato proprio LEDGR).
+// REESCRITO 25/08/2026: nao precisa mais de upload de arquivo - o backend le
+// direto da tabela matriz_master_accounts (editada em Administracao do
+// Sistema -> Plano de Contas Matriz).
+import React, { useState } from 'react';
+import { FiCheckCircle, FiXCircle, FiX } from 'react-icons/fi';
 
 interface Props { onClose: () => void; onSuccess?: () => void; }
 
 const API = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3000';
 
 export const MatrizImportModal: React.FC<Props> = ({ onClose, onSuccess }) => {
-  const [step, setStep]       = useState<'upload' | 'preview' | 'done'>('upload');
-  const [file, setFile]       = useState<File | null>(null);
+  const [step, setStep]       = useState<'inicio' | 'preview' | 'done'>('inicio');
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState<any>(null);
   const [result, setResult]   = useState<any>(null);
-  // CRIADO 24/08/2026: bloco opcional "Operacao Hoteleira" (Receita/Custos/
-  // Despesas de hotel) - so entra se marcado, ja que nao se aplica a maioria
-  // das empresas. Ver matriz-plano-parser.service.ts (marcador de bloco).
   const [incluirHotelaria, setIncluirHotelaria] = useState(false);
-  const fileRef                = useRef<HTMLInputElement>(null);
 
   const token   = localStorage.getItem('@ledgr:token');
   const company = JSON.parse(localStorage.getItem('@ledgr:activeCompany') ?? '{}');
-  const headers = { Authorization: `Bearer ${token}`, 'x-company-id': company.id ?? '' };
+  const headers = {
+    Authorization: `Bearer ${token}`,
+    'x-company-id': company.id ?? '',
+    'Content-Type': 'application/json',
+  };
 
-  function buildFormData() {
-    const fd = new FormData();
-    fd.append('file', file as File);
-    if (incluirHotelaria) fd.append('blocos', 'HOTELARIA');
-    return fd;
+  function body() {
+    return JSON.stringify({ blocos: incluirHotelaria ? ['HOTELARIA'] : [] });
   }
 
   async function handleValidate() {
-    if (!file) return;
     setLoading(true);
     try {
-      const res = await fetch(`${API}/accounting/matriz/import-plano?dryRun=true`, { method: 'POST', headers, body: buildFormData() });
+      const res = await fetch(`${API}/accounting/matriz/import-plano?dryRun=true`, { method: 'POST', headers, body: body() });
       const data = await res.json();
       setPreview(data);
       setStep('preview');
@@ -45,10 +42,9 @@ export const MatrizImportModal: React.FC<Props> = ({ onClose, onSuccess }) => {
   }
 
   async function handleConfirm() {
-    if (!file) return;
     setLoading(true);
     try {
-      const res = await fetch(`${API}/accounting/matriz/import-plano?dryRun=false`, { method: 'POST', headers, body: buildFormData() });
+      const res = await fetch(`${API}/accounting/matriz/import-plano?dryRun=false`, { method: 'POST', headers, body: body() });
       const data = await res.json();
       setResult(data);
       setStep('done');
@@ -62,7 +58,6 @@ export const MatrizImportModal: React.FC<Props> = ({ onClose, onSuccess }) => {
   return (
     <div style={s.overlay}>
       <div style={s.modal}>
-        {/* Header */}
         <div style={{ padding: '16px 20px', borderBottom: '0.5px solid #E5E7EB', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#EFF6FF' }}>
           <div>
             <span style={{ fontSize: 11, fontWeight: 600, color: '#1D4ED8' }}>◆ Contábil</span>
@@ -73,25 +68,14 @@ export const MatrizImportModal: React.FC<Props> = ({ onClose, onSuccess }) => {
 
         <div style={{ padding: 24, overflowY: 'auto', flex: 1 }}>
 
-          {/* STEP 1: Upload */}
-          {step === 'upload' && (
+          {step === 'inicio' && (
             <div>
               <p style={{ fontSize: 13, color: '#6B7280', marginBottom: 16 }}>
-                Selecione o arquivo <strong>PlanoContasMatrizLEDGR.txt</strong>. O código reduzido de cada conta será mapeado automaticamente para o plano de contas existente.
+                Aplica o Plano de Contas Matriz vigente (mantido em Administração do Sistema)
+                a esta empresa. Contas ja existentes tem o código reduzido atualizado; contas
+                novas sao criadas.
               </p>
-              <div
-                onClick={() => fileRef.current?.click()}
-                style={{ border: '2px dashed #D1D5DB', borderRadius: 10, padding: '32px 24px', textAlign: 'center', cursor: 'pointer', background: file ? '#F0FDF4' : '#F9FAFB' }}
-              >
-                <FiUpload size={24} style={{ color: file ? '#15803D' : '#9CA3AF', marginBottom: 8 }} />
-                <p style={{ fontSize: 13, color: file ? '#15803D' : '#6B7280', margin: 0 }}>
-                  {file ? file.name : 'Clique para selecionar o arquivo da Matriz'}
-                </p>
-                {file && <p style={{ fontSize: 11, color: '#9CA3AF', margin: '4px 0 0' }}>{(file.size / 1024).toFixed(1)} KB</p>}
-              </div>
-              <input ref={fileRef} type="file" accept=".txt,.TXT" style={{ display: 'none' }} onChange={e => setFile(e.target.files?.[0] ?? null)} />
-
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 16, padding: '10px 12px', background: '#FFFBEB', border: '0.5px solid #FDE68A', borderRadius: 8, cursor: 'pointer' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', background: '#FFFBEB', border: '0.5px solid #FDE68A', borderRadius: 8, cursor: 'pointer' }}>
                 <input type="checkbox" checked={incluirHotelaria} onChange={e => setIncluirHotelaria(e.target.checked)} />
                 <span style={{ fontSize: 12, color: '#92400E' }}>
                   Incluir grupo de <strong>Operação Hoteleira</strong> (Receita, Custos e Despesas de hotel) — marque só se esta empresa for do ramo hoteleiro.
@@ -100,14 +84,12 @@ export const MatrizImportModal: React.FC<Props> = ({ onClose, onSuccess }) => {
             </div>
           )}
 
-          {/* STEP 2: Preview dry-run */}
           {step === 'preview' && preview && (
             <div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10, marginBottom: 16 }}>
                 {[
-                  { label: 'Total no arquivo', value: preview.stats?.total, color: '#111' },
+                  { label: 'Total no plano', value: preview.stats?.total, color: '#111' },
                   { label: 'Contas mapeadas', value: preview.stats?.matched, color: '#15803D' },
-                  { label: 'Não encontradas', value: preview.stats?.notFound, color: preview.stats?.notFound > 0 ? '#B91C1C' : '#15803D' },
                   { label: 'Contas a criar', value: preview.stats?.created, color: preview.stats?.created > 0 ? '#1D4ED8' : '#9CA3AF' },
                 ].map(k => (
                   <div key={k.label} style={{ background: '#F9FAFB', border: '0.5px solid #E5E7EB', borderRadius: 8, padding: '10px 14px' }}>
@@ -116,21 +98,6 @@ export const MatrizImportModal: React.FC<Props> = ({ onClose, onSuccess }) => {
                   </div>
                 ))}
               </div>
-
-              {preview.notFound?.length > 0 && (
-                <div style={{ background: '#FEF2F2', border: '0.5px solid #FECACA', borderRadius: 8, padding: 12, marginBottom: 12 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-                    <FiAlertTriangle size={13} color="#B91C1C" />
-                    <span style={{ fontSize: 12, fontWeight: 500, color: '#B91C1C' }}>Contas não encontradas no plano ({preview.notFound.length})</span>
-                  </div>
-                  <div style={{ maxHeight: 120, overflowY: 'auto' }}>
-                    {preview.notFound.map((c: string, i: number) => (
-                      <div key={i} style={{ fontSize: 11, color: '#B91C1C', fontFamily: 'monospace', padding: '1px 0' }}>{c}</div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
               {preview.stats?.matched > 0 && (
                 <div style={{ background: '#F0FDF4', border: '0.5px solid #BBF7D0', borderRadius: 8, padding: 12 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -139,17 +106,23 @@ export const MatrizImportModal: React.FC<Props> = ({ onClose, onSuccess }) => {
                   </div>
                 </div>
               )}
+              {preview.errors?.length > 0 && (
+                <div style={{ background: '#FEF2F2', border: '0.5px solid #FECACA', borderRadius: 8, padding: 12, marginTop: 12 }}>
+                  <div style={{ fontSize: 12, fontWeight: 500, color: '#B91C1C', marginBottom: 6 }}>{preview.errors.length} erro(s)</div>
+                  {preview.errors.slice(0, 10).map((e: any, i: number) => (
+                    <div key={i} style={{ fontSize: 11, color: '#B91C1C', fontFamily: 'monospace' }}>{e.message}</div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
-          {/* STEP 3: Done */}
           {step === 'done' && result && (
             <div style={{ textAlign: 'center', padding: '20px 0' }}>
               {result.status === 'done' || result.status === 'partial' ? (
                 <><FiCheckCircle size={40} color="#15803D" style={{ marginBottom: 12 }} />
                 <h3 style={{ fontSize: 16, fontWeight: 500, color: '#111', margin: '0 0 8px' }}>Importação concluída</h3>
-                <p style={{ fontSize: 13, color: '#6B7280' }}>{result.stats?.created > 0 ? `${result.stats.created} contas criadas. ` : ""}{result.stats?.matched > 0 ? `${result.stats.matched} contas atualizadas com código reduzido.` : ""}</p>
-                {result.stats?.notFound > 0 && <p style={{ fontSize: 12, color: '#B91C1C' }}>{result.stats.notFound} contas não encontradas.</p>}</>
+                <p style={{ fontSize: 13, color: '#6B7280' }}>{result.stats?.created > 0 ? `${result.stats.created} contas criadas. ` : ""}{result.stats?.matched > 0 ? `${result.stats.matched} contas atualizadas.` : ""}</p></>
               ) : (
                 <><FiXCircle size={40} color="#B91C1C" style={{ marginBottom: 12 }} />
                 <p style={{ fontSize: 13, color: '#B91C1C' }}>Erro na importação.</p></>
@@ -158,18 +131,17 @@ export const MatrizImportModal: React.FC<Props> = ({ onClose, onSuccess }) => {
           )}
         </div>
 
-        {/* Footer */}
         <div style={{ padding: '12px 20px', borderTop: '0.5px solid #E5E7EB', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
           <button onClick={onClose} style={{ padding: '8px 16px', borderRadius: 8, border: '0.5px solid #D1D5DB', background: '#fff', color: '#374151', fontSize: 13, cursor: 'pointer' }}>
             {step === 'done' ? 'Fechar' : 'Cancelar'}
           </button>
-          {step === 'upload' && (
-            <button onClick={handleValidate} disabled={!file || loading} style={{ padding: '8px 18px', borderRadius: 8, border: 'none', background: '#2563EB', color: '#fff', fontSize: 13, cursor: 'pointer', opacity: !file || loading ? 0.5 : 1 }}>
-              {loading ? 'Validando...' : 'Validar Arquivo'}
+          {step === 'inicio' && (
+            <button onClick={handleValidate} disabled={loading} style={{ padding: '8px 18px', borderRadius: 8, border: 'none', background: '#2563EB', color: '#fff', fontSize: 13, cursor: 'pointer', opacity: loading ? 0.5 : 1 }}>
+              {loading ? 'Validando...' : 'Validar'}
             </button>
           )}
           {step === 'preview' && (
-            <button onClick={handleConfirm} disabled={loading || (preview?.stats?.matched === 0 && preview?.stats?.created === 0)} style={{ padding: '8px 18px', borderRadius: 8, border: 'none', background: '#111', color: '#fff', fontSize: 13, cursor: 'pointer', opacity: loading || preview?.stats?.matched === 0 ? 0.5 : 1 }}>
+            <button onClick={handleConfirm} disabled={loading} style={{ padding: '8px 18px', borderRadius: 8, border: 'none', background: '#111', color: '#fff', fontSize: 13, cursor: 'pointer', opacity: loading ? 0.5 : 1 }}>
               {loading ? 'Importando...' : 'Confirmar Importação'}
             </button>
           )}

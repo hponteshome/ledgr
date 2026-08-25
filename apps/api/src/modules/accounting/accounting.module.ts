@@ -19,6 +19,7 @@ import { AccountingImportController }   from './controllers/accounting-import.co
 import { BalanceComparisonController }  from './controllers/balance-comparison.controller';
 import { IobImportController }          from './controllers/iob-import.controller';
 import { MatrizImportController }       from './controllers/matriz-import.controller';
+import { MatrizMasterAccountController } from './controllers/matriz-master-account.controller';
 import { ChartImporterController }   from './controllers/chart-importer.controller';
 import { JournalImporterController } from './controllers/journal-importer.controller';
 import { EncerramentoExercicioController } from './controllers/encerramento-exercicio.controller';
@@ -34,6 +35,7 @@ import { ChartOfAccountsService }   from './services/chart-of-accounts.service';
 import { JournalEntryService }      from './services/journal-entry.service';
 import { AccountingMaskService }    from './services/accounting-mask.service';
 import { MatrizImportService }      from './services/matriz-import.service';
+import { MatrizMasterAccountService } from './services/matriz-master-account.service';
 import { MatrizPlanoParserService }  from './services/matriz-plano-parser.service';
 import { ChartImporterService }       from './services/chart-importer.service';
 import { JournalImporterService }    from './services/journal-importer.service';
@@ -67,6 +69,7 @@ import { SidebarResourceGuard } from '../../auth/guards/sidebar-resource.guard';
     BalanceComparisonController,
     IobImportController,
     MatrizImportController,
+    MatrizMasterAccountController,
     ChartImporterController,
     JournalImporterController,
     EncerramentoExercicioController,
@@ -84,6 +87,7 @@ import { SidebarResourceGuard } from '../../auth/guards/sidebar-resource.guard';
     JournalEntryService,
     AccountingMaskService,
     MatrizImportService,
+    MatrizMasterAccountService,
     ChartImporterService,
     JournalImporterService,
     EncerramentoExercicioService,

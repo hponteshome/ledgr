@@ -75,6 +75,9 @@ model User {
   updatedAccounts           ChartOfAccounts[]         @relation("UpdatedAccounts")
   // CRIADO 23/08/2026 — Tabela Comparativa ECD x Matriz (conceito 22/08/2026)
   ecdAccountMappingsCreated EcdAccountMapping[]       @relation("EcdMappingCreatedBy")
+  // CRIADO 25/08/2026 — Plano de Contas Matriz (template global)
+  matrizMasterCreated MatrizMasterAccount[] @relation("MatrizMasterCreated")
+  matrizMasterUpdated MatrizMasterAccount[] @relation("MatrizMasterUpdated")
   createdApEntries          ApEntry[]                 @relation("CreatedApEntries")
   updatedApEntries          ApEntry[]                 @relation("UpdatedApEntries")
   accountingConfigs         CompanyAccountingConfig[] @relation("AccountingConfigCreator")
@@ -1198,6 +1201,42 @@ model ChartOfAccounts {
   // findFirst({where:{companyId, code, deletedAt: null}}) no lugar.
   @@index([companyId, type])
   @@map("chart_of_accounts")
+}
+
+/// Plano de Contas Matriz - template global (nao tem companyId) usado como
+/// base ao importar/criar o plano de contas de qualquer empresa nova.
+/// CRIADO 25/08/2026, substitui a edicao manual do arquivo texto de largura
+/// fixa PlanoContasMatrizLEDGR.txt - fonte de varios bugs reais (desalinhamento
+/// de coluna, encoding UTF-8/Latin-1) corrigidos nesta mesma sessao. Migrado
+/// via script unico (import inicial dos 474 registros do arquivo, ver
+/// LEDGR-contexto.md 25/08/2026).
+model MatrizMasterAccount {
+  id          String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code        String        @map("code") @db.VarChar
+  reducedCode String?       @map("reduced_code") @db.VarChar(10)
+  name        String        @map("name") @db.VarChar
+  level       Int           @map("level")
+  type        AccountType   @map("type")
+  nature      AccountNature @map("nature")
+  isAnalytic  Boolean       @default(false) @map("is_analytic")
+  bloco       String        @default("NUCLEO") @map("bloco") @db.VarChar(30)
+
+  parentId String?               @map("parent_id") @db.Uuid
+  parent   MatrizMasterAccount?  @relation("MatrizMasterHierarchy", fields: [parentId], references: [id])
+  children MatrizMasterAccount[] @relation("MatrizMasterHierarchy")
+
+  isActive    Boolean   @default(true) @map("is_active")
+  createdById String?   @map("created_by_id") @db.Uuid
+  updatedById String?   @map("updated_by_id") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamp(6)
+
+  createdBy User? @relation("MatrizMasterCreated", fields: [createdById], references: [id])
+  updatedBy User? @relation("MatrizMasterUpdated", fields: [updatedById], references: [id])
+
+  @@index([bloco])
+  @@map("matriz_master_accounts")
 }
 
 /// Configuração de máscara do plano de contas por empresa.
