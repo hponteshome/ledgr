@@ -361,8 +361,12 @@ export class ChartOfAccountsService {
 
   async validateStructure(companyId: string) {
     // CORRIGIDO 24/08/2026: faltava deletedAt:null (mesmo bug do getTree)
+    // CORRIGIDO 25/08/2026: exclui arvore ECD (historico importado, nunca
+    // deve aparecer em tela de rotina) - filtro via ausencia de vinculo em
+    // chart_of_accounts_ecd_imports, criado pelo importer para toda conta
+    // que veio de um arquivo ECD real (containers inclusive).
     const accounts = await this.prisma.chartOfAccounts.findMany({
-      where: { companyId, deletedAt: null }, orderBy: { code: 'asc' },
+      where: { companyId, deletedAt: null, ecdImportLinks: { none: {} } }, orderBy: { code: 'asc' },
     });
 
     const issues = [];
@@ -419,8 +423,13 @@ export class ChartOfAccountsService {
     // quando o pai delas nao existia mais na lista visivel). Achado real: 27
     // contas-fantasma da Sunsys (import corrompido de arquivo desalinhado, ja
     // corrigido) ficaram visiveis na tela mesmo apos soft-delete, ate este fix.
+    // CORRIGIDO 25/08/2026: Plano de Contas e uma tela de ROTINA (lancamento
+    // corrente) - a arvore ECD (historico importado, preservado intacto por
+    // decisao arquitetural anterior) nao deve aparecer aqui, so em telas
+    // especificas de ECD (Historico, Tabela Comparativa). Nunca apagada -
+    // so ocultada. Mesmo filtro ecdImportLinks:{none:{}} do validateStructure.
     const accounts = await this.prisma.chartOfAccounts.findMany({
-      where: { companyId, deletedAt: null }, orderBy: { code: 'asc' },
+      where: { companyId, deletedAt: null, ecdImportLinks: { none: {} } }, orderBy: { code: 'asc' },
     });
 
     const ecdBalances = await this.prisma.accountBalance.findMany({

@@ -26,7 +26,12 @@ export class MatrizImportController {
     @Query('dryRun') dryRun: string,
     @Body('blocos') blocos: string, // CSV opcional, ex: "HOTELARIA"
   ) {
-    const fileContent = file.buffer.toString('latin1');
+    // CORRIGIDO 25/08/2026: PlanoContasMatrizLEDGR.txt sempre foi UTF-8 (achado
+    // real: linha pre-existente "Nao Circulante" decodifica certo em UTF-8 e
+    // vira mojibake em Latin-1). O 'latin1' aqui foi herdado sem revisao do
+    // antigo IobImportController - la faz sentido (formato real do sistema
+    // IOB), aqui nao - sao arquivos e fontes diferentes.
+    const fileContent = file.buffer.toString('utf-8');
     const blocosIncluidos = blocos ? blocos.split(',').map(b => b.trim()).filter(Boolean) : [];
     return this.matrizImportService.importPlano(
       req.companyId,
