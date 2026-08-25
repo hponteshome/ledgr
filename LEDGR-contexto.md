@@ -6679,3 +6679,37 @@ para aprendizado, nao afetaram o resultado final):
 - `PlanoContasMatrizLEDGR.txt` fica como artefato legado (nao mais lido por
   nenhum fluxo do sistema) - pode ser arquivado ou removido do repo numa
   proxima sessao se confirmado que nada mais depende dele.
+
+
+### Sessao 25/08/2026 (continuacao 2) — Comparativo de Saldos resgatado (periodo flexivel)
+
+**Motivacao:** usuario pediu para resgatar a feature "Comparativo de Saldos"
+(link no sidebar nunca funcionava). Distinta da Tabela Comparativa ECD x
+Matriz (24/08/2026) - esta e um comparativo simples de saldo por conta ao
+longo de multiplos periodos escolhidos (mes/ano), sem depender de
+ecd_account_mappings/de-para.
+
+**Achado real:** o link nunca funcionava porque o path no sidebar_items
+("/app/accounting/balance-comparison") estava desalinhado da rota real
+registrada ("app/reports/balance-comparison") - bug pre-existente, nao
+introduzido nesta sessao, corrigido via UPDATE direto em sidebar_items.
+
+**Decisoes de escopo (confirmadas com o usuario):**
+- Inclui arvore ECD (nao so Matriz) - historico de saldos antigos normalmente
+  so existe la. Diferente do Plano de Contas/Balancete de rotina (24/08/2026),
+  que oculta ECD.
+- Periodo: intervalo mes/ano inicial + final, sistema gera automaticamente um
+  fim-de-mes por mes no meio (nao lista livre de datas).
+
+**Backend reescrito:** BalanceComparisonService substitui
+BalancesService.getBalanceComparison (agrupava account_balance bruto por ANO,
+sem filtro deletedAt, sem garantia de fim-de-periodo - so pegava o ultimo
+registro que aparecesse na iteracao). Reaproveita 100% a logica ja validada
+do Balancete - TrialBalanceService.getVerificationBalance(company, data, data):
+com startDate=endDate=data, previousBalance (tudo antes) + movimento do
+proprio dia = saldo acumulado exatamente ate aquela data. Zero duplicacao de
+logica de calculo de saldo contabil.
+
+**Frontend reescrito:** anos fixos hardcoded (2014-2020) substituidos por 4
+selects (mes/ano inicial, mes/ano final) - input type=month nunca usado (regra
+do projeto). Contas sinteticas destacadas visualmente, indentacao por nivel.
