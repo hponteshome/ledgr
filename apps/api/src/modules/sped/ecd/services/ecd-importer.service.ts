@@ -254,8 +254,13 @@ export class EcdImporterService {
         const type   = this.resolveAccountType(acc.natureCode, acc.name);
         const nature = this.resolveNature(acc.natureCode, type);
 
-        const existing = await this.prisma.chartOfAccounts.findUnique({
-          where: { companyId_code: { companyId, code: normalizedCode } },
+        // CORRIGIDO 24/08/2026: findUnique(companyId_code) trocado por findFirst
+        // - o acessor de unique compound sumiu junto com a constraint
+        // @@unique([companyId, code]) removida do schema (era incompativel
+        // com soft-delete). deletedAt:null aqui e explicito porque o
+        // indice parcial que substitui a constraint so cobre linhas ativas.
+        const existing = await this.prisma.chartOfAccounts.findFirst({
+          where: { companyId, code: normalizedCode, deletedAt: null },
         });
 
         let accountId: string;

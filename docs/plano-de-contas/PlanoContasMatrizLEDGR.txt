@@ -380,33 +380,33 @@
 22101070001         0001122Imposto de Renda Diferido                                                                           6    C    2.02.01
 22101070002         0001123CSLL Diferida                                                                                       6    C    2.02.01
 ### BLOCO: HOTELARIA
-313              0000000Receita Operacional Hoteleira                                                                       3    C    
-31301            0000000Hospedagem                                                                                          4    C    
-3130101          0000000Diarias                                                                                             5    C    
-31301010001       0001124Receita de Diarias                                                                                  6    C    
-3130102          0000000Requerimentos                                                                                       5    C    
-31301020001       0001125Receita de Requerimentos                                                                            6    C    
-31302            0000000Locacao de Espacos e Equipamentos                                                                   4    C    
-3130201          0000000Aluguel de Sala                                                                                     5    C    
-31302010001       0001126Receita Aluguel de Sala                                                                             6    C    
-3130202          0000000Aluguel Espacos p Negocios                                                                          5    C    
-31302020001       0001127Receita Aluguel Espacos p Negocios                                                                  6    C    
-3130203          0000000Aluguel Cadeiras de Praia                                                                           5    C    
-31302030001       0001128Receita Aluguel Cadeiras de Praia                                                                   6    C    
-3130204          0000000Locacao de Equipamento                                                                              5    C    
-31302040001       0001129Receita Locacao de Equipamento                                                                      6    C    
-31303            0000000Servicos ao Hospede                                                                                 4    C    
-3130301          0000000Lavanderia                                                                                          5    C    
-31303010001       0001130Receita de Lavanderia                                                                               6    C    
-3130302          0000000Academia e SPA                                                                                      5    C    
-31303020001       0001131Receita de Academia e SPA                                                                           6    C    
-3130303          0000000Telecomunicacoes                                                                                    5    C    
-31303030001       0001132Receita de Telecomunicacoes                                                                         6    C    
-3130304          0000000Estacionamento                                                                                      5    C    
-31303040001       0001133Receita de Estacionamento                                                                           6    C    
-31304            0000000Deducoes da Receita Hoteleira                                                                       4    D    
-3130401          0000000Vendas Canceladas                                                                                   5    D    
-31304010001       0001134Vendas Canceladas                                                                                   6    D    
+313                 0000000Receita Operacional Hoteleira                                                                       3    C    
+31301               0000000Hospedagem                                                                                          4    C    
+3130101             0000000Diarias                                                                                             5    C    
+31301010001         0001124Receita de Diarias                                                                                  6    C    
+3130102             0000000Requerimentos                                                                                       5    C    
+31301020001         0001125Receita de Requerimentos                                                                            6    C    
+31302               0000000Locacao de Espacos e Equipamentos                                                                   4    C    
+3130201             0000000Aluguel de Sala                                                                                     5    C    
+31302010001         0001126Receita Aluguel de Sala                                                                             6    C    
+3130202             0000000Aluguel Espacos p Negocios                                                                          5    C    
+31302020001         0001127Receita Aluguel Espacos p Negocios                                                                  6    C    
+3130203             0000000Aluguel Cadeiras de Praia                                                                           5    C    
+31302030001         0001128Receita Aluguel Cadeiras de Praia                                                                   6    C    
+3130204             0000000Locacao de Equipamento                                                                              5    C    
+31302040001         0001129Receita Locacao de Equipamento                                                                      6    C    
+31303               0000000Servicos ao Hospede                                                                                 4    C    
+3130301             0000000Lavanderia                                                                                          5    C    
+31303010001         0001130Receita de Lavanderia                                                                               6    C    
+3130302             0000000Academia e SPA                                                                                      5    C    
+31303020001         0001131Receita de Academia e SPA                                                                           6    C    
+3130303             0000000Telecomunicacoes                                                                                    5    C    
+31303030001         0001132Receita de Telecomunicacoes                                                                         6    C    
+3130304             0000000Estacionamento                                                                                      5    C    
+31303040001         0001133Receita de Estacionamento                                                                           6    C    
+31304               0000000Deducoes da Receita Hoteleira                                                                       4    D    
+3130401             0000000Vendas Canceladas                                                                                   5    D    
+31304010001         0001134Vendas Canceladas                                                                                   6    D    
 424                 0000000Custos Diretos de Hospedagem                                                                        3    D    
 42401               0000000Custos de A e B e Suprimentos                                                                       4    D    
 4240101             0000000Alimentos e Bebidas                                                                                 5    D    

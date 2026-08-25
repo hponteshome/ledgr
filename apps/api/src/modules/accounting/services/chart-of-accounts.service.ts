@@ -360,8 +360,9 @@ export class ChartOfAccountsService {
   // ── Validar estrutura do plano ─────────────────────────────────────────────
 
   async validateStructure(companyId: string) {
+    // CORRIGIDO 24/08/2026: faltava deletedAt:null (mesmo bug do getTree)
     const accounts = await this.prisma.chartOfAccounts.findMany({
-      where: { companyId }, orderBy: { code: 'asc' },
+      where: { companyId, deletedAt: null }, orderBy: { code: 'asc' },
     });
 
     const issues = [];
@@ -413,8 +414,13 @@ export class ChartOfAccountsService {
   async getTree(companyId: string, date?: string) {
     const refDate = date ? new Date(date + 'T23:59:59Z') : new Date();
 
+    // CORRIGIDO 24/08/2026: faltava deletedAt:null - a arvore mostrava contas
+    // soft-deletadas junto com as ativas (apareciam soltas fora da hierarquia
+    // quando o pai delas nao existia mais na lista visivel). Achado real: 27
+    // contas-fantasma da Sunsys (import corrompido de arquivo desalinhado, ja
+    // corrigido) ficaram visiveis na tela mesmo apos soft-delete, ate este fix.
     const accounts = await this.prisma.chartOfAccounts.findMany({
-      where: { companyId }, orderBy: { code: 'asc' },
+      where: { companyId, deletedAt: null }, orderBy: { code: 'asc' },
     });
 
     const ecdBalances = await this.prisma.accountBalance.findMany({

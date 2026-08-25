@@ -1188,7 +1188,14 @@ model ChartOfAccounts {
   // Descricao padrao para o item LALUR gerado automaticamente
   lalurItens      LalurItem[]
 
-  @@unique([companyId, code])
+  // CORRIGIDO 24/08/2026: @@unique([companyId, code]) removido daqui - era
+  // incompativel com soft-delete (uma vez deletado, o codigo ficava
+  // permanentemente bloqueado, impedindo recriar a conta). Substituido por
+  // indice UNICO PARCIAL (WHERE deleted_at IS NULL), gerenciado fora do
+  // Prisma via migracao manual (prisma/migrations-manuais/2026-08-24-partial-unique-chart-of-accounts.sql)
+  // - Prisma nao suporta indice parcial na DSL do schema. O acessor
+  // findUnique({where:{companyId_code}}) deixou de existir; usar
+  // findFirst({where:{companyId, code, deletedAt: null}}) no lugar.
   @@index([companyId, type])
   @@map("chart_of_accounts")
 }
