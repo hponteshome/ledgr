@@ -6713,3 +6713,86 @@ logica de calculo de saldo contabil.
 **Frontend reescrito:** anos fixos hardcoded (2014-2020) substituidos por 4
 selects (mes/ano inicial, mes/ano final) - input type=month nunca usado (regra
 do projeto). Contas sinteticas destacadas visualmente, indentacao por nivel.
+
+
+### Sessao 25/08/2026 (continuacao 3) — Investigacao Razao/Diario Hotelsys + ACHADO CRITICO: ecf-importer.service.ts e stub sem persistencia real
+
+**Contexto:** consulta de lancamentos por mes na Hotelsys (Razao/Diario) revelou
+padrao real em 9 anos: 2017 tem escrituracao completa (1200-2400 lancamentos/mes,
+todos os 12 meses); 2018-2025 tem so uma rajada pequena em janeiro + bloco maior
+em dezembro (juros/multas de tributos e obrigacoes trabalhistas em atraso -
+ICMS, IRPJ, CSLL, IPTU, CIM, PIS/COFINS, INSS, CLT/MAED) + o lancamento formal
+de encerramento (IND_LCTO=E) - zero movimento de marco a novembro em todos os
+8 anos seguintes. Nao e falha de importacao - e o que foi de fato declarado.
+
+**Evidencia da continuidade do resultado (account_balances, verificado 2017-2025):**
+- `2302001197/24204002 PREJUIZOS ACUMULADOS`: CONGELADO em R$ 90.451.855,10
+  desde 2017-12-31 ate 2025-12-31 (nunca atualizado - saldo estatico de
+  prejuizos anteriores a 2017)
+- `2302001198 RESULTADO DO EXERCICIO`: cresce cumulativamente TODO ano (nunca
+  zera) - 2017: R$3,42M -> 2025: R$19,47M. Nao segue o padrao classico de
+  "resultado do exercicio zera ao ser transferido para acumulados" - fica
+  acumulando indefinidamente nesta conta.
+- `2302001199 AJUSTES DE EXERCICIOS ANTERIORES`: salto grande de R$1,3M (dez/17)
+  para R$16,4M (jan/18) - correspondente aos ajustes retroativos vistos no
+  Diario. Pequenos ajustes adicionais quase todo janeiro seguinte.
+
+**Ideia de transicao proposta pelo usuario (nao executada, so desenhada):**
+em vez de espelhar TODOS os lancamentos ECD para Matriz (ideia anterior,
+abortada por risco/volume - ver entrada anterior desta sessao), fazer uma
+ABERTURA formal em 01/01/2018 na Matriz (mesmo padrao ja validado da
+ABERTURA-2016 da Hotelsys), carregando o saldo de fechamento de 31/12/2017,
+e a partir dai considerar 2018 em diante como o "livro operativo real" da
+empresa em LEDGR. Dado que 2018-2025 tem volume PEQUENO (100-200 lancamentos/
+ano, nao milhares), converter esses tambem para Matriz via de/para e
+tecnicamente viavel e de baixo risco - diferente da tentativa anterior com
+2017 inteiro (22 mil lancamentos).
+
+**Ressalva critica levantada:** o saldo de "Prejuizos Acumulados" no ECD e um
+numero CONTABIL (Balanco) - NAO e necessariamente identico ao "Prejuizo Fiscal
+a Compensar" do e-LALUR Parte B (ECF), que e o que realmente importa para
+compensacao futura de IRPJ/CSLL. Os dois se relacionam mas divergem por
+adicoes/exclusoes do LALUR. Qualquer abertura 2018 que carregue prejuizo
+fiscal precisa reconciliar contra o e-LALUR real, nao so o saldo contabil.
+
+**ACHADO CRITICO - ecf-importer.service.ts e um STUB, nunca fez persistencia
+real:** usuario lembrava de ja ter "usado com sucesso" a importacao de ECF -
+investigacao revelou que o metodo `import()` (unico caminho, chamado por
+POST /sped/ecf/import) NAO tem nenhum `prisma.create()` em lugar nenhum -
+so retorna um objeto de resultado FABRICADO com `success: true` sempre,
+calculado a partir do tamanho de arrays do `parsed` (que essa sim, a camada
+de parsing, funciona corretamente). Outros metodos (getImports, getBalances,
+getSummary, deleteImport) sao `// TODO` explicitos retornando vazio/null/zero.
+
+**Validado empiricamente:** tabelas `ecf_part_a`, `ecf_part_b`, `lalur_itens`
+confirmadas com 0 registros (todas as empresas) ANTES e DEPOIS do usuario
+testar ao vivo a importacao do ECF 2017 real da Hotelsys pela tela - que
+mostrou "ECF importada com sucesso" com numeros corretos do parser (407
+contas, 612 lancamentos, 13 periodos, 0 erros de parsing) mas gravou
+literalmente ZERO linhas no banco. A mensagem de sucesso na tela e enganosa -
+sempre aparece, independente de qualquer persistencia real ter ocorrido.
+
+**DECISAO:** usuario optou por registrar como PENDENCIA CRITICA E PRIORITARIA,
+retomar em sessao FUTURA DEDICADA (dado o peso da decisao - dados fiscais,
+prejuizo fiscal, base para decisao tributaria real). NAO construir as pressas.
+
+**Plano para a proxima sessao dedicada:**
+1. Ler ecf-parser.service.ts por completo - entender a estrutura exata do
+   objeto `parsed` (accounts, journalEntries, registrosParteA, registrosParteB)
+2. Verificar especificamente se/como o parser captura os registros M300/M305/
+   M350 (Bloco M - LALUR, onde fica o Prejuizo Fiscal a Compensar - Parte B)
+3. Ver os models Prisma EcfPartA/EcfPartB/LalurItem (schema.prisma) - schema
+   ja existe, so a persistencia que falta
+4. Construir a logica REAL de persistencia em ecf-importer.service.ts
+   (atualmente 100% stub) - accounts, balances, journalEntries, ecf_part_a,
+   ecf_part_b, lalur_itens
+5. Importar as ECFs reais transmitidas (usuario confirmou ter 2017-2025 da
+   Hotelsys) e validar o prejuizo fiscal acumulado extraido contra o que
+   foi de fato declarado/homologado
+6. So DEPOIS disso, com o e-LALUR real como fonte de verdade, retomar a
+   decisao de abertura 2018 na Matriz com seguranca
+
+**Pendencia tambem registrada:** verificar Razao/Diario (rotas /app/accounting/
+razao e /app/accounting/diario existem no sidebar) - nao chegamos a avaliar
+o conteudo renderizado dessas telas, so consultamos o banco direto via SQL
+para entender o padrao de lancamentos.
