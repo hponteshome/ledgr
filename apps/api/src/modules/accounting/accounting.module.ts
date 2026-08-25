@@ -28,6 +28,7 @@ import { TabelaComparativaController } from './controllers/tabela-comparativa.co
 // Services
 import { AccountingService }        from './services/accounting.service';
 import { BalancesService }          from './services/balances.service';
+import { BalanceComparisonService } from './services/balance-comparison.service';
 import { TrialBalanceService }      from './services/trial-balance.service';
 import { BalanceImportService }     from './services/balance-import.service';
 import { BankImportService }        from './services/bank-import.service';
@@ -80,6 +81,7 @@ import { SidebarResourceGuard } from '../../auth/guards/sidebar-resource.guard';
     PrismaService,
     AccountingService,
     BalancesService,
+    BalanceComparisonService,
     TrialBalanceService,
     BalanceImportService,
     BankImportService,
