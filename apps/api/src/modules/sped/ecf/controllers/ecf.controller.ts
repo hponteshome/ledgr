@@ -123,7 +123,7 @@ export class EcfController {
     }
 
     try {
-      const result = await this.importer.import(parsed, companyId, userId);
+      const result = await this.importer.import(parsed, companyId, userId, file.originalname);
       return {
         success:     true,
         importId:    result.importId,

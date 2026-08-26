@@ -41,6 +41,46 @@ export interface EcfLalurEntry {
   indRec: string;
 }
 
+// CRIADO 26/08/2026: Parte B REAL do e-Lalur/e-Lacs (prejuizo fiscal a
+// compensar, base de calculo negativa da CSLL). Achado critico: o parser
+// antigo so capturava M300 (Parte A) e rotulava M350 (que na verdade e
+// Parte A do e-LACS/CSLL, nao Parte B) como "registrosParteB" - a Parte B
+// de verdade fica em M010 (cadastro+saldo inicial), M410 (lancamento no
+// periodo) e M500 (controle de saldos, saldo inicial+movimento+saldo final,
+// registro gerado pelo sistema). Validado campo a campo contra 6 ECFs reais
+// da Hotelsys (2017, 2020-2024) - ver LEDGR-contexto.md 26/08/2026.
+export interface EcfPartBAccount {
+  codCta: string;        // codigo da conta na Parte B (definido pela empresa)
+  descricao: string;
+  dtCriacao: string;
+  tipoTributo: string;   // I = IRPJ | C = CSLL
+  vlSldIni: number;      // saldo inicial (ex: prejuizo acumulado ate a data de criacao da conta)
+  indSldIni: string;     // D ou C
+}
+
+export interface EcfPartBMovement {
+  codCta: string;
+  tipoTributo: string;
+  valor: number;
+  indicador: string;     // PF=Prejuizo do Periodo | BC=Base Calc Negativa CSLL do Periodo | outros (CR/DB)
+  codContaContrapartida: string;
+  historico: string;
+  indDiferimento: string;
+}
+
+export interface EcfPartBSaldo {
+  codCta: string;
+  tipoTributo: string;
+  vlSldIni: number;
+  indSldIni: string;
+  vlMov1: number;
+  indMov1: string;
+  vlMov2: number;
+  indMov2: string;
+  vlSldFin: number;      // saldo final do periodo - o numero que importa para prejuizo fiscal a compensar
+  indSldFin: string;
+}
+
 export interface EcfTaxCalc {
   perApur: string;
   vlLucroReal?: number;
@@ -64,6 +104,9 @@ export interface EcfParsed {
   accounts: EcfAccount[];
   periods: EcfPeriod[];
   lalurParteA: EcfLalurEntry[];
+  partBAccounts: EcfPartBAccount[];   // M010
+  partBMovements: EcfPartBMovement[]; // M410
+  partBSaldos: EcfPartBSaldo[];       // M500
   taxCalcs: EcfTaxCalc[];
   socios: any[];
   journalEntries: string[];
@@ -80,6 +123,7 @@ export class EcfParserService {
       reg0000: null, reg0030: null, fileInfo: null,
       periodStart: '', periodEnd: '',
       accounts: [], periods: [], lalurParteA: [],
+      partBAccounts: [], partBMovements: [], partBSaldos: [],
       taxCalcs: [], socios: [],
       journalEntries: [], registrosParteA: [], registrosParteB: [],
       errors: [],
@@ -98,8 +142,8 @@ export class EcfParserService {
           case '0000': {
             const cnpj = f[4]?.trim() ?? '';
             const nome = f[5]?.trim() ?? '';
-            const dtIni = f[9]?.trim() ?? '';
-            const dtFin = f[10]?.trim() ?? '';
+            const dtIni = f[10]?.trim() ?? '';
+            const dtFin = f[11]?.trim() ?? '';
             result.reg0000 = { cnpj, companyName: nome, periodStart: dtIni, periodEnd: dtFin };
             result.periodStart = dtIni;
             result.periodEnd = dtFin;
@@ -169,6 +213,49 @@ export class EcfParserService {
           }
 
           case 'M350': { result.registrosParteB!.push(line); break; }
+
+          case 'M010': {
+            // Layout do campo varia entre versoes de leiaute (2017 vs 2020+
+            // deslocam campos) - codCta e descricao sao estaveis (logo apos
+            // o nome do registro); os 3 campos finais significativos sao
+            // sempre [tipoTributo(I/C), valor, indicador(D/C)] nessa ordem,
+            // entao busca-se pelo final do array em vez de posicao fixa.
+            const codCta = f[2]?.trim() ?? '';
+            const descricao = f[3]?.trim() ?? '';
+            const dtCriacao = f[4]?.trim() ?? '';
+            const significativos = f.slice(5).map(v => v?.trim() ?? '').filter(v => v !== '');
+            let tipoTributo = '', vlSldIni = 0, indSldIni = '';
+            for (let i = significativos.length - 1; i >= 2; i--) {
+              const a = significativos[i-2], b = significativos[i-1], c = significativos[i];
+              if ((a === 'I' || a === 'C') && /^-?\d+([.,]\d+)?$/.test(b) && (c === 'D' || c === 'C')) {
+                tipoTributo = a; vlSldIni = this.parseDecimal(b); indSldIni = c;
+                break;
+              }
+            }
+            result.partBAccounts.push({ codCta, descricao, dtCriacao, tipoTributo, vlSldIni, indSldIni });
+            break;
+          }
+
+          case 'M410': {
+            result.partBMovements.push({
+              codCta: f[2]?.trim() ?? '', tipoTributo: f[3]?.trim() ?? '',
+              valor: this.parseDecimal(f[4]), indicador: f[5]?.trim() ?? '',
+              codContaContrapartida: f[6]?.trim() ?? '', historico: f[7]?.trim() ?? '',
+              indDiferimento: f[8]?.trim() ?? '',
+            });
+            break;
+          }
+
+          case 'M500': {
+            result.partBSaldos.push({
+              codCta: f[2]?.trim() ?? '', tipoTributo: f[3]?.trim() ?? '',
+              vlSldIni: this.parseDecimal(f[4]), indSldIni: f[5]?.trim() ?? '',
+              vlMov1: this.parseDecimal(f[6]), indMov1: f[7]?.trim() ?? '',
+              vlMov2: this.parseDecimal(f[8]), indMov2: f[9]?.trim() ?? '',
+              vlSldFin: this.parseDecimal(f[10]), indSldFin: f[11]?.trim() ?? '',
+            });
+            break;
+          }
 
           case 'N030': {
             currentTaxCalc = { perApur: f[4]?.trim()??''   };

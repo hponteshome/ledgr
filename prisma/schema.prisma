@@ -297,6 +297,7 @@ model Company {
   apEntries              ApEntry[]
   ecfPartAs              EcfPartA[]
   ecfPartBs              EcfPartB[]
+  ecfImportLogs          EcfImportLog[]
   maskConfigs            CompanyMaskConfig[]       @relation("CompanyMaskConfigs")
   accountingConfigs      CompanyAccountingConfig[]
   informesRendimentos    InformeRendimentos[]
@@ -2490,21 +2491,66 @@ model EcfPartA {
   @@map("ecf_part_a")
 }
 
-/// LALUR Parte B — Controle de adições e exclusões temporárias do lucro real.
+/// LALUR Parte B — Controle de saldos (prejuizo fiscal a compensar, base de
+/// calculo negativa da CSLL) - registro M500 da ECF (saldo inicial+movimento
+/// do periodo+saldo final, gerado pelo sistema da RFB a partir do M010+M410).
+/// CORRIGIDO 26/08/2026: faltava period e tipoTributo - constraint original
+/// (companyId, accountCode) so guardava 1 saldo por conta, sobrescrevendo a
+/// cada importacao. Sem historico ano a ano, impossivel validar continuidade
+/// do prejuizo fiscal - motivo real desta correcao (achado durante conferencia
+/// manual da cadeia 2017-2024 da Hotelsys, ver LEDGR-contexto.md 26/08/2026).
+/// tipoTributo necessario pois a mesma empresa pode reutilizar o mesmo
+/// accountCode para I (IRPJ) e C (CSLL) em contas distintas (visto em dado real).
 model EcfPartB {
   id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   companyId   String   @map("company_id") @db.Uuid
   accountCode String   @map("account_code") @db.VarChar
+  tipoTributo String   @map("tipo_tributo") @db.VarChar(1) // I ou C
+  period      String   @map("period") @db.VarChar          // ano-calendario da ECF, ex "2024"
   description String   @map("description") @db.VarChar
-  balance     Decimal  @map("balance") @db.Decimal(18, 2)
+  saldoInicial Decimal @default(0) @map("saldo_inicial") @db.Decimal(18, 2)
+  movimento    Decimal @default(0) @map("movimento") @db.Decimal(18, 2)
+  balance     Decimal  @map("balance") @db.Decimal(18, 2) // saldo final (M500) - o valor que importa
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
 
   company Company @relation(fields: [companyId], references: [id])
 
-  @@unique([companyId, accountCode])
-  @@index([companyId])
+  // CORRIGIDO 26/08/2026: @@unique simples aqui - a licao de 24/08/2026
+  // (indice parcial por causa de soft-delete) NAO se aplica a este modelo,
+  // que nao tem campo deletedAt. Unique normal permite upsert idempotente
+  // ao reimportar/corrigir uma ECF ja importada, sem duplicar linha.
+  @@unique([companyId, accountCode, tipoTributo, period])
+  @@index([companyId, period])
   @@map("ecf_part_b")
+}
+
+/// CRIADO 26/08/2026: log de cada arquivo ECF importado - nome do arquivo,
+/// versao de leiaute, periodo declarado e snapshot dos totais no momento da
+/// importacao. Necessario porque EcfPartA/EcfPartB guardam DADO (saldos,
+/// lancamentos), nao METADADO de importacao - a tela de Historico precisa
+/// dos dois separados.
+model EcfImportLog {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId     String   @map("company_id") @db.Uuid
+  fileName      String   @map("file_name") @db.VarChar
+  layoutVersion String?  @map("layout_version") @db.VarChar(10)
+  periodStart   String   @map("period_start") @db.VarChar(8)  // DDMMAAAA
+  periodEnd     String   @map("period_end") @db.VarChar(8)
+  period        String   @map("period") @db.VarChar          // ano-calendario, ex "2024"
+  accounts      Int      @default(0) @map("accounts")
+  journalEntries Int     @default(0) @map("journal_entries")
+  registrosParteA Int    @default(0) @map("registros_parte_a")
+  registrosParteB Int    @default(0) @map("registros_parte_b")
+  status        String   @map("status") @db.VarChar(20)       // done | partial | error
+  warnings      Json?    @map("warnings")
+  createdById   String?  @map("created_by_id") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@index([companyId, period])
+  @@map("ecf_import_logs")
 }
 
 // =============================================================================
