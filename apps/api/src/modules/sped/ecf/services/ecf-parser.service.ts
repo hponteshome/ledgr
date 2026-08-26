@@ -31,14 +31,18 @@ export interface EcfPeriod {
   balances: EcfBalance[];
 }
 
+// CORRIGIDO 26/08/2026: campos do M300 estavam errados desde antes desta
+// sessao (indProcJud/descLanc/dtLanc/indLancLalur/indRec nao existem nessa
+// ordem no leiaute real) - achado ao construir a tela de visualizacao do
+// LALUR, toda descricao aparecia "R" e valor sempre 0. Layout real validado
+// contra ECF 2024 real da Hotelsys: codCta|descLanc|tipo(R/L/A/E/C)|nivel|
+// vlLanc.
 export interface EcfLalurEntry {
   codCta: string;
-  indProcJud: string;
   descLanc: string;
-  dtLanc: string;
+  tipo: string;   // R=Atividade/Resultado (cabecalho) | L=Lucro Liquido | A=Adicao | E=Exclusao | C=Compensacao
+  nivel: string;
   vlLanc: number;
-  indLancLalur: string;
-  indRec: string;
 }
 
 // CRIADO 26/08/2026: Parte B REAL do e-Lalur/e-Lacs (prejuizo fiscal a
@@ -203,10 +207,9 @@ export class EcfParserService {
 
           case 'M300': {
             result.lalurParteA.push({
-              codCta: f[2]?.trim()??''  , indProcJud: f[3]?.trim()??''  ,
-              descLanc: f[4]?.trim()??''  , dtLanc: f[5]?.trim()??''  ,
+              codCta: f[2]?.trim()??''  , descLanc: f[3]?.trim()??''  ,
+              tipo: f[4]?.trim()??''  , nivel: f[5]?.trim()??''  ,
               vlLanc: this.parseDecimal(f[6]),
-              indLancLalur: f[7]?.trim()??''  , indRec: f[8]?.trim()??''  ,
             });
             result.registrosParteA!.push(line);
             break;

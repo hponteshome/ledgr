@@ -43,7 +43,7 @@ export class EcfController {
   ) {
     if (!file) throw new BadRequestException('Nenhum arquivo enviado');
 
-    const content = file.buffer.toString('latin1');
+    const content = this.decodeEcfBuffer(file.buffer);
     const parsed  = await this.parser.parse(content);
     const company = await this.getCompanyData(companyId);
     const validation = this.validator.validate(parsed, company?.taxId ?? '');
@@ -110,7 +110,13 @@ export class EcfController {
   ) {
     if (!file) throw new BadRequestException('Arquivo não enviado.');
 
-    const content  = file.buffer.toString('latin1');
+    // CORRIGIDO 26/08/2026: arquivos ECF genuinos (gerados pelo PVA oficial
+    // da Receita) sao Latin-1/Windows-1252 - mas um arquivo editado a mao
+    // num editor moderno (ex: correcao manual de acentuacao) normalmente
+    // vira UTF-8. Deteccao automatica: tenta UTF-8, confere round-trip
+    // exato contra os bytes originais - se bater, era UTF-8 valido; senao,
+    // usa latin1 (sempre "funciona" sem perda, seguro para arquivo genuino).
+    const content  = this.decodeEcfBuffer(file.buffer);
     const parsed   = await this.parser.parse(content);
     const company  = await this.getCompanyData(companyId);
     const validation = this.validator.validate(parsed, company?.taxId ?? '');
@@ -213,12 +219,25 @@ export class EcfController {
     };
   }
 
+  @Get('lalur')
+  getLalurView(@Company() companyId: string) {
+    return this.importer.getLalurView(companyId);
+  }
+
   @Get('balances')
   getBalances(
     @Company() companyId: string,
     @Query('periodEnd') periodEnd?: string,
   ) {
     return this.importer.getBalances(companyId, periodEnd);
+  }
+
+  // CRIADO 26/08/2026: deteccao automatica de encoding (ver comentario acima)
+  private decodeEcfBuffer(buffer: Buffer): string {
+    const asUtf8 = buffer.toString('utf-8');
+    const roundTrip = Buffer.from(asUtf8, 'utf-8');
+    if (Buffer.compare(buffer, roundTrip) === 0) return asUtf8;
+    return buffer.toString('latin1');
   }
 
   // ── Helper: busca empresa ativa via Prisma ───────────────────

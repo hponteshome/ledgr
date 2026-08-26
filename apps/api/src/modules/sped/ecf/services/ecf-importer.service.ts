@@ -82,19 +82,29 @@ export class EcfImporterService {
       }
 
       // ── 1. Parte A (M300) - padrao substituicao: apaga o periodo e regrava ──
+      // CORRIGIDO 26/08/2026: M300 se repete uma vez por sub-periodo K030/N030
+      // dentro do ano (13x: anual A00 + 12 meses A01-A12) - achado real ao
+      // exibir a tela de LALUR, toda conta aparecia duplicada 13x identica.
+      // O bloco K030 vem ANTES do M no arquivo e a 1a repeticao de cada
+      // codigo M300 corresponde ao periodo ANUAL (A00, sempre o primeiro
+      // K030 do arquivo) - mantem so a 1a ocorrencia de cada codCta.
+      const parteAAnual = new Map<string, typeof parsed.lalurParteA[number]>();
+      for (const e of parsed.lalurParteA) {
+        if (!e.codCta) continue;
+        if (!parteAAnual.has(e.codCta)) parteAAnual.set(e.codCta, e);
+      }
+
       await this.prisma.ecfPartA.deleteMany({ where: { companyId, period } });
-      if (parsed.lalurParteA.length > 0) {
+      if (parteAAnual.size > 0) {
         await this.prisma.ecfPartA.createMany({
-          data: parsed.lalurParteA
-            .filter(e => e.codCta)
-            .map(e => ({
-              companyId,
-              code: e.codCta,
-              description: e.descLanc || '(sem descricao)',
-              value: e.vlLanc,
-              type: e.indLancLalur || '',
-              period,
-            })),
+          data: Array.from(parteAAnual.values()).map(e => ({
+            companyId,
+            code: e.codCta,
+            description: e.descLanc || '(sem descricao)',
+            value: e.vlLanc,
+            type: e.tipo || '',
+            period,
+          })),
         });
       }
 
@@ -261,5 +271,50 @@ export class EcfImporterService {
       where: { companyId, ...(periodEnd ? { period: periodEnd } : {}) },
       orderBy: [{ period: 'asc' }, { accountCode: 'asc' }],
     });
+  }
+
+  // CRIADO 26/08/2026: visualizacao do LALUR (Parte A + Parte B) para tela
+  // dedicada - Parte B como pivot (conta x periodo, mesmo padrao usado na
+  // Tabela Comparativa ECD x Matriz e no Comparativo de Saldos, 24-25/08/2026).
+  async getLalurView(companyId: string) {
+    const [parteA, parteB] = await Promise.all([
+      this.prisma.ecfPartA.findMany({
+        where: { companyId },
+        orderBy: [{ period: 'desc' }, { code: 'asc' }],
+      }),
+      this.prisma.ecfPartB.findMany({
+        where: { companyId },
+        orderBy: [{ period: 'asc' }, { accountCode: 'asc' }],
+      }),
+    ]);
+
+    const periodos = Array.from(new Set(parteB.map(b => b.period))).sort();
+
+    const porConta = new Map<string, any>();
+    for (const b of parteB) {
+      const chave = `${b.accountCode}|${b.tipoTributo}`;
+      if (!porConta.has(chave)) {
+        porConta.set(chave, {
+          accountCode: b.accountCode,
+          tipoTributo: b.tipoTributo,
+          descricao: b.description,
+          saldos: {},
+        });
+      }
+      porConta.get(chave).saldos[b.period] = {
+        saldoInicial: Number(b.saldoInicial),
+        movimento: Number(b.movimento),
+        balance: Number(b.balance),
+      };
+    }
+
+    return {
+      periodos,
+      parteB: Array.from(porConta.values()),
+      parteA: parteA.map(a => ({
+        period: a.period, code: a.code, description: a.description,
+        value: Number(a.value), type: a.type,
+      })),
+    };
   }
 }
