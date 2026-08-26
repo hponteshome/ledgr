@@ -6871,3 +6871,54 @@ inteira: ECD/ECF sao registro historico imutavel.
 fiscal/base negativa CSLL) validada e continua 2017-2024, tela de
 visualizacao do LALUR funcionando. Desbloqueia decisao de abertura Matriz
 2018 com fonte de verdade fiscal auditavel.
+
+
+### Sessao 26/08/2026 (continuacao 2) — Livro LALUR nativo (Relatorios -> Contabilidade)
+
+**Motivacao:** usuario pediu um livro LALUR oficial (Parte A + Parte B),
+mesmo padrao dos livros ja existentes (Diario Geral, Razao Analitico, DRE,
+Balanco Patrimonial), calculado EXCLUSIVAMENTE dos lancamentos contabeis
+reais em LEDGR - distinto do LALUR importado da ECF (construido mais cedo
+hoje), que serve como referencia de conciliacao.
+
+**Investigacao de possivel vies (locacao):** usuario suspeitou que o motor
+de apuracao existente (apuracao.service.ts, ja tinha 23KB de codigo real -
+nao stub) poderia ter sido pensado so para empresa de locacao de imoveis.
+Investigado em 3 camadas - motor de calculo (generico, agrupa por
+account.type/nature sem hardcode de ramo), configuracao por conta
+(dedutibilidade zerada em TODAS as empresas, nao so a suspeita), tela
+(sem nenhuma mencao textual a locacao/hotel/holding). Nenhum vies real
+encontrado - a suspeita nao se confirmou, mas a investigacao revelou que
+"Config. Dedutibilidade" precisa ser preenchida para qualquer empresa
+antes do "Gerar Sugestoes" funcionar (trabalho de configuracao pendente,
+nao bug).
+
+**Schema novo:** LalurPartBNativo - mesma estrutura de controle de saldo
+(saldo inicial + movimento + saldo final) por ano validada ontem no lado
+da ECF (EcfPartB), mas mantida nativamente a partir da apuracao contabil
+propria.
+
+**Logica implementada (ApuracaoService):**
+- calcularPartBNativa(): calcula lucro real anual (resultado contabil +
+  ajustes Parte A do mesmo ano via LalurItem) e grava o movimento de
+  Parte B, encadeado com o ano anterior. Implementa a TRAVA DOS 30% (Lei
+  9.065/1995) - compensacao de prejuizo fiscal nunca pode exceder 30% do
+  lucro real positivo do proprio ano.
+- getLivroLalur(): Parte A + Parte B (historico ate o ano) para exibicao.
+
+**Tela nova:** LivroLalurPage.tsx (Contabilidade -> Relatorios -> LALUR,
+ordem 5). Mesmo padrao formal/impressao (window.print()) dos outros livros.
+
+**Testado com sucesso real:** calculo gerado e impresso para Hotelsys 2022.
+Achado esperado (nao bug): saldo nativo LEDGR (R$3.693.639,68) diverge do
+saldo declarado na ECF para o mesmo ano (movimento R$1.842.619,55) -
+reflete a escrituracao ainda esparsa pos-2017 (achado de sessao anterior:
+volume real de lancamentos so em jan/dez de cada ano). Essa divergencia
+E o proposito de conciliacao - fica visivel, nao suprimida, e serve de
+guia para a reconstrucao da escrituracao.
+
+**Pendencias registradas para uso pleno da feature:**
+- Configurar "Config. Dedutibilidade" por conta em cada empresa (Fiscal ->
+  Config. Dedutibilidade) - sem isso, "Gerar Sugestoes" nao encontra nada.
+- Considerar completar a escrituracao contabil pos-2017 da Hotelsys para
+  que o Livro LALUR nativo reflita a posicao real, nao so o esparso atual.
