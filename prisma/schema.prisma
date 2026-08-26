@@ -339,6 +339,7 @@ model Company {
   companyTaxRegimes         CompanyTaxRegime[]
   apuracoesImpostos         ApuracaoImpostos[]
   lalurItens                LalurItem[]
+  lalurPartBNativo          LalurPartBNativo[]
   efdContribuicoes          EfdContribuicoes[]
   nfseNacionalEmissoes      NfseNacionalEmissao[]
 
@@ -4552,6 +4553,33 @@ model LalurItem {
   @@index([apuracaoId])
   @@index([companyId, competencia])
   @@map("lalur_itens")
+}
+
+/// CRIADO 26/08/2026: Parte B NATIVA do LALUR (controle de saldo de
+/// prejuizo fiscal/base negativa CSLL) calculada a partir dos lancamentos
+/// contabeis reais em LEDGR - distinta da Parte B importada da ECF
+/// (EcfPartB), que reflete o que ja foi DECLARADO à Receita. Esta serve
+/// como base para o Livro LALUR oficial (Relatorios -> Contabilidade) e
+/// para conciliacao cruzada com o dado da ECF.
+model LalurPartBNativo {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId    String   @map("company_id") @db.Uuid
+  ano          String   @map("ano") @db.VarChar(4)
+  tipoTributo  String   @map("tipo_tributo") @db.VarChar(1) // I=IRPJ | C=CSLL
+  saldoInicial Decimal  @default(0) @map("saldo_inicial") @db.Decimal(18, 2)
+  novoPrejuizo Decimal  @default(0) @map("novo_prejuizo") @db.Decimal(18, 2) // gerado no proprio ano (lucro real < 0)
+  compensacao  Decimal  @default(0) @map("compensacao") @db.Decimal(18, 2)   // usado no proprio ano (limitado a 30% do lucro real positivo)
+  saldoFinal   Decimal  @default(0) @map("saldo_final") @db.Decimal(18, 2)
+  lucroRealAno Decimal? @map("lucro_real_ano") @db.Decimal(18, 2) // referencia: lucro real do ano que gerou o movimento
+  createdById  String?  @map("created_by_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@unique([companyId, ano, tipoTributo])
+  @@index([companyId, ano])
+  @@map("lalur_part_b_nativo")
 }
 
 // =============================================================================

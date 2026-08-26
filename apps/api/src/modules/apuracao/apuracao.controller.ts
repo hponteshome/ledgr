@@ -79,4 +79,15 @@ export class ApuracaoController {
   deleteLalur(@Req() req: any, @Param('comp') comp: string, @Param('id') id: string) {
     return this.svc.deleteLalurItem(req.companyId, id);
   }
+
+  // CRIADO 26/08/2026: Livro LALUR oficial (Parte A + Parte B nativa)
+  @Post('lalur-part-b/:ano/calcular')
+  calcularPartBNativa(@Req() req: any, @Param('ano') ano: string) {
+    return this.svc.calcularPartBNativa(req.companyId, ano, req.user.id);
+  }
+
+  @Get('livro-lalur/:ano')
+  getLivroLalur(@Req() req: any, @Param('ano') ano: string) {
+    return this.svc.getLivroLalur(req.companyId, ano);
+  }
 }

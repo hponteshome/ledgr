@@ -67,6 +67,7 @@ import DiarioGeralPage from '../pages/accounting/DiarioGeralPage';
 import DrePage from '../pages/accounting/DrePage';
 import AgendaPage from '../pages/finance/AgendaPage';
 import BalancoPatrimonialPage from '../pages/accounting/BalancoPatrimonialPage';
+import LivroLalurPage from '../pages/accounting/LivroLalurPage';
 import RazaoAnaliticoPage from '../pages/accounting/RazaoAnaliticoPage';
 import CdbProjecaoPage from '../pages/accounting/investments/CdbProjecaoPage';
 import ProLaborePage from '../pages/hr/ProLabore';
@@ -174,6 +175,7 @@ export const AppRoutes = () => {
                 <Route path="app/sped/aglutinacao-rfb" element={<ProtectedRoute><AglutinacaoRfbPage /></ProtectedRoute>} />
                 <Route path="app/accounting/validate-ecd" element={<ProtectedRoute><EcdValidationPage /></ProtectedRoute>} />
                 <Route path="app/accounting/dre" element={<ProtectedRoute><DrePage /></ProtectedRoute>} /><Route path="app/accounting/balanco" element={<ProtectedRoute><BalancoPatrimonialPage /></ProtectedRoute>} />
+                <Route path="app/accounting/lalur" element={<ProtectedRoute><LivroLalurPage /></ProtectedRoute>} />
                 <Route path="app/accounting/diario" element={<ProtectedRoute><DiarioGeralPage /></ProtectedRoute>} />
                 <Route path="app/accounting/investimentos/renda-fixa" element={<ProtectedRoute><RendaFixaPage /></ProtectedRoute>} />
                 <Route path="app/accounting/investimentos/simulador" element={<ProtectedRoute><CdbProjecaoPage /></ProtectedRoute>} />

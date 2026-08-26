@@ -469,4 +469,83 @@ export class ApuracaoService {
     ]);
     return { pis, irpj, lalur, resultado, receitas };
   }
+
+  // CRIADO 26/08/2026: Parte B NATIVA do LALUR - calculada a partir dos
+  // lancamentos contabeis reais (getResultadoContabil, anual) + ajustes ja
+  // lancados na Parte A (LalurItem) do mesmo ano. Distinta da Parte B
+  // importada da ECF (EcfPartB) - esta reflete a escrituracao propria em
+  // LEDGR, usada para o Livro LALUR oficial e conciliacao cruzada.
+  async calcularPartBNativa(companyId: string, ano: string, userId: string) {
+    const competenciaIni = `${ano}-01`;
+    const competenciaFim = `${ano}-12`;
+    const { resultado } = await this.getResultadoContabil(companyId, competenciaIni, competenciaFim);
+
+    const itensAno = await this.prisma.lalurItem.findMany({
+      where: { companyId, competencia: { gte: competenciaIni, lte: competenciaFim } },
+    });
+
+    const resultados: Record<string, any> = {};
+
+    for (const tipoTributo of ['I', 'C']) {
+      const imposto = tipoTributo === 'I' ? 'IRPJ' : 'CSLL';
+      const adicoes = itensAno
+        .filter(i => i.tipo === 'ADICAO' && (i.imposto === imposto || i.imposto === 'AMBOS'))
+        .reduce((s, i) => s + Number(i.valor), 0);
+      const exclusoes = itensAno
+        .filter(i => i.tipo === 'EXCLUSAO' && (i.imposto === imposto || i.imposto === 'AMBOS'))
+        .reduce((s, i) => s + Number(i.valor), 0);
+
+      const lucroReal = resultado + adicoes - exclusoes;
+
+      const anterior = await this.prisma.lalurPartBNativo.findFirst({
+        where: { companyId, tipoTributo, ano: { lt: ano } },
+        orderBy: { ano: 'desc' },
+      });
+      const saldoInicial = anterior ? Number(anterior.saldoFinal) : 0;
+
+      let novoPrejuizo = 0, compensacao = 0;
+      if (lucroReal < 0) {
+        // gera novo prejuizo/base negativa a compensar em anos futuros
+        novoPrejuizo = Math.abs(lucroReal);
+      } else if (lucroReal > 0 && saldoInicial > 0) {
+        // TRAVA DOS 30%: compensacao de prejuizo fiscal nunca pode exceder
+        // 30% do lucro real positivo do proprio ano (Lei 9.065/1995, art. 15/16)
+        const limiteTrava = lucroReal * 0.30;
+        compensacao = Math.min(saldoInicial, limiteTrava);
+      }
+      const saldoFinal = saldoInicial + novoPrejuizo - compensacao;
+
+      const salvo = await this.prisma.lalurPartBNativo.upsert({
+        where: { companyId_ano_tipoTributo: { companyId, ano, tipoTributo } },
+        create: {
+          companyId, ano, tipoTributo, saldoInicial, novoPrejuizo, compensacao, saldoFinal,
+          lucroRealAno: lucroReal, createdById: userId,
+        },
+        update: { saldoInicial, novoPrejuizo, compensacao, saldoFinal, lucroRealAno: lucroReal },
+      });
+      resultados[tipoTributo] = salvo;
+    }
+
+    return resultados;
+  }
+
+  // CRIADO 26/08/2026: dados formatados para o Livro LALUR oficial
+  // (Relatorios -> Contabilidade), Parte A + Parte B, ano completo.
+  async getLivroLalur(companyId: string, ano: string) {
+    const competenciaIni = `${ano}-01`;
+    const competenciaFim = `${ano}-12`;
+
+    const [parteA, parteB] = await Promise.all([
+      this.prisma.lalurItem.findMany({
+        where: { companyId, competencia: { gte: competenciaIni, lte: competenciaFim } },
+        orderBy: [{ competencia: 'asc' }, { tipo: 'asc' }],
+      }),
+      this.prisma.lalurPartBNativo.findMany({
+        where: { companyId, ano: { lte: ano } },
+        orderBy: [{ tipoTributo: 'asc' }, { ano: 'asc' }],
+      }),
+    ]);
+
+    return { parteA, parteB };
+  }
 }
