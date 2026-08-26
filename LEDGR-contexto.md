@@ -6796,3 +6796,78 @@ prejuizo fiscal, base para decisao tributaria real). NAO construir as pressas.
 razao e /app/accounting/diario existem no sidebar) - nao chegamos a avaliar
 o conteudo renderizado dessas telas, so consultamos o banco direto via SQL
 para entender o padrao de lancamentos.
+
+
+### Sessao 26/08/2026 — Importador de ECF real construido do zero (Parte B / prejuizo fiscal) + tela LALUR
+
+**Contexto:** pendencia critica registrada em 25/08/2026 (ecf-importer.service.ts
+era stub, nunca gravava nada). Retomada com maxima cautela dado o peso fiscal
+(prejuizo fiscal acumulado, base para compensacao futura de IRPJ/CSLL).
+
+**Investigacao pre-codigo:** manual oficial RFB (Manual_ECF_Leiaute_10) buscado
+e lido antes de qualquer parser - confirmou que M350 (rotulado como
+"registrosParteB" no codigo antigo) e na verdade Parte A do e-LACS (espelho
+CSLL do M300), NAO Parte B. A Parte B real fica em M010 (cadastro+saldo
+inicial), M410 (lancamento do periodo) e M500 (controle de saldos - saldo
+inicial+movimento+saldo final, gerado pelo sistema).
+
+**Validacao contra 6 ECFs reais transmitidas da Hotelsys** (2017, 2020-2024)
+via grep manual linha a linha ANTES de qualquer persistencia - conferencia
+aritmetica (saldo final = saldo inicial + movimento) validada em 100% dos
+casos. Cadeia de continuidade do prejuizo fiscal reconstituida ano a ano:
+CSLL 87,9M(2017) -> 115,2M(2020) -> 116,3M -> 118,1M -> 120,2M -> 122,1M(2024).
+IRPJ trajetoria paralela (conta muda de 24204999 para 24404999 a partir de
+2021, sem quebra no saldo). Gap 2018/2019 (sem ECF - periodo prescrito,
+usuario confirmou nao ser obrigatorio) - 93,5M aceito como saldo correto de
+abertura 2020. 2025 excluido do escopo de referencia (usuario informou:
+transacao em andamento com RFB vai amortizar parte substancial do prejuizo).
+
+**3 bugs reais de parsing encontrados e corrigidos, todos pre-existentes
+(nunca corrigidos porque nunca havia persistencia real para expor):**
+1. M010 - layout de campo varia entre leiautes (2017 desloca campos vs
+   2020+) - parsing robusto por busca dos 3 campos finais significativos
+   em vez de posicao fixa.
+2. M300 (Parte A) - campos completamente errados desde antes desta sessao
+   (indProcJud/descLanc/dtLanc/indLancLalur/indRec nessa ordem nao existem)
+   - layout real: codCta|descLanc|tipo(R/L/A/E/C)|nivel|vlLanc.
+3. M500 se repete 13x no arquivo (K030: anual A00 + 12 meses A01-A12) -
+   suposicao inicial "ultima ocorrencia" estava ERRADA (perdia movimento
+   real em 2023/2024) - corrigido para MAX(vlSldFin) por (codCta,tipoTributo),
+   que tambem escolhe automaticamente a versao corrigida quando ha 2
+   declaracoes do mesmo movimento diferindo por retificacao (achado: 2023
+   tinha 2 versoes diferindo em R$100). M300 tem o MESMO padrao de
+   repeticao 13x, mas sem criterio MAX aplicavel (nao e saldo) - corrigido
+   mantendo so a 1a ocorrencia (bloco anual A00, que vem primeiro no arquivo
+   pois K030 antecede M300 na ordem dos blocos ECF).
+
+**Schema:** EcfPartB corrigido - faltava period/tipoTributo (constraint
+antiga so guardava 1 saldo por conta, sobrescrevia a cada import, sem
+historico). Novo modelo EcfImportLog - metadado de importacao (arquivo,
+periodo, contas, lancamentos, status, data), separado do dado
+(EcfPartA/EcfPartB), necessario para a tela de Historico.
+
+**2 bugs de infraestrutura encontrados durante os testes:**
+- @CurrentUser() no controller retorna objeto completo do usuario em
+  runtime (assinatura dizia string) - normalizado no importer.
+- Encoding fixo 'latin1' quebrava se o arquivo local passasse por um editor
+  que resalva em UTF-8 (ex: Bloco de Notas, usado pelo usuario so para
+  atualizar data de modificacao do arquivo, sem edicao intencional de
+  conteudo) - corrigido com deteccao automatica via round-trip UTF-8.
+
+**Tela nova:** LalurViewPage.tsx (SPED -> LALUR - Livro de Apuracao).
+Parte B como pivot com saldo inicial/movimento/saldo final por ano lado a
+lado (evolucao completa visivel). Parte A filtravel por periodo, com opcao
+de ocultar lancamentos zerados (maioria das ~180-680 linhas anuais tem
+valor 0, filtro reduz para so o que e realmente relevante).
+
+**Decisao de principio confirmada com o usuario:** arquivo original de 2024
+tinha espaco literal no lugar de acentos (bug do software gerador da
+Hotelsys, nao do LEDGR) - usuario decidiu NAO corrigir/reconstituir texto,
+preservar fidelidade total ao que foi de fato declarado à Receita, mesmo
+que cosmeticamente pior. Reforca o principio ja estabelecido nesta sessao
+inteira: ECD/ECF sao registro historico imutavel.
+
+**Resultado final:** importador de ECF real e funcional, Parte B (prejuizo
+fiscal/base negativa CSLL) validada e continua 2017-2024, tela de
+visualizacao do LALUR funcionando. Desbloqueia decisao de abertura Matriz
+2018 com fonte de verdade fiscal auditavel.
