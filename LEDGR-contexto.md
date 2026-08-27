@@ -7096,3 +7096,23 @@ mesma licao maior: decisoes de arquitetura tomadas em sessoes anteriores
 precisam ser revalidadas com cuidado antes de generalizar/aplicar a novos
 casos, nunca assumidas por julgamento proprio sem reconferir o registro
 original.
+
+
+### REGRA DEFINITIVA — Bloco 426 (Depreciação e Amortização Operacional)
+
+**O grupo `426` (Depreciação e Amortização Operacional) é EXCLUSIVO de
+empresas do ramo hoteleiro. Faz parte do bloco `HOTELARIA` na tabela
+`matriz_master_accounts`, junto com 313/424/425 — todos criados no MESMO
+commit (5c294c8, 23/08/2026), como um pacote único e coeso.**
+
+Só é importado quando o usuário marca o checkbox "Operação Hoteleira" na
+tela de Importar Matriz. Empresas de outros ramos (escritório de advocacia,
+administradora de imóveis, contabilidade) NÃO devem receber esse grupo.
+
+Motivo de negócio: hotéis têm ativo fixo distinto de uma empresa comum
+(Utensílios de Cozinha, Central Telefônica, etc.), com tratamento de
+depreciação diferenciado que justifica um grupo próprio.
+
+**Esta questão já foi levantada, investigada e corrigida em 27/08/2026**
+(ver entrada "RESOLVIDO: 426 e exclusivo de hoteleiras" acima). Não reabrir
+essa dúvida — se o assunto de novo surgir, ler esta regra primeiro.
