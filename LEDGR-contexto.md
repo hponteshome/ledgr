@@ -7116,3 +7116,32 @@ depreciação diferenciado que justifica um grupo próprio.
 **Esta questão já foi levantada, investigada e corrigida em 27/08/2026**
 (ver entrada "RESOLVIDO: 426 e exclusivo de hoteleiras" acima). Não reabrir
 essa dúvida — se o assunto de novo surgir, ler esta regra primeiro.
+
+
+### REGRA DEFINITIVA — reduced_code com tamanhos diferentes entre empresas (NÃO É BUG)
+
+**Investigado e RESOLVIDO em 27/08/2026. Não levantar isto novamente como
+pendência/alerta em sessões futuras.**
+
+Empresas mostram `reduced_code` com 6 ou 7 dígitos, misturados até dentro da
+mesma empresa (ex: Hotelsys tem 132 contas com 6 dígitos + 289 com 7). Isso
+é **esperado e correto**, não é inconsistência a corrigir:
+
+- **6 dígitos**: veio junto com dado REAL/NATIVO de cada empresa (ECD
+  importado, ou sistema de contabilidade anterior à LEDGR) - preserva o
+  código de origem exatamente como a empresa já usava. Afeta: F5, Hotelsys
+  (parcial), José Silva, Kipstone, LM, Sunsys.
+- **7 dígitos**: numeração própria da LEDGR (`1000 x classe + sequencial`),
+  atribuída quando a conta nasce direto da Matriz, sem historico anterior.
+  Afeta: GRB e Pontes (nunca tiveram importação de dado real anterior à
+  Matriz) e as contas novas adicionadas via Matriz em qualquer empresa.
+
+**Base documentada:** `reduced_code` é explicitamente um "atalho de tela",
+**nunca deve ser usado como COD_CTA** (nota já registrada em sessão
+anterior a 23/08/2026) - ou seja, nunca teve pretensão de ser um campo
+formalmente padronizado/regulatório. Forçar 7 dígitos em toda empresa
+significaria inventar um número que a empresa nunca teve de verdade -
+violaria o princípio de projeto "número bruto sempre, formatação só na
+exibição".
+
+**Se o assunto surgir de novo:** ler esta regra primeiro. Nao e bug.
