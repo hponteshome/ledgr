@@ -202,6 +202,10 @@ const EcdPage: React.FC = () => {
 
     const [history, setHistory] = useState<ImportRecord[]>([]);
     const [loadingHistory, setLoadingHistory] = useState(false);
+    // CRIADO 27/08/2026: consulta de consistencia (I155 vs I250) para
+    // importacoes JA REALIZADAS, nao so a que acabou de rodar - reaproveita
+    // o mesmo stats.consistency ja calculado e persistido na importacao.
+    const [expandedImportId, setExpandedImportId] = useState<string | null>(null);
 
     useEffect(() => { if (tab === 'history') loadHistory(); }, [tab]);
 
@@ -819,7 +823,8 @@ const EcdPage: React.FC = () => {
                             </thead>
                             <tbody className="divide-y divide-gray-100">
                                 {history.map(imp => (
-                                    <tr key={imp.id} className="hover:bg-gray-50">
+                                    <React.Fragment key={imp.id}>
+                                    <tr className="hover:bg-gray-50">
                                         <td className="px-4 py-3 text-sm text-gray-700 max-w-40 truncate" title={imp.fileName}>
                                             <FiFile className="inline mr-1 text-gray-400" size={13} />
                                             {imp.fileName}
@@ -833,7 +838,16 @@ const EcdPage: React.FC = () => {
                                         <td className="px-4 py-3 text-sm text-center text-gray-600">{imp.stats?.balances?.toLocaleString('pt-BR') ?? '—'}</td>
                                         <td className="px-4 py-3 text-sm text-center text-gray-600">{imp.stats?.journalEntries?.toLocaleString('pt-BR') ?? '—'}</td>
                                         <td className="px-4 py-3 text-xs text-gray-400">{fmtDate(imp.importedAt)}</td>
-                                        <td className="px-4 py-3">
+                                        <td className="px-4 py-3 flex items-center gap-2">
+                                            {imp.stats?.consistency && (
+                                                <button
+                                                    onClick={() => setExpandedImportId(expandedImportId === imp.id ? null : imp.id)}
+                                                    className="text-gray-400 hover:text-blue-600 transition-colors"
+                                                    title="Ver consistência (saldos vs lançamentos)"
+                                                >
+                                                    <FiEye size={14} />
+                                                </button>
+                                            )}
                                             <button
                                                 onClick={async () => {
                                                     if (!confirm('Remover este registro de importação?')) return;
@@ -846,6 +860,73 @@ const EcdPage: React.FC = () => {
                                             </button>
                                         </td>
                                     </tr>
+                                    {expandedImportId === imp.id && imp.stats?.consistency && (
+                                        <tr>
+                                            <td colSpan={11} className="px-4 py-3 bg-slate-50">
+                                                <div className="border border-slate-200 rounded-xl overflow-hidden bg-white">
+                                                    <div className="bg-slate-50 px-4 py-3 border-b border-slate-200 flex items-center justify-between">
+                                                        <h4 className="font-semibold text-slate-700 text-sm">
+                                                            Consistência ECD — Saldos (I155) vs Lançamentos (I250)
+                                                        </h4>
+                                                        <div className="flex items-center gap-4 text-xs">
+                                                            <span className="text-green-600 font-bold">✓ {imp.stats.consistency.consistent} consistentes</span>
+                                                            {imp.stats.consistency.divergent > 0 && (
+                                                                <span className="text-amber-600 font-bold">⚠ {imp.stats.consistency.divergent} divergentes</span>
+                                                            )}
+                                                            {imp.stats.consistency.missing > 0 && (
+                                                                <span className="text-red-600 font-bold">✗ {imp.stats.consistency.missing} sem lançamentos</span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    {imp.stats.consistency.details.length === 0 ? (
+                                                        <div className="px-4 py-6 text-center text-green-600 font-semibold text-sm">
+                                                            <FiCheckCircle className="inline mr-2" size={16} />
+                                                            Todos os saldos conferem com os lançamentos importados.
+                                                        </div>
+                                                    ) : (
+                                                        <div className="overflow-x-auto max-h-72 overflow-y-auto">
+                                                            <table className="w-full text-xs">
+                                                                <thead className="sticky top-0 bg-slate-100">
+                                                                    <tr className="text-slate-500 font-bold uppercase">
+                                                                        <th className="px-3 py-2 text-left">Conta</th>
+                                                                        <th className="px-3 py-2 text-right">Saldo ECD (I155)</th>
+                                                                        <th className="px-3 py-2 text-right">Recalculado (I250)</th>
+                                                                        <th className="px-3 py-2 text-right">Diferença</th>
+                                                                        <th className="px-3 py-2 text-left">Diagnóstico</th>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody className="divide-y divide-slate-50">
+                                                                    {imp.stats.consistency.details.map((d: any, i: number) => {
+                                                                        const fmt = (v: number) => {
+                                                                            const abs = Math.abs(v).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+                                                                            return v < 0 ? `(${abs})` : abs;
+                                                                        };
+                                                                        return (
+                                                                            <tr key={i} className="hover:bg-slate-50/50">
+                                                                                <td className="px-3 py-2">
+                                                                                    <span className="font-mono text-blue-600 mr-2">{d.accountCode}</span>
+                                                                                    <span className="text-slate-600">{d.accountName}</span>
+                                                                                </td>
+                                                                                <td className="px-3 py-2 text-right font-mono text-slate-600">{fmt(d.ecdBalance)}</td>
+                                                                                <td className="px-3 py-2 text-right font-mono text-slate-600">{fmt(d.calcBalance)}</td>
+                                                                                <td className={`px-3 py-2 text-right font-mono font-bold ${Math.abs(d.difference) < 0.01 ? 'text-green-500' : 'text-amber-600'}`}>
+                                                                                    {d.difference > 0 ? '+' : ''}{fmt(d.difference)}
+                                                                                </td>
+                                                                                <td className="px-3 py-2 text-slate-400 italic max-w-xs truncate" title={d.diagnosis}>
+                                                                                    {d.diagnosis}
+                                                                                </td>
+                                                                            </tr>
+                                                                        );
+                                                                    })}
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    )}
+                                    </React.Fragment>
                                 ))}
                             </tbody>
                         </table>
