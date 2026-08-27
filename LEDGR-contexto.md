@@ -6986,3 +6986,63 @@ como unica fonte.
 2 <tr> irmãos (linha principal + linha expandida) dentro do mesmo .map()
 sem Fragment causou erro de sintaxe JSX (Babel) - corrigido envolvendo
 ambos em <React.Fragment key={imp.id}>.
+
+
+### Sessao 27/08/2026 (continuacao 2) — REGRESSAO CRITICA: filtro ecdImportLinks quebrou Plano de Contas da Hotelsys
+
+**APRENDIZADO IMPORTANTE (destacar para nao repetir):** a decisao de
+24/08/2026 de ocultar a "arvore ECD" das telas de rotina via
+`ecdImportLinks: { none: {} }` partiu de uma premissa que so vale para
+empresas com Matriz importada DEPOIS e SEPARADA da ECD (ex: Sunsys - two
+arvores genuinamente paralelas e distintas, "1 ATIVO" da Matriz vs "7 ATIVO"
+da ECD, sem sobreposicao). Essa premissa NAO vale para empresas onde o
+plano de contas INTEIRO nasceu de importacoes ECD reais ao longo de anos
+(caso da Hotelsys, com 9 anos de ECD importada) - la, containers-raiz como
+"1 ATIVO" TAMBEM tem vinculo em chart_of_accounts_ecd_imports (o importer
+vincula toda conta processada, nao so folhas analiticas), entao o filtro
+"esconde qualquer coisa com vinculo ECD" removia os containers-raiz mas
+deixava alguns filhos (659 de 1094 contas tinham vinculo, 435 nao) - a
+arvore ficava com filhos orfaos sem pai visivel, buildTree() nao montava
+nada, tela mostrava "Nenhuma conta encontrada" mesmo com 1094 contas reais
+e 112.890 lancamentos intactos no banco (susto real, mas dado nunca foi
+perdido - so a consulta estava quebrada).
+
+**Licao central:** "esta conta tem vinculo com um import de ECD" NAO e
+equivalente a "esta conta pertence a uma arvore ECD paralela/redundante
+que deve ser ocultada". Sao coisas diferentes - a primeira e so proveniencia
+(de onde a conta veio historicamente), a segunda e sobre existir ou nao uma
+arvore DUPLICADA/paralela na mesma posicao conceitual. Um criterio correto
+precisa verificar RAIZ DUPLICADA (existe outro node na mesma "posicao" -
+ex: outro nivel-1 tipo ATIVO - sem vinculo ECD?), nao presenca de vinculo
+em qualquer no isolado.
+
+**Acao tomada:** revertido o filtro em getTree()/validateStructure()
+(chart-of-accounts.service.ts) para o comportamento sem filtro algum -
+restaura a Hotelsys imediatamente. Reabre a pendencia original da Sunsys
+(volta a mostrar as duas raizes ECD+Matriz lado a lado) - documentado como
+conhecido, resolucao adiada ate um criterio de "raiz duplicada" ser
+desenhado com cuidado (nao implementado nesta sessao, dado o risco de
+repetir o mesmo erro sob pressao).
+
+**Contexto da investigacao que levou a essa descoberta:** retomada da
+pendencia "limpeza do 422 nas 4 empresas" (registrada em 24/08). Descoberta
+real durante a investigacao: o "422" da Hotelsys NAO e a mesma coisa que o
+"422" mal-rotulado das outras 3 empresas (GRB/LM/Pontes) + Sunsys - para
+a Hotelsys, "422 DEPRECIACOES E AMORTIZACOES" com folhas de 8 digitos
+(42201001 EDIFICIOS E BENFEITORIAS etc) e dado NATIVO REAL, confirmado
+direto no arquivo .txt original da ECD (registro J050, presente desde pelo
+menos 2014) - com 14.604 lancamentos reais, NUNCA deve ser tocado. Ha
+apenas 6 folhas SOLTAS e quebradas misturadas junto (4220101/4220102/
+4220201 + 3 sub-folhas) com zero uso, essas sim candidatas a limpeza.
+Nas outras 4 empresas, o "422" inteiro (todas as 9 contas) tem zero uso -
+seguro remover por completo.
+
+**Divergencia de intencao sobre o 426 identificada mas NAO resolvida:**
+usuario pediu para restringir 426 ao checkbox "Operacao Hoteleira" no
+import da Matriz - busca na documentacao (MatrizImportModal.tsx, comentario
+original, resumo da decisao de 24/08) mostrou consistentemente que o
+checkbox de Hotelaria sempre cobriu so os blocos 313/424/425 (Receita/
+Custo/Despesa hoteleira), nunca 426 (colocado deliberadamente no NUCLEO,
+generico). Divergencia levantada ao usuario, resposta ainda pendente no
+momento deste registro - decisao final e execucao da limpeza do 422 ficam
+para a proxima retomada do assunto.
