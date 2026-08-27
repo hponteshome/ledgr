@@ -7046,3 +7046,53 @@ Custo/Despesa hoteleira), nunca 426 (colocado deliberadamente no NUCLEO,
 generico). Divergencia levantada ao usuario, resposta ainda pendente no
 momento deste registro - decisao final e execucao da limpeza do 422 ficam
 para a proxima retomada do assunto.
+
+
+### Sessao 27/08/2026 (continuacao 3) — RESOLVIDO: 426 e exclusivo de hoteleiras + limpeza definitiva do 422
+
+**Correcao de intencao (erro proprio reconhecido):** o usuario apontou -
+corretamente, apos releitura cuidadosa do registro de 23/08 - que o `426`
+(Depreciacao e Amortizacao Operacional) foi criado NO MESMO COMMIT (5c294c8)
+e como parte do MESMO "3o Bloco Matriz: Receita/Despesa Operacional
+Hoteleira", junto com 313/424/425. A intencao original SEMPRE foi que 426
+fosse exclusivo de empresas hoteleiras (que tem ativos fixos distintos -
+Utensilios de Cozinha, Central Telefonica - com tratamento diferenciado).
+O erro foi meu, cometido dois dias depois (24-25/08) ao implementar o
+mecanismo NUCLEO x HOTELARIA sem reconferir contra a intencao original -
+coloquei 426 no NUCLEO por julgamento proprio equivocado ("generico,
+reaproveitavel"), nunca validado contra o registro real da decisao.
+
+**Correcao aplicada:**
+1. `matriz_master_accounts`: 426 e seus 13 descendentes movidos de bloco
+   NUCLEO para HOTELARIA (390 NUCLEO + 82 HOTELARIA = 472, bate exato).
+   Futuras importacoes de Matriz so trazem 426 se o checkbox "Operacao
+   Hoteleira" estiver marcado.
+2. Limpeza definitiva do 422/426 nas 5 empresas afetadas (zero uso
+   confirmado em tudo antes de apagar, zero lancamento perdido confirmado
+   depois - Hotelsys manteve exatos 112.890 lancamentos):
+   - **Hotelsys**: mantido o 422 nativo real (12 contas corretas, dado de
+     ECD desde 2014) - removidas as 6 folhas soltas quebradas dentro dele
+     (4220101/4220102/4220201+3) e removido o 426 inteiro (vazio,
+     duplicava desnecessariamente o que o proprio 422 ja faz para ela).
+   - **GRB, LM, Pontes** (nao-hoteleiras): removido 422 inteiro (9 contas,
+     zero uso, mal-rotulado desde sempre) E removido 426 inteiro (13
+     contas cada, tinha sido adicionado incorretamente em 24/08 quando o
+     fix rodou "para todas as 4 empresas" sem diferenciar ramo de
+     negocio - correcao daquele erro tambem).
+   - **Sunsys** (hoteleira de verdade): removido 422 (9 contas, zero uso,
+     resquicio mal-rotulado) - MANTIDO 426 (14 contas, pertence
+     corretamente a ela agora que o bloco esta correto).
+
+**Estado final:** Hotelsys com 422 limpo (so as 12 contas reais, sem
+duplicata/resquicio). Sunsys com 426 limpo (unica estrutura de
+depreciacao, correta). GRB/LM/Pontes sem NENHUM residuo do 422/426 antigo -
+zero contas de depreciacao "quebrada" ou fora de lugar.
+
+**Reforco do aprendizado documentado nesta mesma sessao (regressao
+ecdImportLinks):** este episodio inteiro comecou justamente pela tentativa
+de retomar a limpeza do 422, que expos a regressao critica do getTree()
+(ver entrada anterior desta sessao) - ambos os achados de hoje reforcam a
+mesma licao maior: decisoes de arquitetura tomadas em sessoes anteriores
+precisam ser revalidadas com cuidado antes de generalizar/aplicar a novos
+casos, nunca assumidas por julgamento proprio sem reconferir o registro
+original.
