@@ -439,18 +439,53 @@ export class ChartOfAccountsService {
     // especificas de ECD (Historico, Tabela Comparativa). Nunca apagada -
     // so ocultada. Mesmo filtro ecdImportLinks:{none:{}} do validateStructure.
     const accounts = await this.prisma.chartOfAccounts.findMany({
-      // REVERTIDO 27/08/2026 (emergencia): o filtro ecdImportLinks:{none:{}} de
-      // 24/08/2026 quebrou o Plano de Contas da Hotelsys - la, o plano de contas
-      // INTEIRO nasceu de importacoes ECD reais (containers como "1 ATIVO"
-      // tambem tem vinculo ecdImportLinks), diferente da Sunsys (onde a Matriz
-      // e uma arvore nova, sem vinculo nenhum, genuinamente paralela a ECD).
-      // Filtrar por ecdImportLinks orfanava a arvore inteira (containers-raiz
-      // filtrados, filhos sem pai visivel, tela mostrava "nenhuma conta" mesmo
-      // com 1094 contas reais no banco). Revertido para o comportamento anterior
-      // ate um criterio mais preciso ser desenhado (ex: por raiz duplicada, nao
-      // por presenca de QUALQUER vinculo ECD).
-      where: { companyId, deletedAt: null }, orderBy: { code: 'asc' },
+      where: { companyId, deletedAt: null },
+      include: { ecdImportLinks: { select: { id: true }, take: 1 } },
+      orderBy: { code: 'asc' },
     });
+
+    // CRIADO 27/08/2026: criterio de "raiz duplicada" - substitui o filtro
+    // ecdImportLinks:{none:{}} de 24/08/2026 (revertido em 27/08 por quebrar
+    // a Hotelsys, ver historico). So oculta uma raiz ECD-vinculada se existir
+    // OUTRA raiz do MESMO type sem vinculo ECD (empate genuino, ex: Sunsys
+    // com "1 ATIVO" da Matriz + "7 ATIVO" da ECD). Se so existe UMA raiz
+    // daquele type (caso Hotelsys - "1 ATIVO" e a UNICA raiz de ativo, com
+    // vinculo ECD legitimo pois o plano inteiro nasceu de ECD), mantem
+    // sempre, independente de ter vinculo ou nao.
+    const raizes = accounts.filter(a => !a.parentId);
+    const raizesPorTipo = new Map<string, typeof raizes>();
+    for (const r of raizes) {
+      const lista = raizesPorTipo.get(r.type) ?? [];
+      lista.push(r);
+      raizesPorTipo.set(r.type, lista);
+    }
+
+    const idsExcluidos = new Set<string>();
+    for (const lista of raizesPorTipo.values()) {
+      if (lista.length < 2) continue; // raiz unica - nunca oculta
+      const comVinculo = lista.filter(r => r.ecdImportLinks.length > 0);
+      const semVinculo = lista.filter(r => r.ecdImportLinks.length === 0);
+      if (comVinculo.length === 0 || semVinculo.length === 0) continue; // sem empate genuino - mantem tudo
+      // ha raiz duplicada (mesmo type, uma com vinculo ECD, outra sem) -
+      // oculta a(s) com vinculo ECD e toda a sua descendencia
+      for (const raizEcd of comVinculo) {
+        idsExcluidos.add(raizEcd.id);
+        const pilha = [raizEcd.id];
+        while (pilha.length > 0) {
+          const atualId = pilha.pop()!;
+          for (const acc of accounts) {
+            if (acc.parentId === atualId && !idsExcluidos.has(acc.id)) {
+              idsExcluidos.add(acc.id);
+              pilha.push(acc.id);
+            }
+          }
+        }
+      }
+    }
+
+    const accountsFiltradas = idsExcluidos.size > 0
+      ? accounts.filter(a => !idsExcluidos.has(a.id))
+      : accounts;
 
     const ecdBalances = await this.prisma.accountBalance.findMany({
       where: { companyId, referenceDate: { lte: refDate } },
@@ -474,7 +509,7 @@ export class ChartOfAccountsService {
       calcMap.set(item.accountId, current + delta);
     }
 
-    const accountsWithBalances = accounts.map(a => ({
+    const accountsWithBalances = accountsFiltradas.map(a => ({
       ...a,
       calculatedBalance: calcMap.get(a.id) ?? 0,
       ecdBalance:        ecdMap.get(a.id)  ?? null,
