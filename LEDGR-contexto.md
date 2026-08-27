@@ -6922,3 +6922,67 @@ guia para a reconstrucao da escrituracao.
   Config. Dedutibilidade) - sem isso, "Gerar Sugestoes" nao encontra nada.
 - Considerar completar a escrituracao contabil pos-2017 da Hotelsys para
   que o Livro LALUR nativo reflita a posicao real, nao so o esparso atual.
+
+
+### Sessao 27/08/2026 — Verificacao de backup (achado critico: 9 dias sem push) + Consulta de consistencia ECD historica
+
+**Verificacao de backup solicitada pelo usuario:**
+- Backup horario do Postgres: tarefa agendada rodando normalmente, ultima
+  execucao com sucesso. Integridade do arquivo mais recente confirmada via
+  `pg_restore --list` (865 entradas, formato CUSTOM, sem truncamento).
+  Restauracao COMPLETA validada em banco descartavel (ledgr_backup_test) -
+  contagem de linhas batendo EXATA em 6 tabelas-chave (chart_of_accounts,
+  companies, ecf_part_a, ecf_part_b, journal_entries, journal_entry_items)
+  contra producao. Banco de teste removido apos validacao.
+
+**ACHADO CRITICO:** origin/main no GitHub estava 9 dias desatualizado
+(ultimo push em 17/08/2026) - 33 commits locais acumulados sem nunca
+terem sido enviados, apesar de "commitados". Risco real de perda total
+do trabalho de uma sessao inteira em caso de falha de disco. Corrigido
+imediatamente - push executado, branch sincronizada.
+
+**Prevencao criada:** scripts/check-git-sync.ps1 - roda `git fetch origin`,
+conta commits locais a frente de origin/main, alerta via popup
+(MessageBox) se houver algum, sempre registra em log. Scheduled Task
+LEDGR-Git-Sync-Check registrada (mesmo padrao LogonType S4U + RunLevel
+Highest do backup do Postgres - precisa PowerShell elevado pra registrar),
+gatilho diario as 09:00. Testado end-to-end com sucesso.
+
+**Investigacao de consistencia ECD (motivada por preocupacao real do
+usuario sobre movimentacao de 2018 da Hotelsys):**
+Usuario perguntou como verificar, direto na LEDGR (sem usar o PVA oficial),
+se a movimentacao contabil real de um periodo esta corretamente refletida
+na ECD importada. Investigacao completa:
+1. Confirmado via grep no arquivo original (upload do usuario aos arquivos
+   do projeto): 117 I200 e 248 I250 no arquivo bruto - numeros IDENTICOS
+   aos ja importados na LEDGR. A importacao esta 100% fiel ao arquivo.
+2. A divergencia real (86 contas com saldo I155 declarado mas ZERO I250
+   sustentando, verificado caso a caso - ex: EMPRESTIMOS BANCARIOS com
+   12 I155 identicos ao longo do ano, saldo R$15.209.349,87 congelado,
+   zero I250 em todo o arquivo) e uma caracteristica do PROPRIO ARQUIVO
+   original - quem preparou a ECD 2018 declarou varios saldos finais
+   diretamente, sem lancar a movimentacao detalhada correspondente.
+   Nao e bug de importacao da LEDGR.
+3. O motor de calculo dessa consistencia (I155 vs I250) e o componente
+   visual JA EXISTIAM (ecd_imports.stats.consistency, ja persistido desde
+   a importacao original em 24/08/2026) - so nunca tinham sido exibidos
+   para consulta de importacoes JA REALIZADAS, so no resultado de uma
+   importacao recem-concluida.
+
+**Solucao implementada (sem reinventar nada):** estendido o componente
+existente na aba Historico (ECD -> Escrituracao Contabil) - botao "olho"
+por linha, expande mostrando a mesma tabela de consistencia (conta, saldo
+ECD, recalculado, diferenca, diagnostico) reaproveitando o
+stats.consistency ja presente na resposta (zero mudanca de backend).
+
+**Limpeza:** removido item de sidebar "ECD — Historico" (rota
+/app/sped/ecd/History) - apontava para EcdHistoryPage.tsx, que NUNCA
+existiu (import comentado no codigo, confirmado via Test-Path retornando
+False). A funcionalidade real de historico + agora consistencia ja vive
+dentro de ECD -> aba Historico, que o usuario confirmou querer manter
+como unica fonte.
+
+**Bug corrigido durante o desenvolvimento:** primeira tentativa de renderizar
+2 <tr> irmãos (linha principal + linha expandida) dentro do mesmo .map()
+sem Fragment causou erro de sintaxe JSX (Babel) - corrigido envolvendo
+ambos em <React.Fragment key={imp.id}>.
