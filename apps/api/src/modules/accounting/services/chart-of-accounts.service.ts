@@ -366,7 +366,17 @@ export class ChartOfAccountsService {
     // chart_of_accounts_ecd_imports, criado pelo importer para toda conta
     // que veio de um arquivo ECD real (containers inclusive).
     const accounts = await this.prisma.chartOfAccounts.findMany({
-      where: { companyId, deletedAt: null, ecdImportLinks: { none: {} } }, orderBy: { code: 'asc' },
+      // REVERTIDO 27/08/2026 (emergencia): o filtro ecdImportLinks:{none:{}} de
+      // 24/08/2026 quebrou o Plano de Contas da Hotelsys - la, o plano de contas
+      // INTEIRO nasceu de importacoes ECD reais (containers como "1 ATIVO"
+      // tambem tem vinculo ecdImportLinks), diferente da Sunsys (onde a Matriz
+      // e uma arvore nova, sem vinculo nenhum, genuinamente paralela a ECD).
+      // Filtrar por ecdImportLinks orfanava a arvore inteira (containers-raiz
+      // filtrados, filhos sem pai visivel, tela mostrava "nenhuma conta" mesmo
+      // com 1094 contas reais no banco). Revertido para o comportamento anterior
+      // ate um criterio mais preciso ser desenhado (ex: por raiz duplicada, nao
+      // por presenca de QUALQUER vinculo ECD).
+      where: { companyId, deletedAt: null }, orderBy: { code: 'asc' },
     });
 
     const issues = [];
@@ -429,7 +439,17 @@ export class ChartOfAccountsService {
     // especificas de ECD (Historico, Tabela Comparativa). Nunca apagada -
     // so ocultada. Mesmo filtro ecdImportLinks:{none:{}} do validateStructure.
     const accounts = await this.prisma.chartOfAccounts.findMany({
-      where: { companyId, deletedAt: null, ecdImportLinks: { none: {} } }, orderBy: { code: 'asc' },
+      // REVERTIDO 27/08/2026 (emergencia): o filtro ecdImportLinks:{none:{}} de
+      // 24/08/2026 quebrou o Plano de Contas da Hotelsys - la, o plano de contas
+      // INTEIRO nasceu de importacoes ECD reais (containers como "1 ATIVO"
+      // tambem tem vinculo ecdImportLinks), diferente da Sunsys (onde a Matriz
+      // e uma arvore nova, sem vinculo nenhum, genuinamente paralela a ECD).
+      // Filtrar por ecdImportLinks orfanava a arvore inteira (containers-raiz
+      // filtrados, filhos sem pai visivel, tela mostrava "nenhuma conta" mesmo
+      // com 1094 contas reais no banco). Revertido para o comportamento anterior
+      // ate um criterio mais preciso ser desenhado (ex: por raiz duplicada, nao
+      // por presenca de QUALQUER vinculo ECD).
+      where: { companyId, deletedAt: null }, orderBy: { code: 'asc' },
     });
 
     const ecdBalances = await this.prisma.accountBalance.findMany({
