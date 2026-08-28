@@ -7320,3 +7320,80 @@ WHERE ca.company_id = '<empresa>'
 **Resultado final Hotelsys 2018:** ABERTURA-2018 registrado e validado -
 Balancete de Verificacao, Balanco Patrimonial e DRE todos corretos e
 equilibrados em multiplos periodos testados.
+
+
+### Sessao 28/08/2026 (continuacao 5) — RECONSTRUCAO: Sugestao De/Para ECD vira ferramenta real
+
+**Contexto:** ao iniciar a importacao da nova empresa Sunrise (holding pura,
+detentora de participacao na HotelSys - confirmado NAO usar bloco HOTELARIA
+na Matriz), tentamos usar Lancamentos de Abertura e Tabela Comparativa ECD,
+mas ambos dependem de ecd_account_mappings ja preenchido - que so existia
+para a Hotelsys (370 linhas: 196 SUGGESTED_CONFIRMED + 174 MANUAL).
+
+**ACHADO CRITICO:** o algoritmo que gerou esses 370 mapeamentos (sessao
+23/08/2026) rodou como SCRIPT PYTHON PONTUAL (usando difflib.SequenceMatcher),
+nunca foi persistido como codigo da aplicacao. Confirmado via grep: nenhum
+arquivo .ts do projeto cria linhas em ecd_account_mappings - so
+tabela-comparativa.service.ts (le) e abertura.service.ts (usa para gerar
+lancamento). Isso significa que TODA empresa nova precisaria do mesmo
+trabalho manual/script repetido, sem ferramenta reutilizavel.
+
+**Reconstruido como funcionalidade real** (nao script), fiel ao algoritmo
+original documentado:
+1. Filtro duro: mesma type + mesma nature entre origem (ECD) e destino (Matriz)
+2. Grupo binario (so ASSET/LIABILITY/EQUITY): sobe a cadeia de pais ate achar
+   substring CIRCULANTE/LONGO PRAZO/PERMANENTE/DIFERIDO/IMOBILIZADO/INVESTIMENTO
+3. Similaridade de nome via Levenshtein-ratio (implementacao propria em
+   TypeScript, equivalente ao difflib.SequenceMatcher do Python original,
+   sem dependencia nova)
+4. Atalho de reaproveitamento: decisao MANUAL ja confirmada em OUTRA
+   empresa para o mesmo nome normalizado de conta
+
+**3 bugs reais corrigidos durante o teste end-to-end com a Sunrise:**
+1. Frontend chamava endpoint errado (/accounting/accounts em vez de
+   /chart-of-accounts/tree - prefixo real do controller e "chart-of-accounts")
+   - autocomplete carregava vazio.
+2. Autocomplete so permitia edicao em linhas marcadas "sem sugestao" -
+   impossivel corrigir uma sugestao ERRADA do algoritmo. Achado real que
+   expos isso: "21103004 INSSRF-PF A RECOLHER" foi sugerido para
+   "21101060006 IRRF NF a Recolher" (80% confianca) quando existia
+   "21101060011 INSS Retido s/Servicos PF" mais adequado na Matriz -
+   falha de peso do algoritmo em nomes curtos com palavras genericas em
+   comum ("A RECOLHER") diluindo a discriminacao (INSS vs IRRF vs CSRF).
+   Corrigido: toda linha agora e editavel via autocomplete, nao so as
+   vazias.
+3. Autocomplete oferecia contas NATIVAS da ECD tambem como opcao de
+   destino (deveria oferecer so Matriz) - corrigido expondo
+   destinosDisponiveis (so contas sem vinculo ECD) na propria resposta do
+   endpoint de sugestao, eliminando a chamada separada e mal-direcionada
+   a arvore completa.
+
+**PENDENCIA REGISTRADA PARA MELHORIA FUTURA (nao implementada nesta
+sessao):** o "grupo binario" hoje so considera os 6 grupos de TOPO do
+Balanco (Circulante/Nao Circulante/Permanente/Diferido/Imobilizado/
+Investimento), nao o PAI IMEDIATO da conta. Achado real: origem
+"11402001 ADIANTAMENTOS A FORNECEDORES" nao encontrou o destino
+"11303010001 Fornecedores Diversos" (que fica bem debaixo do grupo
+conceitual "Adiantamentos Fornecedores" na Matriz) porque a similaridade
+pura de texto entre os dois nomes nao e alta o suficiente sozinha.
+Melhoria futura: usar tambem a similaridade do nome do PAI IMEDIATO
+(nao so o grupo binario grosso) como sinal adicional no ranqueamento dos
+candidatos - deve reduzir significativamente a taxa de "sem sugestao".
+
+**Tela nova:** SugestaoDeParaPage.tsx (Contabilidade -> Sugestao De/Para
+ECD, ordem 9 - entre Importacao e Lancamentos de Abertura, seguindo o
+fluxo logico: Importar Matriz -> Sugerir De/Para -> Registrar Abertura).
+
+**Fluxo completo de abertura de nova empresa, agora documentado e
+disponivel como ferramenta do inicio ao fim:**
+1. Importar ECD (SPED -> ECD)
+2. Importar Matriz (Plano de Contas -> Importar Matriz) - decidir
+   checkbox Hotelaria conforme ramo real da empresa (regra definitiva ja
+   registrada acima)
+3. Sugestao De/Para ECD - revisar e confirmar mapeamentos (autocomplete
+   permite corrigir qualquer sugestao, nao so preencher vazias)
+4. Verificar contas is_analytic-com-filhas ANTES de prosseguir (query ja
+   documentada acima)
+5. Lancamentos de Abertura - calcular, revisar, registrar
+6. Verificar Balancete de Verificacao, Balanco Patrimonial e DRE em pelo
+   menos 2 janelas de data diferentes
