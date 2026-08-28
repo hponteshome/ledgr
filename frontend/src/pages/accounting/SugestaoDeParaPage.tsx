@@ -12,7 +12,8 @@ interface Sugestao {
   sourceId: string; sourceCode: string; sourceName: string;
   targetId: string | null; targetCode: string | null; targetName: string | null;
   confidence: number;
-  matchType: 'REAPROVEITADO' | 'SIMILARIDADE' | 'SEM_SUGESTAO';
+  matchType: 'REAPROVEITADO' | 'SIMILARIDADE' | 'SEM_SUGESTAO' | 'CONFIRMADO_AUTOMATICO' | 'CONFIRMADO_MANUAL';
+  confirmado: boolean;
 }
 interface ContaOpcao { id: string; code: string; name: string; type: string; nature: string; }
 
@@ -20,6 +21,8 @@ const matchTypeStyle: Record<string, { bg: string; color: string; label: string 
   REAPROVEITADO: { bg: '#F0F9FF', color: '#0369A1', label: 'Reaproveitado' },
   SIMILARIDADE: { bg: '#ECFDF5', color: '#059669', label: 'Similaridade' },
   SEM_SUGESTAO: { bg: '#FEF2F2', color: '#B91C1C', label: 'Sem sugestão' },
+  CONFIRMADO_AUTOMATICO: { bg: '#EEF2FF', color: '#4338CA', label: '✓ Confirmado (auto)' },
+  CONFIRMADO_MANUAL: { bg: '#FFFBEB', color: '#B45309', label: '✓ Confirmado (manual)' },
 };
 
 // CRIADO 28/08/2026: autocomplete simples, filtro no cliente (ja temos as
@@ -98,7 +101,7 @@ export const SugestaoDeParaPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [confirmando, setConfirmando] = useState(false);
   const [resultado, setResultado] = useState<{ ok: boolean; mensagem: string } | null>(null);
-  const [filtro, setFiltro] = useState<'todos' | 'pendentes'>('todos');
+  const [filtro, setFiltro] = useState<'todos' | 'pendentes' | 'confirmados'>('todos');
 
   const carregar = useCallback(async () => {
     if (!activeCompany?.id) return;
@@ -150,9 +153,11 @@ export const SugestaoDeParaPage: React.FC = () => {
     }
   };
 
-  const listaExibida = filtro === 'pendentes'
-    ? sugestoes.filter(s => s.matchType === 'SEM_SUGESTAO' && !overrides[s.sourceId])
-    : sugestoes;
+  const listaExibida =
+    filtro === 'pendentes' ? sugestoes.filter(s => !s.confirmado && s.matchType === 'SEM_SUGESTAO' && !overrides[s.sourceId]) :
+    filtro === 'confirmados' ? sugestoes.filter(s => s.confirmado) :
+    sugestoes;
+  const qtdConfirmados = sugestoes.filter(s => s.confirmado).length;
 
   const thSt: React.CSSProperties = { padding: '8px 12px', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', color: '#6B7280', background: '#F9FAFB', borderBottom: '0.5px solid #E5E7EB', textAlign: 'left' };
   const selSt: React.CSSProperties = { padding: '5px 8px', border: '1px solid #E5E7EB', borderRadius: 6, fontSize: 12, width: '100%' };
@@ -183,7 +188,7 @@ export const SugestaoDeParaPage: React.FC = () => {
         <div style={{ padding: 60, textAlign: 'center', color: '#9CA3AF', fontSize: 13 }}>Calculando sugestões…</div>
       ) : sugestoes.length === 0 ? (
         <div style={{ padding: 60, textAlign: 'center', color: '#9CA3AF', fontSize: 13 }}>
-          Nenhuma conta pendente de mapeamento — todas as contas de origem ECD já têm de/para confirmado.
+          Nenhuma conta de origem ECD encontrada para esta empresa.
         </div>
       ) : (
         <>
@@ -206,6 +211,7 @@ export const SugestaoDeParaPage: React.FC = () => {
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => setFiltro('todos')} style={{ padding: '6px 12px', border: '1px solid #E5E7EB', borderRadius: 6, fontSize: 12, background: filtro === 'todos' ? '#111827' : '#fff', color: filtro === 'todos' ? '#fff' : '#374151', cursor: 'pointer' }}>Todos ({sugestoes.length})</button>
               <button onClick={() => setFiltro('pendentes')} style={{ padding: '6px 12px', border: '1px solid #E5E7EB', borderRadius: 6, fontSize: 12, background: filtro === 'pendentes' ? '#111827' : '#fff', color: filtro === 'pendentes' ? '#fff' : '#374151', cursor: 'pointer' }}>Só pendentes ({qtdSemSugestao})</button>
+              <button onClick={() => setFiltro('confirmados')} style={{ padding: '6px 12px', border: '1px solid #E5E7EB', borderRadius: 6, fontSize: 12, background: filtro === 'confirmados' ? '#111827' : '#fff', color: filtro === 'confirmados' ? '#fff' : '#374151', cursor: 'pointer' }}>Confirmados ({qtdConfirmados})</button>
             </div>
             <button onClick={handleConfirmar} disabled={confirmando} style={{ padding: '9px 20px', background: '#2563EB', color: '#fff', border: 'none', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: confirmando ? 0.6 : 1 }}>
               {confirmando ? 'Confirmando…' : 'Confirmar Mapeamentos'}

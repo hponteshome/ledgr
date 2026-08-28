@@ -28,7 +28,8 @@ export interface SugestaoMapeamento {
   sourceId: string; sourceCode: string; sourceName: string;
   targetId: string | null; targetCode: string | null; targetName: string | null;
   confidence: number; // 0 a 1
-  matchType: 'REAPROVEITADO' | 'SIMILARIDADE' | 'SEM_SUGESTAO';
+  matchType: 'REAPROVEITADO' | 'SIMILARIDADE' | 'SEM_SUGESTAO' | 'CONFIRMADO_AUTOMATICO' | 'CONFIRMADO_MANUAL';
+  confirmado: boolean; // CRIADO 28/08/2026: ja existe em ecd_account_mappings (gravado), nao e so sugestao pendente
 }
 
 const GRUPOS_BP = ['CIRCULANTE', 'LONGO PRAZO', 'PERMANENTE', 'DIFERIDO', 'IMOBILIZADO', 'INVESTIMENTO'];
@@ -96,10 +97,16 @@ export class DeParaSugestaoService {
     const destinos = todasContas.filter(c => c.ecdImportLinks.length === 0)
       .map(c => ({ id: c.id, code: c.code, name: c.name, type: c.type, nature: c.nature, parentId: c.parentId }));
 
-    const jaMapeadas = new Set(
-      (await this.prisma.ecdAccountMapping.findMany({ where: { companyId }, select: { sourceAccountId: true } }))
-        .map(m => m.sourceAccountId),
-    );
+    // CRIADO 28/08/2026: mapa completo (nao so o Set de ids) - permite exibir
+    // os JA CONFIRMADOS na tela tambem (com destaque automatico/manual),
+    // nao so os pendentes. Achado real: mapeamento manual errado (CSLL
+    // Diferida -> Refeicao/Copa/Cozinha) so foi encontrado via consulta SQL
+    // direta, porque a tela escondia tudo que ja estava confirmado.
+    const mapeamentosExistentes = await this.prisma.ecdAccountMapping.findMany({
+      where: { companyId },
+      include: { targetAccount: { select: { id: true, code: true, name: true } } },
+    });
+    const jaMapeadasMap = new Map(mapeamentosExistentes.map(m => [m.sourceAccountId, m]));
 
     // Atalho: decisoes MANUAL ja confirmadas em QUALQUER empresa, por nome normalizado de origem -> nome do destino escolhido.
     const decisoesAnteriores = await this.prisma.ecdAccountMapping.findMany({
@@ -115,7 +122,16 @@ export class DeParaSugestaoService {
     const sugestoes: SugestaoMapeamento[] = [];
 
     for (const origem of origens) {
-      if (jaMapeadas.has(origem.id)) continue;
+      const existente = jaMapeadasMap.get(origem.id);
+      if (existente) {
+        sugestoes.push({
+          sourceId: origem.id, sourceCode: origem.code, sourceName: origem.name,
+          targetId: existente.targetAccount.id, targetCode: existente.targetAccount.code, targetName: existente.targetAccount.name,
+          confidence: 1, confirmado: true,
+          matchType: existente.matchType === 'MANUAL' ? 'CONFIRMADO_MANUAL' : 'CONFIRMADO_AUTOMATICO',
+        });
+        continue;
+      }
       const origemConta: ContaCandidata = { id: origem.id, code: origem.code, name: origem.name, type: origem.type, nature: origem.nature, parentId: origem.parentId };
 
       const candidatos = destinos.filter(d => d.type === origem.type && d.nature === origem.nature);
@@ -138,7 +154,7 @@ export class DeParaSugestaoService {
           sugestoes.push({
             sourceId: origem.id, sourceCode: origem.code, sourceName: origem.name,
             targetId: match.id, targetCode: match.code, targetName: match.name,
-            confidence: 1, matchType: 'REAPROVEITADO',
+            confidence: 1, matchType: 'REAPROVEITADO', confirmado: false,
           });
           continue;
         }
@@ -155,13 +171,13 @@ export class DeParaSugestaoService {
         sugestoes.push({
           sourceId: origem.id, sourceCode: origem.code, sourceName: origem.name,
           targetId: melhor.conta.id, targetCode: melhor.conta.code, targetName: melhor.conta.name,
-          confidence: melhor.score, matchType: 'SIMILARIDADE',
+          confidence: melhor.score, matchType: 'SIMILARIDADE', confirmado: false,
         });
       } else {
         sugestoes.push({
           sourceId: origem.id, sourceCode: origem.code, sourceName: origem.name,
           targetId: melhor?.conta.id ?? null, targetCode: melhor?.conta.code ?? null, targetName: melhor?.conta.name ?? null,
-          confidence: melhor?.score ?? 0, matchType: 'SEM_SUGESTAO',
+          confidence: melhor?.score ?? 0, matchType: 'SEM_SUGESTAO', confirmado: false,
         });
       }
     }
