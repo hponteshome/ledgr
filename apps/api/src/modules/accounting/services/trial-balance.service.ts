@@ -211,34 +211,25 @@ select: {
     const periodMap = await this.getMovements(companyId, start, end);
     this.rollUp(accounts, periodMap);
 
-    // I155: saldos de abertura do ECD — apenas para analiticas sem lancamentos historicos
-    const accountBalances = await this.prisma.accountBalance.findMany({
-      where: { companyId, referenceDate: { lt: start } },
-      orderBy: { referenceDate: "desc" },
-    });
-    const i155Map = new Map<string, number>();
-    for (const ab of accountBalances) {
-      if (!i155Map.has(ab.accountId))
-        i155Map.set(ab.accountId, Number(ab.balance));
-    }
-
-    // Mapa auxiliar: accountId -> previousBalance ja resolvido
-    // Para analiticas: prevMap se != 0, senao i155Map
-    // Para sinteticas: sera calculado bottom-up abaixo
+    // CORRIGIDO 28/08/2026: removido o fallback para account_balances (I155
+    // declarado na ECD) - causava dupla contagem apos o lancamento de abertura
+    // (ex: conta nativa antiga com saldo declarado + conta nova da Matriz com
+    // o mesmo valor via lancamento real, ambas somando na mesma demonstracao).
+    // Principio definido pelo usuario 28/08/2026: a partir da data de
+    // lancamento de abertura, as demonstracoes contabeis (Balancete, DRE,
+    // Balanco) devem ser construidas EXCLUSIVAMENTE a partir de lancamentos
+    // reais (journal_entry_items) - o saldo declarado da ECD serve apenas
+    // para conferencias retroativas (Comparativo de Saldos, Tabela
+    // Comparativa ECD), nunca como substituto de lancamento real numa
+    // demonstracao.
     const prevBalMap = new Map<string, number>();
 
-    // 1) Resolver analiticas primeiro
+    // 1) Resolver analiticas primeiro - saldo anterior = soma real dos
+    // lancamentos (journal_entry_items) ate a data, sem fallback nenhum.
     for (const acc of accounts) {
       if (!acc.isAnalytic) continue;
       const mov = prevMap.get(acc.id) ?? { debits: 0, credits: 0 };
-      const fromMov = mov.debits - mov.credits;
-      if (fromMov !== 0) {
-        prevBalMap.set(acc.id, fromMov);
-      } else if (i155Map.has(acc.id)) {
-        prevBalMap.set(acc.id, i155Map.get(acc.id)!);
-      } else {
-        prevBalMap.set(acc.id, 0);
-      }
+      prevBalMap.set(acc.id, mov.debits - mov.credits);
     }
 
     // 2) Propagar bottom-up para sinteticas (filhos ja resolvidos)
