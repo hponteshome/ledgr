@@ -7145,3 +7145,74 @@ violaria o princípio de projeto "número bruto sempre, formatação só na
 exibição".
 
 **Se o assunto surgir de novo:** ler esta regra primeiro. Nao e bug.
+
+
+### Sessao 27/08/2026 (continuacao 4) — Lancamentos de Abertura (ferramenta) + preparacao abertura 2018 Hotelsys
+
+**Motivacao:** iniciar a reconstrucao da contabilidade real da Hotelsys a
+partir de 2018, usando os saldos finais analiticos da ECD 2017 como ponto
+de partida no novo Plano Matriz (mesmo padrao ja validado na abertura
+2016->2017: ABERTURA-2016, 97 itens, R$153.929.998,55).
+
+**3 problemas reais de dado encontrados e corrigidos durante a preparacao
+(nao bugs de codigo - inconsistencias historicas nos dados/mapeamentos):**
+
+1. **14 mapeamentos orfaos** em ecd_account_mappings (apontavam para
+   contas do 422/426 removidas na limpeza desta mesma sessao) - 9 sao
+   contas de depreciacao nativas da Hotelsys (o codigo de origem ECD e
+   IDENTICO ao codigo da propria conta nativa dela - auto-mapeamento
+   correto), 5 precisavam de destino novo real (Propaganda e Publicidade,
+   Comissoes sobre Vendas, Descontos Concedidos/Obtidos) - todos corrigidos.
+
+2. **Achado real: contas renomeadas ao longo dos 9 anos de ECD geram
+   duplicatas no de/para.** 76 de 206 mapeamentos tem multiplas origens
+   para o mesmo destino - 58 delas com o MESMO saldo exato em todas as
+   origens (confirma: e a MESMA conta fisica, so o codigo mudou de ano
+   para ano na ECD) - contar as duas dobraria o valor. Regra aplicada e
+   validada: saldo identico entre origens = conta 1 vez so; saldo
+   diferente = soma legitima (ex: ativo bruto + sua propria contra-conta
+   de depreciacao/amortizacao acumulada, netando para o valor contabil
+   liquido).
+
+3. **Achado real: 1 erro de mapeamento genuino (nao duplicata).**
+   "LICENCAS E SOFTWARE" tinha uma origem (13201010) apontando para o
+   destino errado ("Software Progr.Computador") em vez do mesmo destino
+   que suas 3 origens-irmas usavam ("Software", onde ja fechavam
+   sozinhas em zero - software totalmente amortizado). Sem essa correcao,
+   a diferenca do balanco de abertura batia exatamente R$2.661,17 (o
+   valor duplicado indevidamente) - so fechou em R$0,00 exato apos a
+   correcao do mapeamento. Licao: ao validar Ativo=Passivo+PL e achar
+   um residuo, o valor exato do residuo costuma apontar direto para a
+   conta problematica (aqui, o residuo era literalmente o valor da conta
+   com erro).
+
+4. **5 contas sinteticas com saldo indevido:** contas como
+   "1110201 Bancos Conta Movimento" tinham filhas especificas por banco
+   ja cadastradas (11102010001-11102010007), mas o PAI continuava com
+   is_analytic=true (deveria ser false, ja que ganhou filhas depois de
+   criado) - causava saldo indevido indo direto pro pai em vez da folha
+   generica "(Nao Identificado)" ja existente para esse caso. Corrigido
+   is_analytic das 5 contas + repontado o de/para para as folhas corretas
+   (2 generi cas ja existentes reaproveitadas, 2 novas criadas:
+   Adiantamentos Fornecedores, Contas a Pagar - 1 ja existia certa:
+   Lucros Acumulados).
+
+**Resultado final validado (planilha Hotelsys_Abertura_2018.xlsx
+compartilhada e revisada com o usuario antes de qualquer registro real):**
+75 contas analiticas, Debito = Credito = R$135.011.960,69 exato,
+diferenca R$0,00.
+
+**Ferramenta construida (reutilizavel, nao script de uso unico):**
+AberturaService (calcularAbertura + registrarAbertura, replica a logica
+de dedupe validada manualmente) + AberturaController
+(GET /accounting/abertura/calcular, POST /accounting/abertura/registrar)
++ AberturaLancamentosPage.tsx (Contabilidade -> Lancamentos de Abertura,
+ordem 9) - tela carrega ja calculada, mostra debito/credito/diferenca,
+linhas expandiveis com origens ECD, alerta se houver conta sintetica
+com saldo, botao "Registrar Lancamentos" desabilitado se nao fechar.
+
+**IMPORTANTE - decisao de registrar o lancamento real NAO foi tomada
+nesta sessao.** A ferramenta esta pronta e validada, mas o registro
+definitivo do lancamento de abertura 2018 da Hotelsys fica para o usuario
+decidir quando revisar a planilha com calma. Retomar isso como prioridade
+alta na proxima sessao se ainda nao tiver sido registrado.
