@@ -7397,3 +7397,72 @@ disponivel como ferramenta do inicio ao fim:**
 5. Lancamentos de Abertura - calcular, revisar, registrar
 6. Verificar Balancete de Verificacao, Balanco Patrimonial e DRE em pelo
    menos 2 janelas de data diferentes
+
+
+### Sessao 28/08/2026 (continuacao 6) — Matriz completada (26 contas) + abertura Sunrise concluida
+
+**Contexto:** usuario editou o Plano Matriz manualmente (arquivo exportado,
+editado em Excel/planilha) para completar contas faltantes necessarias
+para a abertura da Sunrise, mas as novas nao tinham reduced_code.
+
+**Processamento do arquivo editado:** achado real de encoding - arquivo
+sofreu DUPLA transcodificacao (CP850 -> lido como CP1252 -> salvo como
+UTF-8), corrigido revertendo os dois passos
+(`raw.decode('utf-8').encode('cp1252').decode('cp850')`).
+
+**19 contas analiticas novas + 9 sinteticas novas identificadas** (comparando
+contra o banco atual). Reduced_code calculado seguindo a regra documentada
+(1000×classe+sequencial, 7 digitos), a partir do maior sequencial ja usado
+por classe (formato confirmado: `reducedCode String? @db.VarChar(10)` -
+texto, zeros a esquerda sao dado real, nao formatacao).
+
+**Achado real durante o processo - 2 contas nao eram novas, foram
+RENUMERADAS:** "22101070001/002 Imposto de Renda Diferido/CSLL Diferida"
+foram movidas pelo usuario para "22101080001/002" no arquivo editado,
+mantendo nome e reduced_code (0001122/0001123) - identificado ao notar que
+esses reduced_code ja existiam no banco anexados aos codigos ANTIGOS.
+Tratado como renumeracao pontual (UPDATE code), nao insercao nova.
+
+**Achado real que quase passou despercebido:** a renumeracao no
+matriz_master_accounts sozinha teria ORFANADO 3 empresas que ja tinham
+essas contas mapeadas pelos CODIGOS ANTIGOS (Hotelsys, Sunsys, Sunrise) -
+proxima importacao de Matriz criaria contas DUPLICADAS para elas em vez de
+reconhecer como a mesma conta. Corrigido aplicando a MESMA renomeacao de
+codigo tambem nas 3 empresas (chart_of_accounts.code), preservando id e
+todo vinculo/lancamento existente.
+
+**Achado de dado real (nao aplicado):** duplicata genuina no arquivo
+editado do usuario - codigos "32104" e "3210401" apareceram DUAS VEZES cada,
+com nomes diferentes (Receita Venda de Imobilizado/Venda de Imobilizado vs
+Outras Receitas Operacionais/Resultado Positivo em Participacoes
+Societarias). Usuario optou por ABORTAR a reorganizacao completa da matriz
+(que teria exigido resolver essa ambiguidade) e seguir com a correcao
+cirurgica minima (so as 26 contas realmente necessarias). Duplicata no
+arquivo do usuario fica registrada aqui, nao resolvida - se o usuario for
+usar aquele arquivo editado para outro proposito no futuro, precisa
+resolver essa ambiguidade antes.
+
+**Resultado final da matriz:** 498 contas ativas (472 + 26), 0 analiticas
+sem reduced_code, 0 reduced_code duplicado, 0 orfao de hierarquia.
+
+**Achado real de mapeamento errado na Sunrise:** conta ECD nativa
+"45102002 CONTRIBUICAO SOCIAL S/LUCRO DIFERIDO" tinha sido mapeada
+manualmente (errado) para "42103010030 Refeicao/Copa/Cozinha" - nomes
+completamente sem relacao, erro de clique no autocomplete. So foi
+encontrado porque o usuario pediu para consultar via SQL diretamente,
+ja que a TELA escondia mapeamentos ja confirmados (mostrava so pendentes).
+Corrigido (repontado para 43101020002 CSLL Diferida Despesa) e a CAUSA
+RAIZ tambem corrigida: tela De/Para agora sempre mostra TODOS os
+mapeamentos (nunca mais fica vazia/escondida), com badge distinguindo
+Confirmado (auto) de Confirmado (manual) - permite auditoria visual
+continua, nao so no momento da confirmacao inicial.
+
+**ABERTURA DA SUNRISE REGISTRADA COM SUCESSO** (ABERTURA-2018, 13 contas,
+debito=credito=R$27.771.506,14, diferenca R$0,00) - primeira tentativa,
+sem nenhum conflito de saldo pre-existente (diferente da Hotelsys, que
+precisou de reversao completa) porque a Sunrise e empresa genuinamente
+nova sem escrituracao real anterior nas contas-destino. Validado tambem
+no Balancete de Verificacao pos-registro: equilibrado, R$0,00 de diferenca.
+Confirma que TODAS as correcoes desta sessao (fallback I155 removido,
+is_analytic-com-filhas corrigido em 321 contas, ferramenta de abertura)
+funcionam corretamente de ponta a ponta para uma empresa nova.
