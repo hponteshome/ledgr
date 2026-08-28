@@ -25,6 +25,7 @@ import { JournalImporterController } from './controllers/journal-importer.contro
 import { EncerramentoExercicioController } from './controllers/encerramento-exercicio.controller';
 import { TabelaComparativaController } from './controllers/tabela-comparativa.controller';
 import { AberturaController } from './controllers/abertura.controller';
+import { DeParaSugestaoController } from './controllers/de-para-sugestao.controller';
 
 // Services
 import { AccountingService }        from './services/accounting.service';
@@ -44,6 +45,7 @@ import { JournalImporterService }    from './services/journal-importer.service';
 import { EncerramentoExercicioService } from './services/encerramento-exercicio.service';
 import { TabelaComparativaService } from './services/tabela-comparativa.service';
 import { AberturaService } from './services/abertura.service';
+import { DeParaSugestaoService } from './services/de-para-sugestao.service';
 import { IobLotdParserService }     from './services/iob-lotd-parser.service';
 import { FixedIncomeModule } from './fixed-income/fixed-income.module';
 import { CdiModule } from './cdi/cdi.module';
@@ -78,6 +80,7 @@ import { SidebarResourceGuard } from '../../auth/guards/sidebar-resource.guard';
     EncerramentoExercicioController,
     TabelaComparativaController,
     AberturaController,
+    DeParaSugestaoController,
   ],
   providers: [
     AccountingConfigService,
@@ -98,6 +101,7 @@ import { SidebarResourceGuard } from '../../auth/guards/sidebar-resource.guard';
     EncerramentoExercicioService,
     TabelaComparativaService,
     AberturaService,
+    DeParaSugestaoService,
     MatrizPlanoParserService,
     IobLotdParserService,
     IobLotdImportService,
