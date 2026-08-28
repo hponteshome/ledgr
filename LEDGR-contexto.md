@@ -7216,3 +7216,107 @@ nesta sessao.** A ferramenta esta pronta e validada, mas o registro
 definitivo do lancamento de abertura 2018 da Hotelsys fica para o usuario
 decidir quando revisar a planilha com calma. Retomar isso como prioridade
 alta na proxima sessao se ainda nao tiver sido registrado.
+
+
+### Sessao 28/08/2026 — REGISTRO ABERTURA 2018 HOTELSYS + 2 correcoes criticas de arquitetura (aplicaveis a TODAS as futuras aberturas)
+
+**Contexto:** apos revisar a planilha Hotelsys_Abertura_2018.xlsx (sessao
+anterior), usuario autorizou o registro do lancamento ABERTURA-2018.
+Durante a verificacao pos-registro (Balancete/Balanco/DRE), 2 problemas
+arquiteturais criticos foram descobertos e corrigidos - ambos relevantes
+para QUALQUER empresa que ainda vier a ter sua abertura registrada.
+
+---
+
+**PROBLEMA 1 - Fallback para saldo declarado ECD (I155) causava dupla
+contagem em demonstracoes pos-abertura.**
+
+`getVerificationBalance()` (trial-balance.service.ts) tinha um fallback:
+para conta analitica SEM movimento real antes da data, usava o saldo
+DECLARADO na ECD (account_balances) como se fosse saldo real. Apos
+registrar uma abertura, isso causa dupla contagem: a conta NATIVA antiga
+(zero lancamento real, mas com saldo I155 puxado pelo fallback) e a conta
+NOVA da Matriz (mesmo valor, mas via lancamento real da abertura) somavam
+juntas na mesma demonstracao.
+
+**REGRA DEFINITIVA (principio do usuario, 28/08/2026):** a partir da data
+do lancamento de abertura, TODAS as demonstracoes contabeis (Balancete,
+DRE, Balanco Patrimonial) devem ser construidas EXCLUSIVAMENTE a partir de
+lancamentos reais (journal_entry_items). O saldo declarado da ECD
+(account_balances/I155) serve APENAS para conferencias retroativas
+(Comparativo de Saldos, Tabela Comparativa ECD, e o proprio calculo do
+Lancamento de Abertura) - NUNCA como substituto de lancamento real numa
+demonstracao. Corrigido: fallback removido por completo do
+getVerificationBalance(). getTrialBalance()/getTrialBalanceSummary() ja
+nao tinham esse problema (calculam puro de journal_entry_items).
+
+**Se construir nova demonstracao no futuro:** NUNCA usar account_balances
+como fallback de saldo. Se a conta nao tem lancamento real, o saldo dela
+E ZERO na demonstracao - ponto final.
+
+---
+
+**PROBLEMA 2 - Contas marcadas is_analytic=true mas com filhas cadastradas
+(inconsistencia de dado, nao um bug isolado - achado em TODAS as empresas
+exceto GRB/Pontes).**
+
+Uma conta com `isAnalytic=true` mas que TEM filhas viola a premissa basica
+do bottom-up rollup usado pelas demonstracoes (soma filhas -> pai) - a
+conta-pai acaba carregando SEU PROPRIO saldo direto (por estar marcada
+analitica) E TAMBEM recebendo o rollup das filhas, causando dupla contagem
+silenciosa. Isso so aparece quando a conta e efetivamente TOCADA por
+algum lancamento - por isso o Balancete Mensal e o Balancete de
+Verificacao no periodo completo (2017-2025) fechavam certo, mas o Balanco
+Patrimonial pra 2024 isolado (que exercita caminho de codigo ligeiramente
+diferente) expunha o problema.
+
+**Escala real do problema (verificado 28/08/2026):**
+- Hotelsys: 49 contas
+- Sunsys: 77 contas
+- Kipstone: 52 contas
+- F5 Participacoes: 52 contas
+- LM Administracao: 51 contas
+- Jose Silva: 40 contas
+- GRB e Pontes: 0 (as unicas que nasceram 100% pela Matriz, sem historico
+  anterior arrastando essa inconsistencia)
+- TOTAL: 321 contas corrigidas em toda a plataforma (is_analytic -> false)
+
+**Causa provavel:** contas que ganharam filhas especificas (ex: por banco,
+por fornecedor) ao longo do tempo, sem que o registro-pai fosse atualizado
+de analitica para sintetica no momento da criacao das filhas - mesma
+familia de bug ja vista e corrigida pontualmente ontem (5 contas da
+Hotelsys: Bancos Conta Movimento, Aplicacoes Financeiras, Adiantamentos
+Fornecedores, Contas a Pagar, Lucros Acumulados).
+
+**REGRA DEFINITIVA PARA FUTURAS ABERTURAS:** antes de registrar QUALQUER
+lancamento de abertura para uma nova empresa, rodar esta verificacao e
+corrigir antes de prosseguir:
+```sql
+SELECT ca.code, ca.name, ca.type
+FROM chart_of_accounts ca
+WHERE ca.company_id = '<empresa>'
+  AND ca.is_analytic = true AND ca.deleted_at IS NULL
+  AND EXISTS (SELECT 1 FROM chart_of_accounts filhos WHERE filhos.parent_id = ca.id AND filhos.deleted_at IS NULL);
+-- se retornar linhas, corrigir: UPDATE chart_of_accounts SET is_analytic = false WHERE id IN (...)
+```
+
+---
+
+**Sequencia completa desta sessao (para referencia de futuras aberturas):**
+1. Limpeza total de journal_entries/journal_entry_items da empresa (SO
+   os lancamentos - preservar chart_of_accounts, account_balances,
+   ecd_imports, ecf_part_a/b, matriz_master_accounts, ecd_account_mappings).
+   Backup manual antes de qualquer exclusao.
+2. Verificar e corrigir is_analytic=true-com-filhas ANTES de registrar
+   (query acima).
+3. Registrar o lancamento de abertura (Lancamentos de Abertura -> Registrar
+   Lancamentos).
+4. Verificar Balancete de Verificacao, Balanco Patrimonial e DRE em pelo
+   menos 2 janelas de data diferentes (um periodo completo desde a
+   abertura, e um periodo isolado como um ano especifico) - problemas de
+   arquitetura como o PROBLEMA 1 acima so aparecem em certas combinacoes
+   de janela de data.
+
+**Resultado final Hotelsys 2018:** ABERTURA-2018 registrado e validado -
+Balancete de Verificacao, Balanco Patrimonial e DRE todos corretos e
+equilibrados em multiplos periodos testados.
