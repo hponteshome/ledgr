@@ -795,9 +795,6 @@ const TrialBalanceView: React.FC = () => {
                         {item.account.name}
                     </span>
                 </td>
-                <td style={tdStyle()}>
-                    <NatureBadge nature={item.account.nature} />
-                </td>
                 <td
                     style={{
                         ...tdStyle('right'),
@@ -832,7 +829,7 @@ const TrialBalanceView: React.FC = () => {
                         color: item.balance >= 0 ? '#111111' : '#B91C1C',
                     }}
                 >
-                    {fmt(Math.abs(item.balance))}
+                    {fmt(Math.abs(item.balance))}{' '}{item.balance >= 0 ? 'D' : 'C'}
                 </td>
             </tr>
         );
@@ -881,9 +878,6 @@ const TrialBalanceView: React.FC = () => {
                         {item.account.name}
                     </span>
                 </td>
-                <td style={tdStyle()}>
-                    <NatureBadge nature={item.account.nature} />
-                </td>
                 <td
                     style={{
                         ...tdStyle('right'),
@@ -892,7 +886,7 @@ const TrialBalanceView: React.FC = () => {
                     }}
                 >
                     {item.previousBalance !== 0 ? (
-                        fmt(Math.abs(item.previousBalance))
+                        <>{fmt(Math.abs(item.previousBalance))}{' '}{item.previousBalance >= 0 ? 'D' : 'C'}</>
                     ) : (
                         <span style={{ color: '#D1D5DB' }}>—</span>
                     )}
@@ -931,7 +925,7 @@ const TrialBalanceView: React.FC = () => {
                         color: saldoFinal >= 0 ? '#111111' : '#B91C1C',
                     }}
                 >
-                    {fmt(Math.abs(saldoFinal))}
+                    {fmt(Math.abs(saldoFinal))}{' '}{saldoFinal >= 0 ? 'D' : 'C'}
                 </td>
             </tr>
         );
@@ -1396,11 +1390,6 @@ const TrialBalanceView: React.FC = () => {
                                             Código
                                         </th>
                                         <th style={{ ...thStyle, textAlign: 'left' }}>Conta</th>
-                                        <th
-                                            style={{ ...thStyle, textAlign: 'left', width: 50 }}
-                                        >
-                                            Tipo
-                                        </th>
                                         {viewMode === 'verification' && (
                                             <th
                                                 style={{
