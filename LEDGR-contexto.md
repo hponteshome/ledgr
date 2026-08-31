@@ -7581,3 +7581,31 @@ completa do Plano de Contas foi ADIADA apos entendimento correto do
 estado real (ver Erro Real acima) - retomar na proxima sessao com
 avaliacao precisa do que exatamente esta inconsistente, sem repetir o
 erro de avaliar risco com base em memoria desatualizada.
+
+
+### PENDENCIA REGISTRADA 31/08/2026 — criterio de exibicao ainda nao resolve caso Hotelsys (raiz compartilhada)
+
+**Achado real durante investigacao do Plano de Contas da Hotelsys:** o
+criterio de "raiz duplicada" implementado em getTree() (sessao 28/08/2026,
+manha) so oculta a arvore ECD nativa quando ela tem uma RAIZ PROPRIA e
+DISTINTA da raiz Matriz (caso Sunsys: "1 ATIVO" Matriz vs "7 ATIVO" ECD,
+raizes separadas). Na Hotelsys, as duas estruturas COMPARTILHAM a MESMA
+raiz ("1 ATIVO" contem tanto as ~499 contas que batem com a Matriz quanto
+as ~622 contas nativas com numeracao propria antiga, tipo "1101"/"112"/
+"1301") - o criterio de raiz duplicada nunca dispara, e tudo aparece
+misturado na tela de rotina do Plano de Contas.
+
+**Importante: isso NAO e problema de dado.** As 622 contas nativas sao
+reais e necessarias (12.777 vinculos de account_balances, 483 de
+ecd_account_mappings, 1.811 de chart_of_accounts_ecd_imports - base de
+calculo da abertura e conferencia retroativa ECD x Contabilidade). E uma
+lacuna de EXIBICAO - falta um criterio melhor para ocultar essas contas
+da tela de rotina quando elas convivem com a Matriz sob a MESMA raiz
+(nao raizes separadas).
+
+**Nao resolver com o mesmo criterio ja tentado e revertido em 27/08/2026**
+(ocultar por presenca de QUALQUER vinculo ECD - quebrou a Hotelsys
+inteira ao orfanizar containers-raiz). Precisa de abordagem nova -
+possivelmente por CODIGO/NUMERACAO (contas com esquema curto tipo "XXX"/
+"XXXXX" vs esquema Matriz longo tipo "XXXXXXXXXXX"), nao por vinculo ECD
+generico. Avaliar com cuidado na proxima sessao, sem pressa.
