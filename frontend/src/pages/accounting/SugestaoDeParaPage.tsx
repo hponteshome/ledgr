@@ -238,6 +238,9 @@ export const SugestaoDeParaPage: React.FC = () => {
                         <span style={{ fontFamily: 'monospace', color: '#2563EB', marginRight: 6 }}>{s.sourceCode}</span>
                         {s.sourceName}
                       </td>
+                      <td style={{ padding: '7px 12px', borderBottom: '0.5px solid #F5F5F5', fontSize: 12, textAlign: 'right' }}>
+                        {s.sourceBalance !== null ? Math.abs(s.sourceBalance).toLocaleString('pt-BR', {minimumFractionDigits:2}) : '—'}
+                      </td>
                       <td style={{ padding: '7px 12px', borderBottom: '0.5px solid #F5F5F5', fontSize: 12 }}>
                         {/* CORRIGIDO 28/08/2026: sempre editavel, nao so quando "sem sugestao" -
                             achado real na Sunrise (INSSRF-PF sugerido errado para IRRF NF a Recolher,

@@ -7,6 +7,8 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { useCompany } from '@/contexts/CompanyContext';
 import api from '@/services/api';
+import { imprimirRelatorio } from '@/utils/imprimirRelatorio';
+import { usePrintHandler } from '@/contexts/PrintContext';
 
 interface AberturaLinha {
   targetAccountId: string;
@@ -73,6 +75,35 @@ export const AberturaLancamentosPage: React.FC = () => {
   };
 
   const temProblema = calculo && (calculo.contasNaoAnaliticas.length > 0 || Math.abs(calculo.diferenca) > 0.01);
+
+  const handleImprimir = () => {
+    if (!calculo || !activeCompany) return;
+    const linhas = calculo.linhas.map(l => `
+      <tr>
+        <td>${l.targetCode}</td>
+        <td>${l.targetName}</td>
+        <td>${l.targetType}</td>
+        <td class="num">${l.debito ? fmt(l.debito) : '—'}</td>
+        <td class="num">${l.credito ? fmt(l.credito) : '—'}</td>
+      </tr>`).join('');
+    const corpoHtml = `
+      <table>
+        <thead><tr><th>Código</th><th>Conta</th><th>Tipo</th><th class="num">Débito</th><th class="num">Crédito</th></tr></thead>
+        <tbody>${linhas}
+          <tr class="total"><td colspan="3">TOTAL</td><td class="num">${fmt(calculo.totalDebito)}</td><td class="num">${fmt(calculo.totalCredito)}</td></tr>
+        </tbody>
+      </table>`;
+    imprimirRelatorio({
+      titulo: 'LANÇAMENTOS DE ABERTURA',
+      subtitulo: `Referência: ${referencia}`,
+      empresaNome: activeCompany.legalName || activeCompany.tradeName || '',
+      empresaCnpj: activeCompany.taxId || '',
+      periodo: new Date(dataAbertura + 'T12:00:00').toLocaleDateString('pt-BR'),
+      corpoHtml,
+    });
+  };
+
+  usePrintHandler(calculo ? handleImprimir : null, 'Imprimir Lançamentos de Abertura', [calculo, referencia, dataAbertura]);
 
   const thSt: React.CSSProperties = { padding: '8px 12px', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', color: '#6B7280', background: '#F9FAFB', borderBottom: '0.5px solid #E5E7EB', textAlign: 'left' };
   const inputSt: React.CSSProperties = { padding: '7px 10px', border: '1px solid #E5E7EB', borderRadius: 6, fontSize: 13 };

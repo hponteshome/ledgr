@@ -124,6 +124,24 @@ export class AberturaService {
 
     const dataAbertura = new Date(dataAberturaISO + 'T12:00:00Z');
 
+    // CORRIGIDO 31/08/2026: registrarAbertura() nao verificava se ja existia
+    // uma abertura com a MESMA referencia antes de criar outra - cada clique
+    // em "Registrar" so somava mais uma entrada, causando dupla (ou tripla)
+    // contagem. Achado real na Sunrise: apos remapear o de/para e re-registrar,
+    // 2 lancamentos "ABERTURA-2018" coexistiram, dobrando varias contas no
+    // Balancete. Corrigido: apaga qualquer lancamento com a MESMA referencia
+    // para esta empresa antes de criar o novo - re-registrar sempre SUBSTITUI,
+    // nunca soma.
+    const entriesAntigas = await this.prisma.journalEntry.findMany({
+      where: { companyId, reference: referencia },
+      select: { id: true },
+    });
+    if (entriesAntigas.length > 0) {
+      const idsAntigos = entriesAntigas.map(e => e.id);
+      await this.prisma.journalEntryItem.deleteMany({ where: { journalEntryId: { in: idsAntigos } } });
+      await this.prisma.journalEntry.deleteMany({ where: { id: { in: idsAntigos } } });
+    }
+
     const entry = await this.prisma.journalEntry.create({
       data: {
         companyId,

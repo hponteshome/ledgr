@@ -30,6 +30,8 @@ export interface SugestaoMapeamento {
   confidence: number; // 0 a 1
   matchType: 'REAPROVEITADO' | 'SIMILARIDADE' | 'SEM_SUGESTAO' | 'CONFIRMADO_AUTOMATICO' | 'CONFIRMADO_MANUAL';
   confirmado: boolean; // CRIADO 28/08/2026: ja existe em ecd_account_mappings (gravado), nao e so sugestao pendente
+  sourceBalance: number | null; // CRIADO 31/08/2026: saldo declarado mais recente da conta ECD de origem
+  sourceBalanceDate: string | null; // data de referencia desse saldo (ISO)
 }
 
 const GRUPOS_BP = ['CIRCULANTE', 'LONGO PRAZO', 'PERMANENTE', 'DIFERIDO', 'IMOBILIZADO', 'INVESTIMENTO'];
@@ -88,6 +90,21 @@ export class DeParaSugestaoService {
       where: { companyId, deletedAt: null, isAnalytic: true },
       include: { ecdImportLinks: { select: { id: true }, take: 1 } },
     });
+
+    // CRIADO 31/08/2026: saldo declarado mais recente por conta - ajuda o
+    // usuario a avaliar se um mapeamento importa de verdade (conta zerada
+    // vs com saldo relevante) direto na tela de sugestao, sem precisar
+    // consultar outra tela.
+    const saldosRecentes = await this.prisma.accountBalance.findMany({
+      where: { companyId },
+      orderBy: { referenceDate: 'desc' },
+    });
+    const saldoPorConta = new Map<string, { balance: number; date: Date }>();
+    for (const s of saldosRecentes) {
+      if (!saldoPorConta.has(s.accountId)) {
+        saldoPorConta.set(s.accountId, { balance: Number(s.balance), date: s.referenceDate });
+      }
+    }
     const porId = new Map<string, ContaCandidata>(
       todasContas.map(c => [c.id, { id: c.id, code: c.code, name: c.name, type: c.type, nature: c.nature, parentId: c.parentId }]),
     );
@@ -122,6 +139,7 @@ export class DeParaSugestaoService {
     const sugestoes: SugestaoMapeamento[] = [];
 
     for (const origem of origens) {
+      const saldoOrigem = saldoPorConta.get(origem.id);
       const existente = jaMapeadasMap.get(origem.id);
       if (existente) {
         sugestoes.push({
@@ -129,6 +147,7 @@ export class DeParaSugestaoService {
           targetId: existente.targetAccount.id, targetCode: existente.targetAccount.code, targetName: existente.targetAccount.name,
           confidence: 1, confirmado: true,
           matchType: existente.matchType === 'MANUAL' ? 'CONFIRMADO_MANUAL' : 'CONFIRMADO_AUTOMATICO',
+          sourceBalance: saldoOrigem?.balance ?? null, sourceBalanceDate: saldoOrigem?.date.toISOString() ?? null,
         });
         continue;
       }
@@ -155,6 +174,7 @@ export class DeParaSugestaoService {
             sourceId: origem.id, sourceCode: origem.code, sourceName: origem.name,
             targetId: match.id, targetCode: match.code, targetName: match.name,
             confidence: 1, matchType: 'REAPROVEITADO', confirmado: false,
+            sourceBalance: saldoOrigem?.balance ?? null, sourceBalanceDate: saldoOrigem?.date.toISOString() ?? null,
           });
           continue;
         }
@@ -172,12 +192,14 @@ export class DeParaSugestaoService {
           sourceId: origem.id, sourceCode: origem.code, sourceName: origem.name,
           targetId: melhor.conta.id, targetCode: melhor.conta.code, targetName: melhor.conta.name,
           confidence: melhor.score, matchType: 'SIMILARIDADE', confirmado: false,
+          sourceBalance: saldoOrigem?.balance ?? null, sourceBalanceDate: saldoOrigem?.date.toISOString() ?? null,
         });
       } else {
         sugestoes.push({
           sourceId: origem.id, sourceCode: origem.code, sourceName: origem.name,
           targetId: melhor?.conta.id ?? null, targetCode: melhor?.conta.code ?? null, targetName: melhor?.conta.name ?? null,
           confidence: melhor?.score ?? 0, matchType: 'SEM_SUGESTAO', confirmado: false,
+          sourceBalance: saldoOrigem?.balance ?? null, sourceBalanceDate: saldoOrigem?.date.toISOString() ?? null,
         });
       }
     }

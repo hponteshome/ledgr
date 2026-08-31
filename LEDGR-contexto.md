@@ -7466,3 +7466,118 @@ no Balancete de Verificacao pos-registro: equilibrado, R$0,00 de diferenca.
 Confirma que TODAS as correcoes desta sessao (fallback I155 removido,
 is_analytic-com-filhas corrigido em 321 contas, ferramenta de abertura)
 funcionam corretamente de ponta a ponta para uma empresa nova.
+
+
+### Sessao 31/08/2026 — Abertura Sunrise concluida + bug critico de duplicacao corrigido + melhorias De/Para e impressao
+
+**CHECKPOINT DE ESTADO REAL (31/08/2026, ~15:40) — pratica nova adotada a
+partir de hoje: todo registro de sessao deve incluir este snapshot,
+consultado direto do banco, NUNCA da memoria da conversa (motivo: erro real
+cometido nesta mesma sessao, ver adiante).**
+
+| Empresa | Contas ativas | Journal Entries | Journal Items |
+|---|---|---|---|
+| GRB (Advocacia) | 314 | 524 | 1.300 |
+| F5 Participacoes | 414 | 0 | 0 |
+| Hallo Administracao | 0 | 0 | 0 |
+| Hotelsys | 1.123 | 1 | 75 |
+| Jose Silva Advocacia | 262 | 0 | 0 |
+| Kipstone | 418 | 0 | 0 |
+| LM Administracao | 405 | 204 | 367 |
+| Pontes Contabilidade | 283 | 0 | 0 |
+| Sunrise Holding | 471 | 1 | 14 |
+| Sunsys | 512 | 181 | 362 |
+
+---
+
+**ERRO REAL COMETIDO E CORRIGIDO NESTA SESSAO (registrado para nao repetir):**
+ao discutir limpeza do Plano de Contas da Hotelsys, citei de memoria "112.890
+lancamentos reais" como se ainda existissem - mas esse numero era do estado
+ANTES da limpeza+reversao ja feita na sessao de 28/08/2026 (documentada
+acima). O checkpoint atual confirma: Hotelsys tem HOJE apenas 1 lancamento
+(ABERTURA-2018, 75 itens) - a limpeza de 28/08 ja e o estado real e
+definitivo. Quase dei um aviso de risco falso (baseado em dado que nao
+existe mais) para uma decisao real do usuario. Licao: SEMPRE confirmar
+estado atual via query antes de avaliar risco de qualquer acao destrutiva,
+nunca confiar em contagem lembrada de sessoes/mensagens anteriores, por
+mais recente que pareca.
+
+---
+
+**ABERTURA DA SUNRISE - trabalho completo do dia:**
+
+1. Revisao de 2 balancetes oficiais do PVA (SPED) fornecidos pelo usuario
+   (ECF e ECD, Dez/2017) contra o Balancete gerado na LEDGR pos-abertura -
+   processo de auditoria real, nao so validacao tecnica.
+
+2. **BUG CRITICO ENCONTRADO E CORRIGIDO: registrarAbertura() duplicava
+   lancamento.** Nao verificava se ja existia entry com a MESMA referencia
+   antes de criar outra. Apos o usuario remapear o de/para (corrigindo a
+   conta de CSLL Diferida) e re-registrar, 2 lancamentos "ABERTURA-2018"
+   coexistiram - varias contas do Balancete apareceram com EXATAMENTE 2x
+   o valor correto (Fornecedores No Pais, Socios e Diretores, Provisoes
+   para Perdas em Investimentos). Corrigido: registrarAbertura() agora
+   apaga qualquer lancamento com a mesma referencia antes de criar o novo -
+   re-registrar sempre SUBSTITUI, nunca soma. Mesma correcao tambem
+   necessaria retroativamente - Hotelsys e outras empresas que usarem
+   a ferramenta no futuro se beneficiam automaticamente do fix.
+
+3. **3 erros reais de mapeamento encontrados via auditoria contra o PVA
+   oficial** (nao pela ferramenta de sugestao automatica sozinha):
+   - IRPJ A PAGAR mapeado errado para IPTU a Pagar
+   - CSLL A PAGAR mapeado errado para Contas a Pagar generica
+   - INSSRF-PF A RECOLHER mapeado errado para IRRF NF a Recolher
+   - Erro estrutural: PARCELAMENTO PERT de curto E longo prazo misturados
+     na mesma conta (perdendo classificacao circulante x nao circulante)
+   Todos corrigidos pelo usuario diretamente na tela Sugestao De/Para
+   (autocomplete editavel), nao via SQL.
+
+4. **Conta nova criada na Matriz pelo usuario:** 23301020001 "Prejuizos
+   Acumulados" (sob 2330102 Lucros/Prejuizos do Exercicio) - decisao
+   consciente de nao reaproveitar a conta ECD nativa equivalente
+   (23501002, que ja tinha REF.SPED correto) porque "a partir de 2018 so
+   trabalhamos com o Plano Matriz" - reforca o principio ja estabelecido.
+
+5. **Matriz completada com 26 contas** (19 analiticas + 9 sinteticas, ver
+   entrada anterior desta mesma sessao) - Total Ativo/Passivo/PL da
+   abertura Sunrise ficou mais detalhado como resultado direto (ex:
+   Participacao em Controladas agora mostra "Hotelsys" nomeada, nao um
+   valor generico).
+
+6. **ABERTURA-2018 DA SUNRISE REGISTRADA COM SUCESSO** (apos a correcao do
+   bug de duplicacao) - 14 itens, Balancete de Verificacao equilibrado.
+
+---
+
+**Melhorias de ferramenta construidas nesta sessao:**
+
+- **Botao de impressao GLOBAL** (FAB fixo, canto inferior direito) via
+  novo PrintContext.tsx + hook usePrintHandler() - qualquer tela registra
+  sua propria funcao de impressao, sem duplicar posicionamento/estilo de
+  botao. Helper compartilhado imprimirRelatorio.ts cuida so da parte
+  comum (cabecalho formal, CNPJ, estilo, disparo do print) - decisao
+  arquitetural: nem modal 100% generico (relatorios tem formato diferente
+  demais entre si), nem 1 modal do zero por tela (duplicaria a parte
+  comum). Aplicado em Lancamentos de Abertura.
+
+- **Coluna "Saldo Origem" na tela Sugestao De/Para ECD** - mostra o saldo
+  declarado mais recente (I155) de cada conta ECD de origem, com periodo
+  de referencia (ex: "ECD dez/2017") - ajuda a avaliar se um mapeamento
+  importa de verdade sem sair da tela.
+
+- **Tela Sugestao De/Para agora sempre mostra os JA CONFIRMADOS tambem**
+  (nao so pendentes) - achado real que motivou: mapeamento manual errado
+  (CSLL Diferida -> Refeicao/Copa/Cozinha, clique errado) so foi
+  encontrado via consulta SQL direta porque a tela escondia tudo que ja
+  estava confirmado. Badge distingue Confirmado (auto) de Confirmado
+  (manual) - permite auditoria visual continua.
+
+---
+
+**Pendencia em aberto para a Hotelsys:** usuario levantou preocupacao
+sobre inconsistencia no Plano de Contas apos as atualizacoes de hoje
+(26 contas novas na Matriz + 2 renumeracoes). Decisao sobre limpeza
+completa do Plano de Contas foi ADIADA apos entendimento correto do
+estado real (ver Erro Real acima) - retomar na proxima sessao com
+avaliacao precisa do que exatamente esta inconsistente, sem repetir o
+erro de avaliar risco com base em memoria desatualizada.
