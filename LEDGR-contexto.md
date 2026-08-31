@@ -7609,3 +7609,93 @@ inteira ao orfanizar containers-raiz). Precisa de abordagem nova -
 possivelmente por CODIGO/NUMERACAO (contas com esquema curto tipo "XXX"/
 "XXXXX" vs esquema Matriz longo tipo "XXXXXXXXXXX"), nao por vinculo ECD
 generico. Avaliar com cuidado na proxima sessao, sem pressa.
+
+
+### Sessao 31/08/2026 (continuacao) — Investigacao Plano de Contas Hotelsys + melhorias Balancete
+
+**CHECKPOINT DE ESTADO REAL (31/08/2026, ~16:30):**
+
+| Empresa | Contas ativas | Journal Entries | Journal Items |
+|---|---|---|---|
+| GRB (Advocacia) | 314 | 524 | 1.300 |
+| F5 Participacoes | 414 | 0 | 0 |
+| Hallo Administracao | 0 | 0 | 0 |
+| Hotelsys | 1.123 | 1 | 75 |
+| Jose Silva Advocacia | 262 | 0 | 0 |
+| Kipstone | 418 | 0 | 0 |
+| LM Administracao | 405 | 204 | 367 |
+| Pontes Contabilidade | 283 | 0 | 0 |
+| Sunrise Holding | 471 | 1 | 14 |
+| Sunsys | 512 | 181 | 362 |
+
+(Sem mudanca desde o ultimo checkpoint - esta parte da sessao foi so
+investigacao e melhorias de tela, nenhum lancamento alterado.)
+
+---
+
+**Checagem estrutural do Plano de Contas da Hotelsys (mesma bateria de
+sempre) - 2 problemas reais achados e corrigidos:**
+- 2 contas `is_analytic`-com-filhas: `3210401 Venda de Imobilizado` e
+  `2330102 Lucros/Prejuizos do Exercicio` (a mesma "2330102" que o usuario
+  criou filho hoje pra Sunrise - pode ter vindo junto na completude da
+  Matriz). Corrigidas (is_analytic=false).
+- 132 linhas de "reduced_code duplicado" identificadas, mas eram FALSO
+  ALARME - todas contas SINTETICAS com placeholder '000000' (nunca usado
+  em lancamento, comportamento normal e esperado, nao e bug).
+
+---
+
+**QUASE-ERRO GRAVE EVITADO: usuario pediu para investigar 622 contas da
+Hotelsys que "nao batem com a Matriz por codigo", suspeitando que fossem
+estrutura duplicada morta (padrao ja visto e removido em outras
+empresas nesta sessao). Verificacao inicial (so journal_entry_items = 0)
+pareceu confirmar. QUASE executei hard delete.**
+
+**Antes de executar, checagem adicional revelou:** essas 622 contas
+carregam 12.777 vinculos de `account_balances` (TODO o historico de saldo
+declarado de 9 anos de ECD), 483 vinculos de `ecd_account_mappings`
+(quase todo o de/para ja construido), e 1.811 vinculos de
+`chart_of_accounts_ecd_imports` (rastreabilidade real com os 9 arquivos
+de ECD importados). NAO sao estrutura morta - sao a estrutura NATIVA real
+da Hotelsys (numeracao propria antiga, tipo "1101"/"112"/"1301", diferente
+tanto da Matriz quanto de qualquer coisa reconhecida como "lixo" ate
+agora). O hard delete teria destruido irreversivelmente 9 anos de
+rastreabilidade ECD real da empresa mais trabalhada desta sessao inteira.
+
+**Licao registrada:** antes de qualquer exclusao (soft ou hard), checar
+TODAS as tabelas de vinculo relevantes (account_balances,
+ecd_account_mappings, chart_of_accounts_ecd_imports, journal_entry_items),
+nunca concluir "seguro apagar" a partir de uma unica tabela de referencia.
+Confirma tambem a pratica de checkpoint adotada mais cedo nesta mesma
+sessao (ver entrada anterior) - o mesmo tipo de erro (avaliar risco com
+dado incompleto/desatualizado) quase se repetiu, de forma diferente, na
+mesma sessao.
+
+---
+
+**PENDENCIA REGISTRADA (ja documentada na entrada anterior, resumo):** o
+criterio de "raiz duplicada" (getTree(), 28/08) so oculta a arvore ECD
+nativa da tela de rotina do Plano de Contas quando ela tem raiz PROPRIA
+distinta da Matriz. Na Hotelsys as duas convivem sob a MESMA raiz -
+criterio nunca dispara, tudo aparece misturado. Nao e problema de dado
+(as 622 contas sao reais e necessarias, ver acima) - e lacuna de EXIBICAO.
+Avaliar abordagem por CODIGO/NUMERACAO (nao por vinculo ECD generico, que
+ja quebrou a tela uma vez em 27/08) na proxima sessao.
+
+---
+
+**Melhorias construidas na tela de Balancete (TrialBalanceView.tsx):**
+
+1. Confirmado que retratil/expandir por grupo ja existia (toggleVerification
+   + flag `expanded` por item) - so nao estava obvio visualmente.
+
+2. Novo filtro "Somente este nivel" (exato) - complementa o filtro
+   existente `maxDepth` (cumulativo, "ate o nivel N"). Filtra o resultado
+   JA achatado por profundidade exata, sem alterar a logica de flatten.
+   Adicionado tambem botao de nivel 6 (faltava, ia so ate 5).
+
+3. Impressao via botao global (FAB, ja construido nesta sessao) -
+   handler constroi a tabela HTML a partir das linhas JA filtradas na
+   tela (respeita nivel, busca, zeradas ativos), para Balancete Mensal
+   e de Verificacao. Corrigido apos primeiro teste: faltava a coluna
+   Saldo Final (com D/C) no Balancete Mensal impresso.
