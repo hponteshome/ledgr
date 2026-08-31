@@ -9,6 +9,8 @@ import {
 } from 'react-icons/fi';
 import api from '../../services/api';
 import { useCompany } from '../../contexts/CompanyContext';
+import { usePrintHandler } from '../../contexts/PrintContext';
+import { imprimirRelatorio } from '../../utils/imprimirRelatorio';
 import { useAuth } from '../../contexts/AuthContext';
 
 // ─── Design tokens (Design System Contábil — aprovado 22/03/2026) ─────────────
@@ -525,6 +527,10 @@ const TrialBalanceView: React.FC = () => {
     const [search, setSearch] = useState('');
     const [error, setError] = useState<string | null>(null);
     const [maxDepth, setMaxDepth] = useState<number | null>(null);
+    // CRIADO 31/08/2026: filtro "somente este nivel" (exato), diferente do
+    // maxDepth existente (cumulativo, ate o nivel N). Filtra POS-achatamento,
+    // sem alterar a logica de flatten existente.
+    const [soNivelExato, setSoNivelExato] = useState(false);
     const [showZeroBalances, setShowZeroBalances] = useState(false);
 
     // ── NOVO: toggle contas de Resultado (REVENUE + EXPENSE) ──────────────────
@@ -663,17 +669,66 @@ const TrialBalanceView: React.FC = () => {
         return items;
     })();
 
-    const flatMonthly: MonthlyRow[] = flattenMonthly(pipelineMonthly, 0, maxDepth);
-    const flatVerification: VerificationRow[] = flattenVerification(
+    const flatMonthlyBruto: MonthlyRow[] = flattenMonthly(pipelineMonthly, 0, maxDepth);
+    const flatVerificationBruto: VerificationRow[] = flattenVerification(
         pipelineVerification,
         0,
         maxDepth,
     );
+    // Filtro "somente este nivel": mantem so linhas cujo depth bate exato
+    // com o nivel selecionado (depth e 0-indexado, nivel selecionado e 1-indexado)
+    const flatMonthly: MonthlyRow[] = (soNivelExato && maxDepth !== null)
+        ? flatMonthlyBruto.filter(r => r.depth === maxDepth - 1)
+        : flatMonthlyBruto;
+    const flatVerification: VerificationRow[] = (soNivelExato && maxDepth !== null)
+        ? flatVerificationBruto.filter(r => r.depth === maxDepth - 1)
+        : flatVerificationBruto;
 
     const hasData =
         viewMode === 'monthly'
             ? flatMonthly.length > 0
             : flatVerification.length > 0;
+
+    // CRIADO 31/08/2026: impressao do Balancete via botao global (FAB) -
+    // reflete exatamente os filtros ativos na tela (nivel, busca, zeradas).
+    const handleImprimirBalancete = () => {
+        if (!activeCompany) return;
+        const dc = (v: number) => (v >= 0 ? 'D' : 'C');
+        let corpoHtml = '';
+        if (viewMode === 'monthly') {
+            const linhas = flatMonthly.map(r => `
+              <tr>
+                <td style="padding-left:${8 + r.depth * 14}px">${r.item.account.code}</td>
+                <td>${r.item.account.name}</td>
+                <td class="num">${r.item.balance > 0 ? fmt(r.item.balance) : '—'}</td>
+                <td class="num">${r.item.balance < 0 ? fmt(Math.abs(r.item.balance)) : '—'}</td>
+                <td class="num">${fmt(Math.abs(r.item.balance))} ${dc(r.item.balance)}</td>
+              </tr>`).join('');
+            corpoHtml = `<table><thead><tr><th>Código</th><th>Conta</th><th class="num">Débito</th><th class="num">Crédito</th><th class="num">Saldo Final</th></tr></thead><tbody>${linhas}</tbody></table>`;
+        } else {
+            const linhas = flatVerification.map(r => {
+                const saldoFinal = r.item.previousBalance + r.item.debits - r.item.credits;
+                return `
+              <tr>
+                <td style="padding-left:${8 + r.depth * 14}px">${r.item.account.code}</td>
+                <td>${r.item.account.name}</td>
+                <td class="num">${fmt(Math.abs(r.item.previousBalance))} ${dc(r.item.previousBalance)}</td>
+                <td class="num">${r.item.debits ? fmt(r.item.debits) : '—'}</td>
+                <td class="num">${r.item.credits ? fmt(r.item.credits) : '—'}</td>
+                <td class="num">${fmt(Math.abs(saldoFinal))} ${dc(saldoFinal)}</td>
+              </tr>`;
+            }).join('');
+            corpoHtml = `<table><thead><tr><th>Código</th><th>Conta</th><th class="num">Saldo Anterior</th><th class="num">Débito</th><th class="num">Crédito</th><th class="num">Saldo Final</th></tr></thead><tbody>${linhas}</tbody></table>`;
+        }
+        imprimirRelatorio({
+            titulo: viewMode === 'monthly' ? 'BALANCETE MENSAL' : 'BALANCETE DE VERIFICAÇÃO',
+            empresaNome: activeCompany.legalName || activeCompany.tradeName || '',
+            empresaCnpj: activeCompany.taxId || '',
+            periodo: `${startDisplayDate} a ${endDisplayDate}`,
+            corpoHtml,
+        });
+    };
+    usePrintHandler(hasData ? handleImprimirBalancete : null, 'Imprimir Balancete', [flatMonthly, flatVerification, viewMode, hasData]);
 
     // Raízes para o ClosingPanel e totais de rodapé
     const monthlyRoots = flatMonthly
@@ -1258,7 +1313,7 @@ const TrialBalanceView: React.FC = () => {
                             }}
                         >
                             <span style={{ fontSize: 11, color: '#9CA3AF' }}>Nível:</span>
-                            {[1, 2, 3, 4, 5].map(n => (
+                            {[1, 2, 3, 4, 5, 6].map(n => (
                                 <button
                                     key={n}
                                     onClick={() => setMaxDepth(maxDepth === n ? null : n)}
@@ -1293,6 +1348,15 @@ const TrialBalanceView: React.FC = () => {
                             >
                                 ∞
                             </button>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#6B7280', marginLeft: 4, cursor: maxDepth !== null ? 'pointer' : 'default', opacity: maxDepth !== null ? 1 : 0.4 }}>
+                                <input
+                                    type="checkbox"
+                                    checked={soNivelExato}
+                                    disabled={maxDepth === null}
+                                    onChange={e => setSoNivelExato(e.target.checked)}
+                                />
+                                Somente este nível
+                            </label>
                         </div>
                     )}
                 </div>
