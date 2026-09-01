@@ -7773,3 +7773,104 @@ somadas as 23 ja existentes - conferir contagem exata na proxima consulta).
 mas o metodo (busca por palavra-chave de tributo) so cobre um subconjunto
 de possiveis erros; nao e uma auditoria completa das 483 linhas. Proximo
 passo do fluxo: calcular e revisar Lancamentos de Abertura da Hotelsys.
+
+
+### Sessao 01/09/2026 (continuacao 2) — Ferramenta "Lancamentos ECD" construida e validada com dado real
+
+**CHECKPOINT DE ESTADO REAL (01/09/2026, ~16:15):**
+
+| Empresa | Contas ativas | Journal Entries | Journal Items |
+|---|---|---|---|
+| GRB (Advocacia) | 314 | 524 | 1.300 |
+| F5 Participacoes | 414 | 0 | 0 |
+| Hallo Administracao | 0 | 0 | 0 |
+| Hotelsys | 1.123 | 118 | 326 |
+| Jose Silva Advocacia | 262 | 0 | 0 |
+| Kipstone | 418 | 0 | 0 |
+| LM Administracao | 405 | 204 | 367 |
+| Pontes Contabilidade | 283 | 0 | 0 |
+| Sunrise Holding | 471 | 1 | 14 |
+| Sunsys | 512 | 181 | 362 |
+
+Hotelsys subiu de 1/75 para 118/326 (ABERTURA-2018: 1 lancamento/78 itens
++ ECD-2018: 117 lancamentos/248 itens) - primeira movimentacao real
+pos-abertura trazida com sucesso.
+
+---
+
+**Contexto:** apos fechar a abertura da Hotelsys, usuario quis trazer a
+movimentacao real de 2018 (existente na ECD, nunca lancada de verdade nas
+contas Matriz) para ter demonstracoes espelhadas LEDGR x SPED - deixando
+claro que, no futuro, tambem havera lancamentos SEM origem na ECD
+(movimentacao bancaria etc), exigindo poder identificar/filtrar por
+origem depois.
+
+**Enum SourceModule completado (13 valores, migracao manual aplicada):**
+achado real - PROVISION e ADJUSTMENT ja eram referenciados pelo frontend
+como se existissem, mas faltavam no banco (bug real, corrigido).
+Adicionados tambem RESULT_TRANSFER e OTHER a pedido do usuario.
+
+**Bug real corrigido no formulario de novo lancamento:** o dropdown
+"Tipo" usava getDistinctSourceModules (endpoint pensado para FILTRAR
+lancamentos ja existentes por tipo usado), nao uma lista completa de
+opcoes - tipos validos nunca usados antes pela empresa nunca apareceriam.
+Corrigido para lista fixa com so os 5 tipos de escolha MANUAL
+(Manual/Provisao/Ajuste/Transferencia de Resultado/Outros) - tipos de
+integracao/importacao sao definidos automaticamente pelo processo que
+gera o lancamento, nunca escolhidos na tela.
+
+**NOVA FERRAMENTA: Lancamentos ECD** (Contabilidade -> Lancamentos ECD,
+ordem 11) - converte a movimentacao real da ECD (I200/I250) em
+lancamentos LEDGR de verdade, apontando para as contas MATRIZ via
+de/para ja confirmado. Reaproveita o EcdParserService ja existente
+(mesmo parser da importacao original), so muda o destino.
+
+Decisoes de design ao longo da construcao (varias mudancas de rumo, todas
+por feedback direto do usuario):
+1. Formato lancamento-por-lancamento (preserva granularidade original),
+   nao resumo mensal - escolha do usuario para permitir demonstracoes
+   fieis ao SPED.
+2. Ferramenta reutilizavel (nao so para Hotelsys/2018), mesmo padrao da
+   Sugestao De/Para e Abertura.
+3. PRIMEIRA tentativa: le arquivo direto do disco por caminho digitado -
+   usuario apontou risco de erro (path errado gerou "Internal server
+   error" real, testado). Corrigido para upload real via navegador
+   (input file), mais seguro.
+4. Ano extraido automaticamente do proprio arquivo (registro 0000,
+   DT_FIN) - usuario pediu para eliminar mais um campo manual, inspirado
+   no modal de importacao ECD original.
+5. Achado real durante teste: I250.accountCode vem com pontos
+   ("2.1.03.001.126"), chart_of_accounts.code guarda numero bruto sem
+   pontos ("2103001126") - 32 contas apareciam "sem mapeamento" por
+   incompatibilidade de FORMATO, nao pendencia real. Corrigido com
+   normalizacao (remove nao-digitos) antes de comparar - coerente com a
+   regra ja estabelecida "numero bruto sempre".
+
+**Protecao contra duplicacao** (mesmo padrao do fix em abertura.service.ts):
+re-registrar o mesmo lote (referencia "ECD-{ano}") sempre SUBSTITUI as
+entradas anteriores desse lote, nunca soma.
+
+**Validado com dado real:** ECD 2018 da Hotelsys - 117 lancamentos, 248
+itens, periodo 01/01/2018 a 31/12/2018, convivendo corretamente com
+ABERTURA-2018 (referencias distintas "ABERTURA-2018" x "ECD-2018",
+datas sem sobreposicao, source_module ACCOUNTING x ECD_IMPORT
+diferenciando origem).
+
+**Erro de processo cometido e corrigido durante esta sessao:** entreguei
+uma migracao manual via present_files (violacao direta do protocolo -
+NUNCA usar present_files/create_file/bash_tool para arquivos de projeto).
+Usuario identificou e pediu para reler o protocolo. Corrigido: migracao
+re-entregue via bloco PowerShell, salva direto em
+prisma/migrations-manuais/, versionada normalmente.
+
+**Bug de encoding repetido nesta sessao (2x):** usei \\uXXXX como escape
+literal dentro de string "raw" do Python (r"""..."""), que NAO processa
+esses escapes - texto aparecia literal na tela ("\\u00e7" em vez de "ç").
+Corrigido as duas vezes via regex direcionada ou reescrevendo com
+caracteres UTF-8 diretos (sem escape) - pratica adotada: preferir sempre
+caracteres diretos a `\\uXXXX` em conteudo gerado para arquivos do
+projeto.
+
+**Proximo passo natural:** repetir "Lancamentos ECD" para os demais anos
+da Hotelsys (2019-2025) e depois considerar as demais empresas quando
+chegarem nessa etapa do fluxo.
