@@ -7699,3 +7699,77 @@ ja quebrou a tela uma vez em 27/08) na proxima sessao.
    tela (respeita nivel, busca, zeradas ativos), para Balancete Mensal
    e de Verificacao. Corrigido apos primeiro teste: faltava a coluna
    Saldo Final (com D/C) no Balancete Mensal impresso.
+
+
+### Sessao 01/09/2026 — Auditoria pontual do De/Para da Hotelsys (14 correcoes)
+
+**CHECKPOINT DE ESTADO REAL (01/09/2026, ~13:10):**
+
+| Empresa | Contas ativas | Journal Entries | Journal Items |
+|---|---|---|---|
+| GRB (Advocacia) | 314 | 524 | 1.300 |
+| F5 Participacoes | 414 | 0 | 0 |
+| Hallo Administracao | 0 | 0 | 0 |
+| Hotelsys | 1.123 | 1 | 75 |
+| Jose Silva Advocacia | 262 | 0 | 0 |
+| Kipstone | 418 | 0 | 0 |
+| LM Administracao | 405 | 204 | 367 |
+| Pontes Contabilidade | 283 | 0 | 0 |
+| Sunrise Holding | 471 | 1 | 14 |
+| Sunsys | 512 | 181 | 362 |
+
+(Sem mudanca desde o checkpoint anterior - so mapeamento De/Para foi
+alterado nesta sessao, nenhum lancamento.)
+
+---
+
+**Contexto:** antes de calcular a abertura da Hotelsys, decisao consciente
+de fazer auditoria pontual do De/Para ja existente (483 mapeamentos, todos
+"confirmados") em vez de confiar cegamente - mesma logica que revelou erro
+real na Sunrise (CSLL Diferida -> Refeicao/Copa/Cozinha).
+
+**Metodo:** busca por contas de origem com palavra-chave de tributo
+(IRPJ/CSLL/INSS/PIS/COFINS/IPTU/ISS) cujo destino NAO contem a mesma
+palavra-chave - acha cruzamentos suspeitos sem precisar revisar as 483
+linhas uma por uma.
+
+**14 correcoes aplicadas** (todas via UPDATE direto em ecd_account_mappings,
+match_type alterado para MANUAL):
+
+1-2. PIS/COFINS mapeados para "Ferias"/"Condominios" - erro grave, ruido
+puro de similaridade textual, sem relacao alguma com o conceito real.
+Corrigido para "21101060001 PIS a Recolher"/"21101060002 COFINS a Recolher".
+
+3-4. ISSQN (2 ocorrencias, 2 anos/esquemas) mapeado para "Taxas Diversas"
+generica. Corrigido para "21101060008 ISS Proprio a Pagar".
+
+5. CSLL A PAGAR mapeado para "Contas a Pagar" generica (mesmo padrao do
+erro achado ontem na Sunrise). Corrigido para "21101090002 Provisao CSLL".
+
+6-7. INSS A PAGAR (2 ocorrencias) mapeado para "Contas a Pagar" generica.
+Investigado o PAI da conta origem ("ENCARGOS TRABALHISTAS") antes de
+corrigir - concluido que e INSS PATRONAL sobre folha propria, NAO retencao
+sobre servico de terceiro (PJ/PF) - por isso NAO usado o par
+"INSS Retido s/Servicos PJ/PF" que existe na Matriz, e sim
+"21101050001 INSS a Recolher" (mais generico, mas correto pra folha
+propria).
+
+8-14. Grupo de 8 linhas "INSS/IPTU/PIS/COFINS PARCELAMENTOS" (2
+esquemas/anos cada) que estavam TODAS consolidadas numa unica conta
+generica "Impostos Parcelados", perdendo distincao federal x municipal.
+Achado relacionado: conta nova da Matriz "22101070003 Parcelamento
+Municipal" (uma das 26 adicionadas em 31/08) estava orfa (zero
+mapeamento). Reclassificado por natureza do tributo: INSS/PIS/COFINS
+(federais, RFB) -> "21101070001 Parcelamento RFB"; IPTU (municipal) ->
+"21101070003 Parcelamento Municipal". "PERT - PARCELAMENTOS RFB E PGFN"
+(2 ocorrencias) deixado como estava - cobre RFB e PGFN juntos, nao ha
+destino unico mais especifico sem forcar escolha arbitraria.
+
+**Resultado:** 483 mapeamentos confirmados (461 SUGGESTED_CONFIRMED apos
+as correcoes reduzirem esse total, 37 MANUAL apos as 14 novas correcoes
+somadas as 23 ja existentes - conferir contagem exata na proxima consulta).
+
+**Pendencia remanescente:** nenhuma identificada nesta auditoria pontual -
+mas o metodo (busca por palavra-chave de tributo) so cobre um subconjunto
+de possiveis erros; nao e uma auditoria completa das 483 linhas. Proximo
+passo do fluxo: calcular e revisar Lancamentos de Abertura da Hotelsys.
