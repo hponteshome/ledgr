@@ -3,6 +3,7 @@
 import { Module } from '@nestjs/common';
 import { MulterModule } from '@nestjs/platform-express';
 import { PrismaModule } from '@prisma/prisma.module';
+import { SpedModule } from '../sped/sped.module';
 import { PrismaService } from '@prisma/prisma.service';
 
 // Controllers
@@ -27,6 +28,7 @@ import { TabelaComparativaController } from './controllers/tabela-comparativa.co
 import { AberturaController } from './controllers/abertura.controller';
 import { DeParaSugestaoController } from './controllers/de-para-sugestao.controller';
 import { EcdMovimentacaoController } from './controllers/ecd-movimentacao.controller';
+import { EcdLancamentosImportController } from './controllers/ecd-lancamentos-import.controller';
 
 // Services
 import { AccountingService }        from './services/accounting.service';
@@ -48,6 +50,7 @@ import { TabelaComparativaService } from './services/tabela-comparativa.service'
 import { AberturaService } from './services/abertura.service';
 import { DeParaSugestaoService } from './services/de-para-sugestao.service';
 import { EcdMovimentacaoService } from './services/ecd-movimentacao.service';
+import { EcdLancamentosImportService } from './services/ecd-lancamentos-import.service';
 import { IobLotdParserService }     from './services/iob-lotd-parser.service';
 import { FixedIncomeModule } from './fixed-income/fixed-income.module';
 import { CdiModule } from './cdi/cdi.module';
@@ -58,6 +61,7 @@ import { SidebarResourceGuard } from '../../auth/guards/sidebar-resource.guard';
 @Module({
   imports: [
     PrismaModule,
+    SpedModule,
     FixedIncomeModule,
     CdiModule,
     MulterModule.register({ limits: { fileSize: 50 * 1024 * 1024 } }),
@@ -84,6 +88,7 @@ import { SidebarResourceGuard } from '../../auth/guards/sidebar-resource.guard';
     AberturaController,
     DeParaSugestaoController,
     EcdMovimentacaoController,
+    EcdLancamentosImportController,
   ],
   providers: [
     AccountingConfigService,
@@ -106,6 +111,7 @@ import { SidebarResourceGuard } from '../../auth/guards/sidebar-resource.guard';
     AberturaService,
     DeParaSugestaoService,
     EcdMovimentacaoService,
+    EcdLancamentosImportService,
     MatrizPlanoParserService,
     IobLotdParserService,
     IobLotdImportService,

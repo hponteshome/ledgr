@@ -295,7 +295,7 @@ const JournalPage: React.FC = () => {
 
     // ── Estado do formulário ───────────────────────────────────
     const [fDate, setFDate] = useState(new Date().toISOString().substring(0, 10));
-    const [fType, setFType] = useState<'MANUAL' | 'PROVISION' | 'ADJUSTMENT'>('MANUAL');
+    const [fType, setFType] = useState<'ACCOUNTING' | 'PROVISION' | 'ADJUSTMENT' | 'RESULT_TRANSFER' | 'OTHER'>('ACCOUNTING');
     const [fHistCode, setFHistCode] = useState('');
     const [fHistName, setFHistName] = useState('');
     const [fDebitCode, setFDebitCode] = useState('');
@@ -515,7 +515,7 @@ const JournalPage: React.FC = () => {
 
     const clearForm = () => {
         setFDate(new Date().toISOString().substring(0, 10));
-        setFType('MANUAL'); setFHistCode(''); setFHistName('');
+        setFType('ACCOUNTING'); setFHistCode(''); setFHistName('');
         setFDebitCode(''); setFDebitName(''); setFDebitId('');
         setFCreditCode(''); setFCreditName(''); setFCreditId('');
         setFValue(''); setFComplement('');
@@ -643,12 +643,18 @@ const JournalPage: React.FC = () => {
                         <label className="text-xs text-gray-500">Tipo</label>
                         <select value={fType} onChange={e => setFType(e.target.value as any)}
                             className="h-8 border border-gray-200 rounded-lg px-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 w-32">
-                            <option value="MANUAL">Manual</option>
+                            {/* CORRIGIDO 01/09/2026: lista fixa, so tipos de escolha manual - tipos de
+                                integracao/importacao (ECD_IMPORT, BANK_IMPORT, FINANCE, FISCAL, ASSET, HR,
+                                INVESTMENT, JOURNAL_IMPORT) sao definidos automaticamente pelo processo que
+                                gera o lancamento, nunca escolhidos aqui - so aparecem depois, como filtro/
+                                consulta na lista. Antes usava sourceModules (endpoint de "tipos ja usados",
+                                pensado para filtro, nao para esta selecao de novo lancamento - RESULT_TRANSFER/
+                                OTHER, por serem novos, nunca apareceriam ali de qualquer forma). */}
+                            <option value="ACCOUNTING">Manual</option>
                             <option value="PROVISION">Provisao</option>
                             <option value="ADJUSTMENT">Ajuste</option>
-                            {sourceModules.filter(s => !["ACCOUNTING", "PROVISION", "ADJUSTMENT", "MANUAL"].includes(s.value)).map(s => (
-                                <option key={s.value} value={s.value}>{s.label}</option>
-                            ))}
+                            <option value="RESULT_TRANSFER">Transferencia de Resultado</option>
+                            <option value="OTHER">Outros</option>
                         </select>
                     </div>
                     <div className="w-px bg-gray-200 self-stretch" />

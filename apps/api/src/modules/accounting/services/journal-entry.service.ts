@@ -524,6 +524,10 @@ private validateItems(items: Array<{ type: string; value: number }>) {
       ASSET:       'Ativo Imob.',
       HR:          'RH',
       FINANCE:     'Financeiro',
+      INVESTMENT:  'Investimento',
+      JOURNAL_IMPORT: 'Importacao',
+      RESULT_TRANSFER: 'Transferencia de Resultado',
+      OTHER:       'Outros',
     };
     const rows = await this.prisma.journalEntry.groupBy({
       by: ['sourceModule'],

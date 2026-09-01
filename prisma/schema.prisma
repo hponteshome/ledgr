@@ -1128,6 +1128,15 @@ enum SourceModule {
   ASSET
   INVESTMENT
   JOURNAL_IMPORT
+  // CRIADO 01/09/2026: PROVISION e ADJUSTMENT ja eram referenciados pelo
+  // frontend (JournalPage.tsx) como se existissem - bug real, faltavam no
+  // enum. RESULT_TRANSFER e OTHER sao novos, pedidos pelo usuario para
+  // suportar a futura ferramenta de importacao de movimentacao ECD (tags
+  // de origem por lancamento, permitindo filtrar/desconsiderar por tipo).
+  PROVISION
+  ADJUSTMENT
+  RESULT_TRANSFER
+  OTHER
 
   @@map("source_module")
 }
