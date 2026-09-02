@@ -534,3 +534,24 @@ Apos qualquer patch em arquivo CRLF, validar sempre com
 `raw.count(b"\r\r\n")` antes de considerar o patch concluido - deve ser sempre 0.
 Ver tambem Regra 8 (deteccao de separador), da qual esta e uma extensao especifica
 para o caso de RE-conversao, nao so deteccao inicial.
+
+
+## Licao — Regra 12 (02/09/2026): CSV exportado do LEDGR usa SEMPRE '|' como separador de campo, nunca ','
+
+Descoberto no Razao Analitico (RazaoAnaliticoPage.tsx): exportacao CSV usava
+`lines.map(l => l.join(',')).join('\n')`. Numeros no LEDGR sao formatados em
+pt-BR (ex: "1.234,56" - virgula como separador DECIMAL). Um CSV com virgula
+como separador de CAMPO quebra a leitura em qualquer planilha (Excel, Google
+Sheets, LibreOffice) que respeite o locale pt-BR: cada valor numerico vira
+duas colunas ("1.234" e "56"), desalinhando a linha inteira.
+
+**Regra pratica adotada:** todo `exportCSV()`/geracao de arquivo .csv no
+LEDGR usa `'|'` como separador de campo (`lines.map(l => l.join('|')).join('\n')`),
+nunca `','` nem `';'`. Nao precisa de aspas/escaping especial para nomes de
+conta ou historico com virgula dentro (situacao comum em "Fornecedores, Ltda"
+ou historicos com valores monetarios descritos por extenso) - o '|' raramente
+aparece em texto contabil real, ao contrario da virgula.
+
+Ao criar ou revisar qualquer exportacao CSV no projeto (Razao Analitico,
+Balancete, Diario Geral, extratos, etc.), usar '|' por padrao - nao assumir
+',' so porque e o padrao "de mercado" do formato CSV generico.

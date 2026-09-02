@@ -270,7 +270,7 @@ const RazaoAnaliticoPage: React.FC = () => {
                         : (prevC + perC) - (prevD + perD);
                     return { account, previousBalance, debits: perD, credits: perC, currentBalance };
                 })
-                .filter(r => f.showZero || r.debits !== 0 || r.credits !== 0 || r.previousBalance !== 0)
+                .filter(r => f.showZero || r.debits !== 0 || r.credits !== 0)
                 .sort((a, b) => a.account.code.localeCompare(b.account.code));
 
             setReportData({ startDate: f.startDate, endDate: f.endDate, balances });
@@ -460,7 +460,7 @@ const RazaoAnaliticoPage: React.FC = () => {
             lines.push(['', '', '', 'Total da Conta:', '', '', '', fmtNum(row.debits), fmtNum(row.credits), fmtSaldo(row.currentBalance)]);
         });
         const a = document.createElement('a');
-        a.href = URL.createObjectURL(new Blob(['\uFEFF' + lines.map(l => l.join(',')).join('\n')], { type: 'text/csv;charset=utf-8' }));
+        a.href = URL.createObjectURL(new Blob(['\uFEFF' + lines.map(l => l.join('|')).join('\n')], { type: 'text/csv;charset=utf-8' }));
         a.download = `RazaoAnalitico_${filters.startDate}_${filters.endDate}.csv`;
         a.click();
     };
