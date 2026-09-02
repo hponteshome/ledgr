@@ -7936,3 +7936,65 @@ Sunsys, Sunrise, Kipstone, Jose Silva, LM, Pontes, F5 ainda tem a cadeia antiga
 49/491/49101/4910101/49101010001 tipada EXPENSE - mesmo problema potencial,
 ainda nao corrigido. GRB tem solucao propria (3 contas EQUITY validadas PVA)
 que precisa ser reconciliada com o padrao 234 antes de virar geral.
+
+
+### Sessao 02/09/2026 (continuacao) - Grupo 234 "Apuracao de Resultados" criado (Hotelsys + Matriz)
+
+**Contexto:** durante validacao do ano 2019 da Hotelsys (ferramenta Lancamentos
+ECD), Balancete de Verificacao mostrou TODAS as contas de Despesa com Debito=
+Credito identico no periodo - suspeita inicial de duplicacao. Investigacao
+(journal_entry_items reais) revelou que era o encerramento embutido no proprio
+arquivo ECD funcionando corretamente (IND_LCTO='E'), mas expos um problema real
+de classificacao: a conta "Apuracao de Resultado" (49101010001) estava tipada
+EXPENSE, dentro do grupo 4 (Despesas). Confirmado com dado real: soma de debito
+bruto por type=EXPENSE no periodo ia de R$ 4.074.736,55 (despesas reais) para
+R$ 8.155.272,12 se a Apuracao de Resultado fosse incluida na mesma soma -
+qualquer relatorio futuro que somasse movimento bruto por tipo (em vez de saldo
+liquido) dobraria a despesa do exercicio.
+
+**Investigacao adicional:** GRB ja tinha resolvido o mesmo problema (conta ARE
+tipada EQUITY dentro do PL, validada 0 erros PVA), mas usando 3 contas
+separadas (ARE/Lucro/Prejuizo) em codigos que colidem com o que a Matriz ja
+usa para outras empresas (23301020001 ja e "Prejuizos Acumulados" na Matriz,
+criado deliberadamente na sessao do Sunrise). Decisao: NAO usar o padrao GRB
+como referencia desta vez - trabalhar exclusivamente Hotelsys + Matriz, GRB
+fica de fora por ora (retomar quando padronizar as demais empresas).
+
+**Solucao aplicada (Rota B - reclassificacao, nao flag de excecao):**
+Novo grupo 234 "APURACAO DE RESULTADOS", irmao de 233 "Lucros ou Prejuizos
+Acumulados", sob 23 Patrimonio Liquido - tanto na Matriz (matriz_master_accounts)
+quanto na Hotelsys (chart_of_accounts):
+
+  23 PATRIMONIO LIQUIDO
+   +- 233 LUCROS OU PREJUIZOS ACUMULADOS (existente, intocado)
+   +- 234 APURACAO DE RESULTADOS                      [NOVO - sintetica]
+       +- 23401 APURACAO DE RESULTADOS                [NOVO - sintetica]
+           +- 2340101 APURACAO DO RESULTADO DO EXERCICIO [NOVO - sintetica]
+               +- 23401010001 Apuracao de Resultado   [conta reaproveitada -
+                  MESMO ID que 49101010001, so mudou code/type/nature/parent_id.
+                  EXPENSE->EQUITY, nature DEBIT->CREDIT. journal_entry_items
+                  intactos - ECD-2019 NAO precisou reprocessar.]
+
+Cadeia orfa 49/491/49101/4910101 (0 itens proprios em ambos os lados,
+confirmado antes de excluir) recebeu soft-delete (deleted_at) em ambas as
+tabelas. reduced_code '0008888' preservado sem alteracao (convencao SPED
+Apuracao/Encerramento ja documentada, regra 2).
+
+**Por que reclassificar em vez de criar flag nova (isApuracaoResultado):**
+DrePage.tsx ja tinha uma guarda fragil (!code.startsWith('49')) que excluia
+essa conta dos filtros de Despesa - funcionava, mas quebraria se o codigo
+mudasse sem a logica acompanhar. Reclassificar para EQUITY resolve na raiz:
+todo filtro que ja existe (DrePage type==='EXPENSE', ClosingPanel
+collectByType, encerramento-exercicio.service.ts type IN ('REVENUE','EXPENSE'))
+para de pegar essa conta automaticamente, sem tocar em nenhum desses 3 lugares
+de codigo. Guarda antiga do DrePage fica redundante mas inofensiva - candidata
+a limpeza numa sessao futura, nao urgente.
+
+**Migracao:** prisma/migrations-manuais/2026-09-02-grupo-234-apuracao-resultado.sql
+(8 linhas verificadas: 4 Matriz + 4 Hotelsys, todas EQUITY/CREDIT).
+
+**Pendencia registrada para quando o plano for replicado nas demais empresas:**
+Sunsys, Sunrise, Kipstone, Jose Silva, LM, Pontes, F5 ainda tem a cadeia antiga
+49/491/49101/4910101/49101010001 tipada EXPENSE - mesmo problema potencial,
+ainda nao corrigido. GRB tem solucao propria (3 contas EQUITY validadas PVA)
+que precisa ser reconciliada com o padrao 234 antes de virar geral.
