@@ -7998,3 +7998,57 @@ Sunsys, Sunrise, Kipstone, Jose Silva, LM, Pontes, F5 ainda tem a cadeia antiga
 49/491/49101/4910101/49101010001 tipada EXPENSE - mesmo problema potencial,
 ainda nao corrigido. GRB tem solucao propria (3 contas EQUITY validadas PVA)
 que precisa ser reconciliada com o padrao 234 antes de virar geral.
+
+
+### Sessao 02/09/2026 (continuacao 3) - Filtro de Periodo livre em Lancamentos (JournalPage.tsx)
+
+**Contexto:** apos validar Hotelsys/2019 via Balancete e SQL bruta (D=C=
+R$ 12.325.253,28), usuario pediu o mesmo tipo de filtro de periodo livre
+(Data Inicial/Data Final) na tela de Lancamentos - ate entao so existiam
+"Ref." (mes unico, via parseRefMonth) e "Mostrar Lancamentos" (recentes,
+sem data inicial).
+
+**Achado:** backend (journal-entry.service.ts findAll()/getTotals()) ja
+aceitava dateFrom/dateTo livres - limitacao era 100% da tela. Nao precisou
+tocar em nenhum arquivo de backend.
+
+**Implementado:** novo toggle "Periodo" na barra superior do JournalPage.tsx,
+ao lado da caixa "Ref." - quando ativo, mostra 2 SmartDateInput (mesmo
+componente usado no formulario de novo lancamento) e passa a ter prioridade
+sobre "Ref."/"Mostrar Lancamentos" (que ficam visualmente desabilitados
+enquanto Periodo estiver ligado). Mesmo padrao de UX ja usado no Balancete
+de Verificacao (TrialBalanceView.tsx).
+
+**Validado com dado real:** Hotelsys, Periodo 01/01/2019 a 31/12/2019 -
+rodape da tela mostrou D: R$ 12.325.253,28 / C: R$ 12.325.253,28 / Delta:
+R$ 0,00, batendo exato com o Balancete de Verificacao e a query SQL bruta
+validadas anteriormente na mesma sessao.
+
+**Resumo da sessao de hoje (para referencia rapida):**
+1. Ferramenta "Lancamentos ECD" usada para trazer ECD-2019 da Hotelsys
+   (117 lancamentos/248 itens) - Balanco fechou, Debito=Credito bateu.
+2. Investigacao do "Debito=Credito identico em toda conta de Despesa" -
+   nao era duplicacao, era o encerramento embutido no arquivo (IND_LCTO=E)
+   funcionando corretamente - mas expos classificacao errada da conta
+   "Apuracao de Resultado" (tipada EXPENSE, deveria ser EQUITY/transitoria).
+3. Confirmado com dado real: soma bruta por type=EXPENSE ia de R$
+   4.074.736,55 para R$ 8.155.272,12 se a Apuracao de Resultado fosse
+   incluida - risco real de dobra em relatorios futuros que somem
+   movimento bruto por tipo.
+4. Criado grupo 234 "APURACAO DE RESULTADOS" (irmao de 233, sob 23 PL) na
+   Matriz e na Hotelsys - conta reclassificada EXPENSE->EQUITY reaproveitando
+   o MESMO id (49101010001->23401010001), sem reprocessar ECD-2019. Cadeia
+   orfa 49/491/49101/4910101 (0 itens proprios) recebeu soft-delete.
+   GRB tem solucao propria (3 contas EQUITY) deixada de fora por ora -
+   reconciliar quando padronizar as demais empresas.
+5. PENDENCIA REGISTRADA (nao corrigida ainda): DrePage.tsx usa saldo liquido
+   (currentBalance) em vez de movimento bruto ex-encerramento - zera
+   qualquer periodo que inclua o lancamento de encerramento. Ver secao
+   "PENDENCIA REAL: DrePage.tsx zera qualquer periodo com encerramento"
+   acima.
+6. Filtro de Periodo livre adicionado em Lancamentos (esta entrada).
+
+**Proximo passo natural:** corrigir a pendencia do DrePage.tsx (item 5), ou
+avancar para o ano 2020 da Hotelsys via Lancamentos ECD, repetindo o ciclo
+de validacao ja estabelecido (preview -> registrar -> Balancete em 2+
+janelas -> auditoria pontual se algo parecer estranho).

@@ -293,6 +293,13 @@ const JournalPage: React.FC = () => {
     const [search, setSearch] = useState('');
     const [fSource, setFSource] = useState('');
 
+    // ── NOVO (02/09/2026): filtro de periodo livre (Data Inicial/Data Final),
+    // independente do "Ref." (mes unico) e do "Mostrar Lancamentos" (recentes,
+    // sem inicio). Mesmo padrao de UX do Balancete de Verificacao.
+    const [usePeriodo, setUsePeriodo] = useState(false);
+    const [periodoFrom, setPeriodoFrom] = useState(`${new Date().getFullYear()}-01-01`);
+    const [periodoTo, setPeriodoTo] = useState(new Date().toISOString().substring(0, 10));
+
     // ── Estado do formulário ───────────────────────────────────
     const [fDate, setFDate] = useState(new Date().toISOString().substring(0, 10));
     const [fType, setFType] = useState<'ACCOUNTING' | 'PROVISION' | 'ADJUSTMENT' | 'RESULT_TRANSFER' | 'OTHER'>('ACCOUNTING');
@@ -383,10 +390,13 @@ const JournalPage: React.FC = () => {
     // ── Carregamento ───────────────────────────────────────────
 
     const loadEntries = useCallback(async () => {
-        if (!activeCompany || !currentMonth.valid) return;
+        if (!activeCompany) return;
+        if (!usePeriodo && !currentMonth.valid) return;
         setLoading(true);
         try {
-            const params = showRecent
+            const params = usePeriodo
+                ? { dateFrom: periodoFrom, dateTo: periodoTo, search: search || undefined, sources: fSource || undefined, page, limit: 100, orderBy: sortBy, orderDir: sortDir }
+                : showRecent
                 ? { dateTo: fDate, search: search || undefined, sources: fSource || undefined, page, limit: 50, orderBy: sortBy, orderDir: sortDir }
                 : { dateFrom: currentMonth.from, dateTo: currentMonth.to, search: search || undefined, page, limit: 100, orderBy: sortBy, orderDir: sortDir };
             const r = await api.get('/accounting/journal', { params });
@@ -409,15 +419,18 @@ const JournalPage: React.FC = () => {
             setData({ ...r.data, entries });
         } catch (e) { console.error(e); }
         finally { setLoading(false); }
-    }, [activeCompany, currentMonth.from, currentMonth.valid, search, page, showRecent, fDate, fSource, sortBy, sortDir]);
+    }, [activeCompany, currentMonth.from, currentMonth.valid, search, page, showRecent, fDate, fSource, sortBy, sortDir, usePeriodo, periodoFrom, periodoTo]);
 
     const loadTotals = useCallback(async () => {
-        if (!activeCompany || !currentMonth.valid) return;
+        if (!activeCompany) return;
+        if (!usePeriodo && !currentMonth.valid) return;
+        const dateFrom = usePeriodo ? periodoFrom : currentMonth.from;
+        const dateTo = usePeriodo ? periodoTo : currentMonth.to;
         try {
-            const r = await api.get('/accounting/journal/totals', { params: { dateFrom: currentMonth.from, dateTo: currentMonth.to } });
+            const r = await api.get('/accounting/journal/totals', { params: { dateFrom, dateTo } });
             setTotals(r.data);
         } catch (e) { console.error(e); }
-    }, [activeCompany, currentMonth.from, currentMonth.to, currentMonth.valid]);
+    }, [activeCompany, currentMonth.from, currentMonth.to, currentMonth.valid, usePeriodo, periodoFrom, periodoTo]);
 
     useEffect(() => {
         api.get('/accounting/journal/source-modules')
@@ -588,6 +601,23 @@ const JournalPage: React.FC = () => {
                         {currentMonth.valid && <span className="text-base font-bold text-red-500 hidden sm:inline">{currentMonth.label}</span>}
                         {!currentMonth.valid && refInput.length > 0 && <span className="text-xs text-red-500">formato inválido</span>}
                     </div>
+
+                    {/* Filtro de Periodo livre (NOVO 02/09/2026) - tem prioridade sobre Ref./Mostrar Lancamentos quando ativo */}
+                    <button
+                        onClick={() => { setUsePeriodo(v => !v); setPage(1); }}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ${usePeriodo ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}
+                    >
+                        <FiFilter size={12} /> Período{usePeriodo ? ' ✓' : ''}
+                    </button>
+                    {usePeriodo && (
+                        <div className="flex items-center gap-2 border rounded-lg px-3 py-1.5 bg-gray-50 border-gray-200">
+                            <SmartDateInput value={periodoFrom} onChange={v => { setPeriodoFrom(v); setPage(1); }}
+                                className="h-6 border-none bg-transparent text-sm font-medium text-gray-700 outline-none w-24" />
+                            <span className="text-xs text-gray-400">até</span>
+                            <SmartDateInput value={periodoTo} onChange={v => { setPeriodoTo(v); setPage(1); }}
+                                className="h-6 border-none bg-transparent text-sm font-medium text-gray-700 outline-none w-24" />
+                        </div>
+                    )}
                     {sourceModules.map(s => {
                         const cfg = SOURCE_CONFIG[s.value] ?? { cls: 'bg-gray-100 text-gray-600', label: s.label };
                         const active = fSource === s.value;
@@ -614,8 +644,8 @@ const JournalPage: React.FC = () => {
                         className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-colors">
                         <FiUploadCloud size={13} /> Importar Diário
                     </button>
-                    <label className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 border border-gray-200 rounded-lg bg-white cursor-pointer hover:bg-gray-50">
-                        <input type="checkbox" checked={showRecent} onChange={e => setShowRecent(e.target.checked)} className="accent-blue-600" />
+                    <label className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 border border-gray-200 rounded-lg bg-white cursor-pointer hover:bg-gray-50 ${usePeriodo ? 'opacity-40 pointer-events-none' : ''}`}>
+                        <input type="checkbox" checked={showRecent} onChange={e => setShowRecent(e.target.checked)} className="accent-blue-600" disabled={usePeriodo} />
                         Mostrar Lançamentos
                     </label>
                     <button onClick={() => setShowEncerramento(true)}
