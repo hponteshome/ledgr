@@ -32,7 +32,7 @@ export interface PreviewLancamentosEcd {
   podeRegistrar: boolean;
 }
 
-interface ItemResolvido { accountId: string; value: number; type: 'DEBIT' | 'CREDIT'; }
+interface ItemResolvido { accountId: string; value: number; type: 'DEBIT' | 'CREDIT'; historyCode: string; historyComplement: string; }
 interface EntradaResolvida { date: Date; items: ItemResolvido[]; isClosingEntry: boolean; }
 
 @Injectable()
@@ -103,6 +103,8 @@ export class EcdLancamentosImportService {
           accountId: targetId,
           value: item.value,
           type: item.sign === 'D' ? 'DEBIT' : 'CREDIT',
+          historyCode: item.historyCode,
+          historyComplement: item.historyComplement,
         });
       }
 
@@ -152,6 +154,39 @@ export class EcdLancamentosImportService {
 
     const loteReferencia = `ECD-${ano}`;
 
+    // ── NOVO (03/09/2026): popula/atualiza o catalogo HistoricoPadrao da
+    // empresa a partir do bloco 0400 do proprio arquivo - fonte fiel, ja que
+    // e o catalogo real usado na escrituracao original. Update na descricao
+    // se o codigo ja existir (mantem sincronizado com o arquivo mais
+    // recente) - CUIDADO: se um dia existir tela de manutencao manual do
+    // catalogo, uma edicao manual pode ser sobrescrita num reprocessamento
+    // futuro. Nao urgente enquanto essa tela nao existir.
+    for (const h of parsed.reg0400) {
+      if (!h.code) continue;
+      await this.prisma.historicoPadrao.upsert({
+        where: { companyId_code: { companyId, code: h.code } },
+        create: { companyId, code: h.code, description: h.description || h.code },
+        update: { description: h.description || h.code },
+      });
+    }
+    const catalogo = await this.prisma.historicoPadrao.findMany({
+      where: { companyId },
+      select: { id: true, code: true, description: true },
+    });
+    const catalogoPorCodigo = new Map(catalogo.map(h => [h.code, h]));
+
+    // Compoe a descricao final de cada item: historico padrao + complemento,
+    // ou so o complemento se nao houver codigo, ou undefined (cai no
+    // fallback generico da JournalEntry) se o arquivo nao trouxer nada.
+    const compoeDescricaoItem = (i: ItemResolvido): string | undefined => {
+      const padrao = i.historyCode ? catalogoPorCodigo.get(i.historyCode) : undefined;
+      if (padrao) {
+        return i.historyComplement ? `${padrao.description} - ${i.historyComplement}` : padrao.description;
+      }
+      if (i.historyComplement) return i.historyComplement;
+      return undefined;
+    };
+
     // CORRIGIDO (mesmo padrao do bug de abertura): apaga lote anterior com a
     // MESMA referencia antes de criar o novo - re-registrar sempre SUBSTITUI.
     const loteAnterior = await this.prisma.journalEntry.findMany({
@@ -166,21 +201,34 @@ export class EcdLancamentosImportService {
 
     let criados = 0;
     for (const entrada of entradas) {
+      const itemsComDescricao = entrada.items.map(i => ({
+        accountId: i.accountId,
+        value: i.value,
+        type: i.type,
+        description: compoeDescricaoItem(i) ?? null,
+        historicoPadraoId: i.historyCode ? (catalogoPorCodigo.get(i.historyCode)?.id ?? null) : null,
+      }));
+
+      // Descricao do lancamento = historicos distintos dos itens, ou o
+      // texto generico de sempre se o arquivo nao trouxe historico nenhum.
+      const descricoesDistintas = [...new Set(
+        itemsComDescricao.map(i => i.description).filter((d): d is string => !!d)
+      )];
+      const descricaoLancamento = descricoesDistintas.length > 0
+        ? descricoesDistintas.join('; ')
+        : 'Lancamento com Origem na ECD nesta data';
+
       await this.prisma.journalEntry.create({
         data: {
           companyId,
           date: entrada.date,
-          description: 'Lancamento com Origem na ECD nesta data',
+          description: descricaoLancamento,
           reference: loteReferencia,
           sourceModule: 'ECD_IMPORT',
           isClosingEntry: entrada.isClosingEntry,
           createdById: userId,
           items: {
-            create: entrada.items.map(i => ({
-              accountId: i.accountId,
-              value: i.value,
-              type: i.type,
-            })),
+            create: itemsComDescricao,
           },
         },
       });

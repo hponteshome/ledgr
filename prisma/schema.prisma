@@ -283,6 +283,7 @@ model Company {
   accountBalances        AccountBalance[]
   chartOfAccounts        ChartOfAccounts[]
   journalEntries         JournalEntry[]
+  historicosPadrao       HistoricoPadrao[]
   accountingRules        AccountingRule[]
   ecdImports             EcdImport[]
   proLaboreConfigs       ProLaboreConfig[]
@@ -1329,14 +1330,42 @@ model JournalEntryItem {
   // contas diferentes) - JournalEntry.description continua obrigatorio
   // como resumo/cabecalho do lancamento como um todo.
   description    String?       @map("description") @db.Text
+  // NOVO (03/09/2026): referencia opcional ao catalogo de Historico Padrao
+  // (registro 0400 do layout SPED ECD). Quando preenchido, o campo
+  // "description" acima guarda o TEXTO FINAL ja composto (padrao +
+  // complemento) - historicoPadraoId preserva a origem/rastreabilidade
+  // para eventual exportacao de volta ao SPED (I355).
+  historicoPadraoId String?    @map("historico_padrao_id") @db.Uuid
   createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamp(6)
 
-  journalEntry JournalEntry    @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
-  account      ChartOfAccounts @relation(fields: [accountId], references: [id])
-  asset        FixedAsset?     @relation("JournalEntryItemAsset", fields: [assetId], references: [id])
+  journalEntry    JournalEntry     @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+  account         ChartOfAccounts  @relation(fields: [accountId], references: [id])
+  asset           FixedAsset?      @relation("JournalEntryItemAsset", fields: [assetId], references: [id])
+  historicoPadrao HistoricoPadrao? @relation(fields: [historicoPadraoId], references: [id])
 
   @@index([accountId])
   @@map("journal_entry_items")
+}
+
+/// Catalogo de Historicos Padrao por empresa (registro 0400 do layout SPED
+/// ECD) - CRIADO 03/09/2026. Cada empresa mantem seu proprio catalogo
+/// (mesmo codigo pode significar coisas diferentes em empresas diferentes,
+/// exatamente como no SPED real).
+model HistoricoPadrao {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId   String    @map("company_id") @db.Uuid
+  code        String    @map("code") @db.VarChar(20)
+  description String    @map("description") @db.Text
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamp(6)
+
+  company Company            @relation(fields: [companyId], references: [id])
+  items   JournalEntryItem[]
+
+  @@unique([companyId, code])
+  @@map("historicos_padrao")
 }
 
 /// Regras de classificação automática para importação bancária.

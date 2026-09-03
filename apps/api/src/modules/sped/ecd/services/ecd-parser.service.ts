@@ -79,7 +79,18 @@ export interface EcdRegI250 {
   value: number;
   sign: string;           // D C
   docRef: string;
-  history: string;
+  // CORRIGIDO (03/09/2026): antes vinha tudo misturado num unico campo
+  // "history" (f[7] || f[6]), perdendo o COD_HIST sempre que HIST tambem
+  // vinha preenchido. Agora os dois campos do layout SPED sao preservados
+  // separadamente - historyCode referencia o catalogo do bloco 0400.
+  historyCode: string;       // COD_HIST (f[6]) - referencia ao bloco 0400
+  historyComplement: string; // HIST (f[7]) - complemento livre
+}
+
+/** Catalogo de Historico Padrao (registro 0400 do Bloco 0). */
+export interface EcdReg0400 {
+  code: string;
+  description: string;
 }
 
 export interface EcdRegJ100 {
@@ -123,6 +134,7 @@ export interface EcdParsed {
   regI030: EcdRegI030 | null;
   regI050: EcdRegI050[];
   periods: Array<{ period: EcdRegI150; balances: EcdRegI155[] }>;
+  reg0400: EcdReg0400[];
   journalEntries: Array<{ entry: EcdRegI200; items: EcdRegI250[] }>;
   balanceSheet: EcdRegJ100[];
   incomeStatement: EcdRegJ150[];
@@ -151,6 +163,7 @@ export class EcdParserService {
       regI030: null,
       regI050: [],
       periods: [],
+      reg0400: [],
       journalEntries: [],
       balanceSheet: [],
       incomeStatement: [],
@@ -186,6 +199,10 @@ export class EcdParserService {
           // ── Bloco 0 ──────────────────────────────────────────
           case '0000':
             result.reg0000 = this.parse0000(fields);
+            break;
+
+          case '0400':
+            result.reg0400.push(this.parse0400(fields));
             break;
 
           // ── Bloco I ──────────────────────────────────────────
@@ -379,17 +396,29 @@ export class EcdParserService {
   }
 
   /**
+   * |0400|COD_HIST|HIST|
+   *   f[0]   f[1]   f[2]
+   */
+  private parse0400(f: string[]): EcdReg0400 {
+    return {
+      code:        f[1] || '',
+      description: f[2] || '',
+    };
+  }
+
+  /**
    * |I250|COD_CTA|COD_CCUS|VL_DC|IND_DC|NUM_ARQ|COD_HIST|HIST|
    *   f[0]  f[1]    f[2]    f[3]   f[4]   f[5]    f[6]    f[7]
    */
   private parseI250(f: string[]): EcdRegI250 {
     return {
-      accountCode: f[1] || '',
-      costCenter:  f[2] || '',
-      value:       this.parseDecimal(f[3]),
-      sign:        f[4] || 'D',
-      docRef:      f[5] || '',
-      history:     f[7] || f[6] || '',
+      accountCode:       f[1] || '',
+      costCenter:        f[2] || '',
+      value:             this.parseDecimal(f[3]),
+      sign:              f[4] || 'D',
+      docRef:            f[5] || '',
+      historyCode:       f[6] || '',
+      historyComplement: f[7] || '',
     };
   }
 

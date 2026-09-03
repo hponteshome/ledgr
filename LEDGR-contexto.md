@@ -8131,3 +8131,41 @@ ECD" em JournalPage.tsx pode estar redundante desde que a pagina dedicada
 "Lancamentos de Abertura" (menu lateral) assumiu esse fluxo com preview/
 De-Para/registrar completo. Nao mexido - falta ver o EcdOpeningModal.tsx
 pra confirmar se e 100% redundante antes de remover.
+
+
+### Sessao 03/09/2026 (continuacao) - Historico Padrao (SPED 0400) integrado ao import ECD
+
+**Motivacao real (diferente do pedido inicial de modal manual):** lancamentos
+importados via ECD (Lancamentos ECD) gravavam sempre o mesmo texto generico
+fixo ("Lancamento com Origem na ECD nesta data") como description, perdendo
+o historico real que a ECD ja trazia - impossibilitando copia fiel do
+Diario de Lancamentos original.
+
+**Bug de parsing encontrado e corrigido (ecd-parser.service.ts):** o campo
+I250.history vinha de `f[7] || f[6]` - misturava COD_HIST (codigo, aponta
+pro catalogo 0400) com HIST (complemento livre) num unico campo, perdendo
+COD_HIST sempre que HIST tambem vinha preenchido. Corrigido: EcdRegI250
+agora tem historyCode e historyComplement separados. Novo EcdReg0400
+{code, description} e novo case '0400' no parser (nunca lido antes).
+Confirmado via grep em todo apps/api/src que nenhum outro consumidor do
+parser dependia do campo antigo "history" (so encontrado result.history de
+um modulo de Fixed Assets nao relacionado) - seguro trocar o formato.
+
+**ecd-lancamentos-import.service.ts:** no registrar(), antes de criar os
+lancamentos: upsert do catalogo HistoricoPadrao da empresa a partir do
+proprio reg0400 do arquivo (fonte fiel - e o catalogo real usado na
+escrituracao original). Cada item resolve historyCode contra esse catalogo
+e compoe description = "{padrao} - {complemento}" (ou so um dos dois, ou
+fallback pro texto generico se o arquivo nao trouxer nada). Descricao do
+JournalEntry = historicos distintos dos itens concatenados com "; ".
+
+**Validado com dado real:** reimportado ECD-2018 da Hotelsys (registrar()
+ja substitui o lote anterior automaticamente pela mesma referencia
+"ECD-2018" - hard delete do lote antigo, mesmo mecanismo ja usado desde a
+sessao anterior, nao precisou limpeza manual). Diario de Lancamentos agora
+mostra historicos reais e especificos (ex: "AJUSTE DE SALDO DO EXERCICIO
+ANTERIOR, CONFORME ATUALIZA O LEGAL DOS DEBITOS PERANTE A PGFN - INSS -
+ENCARGOS LEGAIS") em vez do texto generico.
+
+**Proximo passo natural:** reimportar os demais anos da Hotelsys
+(2019-2025) com a mesma logica corrigida - ja em andamento pelo usuario.
