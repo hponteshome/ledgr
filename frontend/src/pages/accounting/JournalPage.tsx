@@ -3,6 +3,7 @@ import { BulkDeleteModal } from './BulkDeleteModal';
 import { EncerramentoExercicioModal } from './EncerramentoExercicioModal';
 
 import { IobLotdImportModal } from './IobLotdImportModal';
+import { JournalManualImportModal } from './JournalManualImportModal';
 import EcdOpeningModal from '../../components/accounting/EcdOpeningModal';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
@@ -340,6 +341,7 @@ const JournalPage: React.FC = () => {
     const [showEncerramento, setShowEncerramento] = useState(false);
     const [showEcdOpening, setShowEcdOpening] = useState(false);
     const [showLotdModal, setShowLotdModal] = useState(false);
+    const [showManualModal, setShowManualModal] = useState(false);
     const [showRecent, setShowRecent] = useState(true);
     const [sortBy, setSortBy] = useState<'date' | 'value' | 'description' | 'debitCode' | 'creditCode' | 'reference'>('date');
     const [sortDir, setSortDir] = useState<'desc' | 'asc'>('desc');
@@ -557,6 +559,12 @@ const JournalPage: React.FC = () => {
                     onSuccess={() => { setShowLotdModal(false); loadEntries(); loadTotals(); }}
                 />
             )}
+            {showManualModal && (
+                <JournalManualImportModal
+                    onClose={() => setShowManualModal(false)}
+                    onSuccess={() => { setShowManualModal(false); loadEntries(); loadTotals(); }}
+                />
+            )}
 
             {showNewAccountModal && (
                 <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
@@ -639,6 +647,10 @@ const JournalPage: React.FC = () => {
                     <button onClick={() => setShowLotdModal(true)}
                         className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-purple-700 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 transition-colors">
                         <FiUploadCloud size={13} /> Importar Lote IOB
+                    </button>
+                    <button onClick={() => setShowManualModal(true)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-teal-700 bg-teal-50 border border-teal-200 rounded-lg hover:bg-teal-100 transition-colors">
+                        <FiUploadCloud size={13} /> Importar Manual
                     </button>
                     <button onClick={() => window.location.href = '/app/accounting/journal/import'}
                         className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-colors">

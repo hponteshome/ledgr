@@ -1322,6 +1322,13 @@ model JournalEntryItem {
   type           AccountNature @map("type")
   assetId        String?       @map("asset_id") @db.Uuid
   propertyTag    String?       @map("property_tag") @db.VarChar(50)
+  // NOVO (03/09/2026): historico proprio da partida, opcional. Quando null,
+  // telas exibem o description do JournalEntry (comportamento atual,
+  // preservado). Viabiliza lancamentos onde cada conta/partida tem um
+  // historico distinto dentro do MESMO lancamento (ex: 1 cheque pagando 2
+  // contas diferentes) - JournalEntry.description continua obrigatorio
+  // como resumo/cabecalho do lancamento como um todo.
+  description    String?       @map("description") @db.Text
   createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamp(6)
 
   journalEntry JournalEntry    @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)

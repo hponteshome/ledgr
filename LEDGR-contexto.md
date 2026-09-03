@@ -8052,3 +8052,82 @@ validadas anteriormente na mesma sessao.
 avancar para o ano 2020 da Hotelsys via Lancamentos ECD, repetindo o ciclo
 de validacao ja estabelecido (preview -> registrar -> Balancete em 2+
 janelas -> auditoria pontual se algo parecer estranho).
+
+
+### Sessao 03/09/2026 - Historico por partida + Importacao Manual (Rota B completa)
+
+**Motivacao:** usuario pediu modal de importacao pra um novo layout TXT
+(pipe-delimitado, NrLancto sempre vazio - a Ledgr atribui). Investigacao
+revelou que o schema so suportava 1 historico por LANCAMENTO inteiro
+(JournalEntry.description), nao por PARTIDA/conta (JournalEntryItem nao
+tinha campo de historico proprio) - impossivel representar corretamente
+casos reais como "1 cheque de R$1.000 pagando 2 contas distintas, cada
+uma com historico proprio". Decisao: resolver definitiva e integralmente
+(Rota B), nao so paliativamente.
+
+**Etapa 1 - Schema:** `JournalEntryItem.description` (String?, opcional).
+Migracao manual: prisma/migrations-manuais/2026-09-03-journal-entry-item-description.sql
+(`ALTER TABLE journal_entry_items ADD COLUMN description TEXT;`). Nao afeta
+nenhum registro existente (NULL por padrao, fallback para
+JournalEntry.description mantido em todas as telas).
+
+**Etapa 2 - CRUD manual:** journal-entry.service.ts (create/update/reverse)
+passa a aceitar e gravar `items[].description` opcional. resolveItems() ja
+preservava via spread, sem alteracao necessaria ali.
+
+**Etapa 3 - Novo servico de importacao (journal-manual-import.service.ts +
+controller):** Deliberadamente SEPARADO do journal-importer.service.ts
+existente (que agrupa por lote|data|historico ja vindo pronto no arquivo) -
+mudar aquela logica alteraria comportamento de quem ja usa o formato antigo.
+
+Layout aceito: `Data|NrLancto|ContaDebito|ContaCredito|Historico|HP|Complemento|Valor`
+(linha 1 do arquivo = cabecalho `CNPJ|Tipo`). Regras:
+- Data DDMMAAAA sem separador; NrLancto sempre vazio, ignorado na leitura.
+- Linha com Debito E Credito preenchidos = partida simples, fecha sozinha.
+- Linha com so um lado = abre/continua grupo de partida dobrada -
+  ACUMULA ate debito=credito bater, EXIGINDO mesma data em todas as linhas
+  do grupo (data divergente = erro, rejeita).
+- Cada item grava seu proprio historico (JournalEntryItem.description);
+  JournalEntry.description = historicos distintos do grupo concatenados
+  com "; " (resolve o caso do cheque pagando 2 contas).
+- Conta aceita code OU reducedCode (usuario pediu explicitamente).
+- CNPJ do cabecalho validado contra company.taxId (so digitos, ambos
+  lados normalizados - taxId no banco pode estar mascarado).
+- Referencia gerada: `MANUAL-{ano}-{seq}`, sequencial por ano/empresa,
+  continua de onde parou consultando o ultimo MANUAL-{ano}-* existente.
+- sourceModule: ACCOUNTING (aparece como "Manual" no filtro de fontes,
+  mesma tag que lancamentos manuais avulsos - nao usa JOURNAL_IMPORT,
+  que e do importador antigo).
+
+Registrado em accounting.module.ts (controllers + providers).
+
+**Etapa 4 - Modal (JournalManualImportModal.tsx), botao "Importar Manual"
+em JournalPage.tsx:** mesmo padrao visual do IobLotdImportModal.tsx
+existente. Diferente dele: textarea SEMPRE editavel (nao 3 steps
+sequenciais) - usuario cola/edita o texto, "Validar" roda preview() quantas
+vezes quiser, erros mostrados com numero da linha exata, corrige ali mesmo
+sem precisar reupload de arquivo. "Confirmar Importacao" so libera com
+hasErrors=false. Icone "i" no header abre painel com o layout completo +
+exemplo copiavel (usuario pediu explicitamente, facilita quem nunca usou).
+
+**Licao tecnica (nao e nova, mas se repetiu):** ancora multi-linha com \n
+embutido em PowerShell -replace falhou por CRLF/LF (accounting.module.ts) -
+resolvido trocando para ancoras de UMA linha so + script Python (mesmo
+padrao da Regra 8/11 do CLAUDE.md, ja documentado, so reforcando que
+ancora multi-linha em PowerShell puro continua sendo ponto fragil mesmo
+fora de arquivos TSX/JSX).
+
+**Pendencia registrada (nao implementada nesta sessao):**
+Tabela "Historico Padrao" (registro 0400 do layout SPED ECD - catalogo de
+historicos reutilizaveis por codigo) - usuario perguntou, decidimos adiar.
+Ficaria: model HistoricoPadrao (id, companyId, code, description) + FK
+opcional historicoPadraoId em JournalEntryItem, com o description atual
+guardando o texto final montado (padrao+complemento). Nao bloqueia nada do
+que foi construido hoje - schema aceita a extensao sem quebrar dado
+existente.
+
+**Outra pendencia observada (nao investigada):** botao "Importar Abertura
+ECD" em JournalPage.tsx pode estar redundante desde que a pagina dedicada
+"Lancamentos de Abertura" (menu lateral) assumiu esse fluxo com preview/
+De-Para/registrar completo. Nao mexido - falta ver o EcdOpeningModal.tsx
+pra confirmar se e 100% redundante antes de remover.

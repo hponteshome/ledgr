@@ -17,6 +17,9 @@ export interface CreateJournalEntryDto {
     accountCode: string;
     value:       number;
     type:        'DEBIT' | 'CREDIT';
+    // NOVO (03/09/2026): historico proprio da partida, opcional. Quando
+    // ausente, a tela deve exibir o description do JournalEntry (fallback).
+    description?: string;
   }>;
 }
 
@@ -257,9 +260,10 @@ account: { select: { id: true, code: true, name: true, type: true, nature: true,
         createdById:  userId,
         items: {
           create: resolvedItems.map(i => ({
-            accountId: i.accountId,
-            value:     i.value,
-            type:      i.type,
+            accountId:   i.accountId,
+            value:       i.value,
+            type:        i.type,
+            description: i.description || null,
           })),
         },
       },
@@ -300,9 +304,10 @@ account: { select: { id: true, code: true, name: true, type: true, nature: true,
         lalurObservacao:(dto as any).lalurObservacao ?? null,
         items: {
           create: resolvedItems.map(i => ({
-            accountId: i.accountId,
-            value:     i.value,
-            type:      i.type,
+            accountId:   i.accountId,
+            value:       i.value,
+            type:        i.type,
+            description: i.description || null,
           })),
         },
       },
@@ -335,9 +340,10 @@ account: { select: { id: true, code: true, name: true, type: true, nature: true,
         createdById:  userId,
         items: {
           create: entry.items.map(i => ({
-            accountId: i.accountId,
-            value:     Number(i.value),
-            type:      i.type === 'DEBIT' ? 'CREDIT' : 'DEBIT',
+            accountId:   i.accountId,
+            value:       Number(i.value),
+            type:        i.type === 'DEBIT' ? 'CREDIT' : 'DEBIT',
+            description: i.description ?? null,
           })),
         },
       },

@@ -29,6 +29,7 @@ import { AberturaController } from './controllers/abertura.controller';
 import { DeParaSugestaoController } from './controllers/de-para-sugestao.controller';
 import { EcdMovimentacaoController } from './controllers/ecd-movimentacao.controller';
 import { EcdLancamentosImportController } from './controllers/ecd-lancamentos-import.controller';
+import { JournalManualImportController } from './controllers/journal-manual-import.controller';
 
 // Services
 import { AccountingService }        from './services/accounting.service';
@@ -51,6 +52,7 @@ import { AberturaService } from './services/abertura.service';
 import { DeParaSugestaoService } from './services/de-para-sugestao.service';
 import { EcdMovimentacaoService } from './services/ecd-movimentacao.service';
 import { EcdLancamentosImportService } from './services/ecd-lancamentos-import.service';
+import { JournalManualImportService } from './services/journal-manual-import.service';
 import { IobLotdParserService }     from './services/iob-lotd-parser.service';
 import { FixedIncomeModule } from './fixed-income/fixed-income.module';
 import { CdiModule } from './cdi/cdi.module';
@@ -89,6 +91,7 @@ import { SidebarResourceGuard } from '../../auth/guards/sidebar-resource.guard';
     DeParaSugestaoController,
     EcdMovimentacaoController,
     EcdLancamentosImportController,
+    JournalManualImportController,
   ],
   providers: [
     AccountingConfigService,
@@ -112,6 +115,7 @@ import { SidebarResourceGuard } from '../../auth/guards/sidebar-resource.guard';
     DeParaSugestaoService,
     EcdMovimentacaoService,
     EcdLancamentosImportService,
+    JournalManualImportService,
     MatrizPlanoParserService,
     IobLotdParserService,
     IobLotdImportService,
