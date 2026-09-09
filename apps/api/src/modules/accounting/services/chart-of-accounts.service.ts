@@ -43,6 +43,14 @@ export class ChartOfAccountsService {
     const where: Prisma.ChartOfAccountsWhereInput = {
       companyId,
       ...(filters.showInactive ? {} : { isActive: true }),
+      // CORRIGIDO (04/09/2026): "origin: { not: 'ECD_NATIVE' }" tinha um bug
+      // real de logica de 3 valores do SQL - "NULL <> 'ECD_NATIVE'" nao e
+      // verdadeiro, e indefinido, entao o Postgres EXCLUI as linhas com
+      // origin=NULL (os containers ancestrais compartilhados, ex: "1 ATIVO")
+      // ao inves de incluir. Como a arvore inteira depende desses ancestrais
+      // pra conectar via parentId, isso orfanava TODA a arvore Matriz visivel
+      // na tela. Corrigido com OR explicito, sem depender de negacao.
+      AND: [{ OR: [{ origin: 'MATRIZ' }, { origin: null }] }],
     };
 
     if (filters.search) {
@@ -438,54 +446,38 @@ export class ChartOfAccountsService {
     // decisao arquitetural anterior) nao deve aparecer aqui, so em telas
     // especificas de ECD (Historico, Tabela Comparativa). Nunca apagada -
     // so ocultada. Mesmo filtro ecdImportLinks:{none:{}} do validateStructure.
+    // CORRIGIDO (04/09/2026): getTree() e o metodo real que alimenta a tela
+    // "Plano de Contas" (confirmado por print real - as colunas SALDO
+    // CALCULADO/SALDO ECD/DIFERENCA so existem aqui). O findAll() patchado
+    // antes hoje NAO e usado por essa tela - correcao ficou no lugar errado.
+    // Agora filtra direto por origin (campo novo, mais preciso que o
+    // criterio de "raiz duplicada" abaixo, que fica mantido como rede de
+    // seguranca redundante mas inofensiva, ja que a esta altura os
+    // candidatos ECD_NATIVE ja saem antes de chegar la).
+    // CORRIGIDO (04/09/2026): mesmo bug de logica de 3 valores do fix
+    // anterior - "not: 'ECD_NATIVE'" excluia origin=NULL (containers
+    // ancestrais compartilhados), orfanando a arvore inteira. OR explicito
+    // resolve sem depender de negacao em campo nullable.
     const accounts = await this.prisma.chartOfAccounts.findMany({
-      where: { companyId, deletedAt: null },
+      where: {
+        companyId, deletedAt: null,
+        OR: [{ origin: 'MATRIZ' }, { origin: null }],
+      },
       include: { ecdImportLinks: { select: { id: true }, take: 1 } },
       orderBy: { code: 'asc' },
     });
 
-    // CRIADO 27/08/2026: criterio de "raiz duplicada" - substitui o filtro
-    // ecdImportLinks:{none:{}} de 24/08/2026 (revertido em 27/08 por quebrar
-    // a Hotelsys, ver historico). So oculta uma raiz ECD-vinculada se existir
-    // OUTRA raiz do MESMO type sem vinculo ECD (empate genuino, ex: Sunsys
-    // com "1 ATIVO" da Matriz + "7 ATIVO" da ECD). Se so existe UMA raiz
-    // daquele type (caso Hotelsys - "1 ATIVO" e a UNICA raiz de ativo, com
-    // vinculo ECD legitimo pois o plano inteiro nasceu de ECD), mantem
-    // sempre, independente de ter vinculo ou nao.
-    const raizes = accounts.filter(a => !a.parentId);
-    const raizesPorTipo = new Map<string, typeof raizes>();
-    for (const r of raizes) {
-      const lista = raizesPorTipo.get(r.type) ?? [];
-      lista.push(r);
-      raizesPorTipo.set(r.type, lista);
-    }
-
-    const idsExcluidos = new Set<string>();
-    for (const lista of raizesPorTipo.values()) {
-      if (lista.length < 2) continue; // raiz unica - nunca oculta
-      const comVinculo = lista.filter(r => r.ecdImportLinks.length > 0);
-      const semVinculo = lista.filter(r => r.ecdImportLinks.length === 0);
-      if (comVinculo.length === 0 || semVinculo.length === 0) continue; // sem empate genuino - mantem tudo
-      // ha raiz duplicada (mesmo type, uma com vinculo ECD, outra sem) -
-      // oculta a(s) com vinculo ECD e toda a sua descendencia
-      for (const raizEcd of comVinculo) {
-        idsExcluidos.add(raizEcd.id);
-        const pilha = [raizEcd.id];
-        while (pilha.length > 0) {
-          const atualId = pilha.pop()!;
-          for (const acc of accounts) {
-            if (acc.parentId === atualId && !idsExcluidos.has(acc.id)) {
-              idsExcluidos.add(acc.id);
-              pilha.push(acc.id);
-            }
-          }
-        }
-      }
-    }
-
-    const accountsFiltradas = idsExcluidos.size > 0
-      ? accounts.filter(a => !idsExcluidos.has(a.id))
-      : accounts;
+    // REMOVIDO (04/09/2026): o criterio de "raiz duplicada" (criado em
+    // 27/08/2026) ficou ATIVAMENTE ERRADO depois que o campo "origin" passou
+    // a filtrar a query acima - ele comparava raizes por type+ecdImportLinks,
+    // e ao criar a nova raiz Matriz "5 Despesas com IRPJ e CSLL" (tambem
+    // type=EXPENSE, sem ecdImportLinks por ser nova), a heuristica confundiu
+    // isso com o padrao "raiz duplicada" da Sunsys e escondeu "4 Despesas"
+    // (a raiz real, com ecdImportLinks legitimo) por engano - achado com
+    // print real, "4" sumindo da tela. O filtro por origin no WHERE acima ja
+    // resolve isso de forma precisa e sem esse efeito colateral - a
+    // heuristica de raiz duplicada nao e mais necessaria.
+    const accountsFiltradas = accounts;
 
     const ecdBalances = await this.prisma.accountBalance.findMany({
       where: { companyId, referenceDate: { lte: refDate } },

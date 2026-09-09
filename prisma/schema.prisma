@@ -1119,6 +1119,19 @@ enum AccountNature {
   @@map("account_nature")
 }
 
+// NOVO (04/09/2026): distingue conta MATRIZ (padrao de trabalho, base dos
+// lancamentos e demonstracoes contabeis) de conta ECD_NATIVE (historico de
+// importacao original da ECD, so para reconciliacao/De-Para - nunca deve
+// aparecer na tela principal de Plano de Contas). NULL = container
+// ancestral compartilhado entre as duas arvores (ex: "1 ATIVO" tem tanto
+// filhos nativos quanto Matriz) - sempre visivel, nunca filtrado.
+enum AccountOrigin {
+  MATRIZ
+  ECD_NATIVE
+
+  @@map("account_origin")
+}
+
 enum SourceModule {
   ACCOUNTING
   FINANCE
@@ -1162,6 +1175,8 @@ model ChartOfAccounts {
   // ── Mapeamentos de compliance ─────────────────────────────
   spedCode    String? @map("sped_code") @db.VarChar
   reducedCode String? @map("reduced_code") @db.VarChar(10)
+  // NOVO (04/09/2026): ver comentario do enum AccountOrigin acima.
+  origin      AccountOrigin? @map("origin")
   ifrsCode    String? @map("ifrs_code") @db.VarChar
   usgaapCode  String? @map("usgaap_code") @db.VarChar
   eSocialCode String? @map("esocial_code") @db.VarChar

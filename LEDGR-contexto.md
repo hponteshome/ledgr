@@ -8169,3 +8169,196 @@ ENCARGOS LEGAIS") em vez do texto generico.
 
 **Proximo passo natural:** reimportar os demais anos da Hotelsys
 (2019-2025) com a mesma logica corrigida - ja em andamento pelo usuario.
+
+
+### Sessao 03/09/2026 (continuacao) - Reorganizacao pontual do Plano de Contas da Hotelsys - PAUSADA, retomar depois
+
+**Contexto:** ao tratar lancamentos pra importacao (extratos bancarios),
+usuario notou contas basicas faltando na Hotelsys (ex: sub-contas analiticas
+de "Banco Conta Movimento" por banco) e propos reorganizar. Decisao tomada:
+NAO fazer reorganizacao completa do Plano Matriz - trabalhar pontualmente
+so na Hotelsys primeiro (aditivo + correcoes cirurgicas), Matriz fica pra
+depois. Motivo: risco de invalidar ECD/ECF ja validados contra PVA de
+outras empresas (GRB), e o trabalho de re-validar cada ano ja importado
+seria maior que o beneficio.
+
+**Plano proposto pelo usuario, revisado e validado nesta sessao:**
+322 -> 347 contas analiticas apos correcoes. Processo de validacao:
+1. Corrigido 2 erros de digitacao no plano (codigos duplicados por
+   incremento sequencial errado: grupo 11307/11308).
+2. IRPJ/CSLL: decidido mover para reduced_code no bloco 51xx (excecao ja
+   documentada no projeto - Regra 2). Depois o usuario decidiu ir alem e
+   criar uma RAIZ NOVA "5 Despesas com IRPJ e CSLL" (nivel 1, paralela a
+   Ativo/Passivo/Receita/Despesa) - nao um type novo (cogitou "Provisoes",
+   descartado - AccountType e enum fixo do Postgres/Prisma, mudar exigiria
+   migracao de schema tocando DRE/Fechamento/Encerramento/rollup - mantido
+   type=Despesa, so a arvore/code mudam).
+3. Diff completo rodado contra o plano real da Hotelsys (export via SQL,
+   accounts is_analytic=true) - importante: Hotelsys tem 2 populacoes de
+   conta distintas coexistindo - ~480 contas "nativas" (codigos curtos/
+   irregulares, sem reduced_code, fonte do de/para ECD) e ~321 contas
+   "Matriz" (codigo 11 digitos, com reduced_code) - so a segunda populacao
+   e comparavel ao plano proposto.
+4. Erro de comparacao corrigido no meio do processo: reduced_code no banco
+   vem com zero a esquerda (0001001), plano sem (1001) - normalizar
+   numericamente antes de comparar, senao gera falsos positivos em massa.
+
+**Resultado final validado (347 contas, 0 duplicatas, 0 colisoes de
+reduced_code, 100% aderente a convencao de classe 1=Ativo/2=Passivo-PL/
+3=Receita/4=Despesa, 5=excecao IRPJ-CSLL):**
+- 31 contas novas a criar (24 sao o detalhamento de "Imoveis" por
+  propriedade especifica, 2 mutuo, 1 LM Administracao, 4 IRPJ/CSLL sob a
+  raiz 5 nova).
+- ~212 correcoes de reduced_code em contas existentes (250 originalmente,
+  menos 38 do bloco 42103010xxx que foi EXCLUIDO desta rodada - ver
+  pendencia critica abaixo).
+- 11303010002 Adiantamentos Fornecedores: mantida como esta (tem 1 item,
+  R$ 218.829,02), NAO cria nova - so recebe reduced_code=1025 (mesmo da
+  11303010001 Fornecedores Diversos, ja que o usuario disse corresponder).
+- 6 nomes de conta corrigidos (terminologia): 11307010001 Lucros/PLR ->
+  Mutuo Ligadas; 12101030002 Mutuo Outros -> Empregados; 12101020001 Conta
+  Corrente Ligadas -> Mutuo Ligadas; 12101020002 Conta Corrente Socios ->
+  Mutuo Socios e Diretores; 12101030001 Mutuo Nao Ligadas -> Mutuo Partes
+  Nao Relacionadas; 21101020006 Contas a Pagar -> Outras Contas a Pagar.
+  Confirmado via SQL: as 2 primeiras tem 0 itens gravados (seguro renomear
+  sem perda de contexto historico).
+- 22101050002 "Conta Corrente Matriz" -> "MOU San Francisco Fund": tem 1
+  item, R$ 16.890.513,66 de credito - o MESMO saldo intercompany visto no
+  Ativo (12101020001) na investigacao da Apuracao de Resultado, inicio
+  desta sessao. Usuario confirmou o nome novo esta correto.
+- IRPJ/CSLL (4 contas, 0 itens gravados cada): confirmado seguro mover -
+  MOVER (mesmo id, code+parent_id+reduced_code atualizados), nao recriar,
+  para a raiz "5" nova (5/51/511/51101/5110101|5110102 - 6 contas
+  sinteticas novas a criar primeiro).
+
+**PENDENCIA CRITICA #1 (bloqueou a execucao, retomar com cuidado):**
+Bloco `42103010xxx` ("Despesas Administrativas", ~38 contas) - o plano
+proposto reordena os mesmos ~28-38 conceitos de despesa em ORDEM
+ALFABETICA, reatribuindo reduced_code sequencial NA NOVA ORDEM. Isso
+significa que o NOME de cada codigo tambem mudaria, nao so o reduced_code.
+Achado grave via SQL: a conta 42103010020 tem HOJE o nome "IPTU, ITR e
+Incra" com 16 lancamentos reais, R$ 4.288.756,60 (6 anos de historico,
+2018-2025). No plano proposto, esse MESMO codigo (42103010020) e
+reatribuido ao conceito "Imobilizados de Baixo Valor" (que e outra coisa).
+Aplicar a reordenacao alfabetica cegamente trocaria o rotulo de contas com
+historico real, criando incompatibilidade entre o nome exibido e o que foi
+de fato lancado. Decisao: EXCLUIR esse bloco inteiro desta rodada (nem
+nome nem reduced_code tocados, nem nas 37 contas vazias, pra nao deixar a
+sequencia pela metade). Fica como tarefa separada pra decidir como
+reorganizar sem atropelar o historico.
+
+**PENDENCIA CRITICA #2 (motivo da pausa desta sessao):**
+Ao levantar os UUIDs pra mover IRPJ/CSLL pra raiz 5 nova, descoberto que a
+arvore REAL da Hotelsys nessa area NAO bate com os nomes que o plano
+proposto assumia:
+  43     = "RESULTADOS FINANCEIROS LIQUIDOS" (plano assumia "Despesas com IRPJ e CSLL")
+  431    = "RECEITAS E DESPESAS FINANCEIRAS" (plano assumia "Impostos sobre o Lucro")
+  43101  = "DESPESAS FINANCEIRAS" (plano assumia "Impostos sobre o Lucro")
+  4310101 = "IRPJ e CSLL" (bate)
+  4310102 = "IRPJ e CSLL Diferidos" (bate)
+So os 2 niveis mais baixos batem com o esperado. Isso sugere fortemente
+que 43/431/43101 podem ter OUTROS FILHOS alem do galho IRPJ/CSLL (o nome
+"Despesas Financeiras" e generico, nao especifico de IRPJ/CSLL) - se
+tivessem sido aposentados (soft-delete) por engano, um galho ainda em uso
+pra outra coisa seria perdido. Consulta de verificacao dos filhos reais de
+43/431/43101/4310101/4310102 foi preparada mas NAO EXECUTADA - sessao
+pausada aqui a pedido do usuario ("abortemos! faremos isto depois").
+
+**Estado atual:** NENHUMA alteracao foi aplicada ao banco nesta
+investigacao inteira (so leituras/comparacoes). O plano final validado
+(347 contas, arquivo de trabalho plano_final.tsv nesta sessao de chat, nao
+salvo no repositorio) fica pronto pra aplicar assim que as duas pendencias
+criticas acima forem resolvidas.
+
+**Proximo passo natural ao retomar:** rodar a consulta de filhos reais de
+43/431/43101 (ja preparada, so nao executada) pra decidir se sao
+seguros pra aposentar ou se tem outra coisa junto - so entao gerar a
+migracao final completa (31 criacoes + ~212 correcoes de reduced_code +
+6 renomeacoes + 1 conta com reduced_code compartilhado + IRPJ/CSLL movido
+pra raiz 5 nova). O bloco 42103010xxx fica de fora ate se decidir uma
+estrategia que nao atropele o historico da conta IPTU (42103010020).
+
+
+### Sessao 04-09/09/2026 - Campo AccountOrigin (Matriz vs ECD_NATIVE) + correcao Plano de Contas
+
+**Motivacao:** apos a reorganizacao pontual do Plano de Contas da Hotelsys
+(sessao anterior), usuario notou que a tela "Plano de Contas" mostrava
+estrutura nativa da ECD (5 niveis, ex: "1101002 BANCOS -> 11010029 BANCO
+CONTA MOVIMENTO" generico) misturada com a estrutura Matriz (6 niveis, ex:
+"111 -> 11102 -> 1110201 -> contas detalhadas por banco"). Investigacao
+revelou que a Hotelsys tem DUAS populacoes de conta coexistindo na mesma
+arvore: ~630 nativas (codigos curtos/irregulares, sem reduced_code, fonte
+do De/Para) e ~460 Matriz (codigo de 1/2/3/5/7/11 digitos conforme nivel,
+sempre com reduced_code exceto o proprio campo em contas sinteticas).
+
+**Historico ja existente relevante (achado via busca em chats passados):**
+24/08/2026 - tentativa de filtrar por `ecdImportLinks:{none:{}}` quebrou a
+Hotelsys inteira (o plano dela nasceu de ECD, ate os containers Matriz tem
+o vinculo). 27/08/2026 - substituido por criterio de "raiz duplicada"
+(so oculta raiz ECD se existir OUTRA raiz do mesmo type sem vinculo - caso
+Sunsys). Nao servia pra Hotelsys porque la nativo e Matriz NAO sao raizes
+separadas, estao entrelacados dentro da mesma arvore (ex: "11" tem "1101"
+nativo e "111" Matriz como filhos irmãos).
+
+**Solucao implementada:** novo enum `AccountOrigin` (MATRIZ | ECD_NATIVE)
+e campo `origin` (nullable) em `ChartOfAccounts`. Classificacao retroativa
+das 1130 contas da Hotelsys:
+- Folhas analiticas: `reduced_code` real (nao vazio, nao "000000") = MATRIZ;
+  vazio = ECD_NATIVE. Validado 100% limpo, zero excecao, contra toda a base
+  (812 analiticas: distribuicao por tamanho de codigo perfeitamente separada
+  entre "com reduced_code" e "sem", sem sobreposicao nenhuma).
+- Sinteticas: herda por uniao dos descendentes analiticos - se todos MATRIZ,
+  vira MATRIZ; se todos ECD_NATIVE, vira ECD_NATIVE; se misto (containers
+  compartilhados como "1 ATIVO", 37 casos) ou sem descendente (3 casos),
+  fica NULL (sempre visivel, nunca filtrado - sao ancestrais necessarios
+  pra conectar a arvore Matriz via parentId).
+- Resultado: 460 MATRIZ, 630 ECD_NATIVE, 40 NULL (compartilhados/vazios).
+
+**Bugs cometidos e corrigidos na mesma sessao (documentados para nao repetir):**
+1. Patch inicial foi aplicado em `findAll()` - metodo ERRADO, nao e o que
+   alimenta a tela "Plano de Contas" (confirmado com print real). O metodo
+   certo e `getTree()` (unico que produz as colunas SALDO CALCULADO/SALDO
+   ECD/DIFERENCA visiveis na tela). Corrigido nos dois metodos por garantia.
+2. `origin: { not: 'ECD_NATIVE' }` tinha bug real de logica de 3 valores do
+   SQL - `NULL <> 'ECD_NATIVE'` e indefinido, nao verdadeiro, entao o
+   Postgres EXCLUI linhas com origin=NULL. Como a arvore inteira depende
+   dos 40 containers-ancestrais NULL pra conectar via parentId, isso
+   orfanava a arvore Matriz inteira. Corrigido com `OR: [{origin:'MATRIZ'},
+   {origin:null}]` explicito, sem depender de negacao em campo nullable.
+3. A logica antiga de "raiz duplicada" (27/08) ficou ATIVAMENTE ERRADA
+   depois do fix acima: ao criar a nova raiz Matriz "IRPJ e CSLL" (type=
+   EXPENSE, sem ecdImportLinks por ser nova), a heuristica confundiu isso
+   com o padrao "raiz duplicada" da Sunsys e escondeu "4 Despesas" (raiz
+   real, com ecdImportLinks legitimo) por engano - achado com print real.
+   Removida (nao e mais necessaria - origin resolve com mais precisao).
+
+**Regra 13 registrada no CLAUDE.md:** Matriz sempre prevalece sobre Nativo
+em colisao de codigo (confirma zero uso real antes de soft-deletar a
+nativa). Pendencia anotada: `41`,`43`,`44`,`45` nativos ainda nao revisados
+sob essa regra.
+
+**Grupo IRPJ/CSLL renumerado de 7 para 5:** apos o campo origin confirmar
+que os nativos "5 CONTA TRANSITORIA" (6 contas) e "6 RESULTADO/TRIBUTACAO
+SOBRE O LUCRO" (9 contas) tinham ZERO lancamento gravado, aplicada a Regra
+13 - soft-delete das nativas do grupo 5 e renomeacao das 10 contas de IRPJ/
+CSLL de `7xxx` para `5xxx` (mesmo id, reduced_code 5101-5104 inalterado).
+Grupo 6 nativo mantido intocado (nao foi necessario liberar, so o 5).
+
+**Plano Matriz (matriz_master_accounts, template global) corrigido igual:**
+"43 Despesas com IRPJ e CSLL" nesse template e EXCLUSIVO de IRPJ/CSLL (sem
+mistura com Despesas Financeiras como na arvore nativa da Hotelsys) -
+migracao mais simples: criada raiz nova "5" (6 contas sinteticas), movidas
+as 4 folhas (mesmo id), aposentada a cadeia orfa 43/431/43101/4310101/
+4310102 por completo. Aproveitado para corrigir reduced_code das contas
+Diferidas (0001176/0001177 -> 0005103/0005104, alinhando com a Regra 2 -
+estavam fora do padrao 51xx ja documentado). Futuras empresas que
+importarem o Matriz ja herdam a estrutura correta desde o inicio.
+
+**Arquivos desta sessao:**
+- prisma/schema.prisma (enum AccountOrigin + campo origin)
+- prisma/migrations-manuais/2026-09-04-account-origin.sql
+- prisma/migrations-manuais/2026-09-04-account-origin-backfill.sql
+- prisma/migrations-manuais/2026-09-09-renomeia-irpj-csll-7-para-5.sql
+- prisma/migrations-manuais/2026-09-09-matriz-grupo-5-irpj-csll.sql
+- apps/api/.../chart-of-accounts.service.ts (findAll + getTree + remocao raiz duplicada)
+- CLAUDE.md (Regra 13, ja commitada separadamente)
