@@ -8427,3 +8427,35 @@ diante, incluindo reentrega dos arquivos ja criados via `present_files`
 - frontend/src/pages/accounting/HistoricoPadraoPage.tsx
 - frontend/src/routes/index.tsx (1 import + 1 rota)
 - prisma/migrations-manuais/2026-09-09-sidebar-historico-padrao.sql
+
+
+### Sessao 09/09/2026 (continuacao) - reduced_code da Hotelsys reatribuido manualmente pelo usuario
+
+Usuario identificou que o reduced_code da Hotelsys ficou inconsistente
+apos as varias correcoes pontuais desta e de sessoes anteriores (resequencia
+alfabetica do 42103, choques de codigo com nativas no grupo 5/6, movimentacao
+do IRPJ/CSLL) - sem seguir uma regra clara e unificada. Decisao: gerar CSV
+completo (so contas analiticas/nivel 6, separador "|") e o usuario reatribuiu
+o reduced_code manualmente, linha por linha, em vez de tentar mais uma
+correcao automatica pontual.
+
+**Validacao antes de aplicar (tudo via SQL, sem processamento fora do banco):**
+- 0 codigo duplicado no arquivo novo.
+- 0 reduced_code duplicado no arquivo novo (comparacao numerica, ignorando
+  zero a esquerda).
+- 325 codigos do arquivo = 325 contas analiticas MATRIZ ja existentes no
+  banco (nenhum "nao encontrado" - sem erro de digitacao de codigo).
+- 270 realmente mudaram de valor; 55 ja estavam corretas (a "diferenca"
+  aparente era so formatacao de zero a esquerda, ex: "0001001" vs "1001").
+
+**Aplicado:** UPDATE em lote das 325 contas (nao so as 270 diferentes -
+uniformizou tambem o formato de zero a esquerda nas 55 que ja estavam
+certas). Migracao salva em
+prisma/migrations-manuais/2026-09-09-reduced-code-hotelsys-manual.sql.
+
+**Nota para o futuro:** o Plano Matriz global (matriz_master_accounts) NAO
+foi tocado nesta rodada - usuario confirmou que la esta ok. Se o
+reduced_code da Hotelsys usar daqui pra frente uma convencao de formatacao
+diferente da que o Plano Matriz usa (com/sem zero a esquerda), vale
+alinhar os dois numa proxima oportunidade, mas nao e urgente (o campo e so
+atalho de digitacao, nao afeta calculo nem SPED).
