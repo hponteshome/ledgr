@@ -8362,3 +8362,32 @@ importarem o Matriz ja herdam a estrutura correta desde o inicio.
 - prisma/migrations-manuais/2026-09-09-matriz-grupo-5-irpj-csll.sql
 - apps/api/.../chart-of-accounts.service.ts (findAll + getTree + remocao raiz duplicada)
 - CLAUDE.md (Regra 13, ja commitada separadamente)
+
+
+### Sessao 09/09/2026 (continuacao) - Reconciliacao SALDO ECD: ferramenta ja existe
+
+Apos o campo origin filtrar a tela "Plano de Contas" (getTree()) para so
+mostrar Matriz, a coluna "SALDO ECD" (vinda de account_balances, 12.777
+registros para a Hotelsys) ficou zerada em toda linha - os saldos so
+existem vinculados a contas ECD_NATIVE (confirmado via SQL: 100% dos
+registros apontam pra origin=ECD_NATIVE), que agora estao ocultas da tela.
+
+Investigacao: NAO e bug, e tensao arquitetural real entre a tela de rotina
+(Matriz limpo) e reconciliacao com o arquivo original (que so faz sentido
+do lado nativo). Cogitado criar tela "Plano de Contas ECD" separada.
+
+Achado: ja existe ferramenta pronta que resolve isso - "Tabela Comparativa
+ECD" (tabela-comparativa.service.ts/controller.ts, menu lateral, rota
+/app/accounting/tabela-comparativa). Para cada conta Matriz, mostra as
+contas nativas de origem de cada ano lado a lado, identificando renumeracao
+de conta nativa entre anos (ex: "Caixa" foi codigo 11101001 em 2017 e
+11010015 em 2018 na ECD, ambos corretamente somando pro mesmo alvo Matriz
+11101010001). Testado com dado real (212 contas, 2017-2018) - funciona
+corretamente, nao foi afetado pelo trabalho de origin desta sessao (usa
+consulta propria via ecd_account_mappings, nao depende de getTree()).
+
+Decisao: nao construir "Plano de Contas ECD" novo - ferramenta existente
+ja cobre a necessidade. Pendencia da tela "Plano de Contas" (SALDO ECD
+zerado apos o filtro origin) fica assim mesmo, documentado como
+comportamento esperado - quem precisar reconciliar usa a Tabela
+Comparativa ECD, nao a tela de rotina.
