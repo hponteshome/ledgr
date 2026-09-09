@@ -8459,3 +8459,30 @@ reduced_code da Hotelsys usar daqui pra frente uma convencao de formatacao
 diferente da que o Plano Matriz usa (com/sem zero a esquerda), vale
 alinhar os dois numa proxima oportunidade, mas nao e urgente (o campo e so
 atalho de digitacao, nao afeta calculo nem SPED).
+
+
+### Sessao 09/09/2026 (continuacao) - reduced_code do Plano Matriz global tambem corrigido manualmente
+
+Correcao do reduced_code (ver nota anterior sobre a Hotelsys) estendida ao
+Plano Matriz global (matriz_master_accounts) - usuario tambem reatribuiu
+manualmente via CSV (319 contas analiticas, mesmo formato "|"). Confirmado
+que sao dados genuinamente diferentes da Hotelsys (nomes ainda no padrao
+antigo: "Conta Corrente Ligadas" em vez de "Mutuo Ligadas", sem as contas
+especificas de banco/mutuo que so existem na Hotelsys) - reforca que Matriz
+e Hotelsys sao populacoes distintas, tratadas cada uma no seu proprio ritmo.
+
+**Validacao antes de aplicar (mesmo processo da Hotelsys, tudo via SQL):**
+- 0 codigo duplicado, 0 reduced_code duplicado no arquivo novo.
+- 319 codigos do arquivo = 319 contas analiticas do Plano Matriz (nenhum
+  "nao encontrado").
+
+**Aplicado:** UPDATE em lote das 319 contas. Migracao salva em
+prisma/migrations-manuais/2026-09-09-reduced-code-matriz-manual.sql.
+
+**Observacao para o futuro (nao tratada agora):** o CSV exportado do Plano
+Matriz revelou mojibake em alguns nomes (ex: "EquivalÃªncia" em vez de
+"Equivalência", "DomÃ­nios", "VeÃ­culos") - parece um problema de
+codificacao na exportacao/armazenamento de caracteres acentuados
+especificos nessa tabela. Nao foi corrigido porque essa rodada mexeu so em
+reduced_code, nao em nome - mas vale investigar se afeta a exibicao real
+na tela em algum momento.
