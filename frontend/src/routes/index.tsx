@@ -49,6 +49,7 @@ import SugestaoDeParaPage from '../pages/accounting/SugestaoDeParaPage';
 import EcdMovimentacaoPage from '../pages/sped/EcdMovimentacaoPage';
 import EcdLancamentosImportPage from '../pages/accounting/EcdLancamentosImportPage';
 import TabelaComparativaPage from '../pages/accounting/TabelaComparativaPage';
+import HistoricoPadraoPage from '../pages/accounting/HistoricoPadraoPage';
 import AberturaLancamentosPage from '../pages/accounting/AberturaLancamentosPage';
 import EcdValidationPage from '../pages/accounting/EcdValidationPage';
 import EcdPage from '../pages/sped/EcdPage';
@@ -174,6 +175,7 @@ export const AppRoutes = () => {
                 <Route path="app/accounting/trial-balance" element={<ProtectedRoute><TrialBalanceView /></ProtectedRoute>} />
                 <Route path="app/accounting/sugestao-de-para" element={<ProtectedRoute><SugestaoDeParaPage /></ProtectedRoute>} />
                 <Route path="app/accounting/tabela-comparativa" element={<ProtectedRoute><TabelaComparativaPage /></ProtectedRoute>} />
+                <Route path="app/accounting/historico-padrao" element={<ProtectedRoute><HistoricoPadraoPage /></ProtectedRoute>} />
                 <Route path="app/accounting/abertura" element={<ProtectedRoute><AberturaLancamentosPage /></ProtectedRoute>} />
                 <Route path="app/accounting/ecd-lancamentos" element={<ProtectedRoute><EcdLancamentosImportPage /></ProtectedRoute>} />
                 <Route path="app/accounting/journal" element={<ProtectedRoute><JournalPage /></ProtectedRoute>} />
