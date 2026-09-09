@@ -609,3 +609,21 @@ futuras do Matriz - `41 CUSTOS DIRETOS`, `43 RESULTADOS FINANCEIROS
 LIQUIDOS`, `44`/`45 RESULTADOS NAO OPERACIONAIS` (duplicado). Revisar
 quando/se o Matriz precisar de algum desses numeros - aplicar esta mesma
 regra (confirmar uso real antes de decidir).
+
+
+## Licao — Regra 14 (09/09/2026): exportar CSV do container sempre via -o + docker cp, nunca > direto do PowerShell
+
+Ao rodar `docker exec ... psql ... -A -t > arquivo.csv` (redirecionamento
+do PowerShell), a travessia Linux(UTF-8) -> PowerShell corrompeu caracteres
+acentuados especificos (ê, í em certas combinacoes) - "Equivalência" virou
+"EquivalÃªncia", mesmo o dado no banco estando 100% correto (confirmado via
+consulta direta). A maioria dos acentos passa ileso, o que torna esse tipo
+de corrupcao enganosa - parece erro de dado real, mas e' so o metodo de
+exportacao.
+
+**Regra pratica:** sempre escrever o CSV DENTRO do container primeiro
+(`psql ... -o /tmp/arquivo.csv`), depois trazer pro host com `docker cp`
+separado - nunca usar `>` do PowerShell direto num comando que passa por
+`docker exec` quando o conteudo tiver acentuacao. Se aparecer suspeita de
+corrupcao de acento num export, SEMPRE confirmar direto no banco (SELECT
+simples) antes de assumir que o dado esta errado e tentar "corrigir".
