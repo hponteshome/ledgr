@@ -576,3 +576,36 @@ aparece em texto contabil real, ao contrario da virgula.
 Ao criar ou revisar qualquer exportacao CSV no projeto (Razao Analitico,
 Balancete, Diario Geral, extratos, etc.), usar '|' por padrao - nao assumir
 ',' so porque e o padrao "de mercado" do formato CSV generico.
+
+
+## Licao — Regra 13 (04/09/2026): Matriz sempre prevalece sobre Nativo em colisao de codigo
+
+Quando um numero/codigo de conta e necessario para o Plano Matriz (padrao de
+trabalho, base dos lancamentos e demonstracoes contabeis) e ja existe uma
+conta NATIVA da ECD ocupando esse mesmo codigo, o Matriz tem prioridade.
+
+**Regra pratica:**
+1. Confirma que a conta nativa em conflito tem ZERO lancamento gravado
+   (`journal_entry_items`) antes de qualquer acao - nunca por suposicao.
+2. Se zero uso: soft-delete a(s) conta(s) nativa(s) em conflito, libera o
+   codigo, e o Matriz assume esse numero.
+3. Se a conta nativa TIVER uso real, no reaproveita o numero - a conta
+   nativa so cede espaco quando genuinamente morta/sem uso.
+4. Nativa so recebe numero proprio quando NAO ha conflito nenhum com Matriz
+   (ou quando a nativa tem uso real e nao pode ser removida).
+
+**Caso real que originou a regra:** grupo `5` (Despesas com IRPJ e CSLL) -
+o Plano Matriz precisava desse numero (convencao classica: Ativo=1,
+Passivo=2, Receita=3, Despesa=4, Apuracao/Resultado=5). A Hotelsys ja tinha
+`5 CONTA TRANSITORIA` nativa (residuo de import antigo, 0 itens gravados,
+confirmado via `journal_entry_items`) ocupando o codigo. Como o uso era
+zero, a conta nativa foi soft-deletada e o galho de IRPJ/CSLL (que tinha
+sido criado provisoriamente em `7`, por `5` e `6` estarem bloqueados na
+hora) foi renomeado de volta para `5` - mesmo id, sem reprocessar nada.
+
+**Pendencia identificada, nao resolvida ainda:** ha pelo menos mais 4
+codigos curtos nativos na Hotelsys que podem colidir com necessidades
+futuras do Matriz - `41 CUSTOS DIRETOS`, `43 RESULTADOS FINANCEIROS
+LIQUIDOS`, `44`/`45 RESULTADOS NAO OPERACIONAIS` (duplicado). Revisar
+quando/se o Matriz precisar de algum desses numeros - aplicar esta mesma
+regra (confirmar uso real antes de decidir).
