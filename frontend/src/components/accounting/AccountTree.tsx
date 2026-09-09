@@ -177,7 +177,7 @@ const TreeRow: React.FC<{
 
 export const AccountTree: React.FC<AccountTreeProps> = ({ nodes, renderBalances }) => {
     return (
-        <div className="rounded-lg overflow-hidden overflow-x-auto">
+        <div className="rounded-lg overflow-x-auto overflow-y-hidden">
             <table className="w-full table-fixed border-collapse text-sm">
                 <colgroup>
                     <col style={{ width: '30%' }} />

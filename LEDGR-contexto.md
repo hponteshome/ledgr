@@ -8486,3 +8486,35 @@ codificacao na exportacao/armazenamento de caracteres acentuados
 especificos nessa tabela. Nao foi corrigido porque essa rodada mexeu so em
 reduced_code, nao em nome - mas vale investigar se afeta a exibicao real
 na tela em algum momento.
+
+
+### Sessao 09/09/2026 (continuacao) - limpeza de reduced_code "000000" + correcao de rolagem horizontal no Plano de Contas
+
+**Mojibake investigado e descartado:** suspeita inicial de nomes corrompidos
+no banco (Equivalência, Domínios, Veículos) era falso alarme - o dado
+sempre esteve correto; a corrupcao aconteceu so na exportacao CSV via
+redirecionamento `>` do PowerShell sobre saida de `docker exec` (traversia
+Linux/UTF-8 -> Windows corrompeu alguns acentos especificos). Confirmado
+via SELECT direto no banco (Hotelsys e Matriz) - nada foi alterado.
+Registrada Regra 14 no CLAUDE.md: exportar CSV do container sempre via
+`-o` + `docker cp`, nunca redirecionamento `>` direto do PowerShell.
+
+**reduced_code "000000" limpo nas contas sinteticas:** placeholder sem
+significado real (contas sinteticas nunca deveriam ter reduced_code, so
+analiticas usam esse campo). Limpo para NULL em 123 contas sinteticas da
+Hotelsys (Matriz global ja estava limpo, 0 ocorrencias). Achado a parte:
+4 contas ANALITICAS da Hotelsys tambem tinham "000000" (2210103 Mutuo
+Ligadas, 2210104 Mutuo Kipstone S/A Incorp, 2310102 Adiantamento para
+Aumento Capital, 2330103 Resultado de Investimentos) - codigo de 7 digitos
+(nivel 5, normalmente sintetico) marcado erroneamente como analitico,
+parecem containers reservados nunca finalizados. Confirmado zero uso
+(journal_entry_items E account_balances) - NAO alteradas nesta rodada,
+ficam como pendencia registrada pra decisao futura (corrigir is_analytic
+para false, ou deixar como estao).
+
+**Bug de CSS corrigido - rolagem horizontal ausente no Plano de Contas:**
+`AccountTree.tsx` tinha as classes Tailwind conflitantes na mesma div
+("overflow-hidden overflow-x-auto" juntas) - `overflow-hidden` cobre os
+dois eixos e competia de forma imprevisivel com `overflow-x-auto`.
+Corrigido para eixos explicitos: `overflow-x-auto overflow-y-hidden`.
+Confirmado funcionando pelo usuario.
