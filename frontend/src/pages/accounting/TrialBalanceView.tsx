@@ -258,6 +258,33 @@ function applyZeroFilterVerification(
         );
 }
 
+// ─── Movement filters (CRIADO 02/09/2026) ─────────────────────────────────────
+// Filtra por presenca/ausencia de movimento (debitos/creditos) no periodo -
+// so aplicavel ao Balancete de Verificacao (Balancete Mensal nao tem debitos/
+// creditos por periodo no schema atual, so saldo acumulado). Mesmo padrao de
+// applyZeroFilterVerification: a agregacao bottom-up ja resolveu os valores
+// do no antes deste filtro rodar, entao um no so aparece "sem movimento" se
+// nenhum descendente teve debito/credito no periodo.
+
+function applyMovementFilterVerification(
+    items: VerificationBalanceItem[],
+    mode: 'all' | 'with' | 'without',
+): VerificationBalanceItem[] {
+    if (mode === 'all') return items;
+    return items
+        .map(i => ({
+            ...i,
+            children: i.children
+                ? applyMovementFilterVerification(i.children, mode)
+                : [],
+        }))
+        .filter(i => {
+            const temMovimento = i.debits !== 0 || i.credits !== 0;
+            const passaNoFiltro = mode === 'with' ? temMovimento : !temMovimento;
+            return passaNoFiltro || (i.children?.length ?? 0) > 0;
+        });
+}
+
 // ─── Row types ────────────────────────────────────────────────────────────────
 
 type MonthlyRow = { kind: 'data'; item: MonthlyBalanceItem; depth: number };
@@ -538,6 +565,10 @@ const TrialBalanceView: React.FC = () => {
     // Quando true, exibe todas as contas, incluindo Resultado.
     const [showResult, setShowResult] = useState(false);
 
+    // ── NOVO (02/09/2026): filtro por movimento no periodo — so aplicavel ao
+    // Balancete de Verificacao (usa debits/credits, que so existem la).
+    const [movementFilter, setMovementFilter] = useState<'all' | 'with' | 'without'>('all');
+
     // ── Loaders ───────────────────────────────────────────────────────────────
 
     const loadMonthly = useCallback(async () => {
@@ -653,7 +684,8 @@ const TrialBalanceView: React.FC = () => {
     // ── Pipeline de filtros aplicados em ordem ─────────────────────────────────
     // 1. Filtro de Resultado (showResult)
     // 2. Filtro de zeros (showZeroBalances)
-    // 3. Busca textual (search)
+    // 3. Filtro de movimento (movementFilter) — so verification
+    // 4. Busca textual (search)
 
     const pipelineMonthly = (() => {
         let items = filterByResultMonthly([...monthlyItems], showResult);
@@ -665,6 +697,7 @@ const TrialBalanceView: React.FC = () => {
     const pipelineVerification = (() => {
         let items = filterByResultVerification([...verificationItems], showResult);
         items = applyZeroFilterVerification(items, showZeroBalances);
+        items = applyMovementFilterVerification(items, movementFilter);
         if (search) items = filterVerification(items, search);
         return items;
     })();
@@ -1237,6 +1270,30 @@ const TrialBalanceView: React.FC = () => {
                             {showResult ? '✓' : ''} Resultado
                         </ToggleButton>
                     </div>
+
+                    {/* Filtro de Movimento (NOVO 02/09/2026) — so Balancete de Verificacao */}
+                    {viewMode === 'verification' && (
+                        <div style={{ display: 'flex', gap: 4, alignItems: 'flex-end' }}>
+                            <ToggleButton
+                                active={movementFilter === 'all'}
+                                onClick={() => setMovementFilter('all')}
+                            >
+                                Movimento: Todas
+                            </ToggleButton>
+                            <ToggleButton
+                                active={movementFilter === 'with'}
+                                onClick={() => setMovementFilter('with')}
+                            >
+                                Com Mov.
+                            </ToggleButton>
+                            <ToggleButton
+                                active={movementFilter === 'without'}
+                                onClick={() => setMovementFilter('without')}
+                            >
+                                Sem Mov.
+                            </ToggleButton>
+                        </div>
+                    )}
 
                     {/* Botão gerar */}
                     <button
