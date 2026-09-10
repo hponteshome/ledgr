@@ -28,7 +28,7 @@ interface ComparativoResponse {
 }
 
 const fmt = (v: number | null | undefined): string => {
-  if (v === null || v === undefined) return '\u2013';
+  if (v === null || v === undefined) return '–';
   return v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
 
@@ -59,6 +59,7 @@ export const TabelaComparativaPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busca, setBusca] = useState('');
+  const [apenasMovimentacao, setApenasMovimentacao] = useState(false);
 
   const gerar = useCallback(async () => {
     setLoading(true);
@@ -75,25 +76,57 @@ export const TabelaComparativaPage: React.FC = () => {
     }
   }, [anoInicio, anoFim]);
 
-  const linhasFiltradas = data?.linhas.filter((l) => {
-    if (!busca) return true;
-    const q = busca.toUpperCase();
-    return (
-      l.targetCode.includes(q) ||
-      l.targetName.toUpperCase().includes(q) ||
-      l.origens.some((o) => o.sourceCode.includes(q) || o.sourceName.toUpperCase().includes(q))
-    );
-  });
+  // NOVO (09/09/2026): "exibir apenas movimentacoes" esconde contas/origens
+  // que nunca tiveram valor != 0 em nenhum ano do periodo - reduz o ruido de
+  // contas cadastradas mas sem uso real. Filtro 100% client-side, o dado ja
+  // vem todo carregado numa unica chamada.
+  // CORRIGIDO (09/09/2026): "movimentacao" nao e "valor != 0" - Ativo/
+  // Passivo/PL guardam SALDO FINAL do ano (precisa comparar com o ano
+  // anterior pra saber se algo mudou); Receita/Despesa ja guardam o
+  // MOVIMENTO LIQUIDO do proprio ano (valor != 0 ja e a resposta certa,
+  // comparar com o ano anterior geraria falso negativo).
+  const ehTipoSaldo = (tipo: string) => tipo === 'ASSET' || tipo === 'LIABILITY' || tipo === 'EQUITY';
+
+  const temMovimento = (tipo: string, valores: Record<string, number | null | undefined>, anos: number[]) => {
+    if (ehTipoSaldo(tipo)) {
+      for (let i = 1; i < anos.length; i++) {
+        const atual = valores[anos[i]] ?? 0;
+        const anterior = valores[anos[i - 1]] ?? 0;
+        if (atual !== anterior) return true;
+      }
+      return false;
+    }
+    return Object.values(valores).some((v) => v !== null && v !== undefined && v !== 0);
+  };
+
+  const linhasFiltradas = data?.linhas
+    .filter((l) => {
+      if (!busca) return true;
+      const q = busca.toUpperCase();
+      return (
+        l.targetCode.includes(q) ||
+        l.targetName.toUpperCase().includes(q) ||
+        l.origens.some((o) => o.sourceCode.includes(q) || o.sourceName.toUpperCase().includes(q))
+      );
+    })
+    .map((l) => {
+      if (!apenasMovimentacao) return l;
+      return {
+        ...l,
+        origens: l.origens.filter((o) => temMovimento(l.targetType, o.valoresPorAno, data?.anos ?? [])),
+      };
+    })
+    .filter((l) => !apenasMovimentacao || temMovimento(l.targetType, l.valoresPorAno, data?.anos ?? []));
 
   return (
     <div style={{ padding: 24 }}>
       <div style={{ marginBottom: 4, fontSize: 12, color: '#9CA3AF' }}>
-        Contabilidade / Relat\u00f3rios
+        Contabilidade / Relatórios
       </div>
       <h1 style={{ fontSize: 20, fontWeight: 600, marginBottom: 4 }}>Tabela Comparativa ECD x Matriz</h1>
       <div style={{ fontSize: 13, color: '#6B7280', marginBottom: 20 }}>
         Para cada conta da matriz, mostra as contas ECD de origem de cada ano lado a lado -
-        identifica renumera\u00e7\u00e3o de conta entre anos.
+        identifica renumeração de conta entre anos.
       </div>
 
       <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', marginBottom: 20, flexWrap: 'wrap' }}>
@@ -121,10 +154,18 @@ export const TabelaComparativaPage: React.FC = () => {
             type="text"
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
-            placeholder="C\u00f3digo ou nome..."
+            placeholder="Código ou nome..."
             style={{ width: '100%', padding: '7px 10px', border: '1px solid #E5E7EB', borderRadius: 6, fontSize: 13 }}
           />
         </div>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#6B7280', cursor: 'pointer', paddingBottom: 8 }}>
+          <input
+            type="checkbox"
+            checked={apenasMovimentacao}
+            onChange={(e) => setApenasMovimentacao(e.target.checked)}
+          />
+          Exibir apenas movimentações
+        </label>
         <button
           onClick={gerar}
           disabled={loading}
@@ -153,7 +194,7 @@ export const TabelaComparativaPage: React.FC = () => {
       {data && (
         <>
           <div style={{ fontSize: 12, color: '#9CA3AF', marginBottom: 8 }}>
-            {linhasFiltradas?.length ?? 0} conta(s) matriz \u00b7 {data.anos.length} ano(s)
+            {linhasFiltradas?.length ?? 0} conta(s) matriz · {data.anos.length} ano(s)
           </div>
           <div style={{ overflowX: 'auto', border: '1px solid #E5E7EB', borderRadius: 8 }}>
             <table style={{ borderCollapse: 'collapse', width: '100%' }}>
@@ -172,7 +213,7 @@ export const TabelaComparativaPage: React.FC = () => {
                   <React.Fragment key={linha.targetCode}>
                     <tr style={{ background: '#F9FAFB' }}>
                       <td style={{ padding: '8px 10px', fontSize: 13, fontWeight: 600, borderBottom: '0.5px solid #F3F4F6', position: 'sticky', left: 0, background: '#F9FAFB' }}>
-                        {linha.targetCode} \u00b7 {linha.targetName}
+                        {linha.targetCode} · {linha.targetName}
                       </td>
                       {data.anos.map((ano) => (
                         <td key={ano} style={{ ...tdNumStyle, fontWeight: 600, background: '#F9FAFB' }}>
@@ -183,7 +224,7 @@ export const TabelaComparativaPage: React.FC = () => {
                     {linha.origens.map((origem) => (
                       <tr key={origem.sourceId}>
                         <td style={{ padding: '5px 10px 5px 28px', fontSize: 12, color: '#6B7280', borderBottom: '0.5px solid #F3F4F6', position: 'sticky', left: 0, background: '#fff' }}>
-                          {origem.sourceCode} \u00b7 {origem.sourceName}
+                          {origem.sourceCode} · {origem.sourceName}
                           {origem.matchType === 'MANUAL' && (
                             <span style={{ marginLeft: 6, fontSize: 9, color: '#B45309', background: '#FEF3C7', padding: '1px 5px', borderRadius: 3 }}>
                               manual
@@ -217,7 +258,7 @@ export const TabelaComparativaPage: React.FC = () => {
 
       {!data && !loading && (
         <div style={{ padding: 40, textAlign: 'center', color: '#9CA3AF', fontSize: 13 }}>
-          Escolha o per\u00edodo e clique em "Gerar Comparativo".
+          Escolha o período e clique em "Gerar Comparativo".
         </div>
       )}
     </div>

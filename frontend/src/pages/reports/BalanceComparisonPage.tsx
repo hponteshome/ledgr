@@ -41,6 +41,7 @@ export const BalanceComparisonPage = () => {
   const [gerado, setGerado] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>('conta');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
+  const [apenasMovimentacao, setApenasMovimentacao] = useState(false);
 
   const loadReport = useCallback(async () => {
     if (!activeCompany?.id) return;
@@ -72,7 +73,16 @@ export const BalanceComparisonPage = () => {
     }
   };
 
-  const sorted = [...data].sort((a, b) => {
+  // NOVO (09/09/2026): "exibir apenas movimentacoes" esconde contas cujo
+  // saldo e zero em TODOS os meses do periodo selecionado - reduz ruido de
+  // contas cadastradas mas sem uso real. Linhas sinteticas ja vem com o
+  // saldo somado dos descendentes, entao o filtro plano funciona sem
+  // precisar de logica de arvore.
+  const dataFiltrada = apenasMovimentacao
+    ? data.filter((row) => periodos.some((p) => (row.saldos?.[p] ?? 0) !== 0))
+    : data;
+
+  const sorted = [...dataFiltrada].sort((a, b) => {
     let valA: string | number;
     let valB: string | number;
     if (sortKey === 'conta') {
@@ -160,6 +170,14 @@ export const BalanceComparisonPage = () => {
             </select>
           </div>
         </div>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#6B7280', cursor: 'pointer', paddingBottom: 8 }}>
+          <input
+            type="checkbox"
+            checked={apenasMovimentacao}
+            onChange={(e) => setApenasMovimentacao(e.target.checked)}
+          />
+          Exibir apenas movimentações
+        </label>
         <button
           onClick={loadReport}
           disabled={loading}

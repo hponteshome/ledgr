@@ -8518,3 +8518,76 @@ para false, ou deixar como estao).
 dois eixos e competia de forma imprevisivel com `overflow-x-auto`.
 Corrigido para eixos explicitos: `overflow-x-auto overflow-y-hidden`.
 Confirmado funcionando pelo usuario.
+
+
+### Sessao 09/09/2026 (continuacao) - Plano de Contas: rolagem, expandir/recolher, impressao formal e exportacao
+
+**Limpeza de dado - reduced_code "000000":** removido (virou NULL) de 123
+contas sinteticas da Hotelsys (Matriz global ja estava limpo). Achado a
+parte: 4 contas ANALITICAS tambem tinham "000000" e codigo de 7 digitos
+(nivel tipicamente sintetico) - zero uso confirmado (journal_entry_items
+E account_balances), reduced_code limpo tambem nelas a pedido do usuario;
+decisao sobre reestruturar is_analytic/nivel fica em aberto, nao decidida.
+
+**Investigacao de mojibake descartada:** nomes aparentemente corrompidos
+no CSV exportado (Equivalência, Domínios, Veículos) eram artefato do
+redirecionamento `>` do PowerShell sobre `docker exec`, nao dado real -
+confirmado via SELECT direto (Hotelsys e Matriz, nada alterado). Regra 14
+ja registrada em sessao anterior sobre isso.
+
+**AccountTree.tsx (arvore do Plano de Contas):**
+- Corrigido bug de CSS: classes Tailwind conflitantes na mesma div
+  ("overflow-hidden overflow-x-auto") impediam rolagem horizontal
+  confiavel - trocado por eixos explicitos (overflow-x-auto overflow-y-hidden).
+- Adicionado mecanismo de expandir/recolher TODAS as contas de uma vez -
+  prop expandSignal (contador) + expandTarget (bool), propagados
+  recursivamente via useEffect em cada TreeRow, sem remontar a arvore.
+- Coluna "Cod. Red." com destaque: fonte 50% maior (10px->15px), negrito,
+  fundo azul mais forte.
+
+**AccountsPage.tsx (tela Plano de Contas):**
+- Botoes "Expandir tudo" / "Recolher tudo" adicionados ao lado de
+  "Importar Matriz".
+- ReportToolbar (componente ja existente, usado no Diario/Razao)
+  integrada - period tratado como data unica (dateFrom=dateTo=referenceDate),
+  botao "Filtros" abre o modal "Alterar Plano" ja existente.
+- exportCSV(): achata a arvore inteira em CSV separador "|" (Regra 12),
+  inclui nivel/tipo/reduced_code/saldos - baixa direto do navegador.
+- Impressao formal via helper compartilhado imprimirRelatorio.ts (ja
+  existente, usado no Diario/Razao) - tabela limpa sem icone/badge de tela,
+  cabecalho com razao social/CNPJ/data/hora, colgroup com larguras
+  proporcionais (Descricao mais larga, Tipo/Cod.Red. mais estreitas),
+  espacamento maximo 0.5cm entre colunas. Conectado tanto ao botao
+  "Imprimir" da ReportToolbar quanto ao botao flutuante global
+  (usePrintHandler/PrintContext, ja existente).
+
+**imprimirRelatorio.ts (helper compartilhado - afeta tambem Diario/Razao):**
+- Ajuste visual: aba de impressao (antes de abrir o dialogo do navegador)
+  agora simula uma folha A4 (fundo cinza, pagina branca centralizada com
+  sombra, max-width 21cm) tanto na visualizacao crua quanto na
+  pre-visualizacao real de impressao - antes a aba de fundo esticava a
+  tabela pra largura total da janela, destoando da pre-visualizacao.
+  @media print remove o efeito de "folha sobre fundo" na impressao real.
+
+**Erros de protocolo cometidos e corrigidos durante a sessao:** multiplas
+violacoes da Regra 6 (uso de bash_tool para leitura/teste, mesmo que
+so-leitura ou "so pra confirmar") - corrigido a cada aviso do usuario,
+sem excecao daqui em diante nesta sessao.
+
+**Decisao registrada:** bloco 42103 (Despesas Administrativas) NAO sera
+reordenado alfabeticamente - fica como esta, por causa do historico real
+da conta 42103010020 (IPTU, ITR e Incra, 6 anos, R$ 4,3 milhoes). Pendencia
+fechada, nao mais um item em aberto.
+
+**Pendencias que continuam em aberto (nao tratadas nesta sessao):**
+- Botao "Importar Abertura ECD" no JournalPage - identificado como
+  redundante e potencialmente arriscado (referencia fixa "ABERTURA-ECD"
+  sem ano, sem dedupe por valor, sem re-registro idempotente - todas
+  correcoes ja presentes na tela dedicada "Lancamentos de Abertura")
+  - analise pronta, remocao ainda NAO executada.
+- Codigos nativos 41/43/44/45 (potencial colisao futura com Matriz) -
+  so documentado, nao investigado a fundo.
+- 4 contas analiticas da Hotelsys com codigo de 7 digitos - decisao sobre
+  estrutura (is_analytic) em aberto.
+- Rolagem horizontal em outras telas (Tabela Comparativa ECD, Comparativo
+  de Saldos) - so o Plano de Contas foi corrigido nesta sessao.

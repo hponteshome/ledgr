@@ -28,7 +28,9 @@ export function imprimirRelatorio(opts: ImprimirRelatorioOptions): void {
   const cnpj = fmtCnpj(opts.empresaCnpj);
 
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${opts.titulo}</title><style>
-    body { font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #111; margin: 24px; }
+    body { font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #111; margin: 0; background: #78716c; }
+    .pagina { max-width: 21cm; margin: 24px auto; padding: 24px; background: #fff; box-shadow: 0 2px 12px rgba(0,0,0,0.15); box-sizing: border-box; }
+    @media print { body { background: #fff; } .pagina { max-width: none; margin: 0; padding: 12px; box-shadow: none; } }
     .cabecalho { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 16px; }
     .cabecalho .empresa { font-size: 13px; }
     .cabecalho .empresa .nome { font-weight: bold; font-size: 14px; }
@@ -44,7 +46,7 @@ export function imprimirRelatorio(opts: ImprimirRelatorioOptions): void {
     .total { font-weight: bold; background: #f9f9f9; }
     .rodape { margin-top: 30px; font-size: 11px; color: #444; white-space: pre-line; border-top: 1px solid #ccc; padding-top: 12px; }
     @media print { body { margin: 12px; } }
-  </style></head><body>
+  </style></head><body><div class="pagina">
     <div class="cabecalho">
       <div class="empresa">
         <div class="nome">${opts.empresaNome}</div>
@@ -60,6 +62,7 @@ export function imprimirRelatorio(opts: ImprimirRelatorioOptions): void {
     ${opts.periodo ? `<div class="periodo">Período: ${opts.periodo}</div>` : ''}
     ${opts.corpoHtml}
     ${opts.rodapeHtml ? `<div class="rodape">${opts.rodapeHtml}</div>` : ''}
+    </div>
     <script>window.onload = function() { window.print(); };<\/script>
   </body></html>`;
 

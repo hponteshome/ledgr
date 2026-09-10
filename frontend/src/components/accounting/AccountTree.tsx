@@ -1,6 +1,6 @@
 // apps/frontend/src/components/accounting/AccountTree.tsx
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FiChevronRight, FiChevronDown, FiFolder, FiFileText } from 'react-icons/fi';
 
 interface AccountNode {
@@ -26,6 +26,8 @@ interface AccountNode {
 interface AccountTreeProps {
     nodes: AccountNode[];
     renderBalances?: (node: AccountNode) => React.ReactNode;
+    expandSignal?: number;
+    expandTarget?: boolean;
 }
 
 // -- Formatadores -------------------------------------------------------------
@@ -94,9 +96,18 @@ const TreeRow: React.FC<{
     node: AccountNode;
     depth: number;
     renderBalances?: (node: AccountNode) => React.ReactNode;
-}> = ({ node, depth, renderBalances }) => {
+    expandSignal?: number;
+    expandTarget?: boolean;
+}> = ({ node, depth, renderBalances, expandSignal, expandTarget }) => {
     const [isOpen, setIsOpen] = useState((node.level ?? depth + 1) <= 2);
     const hasChildren = !!node.children && node.children.length > 0;
+
+    // NOVO: expandir/recolher tudo - sinal externo (contador que muda a
+    // cada clique no botao da tela) forca todas as linhas com filhos a
+    // abrir ou fechar de uma vez, sem depender de remontar a arvore.
+    useEffect(() => {
+        if (expandSignal !== undefined && hasChildren) setIsOpen(!!expandTarget);
+    }, [expandSignal]);
     const isAnalytic = node.isAnalytic ?? node.isAnalytical ?? false;
     const isSynthetic = !isAnalytic;
     const label = node.name || node.description || '';
@@ -141,7 +152,7 @@ const TreeRow: React.FC<{
                 <td className="text-center px-2"><StatusBadge isActive={node.isActive} /></td>
 
                 <td className="text-center px-2">
-                    <span className="font-mono text-[10px] text-slate-500 bg-blue-50 border border-blue-100 px-1 rounded inline-block">
+                    <span className="font-mono font-bold text-[15px] text-blue-800 bg-blue-100 border border-blue-300 px-1.5 py-0.5 rounded inline-block">
                         {node.reducedCode || ''}
                     </span>
                 </td>
@@ -167,7 +178,7 @@ const TreeRow: React.FC<{
             </tr>
 
             {hasChildren && isOpen && node.children!.map(child => (
-                <TreeRow key={child.id} node={child} depth={depth + 1} renderBalances={renderBalances} />
+                <TreeRow key={child.id} node={child} depth={depth + 1} renderBalances={renderBalances} expandSignal={expandSignal} expandTarget={expandTarget} />
             ))}
         </>
     );
@@ -175,7 +186,7 @@ const TreeRow: React.FC<{
 
 // -- Componente principal -------------------------------------------------------
 
-export const AccountTree: React.FC<AccountTreeProps> = ({ nodes, renderBalances }) => {
+export const AccountTree: React.FC<AccountTreeProps> = ({ nodes, renderBalances, expandSignal, expandTarget }) => {
     return (
         <div className="rounded-lg overflow-x-auto overflow-y-hidden">
             <table className="w-full table-fixed border-collapse text-sm">
@@ -207,7 +218,7 @@ export const AccountTree: React.FC<AccountTreeProps> = ({ nodes, renderBalances 
                 </thead>
                 <tbody>
                     {nodes.map(node => (
-                        <TreeRow key={node.id} node={node} depth={0} renderBalances={renderBalances} />
+                        <TreeRow key={node.id} node={node} depth={0} renderBalances={renderBalances} expandSignal={expandSignal} expandTarget={expandTarget} />
                     ))}
                 </tbody>
             </table>

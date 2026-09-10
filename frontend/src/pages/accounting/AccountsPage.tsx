@@ -8,6 +8,9 @@ import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { useCompany } from '../../contexts/CompanyContext';
 import { Calendar, Edit } from 'lucide-react';
 import { AccountTree } from '../../components/accounting/AccountTree';
+import { ReportToolbar } from '../../components/accounting/ReportToolbar';
+import { imprimirRelatorio } from '../../utils/imprimirRelatorio';
+import { usePrintHandler } from '../../contexts/PrintContext';
 import { AccountMaintenanceModal } from './AccountMaintenanceModal';
 import { MatrizImportModal } from './MatrizImportModal';
 
@@ -43,6 +46,10 @@ export default function AccountsPage() {
 
     const [showMatrizModal, setShowMatrizModal] = useState(false);
     const [showLotdModal, setShowLotdModal] = useState(false);
+    // NOVO: sinal de expandir/recolher tudo - contador que muda a cada
+    // clique, repassado ao AccountTree via prop (nao remonta a arvore).
+    const [expandSignal, setExpandSignal] = useState(0);
+    const [expandTarget, setExpandTarget] = useState(true);
     const [referenceDate, setReferenceDate] = useState(
         new Date().toISOString().split('T')[0]
     );
@@ -69,6 +76,97 @@ export default function AccountsPage() {
             nodes.reduce((acc, node) => acc + 1 + (node.children ? count(node.children) : 0), 0);
         return count(treeData);
     }, [treeData]);
+
+    // NOVO: exporta o Plano de Contas em CSV - separador "|" (Regra 12,
+    // evita conflito com decimal pt-BR). Achata a arvore inteira mantendo
+    // o nivel para permitir reconstruir a indentacao se necessario.
+    const exportCSV = () => {
+        const linhas: string[] = ['Codigo|Descricao|Nivel|Tipo|Analitica|Cod.Reduzido|Saldo Calculado|Saldo ECD|Diferenca'];
+        const walk = (nodes: Account[]) => {
+            for (const n of nodes) {
+                linhas.push([
+                    n.code,
+                    n.name,
+                    String(n.level),
+                    n.type,
+                    n.isAnalytic ? 'Sim' : 'Nao',
+                    n.reducedCode || '',
+                    n.calculatedBalance.toFixed(2).replace('.', ','),
+                    n.ecdBalance !== null ? n.ecdBalance.toFixed(2).replace('.', ',') : '',
+                    n.difference !== null ? n.difference.toFixed(2).replace('.', ',') : '',
+                ].join('|'));
+                if (n.children) walk(n.children);
+            }
+        };
+        walk(treeData);
+        const csvContent = '\uFEFF' + linhas.join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', `Plano_de_Contas_${activeCompany?.tradeName || 'Relatorio'}.csv`);
+        link.click();
+        URL.revokeObjectURL(url);
+    };
+
+    // NOVO: impressao formal via helper compartilhado (imprimirRelatorio) -
+    // tabela limpa, sem icone/badge de tela, so texto e numero. Achata a
+    // arvore com indentacao por nivel (espacos non-breaking).
+    const TYPE_LABEL: Record<string, string> = {
+        ASSET: 'Ativo', LIABILITY: 'Passivo', EQUITY: 'PL', REVENUE: 'Receita', EXPENSE: 'Despesa',
+    };
+    const fmtMoeda = (v: number | null) =>
+        v === null ? '-' : v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    const montarLinhasImpressao = (nodes: Account[]): string => {
+        let html = '';
+        for (const n of nodes) {
+            const indent = '&nbsp;&nbsp;'.repeat(Math.max(0, n.level - 1));
+            html += `<tr${n.isAnalytic ? '' : ' class="total"'}>
+                <td>${indent}${n.code}</td>
+                <td>${n.name}</td>
+                <td>${TYPE_LABEL[n.type] || n.type}</td>
+                <td>${n.reducedCode || ''}</td>
+                <td class="num">${fmtMoeda(n.calculatedBalance)}</td>
+                <td class="num">${fmtMoeda(n.ecdBalance)}</td>
+                <td class="num">${n.difference !== null ? fmtMoeda(n.difference) : 'check'}</td>
+            </tr>`;
+            if (n.children) html += montarLinhasImpressao(n.children);
+        }
+        return html;
+    };
+
+    const handleImprimir = () => {
+        const corpoHtml = `<table style="table-layout: fixed;">
+            <colgroup>
+                <col style="width: 13%">
+                <col style="width: 32%">
+                <col style="width: 8%">
+                <col style="width: 8%">
+                <col style="width: 13%">
+                <col style="width: 13%">
+                <col style="width: 13%">
+            </colgroup>
+            <thead><tr>
+                <th>Código</th><th>Descrição</th><th>Tipo</th><th>Cód. Red.</th>
+                <th class="num">Saldo Calculado</th><th class="num">Saldo ECD</th><th class="num">Diferença</th>
+            </tr></thead>
+            <tbody>${montarLinhasImpressao(treeData)}</tbody>
+        </table>
+        <style>
+            table td, table th { padding: 3px 6px !important; max-width: 0.5cm; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+            table td:nth-child(2), table th:nth-child(2) { max-width: none; white-space: normal; }
+        </style>`;
+        imprimirRelatorio({
+            titulo: 'Plano de Contas',
+            empresaNome: activeCompany?.legalName || activeCompany?.tradeName || '',
+            empresaCnpj: activeCompany?.taxId || '',
+            periodo: `Saldos em ${new Date(referenceDate).toLocaleDateString('pt-BR')}`,
+            corpoHtml,
+        });
+    };
+
+    usePrintHandler(treeData.length > 0 ? handleImprimir : null, 'Imprimir Plano de Contas', [treeData, referenceDate]);
 
     if (loading && treeData.length === 0) {
         return (
@@ -103,6 +201,20 @@ export default function AccountsPage() {
                             >
                                 <span>Importar Matriz</span>
                             </button>
+                            <button
+                                onClick={() => { setExpandTarget(true); setExpandSignal(s => s + 1); }}
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 bg-slate-50 hover:bg-slate-100 rounded-full transition-colors border border-slate-200"
+                                title="Expandir todas as contas"
+                            >
+                                <span>Expandir tudo</span>
+                            </button>
+                            <button
+                                onClick={() => { setExpandTarget(false); setExpandSignal(s => s + 1); }}
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 bg-slate-50 hover:bg-slate-100 rounded-full transition-colors border border-slate-200"
+                                title="Recolher todas as contas"
+                            >
+                                <span>Recolher tudo</span>
+                            </button>
                         </div>
                         <p className="text-slate-500 text-sm">
                             {activeCompany
@@ -127,6 +239,20 @@ export default function AccountsPage() {
                 </div>
             </header>
 
+            <ReportToolbar
+                title="Plano de Contas"
+                dateFrom={referenceDate}
+                dateTo={referenceDate}
+                onPeriodChange={(_from, to) => setReferenceDate(to)}
+                count={totalAccounts}
+                countLabel="contas"
+                onFilter={() => setShowMaintenanceModal(true)}
+                filterLabel="Alterar Plano"
+                onPrint={handleImprimir}
+                onExportCSV={exportCSV}
+                hasData={treeData.length > 0}
+            />
+
             <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
                 <div className="flex items-center gap-6 px-4 py-2 bg-slate-50/50 border-b border-slate-100 text-[10px] text-slate-400">
                     <span>✓ = sem divergência</span>
@@ -136,7 +262,7 @@ export default function AccountsPage() {
 
                 <div className="p-2">
                     {treeData.length > 0 ? (
-                        <AccountTree nodes={treeData} />
+                        <AccountTree nodes={treeData} expandSignal={expandSignal} expandTarget={expandTarget} />
                     ) : (
                         <div className="py-20 text-center text-slate-400">
                             <p>Nenhuma conta encontrada até {new Date(referenceDate).toLocaleDateString('pt-BR')}.</p>
