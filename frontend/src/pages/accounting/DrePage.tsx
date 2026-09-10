@@ -35,7 +35,11 @@ const DrePage: React.FC = () => {
         setLoading(true); setError(''); setGenerated(false);
         try {
             const r = await api.get('/accounting/trial-balance/verification', {
-                params: { startDate: from, endDate: to },
+                // NOVO (02/09/2026): DRE precisa do movimento BRUTO do periodo,
+                // sem o lancamento de encerramento (que sempre credita cada
+                // conta de Resultado pelo exato valor debitado - zerava o DRE
+                // de qualquer periodo fechado quando calculado por saldo liquido).
+                params: { startDate: from, endDate: to, excludeClosing: true },
             });
             setData(r.data?.balances ?? []);
             setGenerated(true);
@@ -45,7 +49,13 @@ const DrePage: React.FC = () => {
 
     const receitas = data.filter(i => i.account.type === 'REVENUE' && !i.account.code.startsWith('49'));
     const despesas = data.filter(i => i.account.type === 'EXPENSE' && !i.account.code.startsWith('49'));
-    const val = (item: DREItem) => item.account.nature === 'CREDIT' ? Math.abs(item.currentBalance) : -Math.abs(item.currentBalance);
+    // CORRIGIDO 02/09/2026: DRE deve refletir MOVIMENTO BRUTO do periodo
+    // (excluindo o encerramento via excludeClosing=true na chamada acima),
+    // nao saldo liquido (currentBalance) - encerramento sempre credita cada
+    // conta de Resultado pelo exato valor debitado no periodo, entao usar
+    // currentBalance zerava qualquer DRE de periodo fechado. Mesmo criterio
+    // ja usado pelo ecd-exporter.service.ts (I355/J150), agora replicado aqui.
+    const val = (item: DREItem) => item.account.nature === 'CREDIT' ? (item.credits - item.debits) : (item.debits - item.credits);
     const valTotal = (items: DREItem[]) => items.filter(i => i.account.level === 1).reduce((s, i) => s + val(i), 0);
     const totalReceitas = valTotal(receitas);
     const totalDespesas = valTotal(despesas);

@@ -65,6 +65,13 @@ export class TrialBalanceController {
     @Req() req: any,
     @Query('startDate') startDate: string,
     @Query('endDate')   endDate: string,
+    // NOVO (02/09/2026): quando 'true', exclui os itens do lancamento de
+    // encerramento (isClosingEntry=true) do calculo de debitos/creditos do
+    // periodo - usado pelo DRE, que precisa do movimento BRUTO real, nao do
+    // saldo liquido (que sempre zera quando o encerramento cai na janela).
+    // Default false preserva o comportamento atual do Balancete de
+    // Verificacao (inclui encerramento, como sempre foi).
+    @Query('excludeClosing') excludeClosing?: string,
   ) {
     const companyId = req.headers['x-company-id'];
     if (!companyId)  throw new BadRequestException('Company ID não fornecido');
@@ -78,6 +85,6 @@ export class TrialBalanceController {
     if (isNaN(end.getTime()))   throw new BadRequestException('endDate inválida');
     if (start > end)            throw new BadRequestException('startDate deve ser anterior a endDate');
 
-    return this.trialBalanceService.getVerificationBalance(companyId, start, end);
+    return this.trialBalanceService.getVerificationBalance(companyId, start, end, excludeClosing === 'true');
   }
 }

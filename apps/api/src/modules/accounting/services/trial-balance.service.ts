@@ -54,6 +54,9 @@ select: {
     companyId: string,
     from: Date,
     to: Date,
+    // NOVO (02/09/2026): quando true, exclui itens de journal_entries com
+    // isClosingEntry=true - usado pelo DRE (ver trial-balance.controller.ts).
+    excludeClosing: boolean = false,
   ): Promise<Map<string, { debits: number; credits: number }>> {
 
     const items = await this.prisma.journalEntryItem.findMany({
@@ -62,6 +65,7 @@ select: {
           companyId,
           date     : { gte: from, lte: to },
           deletedAt: null,
+          ...(excludeClosing ? { isClosingEntry: false } : {}),
         },
       },
       select: {
@@ -196,7 +200,7 @@ select: {
   //   - Créditos       : créditos do período
   //   - Saldo Final    : saldo anterior + débitos - créditos do período
   // ═══════════════════════════════════════════════════════════════════════════
-  async getVerificationBalance(companyId: string, startDate: Date, endDate: Date) {
+  async getVerificationBalance(companyId: string, startDate: Date, endDate: Date, excludeClosing: boolean = false) {
     const start       = this.toUTCStart(startDate);
     const end         = this.toUTCEnd(endDate);
     const beginning   = new Date(Date.UTC(1900, 0, 1));
@@ -204,11 +208,11 @@ select: {
     const accounts    = await this.getAccounts(companyId);
 
     // Movimentos reais antes do periodo (lancamentos historicos)
-    const prevMap = await this.getMovements(companyId, beginning, beforeStart);
+    const prevMap = await this.getMovements(companyId, beginning, beforeStart, excludeClosing);
     this.rollUp(accounts, prevMap);
 
     // Movimentos do periodo
-    const periodMap = await this.getMovements(companyId, start, end);
+    const periodMap = await this.getMovements(companyId, start, end, excludeClosing);
     this.rollUp(accounts, periodMap);
 
     // CORRIGIDO 28/08/2026: removido o fallback para account_balances (I155
