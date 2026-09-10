@@ -91,7 +91,12 @@ export const Layout: React.FC = () => {
           </div>
         )}
 
-        <main className="flex-1 overflow-y-auto" style={{ marginTop: !user ? 104 : 64 }}>
+        {/* CORRIGIDO (10/09/2026): overflow-x-auto explicito, nao depende mais da
+    regra implicita do CSS (overflow-y != visible forca overflow-x a virar
+    auto tambem) - fragil e nao obvio pra quem le o codigo. Estabelece aqui,
+    uma vez so, o padrao de rolagem horizontal disponivel pra qualquer tela
+    (Outlet) cujo conteudo seja mais largo que os 1600px do container. */}
+        <main className="flex-1 overflow-y-auto overflow-x-auto" style={{ marginTop: !user ? 104 : 64 }}>
           <div className="h-full w-full p-6 lg:p-10">
             <div className="max-w-[1600px] mx-auto">
               <Breadcrumbs />

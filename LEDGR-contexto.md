@@ -8591,3 +8591,23 @@ fechada, nao mais um item em aberto.
   estrutura (is_analytic) em aberto.
 - Rolagem horizontal em outras telas (Tabela Comparativa ECD, Comparativo
   de Saldos) - so o Plano de Contas foi corrigido nesta sessao.
+
+
+### Sessao 10/09/2026 - Rolagem horizontal resolvida na raiz (Layout.tsx)
+
+Apos corrigir rolagem horizontal pontualmente no Plano de Contas (sessao
+anterior, AccountTree.tsx), restava a mesma pendencia potencial em
+"Tabela Comparativa ECD" e "Comparativo de Saldos". Investigacao revelou
+que os containers internos dessas duas telas ja tinham overflow-x/overflow
+corretos - o que faltava era no nivel do Layout.tsx (componente raiz que
+envolve todas as paginas via <Outlet />): o <main> so declarava
+overflow-y-auto explicitamente, dependendo de uma regra implicita da spec
+do CSS (overflow-y != visible forca overflow-x a virar auto tambem) para
+que a rolagem horizontal funcionasse nas paginas filhas - fragil e nao
+obvio.
+
+Corrigido tornando explicito: <main className="flex-1 overflow-y-auto
+overflow-x-auto">. Resolve de raiz para qualquer tela atual ou futura
+cujo conteudo seja mais largo que os 1600px do container central,
+sem precisar de correcao pontual por tela dai em diante. Confirmado
+funcionando pelo usuario nas duas telas pendentes.
