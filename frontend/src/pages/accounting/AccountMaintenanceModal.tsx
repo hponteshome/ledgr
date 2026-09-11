@@ -38,6 +38,7 @@ interface Account {
   isActive: boolean;
   hasChildren?: boolean;
   childCount?: number;
+  reducedCode?: string | null;
   spedCode?: string | null;
   ifrsCode?: string | null;
   usgaapCode?: string | null;
@@ -87,12 +88,12 @@ const DEDUTIBILIDADE_OPTIONS = [
 
 const emptyCreate = {
   code: '', name: '', type: 'REVENUE', nature: 'CREDIT',
-  isAnalytic: false, parentId: '',
+  isAnalytic: false, parentId: '', reducedCode: '',
   spedCode: '', ifrsCode: '', usgaapCode: '', eSocialCode: '',
 };
 
 const emptyEdit = {
-  name: '', isAnalytic: false, spedCode: '', ifrsCode: '', usgaapCode: '', eSocialCode: '',
+  name: '', isAnalytic: false, spedCode: '', reducedCode: '', ifrsCode: '', usgaapCode: '', eSocialCode: '',
   dedutibilidade: 'DEDUTIVEL', percDeducao: '100', lalurTipoAjuste: '', lalurDescricao: '',
 };
 
@@ -216,6 +217,157 @@ export const AccountMaintenanceModal: React.FC<AccountMaintenanceModalProps> = (
       .slice(0, 50);
   }, [syntheticAccounts, parentQuery]);
 
+  // NOVO: "vizinhanca" de codigo reduzido - contas do mesmo grupo (mesmo
+  // prefixo de code da conta pai escolhida; sem pai, usa so a classe = 1o
+  // digito do code digitado) com reducedCode preenchido. Ajuda o usuario a
+  // ver a sequencia ja em uso e escolher o proximo numero de forma
+  // estruturalmente coerente, em vez de digitar as cegas.
+  const selectedParentAccount = useMemo(
+    () => accounts.find(a => a.id === createForm.parentId) ?? null,
+    [accounts, createForm.parentId],
+  );
+
+  const neighborAccounts = useMemo(() => {
+    if (selectedParentAccount) {
+      return accounts.filter(a =>
+        a.code.startsWith(selectedParentAccount.code) &&
+        a.code !== selectedParentAccount.code &&
+        a.reducedCode,
+      );
+    }
+    const classe = createForm.code.trim()[0];
+    if (!classe) return [];
+    return accounts.filter(a => a.code.startsWith(classe) && a.reducedCode);
+  }, [accounts, selectedParentAccount, createForm.code]);
+
+  const neighborReducedCodes = useMemo(() => {
+    return neighborAccounts
+      .map(a => ({ code: a.code, name: a.name, reducedCode: a.reducedCode as string, num: parseInt((a.reducedCode || '').replace(/^0+/, '') || '0', 10) }))
+      .filter(x => !isNaN(x.num) && x.num > 0)
+      .sort((a, b) => a.num - b.num);
+  }, [neighborAccounts]);
+
+  // NOVO: mapa de lacunas na numeracao da CLASSE inteira (1o digito do
+  // codigo), nao so do grupo pai - mostra de onde veio a ultima conta usada,
+  // o vazio imediatamente anterior a ela, e os 2 proximos vazios adiante.
+  const classeDigit = (selectedParentAccount?.code || createForm.code).trim()[0];
+
+  // CORRIGIDO: exclui 8888 (excecao fixa da conta "Apuracao de Resultado",
+  // documentada e permanente - nunca faz parte da sequencia normal da
+  // classe, distorcia o mapa de lacunas inteiro).
+  const RESERVED_CODES = new Set([8888]);
+
+  const classeUsedNums = useMemo(() => {
+    if (!classeDigit) return [];
+    const nums = accounts
+      .filter(a => a.reducedCode && a.code.startsWith(classeDigit))
+      .map(a => parseInt((a.reducedCode || '').replace(/^0+/, '') || '0', 10))
+      .filter(n => n > 0 && !RESERVED_CODES.has(n));
+    return Array.from(new Set(nums)).sort((a, b) => a - b);
+  }, [accounts, classeDigit]);
+
+  const lastUsedNum = classeUsedNums.length ? classeUsedNums[classeUsedNums.length - 1] : null;
+
+  // Teto natural da classe (ex: classe 2 vai ate 2999, classe 4 ate 4999).
+  const classeCeiling = classeDigit ? parseInt(classeDigit, 10) * 1000 + 999 : null;
+
+  const classeGaps = useMemo(() => {
+    const gaps: { start: number; end: number }[] = [];
+    for (let i = 1; i < classeUsedNums.length; i++) {
+      const prev = classeUsedNums[i - 1], curr = classeUsedNums[i];
+      if (curr - prev > 1) gaps.push({ start: prev + 1, end: curr - 1 });
+    }
+    if (classeUsedNums.length > 0 && classeCeiling !== null) {
+      const last = classeUsedNums[classeUsedNums.length - 1];
+      if (last < classeCeiling) gaps.push({ start: last + 1, end: classeCeiling });
+    }
+    return gaps;
+  }, [classeUsedNums, classeCeiling]);
+
+  const gapBeforeLast = useMemo(() => {
+    if (classeUsedNums.length < 2) return null;
+    const idx = classeUsedNums.length - 1;
+    const prev = classeUsedNums[idx - 1], curr = classeUsedNums[idx];
+    return curr - prev > 1 ? { start: prev + 1, end: curr - 1 } : null;
+  }, [classeUsedNums]);
+
+  const gapsAfterLast = useMemo(() => {
+    if (lastUsedNum === null) return [];
+    return classeGaps.filter(g => g.start > lastUsedNum).slice(0, 2);
+  }, [classeGaps, lastUsedNum]);
+
+  // CORRIGIDO: "proximo livre" agora sempre calculado pela CLASSE inteira
+  // (nao mais pelo grupo pai). Movido pra depois das const acima (bug de
+  // ordem de declaracao - usava classeDigit/gapsAfterLast antes de existirem).
+  // CORRIGIDO: reduced_code nao segue sequencia unica pra classe inteira -
+  // segue BLOCOS DE 100 por grupo principal (21xx=Passivo Circulante,
+  // 23xx=Exigivel LP, 24xx=PL, etc - convencao ja definida quando o usuario
+  // reatribuiu os codigos manualmente nesta sessao). "Proximo livre" precisa
+  // continuar o bloco do GRUPO PAI (maior numero usado nas contas irmas do
+  // mesmo grupo, +1), nao pular pro fim da classe nem pra bloco reservado
+  // de outro grupo.
+  // CORRIGIDO (dado real confirmado pelo usuario): o bloco de numeracao NAO
+  // e por grupo de 5 digitos (22101) - grupos-irmaos de 5 digitos sob o
+  // MESMO prefixo de 2 digitos (22101, 22102, 22501, todos sob "22")
+  // compartilham uma sequencia CONTINUA sem vazio entre eles (2301..2315).
+  // O vazio de verdade so aparece na fronteira do prefixo de 2 digitos
+  // (21->22 tem vazio 2154-2299; 22->23 tem vazio 2316-2400). Escopo correto
+  // = 2 primeiros digitos do code do pai, nao 5.
+  const grupoPaiPrefix = useMemo(() => {
+    if (!selectedParentAccount) return null;
+    return selectedParentAccount.code.slice(0, 2);
+  }, [selectedParentAccount]);
+
+  const grupoUsedNums = useMemo(() => {
+    if (!grupoPaiPrefix) return [];
+    const nums = accounts
+      .filter(a => a.reducedCode && a.code.startsWith(grupoPaiPrefix))
+      .map(a => parseInt((a.reducedCode || '').replace(/^0+/, '') || '0', 10))
+      .filter(n => n > 0 && !RESERVED_CODES.has(n));
+    return Array.from(new Set(nums)).sort((a, b) => a - b);
+  }, [accounts, grupoPaiPrefix]);
+
+  const grupoLastUsedNum = grupoUsedNums.length ? grupoUsedNums[grupoUsedNums.length - 1] : null;
+
+  // Teto do bloco do grupo pai: o proximo numero usado na CLASSE inteira que
+  // fica acima do maior numero do grupo pai, menos 1 (fronteira real do
+  // proximo grupo-irmao de 2 digitos); se nao houver nenhum acima, usa o
+  // teto da classe inteira.
+  const grupoBlockCeiling = useMemo(() => {
+    if (grupoLastUsedNum === null) return classeCeiling;
+    const next = classeUsedNums.find(n => n > grupoLastUsedNum);
+    return next !== undefined ? next - 1 : classeCeiling;
+  }, [grupoLastUsedNum, classeUsedNums, classeCeiling]);
+
+  const grupoGapAfterLast = useMemo(() => {
+    if (grupoLastUsedNum === null || grupoBlockCeiling === null) return null;
+    return grupoLastUsedNum < grupoBlockCeiling
+      ? { start: grupoLastUsedNum + 1, end: grupoBlockCeiling }
+      : null;
+  }, [grupoLastUsedNum, grupoBlockCeiling]);
+
+  // Nome + numero da ultima conta EXIBIDOS SEMPRE JUNTOS, do mesmo escopo
+  // (grupo pai se houver, senao classe inteira) - corrige inconsistencia
+  // anterior onde o numero vinha de um calculo e o nome de outro.
+  const escopoLastUsedNum = grupoPaiPrefix ? grupoLastUsedNum : lastUsedNum;
+  const nomeUltimaConta = useMemo(() => {
+    if (escopoLastUsedNum === null) return null;
+    const padded4 = String(escopoLastUsedNum).padStart(4, '0');
+    const found = accounts.find(a => a.reducedCode &&
+      (a.reducedCode.replace(/^0+/, '') === String(escopoLastUsedNum) || a.reducedCode === padded4));
+    return found?.name ?? null;
+  }, [accounts, escopoLastUsedNum]);
+
+  const suggestedReducedCode = useMemo(() => {
+    if (grupoPaiPrefix) {
+      if (grupoLastUsedNum !== null) return String(grupoLastUsedNum + 1);
+      if (grupoBlockCeiling !== null) return String((grupoBlockCeiling - 99));
+    }
+    if (gapsAfterLast.length > 0) return String(gapsAfterLast[0].start);
+    if (lastUsedNum === null && classeDigit) return String(parseInt(classeDigit, 10) * 1000 + 1);
+    return null;
+  }, [grupoPaiPrefix, grupoLastUsedNum, grupoBlockCeiling, gapsAfterLast, lastUsedNum, classeDigit]);
+
   // ── Seleção ───────────────────────────────────────────────────────────────
 
   const toggleSelectAll = () => setSelectedAccounts(
@@ -316,7 +468,7 @@ export const AccountMaintenanceModal: React.FC<AccountMaintenanceModalProps> = (
     setEditingAccount(a);
     setEditForm({
       name: a.name, isAnalytic: a.isAnalytic,
-      spedCode: a.spedCode || '', ifrsCode: a.ifrsCode || '',
+      spedCode: a.spedCode || '', reducedCode: a.reducedCode || '', ifrsCode: a.ifrsCode || '',
       usgaapCode: a.usgaapCode || '', eSocialCode: a.eSocialCode || '',
       dedutibilidade: a.dedutibilidade || 'DEDUTIVEL',
       percDeducao: a.percDeducao != null ? String(a.percDeducao) : '100',
@@ -341,6 +493,7 @@ export const AccountMaintenanceModal: React.FC<AccountMaintenanceModalProps> = (
         name: editForm.name.trim(),
         isAnalytic: editForm.isAnalytic,
         spedCode: editForm.spedCode || undefined,
+        reducedCode: editForm.reducedCode || undefined,
         ifrsCode: editForm.ifrsCode || undefined,
         usgaapCode: editForm.usgaapCode || undefined,
         eSocialCode: editForm.eSocialCode || undefined,
@@ -421,6 +574,7 @@ export const AccountMaintenanceModal: React.FC<AccountMaintenanceModalProps> = (
         isAnalytic: createForm.isAnalytic,
       };
       if (createForm.parentId) payload.parentId = createForm.parentId;
+      if (createForm.reducedCode) payload.reducedCode = createForm.reducedCode;
       if (createForm.spedCode) payload.spedCode = createForm.spedCode;
       if (createForm.ifrsCode) payload.ifrsCode = createForm.ifrsCode;
       if (createForm.usgaapCode) payload.usgaapCode = createForm.usgaapCode;
@@ -722,6 +876,13 @@ export const AccountMaintenanceModal: React.FC<AccountMaintenanceModalProps> = (
                 Conta analítica (recebe lançamentos diretamente)
               </label>
 
+              <div>
+                <Label>Código Reduzido</Label>
+                <input className={inputSt} value={editForm.reducedCode}
+                  onChange={e => setEditForm({ ...editForm, reducedCode: e.target.value })}
+                  placeholder="ex: 1050" />
+              </div>
+
               <div className="rounded-lg border border-blue-100 bg-blue-50/40 p-3">
                 <Label>Conta Referencial (SPED)</Label>
                 <input className={inputSt} value={editForm.spedCode}
@@ -820,13 +981,14 @@ export const AccountMaintenanceModal: React.FC<AccountMaintenanceModalProps> = (
       {/* Modal de Criação */}
       {createMode && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
             <div className="bg-[#111111] text-white px-6 py-4 flex items-center justify-between shrink-0">
               <h3 className="text-sm font-semibold">Nova Conta</h3>
               <button onClick={() => setCreateMode(false)} className="text-gray-300 hover:text-white"><X size={18} /></button>
             </div>
 
-            <div className="p-6 overflow-y-auto space-y-4">
+            <div className="p-6 overflow-y-auto flex gap-6">
+            <div className="flex-1 space-y-4 min-w-0">
               <div>
                 <Label>Conta pai (opcional — deixe em branco para conta raiz)</Label>
                 <input className={inputSt} value={parentQuery}
@@ -863,6 +1025,22 @@ export const AccountMaintenanceModal: React.FC<AccountMaintenanceModalProps> = (
                   <input className={inputSt} value={createForm.name}
                     onChange={e => setCreateForm({ ...createForm, name: e.target.value })} />
                 </div>
+              </div>
+
+              <div className="flex gap-3 items-end">
+                <div className="w-40">
+                  <Label>Código Reduzido</Label>
+                  <input className={inputSt} value={createForm.reducedCode}
+                    onChange={e => setCreateForm({ ...createForm, reducedCode: e.target.value })}
+                    placeholder="ex: 1050" />
+                </div>
+                {suggestedReducedCode && (
+                  <button type="button"
+                    onClick={() => setCreateForm(prev => ({ ...prev, reducedCode: suggestedReducedCode }))}
+                    className="text-xs px-3 py-2 rounded-lg border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors mb-0.5">
+                    Usar sugerido: {suggestedReducedCode}
+                  </button>
+                )}
               </div>
 
               <div className="flex gap-3">
@@ -910,6 +1088,58 @@ export const AccountMaintenanceModal: React.FC<AccountMaintenanceModalProps> = (
                   <AlertTriangle size={14} className="mt-0.5 shrink-0" /> {createError}
                 </div>
               )}
+            </div>
+
+            {/* NOVO: painel de vizinhanca de codigo reduzido - mostra os ja
+                usados no grupo (conta pai escolhida, ou classe pelo 1o digito
+                do codigo) com o proximo numero livre em destaque. */}
+            <div className="w-64 shrink-0 border-l border-gray-100 pl-6">
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+                Códigos Reduzidos — Vizinhança
+              </p>
+              {!classeDigit ? (
+                <p className="text-xs text-gray-400">
+                  Escolha uma conta pai ou digite o código para ver os intervalos de código reduzido disponíveis nessa classe.
+                </p>
+              ) : (
+                <>
+                  {suggestedReducedCode && (
+                    <div className="mb-3 px-3 py-2 rounded-lg bg-green-50 border border-green-200">
+                      <p className="text-[10px] text-green-600 uppercase font-bold tracking-wide">Próximo livre</p>
+                      <p className="text-lg font-bold text-green-700 font-mono">{suggestedReducedCode}</p>
+                    </div>
+                  )}
+
+                  {lastUsedNum !== null && (
+                    <div className="mb-3 text-[11px] text-gray-500">
+                      Última conta anterior: <span className="font-mono font-semibold text-gray-700">{lastUsedNum}</span>
+                      {nomeUltimaConta && <span className="block text-gray-400 mt-0.5">{nomeUltimaConta}</span>}
+                    </div>
+                  )}
+
+                  {gapBeforeLast && (
+                    <div className="mb-3 px-2 py-1.5 rounded bg-amber-50 border border-amber-200 text-[11px] text-amber-700">
+                      Lacuna antes: <span className="font-mono font-semibold">
+                        {gapBeforeLast.start}{gapBeforeLast.end > gapBeforeLast.start ? `…${gapBeforeLast.end}` : ''}
+                      </span>
+                    </div>
+                  )}
+
+                  {gapsAfterLast.length > 0 && (
+                    <div className="space-y-1">
+                      <p className="text-[10px] text-gray-400 mb-1">Próximos intervalos disponíveis:</p>
+                      {gapsAfterLast.map((g, i) => (
+                        <button key={i} type="button"
+                          onClick={() => setCreateForm(prev => ({ ...prev, reducedCode: String(g.start) }))}
+                          className="w-full text-left px-2 py-1.5 rounded bg-blue-50 border border-blue-200 text-[11px] text-blue-700 hover:bg-blue-100 transition-colors font-mono">
+                          {g.start}{g.end > g.start ? `…${g.end}` : ''}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
             </div>
 
             <div className="bg-[#FAFAFA] border-t border-gray-100 px-6 py-3 flex justify-end gap-2 shrink-0">

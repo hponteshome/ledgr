@@ -8611,3 +8611,76 @@ overflow-x-auto">. Resolve de raiz para qualquer tela atual ou futura
 cujo conteudo seja mais largo que os 1600px do container central,
 sem precisar de correcao pontual por tela dai em diante. Confirmado
 funcionando pelo usuario nas duas telas pendentes.
+
+
+### Sessao 10/09/2026 - Sistema de Lotes de Importacao + correcoes no cadastro de contas e importacao manual
+
+**NOVO - Lotes de Importacao (requisito: numero sequencial unico por
+ano+empresa, atribuido automaticamente, deve constar no Diario/Razao):**
+- Model ImportLote (prisma/schema.prisma) + FK JournalEntry.importLoteId.
+  Migracao manual: prisma/migrations-manuais/2026-09-10-import-lotes.sql.
+- journal-manual-import.service.ts: getOrCreateLoteForYear() usa
+  pg_advisory_xact_lock (trava por empresa) numa transacao CURTA e
+  SEPARADA - so protege a criacao do numero do lote, nao os lancamentos
+  em si (regressao corrigida na mesma sessao: embrulhar os 630+
+  lancamentos numa unica transacao interativa estourava o timeout padrao
+  de 5000ms do Prisma, desfazendo tudo silenciosamente).
+- Deteccao de arquivo ja importado (checkDuplicateFile) - exige
+  confirmacao explicita (overrideDuplicate=true) antes de sobrepor
+  (hard delete do lote anterior + seus lancamentos). Sem isso, o usuario
+  clicou 3x em "Confirmar Importacao" sem nenhum aviso e triplicou os
+  lancamentos - limpo via SQL manual apos o achado.
+- Nome do arquivo capturado de verdade no upload (uploadedFileName) -
+  antes sempre gravava "manual-import.txt" (nome fixo do Blob),
+  independente do nome real carregado pelo usuario.
+- ImportLoteService/Controller (novo modulo) - listagem GET
+  /accounting/import-lotes. ImportLotesPage.tsx - tela de listagem,
+  numero do lote clicavel abre o Diario filtrado.
+- journal-entry.service.ts/controller.ts: filtro importLoteId no
+  findAll(). JournalPage.tsx le ?importLoteId=&loteLabel= da URL via
+  useMemo (nao useState+useEffect - useEffect criava uma CORRIDA real
+  entre a busca "normal" e a busca filtrada, ocasionalmente mostrando
+  lancamentos errados quando a busca sem filtro respondia por ultimo).
+- Reconstrucao retroativa (SO Hotelsys, escopo explicito do usuario):
+  11 lotes criados a partir de journal_entries ja existentes (ECD-2018
+  a ECD-2025 + ABERTURA-2018) sem apagar/reimportar nada - so populou
+  ImportLote e linkou import_lote_id. Ano do lote de abertura = 2017
+  (data real do lancamento/saldo encerrado), nao 2018 (ano a que o saldo
+  se refere) - decisao do usuario. Erro cometido e corrigido na mesma
+  sessao: contagem inicial dos lotes retroativos duplicou (contava
+  JOIN com journal_entry_items sem agrupar por lancamento) - corrigido
+  com UPDATE de recalculo usando COUNT(DISTINCT). A LIGACAO (import_lote_id)
+  em si nunca esteve errada, so os totais exibidos.
+
+**Correcoes no cadastro manual de contas (AccountMaintenanceModal +
+chart-of-accounts.service.ts/dto.ts):**
+- create() usava normalizeAccountCode()/getLevelFromCode() (convencao
+  PONTUADA e configuravel por mascara) em vez do padrao real da Matriz
+  (numero bruto, nivel pelo TAMANHO do codigo) - impedia criar contas.
+  Regra confirmada pelo usuario: "tratar sempre numeros brutos, mascara
+  so na visualizacao/digitacao". Corrigido so no create() (bulkImport()
+  e ecd-importer.service.ts ainda usam a funcao antiga, fora do escopo).
+- reducedCode nunca era salvo (faltava na DTO e no payload do
+  create()/update()) - adicionado nos dois.
+- create() nao gravava origin='MATRIZ' - contas novas nasciam com
+  origin NULL, ficando invisiveis pra buscas que dependem desse campo
+  (achado real: import manual nao reconhecia reduced_code de uma conta
+  recem-criada).
+- Painel "Codigos Reduzidos - Vizinhanca" no modal de criacao: mostra
+  ultima conta anterior + proximos intervalos livres, calculado pela
+  CLASSE inteira (1o digito do codigo) e depois por BLOCO do grupo pai
+  (2 primeiros digitos) apos confirmar com dado real que reduced_code
+  segue blocos continuos entre grupos-irmaos de 5 digitos, nao um bloco
+  fixo de 100 por grupo (ex: 22101+22102+22501 compartilham 2301-2315
+  sem vazio entre eles). Exclui 8888 (excecao fixa de Apuracao de
+  Resultado) do calculo.
+
+**Correcao no import manual (colisao code vs reduced_code):**
+- Bug real: codigo nativo ECD curto "2101" (sintetico, ECD_NATIVE) e
+  reduced_code Matriz "2101" (analitico) apontam pra contas DIFERENTES -
+  a resolucao antiga (OR: code/reducedCode sem filtro de origin) as
+  vezes escolhia a errada, gerando aviso falso de "conta sintetica".
+  Corrigido: classifyCodeUsage() detecta se o arquivo usa codigo
+  completo (11 digitos) OU reduzido pela CONTAGEM DE DIGITOS, rejeita
+  arquivo que mistura os dois padroes, e resolveAccountCodes() busca
+  reduced_code SO em origin=MATRIZ (nunca cai no code curto nativo).

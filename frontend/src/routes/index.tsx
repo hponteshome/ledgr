@@ -114,6 +114,7 @@ import { LogotiposPage } from '../pages/documentos/LogotiposPage';
 import { CertificatesPage } from '../pages/certificates/CertificatesPage';
 import AglutinacaoRfbPage from '../pages/sped/AglutinacaoRfbPage';
 import CalculadoraCorrecaoPage from '../pages/sistema/CalculadoraCorrecaoPage';
+import ImportLotesPage from '../pages/accounting/ImportLotesPage';
 
 
 ///////////////////////////////////////
@@ -180,6 +181,7 @@ export const AppRoutes = () => {
                 <Route path="app/accounting/ecd-lancamentos" element={<ProtectedRoute><EcdLancamentosImportPage /></ProtectedRoute>} />
                 <Route path="app/accounting/journal" element={<ProtectedRoute><JournalPage /></ProtectedRoute>} />
                 <Route path="app/accounting/journal/import" element={<ProtectedRoute><ImportJournalPage /></ProtectedRoute>} />
+                <Route path="app/accounting/import-lotes" element={<ProtectedRoute><ImportLotesPage /></ProtectedRoute>} />
                 <Route path="app/reports/balance-comparison" element={<ProtectedRoute><BalanceComparisonPage /></ProtectedRoute>} />
                 <Route path="app/sped/aglutinacao-rfb" element={<ProtectedRoute><AglutinacaoRfbPage /></ProtectedRoute>} />
                 <Route path="app/accounting/validate-ecd" element={<ProtectedRoute><EcdValidationPage /></ProtectedRoute>} />

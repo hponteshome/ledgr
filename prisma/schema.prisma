@@ -319,6 +319,7 @@ model Company {
   pettyCashCategoryAccounts PettyCashCategoryAccount[]
   pettyCashClosures         PettyCashClosure[]
   accountingViews           AccountingView[]
+  importLotes               ImportLote[]
   // -- Dados SPED/ECD ----------------------------------------
   nire                      String?                    @map("nire") @db.VarChar(20)
   codMun                    String?                    @map("cod_mun") @db.VarChar(7)
@@ -1312,8 +1313,14 @@ model JournalEntry {
   // textual (mesmo criterio que esta sendo substituido), 1x, em 23/08/2026.
   isClosingEntry Boolean      @default(false) @map("is_closing_entry")
 
-  company Company            @relation(fields: [companyId], references: [id])
-  items   JournalEntryItem[]
+  // NOVO (10/09/2026): liga o lancamento ao lote de importacao que o
+  // originou (numeracao sequencial unica por ano, exibida no Diario/Razao).
+  // Null para lancamentos avulsos/manuais individuais, fora de um lote.
+  importLoteId String? @map("import_lote_id") @db.Uuid
+
+  company    Company            @relation(fields: [companyId], references: [id])
+  items      JournalEntryItem[]
+  importLote ImportLote?        @relation(fields: [importLoteId], references: [id])
 
   apEntries         ApEntry[]
   pettyCashClosures PettyCashClosure[]
@@ -1327,6 +1334,34 @@ model JournalEntry {
 
   @@index([companyId, date])
   @@map("journal_entries")
+}
+
+// NOVO (10/09/2026): registro de cada EVENTO de importacao (o arquivo
+// inteiro, nao cada lancamento individual) - numero sequencial unico por
+// companyId+ano, atribuido atomicamente. Precisa constar no Livro Diario e
+// no Razao (requisito confirmado pelo usuario) - JournalEntry.importLoteId
+// liga cada lancamento ao lote que o originou, para exibicao/exportacao
+// nesses livros formais.
+model ImportLote {
+  id                    String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId             String    @map("company_id") @db.Uuid
+  ano                   Int       @map("ano")
+  numero                Int       @map("numero")
+  nomeArquivo           String?   @map("nome_arquivo") @db.VarChar(255)
+  tipo                  String    @map("tipo") @db.VarChar(20) // MANUAL | IOB | ECD
+  quantidadeLancamentos Int       @default(0) @map("quantidade_lancamentos")
+  totalDebito           Decimal   @default(0) @map("total_debito") @db.Decimal(15, 2)
+  totalCredito          Decimal   @default(0) @map("total_credito") @db.Decimal(15, 2)
+  createdById           String    @map("created_by_id") @db.Uuid
+  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  deletedAt             DateTime? @map("deleted_at") @db.Timestamp(6)
+
+  company Company        @relation(fields: [companyId], references: [id])
+  entries JournalEntry[]
+
+  @@unique([companyId, ano, numero])
+  @@index([companyId, ano])
+  @@map("import_lotes")
 }
 
 /// Itens de lançamento contábil (partidas individuais débito/crédito).

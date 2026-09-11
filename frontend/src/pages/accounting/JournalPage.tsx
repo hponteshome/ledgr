@@ -5,7 +5,7 @@ import { EncerramentoExercicioModal } from './EncerramentoExercicioModal';
 import { IobLotdImportModal } from './IobLotdImportModal';
 import { JournalManualImportModal } from './JournalManualImportModal';
 import EcdOpeningModal from '../../components/accounting/EcdOpeningModal';
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
     FiSearch, FiTrash2, FiRotateCcw, FiChevronLeft, FiChevronRight,
     FiAlertCircle, FiX, FiLoader, FiCheck, FiLogOut, FiFilter, FiEdit2, FiPlus, FiUploadCloud,
@@ -15,6 +15,7 @@ import api from '../../services/api';
 import { SmartDateInput } from '../../components/SmartDateInput';
 import { useCompany } from '../../contexts/CompanyContext';
 import { toast } from 'react-hot-toast';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 // ── Tipos ──────────────────────────────────────────────────────
 
@@ -284,6 +285,27 @@ const EditModal: React.FC<{ entry: JournalEntry; onClose: () => void; onSaved: (
 const JournalPage: React.FC = () => {
     const { activeCompany } = useCompany();
 
+    // NOVO (10/09/2026): abre o Diario ja filtrado por lote de importacao,
+    // vindo da tela "Lotes de Importacao" (?importLoteId=...&loteLabel=...).
+    // Mesmo padrao ja usado em AccountsPage.tsx (useLocation + URLSearchParams).
+    const location = useLocation();
+    const navigate = useNavigate();
+    // CORRIGIDO (10/09/2026): useState+useEffect criava uma CORRIDA - a
+    // primeira renderizacao ja disparava loadEntries() no modo "normal"
+    // (loteFilter ainda null), e so DEPOIS o efeito lia a URL e setava o
+    // filtro, disparando uma SEGUNDA busca. As duas corriam em paralelo; se
+    // a busca normal (sem filtro) terminasse DEPOIS da filtrada, ela
+    // sobrescrevia o resultado certo com lançamentos errados (ex: ECD-2025
+    // aparecendo no lugar dos 55 lançamentos do lote). useMemo calcula o
+    // filtro de forma SINCRONA na primeira renderizacao - nunca ha uma
+    // janela onde loteFilter esta desatualizado.
+    const loteFilter = useMemo(() => {
+        const params = new URLSearchParams(location.search);
+        const id = params.get('importLoteId');
+        const label = params.get('loteLabel');
+        return id ? { id, label: label || 'Lote' } : null;
+    }, [location.search]);
+
     const [data, setData] = useState<JournalResponse | null>(null);
     const [totals, setTotals] = useState<Totals | null>(null);
     const [loading, setLoading] = useState(false);
@@ -393,10 +415,12 @@ const JournalPage: React.FC = () => {
 
     const loadEntries = useCallback(async () => {
         if (!activeCompany) return;
-        if (!usePeriodo && !currentMonth.valid) return;
+        if (!loteFilter && !usePeriodo && !currentMonth.valid) return;
         setLoading(true);
         try {
-            const params = usePeriodo
+            const params = loteFilter
+                ? { importLoteId: loteFilter.id, page, limit: 1000, orderBy: sortBy, orderDir: sortDir }
+                : usePeriodo
                 ? { dateFrom: periodoFrom, dateTo: periodoTo, search: search || undefined, sources: fSource || undefined, page, limit: 100, orderBy: sortBy, orderDir: sortDir }
                 : showRecent
                 ? { dateTo: fDate, search: search || undefined, sources: fSource || undefined, page, limit: 50, orderBy: sortBy, orderDir: sortDir }
@@ -421,7 +445,7 @@ const JournalPage: React.FC = () => {
             setData({ ...r.data, entries });
         } catch (e) { console.error(e); }
         finally { setLoading(false); }
-    }, [activeCompany, currentMonth.from, currentMonth.valid, search, page, showRecent, fDate, fSource, sortBy, sortDir, usePeriodo, periodoFrom, periodoTo]);
+    }, [activeCompany, currentMonth.from, currentMonth.valid, search, page, showRecent, fDate, fSource, sortBy, sortDir, usePeriodo, periodoFrom, periodoTo, loteFilter]);
 
     const loadTotals = useCallback(async () => {
         if (!activeCompany) return;
@@ -545,6 +569,23 @@ const JournalPage: React.FC = () => {
 
     return (
         <div className="space-y-3 p-4" style={{ background: 'var(--color-background-tertiary)', minHeight: '100vh' }}>
+
+            {/* NOVO (10/09/2026): banner do filtro de lote ativo - vindo da
+                tela "Lotes de Importacao". Botao "Limpar" remove o parametro
+                da URL e volta ao comportamento normal da tela. */}
+            {loteFilter && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#EFF6FF', border: '0.5px solid #93C5FD', borderRadius: 8, padding: '8px 14px' }}>
+                    <span style={{ fontSize: 13, color: '#1D4ED8', fontWeight: 500 }}>
+                        Filtrado por: {loteFilter.label}
+                    </span>
+                    <button
+                        onClick={() => navigate('/app/accounting/journal', { replace: true })}
+                        style={{ fontSize: 12, color: '#6B7280', background: 'transparent', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
+                    >
+                        Limpar filtro
+                    </button>
+                </div>
+            )}
 
             {/* Modais */}
             {showEcdOpening && (

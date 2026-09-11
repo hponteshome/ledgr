@@ -85,6 +85,10 @@ export class CreateAccountDto {
 
   @IsOptional()
   @IsString()
+  reducedCode?: string;
+
+  @IsOptional()
+  @IsString()
   ifrsCode?: string;
 
   @IsOptional()
@@ -110,6 +114,10 @@ export class UpdateAccountDto {
   @IsOptional()
   @IsString()
   spedCode?: string;
+
+  @IsOptional()
+  @IsString()
+  reducedCode?: string;
 
   @IsOptional()
   @IsString()

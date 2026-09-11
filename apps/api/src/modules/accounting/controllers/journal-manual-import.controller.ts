@@ -3,7 +3,7 @@
 // journal-importer.controller.ts existente. Reaproveita bufferToString de la
 // (mesmo helper, sem duplicar).
 
-import { Controller, Post, UploadedFile, UseInterceptors, UseGuards, Req, BadRequestException } from '@nestjs/common';
+import { Controller, Post, UploadedFile, UseInterceptors, UseGuards, Req, Body, BadRequestException } from '@nestjs/common';
 import { JwtAuthGuard }       from '../../../auth/guards/jwt.guard';
 import { CompanyInterceptor } from '../../../multi-company/company.interceptor';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -28,11 +28,18 @@ export class JournalManualImportController {
 
   @Post('manual-import')
   @UseInterceptors(FileInterceptor('file', { storage: multer.memoryStorage() }))
-  async import(@UploadedFile() file: Express.Multer.File, @Req() req: any) {
+  async import(
+    @UploadedFile() file: Express.Multer.File,
+    @Req() req: any,
+    @Body('overrideDuplicate') overrideDuplicate?: string,
+  ) {
     if (!file) throw new BadRequestException('Arquivo não enviado.');
     const companyId   = req.companyId as string;
     const createdById = req.user.id as string;
     if (!companyId) throw new BadRequestException('Empresa não identificada.');
-    return this.svc.import(bufferToString(file.buffer), companyId, createdById);
+    return this.svc.import(
+      bufferToString(file.buffer), companyId, createdById, file.originalname,
+      overrideDuplicate === 'true',
+    );
   }
 }

@@ -24,12 +24,21 @@ const EXEMPLO = `05736256000185|Manual
 export const JournalManualImportModal: React.FC<Props> = ({ onClose, onSuccess }) => {
     const [text, setText]         = useState('');
     const [tipo, setTipo]         = useState('Manual');
+    // NOVO (10/09/2026): nome real do arquivo carregado - antes era sempre
+    // gravado como "manual-import.txt" (nome fixo do Blob), nunca o nome
+    // que o usuario de fato carregou (ex: LoteSantander2018.txt).
+    const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
     const [loading, setLoading]   = useState(false);
     const [preview, setPreview]   = useState<any>(null);
     const [result, setResult]     = useState<any>(null);
     const [done, setDone]         = useState(false);
     const [showHelp, setShowHelp] = useState(false);
     const fileRef                 = useRef<HTMLInputElement>(null);
+    // NOVO (10/09/2026): confirmacao de sobreposicao quando o mesmo arquivo
+    // ja foi importado antes - achado real de duplicacao (3 clicks geraram
+    // 3x os lancamentos, sem aviso nenhum).
+    const [duplicateLotes, setDuplicateLotes] = useState<any[] | null>(null);
+    const [duplicateMsg, setDuplicateMsg]     = useState('');
 
     const token   = localStorage.getItem('@ledgr:token');
     const company = JSON.parse(localStorage.getItem('@ledgr:activeCompany') ?? '{}');
@@ -42,6 +51,7 @@ export const JournalManualImportModal: React.FC<Props> = ({ onClose, onSuccess }
     }
 
     function handleFile(f: File) {
+        setUploadedFileName(f.name);
         const reader = new FileReader();
         reader.onload = () => setText(String(reader.result ?? ''));
         reader.readAsText(f, 'utf-8');
@@ -53,7 +63,7 @@ export const JournalManualImportModal: React.FC<Props> = ({ onClose, onSuccess }
         try {
             const blob = new Blob([text], { type: 'text/plain' });
             const fd = new FormData();
-            fd.append('file', blob, 'manual-import.txt');
+            fd.append('file', blob, uploadedFileName || 'manual-import.txt');
             const res  = await fetch(`${API}/accounting/journal/preview-manual-import`, { method: 'POST', headers, body: fd });
             const data = await res.json();
             setPreview(data);
@@ -61,18 +71,39 @@ export const JournalManualImportModal: React.FC<Props> = ({ onClose, onSuccess }
         finally { setLoading(false); }
     }
 
-    async function handleConfirm() {
+    async function handleConfirm(overrideDuplicate = false) {
         if (!text.trim() || !preview || preview.hasErrors) return;
         setLoading(true);
+        setDuplicateLotes(null);
         try {
             const blob = new Blob([text], { type: 'text/plain' });
             const fd = new FormData();
-            fd.append('file', blob, 'manual-import.txt');
+            fd.append('file', blob, uploadedFileName || 'manual-import.txt');
+            if (overrideDuplicate) fd.append('overrideDuplicate', 'true');
             const res  = await fetch(`${API}/accounting/journal/manual-import`, { method: 'POST', headers, body: fd });
             const data = await res.json();
+
+            // NOVO (10/09/2026): backend retorna 400 com duplicateLotes
+            // quando o mesmo nome de arquivo ja foi importado - mostra tela
+            // de confirmacao em vez de tentar gravar (ou de falhar em
+            // silencio como antes).
+            if (!res.ok && data?.duplicateLotes) {
+                setDuplicateMsg(data.message || 'Arquivo já importado anteriormente.');
+                setDuplicateLotes(data.duplicateLotes);
+                setLoading(false);
+                return;
+            }
+            if (!res.ok) {
+                alert(data?.message || 'Erro ao importar.');
+                setLoading(false);
+                return;
+            }
+
             setResult(data);
             setDone(true);
-            onSuccess?.();
+            // NAO chama onSuccess aqui - o pai (JournalPage) fecha o modal
+            // instantaneamente no onSuccess, impedindo a tela "Importacao
+            // concluida" de aparecer. onSuccess so dispara no botao Fechar.
         } catch (e: any) { alert(e.message); }
         finally { setLoading(false); }
     }
@@ -228,11 +259,45 @@ export const JournalManualImportModal: React.FC<Props> = ({ onClose, onSuccess }
                         </>
                     )}
 
+                    {duplicateLotes && duplicateLotes.length > 0 && (
+                        <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                            <FiAlertTriangle size={40} color="#C2410C" style={{ marginBottom: 12 }} />
+                            <h3 style={{ fontSize: 16, fontWeight: 500, color: '#111', margin: '0 0 8px' }}>Arquivo já importado</h3>
+                            <p style={{ fontSize: 13, color: '#6B7280', marginBottom: 16 }}>{duplicateMsg}</p>
+                            <div style={{ border: '0.5px solid #FED7AA', background: '#FFF7ED', borderRadius: 8, padding: 12, textAlign: 'left', marginBottom: 4 }}>
+                                {duplicateLotes.map((d: any) => (
+                                    <div key={d.id} style={{ fontSize: 12, color: '#9A3412', marginBottom: 4 }}>
+                                        Lote {d.numero}/{d.ano} — {d.quantidadeLancamentos} lançamento(s) — importado em {new Date(d.createdAt).toLocaleString('pt-BR')}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
                     {done && result && (
                         <div style={{ textAlign: 'center', padding: '20px 0' }}>
                             <FiCheckCircle size={40} color="#15803D" style={{ marginBottom: 12 }} />
                             <h3 style={{ fontSize: 16, fontWeight: 500, color: '#111', margin: '0 0 8px' }}>Importação concluída</h3>
-                            <p style={{ fontSize: 13, color: '#6B7280' }}>{result.inserted} lançamento(s) importado(s).</p>
+                            <p style={{ fontSize: 13, color: '#6B7280', marginBottom: 16 }}>{result.inserted} lançamento(s) importado(s).</p>
+
+                            {/* NOVO (10/09/2026): capa de lote - resumo por ano tocado pelo arquivo */}
+                            {result.lotes?.map((l: any) => (
+                                <div key={`${l.ano}-${l.numero}`} style={{ border: '0.5px solid #BBF7D0', background: '#F0FDF4', borderRadius: 8, padding: 14, textAlign: 'left', marginBottom: 10 }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                                        <span style={{ fontSize: 13, fontWeight: 600, color: '#111' }}>Lote nº {l.numero} / {l.ano}</span>
+                                        <span style={{ fontSize: 12, color: '#6B7280' }}>{l.nomeArquivo}</span>
+                                    </div>
+                                    <div style={{ fontSize: 12, color: '#374151', marginBottom: 6 }}>
+                                        Período: {new Date(l.dataInicial + 'T00:00:00').toLocaleDateString('pt-BR')} a {new Date(l.dataFinal + 'T00:00:00').toLocaleDateString('pt-BR')}
+                                    </div>
+                                    <div style={{ display: 'flex', gap: 16, fontSize: 12 }}>
+                                        <span style={{ color: '#6B7280' }}>{l.quantidadeLancamentos} lançamento(s)</span>
+                                        <span style={{ color: '#2563EB' }}>D: {fmt(l.totalDebito)}</span>
+                                        <span style={{ color: '#15803D' }}>C: {fmt(l.totalCredito)}</span>
+                                    </div>
+                                </div>
+                            ))}
+
                             {result.errors?.length > 0 && (
                                 <div style={{ marginTop: 8 }}>
                                     {result.errors.map((e: any, i: number) => (
@@ -246,16 +311,28 @@ export const JournalManualImportModal: React.FC<Props> = ({ onClose, onSuccess }
 
                 {/* Footer */}
                 <div style={{ padding: '12px 20px', borderTop: '0.5px solid #E5E7EB', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                    <button onClick={onClose} style={{ padding: '8px 16px', borderRadius: 8, border: '0.5px solid #D1D5DB', background: '#fff', color: '#374151', fontSize: 13, cursor: 'pointer' }}>
+                    <button onClick={() => { if (done) onSuccess?.(); onClose(); }} style={{ padding: '8px 16px', borderRadius: 8, border: '0.5px solid #D1D5DB', background: '#fff', color: '#374151', fontSize: 13, cursor: 'pointer' }}>
                         {done ? 'Fechar' : 'Cancelar'}
                     </button>
-                    {!done && (
+                    {!done && duplicateLotes && duplicateLotes.length > 0 && (
+                        <>
+                            <button onClick={() => setDuplicateLotes(null)} disabled={loading}
+                                style={{ padding: '8px 18px', borderRadius: 8, border: '0.5px solid #D1D5DB', background: '#fff', color: '#374151', fontSize: 13, cursor: 'pointer' }}>
+                                Cancelar
+                            </button>
+                            <button onClick={() => handleConfirm(true)} disabled={loading}
+                                style={{ padding: '8px 18px', borderRadius: 8, border: 'none', background: '#C2410C', color: '#fff', fontSize: 13, cursor: 'pointer', opacity: loading ? 0.5 : 1 }}>
+                                {loading ? 'Sobrepondo...' : 'Sobrepor lote existente'}
+                            </button>
+                        </>
+                    )}
+                    {!done && !(duplicateLotes && duplicateLotes.length > 0) && (
                         <>
                             <button onClick={handleValidate} disabled={!text.trim() || loading}
                                 style={{ padding: '8px 18px', borderRadius: 8, border: 'none', background: '#2563EB', color: '#fff', fontSize: 13, cursor: 'pointer', opacity: !text.trim() || loading ? 0.5 : 1 }}>
                                 {loading ? 'Validando...' : 'Validar'}
                             </button>
-                            <button onClick={handleConfirm} disabled={!preview || preview.hasErrors || loading}
+                            <button onClick={() => handleConfirm(false)} disabled={!preview || preview.hasErrors || loading}
                                 style={{ padding: '8px 18px', borderRadius: 8, border: 'none', background: '#111', color: '#fff', fontSize: 13, cursor: 'pointer', opacity: !preview || preview.hasErrors || loading ? 0.5 : 1 }}>
                                 {loading ? 'Importando...' : 'Confirmar Importação'}
                             </button>

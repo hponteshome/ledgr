@@ -61,19 +61,24 @@ export class JournalEntryService {
   // ── Listar lançamentos ──────────────────────────────────────────────────────
 
   async findAll(companyId: string, params: {
-    dateFrom?:    string;
-    dateTo?:      string;
-    search?:      string;
-    sources?:     string;
-    accountCode?: string;
-    page?:        number;
-    limit?:       number;
-    orderBy?:     string;
-    orderDir?:    string;
+    dateFrom?:     string;
+    dateTo?:       string;
+    search?:       string;
+    sources?:      string;
+    accountCode?:  string;
+    importLoteId?: string;
+    page?:         number;
+    limit?:        number;
+    orderBy?:      string;
+    orderDir?:     string;
   }) {
 
-    const { dateFrom, dateTo, search, sources, accountCode, page = 1, limit = 50, orderBy = 'date', orderDir = 'asc' } = params;
+    const { dateFrom, dateTo, search, sources, accountCode, importLoteId, page = 1, limit = 50, orderBy = 'date', orderDir = 'asc' } = params;
     const where: any = { companyId, deletedAt: null };
+
+    // NOVO (10/09/2026): filtro por lote de importacao - usado pela tela
+    // "Lotes de Importacao" pra abrir o Diario ja restrito ao lote clicado.
+    if (importLoteId) where.importLoteId = importLoteId;
 
     // ── Filtro de período ───────────────────────────────────────
     // Usa toUTC/toUTCEnd para garantir comparação correta independente do fuso

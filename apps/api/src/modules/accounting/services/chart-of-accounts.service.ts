@@ -37,6 +37,29 @@ export class ChartOfAccountsService {
     };
   }
 
+  // ── Busca de codigos RFB (Conta Referencial SPED) ──────────────────────────
+  // NOVO (10/09/2026): autocomplete para o campo spedCode, usando a tabela ja
+  // existente rfb_aglutination_codes (model RfbAglutinationCode) - leiaute 9,
+  // BP ate nivel 5 (P100) / DRE ate nivel 6 (P150). Busca por codigo OU
+  // descricao, filtro opcional por tipo (BP/DRE).
+  async searchRfbCodes(query: string, tipo?: string, leiaute = 9, anoBase = 2025) {
+    if (!query || query.trim().length < 2) return [];
+    return this.prisma.rfbAglutinationCode.findMany({
+      where: {
+        leiaute,
+        anoBase,
+        ...(tipo ? { tipo } : {}),
+        OR: [
+          { codigo:    { contains: query.trim(), mode: 'insensitive' } },
+          { descricao: { contains: query.trim(), mode: 'insensitive' } },
+        ],
+      },
+      select: { codigo: true, descricao: true, nivel: true, tipo: true, codigoPai: true },
+      orderBy: { codigo: 'asc' },
+      take: 30,
+    });
+  }
+
   // ── Listar contas com filtros ──────────────────────────────────────────────
 
   async findAll(companyId: string, filters: AccountFilterDto) {
@@ -128,7 +151,29 @@ export class ChartOfAccountsService {
     // Normaliza userId — suporta string direta ou objeto do decorator legado
     const userId = typeof userOrId === 'string' ? userOrId : userOrId?.id;
 
-    const normalizedCode = normalizeAccountCode(dto.code);
+    // CORRIGIDO (10/09/2026): normalizeAccountCode()/getLevelFromCode()/
+    // maskService.validateCode() presumem convencao PONTUADA e configuravel
+    // por mascara (ex: "1.1.02") - a convencao real da Matriz e numero BRUTO
+    // sem ponto, nivel calculado pelo TAMANHO do codigo (1-2-3-5-7-11 digitos
+    // = nivel 1 a 6), ja validada e usada em toda a sessao. Regra confirmada
+    // pelo usuario: "tratar sempre numeros brutos, aplicacao de mascara
+    // ocorre automaticamente na visualizacao e digitacao" - nunca na
+    // validacao estrutural de gravacao. Escopo desta correcao: so o create()
+    // (usado pelo modal de cadastro) - bulkImport() e ecd-importer.service.ts
+    // ainda usam normalizeAccountCode() e podem ter o mesmo problema, mas
+    // ficam fora desta correcao (fluxos diferentes, nao e o que esta
+    // quebrado agora).
+    const normalizedCode = dto.code.trim();
+
+    const getLevelFromRawCode = (code: string): number => {
+      const len = code.length;
+      if (len <= 1) return 1;
+      if (len <= 2) return 2;
+      if (len <= 3) return 3;
+      if (len <= 5) return 4;
+      if (len <= 7) return 5;
+      return 6;
+    };
 
     // Verificar duplicata
     const existing = await this.prisma.chartOfAccounts.findFirst({
@@ -140,7 +185,7 @@ export class ChartOfAccountsService {
 
     // Resolver pai
     let parentId: string | null = dto.parentId || null;
-    let level   = getLevelFromCode(normalizedCode); // calculado pelo código, não pelo pai
+    let level   = getLevelFromRawCode(normalizedCode); // calculado pelo código, não pelo pai
     let type    = dto.type;
     let nature  = dto.nature;
 
@@ -151,10 +196,10 @@ export class ChartOfAccountsService {
       type     = type   || parent.type;
       nature   = nature || parent.nature;
 
-      // Código filho deve começar com código do pai
-      if (!normalizedCode.startsWith(parent.code + '.')) {
+      // Código filho deve começar com código do pai (prefixo bruto, sem ponto)
+      if (!normalizedCode.startsWith(parent.code) || normalizedCode === parent.code) {
         throw new BadRequestException(
-          `Código "${normalizedCode}" deve começar com "${parent.code}." para ser filho desta conta.`
+          `Código "${normalizedCode}" deve começar com "${parent.code}" para ser filho desta conta.`
         );
       }
     }
@@ -162,9 +207,6 @@ export class ChartOfAccountsService {
     if (level === 1 && (!type || !nature)) {
       throw new BadRequestException('Contas de nível 1 devem ter tipo e natureza definidos');
     }
-
-    // Validar contra máscara vigente
-    await this.maskService.validateCode(companyId, normalizedCode);
 
     const account = await this.prisma.chartOfAccounts.create({
       data: {
@@ -177,9 +219,11 @@ export class ChartOfAccountsService {
         isAnalytic:  dto.isAnalytic  || false,
         parentId,
         spedCode:    dto.spedCode    || null,
+        reducedCode: dto.reducedCode || null,
         ifrsCode:    dto.ifrsCode    || null,
         usgaapCode:  dto.usgaapCode  || null,
         eSocialCode: dto.eSocialCode || null,
+        origin:      'MATRIZ',
         createdById: userId,
         isActive:    true,
       } as any,
@@ -206,6 +250,7 @@ export class ChartOfAccountsService {
         name:        dto.name,
         isAnalytic:  dto.isAnalytic,
         spedCode:    dto.spedCode,
+        reducedCode: dto.reducedCode,
         ifrsCode:    dto.ifrsCode,
         usgaapCode:  dto.usgaapCode,
         eSocialCode: dto.eSocialCode,
