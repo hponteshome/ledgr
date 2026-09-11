@@ -8684,3 +8684,53 @@ chart-of-accounts.service.ts/dto.ts):**
   completo (11 digitos) OU reduzido pela CONTAGEM DE DIGITOS, rejeita
   arquivo que mistura os dois padroes, e resolveAccountCodes() busca
   reduced_code SO em origin=MATRIZ (nunca cai no code curto nativo).
+
+
+### Sessao 10-11/09/2026 (madrugada) - Bugs reais descobertos: fuso horario na exibicao de data + paginacao quebrada no endpoint de lancamentos
+
+**Motivacao:** usuario reportou nao conseguir visualizar lancamentos de
+encerramento de exercicio no Diario (pareciam sumidos) nem gerar o Razao
+Analitico (vinha sempre vazio) para a Hotelsys.
+
+**Bug 1 - fuso horario na exibicao de data (JournalPage.tsx, fmtDate()):**
+usava dt.getDate()/getMonth()/getFullYear() (fuso LOCAL do navegador) em
+vez dos metodos UTC - a data vem da API como ISO completo com "Z" (campo
+@db.Date do Prisma, meia-noite UTC exata). Em fuso negativo (Brasil,
+UTC-3), meia-noite UTC de um dia mostra o dia ANTERIOR na tela. Os 2
+lancamentos de encerramento de 2018 (gravados em 31/12/2018) apareciam
+como "30/12/2018" - levou a uma investigacao de periodo errada no Razao
+(usuario tentou isolar "30/12 a 31/12" baseado na data errada exibida).
+Corrigido: getUTCDate()/getUTCMonth()/getUTCFullYear().
+
+**Bug 2 - paginacao quebrada em journal-entry.service.ts findAll() (o bug
+real, mais serio):** "pages" era calculado com
+`Math.ceil(filteredEntries.length / limit)` - o tamanho da PAGINA ATUAL
+(no maximo "limit"), nao o total real de registros (que o `count()` do
+Prisma ja calculava certo, guardado em "total" e simplesmente ignorado
+no calculo de "pages"). Quando uma pagina vinha completamente cheia (ex:
+500 de 500), Math.ceil(500/500)=1 fazia qualquer frontend que pagina em
+loop (`while(pg < pages)`) parar de buscar apos a 1a pagina, mesmo
+havendo centenas de lancamentos alem dela. Como a ordenacao padrao e
+por data crescente, os lancamentos MAIS RECENTES do periodo pedido
+(ex: encerramento de exercicio, sempre em 31/12) sempre caiam nas
+paginas nunca buscadas - o Razao Analitico (RazaoAnaliticoPage.tsx,
+que faz exatamente esse loop contra /accounting/journal) sempre voltava
+incompleto ou vazio nesses casos. So passou a se manifestar quando a
+Hotelsys cruzou a marca de 500+ lancamentos no periodo consultado (o
+volume gerado pelas sessoes recentes, incluindo a importacao manual e a
+reconstrucao retroativa de lotes de hoje) - bug pre-existente, nao
+introduzido hoje, so exposto pelo volume.
+
+**Corrigido:** `pages: Math.ceil(total / limit)` (usa o total real do
+`count()`, ja calculado corretamente, nunca usado antes).
+
+**PENDENCIA registrada para revisao completa futura:** buscar por outros
+consumidores do endpoint /accounting/journal que fazem loop de paginacao
+completo (`while(pg < pages) fetch...`) - a correcao e na FONTE
+(beneficia todos automaticamente), mas vale re-testar visualmente pelo
+menos: Diario Geral (livro formal), e qualquer outro relatorio formal
+que dependa de buscar TODOS os lancamentos de um periodo via este mesmo
+endpoint. Busca no codigo nao encontrou o MESMO padrao de bug (pages
+calculado errado) em nenhum outro service (chart-of-accounts.service.ts,
+por exemplo, ja fazia certo, usando o total do count()) - o problema
+parece ter sido isolado a este arquivo.

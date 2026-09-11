@@ -56,11 +56,18 @@ interface EcdOpeningPreview {
 
 // ── Helpers ────────────────────────────────────────────────────
 
+// CORRIGIDO (11/09/2026): usava getDate()/getMonth()/getFullYear() (fuso
+// LOCAL do navegador) em vez de getUTCDate()/getUTCMonth()/getUTCFullYear()
+// - a data vem da API como ISO completo com "Z" (meia-noite UTC exata,
+// campo @db.Date do Prisma). Em fuso negativo (Brasil, UTC-3), meia-noite
+// UTC de um dia vira 21h do dia ANTERIOR em hora local - a tela mostrava
+// um dia a menos (achado real: lancamento gravado em 31/12/2018 aparecia
+// como "30/12/2018" no Diario, levando a busca errada no Razao Analitico).
 const fmtDate = (d: string) => {
     const dt = new Date(d + (d.length === 10 ? 'T00:00:00' : ''));
-    const dd = String(dt.getDate()).padStart(2, '0');
-    const mm = String(dt.getMonth() + 1).padStart(2, '0');
-    const yy = String(dt.getFullYear());
+    const dd = String(dt.getUTCDate()).padStart(2, '0');
+    const mm = String(dt.getUTCMonth() + 1).padStart(2, '0');
+    const yy = String(dt.getUTCFullYear());
     return `${dd}/${mm}/${yy}`;
 };
 

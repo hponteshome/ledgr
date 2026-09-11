@@ -144,7 +144,7 @@ const filteredTotal = filteredEntries.length;
 return { 
     total: filteredTotal, 
     page, 
-    pages: Math.ceil(filteredTotal / limit), 
+    pages: Math.ceil(total / limit), 
     entries: filteredEntries 
 };
   }
