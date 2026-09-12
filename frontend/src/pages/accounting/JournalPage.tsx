@@ -179,12 +179,12 @@ const EditModal: React.FC<{ entry: JournalEntry; onClose: () => void; onSaved: (
 
                 <div className="flex gap-3 mb-4">
                     <div>
-                        <label className="text-xs text-gray-500 block mb-1">Data</label>
+                        <label className="text-[13px] text-gray-500 block mb-1">Data</label>
                         <SmartDateInput value={date} onChange={v => setDate(v)}
                             className="h-8 border border-gray-200 rounded-lg px-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-36" />
                     </div>
                     <div className="flex-1">
-                        <label className="text-xs text-gray-500 block mb-1">Descricao</label>
+                        <label className="text-[13px] text-gray-500 block mb-1">Descricao</label>
                         <input type="text" value={description} onChange={e => setDescription(e.target.value)}
                             className="h-8 border border-gray-200 rounded-lg px-3 text-sm w-full focus:outline-none focus:ring-2 focus:ring-blue-500" />
                     </div>
@@ -192,15 +192,15 @@ const EditModal: React.FC<{ entry: JournalEntry; onClose: () => void; onSaved: (
 
                 {/* Painel Dedutibilidade Fiscal */}
                 <div style={{ background:'#F5F3FF', border:'0.5px solid #DDD6FE', borderRadius:8, padding:'10px 14px', marginBottom:12 }}>
-                  <div style={{ fontSize:10, fontWeight:600, textTransform:'uppercase', color:'#7C3AED', marginBottom:8, letterSpacing:'.3px' }}>
+                  <div style={{ fontSize: 13, fontWeight:600, textTransform:'uppercase', color:'#7C3AED', marginBottom:8, letterSpacing:'.3px' }}>
                     Tratamento Fiscal (LALUR) — opcional
                   </div>
                   <div style={{ display:'flex', gap:10, alignItems:'center', flexWrap:'wrap' }}>
                     <div>
-                      <label style={{ fontSize:10, color:'#555', display:'block', marginBottom:3 }}>Dedutibilidade</label>
+                      <label style={{ fontSize: 13, color:'#555', display:'block', marginBottom:3 }}>Dedutibilidade</label>
                       <select value={dedutibilidade}
                         onChange={e => setDedutibilidade(e.target.value)}
-                        style={{ height:28, border:'0.5px solid #DDD6FE', borderRadius:6, padding:'0 8px', fontSize:12, background:'#fff', color:'#111', outline:'none' }}>
+                        style={{ height:28, border:'0.5px solid #DDD6FE', borderRadius:6, padding:'0 8px', fontSize: 13, background:'#fff', color:'#111', outline:'none' }}>
                         <option value="">Herdar da conta</option>
                         <option value="DEDUTIVEL">Dedutível (100%)</option>
                         <option value="PARCIALMENTE_DEDUTIVEL">Parcialmente Dedutível</option>
@@ -209,33 +209,33 @@ const EditModal: React.FC<{ entry: JournalEntry; onClose: () => void; onSaved: (
                     </div>
                     {dedutibilidade === 'PARCIALMENTE_DEDUTIVEL' && (
                       <div>
-                        <label style={{ fontSize:10, color:'#555', display:'block', marginBottom:3 }}>% Dedutível</label>
+                        <label style={{ fontSize: 13, color:'#555', display:'block', marginBottom:3 }}>% Dedutível</label>
                         <input type="number" min={0} max={100} value={percDeducao}
                           onChange={e => setPercDeducao(Number(e.target.value))}
-                          style={{ height:28, border:'0.5px solid #DDD6FE', borderRadius:6, padding:'0 8px', fontSize:12, width:80, outline:'none' }} />
+                          style={{ height:28, border:'0.5px solid #DDD6FE', borderRadius:6, padding:'0 8px', fontSize: 13, width:80, outline:'none' }} />
                       </div>
                     )}
                     <div style={{ flex:1, minWidth:200 }}>
-                      <label style={{ fontSize:10, color:'#555', display:'block', marginBottom:3 }}>Observação LALUR</label>
+                      <label style={{ fontSize: 13, color:'#555', display:'block', marginBottom:3 }}>Observação LALUR</label>
                       <input type="text" value={lalurObservacao}
                         onChange={e => setLalurObservacao(e.target.value)}
                         placeholder="Ex: Multa não dedutível conforme art. 41 Lei 8981/95"
-                        style={{ height:28, border:'0.5px solid #DDD6FE', borderRadius:6, padding:'0 8px', fontSize:12, width:'100%', outline:'none' }} />
+                        style={{ height:28, border:'0.5px solid #DDD6FE', borderRadius:6, padding:'0 8px', fontSize: 13, width:'100%', outline:'none' }} />
                     </div>
                   </div>
-                  <div style={{ fontSize:10, color:'#7C3AED', marginTop:6 }}>
+                  <div style={{ fontSize: 13, color:'#7C3AED', marginTop:6 }}>
                     Deixe em branco para herdar a configuração da conta contábil.
                   </div>
                 </div>
 
                 <div style={{ overflowY: 'auto', maxHeight: '50vh' }}>
-                    <table className="w-full text-xs mb-3 border-collapse">
+                    <table className="w-full text-[13px] mb-3 border-collapse">
                         <thead>
                             <tr className="bg-gray-50">
-                                <th className="px-2 py-1.5 text-left text-[10px] text-gray-400 uppercase font-bold border-b border-gray-100">Tipo</th>
-                                <th className="px-2 py-1.5 text-left text-[10px] text-gray-400 uppercase font-bold border-b border-gray-100">Codigo</th>
-                                <th className="px-2 py-1.5 text-left text-[10px] text-gray-400 uppercase font-bold border-b border-gray-100">Conta</th>
-                                <th className="px-2 py-1.5 text-right text-[10px] text-gray-400 uppercase font-bold border-b border-gray-100">Valor</th>
+                                <th className="px-2 py-1.5 text-left text-[13px] text-gray-400 uppercase font-bold border-b border-gray-100">Tipo</th>
+                                <th className="px-2 py-1.5 text-left text-[13px] text-gray-400 uppercase font-bold border-b border-gray-100">Codigo</th>
+                                <th className="px-2 py-1.5 text-left text-[13px] text-gray-400 uppercase font-bold border-b border-gray-100">Conta</th>
+                                <th className="px-2 py-1.5 text-right text-[13px] text-gray-400 uppercase font-bold border-b border-gray-100">Valor</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -243,7 +243,7 @@ const EditModal: React.FC<{ entry: JournalEntry; onClose: () => void; onSaved: (
                                 <tr key={idx} className="border-b border-gray-50">
                                     <td className="px-2 py-1.5">
                                         <select value={item.type} onChange={e => setItems(prev => prev.map((it, i) => i === idx ? { ...it, type: e.target.value as any } : it))}
-                                            className="h-7 border border-gray-200 rounded px-1 text-xs bg-white">
+                                            className="h-7 border border-gray-200 rounded px-1 text-[13px] bg-white">
                                             <option value="DEBIT">Debito</option>
                                             <option value="CREDIT">Credito</option>
                                         </select>
@@ -252,20 +252,20 @@ const EditModal: React.FC<{ entry: JournalEntry; onClose: () => void; onSaved: (
                                         <input type="text" value={item.accountCode}
                                             onChange={e => setItems(prev => prev.map((it, i) => i === idx ? { ...it, accountCode: e.target.value, accountName: '', accountId: '' } : it))}
                                             onBlur={() => lookupCode(idx, item.accountCode)}
-                                            className="h-7 border border-gray-200 rounded px-2 text-xs w-28 focus:outline-none focus:ring-1 focus:ring-blue-400" />
+                                            className="h-7 border border-gray-200 rounded px-2 text-[13px] w-28 focus:outline-none focus:ring-1 focus:ring-blue-400" />
                                     </td>
                                     <td className="px-2 py-1.5 text-gray-500">{item.accountName}</td>
                                     <td className="px-2 py-1.5">
                                         <input type="number" value={item.value} step="0.01"
                                             onChange={e => setItems(prev => prev.map((it, i) => i === idx ? { ...it, value: parseFloat(e.target.value) || 0 } : it))}
-                                            className="h-7 border border-gray-200 rounded px-2 text-xs text-right w-28 focus:outline-none focus:ring-1 focus:ring-blue-400" />
+                                            className="h-7 border border-gray-200 rounded px-2 text-[13px] text-right w-28 focus:outline-none focus:ring-1 focus:ring-blue-400" />
                                     </td>
                                 </tr>
                             ))}
                         </tbody>
                         <tfoot>
                             <tr className="bg-gray-50">
-                                <td colSpan={3} className="px-2 py-1.5 text-xs text-gray-400">
+                                <td colSpan={3} className="px-2 py-1.5 text-[13px] text-gray-400">
                                     D: R$ {fmtCurrency(totalDebit)} · C: R$ {fmtCurrency(totalCredit)}
                                     {balanced ? <span className="text-green-600 ml-2">✓ Balanceado</span> : <span className="text-red-500 ml-2">✗ Diferenca: R$ {fmtCurrency(Math.abs(totalDebit - totalCredit))}</span>}
                                 </td>
@@ -275,7 +275,7 @@ const EditModal: React.FC<{ entry: JournalEntry; onClose: () => void; onSaved: (
                     </table>
 
                 </div>
-                {error && <p className="text-xs text-red-600 mb-3 flex items-center gap-1"><FiAlertCircle size={12} /> {error}</p>}
+                {error && <p className="text-[13px] text-red-600 mb-3 flex items-center gap-1"><FiAlertCircle size={12} /> {error}</p>}
 
                 <div className="flex justify-end gap-2">
                     <button onClick={onClose} className="px-4 py-1.5 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">Cancelar</button>
@@ -587,7 +587,7 @@ const JournalPage: React.FC = () => {
                     </span>
                     <button
                         onClick={() => navigate('/app/accounting/journal', { replace: true })}
-                        style={{ fontSize: 12, color: '#6B7280', background: 'transparent', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
+                        style={{ fontSize: 13, color: '#6B7280', background: 'transparent', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
                     >
                         Limpar filtro
                     </button>
@@ -648,20 +648,20 @@ const JournalPage: React.FC = () => {
                     <span className="text-base font-medium text-gray-800">Diário de lançamentos</span>
                     <span className="text-sm text-gray-400">{activeCompany.legalName || activeCompany.tradeName}</span>
                     <div className={`flex items-center gap-2 border rounded-lg px-3 py-1.5 ${currentMonth.valid ? 'bg-gray-50 border-gray-200' : 'bg-red-50 border-red-300'}`}>
-                        <span className="text-xs text-gray-400 uppercase tracking-wide font-medium">Ref.</span>
+                        <span className="text-[13px] text-gray-400 uppercase tracking-wide font-medium">Ref.</span>
                         <input type="text" value={refInput}
                             onChange={e => { setRefInput(e.target.value); setPage(1); }}
                             onBlur={() => { const p = parseRefMonth(refInput); if (p.valid) { const [yy, mm] = p.from.split('-'); setRefInput(`${mm}/${yy}`); } }}
                             placeholder="mm/aaaa" maxLength={7}
                             className="text-sm font-medium text-gray-700 bg-transparent border-none outline-none w-20" />
                         {currentMonth.valid && <span className="text-base font-bold text-red-500 hidden sm:inline">{currentMonth.label}</span>}
-                        {!currentMonth.valid && refInput.length > 0 && <span className="text-xs text-red-500">formato inválido</span>}
+                        {!currentMonth.valid && refInput.length > 0 && <span className="text-[13px] text-red-500">formato inválido</span>}
                     </div>
 
                     {/* Filtro de Periodo livre (NOVO 02/09/2026) - tem prioridade sobre Ref./Mostrar Lancamentos quando ativo */}
                     <button
                         onClick={() => { setUsePeriodo(v => !v); setPage(1); }}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ${usePeriodo ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-medium rounded-lg border transition-colors ${usePeriodo ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}
                     >
                         <FiFilter size={12} /> Período{usePeriodo ? ' ✓' : ''}
                     </button>
@@ -669,7 +669,7 @@ const JournalPage: React.FC = () => {
                         <div className="flex items-center gap-2 border rounded-lg px-3 py-1.5 bg-gray-50 border-gray-200">
                             <SmartDateInput value={periodoFrom} onChange={v => { setPeriodoFrom(v); setPage(1); }}
                                 className="h-6 border-none bg-transparent text-sm font-medium text-gray-700 outline-none w-24" />
-                            <span className="text-xs text-gray-400">até</span>
+                            <span className="text-[13px] text-gray-400">até</span>
                             <SmartDateInput value={periodoTo} onChange={v => { setPeriodoTo(v); setPage(1); }}
                                 className="h-6 border-none bg-transparent text-sm font-medium text-gray-700 outline-none w-24" />
                         </div>
@@ -680,7 +680,7 @@ const JournalPage: React.FC = () => {
                         return (
                             <button key={s.value}
                                 onClick={() => { setFSource(active ? '' : s.value); setPage(1); }}
-                                className={`text-xs px-2 py-0.5 rounded-full font-medium border transition-all ${cfg.cls} ${active ? 'ring-2 ring-offset-1 ring-blue-400' : 'opacity-70 hover:opacity-100'}`}
+                                className={`text-[13px] px-2 py-0.5 rounded-full font-medium border transition-all ${cfg.cls} ${active ? 'ring-2 ring-offset-1 ring-blue-400' : 'opacity-70 hover:opacity-100'}`}
                                 title={String(s.count) + ' lancamentos'}>
                                 {cfg.label}{active ? ' ×' : ''}
                             </button>
@@ -689,22 +689,22 @@ const JournalPage: React.FC = () => {
                 </div>
                 <div className="flex items-center gap-2">
                     <button onClick={() => setShowEcdOpening(true)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors">
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors">
                         <FiUploadCloud size={13} /> Importar Abertura ECD
                     </button>
                     <button onClick={() => setShowLotdModal(true)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-purple-700 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 transition-colors">
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-medium text-purple-700 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 transition-colors">
                         <FiUploadCloud size={13} /> Importar Lote IOB
                     </button>
                     <button onClick={() => setShowManualModal(true)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-teal-700 bg-teal-50 border border-teal-200 rounded-lg hover:bg-teal-100 transition-colors">
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-medium text-teal-700 bg-teal-50 border border-teal-200 rounded-lg hover:bg-teal-100 transition-colors">
                         <FiUploadCloud size={13} /> Importar Manual
                     </button>
                     <button onClick={() => window.location.href = '/app/accounting/journal/import'}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-colors">
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-medium text-green-700 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-colors">
                         <FiUploadCloud size={13} /> Importar Diário
                     </button>
-                    <label className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 border border-gray-200 rounded-lg bg-white cursor-pointer hover:bg-gray-50 ${usePeriodo ? 'opacity-40 pointer-events-none' : ''}`}>
+                    <label className={`flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-medium text-gray-600 border border-gray-200 rounded-lg bg-white cursor-pointer hover:bg-gray-50 ${usePeriodo ? 'opacity-40 pointer-events-none' : ''}`}>
                         <input type="checkbox" checked={showRecent} onChange={e => setShowRecent(e.target.checked)} className="accent-blue-600" disabled={usePeriodo} />
                         Mostrar Lançamentos
                     </label>
@@ -720,17 +720,17 @@ const JournalPage: React.FC = () => {
 
             {/* Formulário */}
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 space-y-3">
-                <p className="text-xs font-medium text-gray-400 uppercase tracking-widest">Novo lançamento</p>
+                <p className="text-[13px] font-medium text-gray-400 uppercase tracking-widest">Novo lançamento</p>
 
                 {/* Linha 1: Data, Tipo, Histórico */}
                 <div className="flex flex-wrap gap-3 items-end">
                     <div className="flex flex-col gap-1">
-                        <label className="text-xs text-gray-500">Data</label>
+                        <label className="text-[13px] text-gray-500">Data</label>
                         <SmartDateInput value={fDate} onChange={v => setFDate(v)}
                             className="h-8 border border-gray-200 rounded-lg px-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-32" />
                     </div>
                     <div className="flex flex-col gap-1">
-                        <label className="text-xs text-gray-500">Tipo</label>
+                        <label className="text-[13px] text-gray-500">Tipo</label>
                         <select value={fType} onChange={e => setFType(e.target.value as any)}
                             className="h-8 border border-gray-200 rounded-lg px-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 w-32">
                             {/* CORRIGIDO 01/09/2026: lista fixa, so tipos de escolha manual - tipos de
@@ -749,7 +749,7 @@ const JournalPage: React.FC = () => {
                     </div>
                     <div className="w-px bg-gray-200 self-stretch" />
                     <div className="flex flex-col gap-1 flex-1 min-w-52">
-                        <label className="text-xs text-gray-500">Histórico padrão (opcional)</label>
+                        <label className="text-[13px] text-gray-500">Histórico padrão (opcional)</label>
                         <div className="flex gap-2">
                             <input type="text" value={fHistCode} onChange={e => setFHistCode(e.target.value)}
                                 placeholder="Cód." className="h-8 border border-gray-200 rounded-lg px-3 text-sm w-20 focus:outline-none focus:ring-2 focus:ring-blue-500" />
@@ -763,7 +763,7 @@ const JournalPage: React.FC = () => {
                 <div className="flex flex-wrap gap-3 items-end">
                     {/* Débito */}
                     <div className="flex flex-col gap-1">
-                        <label className="text-xs text-gray-500">Débito — código</label>
+                        <label className="text-[13px] text-gray-500">Débito — código</label>
                         <div className="flex gap-1.5">
                             <div className="relative">
                                 <input
@@ -779,10 +779,10 @@ const JournalPage: React.FC = () => {
                                     <div style={{ position:'absolute', top:'100%', left:0, zIndex:100, background:'#fff', border:'1px solid #e5e7eb', borderRadius:8, boxShadow:'0 4px 16px rgba(0,0,0,0.10)', minWidth:320, maxHeight:220, overflowY:'auto', marginTop:2 }}>
                                         {debitSuggestions.map(acc => (
                                             <div key={acc.id} onMouseDown={() => selectAccount(acc, 'debit')}
-                                                style={{ padding:'7px 12px', cursor:'pointer', fontSize:12, display:'flex', gap:8, alignItems:'center', borderBottom:'0.5px solid #f3f4f6' }}
+                                                style={{ padding:'7px 12px', cursor:'pointer', fontSize: 13, display:'flex', gap:8, alignItems:'center', borderBottom:'0.5px solid #f3f4f6' }}
                                                 onMouseEnter={e => (e.currentTarget.style.background='#EFF6FF')}
                                                 onMouseLeave={e => (e.currentTarget.style.background='#fff')}>
-                                                <span style={{ fontFamily:'monospace', fontSize:11, color:'#6B7280', minWidth:100 }}>{acc.code}</span>
+                                                <span style={{ fontFamily:'monospace', fontSize: 13, color:'#6B7280', minWidth:100 }}>{acc.code}</span>
                                                 <span style={{ color:'#111' }}>{acc.name}</span>
                                             </div>
                                         ))}
@@ -798,7 +798,7 @@ const JournalPage: React.FC = () => {
 
                     {/* Crédito */}
                     <div className="flex flex-col gap-1">
-                        <label className="text-xs text-gray-500">Crédito — código</label>
+                        <label className="text-[13px] text-gray-500">Crédito — código</label>
                         <div className="flex gap-1.5">
                             <div className="relative">
                                 <input type="text" value={fCreditCode}
@@ -812,10 +812,10 @@ const JournalPage: React.FC = () => {
                                     <div style={{ position:'absolute', top:'100%', left:0, zIndex:100, background:'#fff', border:'1px solid #e5e7eb', borderRadius:8, boxShadow:'0 4px 16px rgba(0,0,0,0.10)', minWidth:320, maxHeight:220, overflowY:'auto', marginTop:2 }}>
                                         {creditSuggestions.map(acc => (
                                             <div key={acc.id} onMouseDown={() => selectAccount(acc, 'credit')}
-                                                style={{ padding:'7px 12px', cursor:'pointer', fontSize:12, display:'flex', gap:8, alignItems:'center', borderBottom:'0.5px solid #f3f4f6' }}
+                                                style={{ padding:'7px 12px', cursor:'pointer', fontSize: 13, display:'flex', gap:8, alignItems:'center', borderBottom:'0.5px solid #f3f4f6' }}
                                                 onMouseEnter={e => (e.currentTarget.style.background='#EFF6FF')}
                                                 onMouseLeave={e => (e.currentTarget.style.background='#fff')}>
-                                                <span style={{ fontFamily:'monospace', fontSize:11, color:'#6B7280', minWidth:100 }}>{acc.code}</span>
+                                                <span style={{ fontFamily:'monospace', fontSize: 13, color:'#6B7280', minWidth:100 }}>{acc.code}</span>
                                                 <span style={{ color:'#111' }}>{acc.name}</span>
                                             </div>
                                         ))}
@@ -831,7 +831,7 @@ const JournalPage: React.FC = () => {
 
                     {/* Valor — largo o suficiente para 18 dígitos */}
                     <div className="flex flex-col gap-1">
-                        <label className="text-xs text-gray-500">Valor (R$)</label>
+                        <label className="text-[13px] text-gray-500">Valor (R$)</label>
                         <input type="text" value={fValue} onChange={e => setFValue(e.target.value)} placeholder="0,00"
                             className="h-8 border border-gray-200 rounded-lg px-3 text-sm text-right font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
                             style={{ width: '11rem' }} />
@@ -840,7 +840,7 @@ const JournalPage: React.FC = () => {
 
                 {/* Complemento */}
                 <div>
-                    <label className="text-xs text-gray-500 block mb-1">Complemento do histórico</label>
+                    <label className="text-[13px] text-gray-500 block mb-1">Complemento do histórico</label>
                     <input type="text" value={fComplement} onChange={e => setFComplement(e.target.value)}
                         placeholder="Descrição livre do lançamento..."
                         className="w-full h-8 border border-gray-200 rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
@@ -849,9 +849,9 @@ const JournalPage: React.FC = () => {
                 {/* Painel Fiscal LALUR */}
                 {(fDebitId || fCreditId) && (
                   <div style={{ background:'#F5F3FF', border:'0.5px solid #DDD6FE', borderRadius:8, padding:'8px 14px', display:'flex', gap:10, alignItems:'center', flexWrap:'wrap' }}>
-                    <span style={{ fontSize:10, fontWeight:600, textTransform:'uppercase', color:'#7C3AED', letterSpacing:'.3px', whiteSpace:'nowrap' }}>Fiscal / LALUR:</span>
+                    <span style={{ fontSize: 13, fontWeight:600, textTransform:'uppercase', color:'#7C3AED', letterSpacing:'.3px', whiteSpace:'nowrap' }}>Fiscal / LALUR:</span>
                     <select value={fDedutibilidade} onChange={e=>setFDedutibilidade(e.target.value)}
-                      style={{ height:28, border:'0.5px solid #DDD6FE', borderRadius:6, padding:'0 8px', fontSize:12, background:'#fff', color:'#111', outline:'none' }}>
+                      style={{ height:28, border:'0.5px solid #DDD6FE', borderRadius:6, padding:'0 8px', fontSize: 13, background:'#fff', color:'#111', outline:'none' }}>
                       <option value="">Herdar da conta</option>
                       <option value="DEDUTIVEL">Dedutível</option>
                       <option value="PARCIALMENTE_DEDUTIVEL">Parcialmente Dedutível</option>
@@ -859,25 +859,25 @@ const JournalPage: React.FC = () => {
                     </select>
                     {fDedutibilidade === 'PARCIALMENTE_DEDUTIVEL' && (
                       <div style={{ display:'flex', alignItems:'center', gap:4 }}>
-                        <span style={{ fontSize:11, color:'#7C3AED' }}>% Dedutível:</span>
+                        <span style={{ fontSize: 13, color:'#7C3AED' }}>% Dedutível:</span>
                         <input type="number" min={0} max={100} value={fPercDeducao}
                           onChange={e=>setFPercDeducao(Number(e.target.value))}
-                          style={{ height:28, width:70, border:'0.5px solid #DDD6FE', borderRadius:6, padding:'0 8px', fontSize:12, outline:'none' }} />
+                          style={{ height:28, width:70, border:'0.5px solid #DDD6FE', borderRadius:6, padding:'0 8px', fontSize: 13, outline:'none' }} />
                       </div>
                     )}
                     {fDedutibilidade && fDedutibilidade !== 'DEDUTIVEL' && (
                       <input type="text" value={fLalurObs} onChange={e=>setFLalurObs(e.target.value)}
                         placeholder="Observação LALUR (ex: Multa não dedutível art. 41)"
-                        style={{ flex:1, minWidth:220, height:28, border:'0.5px solid #DDD6FE', borderRadius:6, padding:'0 8px', fontSize:12, outline:'none' }} />
+                        style={{ flex:1, minWidth:220, height:28, border:'0.5px solid #DDD6FE', borderRadius:6, padding:'0 8px', fontSize: 13, outline:'none' }} />
                     )}
                   </div>
                 )}
 
                 {/* Repetir ao gravar */}
                 <div className="flex flex-wrap items-center gap-4 px-3 py-2 bg-gray-50 rounded-lg border border-gray-200">
-                    <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">Repetir ao gravar:</span>
+                    <span className="text-[13px] text-gray-400 font-medium uppercase tracking-wide">Repetir ao gravar:</span>
                     {([['Data', setRepeatDate, repeatDate], ['Débito', setRepeatDebit, repeatDebit], ['Crédito', setRepeatCredit, repeatCredit], ['Valor', setRepeatValue, repeatValue], ['Histórico', setRepeatHist, repeatHist], ['Complemento', setRepeatComplement, repeatComplement]] as [string, (v: boolean) => void, boolean][]).map(([label, setter, val]) => (
-                        <label key={label} className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
+                        <label key={label} className="flex items-center gap-1.5 text-[13px] text-gray-600 cursor-pointer">
                             <input type="checkbox" checked={val} onChange={e => setter(e.target.checked)} className="accent-blue-600" />
                             {label}
                         </label>
@@ -890,15 +890,15 @@ const JournalPage: React.FC = () => {
                         {totals && (
                             <>
                                 <div className="flex flex-col items-end gap-0.5 px-3 py-2 bg-gray-50 rounded-lg min-w-28">
-                                    <span className="text-xs text-gray-400 uppercase tracking-wide">Débitos (mês)</span>
+                                    <span className="text-[13px] text-gray-400 uppercase tracking-wide">Débitos (mês)</span>
                                     <span className="text-sm font-medium font-mono text-blue-700">R$ {fmtCurrency(totals.totalDebit)}</span>
                                 </div>
                                 <div className="flex flex-col items-end gap-0.5 px-3 py-2 bg-gray-50 rounded-lg min-w-28">
-                                    <span className="text-xs text-gray-400 uppercase tracking-wide">Créditos (mês)</span>
+                                    <span className="text-[13px] text-gray-400 uppercase tracking-wide">Créditos (mês)</span>
                                     <span className="text-sm font-medium font-mono text-green-700">R$ {fmtCurrency(totals.totalCredit)}</span>
                                 </div>
                                 <div className="flex flex-col items-end gap-0.5 px-3 py-2 bg-gray-50 rounded-lg min-w-24">
-                                    <span className="text-xs text-gray-400 uppercase tracking-wide">Diferença</span>
+                                    <span className="text-[13px] text-gray-400 uppercase tracking-wide">Diferença</span>
                                     <span className={`text-sm font-medium font-mono flex items-center gap-1 ${totals.balanced ? 'text-green-600' : 'text-red-500'}`}>
                                         R$ {fmtCurrency(totals.difference)} {totals.balanced && <FiCheck size={12} />}
                                     </span>
@@ -907,8 +907,8 @@ const JournalPage: React.FC = () => {
                         )}
                     </div>
                     <div className="flex gap-2 items-center">
-                        {formError && <span className="text-xs text-red-600 flex items-center gap-1 max-w-xs"><FiAlertCircle size={12} /> {formError}</span>}
-                        {formSuccess && <span className="text-xs text-green-600 flex items-center gap-1"><FiCheck size={12} /> {formSuccess}</span>}
+                        {formError && <span className="text-[13px] text-red-600 flex items-center gap-1 max-w-xs"><FiAlertCircle size={12} /> {formError}</span>}
+                        {formSuccess && <span className="text-[13px] text-green-600 flex items-center gap-1"><FiCheck size={12} /> {formSuccess}</span>}
                         <button onClick={clearForm} className="px-3 py-1.5 text-sm text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50">Limpar</button>
                         <button onClick={handleSave} disabled={saving}
                             className="px-5 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-1.5">
@@ -941,17 +941,17 @@ const JournalPage: React.FC = () => {
                             <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={13} />
                             <input type="text" value={search} onChange={e => { setSearch(e.target.value); setPage(1); }}
                                 placeholder="Filtrar conta, histórico..."
-                                className="h-7 border border-gray-200 rounded-lg pl-8 pr-3 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 w-52" />
+                                className="h-7 border border-gray-200 rounded-lg pl-8 pr-3 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-500 w-52" />
                             <select value={fSource} onChange={e => { setFSource(e.target.value); setPage(1); }}
-                                className="h-7 border border-gray-200 rounded-lg px-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 w-36">
+                                className="h-7 border border-gray-200 rounded-lg px-2 text-[13px] bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 w-36">
                                 <option value="">Todas as fontes</option>
                                 {sourceModules.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
                             </select>
                         </div>
-                        {data && <span className="text-xs text-gray-400">{data.total} lançamentos</span>}
+                        {data && <span className="text-[13px] text-gray-400">{data.total} lançamentos</span>}
                     </div>
                     <button onClick={() => setShowBulkDelete(true)}
-                        className="text-xs px-3 py-1.5 rounded-lg border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 flex items-center gap-1.5">
+                        className="text-[13px] px-3 py-1.5 rounded-lg border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 flex items-center gap-1.5">
                         <FiTrash2 size={11} /> Excluir período...
                     </button>
                 </div>
@@ -967,11 +967,11 @@ const JournalPage: React.FC = () => {
                     </div>
                 ) : (
                     <div className="overflow-auto" style={{ maxHeight: 'calc(100vh - 480px)' }}>
-                        <table className="w-full border-collapse text-xs">
+                        <table className="w-full border-collapse text-[13px]">
                             <thead className="bg-gray-50 sticky top-0 z-10">
                                 <tr>
                                     {(() => {
-                                        const thBase = "px-3 py-2 text-left text-[10px] font-bold uppercase tracking-wider border-b border-gray-100 whitespace-nowrap select-none";
+                                        const thBase = "px-3 py-2 text-left text-[13px] font-bold uppercase tracking-wider border-b border-gray-100 whitespace-nowrap select-none";
                                         const sortable = (col: typeof sortBy, label: string, extraCls = "") => {
                                             const active = sortBy === col;
                                             const next = active && sortDir === "asc" ? "desc" : "asc";
@@ -1026,8 +1026,8 @@ const JournalPage: React.FC = () => {
                                     return (
                                         <tr key={entry.id} className="hover:bg-blue-50/30 group transition-colors border-b border-gray-50">
                                             <td className="px-3 py-2 font-mono text-gray-600 whitespace-nowrap">{fmtDate(entry.date)}</td>
-                                            <td className="px-3 py-2 font-mono text-gray-400 whitespace-nowrap text-[10px]">{nrLanc}</td>
-                                            <td className="px-3 py-2 text-gray-500 text-[11px] max-w-[180px] overflow-hidden text-ellipsis whitespace-nowrap" title={entry.description}>{entry.description}</td>
+                                            <td className="px-3 py-2 font-mono text-gray-400 whitespace-nowrap text-[13px]">{nrLanc}</td>
+                                            <td className="px-3 py-2 text-gray-500 text-[13px] max-w-[180px] overflow-hidden text-ellipsis whitespace-nowrap" title={entry.description}>{entry.description}</td>
                                             <td className="px-3 py-2 font-mono text-blue-700 whitespace-nowrap"
                                                 title={debitTitle}>{debitCode}</td>
                                             <td className="px-3 py-2 font-mono text-green-700 whitespace-nowrap"
@@ -1036,7 +1036,7 @@ const JournalPage: React.FC = () => {
                                                 {isCredit ? '−' : ''}{fmtCurrency(Math.abs(displayValue))}
                                             </td>
                                             <td className="px-3 py-2 whitespace-nowrap">
-                                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${src.cls}`}>{src.label}</span>
+                                                <span className={`text-[13px] px-2 py-0.5 rounded-full font-bold uppercase ${src.cls}`}>{src.label}</span>
                                             </td>
                                             <td className="px-3 py-2">
                                                 <div className="flex gap-1 opacity-0 group-hover:opacity-100 justify-end">
@@ -1055,12 +1055,12 @@ const JournalPage: React.FC = () => {
 
                 {data && (
                     <div className="px-4 py-2 border-t border-gray-100 bg-gray-50 flex items-center justify-between">
-                        <span className="text-xs font-mono text-gray-400">
+                        <span className="text-[13px] font-mono text-gray-400">
                             {data.total} lançamentos · D: R$ {totals ? fmtCurrency(totals.totalDebit) : '—'} · C: R$ {totals ? fmtCurrency(totals.totalCredit) : '—'} · Δ: R$ {totals ? fmtCurrency(totals.difference) : '—'}
                         </span>
                         {data.pages > 1 && (
                             <div className="flex items-center gap-2">
-                                <span className="text-xs text-gray-400">Pág. {data.page}/{data.pages}</span>
+                                <span className="text-[13px] text-gray-400">Pág. {data.page}/{data.pages}</span>
                                 <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1} className="p-1 rounded hover:bg-gray-100 disabled:opacity-30 text-gray-500"><FiChevronLeft size={14} /></button>
                                 <button onClick={() => setPage(p => Math.min(data.pages, p + 1))} disabled={page >= data.pages} className="p-1 rounded hover:bg-gray-100 disabled:opacity-30 text-gray-500"><FiChevronRight size={14} /></button>
                             </div>
