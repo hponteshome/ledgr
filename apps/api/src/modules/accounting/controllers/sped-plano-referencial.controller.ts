@@ -27,4 +27,9 @@ export class SpedPlanoReferencialController {
   async summary() {
     return this.svc.listSummary();
   }
+
+  @Get('status')
+  async status() {
+    return this.svc.getStatus();
+  }
 }

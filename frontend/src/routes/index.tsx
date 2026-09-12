@@ -40,6 +40,7 @@ import { PersonView } from '../pages/persons/PersonView';
 import { AuditLogs as AuditList } from '../pages/audit/AuditLogs';
 import { BackupRestore } from '../pages/system/BackupRestore';
 import MatrizMasterAccountsPage from '../pages/system/MatrizMasterAccountsPage';
+import SpedPlanoReferencialPage from '../pages/system/SpedPlanoReferencialPage';
 import { TableManager } from '../pages/system/TableManager';
 import Accounts from '../pages/accounting/AccountsPage';
 import ImportChartOfAccountsPage from '../pages/accounting/ImportChartOfAccountsPage';
@@ -314,6 +315,7 @@ export const AppRoutes = () => {
                 {/* Sistema */}
                 <Route path="app/system/backup" element={<ProtectedRoute><BackupRestore /></ProtectedRoute>} />
                 <Route path="app/system/matriz-master-accounts" element={<ProtectedRoute><MatrizMasterAccountsPage /></ProtectedRoute>} />
+                <Route path="app/sistema/sped-plano-referencial" element={<ProtectedRoute><SpedPlanoReferencialPage /></ProtectedRoute>} />
                 <Route path="app/system/audit" element={<ProtectedRoute><AuditList /></ProtectedRoute>} />
 
                 {/* Ativo Imobilizado */}

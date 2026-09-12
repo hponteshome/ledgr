@@ -106,8 +106,24 @@ export class SpedPlanoReferencialService {
     const rows = await this.prisma.spedPlanoReferencial.groupBy({
       by: ['tabela', 'anoBase', 'versao'],
       _count: { _all: true },
+      _max: { createdAt: true },
       orderBy: [{ anoBase: 'desc' }, { tabela: 'asc' }, { versao: 'desc' }],
     });
-    return rows.map(r => ({ tabela: r.tabela, anoBase: r.anoBase, versao: r.versao, quantidade: r._count._all }));
+    return rows.map(r => ({
+      tabela: r.tabela, anoBase: r.anoBase, versao: r.versao,
+      quantidade: r._count._all, importadoEm: r._max.createdAt,
+    }));
+  }
+
+  // NOVO (12/09/2026): usado pela tela de Admin para avisar se a tabela
+  // esta vazia (nenhuma importacao feita ainda) e mostrar a data da
+  // ultima importacao de forma resumida (sem precisar agregar por linha).
+  async getStatus() {
+    const total = await this.prisma.spedPlanoReferencial.count();
+    const ultima = await this.prisma.spedPlanoReferencial.findFirst({
+      orderBy: { createdAt: 'desc' },
+      select: { createdAt: true },
+    });
+    return { totalLinhas: total, ultimaImportacao: ultima?.createdAt ?? null };
   }
 }

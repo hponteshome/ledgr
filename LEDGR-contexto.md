@@ -8882,3 +8882,33 @@ corrigidos pra rolagem funcionar de verdade:
    Layout.tsx - nao deveria precisar repetir esse fix por tela).
 Com o Layout.tsx ja corrigido, telas novas so devem precisar do item 1
 (min-width na tabela em si) - o item 2 ja esta coberto na raiz.
+
+
+### Sessao 12/09/2026 - Tela de Admin para upload do Plano Referencial SPED
+
+Construida a tela "Administracao / Parametros Globais / Plano Referencial
+SPED" - upload direto pela interface (antes so era possivel via script
+PowerShell no servidor). Reaproveita o endpoint de importacao ja existente
+(POST /accounting/sped-plano-referencial/import), sem duplicar logica de
+parse.
+
+Backend: summary() ampliado com data de importacao (_max.createdAt por
+grupo); novo getStatus()/GET /status retorna total de linhas + data da
+ultima importacao - usado para avisar visualmente se a tabela esta vazia
+(requisito explicito do usuario, registrado em sessao anterior).
+
+Frontend: SpedPlanoReferencialPage.tsx - banner vermelho se vazio, verde
+com contagem/data se ja importado, upload multiplo de arquivo, tabela de
+resumo por tabela/ano/versao. Rota e item de menu ao lado de "Tabelas
+Legais" (mesma familia conceitual - tabela de referencia mantida 100%
+manual, sem busca automatica de fonte oficial).
+
+**Erro de processo cometido e corrigido nesta sessao:** o path da rota
+React Router foi corrigido de /app/parametros/... para /app/sistema/...
+(para bater com o path ja inserido no sidebar_items), mas o resultado do
+patch nunca foi conferido antes de seguir em frente - o path errado ficou
+no arquivo por varios turnos, causando "link nao carrega nada" sem
+nenhum rastro no console (cai silenciosamente no fallback `<Route
+path="*">` de index.tsx, que redireciona sem erro visivel). Licao:
+qualquer patch que decide se uma rota/link funciona precisa ter seu
+resultado (OK/ABORTADO) conferido antes do proximo passo, nunca presumir.
