@@ -372,10 +372,11 @@ model CompanyTaxRegime {
 
 /// Vinculo N:N entre usuarios e empresas.
 model UserCompany {
-  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId    String  @map("user_id") @db.Uuid
-  companyId String  @map("company_id") @db.Uuid
-  role      String? @default("ADMIN") @map("role") @db.VarChar
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId            String    @map("user_id") @db.Uuid
+  companyId         String    @map("company_id") @db.Uuid
+  role              String?   @default("ADMIN") @map("role") @db.VarChar
+  activeCompetencia DateTime? @map("active_competencia") @db.Date
 
   company Company @relation(fields: [companyId], references: [id])
   user    User    @relation(fields: [userId], references: [id])

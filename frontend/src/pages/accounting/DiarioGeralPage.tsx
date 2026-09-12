@@ -32,8 +32,11 @@ const fmtCnpj = (cnpj: string) => {
 
 const getActiveYear = () => {
     try {
-        const saved = localStorage.getItem('@ledgr:activeMonth');
-        if (saved) return new Date(saved).getFullYear();
+        const companyId = localStorage.getItem('@ledgr:companyId');
+        if (companyId) {
+            const saved = localStorage.getItem(`@ledgr:activeCompetencia:${companyId}`);
+            if (saved) return new Date(saved).getFullYear();
+        }
     } catch {}
     return new Date().getFullYear();
 };

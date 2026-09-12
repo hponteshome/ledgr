@@ -69,6 +69,30 @@ export class CompanyController {
     return this.companyService.findHeadquarters();
   }
 
+  /**
+   * Competencia ativa do usuario logado para esta empresa (NOVO 12/09/2026).
+   * Usada por Diario Geral, Razao Analitico, Balanco Patrimonial e DRE
+   * como padrao inicial de periodo/exercicio.
+   */
+  @Get(':id/active-competencia')
+  @SkipCompanyCheck()
+  async getActiveCompetencia(@Param('id') id: string, @CurrentUser('object') user: any) {
+    const activeCompetencia = await this.companyService.getActiveCompetencia(user.id, id);
+    return { activeCompetencia };
+  }
+
+  @Patch(':id/active-competencia')
+  @SkipCompanyCheck()
+  async setActiveCompetencia(
+    @Param('id') id: string,
+    @Body() body: { activeCompetencia: string },
+    @CurrentUser('object') user: any,
+  ) {
+    const date = new Date(body.activeCompetencia);
+    await this.companyService.setActiveCompetencia(user.id, id, date);
+    return { activeCompetencia: date };
+  }
+
   // ── Rotas que exigem empresa ativa ──────────────────────────────────────────
 
   /**

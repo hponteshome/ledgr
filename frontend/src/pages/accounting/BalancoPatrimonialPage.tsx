@@ -9,7 +9,13 @@ interface Account { id: string; code: string; name: string; type: string; nature
 interface BPItem { account: Account; previousBalance: number; debits: number; credits: number; currentBalance: number; children?: BPItem[]; }
 
 const getActiveYear = () => {
-    try { const s = localStorage.getItem('@ledgr:activeMonth'); if (s) return new Date(s).getFullYear(); } catch {}
+    try {
+        const companyId = localStorage.getItem('@ledgr:companyId');
+        if (companyId) {
+            const s = localStorage.getItem(`@ledgr:activeCompetencia:${companyId}`);
+            if (s) return new Date(s).getFullYear();
+        }
+    } catch {}
     return new Date().getFullYear();
 };
 

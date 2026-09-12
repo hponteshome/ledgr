@@ -60,7 +60,7 @@ export const Header: React.FC<{ sidebarOpen: boolean }> = ({ sidebarOpen }) => {
   const isMaster = profileName === 'Administrador Master' || (user as any)?.permissions?.all === true;
   const pendentesCount = usePendentesCount(!!user && isMaster);
   const unlockRequestsCount = useUnlockRequestsCount(isMaster);
-  const { companies, activeCompany, selectCompany } = useCompany();
+  const { companies, activeCompany, selectCompany, activeCompetencia, setActiveCompetencia } = useCompany();
   const { canView } = useSidebarPermissions();
   const [isCompanyOpen, setIsCompanyOpen] = useState(false);
   const [isMonthOpen, setIsMonthOpen] = useState(false);
@@ -98,20 +98,6 @@ export const Header: React.FC<{ sidebarOpen: boolean }> = ({ sidebarOpen }) => {
     setDevBannerDismissed(true);
   };
 
-  // Month/Year state
-  const [activeMonth, setActiveMonth] = useState(() => {
-    const saved = localStorage.getItem('@ledgr:activeMonth');
-    return saved ? new Date(saved) : new Date();
-  });
-
-  const [calendarYear, setCalendarYear] = useState(activeMonth.getFullYear());
-  const [calendarMonth, setCalendarMonth] = useState(activeMonth.getMonth());
-
-  const months = [
-    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
-  ];
-
   // Lógica de Filtro e Ordenação das Empresas (Suporta schema antigo e novo)
   const filteredCompanies = (companies || [])
     .filter(company => {
@@ -126,17 +112,39 @@ export const Header: React.FC<{ sidebarOpen: boolean }> = ({ sidebarOpen }) => {
       return nameA.localeCompare(nameB);
     });
 
-  const formatMonthYearShort = (date: Date) => {
-    return date.toLocaleDateString('pt-BR', {
-      month: 'short',
-      year: 'numeric'
-    }).toUpperCase().replace(/\./g, '');
+  // Competência ativa (persistida por usuário+empresa no backend, via CompanyContext)
+  const lastDayOfMonth = (year: number, month: number) => new Date(year, month + 1, 0);
+
+  const formatDDMMYYYY = (date: Date) => {
+    const dd = String(date.getDate()).padStart(2, '0');
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    return `${dd}/${mm}/${date.getFullYear()}`;
   };
 
   const formatMonthInput = (date: Date) => {
     const month = String(date.getMonth() + 1).padStart(2, '0');
-    const year = String(date.getFullYear()).slice(-2);
+    const year = String(date.getFullYear());
     return `${month}/${year}`;
+  };
+
+  // Aceita mm/aaaa, mmaaaa, mm/aa, mmaa - sempre resolve para o ultimo dia do mes
+  const parseCompetencia = (raw: string): { date: Date | null; valid: boolean } => {
+    const s = raw.trim().replace(/[.\-\s]/g, '/');
+    let mm = 0, yy = 0;
+    if (s.includes('/')) {
+      const parts = s.split('/').filter(Boolean);
+      if (parts.length >= 2) {
+        mm = parseInt(parts[0], 10);
+        const y = parts[1];
+        yy = y.length === 2 ? 2000 + parseInt(y, 10) : parseInt(y, 10);
+      }
+    } else {
+      const d = s.replace(/\D/g, '');
+      if (d.length === 4) { mm = parseInt(d.substring(0, 2), 10); yy = 2000 + parseInt(d.substring(2, 4), 10); }
+      else if (d.length === 6) { mm = parseInt(d.substring(0, 2), 10); yy = parseInt(d.substring(2, 6), 10); }
+    }
+    if (!mm || !yy || mm < 1 || mm > 12 || yy < 2000 || yy > 2099) return { date: null, valid: false };
+    return { date: lastDayOfMonth(yy, mm - 1), valid: true };
   };
 
   useEffect(() => {
@@ -148,11 +156,9 @@ export const Header: React.FC<{ sidebarOpen: boolean }> = ({ sidebarOpen }) => {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('@ledgr:activeMonth', activeMonth.toISOString());
-    setCalendarYear(activeMonth.getFullYear());
-    setCalendarMonth(activeMonth.getMonth());
-    setMonthInput(formatMonthInput(activeMonth));
-  }, [activeMonth]);
+    if (activeCompetencia) setMonthInput(formatMonthInput(activeCompetencia));
+    else setMonthInput('');
+  }, [activeCompetencia]);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -229,42 +235,27 @@ export const Header: React.FC<{ sidebarOpen: boolean }> = ({ sidebarOpen }) => {
     setTimeout(() => navigate(0), 50);
   };
 
-  const handleSelectMonth = (year: number, month: number) => {
-    const newDate = new Date(year, month, 1);
-    setActiveMonth(newDate);
-    setIsMonthOpen(false);
-    setInputError('');
-  };
-
-  const handlePrevYear = () => setCalendarYear(calendarYear - 1);
-  const handleNextYear = () => setCalendarYear(calendarYear + 1);
-
   const handleMonthInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let value = e.target.value.replace(/\D/g, '');
-    if (value.length > 4) value = value.slice(0, 4);
-    if (value.length >= 3) value = value.slice(0, 2) + '/' + value.slice(2);
-    setMonthInput(value);
+    setMonthInput(e.target.value);
     setInputError('');
   };
 
   const handleMonthInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      const parts = monthInput.split('/');
-      if (parts.length === 2) {
-        const month = parseInt(parts[0], 10);
-        const yearShort = parseInt(parts[1], 10);
-        if (month >= 1 && month <= 12 && yearShort >= 0 && yearShort <= 99) {
-          const fullYear = yearShort < 50 ? 2000 + yearShort : 1900 + yearShort;
-          setActiveMonth(new Date(fullYear, month - 1, 1));
-          setIsMonthOpen(false);
-        } else setInputError('Mês inválido.');
+      const { date, valid } = parseCompetencia(monthInput);
+      if (valid && date) {
+        setActiveCompetencia(date);
+        setIsMonthOpen(false);
+        setInputError('');
+      } else {
+        setInputError('Competência inválida. Use mm/aaaa, mmaaaa, mm/aa ou mmaa.');
       }
     }
   };
 
   const handleMonthInputBlur = () => {
-    if (!monthInput.trim()) setMonthInput(formatMonthInput(activeMonth));
+    if (!monthInput.trim() && activeCompetencia) setMonthInput(formatMonthInput(activeCompetencia));
   };
 
   useEffect(() => {
@@ -382,6 +373,48 @@ export const Header: React.FC<{ sidebarOpen: boolean }> = ({ sidebarOpen }) => {
                   </div>
                 )}
               </div>
+
+              {/* MONTH SELECTOR - competencia ativa (persistida por usuario+empresa no backend, */}
+              {/* via UserCompany.activeCompetencia - usada como padrao em Diario, Razao, Balanco e DRE) */}
+              {activeCompany && (
+                <div className="relative month-trigger">
+                  <button
+                    onClick={() => setIsMonthOpen(!isMonthOpen)}
+                    className="flex items-center gap-2 px-3.5 py-2 hover:bg-gray-50 rounded-lg transition-all border border-transparent hover:border-gray-200"
+                    title="Competência ativa (padrão para Diário, Razão, Balanço e DRE) - sempre o último dia do mês"
+                  >
+                    <FiCalendar size={16} className="text-gray-400" />
+                    <span className="text-sm font-semibold text-gray-700">
+                      {activeCompetencia ? formatDDMMYYYY(activeCompetencia) : '—'}
+                    </span>
+                    <FiChevronDown size={14} className={`text-gray-400 transition-transform ${isMonthOpen ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {isMonthOpen && (
+                    <div className="month-dropdown absolute top-full left-0 mt-2 w-64 bg-white border border-gray-200 rounded-xl shadow-xl p-3 z-[110]">
+                      <p className="text-xs font-bold text-gray-400 uppercase mb-2">Competência ativa</p>
+                      <input
+                        ref={monthInputRef}
+                        type="text"
+                        value={monthInput}
+                        onChange={handleMonthInputChange}
+                        onKeyDown={handleMonthInputKeyDown}
+                        onBlur={handleMonthInputBlur}
+                        placeholder="mm/aaaa"
+                        maxLength={7}
+                        autoFocus
+                        className="w-full text-center text-sm font-semibold text-gray-700 border border-gray-200 rounded-lg py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      {inputError && (
+                        <p className="text-[11px] text-red-500 mt-2 text-center">{inputError}</p>
+                      )}
+                      <p className="text-[10px] text-gray-400 mt-2 text-center">
+                        mm/aaaa · mmaaaa · mm/aa · mmaa — sempre resolve para o último dia do mês
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* BUSCA GLOBAL / COMMAND PALETTE - Ctrl/Cmd+K (Estagio 2 do roadmap de navegacao) */}
               <button

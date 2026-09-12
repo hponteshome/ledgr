@@ -271,6 +271,22 @@ async findAvailable(user: any) {
   });
 }
 
+// Competencia ativa (por usuario+empresa) - NOVO 12/09/2026
+async getActiveCompetencia(userId: string, companyId: string) {
+  const uc = await this.prisma.userCompany.findUnique({
+    where: { userId_companyId: { userId, companyId } },
+    select: { activeCompetencia: true },
+  });
+  return uc?.activeCompetencia ?? null;
+}
+
+async setActiveCompetencia(userId: string, companyId: string, date: Date) {
+  return this.prisma.userCompany.update({
+    where: { userId_companyId: { userId, companyId } },
+    data: { activeCompetencia: date },
+  });
+}
+
 async findHeadquarters() {
   return this.prisma.company.findFirst({
     where: {

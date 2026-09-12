@@ -18,6 +18,8 @@ interface CompanyContextData {
   loading: boolean;
   error: string | null;
   loadCompanies: () => Promise<void>;
+  activeCompetencia: Date | null;
+  setActiveCompetencia: (date: Date) => Promise<void>;
 }
 
 const CompanyContext = createContext<CompanyContextData>({} as CompanyContextData);
@@ -28,6 +30,38 @@ export const CompanyProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeCompetencia, setActiveCompetenciaState] = useState<Date | null>(null);
+
+  const competenciaKey = (companyId: string) => `@ledgr:activeCompetencia:${companyId}`;
+  const lastDayOfMonth = (year: number, month: number) => new Date(year, month + 1, 0);
+
+  const loadActiveCompetencia = async (companyId: string) => {
+    const cached = localStorage.getItem(competenciaKey(companyId));
+    if (cached) setActiveCompetenciaState(new Date(cached));
+    try {
+      const response = await api.get(`/companies/${companyId}/active-competencia`);
+      const iso = response.data?.activeCompetencia;
+      const today = new Date();
+      const date = iso ? new Date(iso) : lastDayOfMonth(today.getFullYear(), today.getMonth());
+      setActiveCompetenciaState(date);
+      localStorage.setItem(competenciaKey(companyId), date.toISOString());
+    } catch {
+      // Silencioso - mantem o valor em cache local, se houver
+    }
+  };
+
+  const setActiveCompetencia = async (date: Date) => {
+    if (!activeCompany) return;
+    setActiveCompetenciaState(date);
+    localStorage.setItem(competenciaKey(activeCompany.id), date.toISOString());
+    try {
+      await api.patch(`/companies/${activeCompany.id}/active-competencia`, {
+        activeCompetencia: date.toISOString(),
+      });
+    } catch {
+      // Silencioso - fica salvo localmente, tenta novamente na proxima edicao
+    }
+  };
 
   const activateFirstCompany = (companiesList: Company[]) => {
     if (companiesList.length > 0) {
@@ -39,6 +73,7 @@ export const CompanyProvider: React.FC<{ children: React.ReactNode }> = ({ child
       localStorage.setItem('@ledgr:activeCompany', JSON.stringify(firstCompany));
       localStorage.setItem('@ledgr:companyId', firstCompany.id);
       localStorage.setItem('@ledgr:lastCompanyId', firstCompany.id);
+      loadActiveCompetencia(firstCompany.id);
     }
   };
 
@@ -83,6 +118,7 @@ export const CompanyProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (lastCompanyId === 'none') {
         console.log('🌐 Restaurando Modo Global (Nenhuma empresa ativa)');
         setActiveCompany(null);
+        setActiveCompetenciaState(null);
       } else if (lastCompanyId) {
         const foundCompany = formattedCompanies.find((c: Company) => c.id === lastCompanyId);
 
@@ -91,6 +127,7 @@ export const CompanyProvider: React.FC<{ children: React.ReactNode }> = ({ child
           setActiveCompany(foundCompany);
           localStorage.setItem('@ledgr:activeCompany', JSON.stringify(foundCompany));
           localStorage.setItem('@ledgr:companyId', foundCompany.id);
+          loadActiveCompetencia(foundCompany.id);
         } else {
           console.log('⚠️ Última empresa não encontrada, ativando primeira disponível');
           activateFirstCompany(formattedCompanies);
@@ -125,9 +162,11 @@ export const CompanyProvider: React.FC<{ children: React.ReactNode }> = ({ child
       localStorage.setItem('@ledgr:activeCompany', JSON.stringify(company));
       localStorage.setItem('@ledgr:companyId', company.id);
       localStorage.setItem('@ledgr:lastCompanyId', company.id);
+      loadActiveCompetencia(company.id);
     } else {
       console.log('🌐 Modo Global ativado');
       setActiveCompany(null);
+      setActiveCompetenciaState(null);
       localStorage.removeItem('@ledgr:activeCompany');
       localStorage.removeItem('@ledgr:companyId');
       // Marcamos 'none' para que o sistema não force uma empresa no próximo reload
@@ -142,7 +181,9 @@ export const CompanyProvider: React.FC<{ children: React.ReactNode }> = ({ child
       selectCompany,
       loading,
       error,
-      loadCompanies
+      loadCompanies,
+      activeCompetencia,
+      setActiveCompetencia,
     }}>
       {children}
     </CompanyContext.Provider>
