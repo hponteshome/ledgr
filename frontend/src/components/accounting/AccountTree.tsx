@@ -40,7 +40,7 @@ interface AccountTreeProps {
 
 const fmt = (value: number | null | undefined) => {
     if (value === null || value === undefined) {
-        return <span className="text-slate-300 text-xs">-</span>;
+        return <span className="text-slate-300 text-[13px]">-</span>;
     }
     const abs = Math.abs(value).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     return (
@@ -52,14 +52,14 @@ const fmt = (value: number | null | undefined) => {
 
 const fmtDiff = (value: number | null | undefined) => {
     if (value === null || value === undefined) {
-        return <span className="text-slate-300 text-xs">-</span>;
+        return <span className="text-slate-300 text-[13px]">-</span>;
     }
     if (Math.abs(value) < 0.01) {
-        return <span className="text-green-500 text-xs">check</span>;
+        return <span className="text-green-500 text-[13px]">check</span>;
     }
     const abs = Math.abs(value).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     return (
-        <span className="text-amber-600 font-bold text-xs">
+        <span className="text-amber-600 font-bold text-[13px]">
             {value > 0 ? '+' : '-'}{abs}
         </span>
     );
@@ -76,11 +76,11 @@ const TYPE_STYLE: Record<string, { label: string; cls: string }> = {
 };
 
 const TypeBadge: React.FC<{ type?: string }> = ({ type }) => {
-    if (!type) return <span className="text-slate-300 text-xs">-</span>;
+    if (!type) return <span className="text-slate-300 text-[13px]">-</span>;
     const s = TYPE_STYLE[type];
-    if (!s) return <span className="text-[10px] text-slate-400">{type}</span>;
+    if (!s) return <span className="text-[13px] text-slate-400">{type}</span>;
     return (
-        <span className={`inline-block px-1.5 py-0.5 rounded border text-[10px] font-medium whitespace-nowrap ${s.cls}`}>
+        <span className={`inline-block px-1.5 py-0.5 rounded border text-[13px] font-medium whitespace-nowrap ${s.cls}`}>
             {s.label}
         </span>
     );
@@ -89,7 +89,7 @@ const TypeBadge: React.FC<{ type?: string }> = ({ type }) => {
 const StatusBadge: React.FC<{ isActive?: boolean }> = ({ isActive }) => {
     const active = isActive ?? true;
     return (
-        <span className={`inline-flex items-center gap-1 text-[10px] font-medium ${active ? 'text-emerald-600' : 'text-slate-400'}`}>
+        <span className={`inline-flex items-center gap-1 text-[13px] font-medium ${active ? 'text-emerald-600' : 'text-slate-400'}`}>
             <span className={`w-1.5 h-1.5 rounded-full ${active ? 'bg-emerald-500' : 'bg-slate-300'}`} />
             {active ? 'Ativa' : 'Inativa'}
         </span>
@@ -144,8 +144,8 @@ const TreeRow: React.FC<{
                                 ? <FiFolder size={14} className="text-blue-400 fill-blue-50" />
                                 : <FiFileText size={14} className="text-slate-300" />}
                         </span>
-                        <span className="font-mono text-[11px] text-blue-600 mr-2 flex-shrink-0 w-28">{node.code}</span>
-                        <span className="text-xs tracking-tight truncate">{label}</span>
+                        <span className="font-mono text-[13px] text-blue-600 mr-2 flex-shrink-0 w-28">{node.code}</span>
+                        <span className="text-[13px] tracking-tight truncate">{label}</span>
                     </div>
                 </td>
 
@@ -157,11 +157,11 @@ const TreeRow: React.FC<{
                     )}
                 </td>
 
-                <td className="text-center text-[11px] text-slate-400 px-2">{node.level ?? '-'}</td>
+                <td className="text-center text-[13px] text-slate-400 px-2">{node.level ?? '-'}</td>
 
                 <td className="text-center px-2"><TypeBadge type={node.type} /></td>
 
-                <td className="text-center text-[11px] text-slate-500 px-2">
+                <td className="text-center text-[13px] text-slate-500 px-2">
                     {node.nature === 'DEBIT' ? 'D' : node.nature === 'CREDIT' ? 'C' : '-'}
                 </td>
 
@@ -169,7 +169,7 @@ const TreeRow: React.FC<{
 
                 <td className="px-2">
                     <span
-                        className="font-mono text-[10px] text-indigo-600 bg-indigo-50 border border-indigo-100 px-1 rounded inline-block max-w-full truncate"
+                        className="font-mono text-[13px] text-indigo-600 bg-indigo-50 border border-indigo-100 px-1 rounded inline-block max-w-full truncate"
                         title={node.spedCode ? `Conta referencial SPED: ${node.spedCode}` : 'Sem conta referencial SPED'}
                     >
                         {node.spedCode || '-'}
@@ -178,10 +178,10 @@ const TreeRow: React.FC<{
 
                 {renderBalances ? renderBalances(node) : (
                     <>
-                        <td className="text-right font-mono text-sm pr-3">
+                        <td className="text-right font-mono text-[13px] pr-3">
                             <span className={isSynthetic ? 'font-bold' : ''}>{fmt(calculatedBalance)}</span>
                         </td>
-                        <td className="text-right font-mono text-sm text-slate-400 pr-3">{fmt(ecdBalance)}</td>
+                        <td className="text-right font-mono text-[13px] text-slate-400 pr-3">{fmt(ecdBalance)}</td>
                         <td className="text-right font-mono pr-2">{fmtDiff(difference)}</td>
                     </>
                 )}
@@ -219,7 +219,7 @@ export const AccountTree: React.FC<AccountTreeProps> = ({ nodes, renderBalances,
     const showActions = !!(onEditAccount || onAddChildAccount);
     return (
         <div className="rounded-lg overflow-x-auto overflow-y-hidden" style={{ scrollbarWidth: 'auto', scrollbarColor: '#94A3B8 #F1F5F9' }}>
-            <table className="w-full table-fixed border-collapse text-sm" style={{ minWidth: 1100 }}>
+            <table className="w-full table-fixed border-collapse text-[13px]" style={{ minWidth: 1100 }}>
                 <colgroup>
                     <col style={{ width: showActions ? '27%' : '30%' }} />
                     <col style={{ width: '8%' }} />
@@ -234,7 +234,7 @@ export const AccountTree: React.FC<AccountTreeProps> = ({ nodes, renderBalances,
                     {showActions && <col style={{ width: '6%' }} />}
                 </colgroup>
                 <thead>
-                    <tr className="bg-slate-100 border-b border-slate-200 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                    <tr className="bg-slate-100 border-b border-slate-200 text-[13px] font-bold text-slate-400 uppercase tracking-widest">
                         <th className="text-left py-2 px-3">Conta / Descricao</th>
                         <th className="text-center py-2 px-2">Cod. Red.</th>
                         <th className="text-center py-2 px-2">Nivel</th>

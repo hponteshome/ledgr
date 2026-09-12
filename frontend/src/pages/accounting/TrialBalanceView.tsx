@@ -1124,7 +1124,17 @@ const TrialBalanceView: React.FC = () => {
 
             <div style={{ padding: '24px 32px' }}>
 
-                {/* ── Tabs ── */}
+                {/* ── Tabs + Barra de filtros (fixos ao rolar) ── */}
+                <div
+                    style={{
+                        position: 'sticky',
+                        top: 0,
+                        zIndex: 10,
+                        background: '#fff',
+                        paddingTop: 4,
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                    }}
+                >
                 <div
                     style={{ display: 'flex', borderBottom: DS.border, marginBottom: 20 }}
                 >
@@ -1416,6 +1426,7 @@ const TrialBalanceView: React.FC = () => {
                             </label>
                         </div>
                     )}
+                </div>
                 </div>
 
                 {/* ── Erro ── */}

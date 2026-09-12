@@ -554,7 +554,7 @@ const RazaoAnaliticoPage: React.FC = () => {
                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 18, marginBottom: 8 }}>
                             <thead>
                                 <tr style={{ borderBottom: '1px solid #374151' }}>
-                                    <th style={{ padding: '5px 6px', fontSize: 15, fontWeight: 700, color: '#111', textAlign: 'left', width: 90 }}>Data</th>
+                                    <th style={{ padding: '5px 16px 5px 6px', fontSize: 15, fontWeight: 700, color: '#111', textAlign: 'left', width: 130 }}>Data</th>
                                     <th style={{ padding: '5px 6px', fontSize: 15, fontWeight: 700, color: '#111', textAlign: 'left' }}>Histórico</th>
                                     <th style={{ padding: '5px 6px', fontSize: 15, fontWeight: 700, color: '#111', textAlign: 'left', width: 80 }}>Lote/Lcto.</th>
                                     <th style={{ padding: '5px 14px', fontSize: 15, fontWeight: 700, color: '#111', textAlign: 'right', width: 130 }}>Débito</th>
@@ -610,10 +610,10 @@ const RazaoAnaliticoPage: React.FC = () => {
                                                         <tr key={`${entry.id}-${itemIdx}`}
                                                             onMouseEnter={e => e.currentTarget.style.background = '#F0F9FF'}
                                                             onMouseLeave={e => e.currentTarget.style.background = ''}>
-                                                            <td style={{ ...TD, width: 90, fontSize: 18, fontFamily: 'monospace', color: '#6B7280', whiteSpace: 'nowrap' }}>
+                                                            <td style={{ ...TD, width: 130, paddingRight: 16, fontSize: 18, fontFamily: 'monospace', color: '#6B7280', whiteSpace: 'nowrap' }}>
                                                                 {fmtDateFull(entry.date)}
                                                             </td>
-                                                            <td style={{ ...TD, fontSize: 18, color: '#374151' }}>
+                                                            <td style={{ ...TD, paddingLeft: 16, fontSize: 18, color: '#374151' }}>
                                                                 {entry.description}
                                                             </td>
                                                             <td style={{ ...TD, width: 80, fontSize: 16, fontFamily: 'monospace', color: '#9CA3AF', whiteSpace: 'nowrap' }}>

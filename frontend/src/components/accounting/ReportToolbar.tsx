@@ -47,6 +47,7 @@ interface ReportToolbarProps {
     onExportXLSX?: () => void;
     hasData: boolean;
     filterLabel?: string;
+    extraContent?: React.ReactNode;
 }
 
 export const ReportToolbar: React.FC<ReportToolbarProps> = ({
@@ -56,6 +57,7 @@ export const ReportToolbar: React.FC<ReportToolbarProps> = ({
     count, countLabel = 'registros',
     onFilter, onPrint, onExportCSV, onExportPDF, onExportXLSX,
     hasData, filterLabel = 'Mais filtros',
+    extraContent,
 }) => {
     const [from, setFrom] = useState(dateFrom);
     const [to, setTo] = useState(dateTo);
@@ -164,6 +166,7 @@ export const ReportToolbar: React.FC<ReportToolbarProps> = ({
                             </span>
                         )
                     )}
+                    {extraContent}
                 </div>
 
                 {/* ── Direita: ações ── */}

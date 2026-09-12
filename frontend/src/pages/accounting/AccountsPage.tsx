@@ -205,20 +205,6 @@ export default function AccountsPage() {
                             >
                                 <span>Importar Matriz</span>
                             </button>
-                            <button
-                                onClick={() => { setExpandTarget(true); setExpandSignal(s => s + 1); }}
-                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 bg-slate-50 hover:bg-slate-100 rounded-full transition-colors border border-slate-200"
-                                title="Expandir todas as contas"
-                            >
-                                <span>Expandir tudo</span>
-                            </button>
-                            <button
-                                onClick={() => { setExpandTarget(false); setExpandSignal(s => s + 1); }}
-                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 bg-slate-50 hover:bg-slate-100 rounded-full transition-colors border border-slate-200"
-                                title="Recolher todas as contas"
-                            >
-                                <span>Recolher tudo</span>
-                            </button>
                         </div>
                         <p className="text-slate-500 text-sm">
                             {activeCompany
@@ -255,6 +241,24 @@ export default function AccountsPage() {
                 onPrint={handleImprimir}
                 onExportCSV={exportCSV}
                 hasData={treeData.length > 0}
+                extraContent={
+                    <div style={{ display: 'flex', gap: 6, marginLeft: 8 }}>
+                        <button
+                            onClick={() => { setExpandTarget(true); setExpandSignal(s => s + 1); }}
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 bg-slate-50 hover:bg-slate-100 rounded-full transition-colors border border-slate-200"
+                            title="Expandir todas as contas"
+                        >
+                            <span>Expandir tudo</span>
+                        </button>
+                        <button
+                            onClick={() => { setExpandTarget(false); setExpandSignal(s => s + 1); }}
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 bg-slate-50 hover:bg-slate-100 rounded-full transition-colors border border-slate-200"
+                            title="Recolher todas as contas"
+                        >
+                            <span>Recolher tudo</span>
+                        </button>
+                    </div>
+                }
             />
 
             <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
