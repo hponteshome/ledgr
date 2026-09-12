@@ -1364,6 +1364,34 @@ model ImportLote {
   @@map("import_lotes")
 }
 
+// NOVO (11/09/2026): plano referencial oficial da Receita (registro I051),
+// tabelas dinamicas do SPED Contabil (P100/P150 = PJ geral 5/6 niveis;
+// L100/L300 = instituicoes financeiras/seguradoras BACEN/SUSEP; U100/U150 =
+// variante adicional, proposito exato nao confirmado - importadas por
+// cobertura completa mesmo assim, a pedido do usuario). Multiplas versoes
+// por (tabela, ano) convivem de proposito - trabalha-se com exercicios
+// desde 2017, cada ano tem sua propria vigencia historica.
+model SpedPlanoReferencial {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tabela    String    @map("tabela") @db.VarChar(20) // ex: L100_A, P150_B, U100_C
+  anoBase   Int       @map("ano_base")
+  versao    Int       @map("versao")
+  codigo    String    @map("codigo") @db.VarChar(30)
+  descricao String    @map("descricao") @db.Text
+  dtIni     DateTime? @map("dt_ini") @db.Date
+  dtFim     DateTime? @map("dt_fim") @db.Date
+  ordem     Int?      @map("ordem")
+  tipo      String?   @map("tipo") @db.VarChar(1) // S=sintetica, A=analitica
+  codSup    String?   @map("cod_sup") @db.VarChar(30)
+  nivel     Int?      @map("nivel")
+  natureza  String?   @map("natureza") @db.VarChar(2)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+
+  @@unique([tabela, anoBase, versao, codigo])
+  @@index([tabela, anoBase])
+  @@map("sped_plano_referencial")
+}
+
 /// Itens de lançamento contábil (partidas individuais débito/crédito).
 model JournalEntryItem {
   id             String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid

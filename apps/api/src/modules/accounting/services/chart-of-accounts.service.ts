@@ -38,23 +38,36 @@ export class ChartOfAccountsService {
   }
 
   // ── Busca de codigos RFB (Conta Referencial SPED) ──────────────────────────
-  // NOVO (10/09/2026): autocomplete para o campo spedCode, usando a tabela ja
-  // existente rfb_aglutination_codes (model RfbAglutinationCode) - leiaute 9,
-  // BP ate nivel 5 (P100) / DRE ate nivel 6 (P150). Busca por codigo OU
-  // descricao, filtro opcional por tipo (BP/DRE).
-  async searchRfbCodes(query: string, tipo?: string, leiaute = 9, anoBase = 2025) {
+  // CORRIGIDO (11/09/2026): a versao anterior consultava rfb_aglutination_codes
+  // (I052/Bloco J - proposito DIFERENTE, usado so por "Visoes Contabeis").
+  // O campo spedCode (I051) usa o plano referencial completo L100A/L300A -
+  // agora importado de verdade em sped_plano_referencial (163 mil linhas,
+  // P100/P150/L100/L300/U100/U150, varios anos). Default: tabela P100/P150
+  // (padrao PJ geral), ano mais recente disponivel se nao especificado.
+  async searchRfbCodes(query: string, tabela?: string, anoBase?: number) {
     if (!query || query.trim().length < 2) return [];
-    return this.prisma.rfbAglutinationCode.findMany({
+
+    let ano = anoBase;
+    if (!ano) {
+      const maisRecente = await this.prisma.spedPlanoReferencial.findFirst({
+        where: tabela ? { tabela } : { tabela: { in: ['P100', 'P150'] } },
+        orderBy: { anoBase: 'desc' },
+        select: { anoBase: true },
+      });
+      ano = maisRecente?.anoBase;
+    }
+    if (!ano) return [];
+
+    return this.prisma.spedPlanoReferencial.findMany({
       where: {
-        leiaute,
-        anoBase,
-        ...(tipo ? { tipo } : {}),
+        anoBase: ano,
+        tabela: tabela ? tabela : { in: ['P100', 'P150'] },
         OR: [
           { codigo:    { contains: query.trim(), mode: 'insensitive' } },
           { descricao: { contains: query.trim(), mode: 'insensitive' } },
         ],
       },
-      select: { codigo: true, descricao: true, nivel: true, tipo: true, codigoPai: true },
+      select: { codigo: true, descricao: true, nivel: true, tabela: true, tipo: true, codSup: true, anoBase: true },
       orderBy: { codigo: 'asc' },
       take: 30,
     });

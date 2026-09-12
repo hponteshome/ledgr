@@ -1,6 +1,6 @@
 // apps/frontend/src/components/accounting/AccountMaintenanceModal.tsx
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   X, Trash2, Pencil, Search, Plus, Loader2, AlertTriangle, CheckCircle2,
 } from 'lucide-react';
@@ -63,6 +63,11 @@ interface AccountMaintenanceModalProps {
   open: boolean;
   onClose: () => void;
   onSuccess?: () => void;
+  // NOVO (11/09/2026): abre direto no formulario de edicao/criacao, pulando
+  // a tela de busca/listagem - usado pelos icones de acao direto na arvore
+  // do Plano de Contas (AccountsPage/AccountTree).
+  quickEditAccountId?: string | null;
+  quickCreateParentId?: string | null;
 }
 
 // ── Constantes ───────────────────────────────────────────────────────────────
@@ -137,8 +142,16 @@ const inferFromCode = (code: string, allAccounts: Account[]): Partial<typeof emp
 // ── Componente ───────────────────────────────────────────────────────────────
 
 export const AccountMaintenanceModal: React.FC<AccountMaintenanceModalProps> = ({
-  open, onClose, onSuccess,
+  open, onClose, onSuccess, quickEditAccountId, quickCreateParentId,
 }) => {
+  const quickMode = !!quickEditAccountId || !!quickCreateParentId;
+  // Fecha tudo (nao so o sub-modal) quando estiver em modo rapido, ja que
+  // a lista principal nunca chega a ser mostrada nesse caso.
+  const closeQuickOrSub = () => {
+    setEditMode(false);
+    setCreateMode(false);
+    if (quickMode) onClose();
+  };
   const { activeCompany } = useCompany();
 
   // Lista
@@ -164,6 +177,27 @@ export const AccountMaintenanceModal: React.FC<AccountMaintenanceModalProps> = (
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [editForm, setEditForm] = useState({ ...emptyEdit });
   const [showLalur, setShowLalur] = useState(false);
+  // NOVO (11/09/2026): autocomplete do Codigo Referencial SPED (I051),
+  // contra a tabela sped_plano_referencial ja importada (P100/P150 por
+  // padrao - PJ geral).
+  const [spedSuggestions, setSpedSuggestions] = useState<any[]>([]);
+  const [spedShowDrop, setSpedShowDrop] = useState(false);
+  const [spedSearching, setSpedSearching] = useState(false);
+  const spedSearchTimeout = useRef<any>(null);
+
+  const searchSpedCodes = (query: string) => {
+    clearTimeout(spedSearchTimeout.current);
+    if (!query || query.trim().length < 2) { setSpedSuggestions([]); setSpedShowDrop(false); return; }
+    spedSearchTimeout.current = setTimeout(async () => {
+      setSpedSearching(true);
+      try {
+        const r = await api.get('/chart-of-accounts/rfb-codes/search', { params: { q: query.trim() } });
+        setSpedSuggestions(r.data || []);
+        setSpedShowDrop((r.data || []).length > 0);
+      } catch { setSpedSuggestions([]); }
+      finally { setSpedSearching(false); }
+    }, 300);
+  };
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState('');
 
@@ -515,6 +549,7 @@ export const AccountMaintenanceModal: React.FC<AccountMaintenanceModalProps> = (
       setEditingAccount(null);
       await loadAccounts();
       onSuccess?.();
+      if (quickMode) onClose();
     } catch (e: any) {
       setEditError(e.response?.data?.message || 'Erro ao salvar alterações.');
     } finally {
@@ -597,6 +632,7 @@ export const AccountMaintenanceModal: React.FC<AccountMaintenanceModalProps> = (
         }, 300);
       }
       onSuccess?.();
+      if (quickMode) onClose();
     } catch (e: any) {
       setCreateError(e.response?.data?.message || 'Erro ao criar conta.');
     } finally {
@@ -604,12 +640,40 @@ export const AccountMaintenanceModal: React.FC<AccountMaintenanceModalProps> = (
     }
   };
 
+  // NOVO (11/09/2026): modo rapido - busca a conta completa e abre direto
+  // no formulario certo, sem exigir que o usuario navegue a lista antes.
+  useEffect(() => {
+    if (!quickEditAccountId) return;
+    (async () => {
+      try {
+        const r = await api.get(`/chart-of-accounts/${quickEditAccountId}`);
+        handleEdit(r.data);
+      } catch { toast.error('Erro ao carregar conta para edição.'); onClose(); }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quickEditAccountId]);
+
+  useEffect(() => {
+    if (!quickCreateParentId) return;
+    (async () => {
+      try {
+        const r = await api.get(`/chart-of-accounts/${quickCreateParentId}`);
+        openCreate();
+        await handlePickParent(r.data);
+        setParentQuery(`${r.data.code} — ${r.data.name}`);
+      } catch { toast.error('Erro ao carregar conta pai.'); onClose(); }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quickCreateParentId]);
+
   if (!open) return null;
 
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <>
+      {!quickMode && (
+      <>
       {/* Modal principal */}
       <div className="fixed inset-0 z-40 bg-black/40 flex items-center justify-center p-4">
         <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col overflow-hidden">
@@ -840,6 +904,8 @@ export const AccountMaintenanceModal: React.FC<AccountMaintenanceModalProps> = (
           </div>
         </div>
       </div>
+      </>
+      )}
 
       {/* Modal de Edição */}
       {editMode && editingAccount && (
@@ -850,7 +916,7 @@ export const AccountMaintenanceModal: React.FC<AccountMaintenanceModalProps> = (
                 <h3 className="text-sm font-semibold">Editar Conta</h3>
                 <p className="text-xs text-gray-400 mt-0.5 font-mono">{editingAccount.code}</p>
               </div>
-              <button onClick={() => setEditMode(false)} className="text-gray-300 hover:text-white"><X size={18} /></button>
+              <button onClick={closeQuickOrSub} className="text-gray-300 hover:text-white"><X size={18} /></button>
             </div>
 
             <div className="p-6 overflow-y-auto space-y-4">
@@ -885,9 +951,26 @@ export const AccountMaintenanceModal: React.FC<AccountMaintenanceModalProps> = (
 
               <div className="rounded-lg border border-blue-100 bg-blue-50/40 p-3">
                 <Label>Conta Referencial (SPED)</Label>
-                <input className={inputSt} value={editForm.spedCode}
-                  onChange={e => setEditForm({ ...editForm, spedCode: e.target.value })}
-                  placeholder="ex: 1.01.01.01.01" />
+                <div className="relative">
+                  <input className={inputSt} value={editForm.spedCode}
+                    onChange={e => { setEditForm({ ...editForm, spedCode: e.target.value }); searchSpedCodes(e.target.value); }}
+                    onFocus={() => spedSuggestions.length > 0 && setSpedShowDrop(true)}
+                    onBlur={() => setTimeout(() => setSpedShowDrop(false), 200)}
+                    placeholder="ex: 1.01.01.01.01 - digite para buscar" />
+                  {spedSearching && <span className="absolute right-2 top-2 text-[10px] text-gray-400">buscando...</span>}
+                  {spedShowDrop && spedSuggestions.length > 0 && (
+                    <div className="absolute z-50 mt-1 w-full max-h-52 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg">
+                      {spedSuggestions.map((s, i) => (
+                        <button key={i} type="button"
+                          onMouseDown={() => { setEditForm({ ...editForm, spedCode: s.codigo }); setSpedShowDrop(false); }}
+                          className="w-full text-left px-3 py-1.5 text-xs hover:bg-blue-50 border-b border-gray-50 last:border-0 flex justify-between gap-2">
+                          <span><span className="font-mono text-blue-600">{s.codigo}</span> — {s.descricao}</span>
+                          <span className="text-gray-400 flex-shrink-0">{s.tabela} · N{s.nivel} · {s.tipo}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <p className="text-[11px] text-gray-500 mt-1">
                   Código da tabela dinâmica SPED (P100/P150). Contas analíticas devem referenciar
                   uma folha (P100: 5 níveis / P150: 6 níveis); contas sintéticas devem referenciar
@@ -966,7 +1049,7 @@ export const AccountMaintenanceModal: React.FC<AccountMaintenanceModalProps> = (
             </div>
 
             <div className="bg-[#FAFAFA] border-t border-gray-100 px-6 py-3 flex justify-end gap-2 shrink-0">
-              <button onClick={() => setEditMode(false)} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:border-gray-400 transition-colors">
+              <button onClick={closeQuickOrSub} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:border-gray-400 transition-colors">
                 Cancelar
               </button>
               <button onClick={handleSaveEdit} disabled={editSaving}
@@ -984,7 +1067,7 @@ export const AccountMaintenanceModal: React.FC<AccountMaintenanceModalProps> = (
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
             <div className="bg-[#111111] text-white px-6 py-4 flex items-center justify-between shrink-0">
               <h3 className="text-sm font-semibold">Nova Conta</h3>
-              <button onClick={() => setCreateMode(false)} className="text-gray-300 hover:text-white"><X size={18} /></button>
+              <button onClick={closeQuickOrSub} className="text-gray-300 hover:text-white"><X size={18} /></button>
             </div>
 
             <div className="p-6 overflow-y-auto flex gap-6">
@@ -1143,7 +1226,7 @@ export const AccountMaintenanceModal: React.FC<AccountMaintenanceModalProps> = (
             </div>
 
             <div className="bg-[#FAFAFA] border-t border-gray-100 px-6 py-3 flex justify-end gap-2 shrink-0">
-              <button onClick={() => setCreateMode(false)} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:border-gray-400 transition-colors">
+              <button onClick={closeQuickOrSub} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:border-gray-400 transition-colors">
                 Cancelar
               </button>
               <button onClick={handleSaveCreate} disabled={createLoading}

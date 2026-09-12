@@ -46,6 +46,10 @@ export default function AccountsPage() {
 
     const [showMatrizModal, setShowMatrizModal] = useState(false);
     const [showLotdModal, setShowLotdModal] = useState(false);
+    // NOVO (11/09/2026): edicao/criacao direta por linha na arvore, sem
+    // precisar abrir "Alterar Plano" e navegar ate a conta.
+    const [quickEditId, setQuickEditId] = useState<string | null>(null);
+    const [quickCreateParentId, setQuickCreateParentId] = useState<string | null>(null);
     // NOVO: sinal de expandir/recolher tudo - contador que muda a cada
     // clique, repassado ao AccountTree via prop (nao remonta a arvore).
     const [expandSignal, setExpandSignal] = useState(0);
@@ -262,7 +266,11 @@ export default function AccountsPage() {
 
                 <div className="p-2">
                     {treeData.length > 0 ? (
-                        <AccountTree nodes={treeData} expandSignal={expandSignal} expandTarget={expandTarget} />
+                        <AccountTree
+                            nodes={treeData} expandSignal={expandSignal} expandTarget={expandTarget}
+                            onEditAccount={id => setQuickEditId(id)}
+                            onAddChildAccount={parentId => setQuickCreateParentId(parentId)}
+                        />
                     ) : (
                         <div className="py-20 text-center text-slate-400">
                             <p>Nenhuma conta encontrada até {new Date(referenceDate).toLocaleDateString('pt-BR')}.</p>
@@ -296,6 +304,18 @@ export default function AccountsPage() {
                 <MatrizImportModal
                     onClose={() => setShowMatrizModal(false)}
                     onSuccess={() => { setShowMatrizModal(false); fetchTree(); }}
+                />
+            )}
+
+            {/* NOVO: edicao/criacao rapida por linha - modal separado do
+                "Alterar Plano", so abre no formulario certo, sem lista. */}
+            {(quickEditId || quickCreateParentId) && (
+                <AccountMaintenanceModal
+                    open={true}
+                    quickEditAccountId={quickEditId}
+                    quickCreateParentId={quickCreateParentId}
+                    onClose={() => { setQuickEditId(null); setQuickCreateParentId(null); }}
+                    onSuccess={() => fetchTree()}
                 />
             )}
         </div>

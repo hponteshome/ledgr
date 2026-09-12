@@ -1,7 +1,7 @@
 // apps/frontend/src/components/accounting/AccountTree.tsx
 
 import React, { useState, useEffect } from 'react';
-import { FiChevronRight, FiChevronDown, FiFolder, FiFileText } from 'react-icons/fi';
+import { FiChevronRight, FiChevronDown, FiFolder, FiFileText, FiEdit2, FiPlusCircle } from 'react-icons/fi';
 
 interface AccountNode {
     id: string;
@@ -28,6 +28,12 @@ interface AccountTreeProps {
     renderBalances?: (node: AccountNode) => React.ReactNode;
     expandSignal?: number;
     expandTarget?: boolean;
+    // NOVO (11/09/2026): acoes diretas por linha (editar / adicionar conta
+    // filha) - evita ter que abrir o modal "Alterar Plano" e navegar ate a
+    // conta so pra editar/cadastrar. Opcionais - quem nao passar nao ve
+    // a coluna de acoes.
+    onEditAccount?: (nodeId: string) => void;
+    onAddChildAccount?: (parentId: string, parentCode: string) => void;
 }
 
 // -- Formatadores -------------------------------------------------------------
@@ -98,7 +104,9 @@ const TreeRow: React.FC<{
     renderBalances?: (node: AccountNode) => React.ReactNode;
     expandSignal?: number;
     expandTarget?: boolean;
-}> = ({ node, depth, renderBalances, expandSignal, expandTarget }) => {
+    onEditAccount?: (nodeId: string) => void;
+    onAddChildAccount?: (parentId: string, parentCode: string) => void;
+}> = ({ node, depth, renderBalances, expandSignal, expandTarget, onEditAccount, onAddChildAccount }) => {
     const [isOpen, setIsOpen] = useState((node.level ?? depth + 1) <= 2);
     const hasChildren = !!node.children && node.children.length > 0;
 
@@ -141,6 +149,14 @@ const TreeRow: React.FC<{
                     </div>
                 </td>
 
+                <td className="text-center px-2">
+                    {node.reducedCode && (
+                        <span className="font-mono font-bold text-[13px] text-blue-800 bg-blue-100 border border-blue-300 px-1.5 py-0.5 rounded inline-block">
+                            {node.reducedCode}
+                        </span>
+                    )}
+                </td>
+
                 <td className="text-center text-[11px] text-slate-400 px-2">{node.level ?? '-'}</td>
 
                 <td className="text-center px-2"><TypeBadge type={node.type} /></td>
@@ -150,12 +166,6 @@ const TreeRow: React.FC<{
                 </td>
 
                 <td className="text-center px-2"><StatusBadge isActive={node.isActive} /></td>
-
-                <td className="text-center px-2">
-                    <span className="font-mono font-bold text-[15px] text-blue-800 bg-blue-100 border border-blue-300 px-1.5 py-0.5 rounded inline-block">
-                        {node.reducedCode || ''}
-                    </span>
-                </td>
 
                 <td className="px-2">
                     <span
@@ -175,10 +185,29 @@ const TreeRow: React.FC<{
                         <td className="text-right font-mono pr-2">{fmtDiff(difference)}</td>
                     </>
                 )}
+
+                {(onEditAccount || onAddChildAccount) && (
+                    <td className="text-center px-2" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center justify-center gap-1.5">
+                            {onEditAccount && (
+                                <button onClick={() => onEditAccount(node.id)} title="Editar conta"
+                                    className="text-slate-400 hover:text-blue-600 transition-colors">
+                                    <FiEdit2 size={13} />
+                                </button>
+                            )}
+                            {onAddChildAccount && (
+                                <button onClick={() => onAddChildAccount(node.id, node.code)} title="Adicionar conta filha"
+                                    className="text-slate-400 hover:text-emerald-600 transition-colors">
+                                    <FiPlusCircle size={13} />
+                                </button>
+                            )}
+                        </div>
+                    </td>
+                )}
             </tr>
 
             {hasChildren && isOpen && node.children!.map(child => (
-                <TreeRow key={child.id} node={child} depth={depth + 1} renderBalances={renderBalances} expandSignal={expandSignal} expandTarget={expandTarget} />
+                <TreeRow key={child.id} node={child} depth={depth + 1} renderBalances={renderBalances} expandSignal={expandSignal} expandTarget={expandTarget} onEditAccount={onEditAccount} onAddChildAccount={onAddChildAccount} />
             ))}
         </>
     );
@@ -186,39 +215,42 @@ const TreeRow: React.FC<{
 
 // -- Componente principal -------------------------------------------------------
 
-export const AccountTree: React.FC<AccountTreeProps> = ({ nodes, renderBalances, expandSignal, expandTarget }) => {
+export const AccountTree: React.FC<AccountTreeProps> = ({ nodes, renderBalances, expandSignal, expandTarget, onEditAccount, onAddChildAccount }) => {
+    const showActions = !!(onEditAccount || onAddChildAccount);
     return (
-        <div className="rounded-lg overflow-x-auto overflow-y-hidden">
-            <table className="w-full table-fixed border-collapse text-sm">
+        <div className="rounded-lg overflow-x-auto overflow-y-hidden" style={{ scrollbarWidth: 'auto', scrollbarColor: '#94A3B8 #F1F5F9' }}>
+            <table className="w-full table-fixed border-collapse text-sm" style={{ minWidth: 1100 }}>
                 <colgroup>
-                    <col style={{ width: '30%' }} />
+                    <col style={{ width: showActions ? '27%' : '30%' }} />
+                    <col style={{ width: '8%' }} />
                     <col style={{ width: '5%' }} />
                     <col style={{ width: '9%' }} />
                     <col style={{ width: '5%' }} />
-                    <col style={{ width: '8%' }} />
                     <col style={{ width: '8%' }} />
                     <col style={{ width: '11%' }} />
                     <col style={{ width: '10%' }} />
                     <col style={{ width: '8%' }} />
                     <col style={{ width: '6%' }} />
+                    {showActions && <col style={{ width: '6%' }} />}
                 </colgroup>
                 <thead>
                     <tr className="bg-slate-100 border-b border-slate-200 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                         <th className="text-left py-2 px-3">Conta / Descricao</th>
+                        <th className="text-center py-2 px-2">Cod. Red.</th>
                         <th className="text-center py-2 px-2">Nivel</th>
                         <th className="text-center py-2 px-2">Tipo</th>
                         <th className="text-center py-2 px-2">Nat.</th>
                         <th className="text-center py-2 px-2">Status</th>
-                        <th className="text-center py-2 px-2">Cod. Red.</th>
                         <th className="text-left py-2 px-2">Ref. SPED</th>
                         <th className="text-right py-2 pr-3">Saldo Calculado</th>
                         <th className="text-right py-2 pr-3">Saldo ECD</th>
                         <th className="text-right py-2 pr-2">Diferenca</th>
+                        {showActions && <th className="text-center py-2 px-2">Acoes</th>}
                     </tr>
                 </thead>
                 <tbody>
                     {nodes.map(node => (
-                        <TreeRow key={node.id} node={node} depth={0} renderBalances={renderBalances} expandSignal={expandSignal} expandTarget={expandTarget} />
+                        <TreeRow key={node.id} node={node} depth={0} renderBalances={renderBalances} expandSignal={expandSignal} expandTarget={expandTarget} onEditAccount={onEditAccount} onAddChildAccount={onAddChildAccount} />
                     ))}
                 </tbody>
             </table>

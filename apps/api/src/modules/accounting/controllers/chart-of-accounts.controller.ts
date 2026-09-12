@@ -145,13 +145,14 @@ export class ChartOfAccountsController {
     return this.service.validateStructure(companyId);
   }
 
-  // ── Buscar codigos RFB (autocomplete Conta Referencial SPED) ──
+  // ── Buscar codigos do Plano Referencial SPED (autocomplete) ──
   @Get('rfb-codes/search')
   async searchRfbCodes(
     @Query('q') q: string,
-    @Query('tipo') tipo?: string,
+    @Query('tabela') tabela?: string,
+    @Query('anoBase') anoBase?: string,
   ) {
-    return this.service.searchRfbCodes(q, tipo);
+    return this.service.searchRfbCodes(q, tabela, anoBase ? parseInt(anoBase, 10) : undefined);
   }
 
   // ── Sugerir próximo código disponível ─────────────────────────

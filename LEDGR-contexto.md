@@ -8734,3 +8734,151 @@ endpoint. Busca no codigo nao encontrou o MESMO padrao de bug (pages
 calculado errado) em nenhum outro service (chart-of-accounts.service.ts,
 por exemplo, ja fazia certo, usando o total do count()) - o problema
 parece ter sido isolado a este arquivo.
+
+
+### FALSO ALARME (11/09/2026) - "Sugestao De/Para ECD" - erro transitorio, nao era bug
+
+Tela `/app/accounting/sugestao-de-para` mostrou "Nenhuma conta de origem
+ECD encontrada" num primeiro carregamento, mesmo com 624 contas
+ECD_NATIVE confirmadas no banco. Recarregada logo em seguida, funcionou
+normal (481 mapeamentos, todos confirmados automaticamente). Coincidiu
+com o backend recompilando naquele momento (criacao do
+sped-plano-referencial.service.ts) - foi so timing de reinicio, nao bug
+de consulta. Sem acao necessaria.
+
+### PENDENCIA (11/09/2026) - Tela de Admin para importacao/atualizacao do Plano Referencial SPED
+
+Decisao: expor a importacao do plano referencial SPED (sped_plano_referencial,
+163 mil linhas ja importadas via script PowerShell direto por SQL) tambem
+pela interface, em Administracao - reaproveitando o endpoint que ja existe
+(POST /accounting/sped-plano-referencial/import, aceita upload multiplo de
+arquivo, nunca testado via HTTP ate agora) - upload direto pela tela, sem
+precisar de PowerShell nem acesso a pasta do SPED no servidor.
+
+**Requisito explicito do usuario:** a tela deve avisar visualmente se a
+tabela esta vazia (nenhuma importacao feita ainda) e mostrar a data da
+ultima importacao - usar GET /accounting/sped-plano-referencial/summary
+(ja existe, retorna contagem por tabela/ano/versao) + adicionar a data
+mais recente de created_at nesse resumo (falta esse campo ainda).
+
+Nao construida nesta sessao - autocomplete do campo Conta Referencial
+(SPED) foi priorizado primeiro. Retomar quando planejar a secao de
+Administracao do sistema.
+
+### Sessao 11/09/2026 - Plano Referencial SPED completo + edicao rapida no Plano de Contas + correcoes de layout
+
+**NOVO - Plano Referencial SPED (registro I051), importado de verdade:**
+Descoberta critica: o campo spedCode (Conta Referencial SPED) nunca teve
+fonte de dado real - so era digitado manualmente, sem autocomplete nem
+validacao. Endpoint construido antes apontava por engano pra
+rfb_aglutination_codes (tabela de PROPOSITO DIFERENTE - codigo de
+aglutinacao I052/Bloco J, usado so por "Visoes Contabeis" - documentado
+em sessao anterior como conceito que "nunca deve ser confundido" com o
+plano referencial completo).
+
+Solucao: novo model SpedPlanoReferencial (163 mil linhas), importado a
+partir dos arquivos brutos da instalacao local do programa SPED Contabil
+(formato pipe-delimitado, encoding Latin-1, confirmado via inspecao
+manual) - cobertura completa P100/P150 (PJ geral)/L100/L300 (BACEN/SUSEP)/
+U100/U150 (variante adicional), 22 tabelas, ~10 anos cada (2014-2023+).
+Script scripts/importa-sped-referencial.ps1 (reutilizavel, roda de novo
+a cada atualizacao do programa SPED) copia os arquivos-fonte para pasta
+de arquivo morto fora do Git (D:\Projetos\SPED-Referencial-Fonte,
+organizada por ano - exercicios desde 2017 exigem manter versoes
+antigas) e importa direto via SQL gerado em PowerShell (sem HTTP/token,
+mesmo padrao usado a sessao inteira).
+
+searchRfbCodes() (chart-of-accounts.service.ts) corrigido para consultar
+sped_plano_referencial em vez de rfb_aglutination_codes - default P100/
+P150 (PJ geral), ano mais recente disponivel se nao especificado.
+Autocomplete conectado no campo "Conta Referencial (SPED)" do modal de
+edicao (dropdown com resultados reais, mostra tabela/nivel/tipo).
+
+PENDENCIA registrada: tela de Admin para upload/atualizacao via interface
+(endpoint HTTP /accounting/sped-plano-referencial/import ja existe, nunca
+testado via UI) - deve avisar se a tabela esta vazia e mostrar data da
+ultima importacao. Nao construida nesta sessao.
+
+**NOVO - Edicao/criacao rapida por linha no Plano de Contas:**
+Antes: editar uma conta exigia abrir "Alterar Plano" (modal grande de
+busca/filtro) e navegar ate a linha certa. Agora: dois icones por linha
+na propria arvore (lapis=editar, +=adicionar conta filha), abrindo direto
+o formulario certo via novas props quickEditAccountId/quickCreateParentId
+em AccountMaintenanceModal.tsx - reaproveita 100% do formulario/validacao
+ja existente, sem duplicar codigo. Botao "Alterar Plano" mantido separado
+(exclusao em lote e filtros continuam so ali, por decisao do usuario).
+
+AccountTree.tsx: nova coluna de acoes (so aparece se as props forem
+passadas - nao quebra outros consumidores do componente). Coluna "Cod.
+Red." reposicionada para logo apos Codigo/Descricao (antes de Nivel), a
+pedido do usuario - ficou destacada em vez de espremida numa coluna
+estreita a direita.
+
+**Correcoes de layout (afetam potencialmente outras telas, nao so
+Plano de Contas):**
+- AccountTree.tsx: tabela com table-fixed em % nunca "estourava" a tela
+  (so encolhia pra caber) - adicionado min-width:1100px, forcando overflow
+  real quando necessario.
+- Layout.tsx: adicionado minWidth:0 no container flex principal (<main>
+  filho direto) - sem isso, o comportamento padrao de flexbox (min-width:
+  auto em itens flex) deixava o conteudo "vazar" para fora da tela inteira
+  em vez de ficar contido com scroll interno, mesmo com toda a cadeia de
+  overflow-x-auto correta. Resolve na RAIZ para qualquer tela larga futura,
+  nao so o Plano de Contas.
+
+**RECEITA PRONTA - rolagem horizontal em tabela larga (aplicar nas demais
+telas quando chegar a vez):** sao DOIS problemas distintos que so aparecem
+JUNTOS quando a tabela e larga o bastante, e os dois precisam estar
+corrigidos pra rolagem funcionar de verdade:
+1. Tabela com `table-fixed` + colunas em porcentagem NUNCA estoura a tela
+   sozinha - ela so encolhe pra caber, nao importa quantas colunas tenha.
+   Precisa de um `min-width` em pixels na propria `<table>` (ex: 1100px)
+   pra ela ter motivo real de ultrapassar a largura disponivel.
+2. Container flex (qualquer `<div className="flex ...">` ou `<main>` que
+   seja item de um flex) tem `min-width: auto` por padrao no CSS - isso
+   IMPEDE ele de conter overflow internamente, e o conteudo "vaza" pra
+   fora da tela inteira em vez de ficar contido com scroll interno, mesmo
+   com toda a cadeia de `overflow-x-auto` correta em volta da tabela.
+   Precisa de `minWidth: 0` explicito no container flex pai mais proximo
+   (no caso do LEDGR, ja resolvido de forma global no `<main>` do
+   Layout.tsx - nao deveria precisar repetir esse fix por tela).
+Com o Layout.tsx ja corrigido, telas novas so devem precisar do item 1
+(min-width na tabela em si) - o item 2 ja esta coberto na raiz.
+
+**RECEITA PRONTA - rolagem horizontal em tabela larga (aplicar nas demais
+telas quando chegar a vez):** sao DOIS problemas distintos que so aparecem
+JUNTOS quando a tabela e larga o bastante, e os dois precisam estar
+corrigidos pra rolagem funcionar de verdade:
+1. Tabela com `table-fixed` + colunas em porcentagem NUNCA estoura a tela
+   sozinha - ela so encolhe pra caber, nao importa quantas colunas tenha.
+   Precisa de um `min-width` em pixels na propria `<table>` (ex: 1100px)
+   pra ela ter motivo real de ultrapassar a largura disponivel.
+2. Container flex (qualquer `<div className="flex ...">` ou `<main>` que
+   seja item de um flex) tem `min-width: auto` por padrao no CSS - isso
+   IMPEDE ele de conter overflow internamente, e o conteudo "vaza" pra
+   fora da tela inteira em vez de ficar contido com scroll interno, mesmo
+   com toda a cadeia de `overflow-x-auto` correta em volta da tabela.
+   Precisa de `minWidth: 0` explicito no container flex pai mais proximo
+   (no caso do LEDGR, ja resolvido de forma global no `<main>` do
+   Layout.tsx - nao deveria precisar repetir esse fix por tela).
+Com o Layout.tsx ja corrigido, telas novas so devem precisar do item 1
+(min-width na tabela em si) - o item 2 ja esta coberto na raiz.
+
+**RECEITA PRONTA - rolagem horizontal em tabela larga (aplicar nas demais
+telas quando chegar a vez):** sao DOIS problemas distintos que so aparecem
+JUNTOS quando a tabela e larga o bastante, e os dois precisam estar
+corrigidos pra rolagem funcionar de verdade:
+1. Tabela com `table-fixed` + colunas em porcentagem NUNCA estoura a tela
+   sozinha - ela so encolhe pra caber, nao importa quantas colunas tenha.
+   Precisa de um `min-width` em pixels na propria `<table>` (ex: 1100px)
+   pra ela ter motivo real de ultrapassar a largura disponivel.
+2. Container flex (qualquer `<div className="flex ...">` ou `<main>` que
+   seja item de um flex) tem `min-width: auto` por padrao no CSS - isso
+   IMPEDE ele de conter overflow internamente, e o conteudo "vaza" pra
+   fora da tela inteira em vez de ficar contido com scroll interno, mesmo
+   com toda a cadeia de `overflow-x-auto` correta em volta da tabela.
+   Precisa de `minWidth: 0` explicito no container flex pai mais proximo
+   (no caso do LEDGR, ja resolvido de forma global no `<main>` do
+   Layout.tsx - nao deveria precisar repetir esse fix por tela).
+Com o Layout.tsx ja corrigido, telas novas so devem precisar do item 1
+(min-width na tabela em si) - o item 2 ja esta coberto na raiz.

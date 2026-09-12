@@ -72,7 +72,7 @@ export const Layout: React.FC = () => {
       <Sidebar open={sidebarOpen} onToggle={() => setSidebarOpen(prev => !prev)} />
       <div
         className="flex-1 flex flex-col h-full transition-all duration-200"
-        style={{ marginLeft: contentMargin }}
+        style={{ marginLeft: contentMargin, minWidth: 0 }}
       >
         <Header sidebarOpen={sidebarOpen} />
 

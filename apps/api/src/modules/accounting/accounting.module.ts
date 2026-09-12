@@ -32,6 +32,7 @@ import { EcdLancamentosImportController } from './controllers/ecd-lancamentos-im
 import { JournalManualImportController } from './controllers/journal-manual-import.controller';
 import { HistoricoPadraoController } from './controllers/historico-padrao.controller';
 import { ImportLoteController } from './controllers/import-lote.controller';
+import { SpedPlanoReferencialController } from './controllers/sped-plano-referencial.controller';
 
 // Services
 import { AccountingService }        from './services/accounting.service';
@@ -57,6 +58,7 @@ import { EcdLancamentosImportService } from './services/ecd-lancamentos-import.s
 import { JournalManualImportService } from './services/journal-manual-import.service';
 import { HistoricoPadraoService } from './services/historico-padrao.service';
 import { ImportLoteService } from './services/import-lote.service';
+import { SpedPlanoReferencialService } from './services/sped-plano-referencial.service';
 import { IobLotdParserService }     from './services/iob-lotd-parser.service';
 import { FixedIncomeModule } from './fixed-income/fixed-income.module';
 import { CdiModule } from './cdi/cdi.module';
@@ -98,6 +100,7 @@ import { SidebarResourceGuard } from '../../auth/guards/sidebar-resource.guard';
     JournalManualImportController,
     HistoricoPadraoController,
     ImportLoteController,
+    SpedPlanoReferencialController,
   ],
   providers: [
     AccountingConfigService,
@@ -124,6 +127,7 @@ import { SidebarResourceGuard } from '../../auth/guards/sidebar-resource.guard';
     JournalManualImportService,
     HistoricoPadraoService,
     ImportLoteService,
+    SpedPlanoReferencialService,
     MatrizPlanoParserService,
     IobLotdParserService,
     IobLotdImportService,
