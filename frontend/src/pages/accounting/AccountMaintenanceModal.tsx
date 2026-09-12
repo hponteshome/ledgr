@@ -1151,9 +1151,26 @@ export const AccountMaintenanceModal: React.FC<AccountMaintenanceModalProps> = (
 
               <div className="rounded-lg border border-blue-100 bg-blue-50/40 p-3">
                 <Label>Conta Referencial (SPED)</Label>
-                <input className={inputSt} value={createForm.spedCode}
-                  onChange={e => setCreateForm({ ...createForm, spedCode: e.target.value })}
-                  placeholder="ex: 1.01.01.01.01" />
+                <div className="relative">
+                  <input className={inputSt} value={createForm.spedCode}
+                    onChange={e => { setCreateForm({ ...createForm, spedCode: e.target.value }); searchSpedCodes(e.target.value); }}
+                    onFocus={() => spedSuggestions.length > 0 && setSpedShowDrop(true)}
+                    onBlur={() => setTimeout(() => setSpedShowDrop(false), 200)}
+                    placeholder="ex: 1.01.01.01.01 - digite para buscar" />
+                  {spedSearching && <span className="absolute right-2 top-2 text-[10px] text-gray-400">buscando...</span>}
+                  {spedShowDrop && spedSuggestions.length > 0 && (
+                    <div className="absolute z-50 mt-1 w-full max-h-52 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg">
+                      {spedSuggestions.map((s, i) => (
+                        <button key={i} type="button"
+                          onMouseDown={() => { setCreateForm({ ...createForm, spedCode: s.codigo }); setSpedShowDrop(false); }}
+                          className="w-full text-left px-3 py-1.5 text-xs hover:bg-blue-50 border-b border-gray-50 last:border-0 flex justify-between gap-2">
+                          <span><span className="font-mono text-blue-600">{s.codigo}</span> — {s.descricao}</span>
+                          <span className="text-gray-400 flex-shrink-0">{s.tabela} · N{s.nivel} · {s.tipo}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <p className="text-[11px] text-gray-500 mt-1">
                   Se marcar "conta analítica" abaixo, use um código folha (P100: 5 níveis / P150:
                   6 níveis); se deixar sintética, use um código de agrupamento.

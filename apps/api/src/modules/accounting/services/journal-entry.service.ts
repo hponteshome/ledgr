@@ -141,11 +141,29 @@ const filteredEntries = sourcesArr
     : entries;
 const filteredTotal = filteredEntries.length;
 
+// NOVO (12/09/2026): resolve importLoteId -> numero/ano do lote (numeracao
+// sequencial unica por ano) - usado pelos livros formais (Diario Geral,
+// Razao Analitico) para exibir o numero do lote junto de cada lancamento.
+// Batch lookup (nao 1 query por lancamento).
+const loteIds = [...new Set(filteredEntries.map(e => (e as any).importLoteId).filter(Boolean))];
+let loteMap = new Map<string, { numero: number; ano: number }>();
+if (loteIds.length > 0) {
+  const lotes = await this.prisma.importLote.findMany({
+    where: { id: { in: loteIds as string[] } },
+    select: { id: true, numero: true, ano: true },
+  });
+  loteMap = new Map(lotes.map(l => [l.id, { numero: l.numero, ano: l.ano }]));
+}
+const entriesComLote = filteredEntries.map(e => ({
+  ...e,
+  lote: (e as any).importLoteId ? loteMap.get((e as any).importLoteId) ?? null : null,
+}));
+
 return { 
     total: filteredTotal, 
     page, 
     pages: Math.ceil(total / limit), 
-    entries: filteredEntries 
+    entries: entriesComLote 
 };
   }
 

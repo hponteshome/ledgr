@@ -10,7 +10,7 @@ import { ReportToolbar } from '../../components/accounting/ReportToolbar';
 // ── Tipos ──────────────────────────────────────────────────────
 interface Account { id: string; code: string; name: string; reducedCode?: string; }
 interface JournalItem { accountId: string; account?: Account; value: number; type: 'DEBIT' | 'CREDIT'; }
-interface JournalEntry { id: string; date: string; description: string; reference?: string; sourceModule: string; items: JournalItem[]; }
+interface JournalEntry { id: string; date: string; description: string; reference?: string; sourceModule: string; items: JournalItem[]; lote?: { numero: number; ano: number } | null; }
 interface JournalResponse { total: number; page: number; pages: number; entries: JournalEntry[]; }
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -230,6 +230,14 @@ const DiarioGeralPage: React.FC = () => {
 
     const seqMap = React.useMemo(() => data ? buildSeqMap(data.entries) : new Map(), [data]);
 
+    // Fonte unica de verdade para a coluna "Lote/Lcto" - usada pela tela,
+    // pela impressao e pelo export CSV (mesmo padrao aplicado no Razao
+    // Analitico, apos achado real de divergencia entre os tres).
+    const loteLctoLabel = (entry: JournalEntry): string => {
+        const lcto = seqMap.get(entry.id) || '';
+        return entry.lote ? `${entry.lote.numero}/${lcto}` : lcto;
+    };
+
     // Totais gerais
     const totD = data?.entries.reduce((s, e) => s + e.items.filter(i => i.type === 'DEBIT').reduce((a, i) => a + Number(i.value), 0), 0) ?? 0;
     const totC = data?.entries.reduce((s, e) => s + e.items.filter(i => i.type === 'CREDIT').reduce((a, i) => a + Number(i.value), 0), 0) ?? 0;
@@ -253,7 +261,7 @@ const DiarioGeralPage: React.FC = () => {
             let totalMesC = 0;
             const mesAno = fmtMonthYear(days[0].day);
 
-            rows += "<tr class='mes-header'><td colspan='7'><b>CNPJ: " + cnpj + "</b><span style='float:right'><b>M&ecirc;s/Ano: " + mesAno + "</b></span></td></tr>";
+            rows += "<tr class='mes-header'><td colspan='8'><b>CNPJ: " + cnpj + "</b><span style='float:right'><b>M&ecirc;s/Ano: " + mesAno + "</b></span></td></tr>";
             rows += "<tr class='col-header'><td>Dia</td><td>Conta</td><td>Red.</td><td>Hist&oacute;rico</td><td>Lote/Lcto</td><td>NF</td><td class='num'>D&eacute;bito</td><td class='num'>Cr&eacute;dito</td></tr>";
 
             days.forEach(function(dg) {
@@ -277,16 +285,16 @@ const DiarioGeralPage: React.FC = () => {
                         else { totalDiaC += val; totalMesC += val; totalGeralC += val; }
                         const dia = (idx === 0 && firstEntry) ? fmtDay(entry.date) : '';
                         const hist = idx === 0 ? entry.description.substring(0, 55) : '';
-                        const lote = idx === 0 ? ref : '';
+                        const lote = idx === 0 ? loteLctoLabel(entry) : '';
                         const code = (item.account && item.account.code) ? item.account.code : '';
                         const red = (item.account && item.account.reducedCode) ? item.account.reducedCode : '—';
                         rows += "<tr>";
                         rows += "<td>" + dia + "</td>";
                         rows += "<td class='mono'>" + code + "</td>";
-                        rows += "<td class='mono'>" + code + "</td>";
                         rows += "<td style='color:#6B7280;font-family:monospace'>" + red + "</td>";
-
+                        rows += "<td>" + hist + "</td>";
                         rows += "<td class='mono'>" + lote + "</td>";
+                        rows += "<td></td>";
                         rows += "<td class='num'>" + (isD ? fmtNumTotal(val) : '') + "</td>";
                         rows += "<td class='num'>" + (!isD ? fmtNumTotal(val) : '') + "</td>";
                         rows += "</tr>";
@@ -294,15 +302,15 @@ const DiarioGeralPage: React.FC = () => {
                     firstEntry = false;
                 });
 
-                rows += "<tr class='total-dia'><td colspan='5' style='text-align:right'><b>Total do Dia:</b></td><td class='num'><b>" + fmtNumTotal(totalDiaD) + "</b></td><td class='num'><b>" + fmtNumTotal(totalDiaC) + "</b></td></tr>";
+                rows += "<tr class='total-dia'><td colspan='6' style='text-align:right'><b>Total do Dia:</b></td><td class='num'><b>" + fmtNumTotal(totalDiaD) + "</b></td><td class='num'><b>" + fmtNumTotal(totalDiaC) + "</b></td></tr>";
             });
 
-            rows += "<tr class='total-mes'><td colspan='5' style='text-align:right'><b>Total do M&ecirc;s:</b></td><td class='num'><b>" + fmtNumTotal(totalMesD) + "</b></td><td class='num'><b>" + fmtNumTotal(totalMesC) + "</b></td></tr>";
+            rows += "<tr class='total-mes'><td colspan='6' style='text-align:right'><b>Total do M&ecirc;s:</b></td><td class='num'><b>" + fmtNumTotal(totalMesD) + "</b></td><td class='num'><b>" + fmtNumTotal(totalMesC) + "</b></td></tr>";
         });
 
-        rows += "<tr class='total-geral'><td colspan='5' style='text-align:right'><b>Total Geral:</b></td><td class='num'><b>" + fmtNumTotal(totalGeralD) + "</b></td><td class='num'><b>" + fmtNumTotal(totalGeralC) + "</b></td></tr>";
+        rows += "<tr class='total-geral'><td colspan='6' style='text-align:right'><b>Total Geral:</b></td><td class='num'><b>" + fmtNumTotal(totalGeralD) + "</b></td><td class='num'><b>" + fmtNumTotal(totalGeralC) + "</b></td></tr>";
 
-        const css = "@page{size:A4 landscape;margin:10mm 12mm}" +
+        const css = "@page{size:A4 portrait;margin:10mm 12mm}" +
             "body{font-family:'Courier New',monospace;font-size:9pt;color:#000}" +
             "h2{font-size:10pt;margin:0}" +
             ".header-top{display:flex;justify-content:space-between;margin-bottom:4px}" +
@@ -329,10 +337,16 @@ const DiarioGeralPage: React.FC = () => {
             "</div>" +
             "<div><b>Per&iacute;odo: " + periodo + "</b></div>" +
             (inclTermos ? "<div class='termo'><pre>" + termoAbertura + "</pre></div><hr/>" : '') +
-            "<table>" + rows + "</table>" +
+            "<table style='table-layout:fixed'><colgroup>" +
+            "<col style='width:5%'><col style='width:10%'><col style='width:6%'><col style='width:24%'>" +
+            "<col style='width:9%'><col style='width:9%'><col style='width:18.5%'><col style='width:18.5%'>" +
+            "</colgroup>" + rows + "</table>" +
             (inclTermos ? "<hr/><div class='termo'><pre>" + termoEncerramento + "</pre></div>" : '') +
             "<script>window.onload=function(){window.print();}<\/script>" +
             "</body></html>";
+
+        const w = window.open('', '_blank');
+        if (w) { w.document.write(html); w.document.close(); }
     };
     const exportCSV = () => {
         if (!data?.entries.length) return;
@@ -349,7 +363,7 @@ const DiarioGeralPage: React.FC = () => {
                             `"${item.account?.name || ''}"`,
                             '',
                             idx === 0 ? `"${entry.description}"` : '',
-                            idx === 0 ? seqMap.get(entry.id) || '' : '',
+                            idx === 0 ? loteLctoLabel(entry) : '',
                             item.type === 'DEBIT' ? Number(item.value).toFixed(2).replace('.', ',') : '',
                             item.type === 'CREDIT' ? Number(item.value).toFixed(2).replace('.', ',') : '',
                         ]);
@@ -490,10 +504,12 @@ const DiarioGeralPage: React.FC = () => {
                                                                         <td style={{ ...TD, color: '#374151', maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={entry.description}>
                                                                             {idx === 0 ? entry.description : ''}
                                                                         </td>
-                                                                        {/* Lcto — só 1ª linha */}
+                                                                        {/* Lote/Lcto — so 1a linha */}
                                                                         <td style={{ ...TD, fontFamily: 'monospace', color: '#9CA3AF', fontSize: 14 }}>
-                                                                            {idx === 0 ? lcto : ''}
+                                                                            {idx === 0 ? loteLctoLabel(entry) : ''}
                                                                         </td>
+                                                                        {/* NF — coluna existe no cabecalho mas nunca teve celula correspondente na tela (bug pre-existente) */}
+                                                                        <td style={{ ...TD, fontSize: 14 }}></td>
                                                                         {/* Débito */}
                                                                         <td style={{ ...TD, textAlign: 'right', fontFamily: 'monospace', fontSize: 14, color: item.type === 'DEBIT' ? '#111' : '#D1D5DB' }}>
                                                                             {item.type === 'DEBIT' ? fmtNum(Number(item.value)) : ''}
@@ -508,7 +524,7 @@ const DiarioGeralPage: React.FC = () => {
 
                                                             {/* Total do Dia */}
                                                             <tr style={{ background: '#F9FAFB' }}>
-                                                                <td colSpan={5} style={{ padding: '4px 8px', fontSize: 11, fontWeight: 700, color: '#374151', textAlign: 'right', borderTop: '0.5px solid #E5E7EB', borderBottom: '0.5px solid #E5E7EB' }}>
+                                                                <td colSpan={6} style={{ padding: '4px 8px', fontSize: 11, fontWeight: 700, color: '#374151', textAlign: 'right', borderTop: '0.5px solid #E5E7EB', borderBottom: '0.5px solid #E5E7EB' }}>
                                                                     Total do Dia:
                                                                 </td>
                                                                 <td style={{ padding: '4px 8px', fontFamily: 'monospace', textAlign: 'right', fontWeight: 700, fontSize: 15, color: '#111', borderTop: '0.5px solid #E5E7EB', borderBottom: '0.5px solid #E5E7EB' }}>
@@ -526,7 +542,7 @@ const DiarioGeralPage: React.FC = () => {
 
                                                 {/* Total do Mês */}
                                                 <tr style={{ background: '#EFF6FF' }}>
-                                                    <td colSpan={5} style={{ padding: '6px 8px', fontSize: 15, fontWeight: 700, color: '#1D4ED8', textAlign: 'right', borderTop: '1px solid #1D4ED8' }}>
+                                                    <td colSpan={6} style={{ padding: '6px 8px', fontSize: 15, fontWeight: 700, color: '#1D4ED8', textAlign: 'right', borderTop: '1px solid #1D4ED8' }}>
                                                         Total do Mês — {fmtMonthName(firstDay)}:
                                                     </td>
                                                     <td style={{ padding: '6px 8px', fontFamily: 'monospace', textAlign: 'right', fontWeight: 700, fontSize: 15, color: '#1D4ED8', borderTop: '1px solid #1D4ED8' }}>

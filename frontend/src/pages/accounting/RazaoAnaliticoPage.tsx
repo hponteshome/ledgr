@@ -22,6 +22,7 @@ interface JournalEntry {
     id: string; date: string; description: string;
     reference?: string; sourceModule: string;
     items: JournalItem[];
+    lote?: { numero: number; ano: number } | null;
 }
 interface BalanceRow {
     account: AccountInfo;
@@ -329,6 +330,16 @@ const RazaoAnaliticoPage: React.FC = () => {
 
     const seqMap = React.useMemo(() => buildSeqMap(allEntries), [allEntries]);
 
+    // Fonte unica de verdade para a coluna "Lote/Lcto" - usada pela tela,
+    // pela impressao e pelo export CSV, garantindo que os tres nunca
+    // divirjam na interpretacao do mesmo dado (achado real: a impressao
+    // e o CSV ficaram desatualizados apos a tela ser corrigida, ate este
+    // ponto).
+    const loteLctoLabel = (entry: JournalEntry): string => {
+        const lcto = seqMap.get(entry.id) || '';
+        return entry.lote ? `${entry.lote.numero}/${lcto}` : lcto;
+    };
+
     // Totais gerais
     const totPrev = rows.reduce((s, r) => s + r.previousBalance, 0);
     const totD = rows.reduce((s, r) => s + r.debits, 0);
@@ -362,7 +373,7 @@ const RazaoAnaliticoPage: React.FC = () => {
             if (accountEntries.length === 0) {
                 body += "<div class='sem-movimento'>Sem movimentos no período</div>";
             } else {
-                body += "<table><thead><tr><th class='w90'>Data</th><th>Histórico</th><th class='w80'>Lcto</th><th class='num w100'>Débito</th><th class='num w100'>Crédito</th><th class='num w110'>Saldo</th></tr></thead><tbody>";
+                body += "<table><thead><tr><th class='w90'>Data</th><th>Histórico</th><th class='w80'>Lote/Lcto</th><th class='num w100'>Débito</th><th class='num w100'>Crédito</th><th class='num w110'>Saldo</th></tr></thead><tbody>";
                 accountEntries.forEach(function(entry) {
                     const items = entry.items.filter(function(i) { return i.accountId === a.id; });
                     items.forEach(function(item) {
@@ -373,7 +384,7 @@ const RazaoAnaliticoPage: React.FC = () => {
                         body += "<tr>";
                         body += "<td>" + entry.date.substring(0,10).split('-').reverse().join('/') + "</td>";
                         body += "<td class='hist'>" + (entry.description || '').substring(0,60) + "</td>";
-                        body += "<td>" + (entry.reference || '') + "</td>";
+                        body += "<td>" + loteLctoLabel(entry) + "</td>";
                         body += "<td class='num'>" + (isD ? fmtSaldo(val) : '') + "</td>";
                         body += "<td class='num'>" + (!isD ? fmtSaldo(val) : '') + "</td>";
                         body += "<td class='num saldo-" + (saldo < 0 ? 'neg' : 'pos') + "'>" + fmtSaldo(saldo) + "</td>";
@@ -442,7 +453,7 @@ const RazaoAnaliticoPage: React.FC = () => {
     };
 
     const exportCSV = () => {
-        const lines = [['Conta', 'Red.', 'Nome', 'Saldo Anterior', 'Data', 'Histórico', 'Lcto', 'Débito', 'Crédito', 'Saldo']];
+        const lines = [['Conta', 'Red.', 'Nome', 'Saldo Anterior', 'Data', 'Histórico', 'Lote/Lcto', 'Débito', 'Crédito', 'Saldo']];
         rows.forEach(row => {
             const a = row.account;
             const accountEntries = entriesByAccount.get(a.id) || [];
@@ -454,7 +465,7 @@ const RazaoAnaliticoPage: React.FC = () => {
                     const d = item.type === 'DEBIT' ? Number(item.value) : 0;
                     const c = item.type === 'CREDIT' ? Number(item.value) : 0;
                     saldo = a.nature === 'DEBIT' ? saldo + d - c : saldo - d + c;
-                    lines.push(['', '', '', '', fmtDateFull(entry.date), `"${entry.description}"`, seqMap.get(entry.id) || '', fmtNum(d, true), fmtNum(c, true), fmtSaldo(saldo)]);
+                    lines.push(['', '', '', '', fmtDateFull(entry.date), `"${entry.description}"`, loteLctoLabel(entry), fmtNum(d, true), fmtNum(c, true), fmtSaldo(saldo)]);
                 });
             });
             lines.push(['', '', '', 'Total da Conta:', '', '', '', fmtNum(row.debits), fmtNum(row.credits), fmtSaldo(row.currentBalance)]);
@@ -546,9 +557,9 @@ const RazaoAnaliticoPage: React.FC = () => {
                                     <th style={{ padding: '5px 6px', fontSize: 15, fontWeight: 700, color: '#111', textAlign: 'left', width: 90 }}>Data</th>
                                     <th style={{ padding: '5px 6px', fontSize: 15, fontWeight: 700, color: '#111', textAlign: 'left' }}>Histórico</th>
                                     <th style={{ padding: '5px 6px', fontSize: 15, fontWeight: 700, color: '#111', textAlign: 'left', width: 80 }}>Lote/Lcto.</th>
-                                    <th style={{ padding: '5px 6px', fontSize: 15, fontWeight: 700, color: '#111', textAlign: 'right', width: 100 }}>Débito</th>
-                                    <th style={{ padding: '5px 6px', fontSize: 15, fontWeight: 700, color: '#111', textAlign: 'right', width: 100 }}>Crédito</th>
-                                    <th style={{ padding: '5px 6px', fontSize: 15, fontWeight: 700, color: '#111', textAlign: 'right', width: 110 }}>Saldo</th>
+                                    <th style={{ padding: '5px 14px', fontSize: 15, fontWeight: 700, color: '#111', textAlign: 'right', width: 130 }}>Débito</th>
+                                    <th style={{ padding: '5px 14px', fontSize: 15, fontWeight: 700, color: '#111', textAlign: 'right', width: 130 }}>Crédito</th>
+                                    <th style={{ padding: '5px 14px', fontSize: 15, fontWeight: 700, color: '#111', textAlign: 'right', width: 130 }}>Saldo</th>
                                 </tr>
                             </thead>
                         </table>
@@ -581,7 +592,7 @@ const RazaoAnaliticoPage: React.FC = () => {
                                     </div>
 
                                     {/* Lançamentos */}
-                                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, tableLayout: 'fixed' }}>
                                         <tbody>
                                             {accountEntries.length === 0 ? (
                                                 <tr>
@@ -606,15 +617,15 @@ const RazaoAnaliticoPage: React.FC = () => {
                                                                 {entry.description}
                                                             </td>
                                                             <td style={{ ...TD, width: 80, fontSize: 16, fontFamily: 'monospace', color: '#9CA3AF', whiteSpace: 'nowrap' }}>
-                                                                {seqMap.get(entry.id) || ''}
+                                                                {loteLctoLabel(entry)}
                                                             </td>
-                                                            <td style={{ ...TD, width: 100, textAlign: 'right', fontSize: 18, fontFamily: 'monospace', color: d > 0 ? '#111' : '#D1D5DB' }}>
+                                                            <td style={{ ...TD, width: 130, padding: '2px 14px', textAlign: 'right', fontSize: 18, fontFamily: 'monospace', color: d > 0 ? '#111' : '#D1D5DB' }}>
                                                                 {d > 0 ? fmtNum(d) : ''}
                                                             </td>
-                                                            <td style={{ ...TD, width: 100, textAlign: 'right', fontSize: 18, fontFamily: 'monospace', color: c > 0 ? '#111' : '#D1D5DB' }}>
+                                                            <td style={{ ...TD, width: 130, padding: '2px 14px', textAlign: 'right', fontSize: 18, fontFamily: 'monospace', color: c > 0 ? '#111' : '#D1D5DB' }}>
                                                                 {c > 0 ? fmtNum(c) : ''}
                                                             </td>
-                                                            <td style={{ ...TD, width: 110, textAlign: 'right', fontSize: 18, fontFamily: 'monospace', fontWeight: 500, color: saldo < 0 ? '#B91C1C' : '#111' }}>
+                                                            <td style={{ ...TD, width: 130, padding: '2px 14px', textAlign: 'right', fontSize: 18, fontFamily: 'monospace', fontWeight: 500, color: saldo < 0 ? '#B91C1C' : '#111' }}>
                                                                 {fmtSaldo(saldo)}
                                                             </td>
                                                         </tr>
@@ -627,13 +638,13 @@ const RazaoAnaliticoPage: React.FC = () => {
                                                 <td colSpan={3} style={{ padding: '4px 6px', fontSize: 18, fontWeight: 700, color: '#374151', textAlign: 'right' }}>
                                                     Total da Conta:
                                                 </td>
-                                                <td style={{ padding: '4px 6px', fontFamily: 'monospace', textAlign: 'right', fontWeight: 700, fontSize: 18, color: '#111', width: 100 }}>
+                                                <td style={{ padding: '4px 14px', fontFamily: 'monospace', textAlign: 'right', fontWeight: 700, fontSize: 18, color: '#111', width: 130 }}>
                                                     {fmtNum(row.debits)}
                                                 </td>
-                                                <td style={{ padding: '4px 6px', fontFamily: 'monospace', textAlign: 'right', fontWeight: 700, fontSize: 18, color: '#111', width: 100 }}>
+                                                <td style={{ padding: '4px 14px', fontFamily: 'monospace', textAlign: 'right', fontWeight: 700, fontSize: 18, color: '#111', width: 130 }}>
                                                     {fmtNum(row.credits)}
                                                 </td>
-                                                <td style={{ padding: '4px 6px', fontFamily: 'monospace', textAlign: 'right', fontWeight: 700, fontSize: 18, color: row.currentBalance < 0 ? '#B91C1C' : '#111', width: 110 }}>
+                                                <td style={{ padding: '4px 14px', fontFamily: 'monospace', textAlign: 'right', fontWeight: 700, fontSize: 18, color: row.currentBalance < 0 ? '#B91C1C' : '#111', width: 130 }}>
                                                     {fmtSaldo(row.currentBalance)}
                                                 </td>
                                             </tr>
@@ -651,13 +662,13 @@ const RazaoAnaliticoPage: React.FC = () => {
                                         <td colSpan={3} style={{ padding: '6px', fontSize: 13, fontWeight: 700, color: '#111', textAlign: 'right' }}>
                                             Totais Gerais · {rows.length} contas:
                                         </td>
-                                        <td style={{ padding: '6px', fontFamily: 'monospace', textAlign: 'right', fontWeight: 700, fontSize: 13, color: '#1D4ED8', width: 100 }}>
+                                        <td style={{ padding: '6px 14px', fontFamily: 'monospace', textAlign: 'right', fontWeight: 700, fontSize: 13, color: '#1D4ED8', width: 130 }}>
                                             {fmtNum(totD)}
                                         </td>
-                                        <td style={{ padding: '6px', fontFamily: 'monospace', textAlign: 'right', fontWeight: 700, fontSize: 13, color: '#15803D', width: 100 }}>
+                                        <td style={{ padding: '6px 14px', fontFamily: 'monospace', textAlign: 'right', fontWeight: 700, fontSize: 13, color: '#15803D', width: 130 }}>
                                             {fmtNum(totC)}
                                         </td>
-                                        <td style={{ padding: '6px', fontFamily: 'monospace', textAlign: 'right', fontWeight: 700, fontSize: 13, color: totFin < 0 ? '#B91C1C' : '#111', width: 110 }}>
+                                        <td style={{ padding: '6px 14px', fontFamily: 'monospace', textAlign: 'right', fontWeight: 700, fontSize: 13, color: totFin < 0 ? '#B91C1C' : '#111', width: 130 }}>
                                             {fmtSaldo(totFin)}
                                         </td>
                                     </tr>
