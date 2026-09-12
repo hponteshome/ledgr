@@ -8972,3 +8972,45 @@ estrutural em tabela (colunas adicionadas/removidas), contar plates TODAS
 as ocorrencias de colSpan/celula-vazia relacionadas ANTES de considerar a
 mudanca completa, em vez de corrigir uma ocorrencia por vez conforme o
 usuario for reportando.
+
+
+### Correcao registrada (12/09/2026) - Autocomplete SPED ja replicado no modal de CRIACAO tambem
+
+O autocomplete do campo "Conta Referencial (SPED)" contra sped_plano_referencial,
+que ja existia no modal de EDICAO, foi replicado com sucesso no modal de
+CRIACAO de conta (AccountMaintenanceModal.tsx, createForm.spedCode) na mesma
+sessao - reaproveitou os states ja declarados no nivel do componente
+(spedSuggestions, spedShowDrop, spedSearching, searchSpedCodes), sem duplicar
+logica. Testado e confirmado funcionando pelo usuario. Nao ha mais pendencia
+sobre isso - ambos os modais (edicao e criacao) tem o autocomplete completo.
+### Sessão 12/09/2026 — Ajustes de UI: sobreposição de colunas, fonte do Plano de Contas e padrão de barra fixa
+
+**RazaoAnaliticoPage.tsx:** corrigida sobreposição visual entre colunas Data e
+Histórico (fonte monospace 18px não cabia nos 90px da coluna Data, invadindo
+a coluna seguinte por falta de padding de respiro). Largura e padding
+ajustados no `<th>` e `<td>` correspondentes.
+
+**AccountTree.tsx (Plano de Contas):** todas as classes de fonte da árvore
+(`text-xs`, `text-[10px]`, `text-[11px]`, `text-sm`) unificadas em
+`text-[13px]`, igualando ao tamanho já usado no badge do Cód. Reduzido
+(decisão do usuário: usar o maior valor fixo já existente na tela, em vez
+de simplesmente dobrar cada classe).
+
+**Padrão "fixar barra"/"fixar bloco" (novo, registrado em ways-of-working):**
+quando o usuário pede para fixar um bloco, significa aplicar
+`position: sticky` (top/zIndex/fundo branco/sombra leve) num wrapper
+envolvendo o elemento indicado. Aplicado nesta sessão em dois lugares:
+1. `ReportToolbar.tsx` ganhou uma prop genérica `extraContent` (slot para
+   ações extras específicas de cada página, renderizado após o contador
+   "· N registros"), usada em `AccountsPage.tsx` para mover os botões
+   "Expandir tudo"/"Recolher tudo" do cabeçalho da página para dentro da
+   barra fixa — sem acoplar essa lógica ao componente compartilhado.
+2. `TrialBalanceView.tsx` (Balancete): Abas (Balancete Mensal/Balancete de
+   Verificação) + Barra de filtros completa (datas, toggles Zeradas/
+   Resultado/Movimento, busca, seletor de nível) envolvidas num wrapper
+   sticky único, mesmo padrão do ReportToolbar.
+
+**Nota de processo:** usuário relembrou que o pager do git (`git diff`/
+`git log` sem `--no-pager`) já havia sido identificado como problema em
+sessão anterior — reforçado o uso de `git --no-pager` em todo comando de
+diff/log daqui em diante neste projeto.
