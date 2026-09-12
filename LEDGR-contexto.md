@@ -9014,3 +9014,47 @@ envolvendo o elemento indicado. Aplicado nesta sessão em dois lugares:
 `git log` sem `--no-pager`) já havia sido identificado como problema em
 sessão anterior — reforçado o uso de `git --no-pager` em todo comando de
 diff/log daqui em diante neste projeto.
+
+### Sessão 12/09/2026 (continuação) — Competência ativa: campo no Header + persistência por usuário+empresa
+
+**Problema identificado:** o Header.tsx já tinha toda a lógica de um seletor
+de "mês ativo" pronta (estado, calendário, parsing) desde antes, mas o JSX
+correspondente nunca chegou a ser renderizado — a chave `@ledgr:activeMonth`
+era lida por 4 telas (Razão Analítico, Diário Geral, Balanço Patrimonial,
+DRE) mas nunca escrita por nenhuma UI real, o que travava o ano padrão
+dessas telas em 2024 permanentemente.
+
+**Decisão de escopo:** persistir por usuário+empresa (tabela `UserCompany`,
+já existente como join N:N), não apenas por usuário — usuário alterna entre
+várias empresas e cada uma pode estar em uma competência de trabalho
+diferente.
+
+**Implementado:**
+1. `UserCompany.activeCompetencia` (DateTime? @db.Date) + migração manual
+2. `GET`/`PATCH /companies/:id/active-competencia` no `company.controller.ts`
+3. `CompanyContext.tsx`: busca a competência do backend sempre que a empresa
+   ativa muda (com cache instantâneo em localStorage por empresa para não
+   esperar round-trip); grava via PATCH ao editar
+4. `Header.tsx`: campo único de texto (não é mais dropdown com grade de
+   meses), aceita `mm/aaaa`, `mmaaaa`, `mm/aa` ou `mmaa`, sempre resolve
+   para o **último dia do mês** informado; só aparece com empresa ativa
+   selecionada (não faz sentido em Modo Global)
+5. As 4 telas de relatório: `getActiveYear()` passou a ler
+   `@ledgr:activeCompetencia:<companyId>` (por empresa) em vez da chave
+   global morta
+
+**Limitação aceita:** `getActiveYear()` nas 4 telas roda uma vez no
+carregamento do módulo (não é reativo a mudanças), lendo o cache do
+localStorage escrito pelo CompanyContext. Funciona no fluxo normal
+(login → Header carrega empresa → navegação), mas não é garantidamente
+livre de corrida em casos extremos (ex.: link direto para a URL do
+relatório antes do Header montar). Aceito como consistente com o padrão
+já existente no código antes desta sessão.
+
+**Nota de processo:** dois scripts anteriores no Header.tsx (dropdown com
+grade de 12 meses, depois campo único) deixaram blocos JSX duplicados no
+arquivo — identificado via diagnóstico (`Select-String -Pattern "MONTH
+SELECTOR"` retornando 2 ocorrências) antes de prosseguir, e removido na
+reescrita final. Lição: sempre confirmar o estado real do arquivo após
+múltiplos patches sequenciais na mesma sessão, mesmo quando cada patch
+individual reportou "OK".
