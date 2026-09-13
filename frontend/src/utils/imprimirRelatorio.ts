@@ -15,6 +15,11 @@ export interface ImprimirRelatorioOptions {
   periodo?: string;
   corpoHtml: string;
   rodapeHtml?: string;
+  // NOVO 12/09/2026: quando true, a previa NAO fica limitada a largura de uma
+  // folha A4 (21cm) - usa a largura total da janela. Para relatorios com
+  // muitas colunas dinamicas (ex: Comparativo de Saldos). Default false
+  // preserva 100% o comportamento atual de todas as telas existentes.
+  larguraTotal?: boolean;
 }
 
 const fmtCnpj = (cnpj: string) => {
@@ -29,7 +34,7 @@ export function imprimirRelatorio(opts: ImprimirRelatorioOptions): void {
 
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${opts.titulo}</title><style>
     body { font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #111; margin: 0; background: #78716c; }
-    .pagina { max-width: 21cm; margin: 24px auto; padding: 24px; background: #fff; box-shadow: 0 2px 12px rgba(0,0,0,0.15); box-sizing: border-box; }
+    .pagina { max-width: ${opts.larguraTotal ? 'none' : '21cm'}; margin: ${opts.larguraTotal ? '24px' : '24px auto'}; padding: 24px; background: #fff; box-shadow: ${opts.larguraTotal ? 'none' : '0 2px 12px rgba(0,0,0,0.15)'}; box-sizing: border-box; }
     @media print { body { background: #fff; } .pagina { max-width: none; margin: 0; padding: 12px; box-shadow: none; } }
     .cabecalho { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 16px; }
     .cabecalho .empresa { font-size: 13px; }

@@ -4,7 +4,7 @@
 // (ver journal-manual-import.service.ts, getOrCreateLoteForYear). Serve
 // qualquer tipo de importacao (MANUAL, IOB, ECD) que venha a popular a
 // tabela import_lotes no futuro.
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 
 @Injectable()
@@ -34,5 +34,36 @@ export class ImportLoteService {
       ...l,
       createdByName: userMap.get(l.createdById)?.fullName ?? userMap.get(l.createdById)?.email ?? null,
     }));
+  }
+
+  // NOVO 13/09/2026: exclusao INTEGRAL do lote (hard delete) - remove todos
+  // os lancamentos/itens vinculados e o proprio registro do lote. Usado
+  // quando o usuario precisa reimportar um arquivo corrigido do zero.
+  // Mesma logica ja usada internamente em journal-manual-import.service.ts
+  // (hardDeleteLote, privado, so acionado no fluxo de "sobrepor duplicata")
+  // - aqui exposta como acao explicita do usuario a partir da tela de
+  // listagem de lotes.
+  async remove(loteId: string, companyId: string) {
+    const lote = await this.prisma.importLote.findFirst({
+      where: { id: loteId, companyId, deletedAt: null },
+    });
+    if (!lote) {
+      throw new NotFoundException('Lote não encontrado.');
+    }
+
+    const entriesCount = await this.prisma.$transaction(async (tx) => {
+      const count = await tx.journalEntry.count({ where: { importLoteId: loteId } });
+      await tx.journalEntryItem.deleteMany({
+        where: { journalEntry: { importLoteId: loteId } },
+      });
+      await tx.journalEntry.deleteMany({ where: { importLoteId: loteId } });
+      await tx.importLote.delete({ where: { id: loteId } });
+      return count;
+    });
+
+    return {
+      message: `Lote ${lote.numero}/${lote.ano} excluído com sucesso.`,
+      lancamentosExcluidos: entriesCount,
+    };
   }
 }

@@ -224,6 +224,12 @@ function filterVerification(
 
 // ─── Zero-balance filters ─────────────────────────────────────────────────────
 
+// Tolerancia de meio centavo - "debits - credits" raramente fecha em
+// exatamente 0 em JS (residuo de ponto flutuante), especialmente em contas
+// transitorias como Apuracao de Resultado (grupo 234), que sempre deveriam
+// zerar mas acumulam algo como 1.42e-14 em vez de 0 exato.
+const ZERO_EPS = 0.005;
+
 function applyZeroFilterMonthly(
     items: MonthlyBalanceItem[],
     show: boolean,
@@ -234,7 +240,7 @@ function applyZeroFilterMonthly(
             ...i,
             children: i.children ? applyZeroFilterMonthly(i.children, show) : [],
         }))
-        .filter(i => i.balance !== 0 || (i.children?.length ?? 0) > 0);
+        .filter(i => Math.abs(i.balance) >= ZERO_EPS || (i.children?.length ?? 0) > 0);
 }
 
 function applyZeroFilterVerification(
@@ -251,9 +257,9 @@ function applyZeroFilterVerification(
         }))
         .filter(
             i =>
-                i.previousBalance !== 0 ||
-                i.debits !== 0 ||
-                i.credits !== 0 ||
+                Math.abs(i.previousBalance) >= ZERO_EPS ||
+                Math.abs(i.debits) >= ZERO_EPS ||
+                Math.abs(i.credits) >= ZERO_EPS ||
                 (i.children?.length ?? 0) > 0,
         );
 }

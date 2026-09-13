@@ -26,7 +26,10 @@ export class BalanceComparisonController {
     @Param('companyId') companyId: string,
     @Query('anoInicio') anoInicio: string,
     @Query('anoFim') anoFim: string,
+    @Query('excludeClosing') excludeClosing?: string,
   ) {
-    return this.svc.getComparisonAnual(companyId, parseInt(anoInicio, 10), parseInt(anoFim, 10));
+    return this.svc.getComparisonAnual(
+      companyId, parseInt(anoInicio, 10), parseInt(anoFim, 10), excludeClosing === 'true',
+    );
   }
 }

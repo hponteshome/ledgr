@@ -5,8 +5,15 @@
 // para reaproveitar a logica ja validada do Balancete em vez do agrupamento
 // bruto por ano do antigo BalancesService.getBalanceComparison.
 import React, { useState, useCallback } from 'react';
+import toast from 'react-hot-toast';
 import { useCompany } from '@/contexts/CompanyContext';
 import api from '@/services/api';
+import { usePrintHandler } from '@/contexts/PrintContext';
+import { imprimirRelatorio } from '@/utils/imprimirRelatorio';
+
+// NOVO 12/09/2026: limite de colunas nesta tela (mensal e anual) - tabelas
+// muito largas ficam ilegiveis e pesadas para renderizar/imprimir.
+const MAX_COLUNAS = 15;
 
 interface ContaRow {
   conta: string;
@@ -40,10 +47,21 @@ export const BalanceComparisonPage = () => {
   const { activeCompany } = useCompany();
   const anoAtual = new Date().getFullYear();
 
-  const [mesIni, setMesIni] = useState(1);
-  const [anoIni, setAnoIni] = useState(anoAtual - 1);
-  const [mesFim, setMesFim] = useState(new Date().getMonth() + 1);
-  const [anoFim, setAnoFim] = useState(anoAtual);
+  // NOVO 13/09/2026: periodo padrao sugerido = janela de 15 meses terminando
+  // no mes anterior ao atual (mes corrente ainda nao fechado). Ex: hoje
+  // 13/09/2026 -> sugere Jun/25 a Ago/26.
+  const hojeDefault = new Date();
+  let mesFimDefault = hojeDefault.getMonth(); // 0-indexado = ja e "mes atual - 1" em base 1
+  let anoFimDefault = hojeDefault.getFullYear();
+  if (mesFimDefault === 0) { mesFimDefault = 12; anoFimDefault -= 1; }
+  let mesIniDefault = mesFimDefault - 14;
+  let anoIniDefault = anoFimDefault;
+  while (mesIniDefault <= 0) { mesIniDefault += 12; anoIniDefault -= 1; }
+
+  const [mesIni, setMesIni] = useState(mesIniDefault);
+  const [anoIni, setAnoIni] = useState(anoIniDefault);
+  const [mesFim, setMesFim] = useState(mesFimDefault);
+  const [anoFim, setAnoFim] = useState(anoFimDefault);
 
   const [periodos, setPeriodos] = useState<string[]>([]);
   const [data, setData] = useState<ContaRow[]>([]);
@@ -101,7 +119,21 @@ export const BalanceComparisonPage = () => {
   }, [activeCompany?.id, anoIniAnual, anoFimAnual]);
 
   const handleGerar = () => {
-    viewMode === 'mensal' ? loadReport() : loadReportAnual();
+    if (viewMode === 'mensal') {
+      const totalMeses = (anoFim - anoIni) * 12 + (mesFim - mesIni) + 1;
+      if (totalMeses > MAX_COLUNAS) {
+        toast.error(`Selecione no máximo ${MAX_COLUNAS} meses (o período escolhido tem ${totalMeses}).`);
+        return;
+      }
+      loadReport();
+    } else {
+      const totalAnos = anoFimAnual - anoIniAnual + 1;
+      if (totalAnos > MAX_COLUNAS) {
+        toast.error(`Selecione no máximo ${MAX_COLUNAS} anos (o período escolhido tem ${totalAnos}).`);
+        return;
+      }
+      loadReportAnual();
+    }
   };
 
   const handleSort = (key: SortKey) => {
@@ -135,6 +167,49 @@ export const BalanceComparisonPage = () => {
       return sortDir === 'asc' ? valA.localeCompare(valB, 'pt-BR') : valB.localeCompare(valA, 'pt-BR');
     }
     return sortDir === 'asc' ? (valA as number) - (valB as number) : (valB as number) - (valA as number);
+  });
+
+  const rootRowsMensal = data.filter(r => r.level === 1);
+  const diferencaPorPeriodo: Record<string, number> = {};
+  const resultadoPorPeriodo: Record<string, number> = {};
+  periodos.forEach(p => {
+    let diferenca = 0;
+    let outros = 0;
+    rootRowsMensal.forEach(r => {
+      const v = r.saldos?.[p] ?? 0;
+      if (r.conta === '1' || r.conta === '2') diferenca += v;
+      else outros += v;
+    });
+    diferencaPorPeriodo[p] = diferenca;
+    resultadoPorPeriodo[p] = -outros;
+  });
+
+  const rootRowsAnual = dataAnual.filter(r => r.level === 1);
+  let diferencaAnteriorAnual = 0;
+  let outrosAnteriorAnual = 0;
+  rootRowsAnual.forEach(r => {
+    if (r.conta === '1' || r.conta === '2') diferencaAnteriorAnual += r.saldoAnterior;
+    else outrosAnteriorAnual += r.saldoAnterior;
+  });
+  const resultadoAnteriorAnual = -outrosAnteriorAnual;
+  const diferencaSaldoPorAno: Record<string, number> = {};
+  const resultadoMovimentoPorAno: Record<string, number> = {};
+  const resultadoSaldoPorAno: Record<string, number> = {};
+  anosAnuais.forEach(ano => {
+    let difSaldo = 0, outroSaldo = 0, outroMov = 0;
+    rootRowsAnual.forEach(r => {
+      const sal = r.saldos?.[ano as any] ?? 0;
+      const mov = r.movimentos?.[ano as any] ?? 0;
+      if (r.conta === '1' || r.conta === '2') {
+        difSaldo += sal;
+      } else {
+        outroSaldo += sal;
+        outroMov += mov;
+      }
+    });
+    diferencaSaldoPorAno[ano] = difSaldo;
+    resultadoMovimentoPorAno[ano] = -outroMov;
+    resultadoSaldoPorAno[ano] = -outroSaldo;
   });
 
   const dataFiltradaAnual = apenasMovimentacao
@@ -210,6 +285,61 @@ export const BalanceComparisonPage = () => {
     link.click();
     URL.revokeObjectURL(url);
   };
+
+  const handleImprimir = () => {
+    if (!activeCompany) return;
+    if (viewMode === 'mensal') {
+      const linhas = sorted.map(row => `
+        <tr>
+          <td style="padding-left:${8 + (row.level - 1) * 14}px">${row.conta}</td>
+          <td>${row.descricao}</td>
+          ${periodos.map(p => `<td class="num">${(row.saldos?.[p] ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`).join('')}
+        </tr>`).join('');
+      const corpoHtml = `<table><thead><tr><th>Código</th><th>Conta</th>${periodos.map(p => `<th class="num">${formatPeriodo(p)}</th>`).join('')}</tr></thead><tbody>${linhas}</tbody></table>`;
+      imprimirRelatorio({
+        titulo: 'COMPARATIVO DE SALDOS (MENSAL)',
+        empresaNome: activeCompany.legalName || activeCompany.tradeName || '',
+        empresaCnpj: activeCompany.taxId || '',
+        periodo: periodos.length ? `${formatPeriodo(periodos[0])} a ${formatPeriodo(periodos[periodos.length - 1])}` : '',
+        corpoHtml,
+        larguraTotal: true,
+      });
+    } else {
+      const anoAnteriorLbl = anosAnuais[0] ? anosAnuais[0] - 1 : anoIniAnual - 1;
+      const linhas = sortedAnual.map(row => `
+        <tr>
+          <td style="padding-left:${8 + (row.level - 1) * 14}px">${row.conta}</td>
+          <td>${row.descricao}</td>
+          <td class="num">${row.saldoAnterior.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+          ${anosAnuais.map(ano => `
+            <td class="num">${(row.movimentos?.[ano as any] ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+            <td class="num">${(row.saldos?.[ano as any] ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+          `).join('')}
+        </tr>`).join('');
+      const corpoHtml = `<table><thead><tr><th>Código</th><th>Conta</th><th class="num">Saldo Anterior (Dez/${anoAnteriorLbl})</th>${anosAnuais.map(ano => `<th class="num">Movimento ${ano}</th><th class="num">Saldo ${ano}</th>`).join('')}</tr></thead><tbody>${linhas}</tbody></table>`;
+      imprimirRelatorio({
+        titulo: 'COMPARATIVO DE SALDOS (ANUAL)',
+        empresaNome: activeCompany.legalName || activeCompany.tradeName || '',
+        empresaCnpj: activeCompany.taxId || '',
+        periodo: anosAnuais.length ? `${anosAnuais[0]} a ${anosAnuais[anosAnuais.length - 1]}` : '',
+        corpoHtml,
+        larguraTotal: true,
+      });
+    }
+  };
+
+  usePrintHandler(
+    gerado ? handleImprimir : null,
+    'Imprimir Comparativo de Saldos',
+    [viewMode, sorted, sortedAnual, periodos, anosAnuais, activeCompany, anoIniAnual],
+  );
+
+  const summaryTdStyle = (val: number, isDash: boolean): React.CSSProperties => ({
+    padding: '9px 14px', borderBottom: '1px solid #E5E7EB', textAlign: 'right',
+    fontVariantNumeric: 'tabular-nums', fontWeight: 700, fontSize: 12,
+    color: isDash ? '#D1D5DB' : (val < 0 ? '#B91C1C' : '#15803D'),
+  });
+  const fmtSummary = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   const thBase: React.CSSProperties = {
     padding: '10px 14px', fontSize: 11, fontWeight: 500, textTransform: 'uppercase',
@@ -345,7 +475,7 @@ export const BalanceComparisonPage = () => {
         </div>
       ) : viewMode === 'mensal' ? (
         <div style={{ border: '0.5px solid #E5E7EB', borderRadius: 10, overflow: 'auto', maxHeight: 'calc(100vh - 220px)' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, tableLayout: 'auto' }}>
+          <table style={{ width: '100%', minWidth: 900, borderCollapse: 'separate', borderSpacing: 0, fontSize: 13, tableLayout: 'auto' }}>
             <thead>
               <tr>
                 <th style={thFixed} onClick={() => handleSort('conta')}>Conta <SortIcon col="conta" /></th>
@@ -357,42 +487,72 @@ export const BalanceComparisonPage = () => {
               </tr>
             </thead>
             <tbody>
-              {sorted.map((row, i) => (
-                <tr
-                  key={row.conta}
-                  style={{ background: row.isAnalytic ? (i % 2 === 0 ? '#fff' : '#FAFAFA') : '#F3F4F6' }}
-                >
-                  <td style={{
-                    padding: '9px 14px', borderBottom: '0.5px solid #F5F5F5', position: 'sticky', left: 0,
-                    background: 'inherit', zIndex: 5, boxShadow: '2px 0 4px -1px rgba(0,0,0,0.06)',
-                    fontFamily: 'monospace', paddingLeft: 14 + (row.level - 1) * 14,
-                    fontWeight: row.isAnalytic ? 400 : 600,
-                  }}>
-                    <span style={{ color: '#0369A1' }}>{row.conta}</span>
-                    <span style={{ marginLeft: 8, color: '#374151', fontFamily: 'inherit', fontSize: 12, textTransform: row.isAnalytic ? 'none' : 'uppercase' }}>
-                      {row.descricao}
-                    </span>
+              <tr style={{ position: 'sticky', top: 42, zIndex: 8 }}>
+                <td style={{ padding: '9px 14px', borderBottom: '1px solid #E5E7EB', position: 'sticky', left: 0, top: 42, background: '#F0FDF4', zIndex: 9, fontWeight: 700, fontSize: 12, color: '#15803D' }}>
+                  Diferença (Ativo - Passivo)
+                </td>
+                {periodos.map(p => (
+                  <td key={`dif-${p}`} style={{ ...summaryTdStyle(diferencaPorPeriodo[p] ?? 0, false), position: 'sticky', top: 42, background: '#F0FDF4', zIndex: 8 }}>
+                    {fmtSummary(diferencaPorPeriodo[p] ?? 0)}
                   </td>
-                  {periodos.map(p => {
-                    const val = row.saldos?.[p] ?? 0;
-                    return (
-                      <td key={`${row.conta}-${p}`} style={{
-                        padding: '9px 14px', borderBottom: '0.5px solid #F5F5F5', textAlign: 'right',
-                        fontVariantNumeric: 'tabular-nums',
-                        color: val < 0 ? '#B91C1C' : val === 0 ? '#D1D5DB' : '#374151', fontSize: 12,
-                      }}>
-                        {val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
+                ))}
+              </tr>
+              <tr style={{ position: 'sticky', top: 82, zIndex: 8 }}>
+                <td style={{ padding: '9px 14px', borderBottom: '1px solid #E5E7EB', position: 'sticky', left: 0, top: 82, background: '#EFF6FF', zIndex: 9, fontWeight: 700, fontSize: 12, color: '#1D4ED8' }}>
+                  Resultado (Receitas - Despesas)
+                </td>
+                {periodos.map(p => (
+                  <td key={`res-${p}`} style={{ ...summaryTdStyle(resultadoPorPeriodo[p] ?? 0, false), position: 'sticky', top: 82, background: '#EFF6FF', zIndex: 8 }}>
+                    {fmtSummary(resultadoPorPeriodo[p] ?? 0)}
+                  </td>
+                ))}
+              </tr>
+              {sorted.map((row, i) => {
+                const isAtivoRow = row.level === 1 && row.conta === '1';
+                return (
+                  <tr
+                    key={row.conta}
+                    style={{ background: row.isAnalytic ? (i % 2 === 0 ? '#fff' : '#FAFAFA') : '#F3F4F6' }}
+                  >
+                    <td style={{
+                      padding: '9px 14px', borderBottom: '0.5px solid #F5F5F5',
+                      position: 'sticky', left: 0, top: isAtivoRow ? 122 : undefined,
+                      background: isAtivoRow ? '#F3F4F6' : 'inherit', zIndex: isAtivoRow ? 9 : 5,
+                      boxShadow: isAtivoRow ? '2px 2px 4px -1px rgba(0,0,0,0.10)' : '2px 0 4px -1px rgba(0,0,0,0.06)',
+                      fontFamily: 'monospace', paddingLeft: 14 + (row.level - 1) * 14,
+                      fontWeight: row.isAnalytic ? 400 : 600,
+                    }}>
+                      <span style={{ color: '#0369A1' }}>{row.conta}</span>
+                      <span style={{ marginLeft: 8, color: '#374151', fontFamily: 'inherit', fontSize: 12, textTransform: row.isAnalytic ? 'none' : 'uppercase' }}>
+                        {row.descricao}
+                      </span>
+                    </td>
+                    {periodos.map(p => {
+                      const val = row.saldos?.[p] ?? 0;
+                      return (
+                        <td key={`${row.conta}-${p}`} style={{
+                          padding: '9px 14px', borderBottom: '0.5px solid #F5F5F5', textAlign: 'right',
+                          fontVariantNumeric: 'tabular-nums',
+                          color: val < 0 ? '#B91C1C' : val === 0 ? '#D1D5DB' : '#374151', fontSize: 12,
+                          position: isAtivoRow ? 'sticky' : undefined,
+                          top: isAtivoRow ? 122 : undefined,
+                          background: isAtivoRow ? '#F3F4F6' : undefined,
+                          zIndex: isAtivoRow ? 6 : undefined,
+                          boxShadow: isAtivoRow ? '0 2px 4px -2px rgba(0,0,0,0.15)' : undefined,
+                        }}>
+                          {val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
       ) : (
         <div style={{ border: '0.5px solid #E5E7EB', borderRadius: 10, overflow: 'auto', maxHeight: 'calc(100vh - 220px)' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, tableLayout: 'auto' }}>
+          <table style={{ width: '100%', minWidth: 900, borderCollapse: 'separate', borderSpacing: 0, fontSize: 13, tableLayout: 'auto' }}>
             <thead>
               <tr>
                 <th style={thFixed} onClick={() => handleSort('conta')}>Conta <SortIcon col="conta" /></th>
@@ -413,53 +573,97 @@ export const BalanceComparisonPage = () => {
               </tr>
             </thead>
             <tbody>
-              {sortedAnual.map((row, i) => (
-                <tr
-                  key={row.conta}
-                  style={{ background: row.isAnalytic ? (i % 2 === 0 ? '#fff' : '#FAFAFA') : '#F3F4F6' }}
-                >
-                  <td style={{
-                    padding: '9px 14px', borderBottom: '0.5px solid #F5F5F5', position: 'sticky', left: 0,
-                    background: 'inherit', zIndex: 5, boxShadow: '2px 0 4px -1px rgba(0,0,0,0.06)',
-                    fontFamily: 'monospace', paddingLeft: 14 + (row.level - 1) * 14,
-                    fontWeight: row.isAnalytic ? 400 : 600,
-                  }}>
-                    <span style={{ color: '#0369A1' }}>{row.conta}</span>
-                    <span style={{ marginLeft: 8, color: '#374151', fontFamily: 'inherit', fontSize: 12, textTransform: row.isAnalytic ? 'none' : 'uppercase' }}>
-                      {row.descricao}
-                    </span>
-                  </td>
-                  <td style={{
-                    padding: '9px 14px', borderBottom: '0.5px solid #F5F5F5', textAlign: 'right',
-                    fontVariantNumeric: 'tabular-nums', fontWeight: 500,
-                    color: row.saldoAnterior < 0 ? '#B91C1C' : row.saldoAnterior === 0 ? '#D1D5DB' : '#374151', fontSize: 12,
-                  }}>
-                    {row.saldoAnterior.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </td>
-                  {anosAnuais.map(ano => {
-                    const mov = row.movimentos?.[ano as any] ?? 0;
-                    const sal = row.saldos?.[ano as any] ?? 0;
-                    return (
-                      <React.Fragment key={ano}>
-                        <td style={{
-                          padding: '9px 14px', borderBottom: '0.5px solid #F5F5F5', textAlign: 'right',
-                          fontVariantNumeric: 'tabular-nums',
-                          color: mov < 0 ? '#B91C1C' : mov === 0 ? '#D1D5DB' : '#6B7280', fontSize: 12,
-                        }}>
-                          {mov.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </td>
-                        <td style={{
-                          padding: '9px 14px', borderBottom: '0.5px solid #F5F5F5', textAlign: 'right',
-                          fontVariantNumeric: 'tabular-nums', fontWeight: 500,
-                          color: sal < 0 ? '#B91C1C' : sal === 0 ? '#D1D5DB' : '#374151', fontSize: 12,
-                        }}>
-                          {sal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </td>
-                      </React.Fragment>
-                    );
-                  })}
-                </tr>
-              ))}
+              <tr style={{ position: 'sticky', top: 42, zIndex: 8 }}>
+                <td style={{ padding: '9px 14px', borderBottom: '1px solid #E5E7EB', position: 'sticky', left: 0, top: 42, background: '#F0FDF4', zIndex: 9, fontWeight: 700, fontSize: 12, color: '#15803D' }}>
+                  Diferença (Ativo - Passivo)
+                </td>
+                <td style={{ ...summaryTdStyle(diferencaAnteriorAnual, false), position: 'sticky', top: 42, background: '#F0FDF4', zIndex: 8 }}>{fmtSummary(diferencaAnteriorAnual)}</td>
+                {anosAnuais.map(ano => (
+                  <React.Fragment key={`dif-${ano}`}>
+                    <td style={{ ...summaryTdStyle(0, true), position: 'sticky', top: 42, background: '#F0FDF4', zIndex: 8 }}>—</td>
+                    <td style={{ ...summaryTdStyle(diferencaSaldoPorAno[ano] ?? 0, false), position: 'sticky', top: 42, background: '#F0FDF4', zIndex: 8 }}>{fmtSummary(diferencaSaldoPorAno[ano] ?? 0)}</td>
+                  </React.Fragment>
+                ))}
+              </tr>
+              <tr style={{ position: 'sticky', top: 82, zIndex: 8 }}>
+                <td style={{ padding: '9px 14px', borderBottom: '1px solid #E5E7EB', position: 'sticky', left: 0, top: 82, background: '#EFF6FF', zIndex: 9, fontWeight: 700, fontSize: 12, color: '#1D4ED8' }}>
+                  Resultado (Receitas - Despesas)
+                </td>
+                <td style={{ ...summaryTdStyle(resultadoAnteriorAnual, false), position: 'sticky', top: 82, background: '#EFF6FF', zIndex: 8 }}>{fmtSummary(resultadoAnteriorAnual)}</td>
+                {anosAnuais.map(ano => (
+                  <React.Fragment key={`res-${ano}`}>
+                    <td style={{ ...summaryTdStyle(resultadoMovimentoPorAno[ano] ?? 0, false), position: 'sticky', top: 82, background: '#EFF6FF', zIndex: 8 }}>{fmtSummary(resultadoMovimentoPorAno[ano] ?? 0)}</td>
+                    <td style={{ ...summaryTdStyle(resultadoSaldoPorAno[ano] ?? 0, false), position: 'sticky', top: 82, background: '#EFF6FF', zIndex: 8 }}>{fmtSummary(resultadoSaldoPorAno[ano] ?? 0)}</td>
+                  </React.Fragment>
+                ))}
+              </tr>
+              {sortedAnual.map((row, i) => {
+                const isAtivoRow = row.level === 1 && row.conta === '1';
+                return (
+                  <tr
+                    key={row.conta}
+                    style={{ background: row.isAnalytic ? (i % 2 === 0 ? '#fff' : '#FAFAFA') : '#F3F4F6' }}
+                  >
+                    <td style={{
+                      padding: '9px 14px', borderBottom: '0.5px solid #F5F5F5',
+                      position: 'sticky', left: 0, top: isAtivoRow ? 122 : undefined,
+                      background: isAtivoRow ? '#F3F4F6' : 'inherit', zIndex: isAtivoRow ? 9 : 5,
+                      boxShadow: isAtivoRow ? '2px 2px 4px -1px rgba(0,0,0,0.10)' : '2px 0 4px -1px rgba(0,0,0,0.06)',
+                      fontFamily: 'monospace', paddingLeft: 14 + (row.level - 1) * 14,
+                      fontWeight: row.isAnalytic ? 400 : 600,
+                    }}>
+                      <span style={{ color: '#0369A1' }}>{row.conta}</span>
+                      <span style={{ marginLeft: 8, color: '#374151', fontFamily: 'inherit', fontSize: 12, textTransform: row.isAnalytic ? 'none' : 'uppercase' }}>
+                        {row.descricao}
+                      </span>
+                    </td>
+                    <td style={{
+                      padding: '9px 14px', borderBottom: '0.5px solid #F5F5F5', textAlign: 'right',
+                      fontVariantNumeric: 'tabular-nums', fontWeight: 500,
+                      color: row.saldoAnterior < 0 ? '#B91C1C' : row.saldoAnterior === 0 ? '#D1D5DB' : '#374151', fontSize: 12,
+                      position: isAtivoRow ? 'sticky' : undefined,
+                      top: isAtivoRow ? 122 : undefined,
+                      background: isAtivoRow ? '#F3F4F6' : undefined,
+                      zIndex: isAtivoRow ? 6 : undefined,
+                      boxShadow: isAtivoRow ? '0 2px 4px -2px rgba(0,0,0,0.15)' : undefined,
+                    }}>
+                      {row.saldoAnterior.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                    {anosAnuais.map(ano => {
+                      const mov = row.movimentos?.[ano as any] ?? 0;
+                      const sal = row.saldos?.[ano as any] ?? 0;
+                      return (
+                        <React.Fragment key={ano}>
+                          <td style={{
+                            padding: '9px 14px', borderBottom: '0.5px solid #F5F5F5', textAlign: 'right',
+                            fontVariantNumeric: 'tabular-nums',
+                            color: mov < 0 ? '#B91C1C' : mov === 0 ? '#D1D5DB' : '#6B7280', fontSize: 12,
+                            position: isAtivoRow ? 'sticky' : undefined,
+                            top: isAtivoRow ? 122 : undefined,
+                            background: isAtivoRow ? '#F3F4F6' : undefined,
+                            zIndex: isAtivoRow ? 6 : undefined,
+                            boxShadow: isAtivoRow ? '0 2px 4px -2px rgba(0,0,0,0.15)' : undefined,
+                          }}>
+                            {mov.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </td>
+                          <td style={{
+                            padding: '9px 14px', borderBottom: '0.5px solid #F5F5F5', textAlign: 'right',
+                            fontVariantNumeric: 'tabular-nums', fontWeight: 500,
+                            color: sal < 0 ? '#B91C1C' : sal === 0 ? '#D1D5DB' : '#374151', fontSize: 12,
+                            position: isAtivoRow ? 'sticky' : undefined,
+                            top: isAtivoRow ? 122 : undefined,
+                            background: isAtivoRow ? '#F3F4F6' : undefined,
+                            zIndex: isAtivoRow ? 6 : undefined,
+                            boxShadow: isAtivoRow ? '0 2px 4px -2px rgba(0,0,0,0.15)' : undefined,
+                          }}>
+                            {sal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </td>
+                        </React.Fragment>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

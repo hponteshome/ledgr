@@ -3,6 +3,8 @@
 // numero sequencial unico por empresa+ano (qualquer tipo: Manual/IOB/ECD).
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
+import { FiTrash2, FiAlertTriangle } from 'react-icons/fi';
 import api from '../../services/api';
 
 interface ImportLote {
@@ -24,6 +26,19 @@ const TIPO_LABEL: Record<string, string> = {
   ECD: 'ECD',
 };
 
+const COLUNAS: { label: string; key: string | null }[] = [
+  { label: 'Nº Lote', key: 'numero' },
+  { label: 'Ano', key: 'ano' },
+  { label: 'Tipo', key: 'tipo' },
+  { label: 'Arquivo', key: 'nomeArquivo' },
+  { label: 'Lançamentos', key: 'quantidadeLancamentos' },
+  { label: 'Total Débito', key: 'totalDebito' },
+  { label: 'Total Crédito', key: 'totalCredito' },
+  { label: 'Importado em', key: 'createdAt' },
+  { label: 'Por', key: 'createdByName' },
+  { label: 'Ações', key: null },
+];
+
 const fmtMoeda = (v: string) =>
   Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -36,6 +51,19 @@ export const ImportLotesPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ano, setAno] = useState<string>('');
+  const [confirmDelete, setConfirmDelete] = useState<ImportLote | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [sortKey, setSortKey] = useState<string>('ano');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+
+  const handleSort = (key: string) => {
+    if (sortKey === key) {
+      setSortDir(d => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDir('asc');
+    }
+  };
 
   const carregar = useCallback(async () => {
     setLoading(true);
@@ -53,6 +81,36 @@ export const ImportLotesPage: React.FC = () => {
   }, [ano]);
 
   useEffect(() => { carregar(); }, [carregar]);
+
+  const handleDelete = async () => {
+    if (!confirmDelete) return;
+    setDeleting(true);
+    try {
+      const resp = await api.delete(`/accounting/import-lotes/${confirmDelete.id}`);
+      toast.success(resp.data?.message || 'Lote excluído.');
+      setConfirmDelete(null);
+      carregar();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || 'Erro ao excluir o lote.');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const sortedLotes = [...lotes].sort((a, b) => {
+    let valA: any = (a as any)[sortKey];
+    let valB: any = (b as any)[sortKey];
+    if (sortKey === 'totalDebito' || sortKey === 'totalCredito') {
+      valA = Number(valA); valB = Number(valB);
+    }
+    if (valA == null) valA = '';
+    if (valB == null) valB = '';
+    if (typeof valA === 'string' && typeof valB === 'string') {
+      const cmp = valA.localeCompare(valB, 'pt-BR');
+      return sortDir === 'asc' ? cmp : -cmp;
+    }
+    return sortDir === 'asc' ? valA - valB : valB - valA;
+  });
 
   return (
     <div style={{ padding: 24 }}>
@@ -88,22 +146,34 @@ export const ImportLotesPage: React.FC = () => {
         <table style={{ borderCollapse: 'collapse', width: '100%' }}>
           <thead>
             <tr>
-              {['Nº Lote', 'Ano', 'Tipo', 'Arquivo', 'Lançamentos', 'Total Débito', 'Total Crédito', 'Importado em', 'Por'].map(h => (
-                <th key={h} style={{
-                  padding: '8px 10px', fontSize: 11, color: '#9CA3AF', textTransform: 'uppercase',
-                  letterSpacing: '0.3px', textAlign: h === 'Total Débito' || h === 'Total Crédito' || h === 'Lançamentos' ? 'right' : 'left',
-                  borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap',
-                }}>{h}</th>
+              {COLUNAS.map(({ label: h, key }) => (
+                <th
+                  key={h}
+                  onClick={key ? () => handleSort(key) : undefined}
+                  style={{
+                    padding: '8px 10px', fontSize: 11, color: '#9CA3AF', textTransform: 'uppercase',
+                    letterSpacing: '0.3px', textAlign: h === 'Total Débito' || h === 'Total Crédito' || h === 'Lançamentos' || h === 'Ações' ? 'right' : 'left',
+                    borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap',
+                    cursor: key ? 'pointer' : 'default', userSelect: 'none',
+                  }}
+                >
+                  {h}
+                  {key && (
+                    <span style={{ marginLeft: 4, opacity: sortKey === key ? 1 : 0.3, fontSize: 9 }}>
+                      {sortKey === key ? (sortDir === 'asc' ? '▲' : '▼') : '▲'}
+                    </span>
+                  )}
+                </th>
               ))}
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={9} style={{ padding: 24, textAlign: 'center', color: '#9CA3AF' }}>Carregando...</td></tr>
-            ) : lotes.length === 0 ? (
-              <tr><td colSpan={9} style={{ padding: 24, textAlign: 'center', color: '#9CA3AF' }}>Nenhum lote de importação registrado ainda.</td></tr>
+              <tr><td colSpan={10} style={{ padding: 24, textAlign: 'center', color: '#9CA3AF' }}>Carregando...</td></tr>
+            ) : sortedLotes.length === 0 ? (
+              <tr><td colSpan={10} style={{ padding: 24, textAlign: 'center', color: '#9CA3AF' }}>Nenhum lote de importação registrado ainda.</td></tr>
             ) : (
-              lotes.map(l => (
+              sortedLotes.map(l => (
                 <tr key={l.id}>
                   <td style={{ padding: '8px 10px', fontSize: 13, borderBottom: '0.5px solid #F3F4F6' }}>
                     <button
@@ -141,12 +211,55 @@ export const ImportLotesPage: React.FC = () => {
                   <td style={{ padding: '8px 10px', fontSize: 12, color: '#6B7280', borderBottom: '0.5px solid #F3F4F6' }}>
                     {l.createdByName || '-'}
                   </td>
+                  <td style={{ padding: '8px 10px', textAlign: 'right', borderBottom: '0.5px solid #F3F4F6' }}>
+                    <button
+                      onClick={() => setConfirmDelete(l)}
+                      title="Excluir lote integralmente"
+                      style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#B91C1C', padding: 4 }}
+                    >
+                      <FiTrash2 size={14} />
+                    </button>
+                  </td>
                 </tr>
               ))
             )}
           </tbody>
         </table>
       </div>
+
+      {confirmDelete && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
+          <div style={{ background: '#fff', borderRadius: 10, padding: 24, width: '100%', maxWidth: 420, boxShadow: '0 8px 30px rgba(0,0,0,0.2)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+              <FiAlertTriangle size={20} color="#B91C1C" />
+              <h3 style={{ fontSize: 16, fontWeight: 600, color: '#111', margin: 0 }}>Excluir lote definitivamente</h3>
+            </div>
+            <p style={{ fontSize: 13, color: '#374151', marginBottom: 6 }}>
+              Isso vai apagar <strong>permanentemente</strong> o lote <strong>{confirmDelete.numero}/{confirmDelete.ano}</strong>
+              {confirmDelete.nomeArquivo ? <> ({confirmDelete.nomeArquivo})</> : null} e os <strong>{confirmDelete.quantidadeLancamentos} lançamento(s)</strong> vinculados a ele.
+            </p>
+            <p style={{ fontSize: 13, color: '#B91C1C', marginBottom: 20 }}>
+              Esta ação não pode ser desfeita.
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+              <button
+                onClick={() => setConfirmDelete(null)}
+                disabled={deleting}
+                style={{ padding: '8px 16px', borderRadius: 6, border: '1px solid #E5E7EB', background: '#fff', color: '#374151', fontSize: 13, cursor: 'pointer' }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                style={{ padding: '8px 16px', borderRadius: 6, border: 'none', background: '#B91C1C', color: '#fff', fontSize: 13, fontWeight: 500, cursor: deleting ? 'default' : 'pointer', opacity: deleting ? 0.6 : 1 }}
+              >
+                {deleting ? 'Excluindo...' : 'Excluir Definitivamente'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

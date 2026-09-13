@@ -119,8 +119,10 @@ function parseManualFile(content: string): {
 
   for (let i = 1; i < lines.length; i++) {
     const parts = lines[i].split('|');
-    if (parts.length < 8) {
-      issues.push({ severity: 'error', ref: '?', lineNum: i + 1, reason: `Linha com ${parts.length} campos (esperado 8: Data|NrLancto|Debito|Credito|Historico|HP|Complemento|Valor)` });
+    if (parts.length !== 8) {
+      const diferenca = Math.abs(parts.length - 8);
+      const motivo = parts.length < 8 ? 'faltando' : 'em excesso (verifique se não há um "|" a mais)';
+      issues.push({ severity: 'error', ref: '?', lineNum: i + 1, reason: `Linha com ${parts.length} campos, esperado exatamente 8 (${diferenca} ${motivo}): Data|NrLancto|Debito|Credito|Historico|HP|Complemento|Valor` });
       continue;
     }
 

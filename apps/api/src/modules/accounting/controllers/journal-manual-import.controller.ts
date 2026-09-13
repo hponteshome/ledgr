@@ -37,8 +37,13 @@ export class JournalManualImportController {
     const companyId   = req.companyId as string;
     const createdById = req.user.id as string;
     if (!companyId) throw new BadRequestException('Empresa não identificada.');
+    // Corrige mojibake do nome do arquivo: multer/busboy decodifica o header
+    // multipart como Latin-1 por padrao, mesmo quando o navegador manda o
+    // nome em UTF-8 (bug conhecido, nao especifico do LEDGR - mesma causa
+    // ja corrigida antes no MatrizImportController).
+    const nomeArquivoCorrigido = Buffer.from(file.originalname, 'latin1').toString('utf8');
     return this.svc.import(
-      bufferToString(file.buffer), companyId, createdById, file.originalname,
+      bufferToString(file.buffer), companyId, createdById, nomeArquivoCorrigido,
       overrideDuplicate === 'true',
     );
   }

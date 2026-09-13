@@ -147,7 +147,7 @@ select: {
         const balance = m.debits - m.credits;
         return { account, balance, referenceDate: date };
       })
-      .filter(b => b.balance !== 0);
+      .filter(b => Math.abs(b.balance) >= 0.005);
 
     return { date, balances };
   }
@@ -253,7 +253,9 @@ select: {
         const debits  = period.debits;
         const credits = period.credits;
         const currentBalance = previousBalance + debits - credits;
-        if (previousBalance === 0 && debits === 0 && credits === 0) return null;
+        // Tolerancia de meio centavo - mesmo residuo de ponto flutuante do
+        // filtro do frontend (ver TrialBalanceView.tsx, ZERO_EPS).
+        if (Math.abs(previousBalance) < 0.005 && Math.abs(debits) < 0.005 && Math.abs(credits) < 0.005) return null;
         return { account, previousBalance, debits, credits, currentBalance, hasData: true };
       })
       .filter(Boolean);

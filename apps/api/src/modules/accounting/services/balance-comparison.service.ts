@@ -69,7 +69,7 @@ export class BalanceComparisonService {
   // devolve previousBalance = saldo em 31/12 do ano anterior e currentBalance
   // = saldo em 31/12 do proprio ano, entao "movimento do ano" e simplesmente
   // debits - credits do proprio periodo anual (sem calculo extra).
-  async getComparisonAnual(companyId: string, anoIni: number, anoFim: number) {
+  async getComparisonAnual(companyId: string, anoIni: number, anoFim: number, excludeClosing: boolean = false) {
     const anos: number[] = [];
     for (let a = anoIni; a <= anoFim; a++) anos.push(a);
 
@@ -79,7 +79,7 @@ export class BalanceComparisonService {
       const ano = anos[idx];
       const dataIni = new Date(Date.UTC(ano, 0, 1, 0, 0, 0, 0));
       const dataFim = new Date(Date.UTC(ano, 11, 31, 23, 59, 59, 999));
-      const { balances } = await this.trialBalance.getVerificationBalance(companyId, dataIni, dataFim);
+      const { balances } = await this.trialBalance.getVerificationBalance(companyId, dataIni, dataFim, excludeClosing);
 
       for (const b of balances as any[]) {
         const acc = b.account;
@@ -89,6 +89,11 @@ export class BalanceComparisonService {
             descricao: acc.name,
             level: acc.level,
             isAnalytic: acc.isAnalytic,
+            // NOVO 13/09/2026: type/nature - usados pela DRE Comparativa para
+            // filtrar REVENUE/EXPENSE e aplicar o sinal natural (mesmo criterio
+            // ja usado em DrePage.tsx: nature CREDIT -> creditos-debitos).
+            type: acc.type,
+            nature: acc.nature,
             saldoAnterior: 0,
             saldos: {},
             movimentos: {},
