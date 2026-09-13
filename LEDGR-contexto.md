@@ -9101,3 +9101,70 @@ arquivo real. Mantém-se como prática preferida pedir `Get-Content` real
 para arquivos já editados na própria sessão (Regra 1), mas para um arquivo
 ainda não tocado nesta sessão, com o usuário confirmando que subiu a versão
 atual à base de conhecimento, a busca é uma fonte válida.
+
+### Sessão 13/09/2026 — DRE Comparativa, exclusão de lotes, validações de import, ajustes finos no Comparativo de Saldos
+
+**Investigação inicial (erro de importação manual):** usuário suspeitava de
+limite de tamanho no campo Histórico de lançamento. Não há limite (campo é
+TEXT no banco) — causa real era contagem de campos: uma linha com 9 campos
+em vez de 8 (um "|" extra) desalinhava tudo silenciosamente, e o parser só
+validava `parts.length < 8`, nunca `> 8`. Corrigido para `!== 8`, com
+mensagem apontando quantos campos estão sobrando/faltando. Corrigido também
+o encoding do nome de arquivo (mojibake) no mesmo módulo — mesma causa raiz
+(multer/busboy decodificando UTF-8 como Latin-1) já vista antes no
+MatrizImportController.
+
+**Exclusão de lote:** usuário queria reimportar um arquivo corrigido e não
+havia como excluir um lote inteiro pela UI (só existia hard-delete
+interno, usado no fluxo de "sobrepor duplicata"). Exposto como ação
+explícita em `ImportLotesPage.tsx` (ícone de lixeira + modal de confirmação
+forte, já que é irreversível), com endpoint `DELETE /accounting/import-lotes/:id`
+em `ImportLoteService`.
+
+**Comparativo de Saldos — sessão de polimento intensivo, várias idas e
+vindas de diagnóstico:**
+- Checkbox "apenas movimentações" não filtrava o grupo 234 (Apuração de
+  Resultado) por resíduo de ponto flutuante — mesma classe de bug depois
+  replicada e corrigida também no filtro "Zeradas" do Balancete
+  (`TrialBalanceView.tsx` + `trial-balance.service.ts`), usando tolerância
+  de meio centavo (`Math.abs(x) >= 0.005`) em vez de comparação exata.
+- Botão de impressão flutuante conectado; impressão em largura total (nova
+  opção `larguraTotal` no `imprimirRelatorio.ts`, compartilhado, default
+  `false` para não afetar as demais telas).
+- Limite de 15 colunas na geração, com toast de aviso.
+- **Linha "1 ATIVO" fixa ao rolar** — precisou de 3 tentativas: (1) sticky
+  em `<tr>` não funciona com `border-collapse: collapse` (limitação real de
+  CSS, não específica deste projeto — trocado para `separate`); (2) sticky
+  em nível de `<tr>` tem suporte inconsistente entre navegadores, movido
+  para cada `<td>` individualmente; (3) a linha ficava escondida atrás do
+  cabeçalho por empilhar no mesmo `top: 0` — corrigido calculando a altura
+  real do cabeçalho (`top: 42`). Depois disso, adicionadas mais 2 linhas
+  fixas ("Diferença Ativo-Passivo" e "Resultado Receitas-Despesas"),
+  exigindo reempilhar tudo (`top: 42`, `82`, `122`).
+- Rolagem horizontal não aparecia mesmo com colunas cortadas —
+  `tableLayout: 'auto'` sem `min-width` deixa o navegador espremer as
+  colunas em vez de estourar a largura; corrigido com `minWidth: 900` na
+  tabela.
+- Período padrão (Mensal) ajustado para sugerir janela de 15 meses
+  terminando no mês anterior ao atual (mês corrente ainda não fechado).
+
+**DRE Comparativa (nova aba em DrePage.tsx):** evolução anual de
+Receitas/Despesas com Var% (ano a ano) e AV% (% da Receita Total do
+próprio ano), reaproveitando `getComparisonAnual` do Comparativo de
+Saldos. Precisou de dois ajustes no backend: (1) `excludeClosing`
+repassado até `getVerificationBalance` — sem isso o lançamento de
+encerramento zeraria o movimento anual, mesmo bug já documentado e
+corrigido na DRE normal em 02/09/2026; (2) `type`/`nature` de cada conta
+incluídos na resposta, para filtrar REVENUE/EXPENSE e aplicar o sinal
+natural (mesmo critério já usado em `DrePage.tsx`: nature CREDIT =
+créditos-débitos). Escopo desta primeira versão não inclui impressão nem
+exportação CSV própria da aba comparativa.
+
+**Nota de processo:** confirmado mais uma vez nesta sessão que a base de
+conhecimento do projeto NÃO reflete edições feitas ao vivo na própria
+sessão — em pelo menos 2 momentos, buscas na base trouxeram versões
+anteriores às edições já aplicadas hoje, incluindo uma vez em que o
+usuário mandou o arquivo real diretamente (upload) depois de eu insistir
+em buscar na base sem sucesso. Regra reafirmada: para arquivo já tocado
+nesta sessão, só `Get-Content` real (ou upload direto do usuário) conta
+como fonte confiável — busca na base nunca mais nesse caso.
