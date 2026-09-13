@@ -9058,3 +9058,46 @@ SELECTOR"` retornando 2 ocorrências) antes de prosseguir, e removido na
 reescrita final. Lição: sempre confirmar o estado real do arquivo após
 múltiplos patches sequenciais na mesma sessão, mesmo quando cada patch
 individual reportou "OK".
+
+### Sessão 12/09/2026 (continuação 4) — Comparativo de Saldos: visão Anual com Movimento intercalado
+
+**Motivação:** tela existente (BalanceComparisonPage.tsx, resgatada em
+25/08/2026) só tinha granularidade mensal. Usuário pediu colunas anuais com
+o movimento de cada conta intercalado entre elas, mantendo a opção mensal
+como estava (não substituir).
+
+**Design (evita cálculo duplicado):** getVerificationBalance(01/01/ano,
+31/12/ano) já devolve previousBalance = saldo em 31/12 do ano anterior e
+currentBalance = saldo em 31/12 do próprio ano — logo "movimento do ano" =
+debits - credits do próprio período anual, sem precisar de nenhuma lógica
+nova de cálculo contábil. "Saldo Anterior" (coluna antes do primeiro ano)
+vem do previousBalance do primeiro ano do intervalo.
+
+**Layout confirmado com o usuário:** Saldo Anterior | Movimento 20XX |
+Saldo 20XX | Movimento 20XY | Saldo 20XY... — toggle Mensal/Anual acima dos
+filtros, trocando 4 selects (mês+ano) por 2 (só ano) no modo Anual.
+
+**Dois bugs encontrados e corrigidos na mesma sessão, ambos no filtro
+"Exibir apenas movimentações":**
+1. Condição tinha `|| row.saldoAnterior !== 0`, que mantinha contas com
+   saldo histórico sempre visíveis mesmo sem nenhum movimento nos anos
+   exibidos (ex: Caixa, saldo parado) — removido, filtro passou a
+   considerar só movimento no período.
+2. Contas transitórias que sempre fecham em zero (grupo 234 - Apuração de
+   Resultado, movimenta mas nunca fica com saldo) ainda escapavam do
+   filtro por resíduo de ponto flutuante (`debits - credits` raramente
+   fecha em exatamente `0` em JS, ex: `1.42e-14`) — filtro agora usa
+   tolerância de meio centavo (`Math.abs(movimento) >= 0.005`) em vez de
+   comparar contra zero exato. Correção genérica, não amarrada ao código
+   234 especificamente - vale para qualquer conta com esse padrão.
+
+**Nota de processo:** o arquivo `BalanceComparisonPage.tsx` foi reconstruído
+via `project_knowledge_search` (múltiplas buscas até fechar o arquivo
+completo, por pedido explícito do usuário — disponibilizou a versão
+atualizada na base de conhecimento do projeto) em vez de `Get-Content` no
+terminal. Os 3 scripts (service, controller, frontend) rodaram `OK` de
+primeira, sem nenhum `ERRO` de âncora — a reconstrução se confirmou fiel ao
+arquivo real. Mantém-se como prática preferida pedir `Get-Content` real
+para arquivos já editados na própria sessão (Regra 1), mas para um arquivo
+ainda não tocado nesta sessão, com o usuário confirmando que subiu a versão
+atual à base de conhecimento, a busca é uma fonte válida.
