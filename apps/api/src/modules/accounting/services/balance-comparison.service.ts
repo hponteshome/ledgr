@@ -63,4 +63,47 @@ export class BalanceComparisonService {
       contas: Array.from(porConta.values()).sort((a, b) => a.conta.localeCompare(b.conta)),
     };
   }
+
+  // NOVO 12/09/2026: visao anual com movimento intercalado. Uma chamada por
+  // ano (nao por mes) - getVerificationBalance(ano-01-01, ano-12-31) ja
+  // devolve previousBalance = saldo em 31/12 do ano anterior e currentBalance
+  // = saldo em 31/12 do proprio ano, entao "movimento do ano" e simplesmente
+  // debits - credits do proprio periodo anual (sem calculo extra).
+  async getComparisonAnual(companyId: string, anoIni: number, anoFim: number) {
+    const anos: number[] = [];
+    for (let a = anoIni; a <= anoFim; a++) anos.push(a);
+
+    const porConta = new Map<string, any>();
+
+    for (let idx = 0; idx < anos.length; idx++) {
+      const ano = anos[idx];
+      const dataIni = new Date(Date.UTC(ano, 0, 1, 0, 0, 0, 0));
+      const dataFim = new Date(Date.UTC(ano, 11, 31, 23, 59, 59, 999));
+      const { balances } = await this.trialBalance.getVerificationBalance(companyId, dataIni, dataFim);
+
+      for (const b of balances as any[]) {
+        const acc = b.account;
+        if (!porConta.has(acc.id)) {
+          porConta.set(acc.id, {
+            conta: acc.code,
+            descricao: acc.name,
+            level: acc.level,
+            isAnalytic: acc.isAnalytic,
+            saldoAnterior: 0,
+            saldos: {},
+            movimentos: {},
+          });
+        }
+        const linha = porConta.get(acc.id);
+        if (idx === 0) linha.saldoAnterior = b.previousBalance;
+        linha.saldos[ano] = b.currentBalance;
+        linha.movimentos[ano] = b.debits - b.credits;
+      }
+    }
+
+    return {
+      anos,
+      contas: Array.from(porConta.values()).sort((a, b) => a.conta.localeCompare(b.conta)),
+    };
+  }
 }

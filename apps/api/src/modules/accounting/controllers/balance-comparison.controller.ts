@@ -20,4 +20,13 @@ export class BalanceComparisonController {
   ) {
     return this.svc.getComparison(companyId, startMonth, endMonth);
   }
+
+  @Get('balance-comparison/:companyId/anual')
+  async getComparisonAnual(
+    @Param('companyId') companyId: string,
+    @Query('anoInicio') anoInicio: string,
+    @Query('anoFim') anoFim: string,
+  ) {
+    return this.svc.getComparisonAnual(companyId, parseInt(anoInicio, 10), parseInt(anoFim, 10));
+  }
 }
