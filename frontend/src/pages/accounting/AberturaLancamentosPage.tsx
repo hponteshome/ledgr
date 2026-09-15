@@ -19,7 +19,7 @@ interface AberturaLinha {
   saldo: number;
   debito: number;
   credito: number;
-  origens: { code: string; name: string; balance: number }[];
+  origens: { code: string; name: string; balance: number; possivelDuplicata?: boolean }[];
 }
 interface AberturaCalculo {
   linhas: AberturaLinha[];
@@ -228,7 +228,14 @@ export const AberturaLancamentosPage: React.FC = () => {
                           <div style={{ fontSize: 11, color: '#9CA3AF', marginBottom: 4 }}>Origens ECD:</div>
                           {l.origens.map((o, i) => (
                             <div key={i} style={{ fontSize: 12, display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
-                              <span><span style={{ fontFamily: 'monospace', color: '#2563EB' }}>{o.code}</span> {o.name}</span>
+                              <span>
+                                <span style={{ fontFamily: 'monospace', color: '#2563EB' }}>{o.code}</span> {o.name}
+                                {o.possivelDuplicata && (
+                                  <span title="Outra origem neste mesmo destino tem valor identico - coincidencia comum ao consolidar varios anos de ECD, mas vale conferir." style={{ marginLeft: 6, color: '#D97706', fontSize: 11 }}>
+                                    ⚠ valor repetido
+                                  </span>
+                                )}
+                              </span>
                               <span style={{ fontVariantNumeric: 'tabular-nums' }}>{fmt(o.balance)}</span>
                             </div>
                           ))}
