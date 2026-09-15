@@ -103,6 +103,7 @@ import FluxoCaixaPage from '../pages/finance/FluxoCaixaPage';
 import PettyCashPage from '../pages/finance/PettyCashPage';
 import RendaFixaPage from '../pages/accounting/investments/RendaFixaPage';
 import CdiTabelaPage from '../pages/accounting/investments/CdiTabelaPage';
+import EquityMethodPage from '../pages/accounting/investments/EquityMethodPage';
 import { IndicadoresPage } from '../pages/sistema/IndicadoresPage';
 import { CalendarioPage } from '../pages/sistema/CalendarioPage';
 import { ObrigacoesPage } from '../pages/sistema/ObrigacoesPage';
@@ -192,6 +193,7 @@ export const AppRoutes = () => {
                 <Route path="app/accounting/investimentos/renda-fixa" element={<ProtectedRoute><RendaFixaPage /></ProtectedRoute>} />
                 <Route path="app/accounting/investimentos/simulador" element={<ProtectedRoute><CdbProjecaoPage /></ProtectedRoute>} />
                 <Route path="app/accounting/investimentos/cdi" element={<ProtectedRoute><CdiTabelaPage /></ProtectedRoute>} />
+                <Route path="app/accounting/investimentos/equivalencia-patrimonial" element={<ProtectedRoute><EquityMethodPage /></ProtectedRoute>} />
                 <Route path="app/sistema/indicadores" element={<ProtectedRoute><IndicadoresPage /></ProtectedRoute>} />
                 <Route path="app/sistema/indicadores/calculadora" element={<ProtectedRoute><CalculadoraCorrecaoPage /></ProtectedRoute>} />
                 <Route path="app/sistema/calendario" element={<ProtectedRoute><CalendarioPage /></ProtectedRoute>} />
