@@ -46,28 +46,32 @@ export class TransfersService {
    */
   async create(companyId: string, userId: string, dto: CreateTransferDto) {
     const [fromRecord, toRecord] = await Promise.all([
-      this.prisma.shareholderRecord.findFirst({ where: { id: dto.fromRecordId, companyId, deletedAt: null } }),
+      dto.fromRecordId
+        ? this.prisma.shareholderRecord.findFirst({ where: { id: dto.fromRecordId, companyId, deletedAt: null } })
+        : Promise.resolve(null),
       this.prisma.shareholderRecord.findFirst({ where: { id: dto.toRecordId, companyId, deletedAt: null } }),
     ]);
 
-    if (!fromRecord) throw new NotFoundException('Registro do cedente não encontrado');
+    if (dto.fromRecordId && !fromRecord) throw new NotFoundException('Registro do cedente não encontrado');
     if (!toRecord) throw new NotFoundException('Registro do cessionário não encontrado');
 
     const qty = new Decimal(dto.quantity);
 
-    if (new Decimal(fromRecord.quantity).lt(qty)) {
+    if (fromRecord && new Decimal(fromRecord.quantity).lt(qty)) {
       throw new BadRequestException(
         `Cedente possui ${fromRecord.quantity} ${fromRecord.shareType} — transferência de ${dto.quantity} excede o saldo.`
       );
     }
     return this.prisma.$transaction(async (tx) => {
-      // 1. Deduz do cedente
-      const newFromQty = new Decimal(fromRecord.quantity).sub(qty);
-      const newFromTotal = newFromQty.mul(new Decimal(fromRecord.nominalValue));
-      await tx.shareholderRecord.update({
-        where: { id: fromRecord.id },
-        data: { quantity: newFromQty, totalValue: newFromTotal, isActive: newFromQty.gt(0) },
-      });
+      // 1. Deduz do cedente (pula quando emissao sem cedente - constituicao/aumento de capital)
+      if (fromRecord) {
+        const newFromQty = new Decimal(fromRecord.quantity).sub(qty);
+        const newFromTotal = newFromQty.mul(new Decimal(fromRecord.nominalValue));
+        await tx.shareholderRecord.update({
+          where: { id: fromRecord.id },
+          data: { quantity: newFromQty, totalValue: newFromTotal, isActive: newFromQty.gt(0) },
+        });
+      }
       // 2. Adiciona ao cessionário
       const newToQty = new Decimal(toRecord.quantity).add(qty);
       const newToTotal = newToQty.mul(new Decimal(toRecord.nominalValue));
@@ -88,12 +92,12 @@ export class TransfersService {
           })
         ));
       }
-      // 3. Registra a transferência
+      // 4. Registra a transferência (append-only)
       return tx.shareTransfer.create({
         data: {
           companyId,
           entryType: dto.entryType as any,
-          fromRecordId: dto.fromRecordId,
+          fromRecordId: dto.fromRecordId ?? null,
           toRecordId: dto.toRecordId,
           shareType: dto.shareType as any,
           series: dto.series,

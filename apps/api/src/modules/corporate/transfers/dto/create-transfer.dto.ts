@@ -23,7 +23,8 @@ export class CreateTransferDto {
   entryType: ShareEntryType;
 
   @IsUUID()
-  fromRecordId: string;
+  @IsOptional()
+  fromRecordId?: string;
 
   @IsUUID()
   toRecordId: string;

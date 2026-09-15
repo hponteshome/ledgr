@@ -320,6 +320,9 @@ model Company {
   pettyCashClosures         PettyCashClosure[]
   accountingViews           AccountingView[]
   importLotes               ImportLote[]
+  // NOVO 13/09/2026: Equivalencia Patrimonial (MEP)
+  equityInvestmentsAsInvestor EquityMethodInvestment[] @relation("EquityInvestorCompany")
+  equityInvestmentsAsInvestee EquityMethodInvestment[] @relation("EquityInvesteeCompany")
   // -- Dados SPED/ECD ----------------------------------------
   nire                      String?                    @map("nire") @db.VarChar(20)
   codMun                    String?                    @map("cod_mun") @db.VarChar(7)
@@ -1207,6 +1210,10 @@ model ChartOfAccounts {
   ecdImportLinks            ChartOfAccountsEcdImport[] @relation("EcdImportLinks")
   ecdMappingAsSource        EcdAccountMapping[]        @relation("EcdMappingSource")
   ecdMappingAsTarget        EcdAccountMapping[]        @relation("EcdMappingTarget")
+  // NOVO 13/09/2026: Equivalencia Patrimonial (MEP)
+  equityInvestmentAccounts  EquityMethodInvestment[]   @relation("EquityInvestmentAccount")
+  equityGainAccounts        EquityMethodInvestment[]   @relation("EquityGainAccount")
+  equityLossAccounts        EquityMethodInvestment[]   @relation("EquityLossAccount")
 
   // ── Deducibilidade Fiscal (LALUR/LACS) ──────────────────────────────────
   /// Indica se despesas desta conta sao total ou parcialmente nao-dedutiveis
@@ -1325,6 +1332,7 @@ model JournalEntry {
 
   apEntries         ApEntry[]
   pettyCashClosures PettyCashClosure[]
+  equityMethodCalculations EquityMethodCalculation[]
 
   // ── Dedutibilidade Fiscal (LALUR) — override por lancamento ──────────
   /// Sobrescreve a regra da conta para este lancamento especifico
@@ -1335,6 +1343,67 @@ model JournalEntry {
 
   @@index([companyId, date])
   @@map("journal_entries")
+}
+
+// =============================================================================
+// EQUIVALENCIA PATRIMONIAL (MEP) — CRIADO 13/09/2026
+// =============================================================================
+
+/// Participacao societaria sujeita ao Metodo de Equivalencia Patrimonial.
+/// Vincula empresa investidora e investida (ambas dentro do proprio LEDGR) -
+/// o PL da investida e buscado automaticamente via TrialBalanceService,
+/// nunca digitado manualmente.
+model EquityMethodInvestment {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  investorCompanyId   String    @map("investor_company_id") @db.Uuid
+  investeeCompanyId   String    @map("investee_company_id") @db.Uuid
+  percentOwned        Decimal   @map("percent_owned") @db.Decimal(8, 4)
+  investmentAccountId String    @map("investment_account_id") @db.Uuid
+  // CORRIGIDO 13/09/2026: ganho e perda de equivalencia patrimonial vao em
+  // contas de resultado SEPARADAS (uma REVENUE, outra EXPENSE) - nao uma
+  // unica "conta de resultado" generica.
+  gainAccountId       String    @map("gain_account_id") @db.Uuid
+  lossAccountId       String    @map("loss_account_id") @db.Uuid
+  initialCost         Decimal   @map("initial_cost") @db.Decimal(18, 2)
+  acquisitionDate     DateTime  @map("acquisition_date") @db.Date
+  notes               String?   @map("notes") @db.Text
+  isActive            Boolean   @default(true) @map("is_active")
+  createdById         String    @map("created_by_id") @db.Uuid
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  deletedAt           DateTime? @map("deleted_at") @db.Timestamp(6)
+
+  investorCompany   Company                   @relation("EquityInvestorCompany", fields: [investorCompanyId], references: [id])
+  investeeCompany   Company                   @relation("EquityInvesteeCompany", fields: [investeeCompanyId], references: [id])
+  investmentAccount ChartOfAccounts           @relation("EquityInvestmentAccount", fields: [investmentAccountId], references: [id])
+  gainAccount       ChartOfAccounts           @relation("EquityGainAccount", fields: [gainAccountId], references: [id])
+  lossAccount       ChartOfAccounts           @relation("EquityLossAccount", fields: [lossAccountId], references: [id])
+  calculations      EquityMethodCalculation[]
+
+  @@index([investorCompanyId])
+  @@map("equity_method_investments")
+}
+
+/// Cada apuracao periodica de MEP - a "Demonstracao" ao longo do tempo.
+model EquityMethodCalculation {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  investmentId      String   @map("investment_id") @db.Uuid
+  referenceDate     DateTime @map("reference_date") @db.Date
+  investeePl        Decimal  @map("investee_pl") @db.Decimal(18, 2)
+  percentApplied    Decimal  @map("percent_applied") @db.Decimal(8, 4)
+  equityValue       Decimal  @map("equity_value") @db.Decimal(18, 2)
+  previousBookValue Decimal  @map("previous_book_value") @db.Decimal(18, 2)
+  adjustment        Decimal  @map("adjustment") @db.Decimal(18, 2)
+  journalEntryId    String?  @map("journal_entry_id") @db.Uuid
+  createdById       String   @map("created_by_id") @db.Uuid
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+
+  investment   EquityMethodInvestment @relation(fields: [investmentId], references: [id])
+  journalEntry JournalEntry?          @relation(fields: [journalEntryId], references: [id])
+
+  @@unique([investmentId, referenceDate])
+  @@index([investmentId])
+  @@map("equity_method_calculations")
 }
 
 // NOVO (10/09/2026): registro de cada EVENTO de importacao (o arquivo
@@ -2905,8 +2974,8 @@ model ShareTransfer {
   entryType ShareEntryType @map("entry_type")
 
   // ── Partes ────────────────────────────────────────────────
-  fromRecordId String @map("from_record_id") @db.Uuid /// ShareholderRecord do cedente
-  toRecordId   String @map("to_record_id") @db.Uuid /// ShareholderRecord do cessionário
+  fromRecordId String? @map("from_record_id") @db.Uuid /// ShareholderRecord do cedente (NULL = emissao sem cedente: constituicao/aumento de capital)
+  toRecordId   String  @map("to_record_id") @db.Uuid /// ShareholderRecord do cessionário
 
   // ── Objeto da transferência ───────────────────────────────
   shareType       ShareType @map("share_type")
@@ -2939,9 +3008,9 @@ model ShareTransfer {
   updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
 
   // ── Relations ─────────────────────────────────────────────
-  company    Company           @relation(fields: [companyId], references: [id])
-  fromRecord ShareholderRecord @relation("TransferFrom", fields: [fromRecordId], references: [id])
-  toRecord   ShareholderRecord @relation("TransferTo", fields: [toRecordId], references: [id])
+  company    Company            @relation(fields: [companyId], references: [id])
+  fromRecord ShareholderRecord? @relation("TransferFrom", fields: [fromRecordId], references: [id])
+  toRecord   ShareholderRecord  @relation("TransferTo", fields: [toRecordId], references: [id])
 
   @@index([companyId, transferDate])
   @@index([fromRecordId])
