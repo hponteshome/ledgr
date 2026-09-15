@@ -23,6 +23,15 @@ const Section = ({ title, color, children }: { title: string; color: string; chi
   </div>
 );
 
+const SHARE_TYPE_LABEL: Record<string, string> = {
+  ORDINARIA: 'ON', PREFERENCIAL: 'PN', QUOTA: 'Quota',
+};
+const TRANSFER_REASON_LABEL: Record<string, string> = {
+  COMPRA_VENDA: 'Compra e Venda', DOACAO: 'Doacao', HERANCA: 'Heranca',
+  INTEGRALIZACAO: 'Integralizacao', REDUCAO_CAPITAL: 'Reducao de Capital',
+  BONIFICACAO: 'Bonificacao', CISAO: 'Cisao', INCORPORACAO: 'Incorporacao', OUTRO: 'Outro',
+};
+
 export const CompanyShow: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -34,6 +43,9 @@ export const CompanyShow: React.FC = () => {
   const [regimeForm, setRegimeForm] = useState({ dtIni: '', formaTributacao: '2', periodoApuracaoIRPJ: 'A' });
   const [savingRegime, setSavingRegime] = useState(false);
   const [history, setHistory] = useState<any[]>([]);
+  const [capitalSummary, setCapitalSummary] = useState<any>(null);
+  const [shareholderRecords, setShareholderRecords] = useState<any[]>([]);
+  const [shareTransfers, setShareTransfers] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'geral'|'contabil'|'esocial'|'sped'|'historico'>('geral');
 
   useEffect(() => {
@@ -42,6 +54,9 @@ export const CompanyShow: React.FC = () => {
     api.get('/persons/links/company/' + id).then(({ data }) => setQsaLinks(data || [])).catch(() => {});
     api.get('/companies/' + id + '/tax-regimes').then(({ data }) => setRegimes(data || [])).catch(() => {});
     api.get('/companies/' + id + '/history').then(({ data }) => setHistory(data || [])).catch(() => {});
+    api.get('/corporate/shareholders', { headers: { 'x-company-id': id }, params: { active: true } }).then(({ data }) => setShareholderRecords(data || [])).catch(() => {});
+    api.get('/corporate/shareholders/capital-summary', { headers: { 'x-company-id': id } }).then(({ data }) => setCapitalSummary(data)).catch(() => {});
+    api.get('/corporate/transfers', { headers: { 'x-company-id': id } }).then(({ data }) => setShareTransfers(data || [])).catch(() => {});
   }, [id]);
 
   if (!company) return <div className="p-8 text-gray-400 text-sm">Carregando...</div>;
@@ -114,6 +129,101 @@ export const CompanyShow: React.FC = () => {
               <Field label="Regime Tributario" value={company.taxRegime} />
               <Field label="Situacao" value={company.status === 'active' ? 'ATIVA' : company.status === 'inactive' ? 'INATIVA' : company.status} />
             </div>
+          </Section>
+          <Section title="Composicao do Capital Social" color="border-indigo-500">
+            {capitalSummary && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pb-3 border-b border-gray-100">
+                <Field label="Capital Total" value={'R$ ' + Number(capitalSummary.totalCapital || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} />
+                <Field label="Titulos/Quotas" value={Number(capitalSummary.totalShares || 0).toLocaleString('pt-BR')} />
+                <Field label="Socios/Acionistas" value={capitalSummary.holdersCount ?? 0} />
+                <Field label="Ultima Alteracao" value={shareTransfers[0] ? new Date(shareTransfers[0].transferDate).toLocaleDateString('pt-BR') : undefined} />
+              </div>
+            )}
+            {shareholderRecords.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-xs text-gray-400 uppercase border-b border-gray-100">
+                      <th className="text-left py-2">Socio/Acionista</th>
+                      <th className="text-left py-2">CPF/CNPJ</th>
+                      <th className="text-center py-2">Tipo</th>
+                      <th className="text-right py-2">Quantidade</th>
+                      <th className="text-right py-2">Valor Total</th>
+                      <th className="text-right py-2">Participacao</th>
+                      <th className="text-center py-2">Integralizado</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {shareholderRecords.map((s: any) => (
+                      <tr key={s.id}>
+                        <td className="py-2 font-semibold text-gray-700">{s.holderName}</td>
+                        <td className="py-2 font-mono text-xs text-gray-500">{s.holderTaxId}</td>
+                        <td className="py-2 text-center text-xs text-gray-500">{(SHARE_TYPE_LABEL[s.shareType] || s.shareType) + (s.series ? ' ' + s.series : '')}</td>
+                        <td className="py-2 text-right">{Number(s.quantity).toLocaleString('pt-BR')}</td>
+                        <td className="py-2 text-right font-medium">{'R$ ' + Number(s.totalValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                        <td className="py-2 text-right font-bold text-indigo-600">{Number(s.percentOwned).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%'}</td>
+                        <td className="py-2 text-center">
+                          {s.isFullyPaid
+                            ? <span className="text-emerald-600 text-xs font-semibold">Sim</span>
+                            : <span className="text-amber-500 text-xs font-semibold">Parcial</span>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center text-gray-400 text-xs py-4">
+                Nenhum registro de capital social cadastrado. Lance a composicao inicial em Societario -&gt; Livros -&gt; Acionistas.
+              </div>
+            )}
+            {shareTransfers.length > 0 && (
+              <div className="pt-3">
+                <L>Historico / Evolucao</L>
+                <div className="overflow-x-auto mt-1">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="text-[10px] text-gray-400 uppercase border-b border-gray-100">
+                        <th className="text-left py-2">Data</th>
+                        <th className="text-left py-2">Documento</th>
+                        <th className="text-left py-2">Motivo</th>
+                        <th className="text-left py-2">De</th>
+                        <th className="text-left py-2">Para</th>
+                        <th className="text-right py-2">Quantidade</th>
+                        <th className="text-right py-2">Valor</th>
+                        <th className="text-left py-2">#Registro</th>
+                        <th className="text-center py-2">Averbacao</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {shareTransfers.map((t: any) => (
+                        <tr key={t.id}>
+                          <td className="py-2 text-gray-500">{new Date(t.transferDate).toLocaleDateString('pt-BR')}</td>
+                          <td className="py-2 text-gray-700">
+                            {t.instrumentType || '—'}
+                            {t.instrumentDate ? <span className="text-gray-400"> ({new Date(t.instrumentDate).toLocaleDateString('pt-BR')})</span> : null}
+                          </td>
+                          <td className="py-2 text-gray-500">{TRANSFER_REASON_LABEL[t.reason] || t.reason}</td>
+                          <td className="py-2 text-gray-700">{t.fromRecord?.holderName || '—'}</td>
+                          <td className="py-2 text-gray-700">{t.toRecord?.holderName || '—'}</td>
+                          <td className="py-2 text-right">{Number(t.quantity).toLocaleString('pt-BR')}</td>
+                          <td className="py-2 text-right">{'R$ ' + Number(t.transferValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                          <td className="py-2 text-gray-500">
+                            {[t.notaryOffice, t.bookNumber ? ('Livro ' + t.bookNumber) : '', t.pageNumber ? ('Fl. ' + t.pageNumber) : '']
+                              .filter(Boolean).join(' — ') || '—'}
+                          </td>
+                          <td className="py-2 text-center">
+                            {t.averbacaoDate
+                              ? <span className="text-emerald-600 font-semibold">Averbado</span>
+                              : <span className="text-amber-500 font-semibold">Pendente</span>}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </Section>
           {company.partners && company.partners.length > 0 && (
             <Section title="QSA — Quadro de Socios e Administradores" color="border-blue-500">
