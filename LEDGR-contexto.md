@@ -9168,3 +9168,107 @@ usuário mandou o arquivo real diretamente (upload) depois de eu insistir
 em buscar na base sem sucesso. Regra reafirmada: para arquivo já tocado
 nesta sessão, só `Get-Content` real (ou upload direto do usuário) conta
 como fonte confiável — busca na base nunca mais nesse caso.
+
+## Sessão 15/09/2026 — Composição do Capital Social (CompanyShow) + emissão sem cedente + ligação com MEP
+
+**Motivação:** tela de detalhe da empresa (`CompanyShow.tsx`) não mostrava a composição
+do capital social nem sua evolução histórica — só o QSA cru vindo da RFB
+(`QsaVinculoGrid`, "Não cadastrado"). Pedido do usuário: detalhar valor total,
+participação de cada sócio, e histórico com Doc/Data/#Registro, reaproveitável na
+tela de Equivalência Patrimonial (MEP), criada em 13/09/2026.
+
+**Descoberta:** o backend do Livro de Registro de Ações/Quotas (`ShareholderRecord`
++ `ShareTransfer`, módulo `corporate/shareholders` e `corporate/transfers`) já
+existia completo, com CRUD funcional em `/app/societario/livros/acionistas`
+(`ShareholdersPage.tsx`) — só nunca tinha sido ligado à tela de detalhe da empresa.
+Zero mudança de schema foi necessária para essa parte; só consumo dos endpoints
+`GET /corporate/shareholders`, `/capital-summary` e `GET /corporate/transfers`,
+sempre com `x-company-id` explícito no header (Regra 6 — `CompanyShow` pode exibir
+empresa diferente da empresa ativa no seletor, ex: Master Admin navegando cross-empresa).
+
+**Gap real encontrado e corrigido:** `ShareTransfer` exigia `fromRecordId` E
+`toRecordId` (desenhado só para cessão entre duas partes já existentes). Constituição
+de sociedade e aumento de capital não têm cedente. `fromRecordId` passou a ser
+opcional (`NULL` = emissão sem cedente) — schema + migração manual
+(`prisma/migrations-manuais/20260915-share-transfers-nullable-from-record.sql`,
+`ALTER TABLE share_transfers ALTER COLUMN from_record_id DROP NOT NULL`) +
+`TransfersService.create()` pula a dedução do lado "de" quando ausente, mantém soma
+no lado "para" e recálculo de `percentOwned` de todos os titulares.
+
+**Dado real lançado (Hotelsys Gestão Hoteleira Ltda, CNPJ 05736256000185):**
+Sunrise Hotels & Resorts Holding Ltda (CNPJ 16846468000131) 99,00% / Mohamed Sidik
+Abdul Latif (CPF 70215330129) 1,00%, capital total R$63.774.678,00. Histórico com 2
+eventos: Constituição (24/06/2003, Contrato Social, Registro 26600134824, JUCEPE) e
+13ª Alteração (07/03/2018, Registro 20189937106, JUCEPE — aumento de R$2.495.942,00
+integralizado 100% pela Sunrise; Sidik sem alteração de participação nas duas datas).
+Lançado via `Invoke-RestMethod` direto (token JWT extraído de
+`localStorage['@ledgr:token']`, chave confirmada — não documentada antes).
+
+**Ligação com Equivalência Patrimonial:** `EquityMethodService` ganhou
+`percentualSugerido()` (casa CNPJ/CPF da investidora com `ShareholderRecord.holderTaxId`
+ativo da investida) e `updatePercentOwned()`. `EquityMethodPage.tsx`: sugere o % no
+form de cadastro (nunca trava o campo) e, para participações já cadastradas, mostra
+aviso quando o % gravado diverge do Livro de Sócios atual, com botão explícito
+"Atualizar" — nunca sobrescreve sozinho.
+
+**Achado paralelo (sem relação com o pedido original):** `equity-method.controller.ts`,
+`equity-method.service.ts` e `EquityMethodPage.tsx` (criados na sessão de 13/09/2026)
+nunca tinham sido commitados — ficaram como arquivos físicos em disco, fora do
+controle de versão, por ~2 dias. Só foi descoberto porque `git diff` (rastreado)
+voltava vazio mesmo com o código novo confirmadamente gravado no arquivo
+(`Select-String` direto), o que gerou 2 rodadas de diagnóstico desnecessárias antes
+de checar `git status` (que mostra "Untracked files" separado de "Changes not staged").
+
+**Regra prática a considerar para o CLAUDE.md (não aplicada ainda, só registrada):**
+`git diff` (sem `--no-index`) nunca mostra nada para arquivo untracked, mesmo com
+conteúdo correto gravado — não é bug de encoding/CRLF/anchor. Antes de investigar
+"por que o diff está vazio" num arquivo que pode ser novo, checar `git status` primeiro.
+
+**Commits:** composição do capital social em `CompanyShow.tsx` (`6f419ac`); módulo MEP
+completo + sugestão de percentual (commit 1) e emissão sem cedente + lançamento real
+Hotelsys (commit 2) — 3 commits totais à frente de `origin/main`, ainda não *push*ado.
+
+## Sessão 15/09/2026 (continuação) — Bug real na Abertura: saldo multiplicado por ano de ECD
+
+**Sintoma reportado:** Diferença de R$14.744.899,07 na tela de Lançamentos de Abertura da
+Hotelsys, após reprocessar a Sugestão De/Para. Investigação inicial suspeitou do De/Para
+(dados sobrescritos) e depois de uma dedupe por valor no `abertura.service.ts` — as duas
+hipóteses foram descartadas com evidência antes da causa real ser encontrada.
+
+**Descartado 1 — De/Para reprocessado:** comparação byte-a-byte contra backup de 14:26
+(antes da reprocessada) via tabela temporária `ecd_account_mappings_bkp1426` mostrou só
+13 divergências, todas SUGGESTED_CONFIRMED→MANUAL (correção pra melhor, feita à mão hoje),
+zero casos de MANUAL→SUGGESTED_CONFIRMED. O reprocessar do De/Para não foi a causa.
+
+**Descartado 2 (tentativa de correção errada, desfeita) — dedupe por valor:** primeira
+hipótese: `calcularAbertura()` tinha uma dedupe que descartava origens com valor idêntico
+no mesmo destino ("mesmo saldo = mesma conta reimportada, não somar 2x", criada 27/08/2026).
+Remover essa dedupe pareceu corrigir (fechou em R$0,00), mas o teste usado (somar tudo sem
+filtro nenhum) sempre fecha em zero quando se soma N anos de ECD completos e válidos - isso
+não prova que somar todos os anos juntos está certo. Print real da Razão Analítico expôs o
+erro: Imóveis/Edifícios e Benfeitorias com saldo inflado (~9x o valor real).
+
+**Causa raiz real:** cada ano de ECD da Hotelsys cria contas NOVAS em `chart_of_accounts`
+("árvores ECD paralelas", já documentado antes no projeto) em vez de reaproveitar as do ano
+anterior. Cada ECD subsequente (2018 a 2025) redeclara o saldo comparativo de 31/12/2017 sob
+suas PRÓPRIAS contas novas - prática normal do SPED. `calcularAbertura()` somava TODAS as
+origens com saldo em 31/12/2017, de qualquer ano de importação - contando o mesmo imóvel uma
+vez por ano de ECD que o redeclarava (9x na Hotelsys, 2017-2025).
+
+**Correção aplicada:** `calcularAbertura()` agora filtra as origens ao LOTE de importação
+(`ecd_imports.period_end`) que bate exatamente com a data de fechamento escolhida - via
+`chart_of_accounts_ecd_imports`. A dedupe por valor foi mantida removida (premissa também
+falsa, só que por outro motivo: contas realmente diferentes, consolidadas de origens
+distintas no mesmo destino Matriz, podem legitimamente ter valor coincidente - a Regra do
+De/Para é justamente consolidar múltiplas origens). Resultado após a correção: 87 contas,
+Débito = Crédito = R$144.705.286,82, Diferença R$0,00 - confirmado na tela e na Razão
+Analítico (Edifícios e Benfeitorias com um único valor, R$6.684.354,89, não mais 9x).
+
+**Efeito colateral bom:** origens com valor idêntico dentro do MESMO lote agora só recebem
+um aviso visual "⚠ valor repetido" no preview expandido (não são mais descartadas
+silenciosamente) - visibilidade sem nunca alterar o cálculo.
+
+**Lição pra futuras empresas com múltiplos anos de ECD:** sempre que `calcularAbertura()`
+for usado numa empresa nova, confirmar que existe um `ecd_import` com `period_end` batendo
+EXATAMENTE com a data de fechamento escolhida antes de registrar - o service agora bloqueia
+com erro claro se não encontrar nenhum lote, mas vale a checagem visual mesmo assim.

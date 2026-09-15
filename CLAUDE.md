@@ -177,6 +177,9 @@ de usar.
 - Scripts de append ao contexto/md: sempre incluir a confirmacao (Get-Content -Tail 10
   ou Select-String) no mesmo bloco PS, logo apos o comando principal. Nao entregar
   confirmacao separada em bloco distinto.
+- Inicio de sessao: rodar `git status` antes de comecar qualquer trabalho novo -
+  pega arquivos de sessoes anteriores que ficaram sem commit (ver Regra 15), antes
+  que fiquem dias parados sem controle de versao.
 
 
 ## 9. Seguranca
@@ -627,3 +630,30 @@ separado - nunca usar `>` do PowerShell direto num comando que passa por
 `docker exec` quando o conteudo tiver acentuacao. Se aparecer suspeita de
 corrupcao de acento num export, SEMPRE confirmar direto no banco (SELECT
 simples) antes de assumir que o dado esta errado e tentar "corrigir".
+
+
+## Licao — Regra 15 (15/09/2026): `git diff` vazio para arquivo NAO RASTREADO nao significa "sem mudancas"
+
+Aconteceu 2x seguidas na mesma sessao (equity-method.controller.ts,
+equity-method.service.ts, EquityMethodPage.tsx): `git diff -- <arquivo>`
+retornou vazio mesmo com o codigo novo confirmadamente gravado no disco
+(confirmado via `Select-String` direto, fora do git). Gerou duas rodadas de
+diagnostico desnecessarias (inspecao byte a byte via Python, depois
+`git log`/`git rev-parse`) antes de checar o basico.
+
+**Causa real:** os 3 arquivos nunca tinham sido commitados desde que foram
+criados (sessao de 13/09/2026) - existiam so em disco, fora do controle de
+versao ("Untracked files" no `git status`). `git diff` (sem `--no-index`) so
+compara arquivos RASTREADOS contra sua versao anterior - um arquivo novo nao
+tem versao anterior, entao o diff e sempre vazio, **mesmo com conteudo
+correto**. Nao e bug de encoding/CRLF/ancora - e comportamento padrao do
+Git, alheio ao LEDGR.
+
+**Regra pratica adotada:** se `git diff -- <arquivo>` vier vazio de forma
+suspeita (script reportou sucesso, ou o proprio codigo foi confirmado por
+outro meio), o primeiro passo e `git status` (nao mais Python/diagnostico) -
+ele distingue "Changes not staged" (rastreado, diff funciona normalmente) de
+"Untracked files" (arquivo novo, diff sempre vazio, precisa `git add` antes
+de qualquer diff fazer sentido). Ver tambem o novo lembrete na secao 8
+(`git status` no inicio de cada sessao) - previne o arquivo ficar dias sem
+commit ao ponto de essa confusao acontecer de novo.
