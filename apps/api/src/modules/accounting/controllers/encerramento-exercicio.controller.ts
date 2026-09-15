@@ -11,6 +11,11 @@ import { EncerramentoExercicioService } from '../services/encerramento-exercicio
 export class EncerramentoExercicioController {
   constructor(private readonly svc: EncerramentoExercicioService) {}
 
+  @Get('exercicios')
+  exercicios(@Req() req: any) {
+    return this.svc.listarExercicios(req.companyId);
+  }
+
   @Get('preview')
   preview(@Req() req: any, @Query('year') year: string) {
     return this.svc.preview(req.companyId, parseInt(year, 10));

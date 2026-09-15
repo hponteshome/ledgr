@@ -3,6 +3,7 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import { JournalEntryService } from './journal-entry.service';
+import { TrialBalanceService } from './trial-balance.service';
 
 interface ResultAccountRow {
   id: string;
@@ -17,6 +18,7 @@ export class EncerramentoExercicioService {
   constructor(
     private prisma: PrismaService,
     private journalEntryService: JournalEntryService,
+    private trialBalance: TrialBalanceService,
   ) {}
 
   private toUTC(dateStr: string): Date {
@@ -213,5 +215,92 @@ export class EncerramentoExercicioService {
     });
 
     return { revertido: true, lancamentosRevertidos: entries.length };
+  }
+
+  // CRIADO 15/09/2026: lista todos os exercicios com movimento contabil,
+  // status de encerramento (isClosingEntry) e situacao patrimonial
+  // (Ativo x Passivo+PL) na data-base 31/12 de cada ano - usado pela tela
+  // "Encerramento de Exercicios". Mesma logica de equilibrio ja usada em
+  // BalancoPatrimonialPage.tsx (soma currentBalance de contas nivel 1: ASSET
+  // vs abs(LIABILITY+EQUITY)) - reaproveitada aqui para nao divergir.
+  async listarExercicios(companyId: string) {
+    const anos = await this.prisma.$queryRaw<{ year: number }[]>`
+      SELECT DISTINCT EXTRACT(YEAR FROM date)::int as year
+      FROM journal_entries
+      WHERE company_id = ${companyId}::uuid AND deleted_at IS NULL
+      ORDER BY year DESC
+    `;
+
+    const beginning = new Date(Date.UTC(1900, 0, 1));
+
+    const resultado = await Promise.all(anos.map(async ({ year }) => {
+      const periodStart = `${year}-01-01`;
+      const periodEnd = `${year}-12-31`;
+
+      const encerramento = await this.prisma.journalEntry.findFirst({
+        where: {
+          companyId,
+          date: { gte: this.toUTC(periodEnd), lte: this.toUTCEnd(periodEnd) },
+          isClosingEntry: true,
+          deletedAt: null,
+        },
+      });
+
+      const { balances } = await this.trialBalance.getVerificationBalance(
+        companyId, beginning, this.toUTCEnd(periodEnd),
+      );
+
+      // CORRIGIDO 15/09/2026: reaproveita EXATAMENTE a formula ja validada do
+      // ClosingPanel (TrialBalanceView.tsx) - soma SEMPRE com o sinal contabil
+      // original (nunca Math.abs() por classe antes de somar - mesmo bug ja
+      // documentado e corrigido ali em 21/08/2026) e INCLUI Receita/Despesa no
+      // calculo do equilibrio, nao so Ativo x Passivo+PL. Sem isso, todo ano
+      // com Resultado do Exercicio ainda nao fechado numa conta de PL mostrava
+      // "diferenca" mesmo estando corretamente encerrado.
+      let ativoRaw = 0, passivoRaw = 0, plRaw = 0, receitaRaw = 0, despesaRaw = 0;
+      for (const b of balances as any[]) {
+        const acc = b.account;
+        if (acc.level !== 1) continue;
+        if (acc.type === 'ASSET') ativoRaw += b.currentBalance;
+        else if (acc.type === 'LIABILITY') passivoRaw += b.currentBalance;
+        else if (acc.type === 'EQUITY') plRaw += b.currentBalance;
+        else if (acc.type === 'REVENUE') receitaRaw += b.currentBalance;
+        else if (acc.type === 'EXPENSE') despesaRaw += b.currentBalance;
+      }
+      const diferencaApurada = ativoRaw + passivoRaw + plRaw + (receitaRaw + despesaRaw);
+
+      // CORRIGIDO 15/09/2026: currentBalance de getVerificationBalance e SEMPRE
+      // cumulativo desde o inicio (saldoAnterior + movimento do periodo = saldo
+      // final, independente do startDate escolhido) - nao serve para isolar o
+      // resultado DE UM ANO especifico. Precisa de uma segunda chamada travada
+      // no intervalo 01/01-31/12 daquele ano, usando os campos debits/credits
+      // (movimento REAL do periodo, nao o saldo acumulado), com excludeClosing
+      // =true - mesmo parametro/motivo ja usado no DRE (movimento bruto real,
+      // sem a reclassificacao do proprio lancamento de encerramento).
+      const { balances: balancesAno } = await this.trialBalance.getVerificationBalance(
+        companyId, this.toUTC(periodStart), this.toUTCEnd(periodEnd), true,
+      );
+      let receitaAno = 0, despesaAno = 0;
+      for (const b of balancesAno as any[]) {
+        const acc = b.account;
+        if (acc.level !== 1) continue;
+        const movimento = b.debits - b.credits;
+        if (acc.type === 'REVENUE') receitaAno += movimento;
+        else if (acc.type === 'EXPENSE') despesaAno += movimento;
+      }
+      const resultado = -(receitaAno + despesaAno);
+
+      return {
+        year,
+        status: encerramento ? 'ENCERRADO' : 'ABERTO',
+        totalAtivo: Math.abs(ativoRaw),
+        totalPassivoPL: Math.abs(passivoRaw + plRaw),
+        resultado,
+        diferenca: diferencaApurada,
+        equilibrado: Math.abs(diferencaApurada) < 0.01,
+      };
+    }));
+
+    return resultado.sort((a, b) => b.year - a.year);
   }
 }
