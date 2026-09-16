@@ -143,8 +143,8 @@ export default function AccountsPage() {
     const handleImprimir = () => {
         const corpoHtml = `<table style="table-layout: fixed;">
             <colgroup>
-                <col style="width: 13%">
-                <col style="width: 32%">
+                <col style="width: 20%">
+                <col style="width: 25%">
                 <col style="width: 8%">
                 <col style="width: 8%">
                 <col style="width: 13%">
@@ -159,6 +159,7 @@ export default function AccountsPage() {
         </table>
         <style>
             table td, table th { padding: 3px 6px !important; max-width: 0.5cm; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+            table td:nth-child(1), table th:nth-child(1) { max-width: none; }
             table td:nth-child(2), table th:nth-child(2) { max-width: none; white-space: normal; }
         </style>`;
         imprimirRelatorio({
