@@ -9272,3 +9272,49 @@ silenciosamente) - visibilidade sem nunca alterar o cálculo.
 for usado numa empresa nova, confirmar que existe um `ecd_import` com `period_end` batendo
 EXATAMENTE com a data de fechamento escolhida antes de registrar - o service agora bloqueia
 com erro claro se não encontrar nenhum lote, mas vale a checagem visual mesmo assim.
+
+## Sessao 16/09/2026 - Codigo Reduzido (blocos disponiveis)
+
+### O que foi feito
+- Fix impressao Plano de Contas: coluna Codigo truncava em 0.5cm por
+  regra CSS generica de impressao - corrigido (AccountsPage.tsx).
+- Novo endpoint GET /chart-of-accounts/reduced-code-blocks/:classDigit
+  - agrupa por 2 primeiros digitos do CODIGO COMPLETO, lista gaps
+  disponiveis (10 primeiros por bloco) - substitui logica client-side
+  quebrada do AccountMaintenanceModal (vizinhanca por prefixo).
+- Fix suggestCode: UUID error (parentCode tratado como parentId).
+
+### Aprendizados / erros para nao repetir
+1. REDUZIDO NAO SEGUE OS DIGITOS DO CODIGO COMPLETO: confirmado com
+   dado real Hotelsys via SQL manual - conta com codigo completo "22"
+   (Exigivel LP) usa reduzido 23xx; codigo "23" (Patrimonio Liquido)
+   usa reduzido 24xx. Banda do reduzido = decisao humana historica,
+   sem formula. So o AGRUPAMENTO por 2 primeiros digitos do codigo
+   COMPLETO e confiavel (ranges nunca se sobrepoem entre grupos).
+2. Despesas (grupo full-code "42") engloba as 4 sub-categorias
+   (Operacionais/Administrativas/Financeiras/Hoteleiras) sem nenhum
+   sinal estrutural recuperavel - nem 2o nem 3o digito do codigo
+   completo separa. Sugestao fica sem sub-banda ali; usuario ajusta
+   na mao quando precisar de categoria especifica.
+3. Comentario de cabecalho dos arquivos frontend NAO e confiavel pra
+   caminho real (AccountsPage.tsx e AccountMaintenanceModal.tsx tinham
+   "apps/frontend/..." no comentario, caminho real e so
+   "frontend/..." sem apps/, e AccountMaintenanceModal.tsx fica em
+   pages/accounting, nao components/accounting como o comentario
+   dizia). Usar sempre `git ls-files | Select-String <nome>` pra
+   confirmar antes de montar o script de patch.
+4. cls tem que vir logo apos o fechamento de CADA heredoc (`'@`),
+   antes do Set-Content/comando seguinte - nao so um cls no fim do
+   bloco todo (isso deixa o output relevante de heredocs anteriores
+   sumir da tela antes de eu conseguir ver).
+5. Regex em string Python gerada via heredoc PowerShell: cuidado com
+   duplo escaping - `\\\\d` dentro do heredoc virou `\\d` no arquivo
+   .py final (2 barras, nao 1), fazendo a regex `/^\\d+$/` nunca
+   bater com digito nenhum (procurava um backslash literal). Bug
+   silencioso - endpoint retornou [] sem erro, so foi pego inspecionando
+   a aba Resposta do DevTools. Sempre conferir a regex no diff final,
+   nao so confiar no "OK" do script.
+6. PENDENTE (nao corrigido nesta sessao): /suggest-code/:parentCode
+   ainda retorna 400 "conta pai nao encontrada" pra alguns codigos
+   (ex: "11102") - suspeita de mismatch de normalizacao (codigo com/sem
+   ponto) na query `code: parentCode`. Fica para proxima sessao.
