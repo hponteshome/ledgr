@@ -163,6 +163,15 @@ export class ChartOfAccountsController {
   ) {
     return this.service.suggestCode(companyId, parentCode);
   }
+
+  // ── Blocos de código reduzido disponíveis (por classe) ─────────────────
+  @Get('reduced-code-blocks/:classDigit')
+  async getReducedCodeBlocks(
+    @Company() companyId: string,
+    @Param('classDigit') classDigit: string,
+  ) {
+    return this.service.getReducedCodeBlocks(companyId, classDigit);
+  }
 @Get(':id/balance')
 async getAccountBalance(
   @Company() companyId: string,

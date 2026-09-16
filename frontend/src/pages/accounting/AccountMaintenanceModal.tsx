@@ -261,146 +261,32 @@ export const AccountMaintenanceModal: React.FC<AccountMaintenanceModalProps> = (
     [accounts, createForm.parentId],
   );
 
-  const neighborAccounts = useMemo(() => {
-    if (selectedParentAccount) {
-      return accounts.filter(a =>
-        a.code.startsWith(selectedParentAccount.code) &&
-        a.code !== selectedParentAccount.code &&
-        a.reducedCode,
-      );
-    }
-    const classe = createForm.code.trim()[0];
-    if (!classe) return [];
-    return accounts.filter(a => a.code.startsWith(classe) && a.reducedCode);
-  }, [accounts, selectedParentAccount, createForm.code]);
-
-  const neighborReducedCodes = useMemo(() => {
-    return neighborAccounts
-      .map(a => ({ code: a.code, name: a.name, reducedCode: a.reducedCode as string, num: parseInt((a.reducedCode || '').replace(/^0+/, '') || '0', 10) }))
-      .filter(x => !isNaN(x.num) && x.num > 0)
-      .sort((a, b) => a.num - b.num);
-  }, [neighborAccounts]);
-
-  // NOVO: mapa de lacunas na numeracao da CLASSE inteira (1o digito do
-  // codigo), nao so do grupo pai - mostra de onde veio a ultima conta usada,
-  // o vazio imediatamente anterior a ela, e os 2 proximos vazios adiante.
+  // NOVO (16/09/2026): blocos de codigo reduzido disponiveis vem agora do
+  // backend (getReducedCodeBlocks) - agrupa pelos 2 primeiros digitos do
+  // CODIGO COMPLETO (unico sinal que nao se sobrepoe entre grupos,
+  // confirmado com dado real do Hotelsys: banda do reduzido pode ter
+  // digitos diferentes do codigo completo, ex: code "22" usa reduzido
+  // 23xx). Substitui toda a logica client-side anterior (classeDigit +
+  // grupoPaiPrefix + gaps calculados na mao), que assumia erroneamente que
+  // os digitos do reduzido batem com os do codigo completo.
   const classeDigit = (selectedParentAccount?.code || createForm.code).trim()[0];
 
-  // CORRIGIDO: exclui 8888 (excecao fixa da conta "Apuracao de Resultado",
-  // documentada e permanente - nunca faz parte da sequencia normal da
-  // classe, distorcia o mapa de lacunas inteiro).
-  const RESERVED_CODES = new Set([8888]);
+  const [reducedCodeBlocks, setReducedCodeBlocks] = useState([] as { grupo: string; inicio: number; fim: number; total: number; primeiros10: number[] }[]);
+  const [loadingBlocks, setLoadingBlocks] = useState(false);
 
-  const classeUsedNums = useMemo(() => {
-    if (!classeDigit) return [];
-    const nums = accounts
-      .filter(a => a.reducedCode && a.code.startsWith(classeDigit))
-      .map(a => parseInt((a.reducedCode || '').replace(/^0+/, '') || '0', 10))
-      .filter(n => n > 0 && !RESERVED_CODES.has(n));
-    return Array.from(new Set(nums)).sort((a, b) => a - b);
-  }, [accounts, classeDigit]);
-
-  const lastUsedNum = classeUsedNums.length ? classeUsedNums[classeUsedNums.length - 1] : null;
-
-  // Teto natural da classe (ex: classe 2 vai ate 2999, classe 4 ate 4999).
-  const classeCeiling = classeDigit ? parseInt(classeDigit, 10) * 1000 + 999 : null;
-
-  const classeGaps = useMemo(() => {
-    const gaps: { start: number; end: number }[] = [];
-    for (let i = 1; i < classeUsedNums.length; i++) {
-      const prev = classeUsedNums[i - 1], curr = classeUsedNums[i];
-      if (curr - prev > 1) gaps.push({ start: prev + 1, end: curr - 1 });
-    }
-    if (classeUsedNums.length > 0 && classeCeiling !== null) {
-      const last = classeUsedNums[classeUsedNums.length - 1];
-      if (last < classeCeiling) gaps.push({ start: last + 1, end: classeCeiling });
-    }
-    return gaps;
-  }, [classeUsedNums, classeCeiling]);
-
-  const gapBeforeLast = useMemo(() => {
-    if (classeUsedNums.length < 2) return null;
-    const idx = classeUsedNums.length - 1;
-    const prev = classeUsedNums[idx - 1], curr = classeUsedNums[idx];
-    return curr - prev > 1 ? { start: prev + 1, end: curr - 1 } : null;
-  }, [classeUsedNums]);
-
-  const gapsAfterLast = useMemo(() => {
-    if (lastUsedNum === null) return [];
-    return classeGaps.filter(g => g.start > lastUsedNum).slice(0, 2);
-  }, [classeGaps, lastUsedNum]);
-
-  // CORRIGIDO: "proximo livre" agora sempre calculado pela CLASSE inteira
-  // (nao mais pelo grupo pai). Movido pra depois das const acima (bug de
-  // ordem de declaracao - usava classeDigit/gapsAfterLast antes de existirem).
-  // CORRIGIDO: reduced_code nao segue sequencia unica pra classe inteira -
-  // segue BLOCOS DE 100 por grupo principal (21xx=Passivo Circulante,
-  // 23xx=Exigivel LP, 24xx=PL, etc - convencao ja definida quando o usuario
-  // reatribuiu os codigos manualmente nesta sessao). "Proximo livre" precisa
-  // continuar o bloco do GRUPO PAI (maior numero usado nas contas irmas do
-  // mesmo grupo, +1), nao pular pro fim da classe nem pra bloco reservado
-  // de outro grupo.
-  // CORRIGIDO (dado real confirmado pelo usuario): o bloco de numeracao NAO
-  // e por grupo de 5 digitos (22101) - grupos-irmaos de 5 digitos sob o
-  // MESMO prefixo de 2 digitos (22101, 22102, 22501, todos sob "22")
-  // compartilham uma sequencia CONTINUA sem vazio entre eles (2301..2315).
-  // O vazio de verdade so aparece na fronteira do prefixo de 2 digitos
-  // (21->22 tem vazio 2154-2299; 22->23 tem vazio 2316-2400). Escopo correto
-  // = 2 primeiros digitos do code do pai, nao 5.
-  const grupoPaiPrefix = useMemo(() => {
-    if (!selectedParentAccount) return null;
-    return selectedParentAccount.code.slice(0, 2);
-  }, [selectedParentAccount]);
-
-  const grupoUsedNums = useMemo(() => {
-    if (!grupoPaiPrefix) return [];
-    const nums = accounts
-      .filter(a => a.reducedCode && a.code.startsWith(grupoPaiPrefix))
-      .map(a => parseInt((a.reducedCode || '').replace(/^0+/, '') || '0', 10))
-      .filter(n => n > 0 && !RESERVED_CODES.has(n));
-    return Array.from(new Set(nums)).sort((a, b) => a - b);
-  }, [accounts, grupoPaiPrefix]);
-
-  const grupoLastUsedNum = grupoUsedNums.length ? grupoUsedNums[grupoUsedNums.length - 1] : null;
-
-  // Teto do bloco do grupo pai: o proximo numero usado na CLASSE inteira que
-  // fica acima do maior numero do grupo pai, menos 1 (fronteira real do
-  // proximo grupo-irmao de 2 digitos); se nao houver nenhum acima, usa o
-  // teto da classe inteira.
-  const grupoBlockCeiling = useMemo(() => {
-    if (grupoLastUsedNum === null) return classeCeiling;
-    const next = classeUsedNums.find(n => n > grupoLastUsedNum);
-    return next !== undefined ? next - 1 : classeCeiling;
-  }, [grupoLastUsedNum, classeUsedNums, classeCeiling]);
-
-  const grupoGapAfterLast = useMemo(() => {
-    if (grupoLastUsedNum === null || grupoBlockCeiling === null) return null;
-    return grupoLastUsedNum < grupoBlockCeiling
-      ? { start: grupoLastUsedNum + 1, end: grupoBlockCeiling }
-      : null;
-  }, [grupoLastUsedNum, grupoBlockCeiling]);
-
-  // Nome + numero da ultima conta EXIBIDOS SEMPRE JUNTOS, do mesmo escopo
-  // (grupo pai se houver, senao classe inteira) - corrige inconsistencia
-  // anterior onde o numero vinha de um calculo e o nome de outro.
-  const escopoLastUsedNum = grupoPaiPrefix ? grupoLastUsedNum : lastUsedNum;
-  const nomeUltimaConta = useMemo(() => {
-    if (escopoLastUsedNum === null) return null;
-    const padded4 = String(escopoLastUsedNum).padStart(4, '0');
-    const found = accounts.find(a => a.reducedCode &&
-      (a.reducedCode.replace(/^0+/, '') === String(escopoLastUsedNum) || a.reducedCode === padded4));
-    return found?.name ?? null;
-  }, [accounts, escopoLastUsedNum]);
+  useEffect(() => {
+    if (!classeDigit) { setReducedCodeBlocks([]); return; }
+    setLoadingBlocks(true);
+    api.get(`/chart-of-accounts/reduced-code-blocks/${classeDigit}`)
+      .then(res => setReducedCodeBlocks(res.data || []))
+      .catch(() => setReducedCodeBlocks([]))
+      .finally(() => setLoadingBlocks(false));
+  }, [classeDigit]);
 
   const suggestedReducedCode = useMemo(() => {
-    if (grupoPaiPrefix) {
-      if (grupoLastUsedNum !== null) return String(grupoLastUsedNum + 1);
-      if (grupoBlockCeiling !== null) return String((grupoBlockCeiling - 99));
-    }
-    if (gapsAfterLast.length > 0) return String(gapsAfterLast[0].start);
-    if (lastUsedNum === null && classeDigit) return String(parseInt(classeDigit, 10) * 1000 + 1);
-    return null;
-  }, [grupoPaiPrefix, grupoLastUsedNum, grupoBlockCeiling, gapsAfterLast, lastUsedNum, classeDigit]);
+    if (reducedCodeBlocks.length === 0) return null;
+    return String(reducedCodeBlocks[0].primeiros10[0]);
+  }, [reducedCodeBlocks]);
 
   // ── Seleção ───────────────────────────────────────────────────────────────
 
@@ -1190,54 +1076,41 @@ export const AccountMaintenanceModal: React.FC<AccountMaintenanceModalProps> = (
               )}
             </div>
 
-            {/* NOVO: painel de vizinhanca de codigo reduzido - mostra os ja
-                usados no grupo (conta pai escolhida, ou classe pelo 1o digito
-                do codigo) com o proximo numero livre em destaque. */}
+            {/* NOVO (16/09/2026): blocos de codigo reduzido disponiveis, um
+                por grupo (2 primeiros digitos do codigo completo), listando
+                os 10 primeiros numeros livres de cada intervalo - dado vem
+                pronto do backend (getReducedCodeBlocks). */}
             <div className="w-64 shrink-0 border-l border-gray-100 pl-6">
               <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
-                Códigos Reduzidos — Vizinhança
+                Códigos Reduzidos Disponíveis
               </p>
               {!classeDigit ? (
                 <p className="text-xs text-gray-400">
                   Escolha uma conta pai ou digite o código para ver os intervalos de código reduzido disponíveis nessa classe.
                 </p>
+              ) : loadingBlocks ? (
+                <p className="text-xs text-gray-400">Carregando…</p>
+              ) : reducedCodeBlocks.length === 0 ? (
+                <p className="text-xs text-gray-400">Nenhum intervalo disponível encontrado nessa classe.</p>
               ) : (
-                <>
-                  {suggestedReducedCode && (
-                    <div className="mb-3 px-3 py-2 rounded-lg bg-green-50 border border-green-200">
-                      <p className="text-[10px] text-green-600 uppercase font-bold tracking-wide">Próximo livre</p>
-                      <p className="text-lg font-bold text-green-700 font-mono">{suggestedReducedCode}</p>
+                <div className="space-y-3">
+                  {reducedCodeBlocks.map((b, i) => (
+                    <div key={i}>
+                      <p className="text-[10px] text-gray-400 mb-1">
+                        Grupo {b.grupo} — {b.total} disponíve{b.total === 1 ? 'l' : 'is'}
+                      </p>
+                      <div className="flex flex-wrap gap-1">
+                        {b.primeiros10.map(n => (
+                          <button key={n} type="button"
+                            onClick={() => setCreateForm(prev => ({ ...prev, reducedCode: String(n) }))}
+                            className="px-2 py-1 rounded bg-blue-50 border border-blue-200 text-[11px] text-blue-700 hover:bg-blue-100 transition-colors font-mono">
+                            {n}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  )}
-
-                  {lastUsedNum !== null && (
-                    <div className="mb-3 text-[11px] text-gray-500">
-                      Última conta anterior: <span className="font-mono font-semibold text-gray-700">{lastUsedNum}</span>
-                      {nomeUltimaConta && <span className="block text-gray-400 mt-0.5">{nomeUltimaConta}</span>}
-                    </div>
-                  )}
-
-                  {gapBeforeLast && (
-                    <div className="mb-3 px-2 py-1.5 rounded bg-amber-50 border border-amber-200 text-[11px] text-amber-700">
-                      Lacuna antes: <span className="font-mono font-semibold">
-                        {gapBeforeLast.start}{gapBeforeLast.end > gapBeforeLast.start ? `…${gapBeforeLast.end}` : ''}
-                      </span>
-                    </div>
-                  )}
-
-                  {gapsAfterLast.length > 0 && (
-                    <div className="space-y-1">
-                      <p className="text-[10px] text-gray-400 mb-1">Próximos intervalos disponíveis:</p>
-                      {gapsAfterLast.map((g, i) => (
-                        <button key={i} type="button"
-                          onClick={() => setCreateForm(prev => ({ ...prev, reducedCode: String(g.start) }))}
-                          className="w-full text-left px-2 py-1.5 rounded bg-blue-50 border border-blue-200 text-[11px] text-blue-700 hover:bg-blue-100 transition-colors font-mono">
-                          {g.start}{g.end > g.start ? `…${g.end}` : ''}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </>
+                  ))}
+                </div>
               )}
             </div>
             </div>

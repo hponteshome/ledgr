@@ -483,10 +483,88 @@ export class ChartOfAccountsService {
     };
   }
 
-  // ── Sugerir próximo código (usa AccountingMaskService) ─────────────────────
+  // ── Blocos de código reduzido disponíveis (por classe) ─────────────────────
+  // NOVO (16/09/2026): substitui a logica client-side de "vizinhanca" do
+  // AccountMaintenanceModal (baseada em prefixo do codigo completo, que nao
+  // bate com a banda real do reduzido - achado real: conta com code "22"
+  // usa reduzido 23xx, code "23" usa reduzido 24xx). Agrupa pelos 2
+  // primeiros digitos do CODIGO COMPLETO (unico sinal que nao se sobrepoe
+  // entre grupos, confirmado com dado real do Hotelsys), lista os buracos
+  // (gaps) dentro de cada grupo, com teto dinamico = proxima centena acima
+  // do maior numero ja usado. Exclui 8888 (excecao fixa "Apuracao de
+  // Resultado"). Filtra so contas cujo codigo comeca com classDigit (1o
+  // digito passado pelo modal) para nao misturar classes diferentes.
+  async getReducedCodeBlocks(companyId: string, classDigit: string) {
+    const accounts = await this.prisma.chartOfAccounts.findMany({
+      where: {
+        companyId,
+        deletedAt: null,
+        code: { startsWith: classDigit },
+        reducedCode: { not: null },
+      },
+      select: { code: true, reducedCode: true },
+    });
 
-  async suggestCode(companyId: string, parentId: string) {
-    return this.maskService.suggestChildCode(companyId, parentId);
+    const RESERVED = new Set([8888]);
+    const byGrupo = new Map<string, number[]>();
+
+    for (const a of accounts) {
+      const rc = (a.reducedCode || '').trim();
+      if (!/^\d+$/.test(rc)) continue;
+      const num = parseInt(rc, 10);
+      if (RESERVED.has(num)) continue;
+      const grupo = a.code.slice(0, 2);
+      if (!byGrupo.has(grupo)) byGrupo.set(grupo, []);
+      byGrupo.get(grupo)!.push(num);
+    }
+
+    const range10 = (inicio: number, fim: number) => {
+      const fimBloco = Math.min(inicio + 9, fim);
+      const arr: number[] = [];
+      for (let n = inicio; n <= fimBloco; n++) arr.push(n);
+      return arr;
+    };
+
+    const blocks: { grupo: string; inicio: number; fim: number; total: number; primeiros10: number[] }[] = [];
+
+    for (const [grupo, nums] of byGrupo) {
+      const distintos = Array.from(new Set(nums)).sort((a, b) => a - b);
+      if (distintos.length === 0) continue;
+
+      for (let i = 1; i < distintos.length; i++) {
+        const prev = distintos[i - 1], curr = distintos[i];
+        if (curr - prev > 1) {
+          const inicio = prev + 1, fim = curr - 1;
+          blocks.push({ grupo, inicio, fim, total: fim - inicio + 1, primeiros10: range10(inicio, fim) });
+        }
+      }
+
+      const max = distintos[distintos.length - 1];
+      const ceiling = (Math.floor(max / 100) + 1) * 100 - 1;
+      if (max < ceiling) {
+        const inicio = max + 1, fim = ceiling;
+        blocks.push({ grupo, inicio, fim, total: fim - inicio + 1, primeiros10: range10(inicio, fim) });
+      }
+    }
+
+    blocks.sort((a, b) => a.grupo.localeCompare(b.grupo) || a.inicio - b.inicio);
+    return blocks;
+  }
+
+  // ── Sugerir próximo código (usa AccountingMaskService) ─────────────────────
+  // CORRIGIDO (16/09/2026): o controller recebe parentCode (o CODIGO da
+  // conta, ex "11102010003"), mas o service repassava direto pra
+  // maskService.suggestChildCode() como se fosse um UUID - erro real do
+  // Postgres ao tentar findFirst({ where: { id: parentCode } }). Resolve
+  // code -> id aqui antes de chamar o maskService.
+  async suggestCode(companyId: string, parentCode: string) {
+    const parent = await this.prisma.chartOfAccounts.findFirst({
+      where: { companyId, code: parentCode },
+    });
+    if (!parent) {
+      throw new BadRequestException('Conta pai não encontrada para sugestão de código.');
+    }
+    return this.maskService.suggestChildCode(companyId, parent.id);
   }
 
   // ── Árvore com saldos ──────────────────────────────────────────────────────
