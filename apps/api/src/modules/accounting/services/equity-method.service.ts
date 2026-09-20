@@ -280,4 +280,35 @@ export class EquityMethodService {
       include: { journalEntry: { select: { id: true, date: true, description: true } } },
     });
   }
+
+  // NOVO (18/09/2026): reverte um calculo de Equivalencia Patrimonial ja
+  // gravado - apaga o lancamento contabil (soft-delete) E o registro de
+  // apuracao (equity_method_calculations tem chave unica por investmentId+
+  // referenceDate, entao apagar so o lancamento pelo Diario deixava o
+  // registro de apuracao orfao, bloqueando um novo calculo pra mesma data
+  // com "Ja existe uma apuracao para esta data"). Achado real: PL da
+  // investida calculado incorretamente durante uma janela de manutencao do
+  // Plano de Contas dela, gerando baixa total indevida do investimento.
+  async reverter(companyId: string, investmentId: string, referenceDateStr: string) {
+    await this.getInvestimentoOuFalha(companyId, investmentId);
+    const referenceDate = new Date(referenceDateStr + 'T00:00:00Z');
+
+    const calculo = await this.prisma.equityMethodCalculation.findUnique({
+      where: { investmentId_referenceDate: { investmentId, referenceDate } },
+    });
+    if (!calculo) {
+      throw new BadRequestException('Não há apuração de Equivalência Patrimonial gravada para esta data.');
+    }
+
+    await this.prisma.journalEntry.update({
+      where: { id: calculo.journalEntryId },
+      data: { deletedAt: new Date() },
+    });
+
+    await this.prisma.equityMethodCalculation.delete({
+      where: { id: calculo.id },
+    });
+
+    return { revertido: true };
+  }
 }

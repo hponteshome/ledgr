@@ -40,6 +40,11 @@ export class EquityMethodController {
     return this.svc.historico(req.headers['x-company-id'], id);
   }
 
+  @Post(':id/reverter')
+  reverter(@Req() req: any, @Param('id') id: string, @Body('referenceDate') referenceDate: string) {
+    return this.svc.reverter(req.headers['x-company-id'], id, referenceDate);
+  }
+
   @Post(':id/atualizar-percentual')
   atualizarPercentual(@Req() req: any, @Param('id') id: string, @Body('percentOwned') percentOwned: number) {
     return this.svc.updatePercentOwned(req.headers['x-company-id'], id, percentOwned);
