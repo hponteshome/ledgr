@@ -7,6 +7,8 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { useCompany } from '@/contexts/CompanyContext';
 import api from '@/services/api';
+import { usePrintHandler } from '@/contexts/PrintContext';
+import { imprimirRelatorio } from '@/utils/imprimirRelatorio';
 
 interface Sugestao {
   sourceId: string; sourceCode: string; sourceName: string;
@@ -14,6 +16,8 @@ interface Sugestao {
   confidence: number;
   matchType: 'REAPROVEITADO' | 'SIMILARIDADE' | 'SEM_SUGESTAO' | 'CONFIRMADO_AUTOMATICO' | 'CONFIRMADO_MANUAL';
   confirmado: boolean;
+  sourceBalance: number | null;
+  sourceBalanceDate: string | null;
 }
 interface ContaOpcao { id: string; code: string; name: string; type: string; nature: string; }
 
@@ -23,6 +27,16 @@ const matchTypeStyle: Record<string, { bg: string; color: string; label: string 
   SEM_SUGESTAO: { bg: '#FEF2F2', color: '#B91C1C', label: 'Sem sugestão' },
   CONFIRMADO_AUTOMATICO: { bg: '#EEF2FF', color: '#4338CA', label: '✓ Confirmado (auto)' },
   CONFIRMADO_MANUAL: { bg: '#FFFBEB', color: '#B45309', label: '✓ Confirmado (manual)' },
+};
+
+// NOVO (16/09/2026): mesmo padrao ja usado em RazaoAnaliticoPage.tsx -
+// debito positivo (preto), credito negativo (vermelho, entre parenteses).
+// O sinal ja vem correto de account_balance.balance - antes a tela fazia
+// Math.abs() e escondia se era D ou C.
+const fmtSaldoDebitoCredito = (v: number): string => {
+  if (v === 0) return '0,00';
+  const s = Math.abs(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return v < 0 ? `(${s})` : s;
 };
 
 // CRIADO 28/08/2026: autocomplete simples, filtro no cliente (ja temos as
@@ -103,8 +117,29 @@ export const SugestaoDeParaPage: React.FC = () => {
   const [resultado, setResultado] = useState<{ ok: boolean; mensagem: string } | null>(null);
   const [filtro, setFiltro] = useState<'todos' | 'pendentes' | 'confirmados'>('todos');
 
-  const carregar = useCallback(async () => {
+  // NOVO (16/09/2026): data de fechamento agora obrigatoria - sem ela, o
+  // De/Para carregava contas de QUALQUER lote ECD com o saldo mais recente
+  // disponivel, misturando anos e criando falsa impressao de pendencias
+  // que nao existem naquele fechamento especifico (achado real: "CIM A
+  // PAGAR", que so existe a partir de 2018, aparecia com saldo de 2025 ao
+  // conferir a Abertura de 2017).
+  const [dataFechamento, setDataFechamento] = useState('');
+
+  // NOVO (16/09/2026): lista de exercicios (lotes ECD) disponiveis pra essa
+  // empresa, com contagem de pendentes/confirmadas por ano - alimenta os
+  // "pills" coloridos (verde = tudo confirmado, vermelho = tem pendencia).
+  const [exercicios, setExercicios] = useState([] as { periodEnd: string; totalContas: number; confirmadas: number; pendentes: number; completo: boolean }[]);
+
+  useEffect(() => {
     if (!activeCompany?.id) return;
+    api.get('/accounting/de-para/exercicios')
+      .then(r => setExercicios(r.data || []))
+      .catch(() => setExercicios([]));
+  }, [activeCompany?.id]);
+
+  const carregar = useCallback(async (dataOverride?: string) => {
+    const data = dataOverride ?? dataFechamento;
+    if (!activeCompany?.id || !data) return;
     setLoading(true);
     setResultado(null);
     try {
@@ -112,7 +147,7 @@ export const SugestaoDeParaPage: React.FC = () => {
       // sugestao (so contas Matriz, sem vinculo ECD) em vez de carregar a
       // arvore inteira - achado real: autocomplete oferecia contas ECD
       // nativas tambem, quando so Matriz faz sentido como destino.
-      const sugResp = await api.get('/accounting/de-para/sugerir');
+      const sugResp = await api.get('/accounting/de-para/sugerir', { params: { dataFechamento: data } });
       setSugestoes(sugResp.data?.sugestoes || []);
       setContasDisponiveis(sugResp.data?.destinosDisponiveis || []);
     } catch (e: any) {
@@ -120,7 +155,7 @@ export const SugestaoDeParaPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [activeCompany?.id]);
+  }, [activeCompany?.id, dataFechamento]);
 
   useEffect(() => { carregar(); }, [carregar]);
 
@@ -166,6 +201,52 @@ export const SugestaoDeParaPage: React.FC = () => {
   const qtdSimilaridade = sugestoes.filter(s => s.matchType === 'SIMILARIDADE').length;
   const qtdSemSugestao = sugestoes.filter(s => s.matchType === 'SEM_SUGESTAO' && !overrides[s.sourceId]).length;
 
+  // NOVO (16/09/2026): botao flutuante de impressao (usePrintHandler) -
+  // reflete a lista/filtro ativo na tela (Todos/Pendentes/Confirmados).
+  const montarLinhasImpressao = (): string => {
+    return listaExibida.map(s => {
+      const st = matchTypeStyle[overrides[s.sourceId] ? 'SIMILARIDADE' : s.matchType];
+      const destinoId = overrides[s.sourceId] ?? s.targetId;
+      const destino = contasDisponiveis.find(c => c.id === destinoId);
+      const destinoLabel = destino
+        ? `${destino.code} — ${destino.name}`
+        : (s.targetCode ? `${s.targetCode} — ${s.targetName}` : '—');
+      const saldoTxt = s.sourceBalance !== null ? fmtSaldoDebitoCredito(s.sourceBalance) : '—';
+      const saldoClasse = (s.sourceBalance ?? 0) < 0 ? 'num credito' : 'num';
+      return `<tr>
+        <td>${s.sourceCode} · ${s.sourceName}</td>
+        <td class="${saldoClasse}">${saldoTxt}</td>
+        <td>${destinoLabel}</td>
+        <td class="num">${(s.confidence * 100).toFixed(0)}%</td>
+        <td>${st.label}</td>
+      </tr>`;
+    }).join('');
+  };
+
+  const handleImprimir = () => {
+    if (!activeCompany) return;
+    const corpoHtml = `<table>
+      <thead><tr><th>Origem (ECD)</th><th class="num">Saldo</th><th>Destino sugerido (Matriz)</th><th class="num">Confiança</th><th>Tipo</th></tr></thead>
+      <tbody>${montarLinhasImpressao()}</tbody>
+    </table>
+    <style>
+      table td.credito { color: #B91C1C; }
+    </style>`;
+    imprimirRelatorio({
+      titulo: 'Sugestão de De/Para (ECD → Matriz)',
+      empresaNome: activeCompany.legalName || activeCompany.tradeName || '',
+      empresaCnpj: activeCompany.taxId || '',
+      periodo: filtro === 'todos' ? 'Todos' : filtro === 'pendentes' ? 'Somente pendentes' : 'Confirmados',
+      corpoHtml,
+    });
+  };
+
+  usePrintHandler(
+    sugestoes.length > 0 ? handleImprimir : null,
+    'Imprimir Sugestão De/Para',
+    [listaExibida, filtro, contasDisponiveis, overrides],
+  );
+
   return (
     <div style={{ padding: 24 }}>
       <header style={{ marginBottom: 20 }}>
@@ -178,6 +259,55 @@ export const SugestaoDeParaPage: React.FC = () => {
         </p>
       </header>
 
+      {exercicios.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ fontSize: 11, color: '#6B7280', display: 'block', marginBottom: 6 }}>Exercícios disponíveis</label>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {exercicios.map(ex => {
+              const ano = ex.periodEnd.slice(0, 4);
+              const selecionado = dataFechamento === ex.periodEnd;
+              const cor = ex.completo
+                ? { bg: '#ECFDF5', border: '#A7F3D0', text: '#059669' }
+                : { bg: '#FEF2F2', border: '#FECACA', text: '#B91C1C' };
+              return (
+                <button key={ex.periodEnd} type="button"
+                  onClick={() => { setDataFechamento(ex.periodEnd); carregar(ex.periodEnd); }}
+                  style={{
+                    padding: '8px 14px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', textAlign: 'left',
+                    border: selecionado ? '2px solid #111827' : `1px solid ${cor.border}`,
+                    background: cor.bg, color: cor.text,
+                  }}
+                >
+                  {ano}
+                  <span style={{ display: 'block', fontSize: 10, fontWeight: 400, marginTop: 2 }}>
+                    {ex.totalContas === 0 ? 'sem contas com saldo' : ex.completo ? `✓ ${ex.confirmadas}/${ex.totalContas} confirmadas` : `${ex.pendentes} pendente${ex.pendentes === 1 ? '' : 's'}`}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12, marginBottom: 16 }}>
+        <div>
+          <label style={{ fontSize: 11, color: '#6B7280', display: 'block', marginBottom: 4 }}>Ou digite outra data de fechamento</label>
+          <input
+            type="date"
+            value={dataFechamento}
+            onChange={e => setDataFechamento(e.target.value)}
+            style={{ padding: '7px 10px', border: '1px solid #E5E7EB', borderRadius: 6, fontSize: 13 }}
+          />
+        </div>
+        <button
+          onClick={() => carregar()}
+          disabled={!dataFechamento || loading}
+          style={{ padding: '8px 18px', background: '#111827', color: '#fff', border: 'none', borderRadius: 6, fontSize: 13, fontWeight: 500, cursor: (!dataFechamento || loading) ? 'default' : 'pointer', opacity: (!dataFechamento || loading) ? 0.5 : 1 }}
+        >
+          {loading ? 'Carregando…' : 'Carregar'}
+        </button>
+      </div>
+
       {resultado && (
         <div style={{ padding: 12, borderRadius: 8, marginBottom: 16, fontSize: 13, background: resultado.ok ? '#ECFDF5' : '#FEF2F2', color: resultado.ok ? '#059669' : '#B91C1C' }}>
           {resultado.mensagem}
@@ -186,9 +316,13 @@ export const SugestaoDeParaPage: React.FC = () => {
 
       {loading ? (
         <div style={{ padding: 60, textAlign: 'center', color: '#9CA3AF', fontSize: 13 }}>Calculando sugestões…</div>
+      ) : !dataFechamento ? (
+        <div style={{ padding: 60, textAlign: 'center', color: '#9CA3AF', fontSize: 13 }}>
+          Escolha a data de fechamento (ex: 31/12/2017) para ver as contas de origem daquele lote.
+        </div>
       ) : sugestoes.length === 0 ? (
         <div style={{ padding: 60, textAlign: 'center', color: '#9CA3AF', fontSize: 13 }}>
-          Nenhuma conta de origem ECD encontrada para esta empresa.
+          Nenhuma conta de origem ECD encontrada para o lote dessa data de fechamento.
         </div>
       ) : (
         <>
@@ -223,6 +357,7 @@ export const SugestaoDeParaPage: React.FC = () => {
               <thead>
                 <tr>
                   <th style={thSt}>Origem (ECD)</th>
+                  <th style={{ ...thSt, textAlign: 'right' }}>Saldo</th>
                   <th style={thSt}>Destino sugerido (Matriz)</th>
                   <th style={{ ...thSt, textAlign: 'center' }}>Confiança</th>
                   <th style={{ ...thSt, textAlign: 'center' }}>Tipo</th>
@@ -238,8 +373,8 @@ export const SugestaoDeParaPage: React.FC = () => {
                         <span style={{ fontFamily: 'monospace', color: '#2563EB', marginRight: 6 }}>{s.sourceCode}</span>
                         {s.sourceName}
                       </td>
-                      <td style={{ padding: '7px 12px', borderBottom: '0.5px solid #F5F5F5', fontSize: 12, textAlign: 'right' }}>
-                        {s.sourceBalance !== null ? Math.abs(s.sourceBalance).toLocaleString('pt-BR', {minimumFractionDigits:2}) : '—'}
+                      <td style={{ padding: '7px 12px', borderBottom: '0.5px solid #F5F5F5', fontSize: 12, textAlign: 'right', fontFamily: 'monospace', color: (s.sourceBalance ?? 0) < 0 ? '#B91C1C' : '#111827' }}>
+                        {s.sourceBalance !== null ? fmtSaldoDebitoCredito(s.sourceBalance) : '—'}
                       </td>
                       <td style={{ padding: '7px 12px', borderBottom: '0.5px solid #F5F5F5', fontSize: 12 }}>
                         {/* CORRIGIDO 28/08/2026: sempre editavel, nao so quando "sem sugestao" -

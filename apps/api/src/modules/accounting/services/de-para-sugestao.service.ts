@@ -85,18 +85,36 @@ export class DeParaSugestaoService {
     return null;
   }
 
-  async sugerirMapeamento(companyId: string): Promise<{ sugestoes: SugestaoMapeamento[]; destinosDisponiveis: ContaCandidata[] }> {
+  async sugerirMapeamento(companyId: string, dataFechamentoISO?: string): Promise<{ sugestoes: SugestaoMapeamento[]; destinosDisponiveis: ContaCandidata[] }> {
+    // NOVO (16/09/2026): quando dataFechamento e informada, restringe as
+    // origens ao LOTE de importacao ECD cujo period_end bate com essa data
+    // (mesmo criterio ja usado por abertura.service.ts) e usa o saldo
+    // declarado EXATAMENTE nessa data - nao mais "o mais recente de
+    // qualquer data". Achado real: conta "CIM A PAGAR" so existe a partir
+    // do lote 2018 mas aparecia no De/Para com saldo de 2025 (o mais
+    // recente), dando a falsa impressao de que deveria constar na
+    // Abertura de 2017.
+    let loteIds: string[] | null = null;
+    if (dataFechamentoISO) {
+      const lotes = await this.prisma.ecdImport.findMany({
+        where: { companyId, periodEnd: new Date(dataFechamentoISO + 'T00:00:00Z'), deletedAt: null },
+        select: { id: true },
+      });
+      loteIds = lotes.map(l => l.id);
+    }
+
     const todasContas = await this.prisma.chartOfAccounts.findMany({
       where: { companyId, deletedAt: null, isAnalytic: true },
-      include: { ecdImportLinks: { select: { id: true }, take: 1 } },
+      include: { ecdImportLinks: { select: { id: true, ecdImportId: true } } },
     });
 
-    // CRIADO 31/08/2026: saldo declarado mais recente por conta - ajuda o
-    // usuario a avaliar se um mapeamento importa de verdade (conta zerada
-    // vs com saldo relevante) direto na tela de sugestao, sem precisar
-    // consultar outra tela.
+    // Saldo declarado - se dataFechamento foi informada, so aceita saldo
+    // EXATAMENTE naquela data; senao mantem o comportamento antigo (mais
+    // recente de qualquer data), para nao quebrar chamadores existentes.
     const saldosRecentes = await this.prisma.accountBalance.findMany({
-      where: { companyId },
+      where: dataFechamentoISO
+        ? { companyId, referenceDate: { gte: new Date(dataFechamentoISO + 'T00:00:00Z'), lte: new Date(dataFechamentoISO + 'T23:59:59Z') } }
+        : { companyId },
       orderBy: { referenceDate: 'desc' },
     });
     const saldoPorConta = new Map<string, { balance: number; date: Date }>();
@@ -110,7 +128,21 @@ export class DeParaSugestaoService {
     );
 
     // Origem = tem vinculo ECD (nasceu de importacao real). Destino = Matriz (sem vinculo).
-    const origens = todasContas.filter(c => c.ecdImportLinks.length > 0);
+    // Quando dataFechamento foi informada, so entram contas vinculadas ao
+    // LOTE daquela data especifica - nao qualquer lote da empresa. Tambem
+    // oculta contas com saldo zerado (ou sem registro) naquela data - nao
+    // ha nada a mapear ali, e a Abertura (abertura.service.ts) ja ignora
+    // saldo zero do mesmo jeito, entao a contagem desta tela fica alinhada
+    // com o que de fato vira lancamento.
+    const origens = todasContas.filter(c => {
+      if (c.ecdImportLinks.length === 0) return false;
+      if (!loteIds) return true;
+      return c.ecdImportLinks.some(l => loteIds!.includes(l.ecdImportId));
+    }).filter(c => {
+      if (!dataFechamentoISO) return true;
+      const saldo = saldoPorConta.get(c.id);
+      return saldo !== undefined && Math.abs(saldo.balance) > 0.004;
+    });
     const destinos = todasContas.filter(c => c.ecdImportLinks.length === 0)
       .map(c => ({ id: c.id, code: c.code, name: c.name, type: c.type, nature: c.nature, parentId: c.parentId }));
 
@@ -211,6 +243,58 @@ export class DeParaSugestaoService {
     // Matriz faz sentido como destino de mapeamento.
     const destinosOrdenados = [...destinos].sort((a, b) => a.code.localeCompare(b.code));
     return { sugestoes, destinosDisponiveis: destinosOrdenados };
+  }
+
+  // NOVO (16/09/2026): lista os exercicios (lotes ECD, sempre 31/12)
+  // disponiveis pra essa empresa, com quantas contas relevantes (com
+  // saldo != 0 naquela data) ja tem De/Para confirmado - mesmo criterio
+  // de "relevante" usado em sugerirMapeamento (saldo zerado nao conta).
+  async listarExercicios(companyId: string) {
+    const lotes = await this.prisma.ecdImport.findMany({
+      where: { companyId, deletedAt: null },
+      select: { id: true, periodEnd: true },
+      orderBy: { periodEnd: 'asc' },
+    });
+
+    const resultado: { periodEnd: string; totalContas: number; confirmadas: number; pendentes: number; completo: boolean }[] = [];
+
+    for (const lote of lotes) {
+      const dataISO = lote.periodEnd.toISOString().slice(0, 10);
+      const contasDoLote = await this.prisma.chartOfAccounts.findMany({
+        where: { companyId, deletedAt: null, isAnalytic: true, ecdImportLinks: { some: { ecdImportId: lote.id } } },
+        select: { id: true },
+      });
+      const ids = contasDoLote.map(c => c.id);
+      if (ids.length === 0) {
+        resultado.push({ periodEnd: dataISO, totalContas: 0, confirmadas: 0, pendentes: 0, completo: false });
+        continue;
+      }
+
+      const saldos = await this.prisma.accountBalance.findMany({
+        where: {
+          accountId: { in: ids },
+          referenceDate: { gte: new Date(dataISO + 'T00:00:00Z'), lte: new Date(dataISO + 'T23:59:59Z') },
+        },
+        select: { accountId: true, balance: true },
+      });
+      const comSaldo = new Set(saldos.filter(s => Math.abs(Number(s.balance)) > 0.004).map(s => s.accountId));
+      const relevantes = ids.filter(id => comSaldo.has(id));
+
+      const totalContas = relevantes.length;
+      const confirmadas = totalContas === 0 ? 0 : await this.prisma.ecdAccountMapping.count({
+        where: { sourceAccountId: { in: relevantes } },
+      });
+
+      resultado.push({
+        periodEnd: dataISO,
+        totalContas,
+        confirmadas,
+        pendentes: totalContas - confirmadas,
+        completo: totalContas > 0 && confirmadas === totalContas,
+      });
+    }
+
+    return resultado;
   }
 
   async confirmarMapeamento(
