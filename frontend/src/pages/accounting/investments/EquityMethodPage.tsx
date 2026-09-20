@@ -52,6 +52,7 @@ const EquityMethodPage: React.FC = () => {
   const [calculando, setCalculando] = useState(false);
   const [lancando, setLancando] = useState(false);
   const [historico, setHistorico] = useState<any[]>([]);
+  const [revertendo, setRevertendo] = useState<string | null>(null);
   const [sugestaoForm, setSugestaoForm] = useState<{ found: boolean; percentOwned: number | null; holderName: string | null } | null>(null);
   const [sugestaoSelecionado, setSugestaoSelecionado] = useState<{ found: boolean; percentOwned: number | null; holderName: string | null } | null>(null);
   const [atualizandoPercentual, setAtualizandoPercentual] = useState(false);
@@ -171,6 +172,28 @@ const EquityMethodPage: React.FC = () => {
     } catch (e: any) {
       toast.error(e?.response?.data?.message || 'Erro ao gerar lançamento.');
     } finally { setLancando(false); }
+  };
+
+  // NOVO (20/09/2026): reverte uma apuracao ja lancada (lancamento contabil de ajuste + registro de apuracao),
+  // liberando um novo calculo para a mesma data-base. O historico vem em ordem decrescente de data-base.
+  const handleReverter = async (h: any) => {
+    if (!selected) return;
+    const dataBase = String(h.referenceDate).slice(0, 10); // date-only (UTC): AAAA-MM-DD
+    const dataBR = dataBase.split('-').reverse().join('/');
+    const ehUltima = historico.length > 0 && historico[0].id === h.id;
+    const aviso = ehUltima
+      ? ''
+      : '\n\nAtenção: existem apurações POSTERIORES a esta data. Elas não são recalculadas - se for o caso, reverta antes as mais recentes.';
+    if (!window.confirm(`Reverter a apuração de ${dataBR}? O lançamento contábil de ajuste será excluído (permanece no histórico como excluído) e essa data poderá ser apurada novamente.${aviso}`)) return;
+    setRevertendo(h.id);
+    try {
+      await api.post(`/accounting/equity-method/${selected.id}/reverter`, { referenceDate: dataBase });
+      toast.success('Apuração revertida.');
+      setPreview(null);
+      carregarHistorico(selected.id);
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || 'Erro ao reverter a apuração.');
+    } finally { setRevertendo(null); }
   };
 
   const empresasInvestiveis = (companies || []).filter(c => c.id !== activeCompany?.id);
@@ -381,7 +404,7 @@ const EquityMethodPage: React.FC = () => {
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                     <thead>
                       <tr style={{ background: '#F9FAFB' }}>
-                        {['Data-base', 'PL Investida', '% Aplicado', 'Valor MEP', 'Saldo Anterior', 'Ajuste'].map(h => (
+                        {['Data-base', 'PL Investida', '% Aplicado', 'Valor MEP', 'Saldo Anterior', 'Ajuste', ''].map(h => (
                           <th key={h} style={{ padding: '6px 10px', fontSize: 10, color: '#9CA3AF', textTransform: 'uppercase', textAlign: h === 'Data-base' ? 'left' : 'right' }}>{h}</th>
                         ))}
                       </tr>
@@ -389,13 +412,23 @@ const EquityMethodPage: React.FC = () => {
                     <tbody>
                       {historico.map(h => (
                         <tr key={h.id} style={{ borderTop: '0.5px solid #F3F4F6' }}>
-                          <td style={{ padding: '6px 10px' }}>{new Date(h.referenceDate).toLocaleDateString('pt-BR')}</td>
+                          <td style={{ padding: '6px 10px' }}>{new Date(h.referenceDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</td>
                           <td style={{ padding: '6px 10px', textAlign: 'right', fontFamily: 'monospace' }}>{fmtNum(Number(h.investeePl))}</td>
                           <td style={{ padding: '6px 10px', textAlign: 'right', fontFamily: 'monospace' }}>{fmtPct(Number(h.percentApplied))}</td>
                           <td style={{ padding: '6px 10px', textAlign: 'right', fontFamily: 'monospace' }}>{fmtNum(Number(h.equityValue))}</td>
                           <td style={{ padding: '6px 10px', textAlign: 'right', fontFamily: 'monospace' }}>{fmtNum(Number(h.previousBookValue))}</td>
                           <td style={{ padding: '6px 10px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 600, color: Number(h.adjustment) >= 0 ? '#16A34A' : '#DC2626' }}>
                             {fmtNum(Number(h.adjustment))}
+                          </td>
+                          <td style={{ padding: '6px 10px', textAlign: 'right' }}>
+                            <button
+                              onClick={() => handleReverter(h)}
+                              disabled={revertendo !== null}
+                              title="Reverte esta apuração (exclui o lançamento de ajuste) para poder apurar a data novamente"
+                              style={{ padding: '3px 10px', borderRadius: 6, border: '0.5px solid #DC2626', background: '#fff', color: '#DC2626', fontSize: 11, fontWeight: 500, cursor: revertendo !== null ? 'default' : 'pointer', whiteSpace: 'nowrap', opacity: revertendo === h.id ? 0.6 : 1 }}
+                            >
+                              {revertendo === h.id ? 'Revertendo...' : 'Reverter'}
+                            </button>
                           </td>
                         </tr>
                       ))}
