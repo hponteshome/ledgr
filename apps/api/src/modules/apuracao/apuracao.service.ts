@@ -70,34 +70,47 @@ export class ApuracaoService {
   // ── Busca receitas brutas para PIS/COFINS ──────────────────────────────────
   async getReceitasBrutas(companyId: string, competencia: string, competenciaFim?: string) {
     const [ano, mes] = competencia.split('-').map(Number);
-    const ini = new Date(ano, mes - 1, 1);
     const fimComp = competenciaFim ?? competencia;
     const [anoF, mesF] = fimComp.split('-').map(Number);
-    const fim = new Date(anoF, mesF, 0, 23, 59, 59);
+    // CORRIGIDO 20/09/2026: receita bruta = movimento REAL das contas de receita (credito - debito). Antes somava o
+    // value de todas as partidas (debito + credito juntos), incluia lancamentos excluidos (deletedAt) e de
+    // encerramento (isClosingEntry - o encerramento debita a receita e ENTRAVA somando) e usava Date local.
+    // Mesmos criterios do getResultadoContabil (datas em UTC).
+    const ini = new Date(Date.UTC(ano, mes - 1, 1));
+    const fim = new Date(Date.UTC(anoF, mesF, 0, 23, 59, 59, 999));
 
     const rows = await this.prisma.journalEntryItem.groupBy({
-      by: ['accountId'],
+      by: ['accountId', 'type'],
       where: {
-        journalEntry: { companyId, date: { gte: ini, lte: fim } },
+        journalEntry: { companyId, deletedAt: null, isClosingEntry: false, date: { gte: ini, lte: fim } },
         account: { type: 'REVENUE' as any },
       },
       _sum: { value: true },
     });
 
     const accounts = await this.prisma.chartOfAccounts.findMany({
-      where: { id: { in: rows.map(r => r.accountId) } },
+      where: { id: { in: Array.from(new Set(rows.map(r => r.accountId))) } },
       select: { id: true, code: true, name: true, nature: true },
     });
     const accMap = new Map(accounts.map(a => [a.id, a]));
 
+    const porConta = new Map<string, { debito: number; credito: number }>();
+    for (const row of rows) {
+      const m = porConta.get(row.accountId) ?? { debito: 0, credito: 0 };
+      const val = Number(row._sum.value ?? 0);
+      if (row.type === 'DEBIT') m.debito += val;
+      else m.credito += val;
+      porConta.set(row.accountId, m);
+    }
+
     let total = 0;
     const itens: any[] = [];
-    for (const row of rows) {
-      const acc = accMap.get(row.accountId);
+    for (const [accountId, m] of porConta) {
+      const acc = accMap.get(accountId);
       if (!acc) continue;
-      const val = Number(row._sum.value ?? 0);
+      const val = m.credito - m.debito;
       total += val;
-      itens.push({ accountId: row.accountId, code: acc.code, name: acc.name, valor: val });
+      itens.push({ accountId, code: acc.code, name: acc.name, valor: val });
     }
     return { total, itens };
   }
