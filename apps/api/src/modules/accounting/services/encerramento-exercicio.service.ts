@@ -43,11 +43,16 @@ export class EncerramentoExercicioService {
 
   // ── Prévia: calcula o resultado do período sem gravar nada ──────────────────
 
-  async preview(companyId: string, year: number) {
+  // NOVO (18/09/2026): closingDateOverride permite um balanco intermediario
+  // (ex: 30/06) em vez de forcar sempre 31/12 - period sempre comeca em 1o
+  // de janeiro do "year" informado, so a data final fica flexivel. Grava
+  // zeragem contabil de verdade, igual o encerramento anual (decisao do
+  // usuario 18/09/2026).
+  async preview(companyId: string, year: number, closingDateOverride?: string) {
     const config = await this.getConfig(companyId);
 
     const periodStart = `${year}-01-01`;
-    const periodEnd = `${year}-12-31`;
+    const periodEnd = closingDateOverride || `${year}-12-31`;
 
     const rows = await this.prisma.$queryRaw<ResultAccountRow[]>`
       SELECT coa.id, coa.code, coa.name, coa.type,
@@ -100,6 +105,7 @@ export class EncerramentoExercicioService {
 
     return {
       year,
+      closingDate: periodEnd,
       accounts,
       totalDebito,
       totalCredito,
@@ -113,8 +119,8 @@ export class EncerramentoExercicioService {
 
   // ── Confirma: grava o encerramento em 2 etapas (Receita/Despesa → ARE → Lucro/Prejuízo) ──
 
-  async confirmar(companyId: string, userId: string, year: number) {
-    const prev = await this.preview(companyId, year);
+  async confirmar(companyId: string, userId: string, year: number, closingDateOverride?: string) {
+    const prev = await this.preview(companyId, year, closingDateOverride);
 
     if (prev.jaEncerrado) {
       throw new BadRequestException(`O exercício ${year} já possui lançamento de encerramento.`);
@@ -127,7 +133,7 @@ export class EncerramentoExercicioService {
     }
 
     const config = await this.getConfig(companyId);
-    const closingDate = `${year}-12-31`;
+    const closingDate = prev.closingDate;
 
     const areId = config.encerramentoContaApuracaoResultadoId!;
     const areAccount = await this.prisma.chartOfAccounts.findUnique({ where: { id: areId } });
@@ -154,16 +160,24 @@ export class EncerramentoExercicioService {
       type: prev.resultadoTipo === 'LUCRO' ? 'CREDIT' : 'DEBIT',
     });
 
+    // CORRIGIDO (17/09/2026): journalEntryService.create() so passou a
+    // aceitar sourceModule hoje - antes gravava 'ACCOUNTING' fixo pra
+    // QUALQUER chamador, entao todo encerramento aparecia como "Manual"
+    // no Diario/Balancete/Comparativo de Saldos, mesmo sendo gerado pelo
+    // proprio sistema. Usa RESULT_TRANSFER (label ja existente:
+    // "Transferencia de Resultado").
     const entry1 = await this.journalEntryService.create(companyId, userId, {
       date: closingDate,
-      description: `Encerramento do Exercício ${year} - Apuração do Resultado (Etapa 1/2)`,
+      description: `Encerramento do Exercício ${year} (${closingDate}) - Apuração do Resultado (Etapa 1/2)`,
       items: itemsEtapa1,
+      sourceModule: 'RESULT_TRANSFER',
     });
 
     // Etapa 2: zera a ARE contra Lucro ou Prejuízo do Exercício
     const entry2 = await this.journalEntryService.create(companyId, userId, {
       date: closingDate,
-      description: `Encerramento do Exercício ${year} - Transferência do Resultado (Etapa 2/2)`,
+      description: `Encerramento do Exercício ${year} (${closingDate}) - Transferência do Resultado (Etapa 2/2)`,
+      sourceModule: 'RESULT_TRANSFER',
       items: [
         {
           accountId: areId,
@@ -188,13 +202,37 @@ export class EncerramentoExercicioService {
       data: { isClosingEntry: true },
     });
 
-    return { entry1, entry2, resultado: prev.resultado, resultadoTipo: prev.resultadoTipo };
+    // NOVO (16/09/2026): a data de encerramento de um ano nunca pode ser
+    // anterior a de um ano posterior ja encerrado - o resultado acumulado
+    // deste exercicio muda o que os anos seguintes ja tinham fechado.
+    // Reabre (soft-delete do lancamento de encerramento) qualquer ano
+    // POSTERIOR a este que ja estivesse encerrado, em cascata.
+    const encerramentosPosteriores = await this.prisma.journalEntry.findMany({
+      where: {
+        companyId,
+        isClosingEntry: true,
+        deletedAt: null,
+        date: { gt: this.toUTCEnd(closingDate) },
+      },
+      select: { id: true, date: true },
+    });
+
+    let anosReabertos: number[] = [];
+    if (encerramentosPosteriores.length > 0) {
+      anosReabertos = Array.from(new Set(encerramentosPosteriores.map((e) => e.date.getUTCFullYear()))).sort((a, b) => a - b);
+      await this.prisma.journalEntry.updateMany({
+        where: { id: { in: encerramentosPosteriores.map((e) => e.id) } },
+        data: { deletedAt: new Date() },
+      });
+    }
+
+    return { entry1, entry2, resultado: prev.resultado, resultadoTipo: prev.resultadoTipo, anosReabertos };
   }
 
   // ── Reverte (soft-delete) o encerramento ja gravado de um exercicio ─────────
 
-  async reverter(companyId: string, year: number) {
-    const periodEnd = `${year}-12-31`;
+  async reverter(companyId: string, year: number, closingDateOverride?: string) {
+    const periodEnd = closingDateOverride || `${year}-12-31`;
     // CORRIGIDO 23/08/2026: description-match trocado por isClosingEntry.
     const entries = await this.prisma.journalEntry.findMany({
       where: {
@@ -209,12 +247,34 @@ export class EncerramentoExercicioService {
       throw new BadRequestException(`Não há lançamento de encerramento gravado para o exercício ${year}.`);
     }
 
+    // NOVO (20/09/2026): mesma regra do confirmar() - o acumulado dos anos
+    // seguintes depende deste fechamento, entao reverter uma data invalida
+    // TODOS os encerramentos POSTERIORES a ela. Reverte em cascata, no mesmo
+    // updateMany (atomico).
+    const posteriores = await this.prisma.journalEntry.findMany({
+      where: {
+        companyId,
+        isClosingEntry: true,
+        deletedAt: null,
+        date: { gt: this.toUTCEnd(periodEnd) },
+      },
+      select: { id: true, date: true },
+    });
+
     await this.prisma.journalEntry.updateMany({
-      where: { id: { in: entries.map((e) => e.id) } },
+      where: { id: { in: [...entries.map((e) => e.id), ...posteriores.map((e) => e.id)] } },
       data: { deletedAt: new Date() },
     });
 
-    return { revertido: true, lancamentosRevertidos: entries.length };
+    const datasPosterioresRevertidas = Array.from(new Set(posteriores.map((e) => e.date.toISOString().slice(0, 10)))).sort();
+    const anosReabertos = Array.from(new Set(posteriores.map((e) => e.date.getUTCFullYear()))).sort((a, b) => a - b);
+
+    return {
+      revertido: true,
+      lancamentosRevertidos: entries.length + posteriores.length,
+      datasPosterioresRevertidas,
+      anosReabertos,
+    };
   }
 
   // CRIADO 15/09/2026: lista todos os exercicios com movimento contabil,
@@ -290,17 +350,65 @@ export class EncerramentoExercicioService {
       }
       const resultado = -(receitaAno + despesaAno);
 
+      // NOVO (18/09/2026): inclui todos os fechamentos ja gravados nesse ano
+      // (anual + intermediarios) - pedido do usuario pra ver/gerenciar tudo
+      // direto na lista, sem precisar abrir o modal pra descobrir.
+      const fechamentos = await this.listarFechamentosDoAno(companyId, year);
+
       return {
         year,
         status: encerramento ? 'ENCERRADO' : 'ABERTO',
+        closedAt: encerramento?.createdAt.toISOString() ?? null,
         totalAtivo: Math.abs(ativoRaw),
         totalPassivoPL: Math.abs(passivoRaw + plRaw),
         resultado,
         diferenca: diferencaApurada,
         equilibrado: Math.abs(diferencaApurada) < 0.01,
+        fechamentos,
       };
     }));
 
     return resultado.sort((a, b) => b.year - a.year);
+  }
+
+  // NOVO (18/09/2026): lista TODOS os fechamentos ja gravados num ano
+  // (anual em 31/12 + eventuais balancos intermediarios em outras datas) -
+  // agrupa os 2 lancamentos de cada fechamento (Etapa 1/2) pela data, e
+  // extrai o resultado/tipo lendo o valor lancado na conta de Lucro ou
+  // Prejuizo do Exercicio configurada (nao recalcula, le o que foi
+  // efetivamente gravado).
+  async listarFechamentosDoAno(companyId: string, year: number) {
+    const config = await this.getConfig(companyId);
+    const periodStart = `${year}-01-01`;
+    const periodEnd = `${year}-12-31`;
+
+    const entries = await this.prisma.journalEntry.findMany({
+      where: {
+        companyId,
+        isClosingEntry: true,
+        deletedAt: null,
+        date: { gte: this.toUTC(periodStart), lte: this.toUTCEnd(periodEnd) },
+      },
+      include: { items: true },
+      orderBy: { date: 'asc' },
+    });
+
+    const porData = new Map<string, { date: string; resultado: number; resultadoTipo: 'LUCRO' | 'PREJUIZO' | 'NEUTRO' }>();
+    for (const e of entries) {
+      const dataISO = e.date.toISOString().slice(0, 10);
+      if (!porData.has(dataISO)) porData.set(dataISO, { date: dataISO, resultado: 0, resultadoTipo: 'NEUTRO' });
+      const g = porData.get(dataISO)!;
+      for (const item of e.items) {
+        if (item.accountId === config.encerramentoContaLucroExercicioId) {
+          g.resultado = Number(item.value);
+          g.resultadoTipo = 'LUCRO';
+        } else if (item.accountId === config.encerramentoContaPrejuizoExercicioId) {
+          g.resultado = Number(item.value);
+          g.resultadoTipo = 'PREJUIZO';
+        }
+      }
+    }
+
+    return Array.from(porData.values()).sort((a, b) => a.date.localeCompare(b.date));
   }
 }

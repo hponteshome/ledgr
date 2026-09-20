@@ -16,18 +16,23 @@ export class EncerramentoExercicioController {
     return this.svc.listarExercicios(req.companyId);
   }
 
+  @Get('fechamentos')
+  fechamentos(@Req() req: any, @Query('year') year: string) {
+    return this.svc.listarFechamentosDoAno(req.companyId, parseInt(year, 10));
+  }
+
   @Get('preview')
-  preview(@Req() req: any, @Query('year') year: string) {
-    return this.svc.preview(req.companyId, parseInt(year, 10));
+  preview(@Req() req: any, @Query('year') year: string, @Query('closingDate') closingDate?: string) {
+    return this.svc.preview(req.companyId, parseInt(year, 10), closingDate);
   }
 
   @Post('confirmar')
-  confirmar(@Req() req: any, @Body() body: { year: number }) {
-    return this.svc.confirmar(req.companyId, req.user.id, body.year);
+  confirmar(@Req() req: any, @Body() body: { year: number; closingDate?: string }) {
+    return this.svc.confirmar(req.companyId, req.user.id, body.year, body.closingDate);
   }
 
   @Post('reverter')
-  reverter(@Req() req: any, @Body() body: { year: number }) {
-    return this.svc.reverter(req.companyId, body.year);
+  reverter(@Req() req: any, @Body() body: { year: number; closingDate?: string }) {
+    return this.svc.reverter(req.companyId, body.year, body.closingDate);
   }
 }
