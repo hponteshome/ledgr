@@ -9318,3 +9318,309 @@ com erro claro se não encontrar nenhum lote, mas vale a checagem visual mesmo a
    ainda retorna 400 "conta pai nao encontrada" pra alguns codigos
    (ex: "11102") - suspeita de mismatch de normalizacao (codigo com/sem
    ponto) na query `code: parentCode`. Fica para proxima sessao.
+
+## Sessao 17/09/2026 - Bug sistemico do campo "origin" em chart_of_accounts
+
+### Contexto
+Investigando por que o Balancete/Plano de Contas da Hotelsys sumiu (so
+mostrava 1 grupo) e por que o Comparativo de Saldos da Sunsys acusava
+diferenca batendo com o resultado de um exercicio ja encerrado, foram
+descobertas VARIAS camadas do mesmo bug de fundo: o campo `origin`
+(MATRIZ vs ECD_NATIVE) estava classificado errado em milhares de linhas,
+em MULTIPLAS empresas, por causas diferentes acumuladas ao longo do tempo.
+
+### PRINCIPIO CENTRAL (pedido explicito do usuario, sempre aplicar):
+Qualquer correcao de `origin`/hierarquia de chart_of_accounts e um bug
+de ARQUITETURA, nao um problema de uma empresa so. TODA correcao desse
+tipo tem que rodar SEM filtro de empresa (todas as companies de uma vez),
+nunca escopada so pra quem estava sendo testado no momento.
+
+### As 3 causas reais encontradas (por ordem de descoberta)
+1. **origin NULL** - contas antigas nunca tiveram o campo preenchido
+   (criadas antes do create() gravar origin:'MATRIZ' obrigatorio). Corrigido
+   inferindo pelo vinculo ECD: tem vinculo -> ECD_NATIVE, sem vinculo -> MATRIZ.
+2. **Sintetica (nao-analitica) com vinculo ECD nao e sinonimo de
+   "so historico"** - nos de topo tipo "1 ATIVO"/"11 ATIVO CIRCULANTE" sao
+   RAIZ COMPARTILHADA entre a arvore Matriz viva e a arvore ECD nativa (o
+   importer linka ate os containers sinteticos a cada ano de ECD, "9
+   vinculos" pra 9 anos de import). A regra "tem vinculo -> ECD_NATIVE" e
+   valida SO pra folhas analiticas; em sintetica, marca como ECD_NATIVE
+   apaga a arvore inteira da tela (Plano de Contas, Balancete). Corrigido
+   revertendo toda sintetica ECD_NATIVE -> MATRIZ.
+3. **CUIDADO - essa correcao (2) tem excecao real**: se uma empresa tiver
+   uma arvore ECD historica PARALELA com codigos proprios diferentes
+   (ex: Sunsys tinha uma 2a arvore com codigo raiz "7"/"630"/"1239"/"3038"
+   em vez de "1"/"2"/"3"/"4", criada num import antigo de 2025), reverter
+   ela pra MATRIZ tambem a "ressuscita" erroneamente na tela, mesmo ela
+   sendo duplicata legitima de um ano especifico com lancamentos/saldos/
+   De-Para REAIS (nao pode ser excluida, so precisa voltar a ficar
+   ECD_NATIVE). Como diferenciar raiz legitima compartilhada de raiz
+   ECD paralela: verificar o `created_at` (a raiz compartilhada nasce
+   junto com a criacao inicial do plano; uma raiz paralela nasce minutos/
+   dias depois, tipicamente durante um import ECD especifico) e se os
+   CODIGOS batem com a convencao padrao Matriz (1,2,3,4,5,6 e filhos
+   diretos 11,12,13,21...) - codigos arbitrarios/grandes (630, 1239) sao
+   sinal de arvore paralela, nao raiz compartilhada.
+4. **A REGRA MAIS CONFIAVEL DE TODAS (usar de agora em diante como
+   verificacao final)**: conta com `journal_entry_items` (lancamento real
+   gravado) NUNCA pode ser ECD_NATIVE - lancamento real so e gravado em
+   conta Matriz, por definicao da arquitetura (Lancamentos ECD sempre
+   grava no DESTINO do De/Para via ecd-lancamentos-import.service.ts,
+   nunca na conta nativa origem). Achado real: encerramento de exercicio
+   da Sunsys usou 2 contas de despesa que estavam ECD_NATIVE por engano -
+   o lado credor do lancamento ficou invisivel pros relatorios (que
+   filtram por origin), sobrando uma "diferenca" batendo exatamente com
+   o valor do encerramento. Corrigido globalmente: toda conta com
+   journal_entry_items e origin=ECD_NATIVE vira MATRIZ, sem excecao.
+
+### Telas que precisaram do MESMO filtro de origin (nao presumir que 1
+correcao cobre tudo - cada relatorio pode ter sua propria query de contas)
+- chart-of-accounts.service.ts / getTree() - ja tinha o filtro (correcao
+  anterior, 04/09).
+- trial-balance.service.ts / getAccounts() - NAO tinha, usado por
+  Balancete Mensal, Balancete de Verificacao, DRE, Balanco Patrimonial,
+  Comparativo de Saldos (todos via getVerificationBalance/rollUp) -
+  corrigido hoje (17/09).
+- Outras telas que fazem query propria de chart_of_accounts (fora desses
+  2 services) precisam ser auditadas se o mesmo sintoma aparecer nelas.
+
+### Erro de diagnostico a nao repetir
+Ao ver "7 ATIVO" fantasma na Sunsys logo apos o usuario ter dito "reimportei
+a Matriz", a hipotese errada foi culpar a reimportacao de hoje. O
+`created_at` das contas fantasma provou que eram de 24/08 (quase um mes
+antes) - SEMPRE checar created_at antes de assumir que a ultima acao do
+usuario causou o problema.
+
+### ReportToolbar.tsx - botao duplicado (achado lateral, ja corrigido)
+O botao generico "Gerar relatorio" (mostrado quando hasData=false) ficava
+duplicado ao lado de qualquer botao customizado via filterLabel (ex:
+"Gerar Razao", "Gerar Comparativo") em toda tela que exige clique manual
+pra carregar. Corrigido condicionando a exibicao a filterLabel==='Mais
+filtros' (default) - so aparece quando a tela NAO tem botao proprio.
+
+## Sessao 17/09/2026 (continuacao) - PENDENCIA ABERTA: codigo de conta
+duplicado quebra Comparativo de Saldos (Anual) e Razao Analitico
+
+### Sintoma original
+Sunsys, apos excluir e reimportar do zero (Matriz + ECD + Encerramento
+refeito para 2024/2025/2026): Comparativo de Saldos (visao Anual) mostra
+"Diferenca (Ativo-Passivo)" crescente ano a ano, batendo EXATAMENTE com
+o resultado do exercicio anterior acumulado (2025: R$150.277,99 = resultado
+2024; 2026: R$515.556,19 = soma 2024+2025). Balancete (Mensal, a confirmar
+se tambem o de Verificacao) parece correto - PENDENTE DE CONFIRMACAO EXATA
+com o usuario qual dos dois Balancetes foi validado como "ok".
+
+### O que foi DESCARTADO nesta rodada (nao e a causa)
+- origin/ECD_NATIVE contaminando o rollup: todas as contas do encerramento
+  novo sao MATRIZ, cadeia de pais 100% limpa (verificado ate a raiz tanto
+  pra "Prejuizos Acumulados" 23301020001 quanto pra "Apuracao de Resultado"
+  23401010001).
+- raiz duplicada (tipo "7 ATIVO" fantasma): nao existe, so 1 linha pra
+  code='1' e 1 linha pra code='2' na Sunsys pos-reimport.
+- rollup do Ativo "espelhando" o Passivo por bug de calculo: FALSO POSITIVO
+  - conferido via soma bruta direta em journal_entry_items de toda a
+    subarvore de "1 ATIVO" em 2024, bateu EXATO com o -150.277,99 exibido
+    (Mutuo Hotelsys + Terceiros baixaram de verdade, SEM contrapartida
+    lancada - e um lancamento incompleto real da importacao do extrato,
+    nao bug de sistema. Fica como pendencia separada, nao arquitetural).
+
+### ACHADO REAL (confirmado, mas causa EXATA do calculo ainda nao fechada)
+Existem DUAS contas diferentes com o MESMO codigo "2330102" ("Lucros/
+Prejuizos do Exercicio"), uma pai da outra:
+  - id 6b424c16-d250-4b95-bc86-5a352c514cb0 - level 5, is_analytic=FALSE
+    (sintetica, pai de "23301" -> "233" -> "23" -> "2")
+  - id 232f3edf-8c13-4342-99c9-cb68957744f1 - is_analytic=TRUE, mas E
+    FILHA da conta acima (parent_id = 6b424c16) E TEM FILHA PROPRIA
+    ("23301020001 Prejuizos Acumulados") - contradicao: "analitica" com
+    filho.
+  - 232f3edf NAO e no vazio de passagem: tem 4 lancamentos reais proprios
+    (ECD_IMPORT, trimestrais de 2025, total R$47.482,03) - nao pode ser
+    simplesmente excluida.
+
+### Evidencia de que a colisao de codigo E o mecanismo (nao so coincidencia)
+O usuario confirmou que os 4 lancamentos de 232f3edf NAO aparecem no Razao
+Analitico ao buscar pela conta "2330102" - sugere que a busca por conta
+(provavelmente findFirst por code, sem sonar que ha 2 linhas com o mesmo
+codigo) esta resolvendo pro id ERRADO (a sintetica 6b424c16, sem
+lancamento nenhum) em vez da analitica certa (232f3edf). Isso e prova
+concreta (nao so hipotese matematica) de que o codigo duplicado quebra
+pelo menos 2 telas.
+
+### Hipotese tecnica para a duplicacao no getVerificationBalance
+(trial-balance.service.ts) - AINDA NAO CONFIRMADA, precisa validar com
+teste isolado antes de mexer:
+getVerificationBalance tem uma logica CUSTOM de saldo anterior (prevBalMap)
+que trata contas por `isAnalytic`:
+  1) contas analiticas pegam saldo direto de prevMap (seus proprios
+     lancamentos)
+  2) sinteticas propagam bottom-up via segundo loop, TAMBEM usando
+     prevBalMap (nao prevMap)
+Como 232f3edf esta (erradamente) marcada is_analytic=true, ela: (a) pega
+saldo proprio no passo 1 (dos seus 4 lancamentos ECD_IMPORT reais) E (b)
+ainda participa do loop bottom-up do passo 2 como "filha" de 6b424c16 E
+como "pai" de 23301020001 (que tambem contribui pra ela no mesmo loop) -
+criando 2 fontes de valor se somando na mesma conta id, que depois sobe
+pra 6b424c16 e dai pra cima. NAO FOI TESTADO SE ISSO EXPLICA O VALOR EXATO
+observado (R$150.277,99 por ano) - precisa reconstruir a conta na mao
+(replicar prevBalMap passo a passo) antes de aplicar qualquer fix.
+
+### Origem provavel da colisao de codigo
+Mesma familia de bug ja documentada hoje: "Importar Matriz" gerando
+estrutura malformada quando os codigos padrao ja existem (dessa vez no
+MEIO da arvore, nao na raiz). Precisa investigar o proprio processo de
+"Importar Matriz" (import/matriz-import service) se o codigo permitir
+gerar 2 contas com o mesmo code sob o mesmo parent/proximas na hierarquia
+sem validacao de unicidade.
+
+### Proximos passos sugeridos (nova sessao)
+1. Confirmar com o usuario: Balancete MENSAL ou de VERIFICACAO estava "ok"?
+   (Balancete Mensal usa getTrialBalance(), mais simples, SEM a logica
+   isAnalytic especial - Balancete de Verificacao usa getVerificationBalance(),
+   a mesma funcao do Comparativo. Se for o de Verificacao que esta ok, a
+   hipotese acima cai e precisa investigar outra coisa).
+2. Testar isoladamente getVerificationBalance com um caso minimo reproduzindo
+   so essa colisao de codigo, pra confirmar/refutar a hipotese do prevBalMap.
+3. Decidir o que fazer com 232f3edf: nao pode ser excluida (tem uso real).
+   Melhor caminho provavel: RECODIFICAR ela pra um codigo unico (nao mais
+   "2330102"), preservando o parentId e os lancamentos - precisa achar/
+   confirmar qual deveria ser o codigo correto dela antes de mudar.
+4. Investigar o "Razao Analitico nao acha por codigo duplicado" separadamente -
+   pode precisar buscar por ID em vez de/alem de codigo, ou pelo menos
+   alertar quando ha mais de uma conta com o mesmo codigo.
+
+## Sessao 18/09/2026 - Correcao definitiva do bug de origin na
+reimportacao da Matriz + melhorias no Plano de Contas Matriz
+
+### ACHADO PRINCIPAL: causa raiz de varios problemas de ontem e de hoje
+`matriz-import.service.ts` (`MatrizImportService.importPlano()`, o servico
+real por tras do botao "Importar Matriz") criava cada conta nova via
+`prisma.chartOfAccounts.create()` SEM o campo `origin` - ficava em branco,
+nao 'MATRIZ'. Isso e a mesma familia do bug ja mapeado ontem (17/09) em
+`chart-of-accounts.service.ts`, mas esse arquivo especifico (`bulkImport()`)
+tinha sido EXPLICITAMENTE deixado de fora de uma correcao anterior
+(10/09/2026), documentado no proprio codigo como pendente. `matriz-import.
+service.ts` e um servico DIFERENTE ainda, nem coberto por aquele comentario -
+so foi achado hoje ao rastrear por que a Sunsys, reimportada do zero,
+repetia o mesmo sintoma ("Conta X nao cadastrada no plano de contas" na
+Importacao Manual, mesmo a conta existindo visualmente na tela).
+CORRIGIDO: adicionado `origin: 'MATRIZ'` no create() do importPlano().
+
+### Licao de processo (usar sempre que houver fix de codigo + dado ja
+gravado errado)
+Corrigir o codigo NAO conserta retroativamente linhas ja criadas com o bug
+- e preciso (1) corrigir o codigo, (2) confirmar que o backend recarregou
+de verdade (watch mode as vezes nao pega certos arquivos - matar/reiniciar
+o processo e o teste definitivo), (3) SO DEPOIS excluir e reimportar o
+dado afetado pra validar. Hoje isso exigiu 2 rodadas completas de hard
+delete + reimport da Sunsys ate confirmar o fix.
+
+### Cuidado ao fazer hard delete de "todo o Plano de Contas" de uma empresa
+Contas cadastradas manualmente DIRETO no Plano de Contas da empresa (nao
+via Plano de Contas Matriz) NAO sobrevivem a um "excluir tudo e
+reimportar" - o reimport so recria o que esta no template global
+(matriz_master_accounts). Regra pratica: qualquer conta que faca sentido
+POTENCIALMENTE para mais de uma empresa (ou que va sobreviver a futuras
+reimportacoes da mesma empresa) deve ser cadastrada na Matriz (Administracao
+do Sistema -> Plano de Contas Matriz), nunca direto no Plano de Contas de
+uma empresa especifica, a menos que seja proposital so pra ela.
+
+### Ordem de dependencias pra hard delete do Plano de Contas de uma empresa
+Antes de apagar chart_of_accounts, apagar nessa ordem (senao da erro de FK):
+ecd_account_mappings (source e target) -> chart_of_accounts_ecd_imports ->
+account_balances -> so entao chart_of_accounts. journal_entries/items
+tambem precisam estar zerados antes (ou apagados junto). A tabela
+`companies` tem campos proprios apontando pra chart_of_accounts (config de
+Encerramento: ARE/Lucro/Prejuizo do Exercicio) - nome exato da(s) coluna(s)
+ainda NAO confirmado (tentativa "encerramento_conta_apuracao_resultado_id"
+deu erro de coluna inexistente - a config provavelmente fica numa tabela
+separada, nao direto em `companies`. Investigar o nome certo se for
+necessario zerar essa referencia de novo no futuro).
+
+### Melhorias aplicadas no Plano de Contas Matriz
+(Administracao do Sistema -> Plano de Contas Matriz, MatrizMasterAccountsPage.tsx)
+- Botao "+" por linha pra criar conta FILHA direto (igual ja existia no
+  Plano de Contas da empresa) - pre-preenche pai/nivel/tipo/natureza.
+- Formulario de Nova Conta: ao digitar o CODIGO, infere automaticamente
+  Tipo/Natureza/Conta Pai pelo maior prefixo de codigo ja existente no
+  plano (mesma logica ja usada no AccountMaintenanceModal da empresa).
+- Campo "Conta Pai" trocou de <select> com 499 opcoes pra busca com
+  autocomplete (so contas sinteticas aparecem como opcao).
+- Painel "Codigos Reduzidos Disponiveis" (igual ao da empresa), calculado
+  100% client-side com as contas ja carregadas (a Matriz nao e por
+  empresa, entao nao tem o endpoint /reduced-code-blocks/:classDigit -
+  replicado a mesma logica de agrupamento por 2 primeiros digitos + teto
+  dinamico direto no frontend).
+
+### Plano de Contas (AccountTree.tsx) - zebra striping
+Linhas alternando clara (branca) / sombreada (slate-100) em TODAS as
+linhas (sinteticas e analiticas), sem depender de indice manual - usa os
+variants odd:/even: do Tailwind, que funcionam corretamente mesmo sendo
+uma arvore recursiva (a ordem das <tr> no DOM e sempre sequencial,
+independente da profundidade). Contraste ajustado a pedido do usuario
+(slate-50 ficou fraco demais, foi pra slate-100 + hover slate-200).
+
+### Limpezas pontuais feitas na Sunsys durante os testes
+- Conta duplicada/errada criada direto no Plano de Contas (nao na Matriz)
+  durante um teste - excluida dos dois lugares (chart_of_accounts da
+  Sunsys E matriz_master_accounts, ja que tinha sido cadastrada la por
+  engano) apos confirmar zero uso (sem lancamento, sem saldo).
+
+## 2026-09-20 12:47 - Sessao 19-20/09/2026: Plano de Contas, Razao, Encerramento e LALUR [SESSAO-2026-09-20-PLANO-RAZAO-ENCERRAMENTO-LALUR]
+
+### Resumo (o que foi entregue)
+
+**Plano de Contas (AccountTree.tsx)**
+- Colunas redimensionáveis (alça na borda do cabeçalho; duplo clique restaura; link "Restaurar larguras das colunas"); coluna Conta/Descrição dinâmica (ocupa o espaço livre, mín. 320px); larguras salvas em localStorage `ledgr:accountTree:colWidths:v1`; tooltip com o nome completo. Só visualização - a impressão dos relatórios usa HTML próprio (window.open + print) e não é afetada.
+- Decisão: NÃO aplicar nos demais relatórios/balancetes (ficam como estão).
+
+**Razão Analítico (RazaoAnaliticoPage.tsx)**
+- Impressão: removido page-break-inside:avoid do .conta-bloco (gerava páginas quase vazias com contas longas); histórico completo (sem substring(0,60)) com quebra; table-layout fixed + colunas fixas (.w90/.w80/.w100/.w110); thead repetido por página; tr sem quebra; @media screen limita a 1000px.
+- Nome do PDF (<title>): `<raiz CNPJ 00.000.000> - Razão Completo | Razão Conta <cód> | Razão Contas <de> a <até> | Razão Contas selecionadas - DD-MM-AAAA a DD-MM-AAAA` (fallback: nome fantasia/razão social; caracteres inválidos viram "-").
+- Tela: barra de filtros realmente fixa (sticky) com top dinâmico medido em `.report-toolbar` (12px + altura + 8px), porque a toolbar (sticky top:12, z-index 40) cobria a barra (top:0). Novo campo "Cód. reduzido" com autocomplete (ReducedCodeAutocomplete: só prefixo numérico em reducedCode; setas/Enter/Esc; seleciona a conta e aplica filterMode 'one' com o código completo).
+
+**Encerramento de Exercícios**
+- Lista: botão "Encerrar" só em exercício aberto; encerrado mostra "Gerenciar" (o modal é o único lugar para reverter e ver/criar fechamentos intermediários). Coluna Fechamentos: data completa + tipo (classificarFechamento, exportada do modal): 31/12 = Anual (verde); 31/03, 30/06 e 30/09 = Trimestral (azul); demais = Intermediário (âmbar). O badge do modal usa a mesma regra.
+- Modal: faixa verde após reverter ("Encerramento de DD/MM/AAAA revertido com sucesso" + posteriores revertidos), botão "Cancelar" virou "Fechar", a lista recarrega sempre ao fechar (X/Fechar); data BR na confirmação; erro detalhado (HTTP/rede/timeout) no confirmar; timeout de 180s em confirmar/reverter.
+- REGRA (backend): encerrar OU reverter uma data reabre/reverte TODOS os encerramentos POSTERIORES (o confirmar já tinha desde 16/09; o reverter() ganhou em 20/09, no mesmo updateMany; retorna datasPosterioresRevertidas/anosReabertos). Encerrar 2022 sem os anteriores continua permitido.
+- Diagnóstico: o "Erro ao confirmar" sem mensagem foi timeout no navegador - a API continuou e gravou; requisições confirmar pendentes/concorrentes recriaram pares de encerramento logo após reversões (33 lançamentos de 2018 na base, só o último ativo). O usuário decidiu abortar a investigação; o encerramento ativo de 20/09 10:56 é o válido.
+
+**LALUR (Livro LALUR / apuracao.service.ts)**
+- Formatação: fmt local com Number() (o Decimal do Prisma chega como string e String.toLocaleString devolve a própria string) + regra do sistema: negativo entre parênteses e #B91C1C (mesmo padrão de fmtSaldo/fmtNum do Razão/Balanço/DRE); sem helper novo.
+- BUG CRÍTICO corrigido - getResultadoContabil: somava o value de TODAS as partidas (débito+crédito), incluía lançamentos excluídos (deletedAt) e de encerramento (isClosingEntry) e usava Date local. Agora: groupBy accountId+type (movimento real), deletedAt null, isClosingEntry false, datas em UTC. (2018 dava 64.556.569,08; correto 3.136.722,12.) Corrige também a apuração mensal IRPJ/CSLL, que usa a mesma função.
+- Parte B nativa: o saldo de abertura (Lançamento de Abertura, ref ABERTURA-2018 datado 31/12/2017) da conta de Prejuízo do Exercício configurada no encerramento (encerramentoContaPrejuizoExercicioId = 23301020001 na Hotelsys) entra como saldo inicial (getSaldoAberturaPrejuizo; encerramentos excluídos); cálculo em CADEIA (calcularPartBNativa -> calcularAnoPartBNativa; início = primeiro lançamento ou menor ano já gravado); o Livro recalcula a cadeia ao abrir (getLivroLalur; userId opcional, created_by_id nullable); botão agora "Recalcular Parte B".
+- Saldo inicial MANUAL por ano/tributo: coluna `saldo_inicial_manual` (nullable) em lalur_part_b_nativo (migração manual `prisma/migrations-manuais/20260920_lalur_saldo_inicial_manual.sql`); o manual sobrepõe o automático; endpoints GET/PUT `/apuracao/lalur-part-b/:ano/saldo-inicial` (PUT {I,C}; null limpa); modal "Saldo inicial da Parte B" com o valor automático sugerido; marca MANUAL na tabela; botão "Lançar ajustes" -> /app/fiscal/apuracao.
+- Conciliação validada: saldo final 2025 = 111.867.539,36 = PL "Prejuízos Acumulados" (90.451.855,10 de abertura + 21.415.684,26 de 2018-2025). Sem ajustes na Parte A, o prejuízo fiscal do ano = resultado contábil do ano.
+- O lançamento da Parte A já existe em Fiscal -> Apuração de Impostos (aba LALUR: sugestões + item avulso + lista por competência); LACS = mesmo lançamento com imposto CSLL/AMBOS (sem livro separado).
+
+**Importação manual de lançamentos (diagnóstico, sem código)**
+- O layout exige 8 campos: Data|NrLancto(vazio)|Débito|Crédito|Histórico|HP|Complemento|Valor. Arquivo com `Data|Débito|Crédito||Hist...` desloca as colunas (o débito vira NrLancto, ignorado) e gera 93 erros "Data divergente dentro do mesmo grupo". Correção do arquivo por regex `^(\d{8})\|(\d+)\|(\d+)\|\|` -> `$1||$2|$3|`.
+
+### Decisões
+- Relatórios/balancetes NÃO recebem colunas redimensionáveis (só o Plano de Contas).
+- Fluxo de blocos de script CONSOLIDADO (regra ao final desta nota) - não alterar.
+
+### Aprendizados (evitar regressão)
+- Prisma Decimal serializa como string: sempre Number() antes de toLocaleString/aritmética na tela.
+- Os arquivos do project knowledge ficam desatualizados: pedir a versão atual antes de escrever âncoras; os scripts validam a contagem de âncoras (==1) e abortam sem alterar nada.
+- A impressão dos relatórios é uma janela própria (window.open + window.print), independente do layout da tela.
+- O confirmar() do encerramento não é atômico nem protegido contra requisições concorrentes (checagem jaEncerrado no início, criação depois).
+- Não comparar o saldo do PL com o LALUR sem considerar o saldo de abertura (prejuízos anteriores ao primeiro ano escriturado).
+
+### Pendências
+- Trava (advisory lock/mutex por empresa+data) + transação no confirmar() do encerramento; botão bloqueado no front enquanto a API responde.
+- Lentidão: listarExercicios chama getVerificationBalance 2x por ano (a lista e o encerramento demoram).
+- O tipo "Compensação" do formulário da Apuração é ignorado pela Parte B nativa (decidir: remover a opção ou considerar).
+- getReceitasBrutas (PIS/COFINS) tem os mesmos filtros faltando (deletedAt, isClosingEntry) e datas locais.
+- Validador do importador manual: detectar deslocamento de colunas (NrLancto preenchido) com mensagem única e fechar o grupo ao mudar de data.
+- Parte B: o prejuízo fiscal de abertura é assumido igual ao saldo contábil; se a ECF anterior declarou outro saldo, usar o Saldo inicial manual (ou trazer da Parte B importada da ECF).
+
+### Recentes 16-18/09 (reconstituído dos históricos de chat e comentários de código - conferir)
+- 16/09: cascata de reabertura no confirmar() + alerta no modal; card de filtros fixo no Razão; tabela compacta + data/hora do encerramento.
+- 17/09: encerramentos gravados com sourceModule RESULT_TRANSFER ("Transferência de Resultado").
+- 18/09: data de fechamento flexível (balanço intermediário) + lista de fechamentos do ano (endpoint /fechamentos); matriz-import origin MATRIZ; ativos: recálculo de landValueAmount, início da depreciação no AssetFormModal, "Gerar Pendentes" em AssetsList; "Reverter Cálculo" (backend pronto, frontend pendente).
+
+### REGRA CONSOLIDADA - fluxo de blocos de script (20/09/2026) - NÃO ALTERAR
+- Um único bloco PowerShell copiável, com `cls` antes do output, que: grava o script Python em D:\Temp\ (here-string de aspas simples + WriteAllText sem BOM), executa (`python $p`) e mostra OK/ERRO + `git --no-pager diff --stat -- <arquivos>`. A confirmação é o usuário colar essa saída.
+- O script Python valida cada âncora (contagem == 1), localiza arquivos por rglob quando o caminho pode variar, preserva CRLF/LF e aborta sem alterar nada se algo não bater; patches de vários arquivos validam tudo antes de gravar qualquer um.
+- Migração de banco (docker cp/exec + prisma generate) vai no mesmo bloco, protegida por `$LASTEXITCODE -eq 0`, rodando da raiz do repositório.
+- Patch testado numa cópia antes de entregar; a entrega sempre traz "como testar" e o resultado esperado.
