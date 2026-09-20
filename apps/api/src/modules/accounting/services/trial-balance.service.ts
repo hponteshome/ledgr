@@ -65,7 +65,11 @@ select: {
     excludeClosing: boolean = false,
   ): Promise<Map<string, { debits: number; credits: number }>> {
 
-    const items = await this.prisma.journalEntryItem.findMany({
+    // CORRIGIDO 20/09/2026: antes trazia TODAS as partidas do intervalo para a memoria do Node (findMany) e
+    // somava em JS - a lista de Encerramento chamava isso 2x por ano (acumulado desde 1900) e demorava.
+    // Agora o banco soma por conta e por tipo (groupBy): mesmo resultado, so uma linha por conta/tipo.
+    const items = await this.prisma.journalEntryItem.groupBy({
+      by: ['accountId', 'type'],
       where: {
         journalEntry: {
           companyId,
@@ -74,11 +78,7 @@ select: {
           ...(excludeClosing ? { isClosingEntry: false } : {}),
         },
       },
-      select: {
-        accountId: true,
-        type     : true,   // AccountNature: DEBIT | CREDIT
-        value    : true,
-      },
+      _sum: { value: true },
     });
 
     const map = new Map<string, { debits: number; credits: number }>();
@@ -88,7 +88,7 @@ select: {
         map.set(item.accountId, { debits: 0, credits: 0 });
 
       const entry = map.get(item.accountId)!;
-      const val   = Number(item.value);
+      const val   = Number(item._sum.value ?? 0);
 
       if (item.type === 'DEBIT')  entry.debits  += val;
       else                        entry.credits += val;
