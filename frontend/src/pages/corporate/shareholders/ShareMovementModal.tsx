@@ -121,11 +121,29 @@ const ShareMovementModal: React.FC<Props> = ({ isOpen, onClose, onSuccess, exist
   const handleAddCpfLookup = async (cpf: string) => {
     const clean = cpf.replace(/\D/g, '');
     if (clean.length < 11) return;
+    if (clean.length !== 11 && clean.length !== 14) return;
     setPersonLookup('loading');
     try {
-      const res = await api.get(`/persons/cpf/${clean}`);
-      setAddForm(p => ({ ...p, holderName: res.data.fullName ?? p.holderName, holderType: res.data.documentType === 'CNPJ' ? 'PJ' : 'PF' }));
-      setPersonLookup('found');
+      if (clean.length === 14) {
+        // CORRIGIDO (17/09/2026): faltava o branch de CNPJ (buscava sempre em
+        // /persons/cpf/, nunca em /companies/taxid/) - achado real: CNPJ da
+        // Hotelsys (empresa ja cadastrada no sistema) dava "Empresa nao
+        // cadastrada" ao tentar lancar ela como socia da Sunsys. Mesma
+        // logica ja usada corretamente em handleToCpfLookup (fluxo de
+        // Reducao/Cessionario).
+        const res = await api.get('/companies/taxid/' + clean).catch(() => null);
+        const company = res?.data;
+        if (company) {
+          setAddForm(p => ({ ...p, holderName: company.legalName ?? p.holderName, holderType: 'PJ' }));
+          setPersonLookup('found');
+        } else {
+          setPersonLookup('not_found');
+        }
+      } else {
+        const res = await api.get(`/persons/cpf/${clean}`);
+        setAddForm(p => ({ ...p, holderName: res.data.fullName ?? p.holderName, holderType: 'PF' }));
+        setPersonLookup('found');
+      }
     } catch {
       setPersonLookup('not_found');
     }
