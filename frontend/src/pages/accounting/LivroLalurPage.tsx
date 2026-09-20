@@ -41,6 +41,7 @@ export const LivroLalurPage: React.FC = () => {
   const [calculando, setCalculando] = useState(false);
   const [accountingConfig, setAccountingConfig] = useState<any>({});
   const navigate = useNavigate();
+  const [tributoTab, setTributoTab] = useState<'I' | 'C'>('I');
   // Saldo inicial da Parte B (modal)
   const [saldoModal, setSaldoModal] = useState(false);
   const [saldoInfo, setSaldoInfo] = useState<Record<string, { automatico: number; manual: number | null; efetivo: number }> | null>(null);
@@ -177,47 +178,103 @@ export const LivroLalurPage: React.FC = () => {
     if (win) { win.document.write(html); win.document.close(); }
   };
 
-  const thSt: React.CSSProperties = { padding: '8px 12px', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', color: '#6B7280', background: '#F9FAFB', borderBottom: '0.5px solid #E5E7EB', textAlign: 'left' };
+  const linhaAno = (t: string) => parteB.find(b => b.ano === ano && b.tipoTributo === t);
+  const linhasB = React.useMemo(
+    () => parteB.filter(b => b.tipoTributo === tributoTab).sort((a, b) => a.ano.localeCompare(b.ano)),
+    [parteB, tributoTab]
+  );
+  const maxSaldo = Math.max(0, ...linhasB.map(b => Math.abs(Number(b.saldoFinal))));
+
+  const btnBase: React.CSSProperties = { padding: '8px 14px', borderRadius: 6, fontSize: 13, fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap' };
+  const btnOutline: React.CSSProperties = { ...btnBase, background: '#fff', color: '#374151', border: '1px solid #E5E7EB' };
+
+  // Cards-resumo do exercicio selecionado (uma coluna por tributo)
+  const renderResumo = (t: 'I' | 'C') => {
+    const l = linhaAno(t);
+    const cor = t === 'I' ? { fg: '#1D4ED8', bg: '#EFF6FF' } : { fg: '#A21CAF', bg: '#FDF4FF' };
+    const valor = (v: number | string | null | undefined) => (
+      <span style={{ fontVariantNumeric: 'tabular-nums', color: Number(v) < 0 ? '#B91C1C' : undefined }}>{fmt(v)}</span>
+    );
+    const linha = (rotulo: string, conteudo: React.ReactNode, forte = false) => (
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '6px 0', fontSize: forte ? 14 : 13, fontWeight: forte ? 700 : 400, color: forte ? '#111' : '#374151', borderTop: forte ? '0.5px solid #E5E7EB' : undefined, marginTop: forte ? 4 : 0 }}>
+        <span>{rotulo}</span>{conteudo}
+      </div>
+    );
+    return (
+      <div key={t} style={{ flex: 1, minWidth: 320, background: '#fff', border: '0.5px solid #E5E7EB', borderRadius: 10, padding: '14px 18px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+          <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 10px', borderRadius: 20, background: cor.bg, color: cor.fg }}>
+            {tributoLabel[t]} · {t === 'I' ? 'prejuízo fiscal' : 'base negativa'}
+          </span>
+          <span style={{ fontSize: 11, color: '#9CA3AF' }}>Exercício {ano}</span>
+        </div>
+        {!l ? (
+          <div style={{ fontSize: 12, color: '#9CA3AF', padding: '12px 0' }}>Sem cálculo para {ano}. Clique em "Recalcular Parte B".</div>
+        ) : (
+          <>
+            {linha('Saldo inicial', valor(l.saldoInicial))}
+            {linha('(+) Novo prejuízo do ano', Number(l.novoPrejuizo) > 0
+              ? <span style={{ fontVariantNumeric: 'tabular-nums', color: '#B91C1C' }}>+{fmt(l.novoPrejuizo)}</span>
+              : <span style={{ color: '#D1D5DB' }}>—</span>)}
+            {linha('(−) Compensação', Number(l.compensacao) > 0
+              ? <span style={{ fontVariantNumeric: 'tabular-nums', color: '#059669' }}>-{fmt(l.compensacao)}</span>
+              : <span style={{ color: '#D1D5DB' }}>—</span>)}
+            {linha('Saldo final', valor(l.saldoFinal), true)}
+            <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 6 }}>
+              Lucro real do ano: {l.lucroRealAno == null ? '—' : valor(l.lucroRealAno)}
+            </div>
+          </>
+        )}
+      </div>
+    );
+  };
+
+  const thSt: React.CSSProperties = { padding: '8px 12px', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', color: '#6B7280', background: '#F9FAFB', borderBottom: '0.5px solid #E5E7EB', textAlign: 'left', position: 'sticky', top: 0, zIndex: 1 };
   const selSt: React.CSSProperties = { padding: '6px 10px', border: '1px solid #E5E7EB', borderRadius: 6, fontSize: 13 };
 
   return (
     <div style={{ padding: 24 }}>
-      <header style={{ marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 20, background: '#F0F9FF', color: '#0369A1', marginBottom: 6 }}>
+      <header style={{ position: 'sticky', top: 12, zIndex: 40, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', background: '#fff', border: '0.5px solid #E5E7EB', borderRadius: 10, padding: '10px 16px', marginBottom: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, padding: '3px 10px', borderRadius: 20, background: '#EFF6FF', color: '#1D4ED8', whiteSpace: 'nowrap' }}>
             ◆ Contábil
           </span>
-          <h1 style={{ fontSize: 20, fontWeight: 500, color: '#111111', margin: 0 }}>Livro LALUR</h1>
-          <p style={{ fontSize: 12, color: '#9CA3AF', margin: '2px 0 0' }}>
-            Calculado exclusivamente a partir dos lançamentos contábeis registrados em LEDGR.
-            Para conciliação com o que foi declarado à Receita, veja SPED → LALUR — Livro de Apuração (ECF).
-          </p>
+          <h1 style={{ fontSize: 20, fontWeight: 600, color: '#111111', margin: 0, whiteSpace: 'nowrap' }}>Livro LALUR</h1>
+          <span style={{ fontSize: 12, color: '#9CA3AF', whiteSpace: 'nowrap' }}>Parte A e Parte B · exercício {ano}</span>
         </div>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <select value={ano} onChange={e => setAno(e.target.value)} style={selSt}>
             {Array.from({ length: 10 }, (_, i) => String(new Date().getFullYear() - i)).map(a => (
               <option key={a} value={a}>{a}</option>
             ))}
           </select>
-          <button onClick={() => navigate('/app/fiscal/apuracao')} title="Abre Fiscal > Apuração de Impostos (aba LALUR) para lançar adições e exclusões" style={{ padding: '8px 16px', background: '#fff', color: '#374151', border: '1px solid #E5E7EB', borderRadius: 6, fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
+          <button onClick={() => navigate('/app/fiscal/apuracao')} title="Abre Fiscal > Apuração de Impostos (aba LALUR) para lançar adições e exclusões" style={btnOutline}>
             Lançar ajustes
           </button>
-          <button onClick={abrirSaldoInicial} title="Informar o saldo inicial de prejuízo fiscal / base negativa do ano" style={{ padding: '8px 16px', background: '#fff', color: '#374151', border: '1px solid #E5E7EB', borderRadius: 6, fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
+          <button onClick={abrirSaldoInicial} title="Informar o saldo inicial de prejuízo fiscal / base negativa do ano" style={btnOutline}>
             Saldo inicial
           </button>
-          <button onClick={handleCalcular} disabled={calculando} style={{ padding: '8px 16px', background: '#2563EB', color: '#fff', border: 'none', borderRadius: 6, fontSize: 13, fontWeight: 500, cursor: 'pointer', opacity: calculando ? 0.6 : 1 }}>
+          <button onClick={handleCalcular} disabled={calculando} style={{ ...btnBase, background: '#2563EB', color: '#fff', border: 'none', opacity: calculando ? 0.6 : 1 }}>
             {calculando ? 'Recalculando...' : 'Recalcular Parte B'}
           </button>
-          <button onClick={handlePrint} style={{ padding: '8px 16px', background: '#111827', color: '#fff', border: 'none', borderRadius: 6, fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
+          <button onClick={handlePrint} style={{ ...btnBase, background: '#111827', color: '#fff', border: 'none' }}>
             Imprimir Livro
           </button>
         </div>
       </header>
+      <p style={{ fontSize: 12, color: '#9CA3AF', margin: '0 0 16px' }}>
+        Calculado exclusivamente a partir dos lançamentos contábeis registrados em LEDGR.
+        Para conciliação com o que foi declarado à Receita, veja SPED → LALUR — Livro de Apuração (ECF).
+      </p>
 
       {loading ? (
         <div style={{ padding: 60, textAlign: 'center', color: '#9CA3AF', fontSize: 13 }}>Carregando…</div>
       ) : (
         <>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 24 }}>
+            {(['I', 'C'] as const).map(t => renderResumo(t))}
+          </div>
+
           <h2 style={{ fontSize: 14, fontWeight: 600, color: '#374151', marginBottom: 10 }}>Parte A — Demonstração do Lucro Real ({ano})</h2>
           <div style={{ border: '0.5px solid #E5E7EB', borderRadius: 10, overflow: 'auto', maxHeight: 340, marginBottom: 24 }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
@@ -243,37 +300,72 @@ export const LivroLalurPage: React.FC = () => {
             </table>
           </div>
 
-          <h2 style={{ fontSize: 14, fontWeight: 600, color: '#374151', marginBottom: 10 }}>Parte B — Controle de Saldos</h2>
-          <div style={{ border: '0.5px solid #E5E7EB', borderRadius: 10, overflow: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-              <thead><tr>
-                <th style={thSt}>Ano</th><th style={thSt}>Tributo</th>
-                <th style={{ ...thSt, textAlign: 'right' }}>Saldo Inicial</th>
-                <th style={{ ...thSt, textAlign: 'right' }}>Novo Prejuízo</th>
-                <th style={{ ...thSt, textAlign: 'right' }}>Compensação</th>
-                <th style={{ ...thSt, textAlign: 'right' }}>Saldo Final</th>
-              </tr></thead>
-              <tbody>
-                {parteB.length === 0 ? (
-                  <tr><td colSpan={6} style={{ padding: 24, textAlign: 'center', color: '#9CA3AF', fontSize: 13 }}>
-                    Nenhum cálculo de Parte B para {ano} ainda. Clique em "Calcular Parte B".
-                  </td></tr>
-                ) : parteB.map((b, idx) => (
-                  <tr key={`${b.ano}-${b.tipoTributo}`} style={{ background: idx % 2 === 0 ? '#fff' : '#FAFAFA' }}>
-                    <td style={{ padding: '7px 12px', borderBottom: '0.5px solid #F5F5F5', fontSize: 12 }}>{b.ano}</td>
-                    <td style={{ padding: '7px 12px', borderBottom: '0.5px solid #F5F5F5', fontSize: 12 }}>
-                      <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 3, background: b.tipoTributo === 'I' ? '#EFF6FF' : '#FDF4FF', color: b.tipoTributo === 'I' ? '#1D4ED8' : '#A21CAF' }}>
-                        {tributoLabel[b.tipoTributo] || b.tipoTributo}
-                      </span>
-                    </td>
-                    <td style={{ padding: '7px 12px', borderBottom: '0.5px solid #F5F5F5', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontSize: 12, color: Number(b.saldoInicial) < 0 ? '#B91C1C' : '#9CA3AF' }}>{b.saldoInicialManual != null && <span title="Saldo inicial informado manualmente" style={{ fontSize: 9, fontWeight: 600, color: '#2563EB', background: '#EFF6FF', padding: '1px 5px', borderRadius: 3, marginRight: 6 }}>MANUAL</span>}{fmt(b.saldoInicial)}</td>
-                    <td style={{ padding: '7px 12px', borderBottom: '0.5px solid #F5F5F5', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontSize: 12, color: b.novoPrejuizo > 0 ? '#B91C1C' : '#D1D5DB' }}>{b.novoPrejuizo > 0 ? `+${fmt(b.novoPrejuizo)}` : '—'}</td>
-                    <td style={{ padding: '7px 12px', borderBottom: '0.5px solid #F5F5F5', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontSize: 12, color: b.compensacao > 0 ? '#059669' : '#D1D5DB' }}>{b.compensacao > 0 ? `-${fmt(b.compensacao)}` : '—'}</td>
-                    <td style={{ padding: '7px 12px', borderBottom: '0.5px solid #F5F5F5', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontSize: 12, fontWeight: 700, color: Number(b.saldoFinal) < 0 ? '#B91C1C' : undefined }}>{fmt(b.saldoFinal)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
+            <h2 style={{ fontSize: 14, fontWeight: 600, color: '#374151', margin: 0 }}>Parte B — Controle de Saldos</h2>
+            <div style={{ display: 'inline-flex', border: '1px solid #E5E7EB', borderRadius: 8, overflow: 'hidden' }}>
+              {(['I', 'C'] as const).map(t => (
+                <button key={t} onClick={() => setTributoTab(t)} style={{ padding: '6px 18px', fontSize: 12, fontWeight: 600, border: 'none', cursor: 'pointer', background: tributoTab === t ? '#2563EB' : '#fff', color: tributoTab === t ? '#fff' : '#6B7280' }}>
+                  {tributoLabel[t]}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ border: '0.5px solid #E5E7EB', borderRadius: 10, overflow: 'hidden', background: '#fff' }}>
+            {linhasB.length === 0 ? (
+              <div style={{ padding: 24, textAlign: 'center', color: '#9CA3AF', fontSize: 13 }}>
+                Nenhum cálculo de Parte B para {ano} ainda. Clique em "Recalcular Parte B".
+              </div>
+            ) : (
+              <>
+                <div style={{ padding: '10px 16px 0', fontSize: 11, color: '#9CA3AF' }}>Saldo final por ano — {tributoLabel[tributoTab]}</div>
+                <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 96, padding: '6px 16px 0', borderBottom: '0.5px solid #E5E7EB' }}>
+                  {linhasB.map(b => {
+                    const sel = b.ano === ano;
+                    const h = maxSaldo > 0 ? Math.max(2, (Math.abs(Number(b.saldoFinal)) / maxSaldo) * 64) : 2;
+                    return (
+                      <div key={b.ano} title={`${b.ano}: saldo final ${fmt(b.saldoFinal)}`} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+                        <div style={{ width: '100%', maxWidth: 44, height: h, background: sel ? '#2563EB' : '#CBD5E1', borderRadius: '3px 3px 0 0' }} />
+                        <span style={{ fontSize: 10, color: sel ? '#2563EB' : '#9CA3AF', fontWeight: sel ? 700 : 400, paddingBottom: 4 }}>{b.ano}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div style={{ overflow: 'auto', maxHeight: 420 }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                    <thead><tr>
+                      <th style={thSt}>Ano</th>
+                      <th style={{ ...thSt, textAlign: 'right' }}>Saldo inicial</th>
+                      <th style={{ ...thSt, textAlign: 'right' }}>(+) Novo prejuízo</th>
+                      <th style={{ ...thSt, textAlign: 'right' }}>(−) Compensação</th>
+                      <th style={{ ...thSt, textAlign: 'right' }}>Saldo final</th>
+                      <th style={{ ...thSt, textAlign: 'right' }}>Lucro real do ano</th>
+                    </tr></thead>
+                    <tbody>
+                      {linhasB.map(b => {
+                        const sel = b.ano === ano;
+                        const semMov = Number(b.novoPrejuizo) === 0 && Number(b.compensacao) === 0;
+                        const td: React.CSSProperties = { padding: '7px 12px', borderBottom: '0.5px solid #F5F5F5', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontSize: 12 };
+                        return (
+                          <tr key={`${b.ano}-${b.tipoTributo}`} style={{ background: sel ? '#EFF6FF' : '#fff', opacity: semMov && !sel ? 0.65 : 1 }}>
+                            <td style={{ ...td, textAlign: 'left', fontWeight: sel ? 700 : 500, color: sel ? '#1D4ED8' : '#374151' }}>{b.ano}</td>
+                            <td style={{ ...td, color: Number(b.saldoInicial) < 0 ? '#B91C1C' : '#6B7280' }}>
+                              {b.saldoInicialManual != null && <span title="Saldo inicial informado manualmente" style={{ fontSize: 9, fontWeight: 600, color: '#2563EB', background: '#EFF6FF', padding: '1px 5px', borderRadius: 3, marginRight: 6 }}>MANUAL</span>}
+                              {fmt(b.saldoInicial)}
+                            </td>
+                            <td style={{ ...td, color: Number(b.novoPrejuizo) > 0 ? '#B91C1C' : '#D1D5DB' }}>{Number(b.novoPrejuizo) > 0 ? `+${fmt(b.novoPrejuizo)}` : '—'}</td>
+                            <td style={{ ...td, color: Number(b.compensacao) > 0 ? '#059669' : '#D1D5DB' }}>{Number(b.compensacao) > 0 ? `-${fmt(b.compensacao)}` : '—'}</td>
+                            <td style={{ ...td, fontWeight: 700, color: Number(b.saldoFinal) < 0 ? '#B91C1C' : '#111111' }}>{fmt(b.saldoFinal)}</td>
+                            <td style={{ ...td, color: b.lucroRealAno == null ? '#D1D5DB' : Number(b.lucroRealAno) < 0 ? '#B91C1C' : '#374151' }}>{b.lucroRealAno == null ? '—' : fmt(b.lucroRealAno)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
           </div>
         </>
       )}
