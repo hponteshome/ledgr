@@ -29,8 +29,14 @@ export class TrialBalanceService {
   // ─── Helper: Busca contas ────────────────────────────────────────────────────
 
   private async getAccounts(companyId: string) {
+    // CORRIGIDO (17/09/2026): faltava o filtro por origin (ver
+    // chart-of-accounts.service.ts/getTree, 04/09/2026) - Balancete Mensal
+    // e Balancete de Verificacao (os dois usam este helper) mostravam a
+    // arvore ECD_NATIVE duplicada junto da Matriz (achado real: raiz "7
+    // ATIVO"/"2 PASSIVO" fantasma na Sunsys, code diferente da arvore real
+    // "1"/"2"). Mesmo criterio ja usado no Plano de Contas.
     return this.prisma.chartOfAccounts.findMany({
-      where: { companyId, deletedAt: null },
+      where: { companyId, deletedAt: null, OR: [{ origin: 'MATRIZ' }, { origin: null }] },
 select: {
     id        : true,
     code      : true,

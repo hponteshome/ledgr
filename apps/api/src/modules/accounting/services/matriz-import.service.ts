@@ -94,6 +94,15 @@ export class MatrizImportService {
               isAnalytic:  acc.isAnalytic,
               parentId:    parentTargetId,
               reducedCode: acc.reducedCode,
+              // CORRIGIDO (18/09/2026): faltava origin - toda conta criada
+              // por este import (reimportacao da Matriz) ficava com origin
+              // em branco, sumindo do Plano de Contas/Balancete/Comparativo/
+              // resolvedor de importacao manual (todos filtram por
+              // origin='MATRIZ'). Bug documentado desde 10/09/2026 no
+              // create() de chart-of-accounts.service.ts como pendente
+              // "fora do escopo" daquela correcao - fechado agora aqui,
+              // que e o servico que o botao "Importar Matriz" realmente usa.
+              origin:      'MATRIZ' as any,
               createdById: userId,
             },
           });

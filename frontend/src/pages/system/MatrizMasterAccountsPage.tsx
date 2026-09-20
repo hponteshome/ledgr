@@ -25,6 +25,80 @@ const typeLabel: Record<string, string> = {
   ASSET: 'Ativo', LIABILITY: 'Passivo', EQUITY: 'PL', REVENUE: 'Receita', EXPENSE: 'Despesa',
 };
 
+// NOVO (18/09/2026): mesma inferencia automatica ja usada no
+// AccountMaintenanceModal.tsx (Plano de Contas da empresa) - acha o pai
+// pelo maior prefixo de codigo ja existente, e infere tipo/natureza a
+// partir dele (ou da classe 1/2/3/4 quando nao ha prefixo).
+const CLASS_MAP: Record<string, { type: string; nature: string }> = {
+  '1': { type: 'ASSET', nature: 'DEBIT' },
+  '2': { type: 'LIABILITY', nature: 'CREDIT' },
+  '3': { type: 'REVENUE', nature: 'CREDIT' },
+  '4': { type: 'EXPENSE', nature: 'DEBIT' },
+};
+
+const findParentByPrefix = (code: string, allAccounts: MatrizAccount[]): MatrizAccount | null => {
+  for (let len = code.length - 1; len >= 1; len--) {
+    const candidate = code.slice(0, len);
+    const found = allAccounts.find(a => a.code === candidate);
+    if (found) return found;
+  }
+  return null;
+};
+
+const inferFromCode = (code: string, allAccounts: MatrizAccount[]) => {
+  const clean = code.trim();
+  if (!clean) return null;
+  const parentAccount = findParentByPrefix(clean, allAccounts);
+  if (parentAccount) {
+    return { type: parentAccount.type, nature: parentAccount.nature, parent: parentAccount };
+  }
+  const first = clean[0];
+  const inferred = CLASS_MAP[first] ?? { type: 'ASSET', nature: 'DEBIT' };
+  return { type: inferred.type, nature: inferred.nature, parent: null };
+};
+
+// NOVO (18/09/2026): mesmo painel "Codigos Reduzidos Disponiveis" do Plano
+// de Contas da empresa (AccountMaintenanceModal/getReducedCodeBlocks), so
+// que calculado aqui 100% client-side com as contas ja carregadas - agrupa
+// pelos 2 primeiros digitos do codigo completo, dentro da classe (1o
+// digito), teto dinamico = proxima centena acima do maior reduzido ja
+// usado no grupo, exclui 8888 (Apuracao de Resultado, reservado).
+interface ReducedCodeBlock { grupo: string; total: number; primeiros10: number[] }
+const computeReducedBlocks = (contas: MatrizAccount[], classeDigit: string): ReducedCodeBlock[] => {
+  const porGrupo = new Map<string, number[]>();
+  contas.forEach(c => {
+    if (!c.code.startsWith(classeDigit) || !c.reducedCode) return;
+    const num = parseInt(c.reducedCode, 10);
+    if (isNaN(num)) return;
+    // CORRIGIDO (18/09/2026): agrupa pelos 2 primeiros digitos do PROPRIO
+    // codigo reduzido, nao do codigo completo - achado real confirmado no
+    // Hotelsys (documentado no getReducedCodeBlocks do backend, que este
+    // painel client-side replica): o reduzido pode ter faixa de digitos
+    // diferente do codigo completo (ex: code "22" usa reduzido 23xx).
+    // Agrupar pelo codigo completo dava blocos/sugestoes diferentes do
+    // Plano da empresa mesmo com os dois planos identicos.
+    const grupo = c.reducedCode.padStart(4, '0').slice(0, 2);
+    if (!porGrupo.has(grupo)) porGrupo.set(grupo, []);
+    porGrupo.get(grupo)!.push(num);
+  });
+  const blocos: ReducedCodeBlock[] = [];
+  for (const [grupo, nums] of porGrupo.entries()) {
+    const usados = new Set(nums);
+    const min = Math.min(...nums);
+    const max = Math.max(...nums);
+    const teto = Math.ceil((max + 1) / 100) * 100;
+    const livres: number[] = [];
+    let total = 0;
+    for (let n = min; n < teto; n++) {
+      if (n === 8888 || usados.has(n)) continue;
+      total++;
+      if (livres.length < 10) livres.push(n);
+    }
+    if (total > 0) blocos.push({ grupo, total, primeiros10: livres });
+  }
+  return blocos.sort((a, b) => a.grupo.localeCompare(b.grupo));
+};
+
 export const MatrizMasterAccountsPage: React.FC = () => {
   const [contas, setContas] = useState<MatrizAccount[]>([]);
   const [loading, setLoading] = useState(false);
@@ -32,6 +106,10 @@ export const MatrizMasterAccountsPage: React.FC = () => {
   const [mostrarInativas, setMostrarInativas] = useState(false);
   const [modalAberto, setModalAberto] = useState<'novo' | 'editar' | null>(null);
   const [contaEditando, setContaEditando] = useState<MatrizAccount | null>(null);
+  // NOVO (18/09/2026): "+" na linha - cria conta FILHA da clicada, igual ao
+  // Plano de Contas da empresa ja tem, em vez de exigir escolher o pai manual
+  // sempre pelo botao generico "Nova Conta" do topo.
+  const [paiPreSelecionado, setPaiPreSelecionado] = useState<MatrizAccount | null>(null);
 
   const fetchContas = async () => {
     setLoading(true);
@@ -101,7 +179,7 @@ export const MatrizMasterAccountsPage: React.FC = () => {
           Mostrar inativas
         </label>
         <button
-          onClick={() => { setContaEditando(null); setModalAberto('novo'); }}
+          onClick={() => { setContaEditando(null); setPaiPreSelecionado(null); setModalAberto('novo'); }}
           style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', background: '#111827', color: '#fff', border: 'none', borderRadius: 6, fontSize: 13, fontWeight: 500, cursor: 'pointer' }}
         >
           <FiPlus size={14} /> Nova Conta
@@ -122,8 +200,8 @@ export const MatrizMasterAccountsPage: React.FC = () => {
             </tr>
           </thead>
           <tbody>
-            {contasVisiveis.map(c => (
-              <tr key={c.id} style={{ opacity: c.isActive ? 1 : 0.45, background: c.isAnalytic ? 'transparent' : '#F9FAFB' }}>
+            {contasVisiveis.map((c, idx) => (
+              <tr key={c.id} style={{ opacity: c.isActive ? 1 : 0.45, background: idx % 2 === 0 ? '#FFFFFF' : '#F1F5F9' }}>
                 <td style={{ padding: '6px 10px', fontSize: 12, fontFamily: 'monospace', fontWeight: c.isAnalytic ? 400 : 600, color: c.isAnalytic ? '#111827' : '#374151', borderBottom: '0.5px solid #F3F4F6', paddingLeft: 10 + (c.level - 1) * 16, borderLeft: c.isAnalytic ? '3px solid #10B981' : '3px solid transparent' }}>
                   {c.code}
                 </td>
@@ -140,6 +218,9 @@ export const MatrizMasterAccountsPage: React.FC = () => {
                 </td>
                 <td style={{ padding: '6px 10px', fontSize: 12, fontFamily: 'monospace', color: c.isAnalytic ? '#059669' : '#D1D5DB', fontWeight: c.isAnalytic ? 500 : 400, borderBottom: '0.5px solid #F3F4F6' }}>{c.reducedCode || '-'}</td>
                 <td style={{ padding: '6px 10px', borderBottom: '0.5px solid #F3F4F6', whiteSpace: 'nowrap' }}>
+                  <button onClick={() => { setPaiPreSelecionado(c); setContaEditando(null); setModalAberto('novo'); }} title="Adicionar conta filha" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#2563EB', marginRight: 8 }}>
+                    <FiPlus size={14} />
+                  </button>
                   <button onClick={() => { setContaEditando(c); setModalAberto('editar'); }} title="Editar" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6B7280', marginRight: 8 }}>
                     <FiEdit2 size={14} />
                   </button>
@@ -163,8 +244,9 @@ export const MatrizMasterAccountsPage: React.FC = () => {
         <ContaFormModal
           conta={contaEditando}
           contasExistentes={contas}
-          onClose={() => setModalAberto(null)}
-          onSuccess={() => { setModalAberto(null); fetchContas(); }}
+          paiPreSelecionado={paiPreSelecionado}
+          onClose={() => { setModalAberto(null); setPaiPreSelecionado(null); }}
+          onSuccess={() => { setModalAberto(null); setPaiPreSelecionado(null); fetchContas(); }}
         />
       )}
     </div>
@@ -175,24 +257,64 @@ export const MatrizMasterAccountsPage: React.FC = () => {
 const ContaFormModal: React.FC<{
   conta: MatrizAccount | null;
   contasExistentes: MatrizAccount[];
+  paiPreSelecionado?: MatrizAccount | null;
   onClose: () => void;
   onSuccess: () => void;
-}> = ({ conta, contasExistentes, onClose, onSuccess }) => {
+}> = ({ conta, contasExistentes, paiPreSelecionado, onClose, onSuccess }) => {
   const isEdicao = !!conta;
   const [code, setCode] = useState(conta?.code ?? '');
   const [name, setName] = useState(conta?.name ?? '');
-  const [level, setLevel] = useState(conta?.level ?? 1);
-  const [type, setType] = useState(conta?.type ?? 'ASSET');
-  const [nature, setNature] = useState(conta?.nature ?? 'DEBIT');
-  const [isAnalytic, setIsAnalytic] = useState(conta?.isAnalytic ?? false);
-  const [bloco, setBloco] = useState(conta?.bloco ?? 'NUCLEO');
-  const [parentId, setParentId] = useState(conta?.parentId ?? '');
+  // NOVO (18/09/2026): quando aberto via "+" de uma linha, pre-preenche
+  // nivel/tipo/natureza/pai a partir da conta clicada (o filho normalmente
+  // herda tipo/natureza do pai; nivel = pai + 1).
+  const [level, setLevel] = useState(conta?.level ?? (paiPreSelecionado ? paiPreSelecionado.level + 1 : 1));
+  const [type, setType] = useState(conta?.type ?? paiPreSelecionado?.type ?? 'ASSET');
+  const [nature, setNature] = useState(conta?.nature ?? paiPreSelecionado?.nature ?? 'DEBIT');
+  const [isAnalytic, setIsAnalytic] = useState(conta?.isAnalytic ?? true);
+  const [bloco, setBloco] = useState(conta?.bloco ?? paiPreSelecionado?.bloco ?? 'NUCLEO');
+  const [parentId, setParentId] = useState(conta?.parentId ?? paiPreSelecionado?.id ?? '');
   const [reducedCode, setReducedCode] = useState(conta?.reducedCode ?? '');
   const [saving, setSaving] = useState(false);
 
   const parentsDisponiveis = contasExistentes
-    .filter(c => c.isActive && c.id !== conta?.id)
+    .filter(c => c.isActive && c.id !== conta?.id && !c.isAnalytic)
     .sort((a, b) => a.code.localeCompare(b.code));
+
+  // NOVO (18/09/2026): busca com autocomplete em vez de <select> gigante
+  // (499 contas nao cabem numa lista pra escolher a dedo). Inicializa com
+  // o rotulo do pai ja escolhido (edicao ou pre-selecionado via "+").
+  const paiInicial = contasExistentes.find(c => c.id === (conta?.parentId ?? paiPreSelecionado?.id));
+  const [parentQuery, setParentQuery] = useState(paiInicial ? `${paiInicial.code} — ${paiInicial.name}` : '');
+  const parentOptions = useMemo(() => {
+    if (!parentQuery.trim()) return [];
+    const q = parentQuery.toUpperCase();
+    return parentsDisponiveis.filter(p => p.code.includes(q) || p.name.toUpperCase().includes(q)).slice(0, 30);
+  }, [parentQuery, parentsDisponiveis]);
+
+  // NOVO (18/09/2026): ao digitar o codigo (so em modo criacao), infere
+  // conta pai + tipo + natureza pelo maior prefixo ja existente no plano -
+  // mesma logica do formulario do Plano de Contas da empresa.
+  const handleCodeBlur = () => {
+    if (isEdicao) return;
+    const inferido = inferFromCode(code, contasExistentes);
+    if (!inferido) return;
+    setType(inferido.type);
+    setNature(inferido.nature);
+    if (inferido.parent) {
+      setParentId(inferido.parent.id);
+      setParentQuery(`${inferido.parent.code} — ${inferido.parent.name}`);
+      setLevel(inferido.parent.level + 1);
+    }
+  };
+
+  // classe = 1o digito do codigo digitado, ou da conta pai escolhida quando
+  // o codigo ainda esta em branco (ex: acabou de inferir/selecionar o pai).
+  const paiAtual = contasExistentes.find(p => p.id === parentId);
+  const classeDigit = (code.trim()[0]) || paiAtual?.code[0] || null;
+  const reducedCodeBlocks = useMemo(
+    () => classeDigit ? computeReducedBlocks(contasExistentes, classeDigit) : [],
+    [classeDigit, contasExistentes],
+  );
 
   const handleSave = async () => {
     setSaving(true);
@@ -220,15 +342,16 @@ const ContaFormModal: React.FC<{
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-      <div style={{ background: '#fff', borderRadius: 14, width: 480, maxHeight: '85vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.15)' }}>
+      <div style={{ background: '#fff', borderRadius: 14, width: classeDigit ? 820 : 480, maxWidth: '95vw', maxHeight: '85vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.15)' }}>
         <div style={{ padding: '16px 20px', borderBottom: '0.5px solid #E5E7EB', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h2 style={{ margin: 0, fontSize: 15, fontWeight: 500 }}>{isEdicao ? 'Editar Conta' : 'Nova Conta'}</h2>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6B7280' }}><FiX size={18} /></button>
         </div>
-        <div style={{ padding: 20, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ display: 'flex', overflowY: 'auto' }}>
+        <div style={{ padding: 20, flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div>
             <label style={labelSt}>CÓDIGO</label>
-            <input style={inputSt} value={code} onChange={e => setCode(e.target.value)} disabled={isEdicao} />
+            <input style={inputSt} value={code} onChange={e => setCode(e.target.value)} onBlur={handleCodeBlur} disabled={isEdicao} />
           </div>
           <div>
             <label style={labelSt}>NOME</label>
@@ -263,14 +386,31 @@ const ContaFormModal: React.FC<{
               </select>
             </div>
           </div>
-          <div>
+          <div style={{ position: 'relative' }}>
             <label style={labelSt}>CONTA PAI</label>
-            <select style={inputSt} value={parentId} onChange={e => setParentId(e.target.value)}>
-              <option value="">(nenhuma - raiz)</option>
-              {parentsDisponiveis.map(p => (
-                <option key={p.id} value={p.id}>{p.code} · {p.name}</option>
-              ))}
-            </select>
+            <input
+              style={inputSt}
+              value={parentQuery}
+              placeholder="Buscar por código ou nome... (deixe em branco para conta raiz)"
+              onChange={e => { setParentQuery(e.target.value); if (!e.target.value.trim()) setParentId(''); }}
+            />
+            {parentQuery.trim() && parentOptions.length > 0 && (
+              <div style={{ border: '1px solid #E5E7EB', borderRadius: 6, maxHeight: 160, overflowY: 'auto', marginTop: 4 }}>
+                {parentOptions.map(p => (
+                  <button key={p.id} type="button"
+                    onClick={() => { setParentId(p.id); setParentQuery(`${p.code} — ${p.name}`); }}
+                    style={{ display: 'block', width: '100%', textAlign: 'left', padding: '6px 10px', fontSize: 12, background: 'none', border: 'none', borderBottom: '0.5px solid #F3F4F6', cursor: 'pointer' }}>
+                    <span style={{ fontFamily: 'monospace', color: '#6B7280' }}>{p.code}</span> — {p.name}
+                  </button>
+                ))}
+              </div>
+            )}
+            {parentId && (
+              <button type="button" onClick={() => { setParentId(''); setParentQuery(''); }}
+                style={{ fontSize: 11, color: '#DC2626', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0' }}>
+                Limpar conta pai
+              </button>
+            )}
           </div>
           <div>
             <label style={labelSt}>BLOCO</label>
@@ -280,6 +420,36 @@ const ContaFormModal: React.FC<{
             <input type="checkbox" checked={isAnalytic} onChange={e => setIsAnalytic(e.target.checked)} />
             Conta analítica (recebe lançamento direto)
           </label>
+        </div>
+        {classeDigit && (
+          <div style={{ width: 220, flexShrink: 0, borderLeft: '1px solid #F3F4F6', padding: '20px 16px', overflowY: 'auto' }}>
+            <p style={{ fontSize: 10, fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>
+              Códigos Reduzidos Disponíveis
+            </p>
+            {reducedCodeBlocks.length === 0 ? (
+              <p style={{ fontSize: 11, color: '#9CA3AF' }}>Nenhum intervalo disponível encontrado nessa classe.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {reducedCodeBlocks.map(b => (
+                  <div key={b.grupo}>
+                    <p style={{ fontSize: 10, color: '#9CA3AF', marginBottom: 4 }}>
+                      Grupo {b.grupo} — {b.total} disponíve{b.total === 1 ? 'l' : 'is'}
+                    </p>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                      {b.primeiros10.map(n => (
+                        <button key={n} type="button"
+                          onClick={() => setReducedCode(String(n))}
+                          style={{ padding: '3px 6px', borderRadius: 4, background: '#EFF6FF', border: '1px solid #BFDBFE', fontSize: 11, color: '#1D4ED8', cursor: 'pointer', fontFamily: 'monospace' }}>
+                          {n}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         </div>
         <div style={{ padding: '12px 20px', borderTop: '0.5px solid #E5E7EB', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
           <button onClick={onClose} style={{ padding: '8px 16px', borderRadius: 8, border: '0.5px solid #D1D5DB', background: '#fff', fontSize: 13, cursor: 'pointer' }}>Cancelar</button>
