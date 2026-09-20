@@ -65,6 +65,8 @@ export const EncerramentoExercicioModal: React.FC<Props> = ({ defaultYear, onClo
   const [reverting, setReverting] = useState(false);
   const [error, setError] = useState('');
   const [aviso, setAviso] = useState('');
+  // sem resposta da API (timeout/rede): ela pode ainda estar gravando - segura os botoes e reconfere o estado
+  const [cooldown, setCooldown] = useState(false);
 
   const loadPreview = async (y: number, cd: string) => {
     setLoading(true); setError(''); setPreview(null);
@@ -128,6 +130,10 @@ export const EncerramentoExercicioModal: React.FC<Props> = ({ defaultYear, onClo
           ? `Erro ao confirmar o encerramento (HTTP ${status}). Veja o log da API.`
           : `Erro ao confirmar o encerramento (${e?.message || 'sem resposta da API'}). Veja o log da API e confira se o encerramento chegou a ser gravado antes de tentar de novo.`)
       );
+      if (!status) {
+        setCooldown(true);
+        window.setTimeout(() => { setCooldown(false); loadPreview(year, closingDate); loadFechamentos(year); }, 15000);
+      }
     } finally {
       setConfirming(false);
     }
@@ -252,7 +258,7 @@ export const EncerramentoExercicioModal: React.FC<Props> = ({ defaultYear, onClo
                   </div>
                   <button
                     onClick={handleRevert}
-                    disabled={reverting}
+                    disabled={reverting || cooldown}
                     style={{ flexShrink: 0, padding: '5px 12px', borderRadius: 6, border: '0.5px solid #DC2626', background: '#fff', color: '#DC2626', fontSize: 12, fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap' }}
                   >
                     {reverting ? 'Revertendo...' : 'Reverter Encerramento'}
@@ -330,7 +336,7 @@ export const EncerramentoExercicioModal: React.FC<Props> = ({ defaultYear, onClo
           </button>
           <button
             onClick={handleConfirm}
-            disabled={!preview?.podeEncerrar || confirming}
+            disabled={!preview?.podeEncerrar || confirming || cooldown}
             style={{
               padding: '8px 18px', borderRadius: 8, border: 'none',
               background: preview?.podeEncerrar ? '#047857' : '#D1D5DB',
@@ -340,7 +346,7 @@ export const EncerramentoExercicioModal: React.FC<Props> = ({ defaultYear, onClo
             }}
           >
             {confirming ? <FiLoader className="animate-spin" size={14} /> : <FiCheckCircle size={14} />}
-            {confirming ? 'Encerrando...' : 'Confirmar Encerramento'}
+            {confirming ? 'Encerrando...' : cooldown ? 'Aguardando a API...' : 'Confirmar Encerramento'}
           </button>
         </div>
       </div>

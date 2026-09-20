@@ -119,7 +119,23 @@ export class EncerramentoExercicioService {
 
   // ── Confirma: grava o encerramento em 2 etapas (Receita/Despesa → ARE → Lucro/Prejuízo) ──
 
+  // NOVO 20/09/2026: confirmar/reverter da MESMA empresa passam a rodar um de cada vez. Advisory lock do
+  // Postgres (pg_advisory_xact_lock) preso por uma transacao longa - so segura o lock; as gravacoes usam o
+  // proprio prisma e ja estao commitadas quando o proximo entra. Dentro da trava a checagem "ja encerrado"
+  // enxerga o que a requisicao anterior gravou (antes, cliques repetidos/timeouts geravam varios pares de
+  // encerramento para a mesma data). Trava por empresa (e nao por data) porque a cascata mexe em outras datas.
+  private async comTrava<T>(companyId: string, fn: () => Promise<T>): Promise<T> {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${'encerramento:' + companyId}))`;
+      return fn();
+    }, { maxWait: 120000, timeout: 300000 });
+  }
+
   async confirmar(companyId: string, userId: string, year: number, closingDateOverride?: string) {
+    return this.comTrava(companyId, () => this.confirmarSemTrava(companyId, userId, year, closingDateOverride));
+  }
+
+  private async confirmarSemTrava(companyId: string, userId: string, year: number, closingDateOverride?: string) {
     const prev = await this.preview(companyId, year, closingDateOverride);
 
     if (prev.jaEncerrado) {
@@ -166,7 +182,12 @@ export class EncerramentoExercicioService {
     // no Diario/Balancete/Comparativo de Saldos, mesmo sendo gerado pelo
     // proprio sistema. Usa RESULT_TRANSFER (label ja existente:
     // "Transferencia de Resultado").
-    const entry1 = await this.journalEntryService.create(companyId, userId, {
+    // NOVO 20/09/2026: se qualquer etapa abaixo falhar (2o lancamento, marcacao ou cascata), o que ja foi
+    // gravado e desfeito (soft-delete) - evita lancamento "Etapa 1/2" orfao e encerramento pela metade.
+    let entry1: any = null;
+    let entry2: any = null;
+    try {
+    entry1 = await this.journalEntryService.create(companyId, userId, {
       date: closingDate,
       description: `Encerramento do Exercício ${year} (${closingDate}) - Apuração do Resultado (Etapa 1/2)`,
       items: itemsEtapa1,
@@ -174,7 +195,7 @@ export class EncerramentoExercicioService {
     });
 
     // Etapa 2: zera a ARE contra Lucro ou Prejuízo do Exercício
-    const entry2 = await this.journalEntryService.create(companyId, userId, {
+    entry2 = await this.journalEntryService.create(companyId, userId, {
       date: closingDate,
       description: `Encerramento do Exercício ${year} (${closingDate}) - Transferência do Resultado (Etapa 2/2)`,
       sourceModule: 'RESULT_TRANSFER',
@@ -227,11 +248,24 @@ export class EncerramentoExercicioService {
     }
 
     return { entry1, entry2, resultado: prev.resultado, resultadoTipo: prev.resultadoTipo, anosReabertos };
+    } catch (e) {
+      const ids = [entry1?.id, entry2?.id].filter(Boolean) as string[];
+      if (ids.length > 0) {
+        try {
+          await this.prisma.journalEntry.updateMany({ where: { id: { in: ids } }, data: { deletedAt: new Date() } });
+        } catch { /* mantem o erro original */ }
+      }
+      throw e;
+    }
   }
 
   // ── Reverte (soft-delete) o encerramento ja gravado de um exercicio ─────────
 
   async reverter(companyId: string, year: number, closingDateOverride?: string) {
+    return this.comTrava(companyId, () => this.reverterSemTrava(companyId, year, closingDateOverride));
+  }
+
+  private async reverterSemTrava(companyId: string, year: number, closingDateOverride?: string) {
     const periodEnd = closingDateOverride || `${year}-12-31`;
     // CORRIGIDO 23/08/2026: description-match trocado por isClosingEntry.
     const entries = await this.prisma.journalEntry.findMany({
