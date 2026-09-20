@@ -232,8 +232,16 @@ export const ReportToolbar: React.FC<ReportToolbarProps> = ({
                         </div>
                     )}
 
-                    {/* Gerar — só sem dados */}
-                    {!hasData && (
+                    {/* Gerar - so sem dados E quando a tela NAO tem um botao
+                        de "gerar" proprio ja customizado via filterLabel
+                        (ex: "Gerar Razao", "Gerar Comparativo") - CORRIGIDO
+                        (17/09/2026): esse botao generico ficava DUPLICADO ao
+                        lado do botao customizado em toda tela que exige
+                        clique manual pra carregar (Razao Analitico, Tabela
+                        Comparativa, Sugestao De/Para, BP, DRE) - achado real
+                        no Razao Analitico ("Gerar Razao" + "Gerar relatorio"
+                        lado a lado fazendo a mesma coisa). */}
+                    {!hasData && filterLabel === 'Mais filtros' && (
                         <button onClick={handleApply} style={btnPrimary}>
                             <FiRefreshCw size={18} /> Gerar relatório
                         </button>

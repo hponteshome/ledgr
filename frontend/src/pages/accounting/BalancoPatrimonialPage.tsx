@@ -35,6 +35,11 @@ const BalancoPatrimonialPage: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [generated, setGenerated] = useState(false);
+    // NOVO (16/09/2026): filtro de nivel, mesmo padrao do Balancete
+    // (TrialBalanceView) - maxDepth null = todos os niveis; soNivelExato
+    // filtra so o nivel exato em vez de "ate o nivel N".
+    const [maxDepth, setMaxDepth] = useState<number | null>(null);
+    const [soNivelExato, setSoNivelExato] = useState(false);
     React.useEffect(() => { setData([]); setGenerated(false); }, [activeCompany?.id]);
 
     const load = useCallback(async (from: string, to: string) => {
@@ -59,6 +64,13 @@ const BalancoPatrimonialPage: React.FC = () => {
     const totalPassivo = passivo.filter(i => i.account.level === 1).reduce((s, i) => s + Math.abs(i.currentBalance), 0);
     const totalPL      = pl.filter(i => i.account.level === 1).reduce((s, i) => s + Math.abs(i.currentBalance), 0);
     const totalPasivoPL = totalPassivo + totalPL;
+
+    // Filtro de nivel (so afeta o que e exibido/impresso - totais acima
+    // sempre usam os arrays completos, nunca os "visiveis").
+    const passaNivel = (lvl: number) => maxDepth === null ? true : (soNivelExato ? lvl === maxDepth : lvl <= maxDepth);
+    const ativoVisivel = ativo.filter(i => passaNivel(i.account.level));
+    const passivoVisivel = passivo.filter(i => passaNivel(i.account.level));
+    const plVisivel = pl.filter(i => passaNivel(i.account.level));
 
     const BPRow = ({ item, depth = 0 }: { item: BPItem; depth?: number }) => (
         <tr>
@@ -94,9 +106,9 @@ const BalancoPatrimonialPage: React.FC = () => {
                 "</tr>";
         }).join('');
 
-        const ativoRows = buildRows(ativo, 0);
-        const passivoRows = buildRows(passivo, 0);
-        const plRows = buildRows(pl, 0);
+        const ativoRows = buildRows(ativoVisivel, 0);
+        const passivoRows = buildRows(passivoVisivel, 0);
+        const plRows = buildRows(plVisivel, 0);
 
         const css = "@page{size:A4 portrait;margin:12mm 14mm}" +
             "body{font-family:Arial,sans-serif;font-size:9pt;color:#000}" +
@@ -147,6 +159,27 @@ const BalancoPatrimonialPage: React.FC = () => {
                 filterLabel="Gerar BP"
                 onPrint={generated ? printBP : undefined}
                 hasData={generated}
+                extraContent={generated ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 8 }}>
+                        <span style={{ fontSize: 11, color: '#9CA3AF' }}>Nível:</span>
+                        {[1, 2, 3, 4, 5, 6].map(n => (
+                            <button key={n} type="button"
+                                onClick={() => setMaxDepth(maxDepth === n ? null : n)}
+                                style={{ width: 24, height: 24, borderRadius: 4, fontSize: 12, fontWeight: 500, border: 'none', cursor: 'pointer', background: maxDepth === n ? '#111111' : 'transparent', color: maxDepth === n ? '#fff' : '#6B7280' }}>
+                                {n}
+                            </button>
+                        ))}
+                        <button type="button"
+                            onClick={() => setMaxDepth(null)}
+                            style={{ padding: '0 6px', height: 24, borderRadius: 4, fontSize: 13, fontWeight: 500, border: 'none', cursor: 'pointer', background: maxDepth === null ? '#111111' : 'transparent', color: maxDepth === null ? '#fff' : '#6B7280' }}>
+                            ∞
+                        </button>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#6B7280', marginLeft: 4, cursor: maxDepth !== null ? 'pointer' : 'default', opacity: maxDepth !== null ? 1 : 0.4 }}>
+                            <input type="checkbox" checked={soNivelExato} disabled={maxDepth === null} onChange={e => setSoNivelExato(e.target.checked)} />
+                            Somente este nível
+                        </label>
+                    </div>
+                ) : undefined}
             />
 
             {loading ? (
@@ -182,7 +215,7 @@ const BalancoPatrimonialPage: React.FC = () => {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {ativo.map(item => <BPRow key={item.account.id} item={item} />)}
+                                    {ativoVisivel.map(item => <BPRow key={item.account.id} item={item} />)}
                                     <tr style={{ background: '#EFF6FF', borderTop: '1px solid #1D4ED8' }}>
                                         <td colSpan={2} style={{ padding: '6px 8px', fontWeight: 700, fontSize: 12 }}>TOTAL DO ATIVO</td>
                                         <td style={{ textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, fontSize: 13, padding: '6px 8px', color: '#1D4ED8' }}>{fmtNum(totalAtivo)}</td>
@@ -205,13 +238,13 @@ const BalancoPatrimonialPage: React.FC = () => {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {passivo.map(item => <BPRow key={item.account.id} item={item} />)}
+                                    {passivoVisivel.map(item => <BPRow key={item.account.id} item={item} />)}
                                     {pl.length > 0 && (
                                         <tr style={{ background: '#F5F3FF' }}>
                                             <td colSpan={3} style={{ padding: '6px 8px', fontWeight: 700, fontSize: 11, color: '#7C3AED', borderTop: '1px solid #DDD6FE', borderBottom: '1px solid #DDD6FE' }}>PATRIMONIO LIQUIDO</td>
                                         </tr>
                                     )}
-                                    {pl.map(item => <BPRow key={item.account.id} item={item} />)}
+                                    {plVisivel.map(item => <BPRow key={item.account.id} item={item} />)}
                                     <tr style={{ background: '#F5F3FF', borderTop: '1px solid #7C3AED' }}>
                                         <td colSpan={2} style={{ padding: '6px 8px', fontWeight: 700, fontSize: 12 }}>TOTAL PASSIVO + PL</td>
                                         <td style={{ textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, fontSize: 13, padding: '6px 8px', color: '#7C3AED' }}>{fmtNum(totalPasivoPL)}</td>

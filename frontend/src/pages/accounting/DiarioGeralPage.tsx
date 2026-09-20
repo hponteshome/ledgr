@@ -44,7 +44,11 @@ const yr = getActiveYear();
 const DEF = {
     dateFrom: `${yr}-01-01`, dateTo: `${yr}-12-31`,
     accountFrom: '', accountTo: '', search: '',
-    sources: ['ECD_IMPORT', 'ACCOUNTING', 'PROVISION', 'BANK_IMPORT', 'FISCAL', 'JOURNAL_IMPORT'],
+    // NOVO (16/09/2026): default agora e [] (vazio) = Todas as fontes
+    // (mesma semantica ja existente em load(): sources.length > 0 filtra,
+    // vazio nao filtra nada). Antes vinha com 6 fontes pre-marcadas, o que
+    // nao era "Todas" de verdade.
+    sources: [] as string[],
 };
 type F = typeof DEF;
 
@@ -116,12 +120,13 @@ const FilterModal: React.FC<{ f: F; onApply: (f: F) => void; inclTermos: boolean
                     <div>
                         <p style={{ fontSize: 10, fontWeight: 500, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 8 }}>Fonte</p>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, padding: 12, background: '#F9FAFB', borderRadius: 6, border: '0.5px solid #E5E7EB' }}>
-                            {[['ECD_IMPORT', 'ECD'], ['ACCOUNTING', 'Manual'], ['PROVISION', 'Provisão'], ['BANK_IMPORT', 'Banco'], ['FISCAL', 'Fiscal']].map(([v, l]) => (
+                            {[['ECD_IMPORT', 'ECD'], ['ACCOUNTING', 'Manual'], ['PROVISION', 'Provisão'], ['BANK_IMPORT', 'Banco'], ['FISCAL', 'Fiscal'], ['JOURNAL_IMPORT', 'Importação']].map(([v, l]) => (
                                 <label key={v} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: '#374151', cursor: 'pointer' }}>
                                     <input type="checkbox" checked={f.sources.includes(v)} onChange={() => tog(v)} style={{ accentColor: '#2563EB' }} />{l}
                                 </label>
                             ))}
                         </div>
+                        <p style={{ fontSize: 11, color: '#9CA3AF', marginTop: 6 }}>Nenhuma marcada = todas as fontes incluídas.</p>
                     </div>
                 </div>
                 <div style={{ padding: '12px 20px', borderTop: '0.5px solid #E5E7EB' }}>

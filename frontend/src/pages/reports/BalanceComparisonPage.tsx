@@ -72,7 +72,7 @@ export const BalanceComparisonPage = () => {
   const [apenasMovimentacao, setApenasMovimentacao] = useState(false);
 
   // NOVO: visao anual com movimento intercalado (12/09/2026)
-  const [viewMode, setViewMode] = useState<'mensal' | 'anual'>('mensal');
+  const [viewMode, setViewMode] = useState<'mensal' | 'anual'>('anual');
   const [anoIniAnual, setAnoIniAnual] = useState(anoAtual - 2);
   const [anoFimAnual, setAnoFimAnual] = useState(anoAtual);
   const [anosAnuais, setAnosAnuais] = useState<number[]>([]);
