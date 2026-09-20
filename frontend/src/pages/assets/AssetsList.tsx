@@ -550,7 +550,17 @@ function DepreciationReportTab({ token, companyId }: { token: string; companyId:
                 `${API}/assets/depreciation-report?yearFrom=${yearFrom}&yearTo=${yearTo}`,
                 { headers: { Authorization: `Bearer ${token}`, 'x-company-id': companyId } }
             );
-            setData(await r.json());
+            const json = await r.json();
+            setData(json);
+            // CORRIGIDO (18/09/2026): mudar Ano inicial/final e clicar
+            // "Atualizar" nao atualizava a tabela de meses ja aberta -
+            // achado real: trocar pra 2018 e clicar Atualizar continuava
+            // mostrando so 2023 em diante nos meses, exigindo fechar/reabrir
+            // manualmente pra refazer a busca.
+            if (showMonthly) {
+                const newYears: number[] = json[0]?.years ?? [];
+                await fetchMonthly(newYears);
+            }
         } finally { setLoading(false); }
     };
 
@@ -585,19 +595,50 @@ function DepreciationReportTab({ token, companyId }: { token: string; companyId:
 
     const fmt = (v: number) => v ? formatCurrency(v) : '—';
 
-    const loadMonthly = async () => {
-        if (showMonthly) { setShowMonthly(false); return; }
+    // NOVO (18/09/2026): extraido de loadMonthly pra ser reutilizavel por
+    // load() (ao trocar o periodo) e por generateAllPending (bulk abaixo) -
+    // retorna o resultado pra quem chama poder usar sem esperar re-render.
+    const fetchMonthly = async (yrs: number[]) => {
         setMonthlyLoading(true);
         try {
             const results: Record<number, any[]> = {};
-            await Promise.all(years.map(async y => {
+            await Promise.all(yrs.map(async y => {
                 const r = await fetch(`${API}/assets/depreciation-monthly-totals?year=${y}`,
                     { headers: { Authorization: `Bearer ${token}`, "x-company-id": companyId } });
                 results[y] = await r.json();
             }));
             setMonthlyData(results);
-            setShowMonthly(true);
+            return results;
         } finally { setMonthlyLoading(false); }
+    };
+
+    const loadMonthly = async () => {
+        if (showMonthly) { setShowMonthly(false); return; }
+        await fetchMonthly(years);
+        setShowMonthly(true);
+    };
+
+    // NOVO (18/09/2026): gera de uma vez todos os lancamentos contabeis
+    // pendentes (meses com deprec. calculada mas sem lancamento ainda) no
+    // periodo filtrado, em vez de clicar no raio de cada mes manualmente.
+    const [bulkGenLoading, setBulkGenLoading] = useState(false);
+    const [bulkGenResult, setBulkGenResult]   = useState('');
+    const generateAllPending = async () => {
+        setBulkGenLoading(true);
+        setBulkGenResult('');
+        try {
+            const fresh = await fetchMonthly(years);
+            setShowMonthly(true);
+            let ok = 0, skip = 0;
+            for (const y of years) {
+                for (const m of (fresh[y] ?? [])) {
+                    if (m.hasJournal || !m.total) { skip++; continue; }
+                    await generateJournal(m.yearMonth);
+                    ok++;
+                }
+            }
+            setBulkGenResult(`✓ ${ok} lançamento(s) gerado(s), ${skip} ignorado(s) (já existia ou sem movimento).`);
+        } finally { setBulkGenLoading(false); }
     };
 
     const generateJournal = async (yearMonth: string) => {
@@ -639,6 +680,11 @@ function DepreciationReportTab({ token, companyId }: { token: string; companyId:
                 <button onClick={exportXlsx} className="flex items-center gap-2 border border-green-300 text-green-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-50">
                     <FileSpreadsheet className="w-4 h-4" /> Exportar XLSX
                 </button>
+                <button onClick={generateAllPending} disabled={bulkGenLoading}
+                    className="flex items-center gap-2 bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-orange-700 disabled:opacity-50">
+                    <Zap className="w-4 h-4" /> {bulkGenLoading ? 'Gerando...' : 'Gerar Pendentes'}
+                </button>
+                {bulkGenResult && <span className="text-xs text-gray-600">{bulkGenResult}</span>}
             </div>
             {/* Tabela */}
             <div className="bg-white border border-gray-200 rounded-xl overflow-auto">

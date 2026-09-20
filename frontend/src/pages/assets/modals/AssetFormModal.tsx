@@ -196,6 +196,25 @@ export function AssetFormModal({ asset, onClose, onSuccess }: Props) {
         }
     }, [form.group, isEdit]);
 
+    // NOVO (18/09/2026): "Inicio da Depreciacao" tinha default fixo em
+    // new Date() (hoje) e nenhum campo na tela pra corrigir - qualquer
+    // ativo cadastrado com Data de Aquisicao retroativa (comum: imoveis,
+    // migracao de patrimonio antigo) nascia depreciando so a partir de
+    // hoje, gerando cota mensal 0 nos meses "faltantes" e exigindo correcao
+    // manual no banco. Ao criar um ativo novo, segue a Data de Aquisicao
+    // automaticamente ate o usuario mexer no campo diretamente.
+    // CORRIGIDO (18/09/2026): depreciacao comeca no dia SEGUINTE a aquisicao
+    // (o bem so esta disponivel pra uso a partir dai), nao no mesmo dia -
+    // regra contabil generica, nao especifica de nenhum ativo.
+    useEffect(() => {
+        if (!isEdit && form.acquisitionDate) {
+            const d = new Date(form.acquisitionDate + 'T00:00:00Z');
+            d.setUTCDate(d.getUTCDate() + 1);
+            const next = d.toISOString().slice(0, 10);
+            setForm((f: any) => ({ ...f, depreciationStart: next }));
+        }
+    }, [form.acquisitionDate, isEdit]);
+
     useEffect(() => {
         const meses = Number(form.usefulLifeMonths);
         if (meses > 0) {
@@ -306,7 +325,7 @@ export function AssetFormModal({ asset, onClose, onSuccess }: Props) {
                 {/* ── Step 2: Financeiro ────────────────────────── */}
                 {step === 2 && (
                     <>
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className={form.nonDepreciable ? "grid grid-cols-2 gap-4" : "grid gap-4"} style={form.nonDepreciable ? undefined : { gridTemplateColumns: '0.8fr 1fr 1fr' }}>
                             <Field label="Valor de Aquisição *">
                                 <NumInput className={input} value={String(form.acquisitionCost)}
                                     onChange={v => set('acquisitionCost', v)} />
@@ -315,6 +334,12 @@ export function AssetFormModal({ asset, onClose, onSuccess }: Props) {
                                 <SmartDateInput className={input} value={form.acquisitionDate}
                                     onChange={v => set('acquisitionDate', v)} />
                             </Field>
+                            {!form.nonDepreciable && (
+                                <Field label="Início da Depreciação *">
+                                    <SmartDateInput className={input} value={form.depreciationStart}
+                                        onChange={v => set('depreciationStart', v)} />
+                                </Field>
+                            )}
                         </div>
 
                         <div className="flex items-center gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">

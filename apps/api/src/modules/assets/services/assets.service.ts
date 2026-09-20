@@ -190,7 +190,16 @@ export class AssetsService {
 
   // ── Update ───────────────────────────────────────────────
   async update(companyId: string, id: string, dto: UpdateAssetDto) {
-    await this.findOne(companyId, id);
+    const asset = await this.findOne(companyId, id);
+
+    // CORRIGIDO (18/09/2026): update() nunca recalculava landValueAmount -
+    // so create() fazia isso. Achado real: editar landValuePercent pra 15%
+    // salvava o percentual mas deixava landValueAmount em branco, entao a
+    // exclusao do terreno da base depreciavel nunca acontecia de fato
+    // (calculateCharge usa landValueAmount, nao landValuePercent).
+    const landValueAmount = dto.landValuePercent !== undefined
+      ? ((dto.acquisitionCost ?? Number(asset.acquisitionCost)) * dto.landValuePercent) / 100
+      : undefined;
 
     return this.prisma.fixedAsset.update({
       where: { id },
@@ -198,6 +207,7 @@ export class AssetsService {
         ...dto,
         ...(dto.acquisitionDate   && { acquisitionDate:   new Date(dto.acquisitionDate) }),
         ...(dto.depreciationStart && { depreciationStart: new Date(dto.depreciationStart) }),
+        ...(landValueAmount !== undefined && { landValueAmount }),
       },
     });
   }
