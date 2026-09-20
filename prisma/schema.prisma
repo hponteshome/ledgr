@@ -4764,6 +4764,7 @@ model LalurPartBNativo {
   compensacao  Decimal  @default(0) @map("compensacao") @db.Decimal(18, 2)   // usado no proprio ano (limitado a 30% do lucro real positivo)
   saldoFinal   Decimal  @default(0) @map("saldo_final") @db.Decimal(18, 2)
   lucroRealAno Decimal? @map("lucro_real_ano") @db.Decimal(18, 2) // referencia: lucro real do ano que gerou o movimento
+  saldoInicialManual Decimal? @map("saldo_inicial_manual") @db.Decimal(18, 2) // saldo inicial informado na tela (null = automatico)
   createdById  String?  @map("created_by_id") @db.Uuid
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)

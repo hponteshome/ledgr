@@ -1,5 +1,5 @@
 // apps/api/src/modules/apuracao/apuracao.controller.ts
-import { Controller, Get, Post, Delete, Param, Body, Query, Req, Res, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Param, Body, Query, Req, Res, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '@/auth/guards/jwt.guard';
 import { ApuracaoService } from './apuracao.service';
 
@@ -89,5 +89,16 @@ export class ApuracaoController {
   @Get('livro-lalur/:ano')
   getLivroLalur(@Req() req: any, @Param('ano') ano: string) {
     return this.svc.getLivroLalur(req.companyId, ano);
+  }
+
+  // NOVO 20/09/2026: saldo inicial da Parte B (automatico x manual) por ano e tributo
+  @Get('lalur-part-b/:ano/saldo-inicial')
+  getSaldosIniciais(@Req() req: any, @Param('ano') ano: string) {
+    return this.svc.getSaldosIniciais(req.companyId, ano);
+  }
+
+  @Put('lalur-part-b/:ano/saldo-inicial')
+  definirSaldoInicial(@Req() req: any, @Param('ano') ano: string, @Body() body: { I?: number | null; C?: number | null }) {
+    return this.svc.definirSaldoInicial(req.companyId, ano, body ?? {}, req.user.id);
   }
 }

@@ -10,38 +10,58 @@ export class ApuracaoService {
   // ── Busca resultado contabil do periodo (receitas - despesas) ──────────────
   async getResultadoContabil(companyId: string, competencia: string, competenciaFim?: string) {
     const [ano, mes] = competencia.split('-').map(Number);
-    const ini = new Date(ano, mes - 1, 1);
     const fimComp = competenciaFim ?? competencia;
     const [anoF, mesF] = fimComp.split('-').map(Number);
-    const fim = new Date(anoF, mesF, 0, 23, 59, 59);
+    // CORRIGIDO 20/09/2026: datas em UTC (lancamentos sao gravados em UTC; com Date local o
+    // dia 01/01 saia do ano e o 01/01 seguinte entrava). Fim = ultimo dia do mes, 23:59:59.999.
+    const ini = new Date(Date.UTC(ano, mes - 1, 1));
+    const fim = new Date(Date.UTC(anoF, mesF, 0, 23, 59, 59, 999));
 
+    // CORRIGIDO 20/09/2026: antes somava o "value" de TODAS as partidas (debito + credito juntos),
+    // incluia lancamentos excluidos (soft-delete) e os de encerramento (isClosingEntry) - cada
+    // encerramento gravado/revertido inflava o resultado (ex.: 2018 = 64,5 mi em vez de 3,1 mi).
+    // Agora usa o movimento real por conta (debito x credito), so lancamentos ativos e sem encerramento
+    // - mesma base do DRE (excludeClosing) e da tela de Encerramento de Exercicios.
     const rows = await this.prisma.journalEntryItem.groupBy({
-      by: ['accountId'],
+      by: ['accountId', 'type'],
       where: {
-        journalEntry: { companyId, date: { gte: ini, lte: fim } },
+        journalEntry: { companyId, deletedAt: null, isClosingEntry: false, date: { gte: ini, lte: fim } },
         account: { type: { in: ['REVENUE', 'EXPENSE'] as any } },
       },
       _sum: { value: true },
     });
 
     const accounts = await this.prisma.chartOfAccounts.findMany({
-      where: { id: { in: rows.map(r => r.accountId) } },
+      where: { id: { in: Array.from(new Set(rows.map(r => r.accountId))) } },
       select: { id: true, type: true, nature: true, code: true, name: true },
     });
 
     const accMap = new Map(accounts.map(a => [a.id, a]));
 
+    const porConta = new Map<string, { debito: number; credito: number }>();
+    for (const row of rows) {
+      const m = porConta.get(row.accountId) ?? { debito: 0, credito: 0 };
+      const val = Number(row._sum.value ?? 0);
+      if (row.type === 'DEBIT') m.debito += val;
+      else m.credito += val;
+      porConta.set(row.accountId, m);
+    }
+
     let receitas = 0, despesas = 0;
     const detalhes: any[] = [];
 
-    for (const row of rows) {
-      const acc = accMap.get(row.accountId);
+    for (const [accountId, m] of porConta) {
+      const acc = accMap.get(accountId);
       if (!acc) continue;
-      const val = Number(row._sum.value ?? 0);
-      const saldo = acc.nature === 'CREDIT' ? val : -val;
-      if (acc.type === 'REVENUE') receitas += saldo;
-      else despesas += Math.abs(saldo);
-      detalhes.push({ ...acc, saldo: acc.type === 'REVENUE' ? saldo : -Math.abs(saldo) });
+      if (acc.type === 'REVENUE') {
+        const saldo = m.credito - m.debito;
+        receitas += saldo;
+        detalhes.push({ ...acc, saldo });
+      } else {
+        const despesa = m.debito - m.credito;
+        despesas += despesa;
+        detalhes.push({ ...acc, saldo: -despesa });
+      }
     }
 
     return { receitas, despesas, resultado: receitas - despesas, detalhes };
@@ -475,10 +495,46 @@ export class ApuracaoService {
   // lancados na Parte A (LalurItem) do mesmo ano. Distinta da Parte B
   // importada da ECF (EcfPartB) - esta reflete a escrituracao propria em
   // LEDGR, usada para o Livro LALUR oficial e conciliacao cruzada.
-  async calcularPartBNativa(companyId: string, ano: string, userId: string) {
+  // NOVO 20/09/2026: calculo em CADEIA - recalcula, em ordem, do primeiro ano escriturado da empresa
+  // (primeiro lancamento ativo, inclusive abertura) ate o ano pedido. Cada ano parte do saldo final do
+  // anterior, entao calcular so um ano deixava os seguintes desatualizados e exigia clicar ano a ano.
+  // Mantem a assinatura e o retorno (Parte B do ano pedido), entao controller e tela nao mudam.
+  async calcularPartBNativa(companyId: string, ano: string, userId?: string) {
+    const alvo = Number(ano);
+    const primeiro = await this.getPrimeiroAnoEscrituracao(companyId);
+    const inicio = primeiro !== null && primeiro < alvo ? primeiro : alvo;
+
+    let resultado: Record<string, any> = {};
+    for (let a = inicio; a <= alvo; a++) {
+      resultado = await this.calcularAnoPartBNativa(companyId, String(a), userId);
+    }
+    return resultado;
+  }
+
+  private async getPrimeiroAnoEscrituracao(companyId: string): Promise<number | null> {
+    const r = await this.prisma.journalEntry.aggregate({
+      where: { companyId, deletedAt: null },
+      _min: { date: true },
+    });
+    const anoLancamento = r._min.date ? r._min.date.getUTCFullYear() : null;
+    // Inclui anos ja gravados na Parte B (ex.: saldo inicial manual informado antes do primeiro lancamento)
+    const rb = await this.prisma.lalurPartBNativo.aggregate({ where: { companyId }, _min: { ano: true } });
+    const anoRegistro = rb._min.ano ? Number(rb._min.ano) : null;
+    if (anoLancamento === null) return anoRegistro;
+    return anoRegistro !== null ? Math.min(anoLancamento, anoRegistro) : anoLancamento;
+  }
+
+  // Calculo de UM ano (usado pela cadeia acima).
+  private async calcularAnoPartBNativa(companyId: string, ano: string, userId?: string) {
     const competenciaIni = `${ano}-01`;
     const competenciaFim = `${ano}-12`;
     const { resultado } = await this.getResultadoContabil(companyId, competenciaIni, competenciaFim);
+
+    // NOVO 20/09/2026: saldo de abertura de prejuizo (Lancamento de Abertura) na conta de Prejuizo do
+    // Exercicio configurada no encerramento - a Parte B nativa comecava sempre do zero e ignorava o
+    // prejuizo acumulado que veio de exercicios anteriores ao primeiro ano escriturado no LEDGR.
+    const configEnc = await this.prisma.companyAccountingConfig.findUnique({ where: { companyId } });
+    const contaPrejuizoId = configEnc?.encerramentoContaPrejuizoExercicioId ?? null;
 
     const itensAno = await this.prisma.lalurItem.findMany({
       where: { companyId, competencia: { gte: competenciaIni, lte: competenciaFim } },
@@ -497,11 +553,15 @@ export class ApuracaoService {
 
       const lucroReal = resultado + adicoes - exclusoes;
 
-      const anterior = await this.prisma.lalurPartBNativo.findFirst({
-        where: { companyId, tipoTributo, ano: { lt: ano } },
-        orderBy: { ano: 'desc' },
+      // Saldo inicial: valor MANUAL (informado na tela do Livro) sobrepoe o automatico
+      // (saldo final do ano anterior + abertura da contabilidade).
+      const existente = await this.prisma.lalurPartBNativo.findUnique({
+        where: { companyId_ano_tipoTributo: { companyId, ano, tipoTributo } },
+        select: { saldoInicialManual: true },
       });
-      const saldoInicial = anterior ? Number(anterior.saldoFinal) : 0;
+      const saldoInicial = existente?.saldoInicialManual != null
+        ? Number(existente.saldoInicialManual)
+        : await this.calcularSaldoInicialAuto(companyId, ano, tipoTributo, contaPrejuizoId);
 
       let novoPrejuizo = 0, compensacao = 0;
       if (lucroReal < 0) {
@@ -529,9 +589,99 @@ export class ApuracaoService {
     return resultados;
   }
 
+  // NOVO 20/09/2026: saldo inicial AUTOMATICO de um ano/tributo = saldo final do ano anterior (ja gravado)
+  // + saldo de abertura que passou a existir desde o inicio daquele ano (ver getSaldoAberturaPrejuizo).
+  // Sem ano anterior gravado: usa direto a abertura anterior a 01/01 do ano.
+  private async calcularSaldoInicialAuto(companyId: string, ano: string, tipoTributo: string, contaPrejuizoId: string | null): Promise<number> {
+    const aberturaAno = await this.getSaldoAberturaPrejuizo(companyId, contaPrejuizoId, Number(ano));
+    const anterior = await this.prisma.lalurPartBNativo.findFirst({
+      where: { companyId, tipoTributo, ano: { lt: ano } },
+      orderBy: { ano: 'desc' },
+    });
+    if (anterior) {
+      const aberturaAnterior = await this.getSaldoAberturaPrejuizo(companyId, contaPrejuizoId, Number(anterior.ano));
+      return Math.max(0, Number(anterior.saldoFinal) + aberturaAno - aberturaAnterior);
+    }
+    return Math.max(0, aberturaAno);
+  }
+
+  // NOVO 20/09/2026: saldos iniciais do ano (IRPJ e CSLL) para a tela: automatico, manual (se houver) e efetivo.
+  async getSaldosIniciais(companyId: string, ano: string) {
+    const configEnc = await this.prisma.companyAccountingConfig.findUnique({ where: { companyId } });
+    const contaPrejuizoId = configEnc?.encerramentoContaPrejuizoExercicioId ?? null;
+    const saldos: Record<string, { automatico: number; manual: number | null; efetivo: number }> = {};
+    for (const tipoTributo of ['I', 'C']) {
+      const automatico = await this.calcularSaldoInicialAuto(companyId, ano, tipoTributo, contaPrejuizoId);
+      const linha = await this.prisma.lalurPartBNativo.findUnique({
+        where: { companyId_ano_tipoTributo: { companyId, ano, tipoTributo } },
+        select: { saldoInicial: true, saldoInicialManual: true },
+      });
+      const manual = linha?.saldoInicialManual != null ? Number(linha.saldoInicialManual) : null;
+      saldos[tipoTributo] = { automatico, manual, efetivo: manual ?? (linha ? Number(linha.saldoInicial) : automatico) };
+    }
+    return { ano, saldos };
+  }
+
+  // NOVO 20/09/2026: grava (ou limpa, com null) o saldo inicial MANUAL do ano por tributo e recalcula a cadeia.
+  // So mexe nos tributos informados no corpo ({ I?, C? }).
+  async definirSaldoInicial(companyId: string, ano: string, saldos: { I?: number | null; C?: number | null }, userId?: string) {
+    if (!/^\d{4}$/.test(ano)) throw new BadRequestException('Ano invalido.');
+    for (const tipoTributo of ['I', 'C'] as const) {
+      if (!(tipoTributo in saldos)) continue;
+      const bruto = saldos[tipoTributo];
+      const manual = bruto === null || bruto === undefined ? null : Number(bruto);
+      if (manual !== null && (!Number.isFinite(manual) || manual < 0)) {
+        throw new BadRequestException('Saldo inicial invalido para ' + (tipoTributo === 'I' ? 'IRPJ' : 'CSLL') + '.');
+      }
+      await this.prisma.lalurPartBNativo.upsert({
+        where: { companyId_ano_tipoTributo: { companyId, ano, tipoTributo } },
+        create: { companyId, ano, tipoTributo, saldoInicial: manual ?? 0, saldoFinal: manual ?? 0, saldoInicialManual: manual, createdById: userId },
+        update: { saldoInicialManual: manual },
+      });
+    }
+    // recalcula do 1o ano ate o ultimo ano ja gravado (ou o ano informado, se maior)
+    const ultimo = await this.prisma.lalurPartBNativo.aggregate({ where: { companyId }, _max: { ano: true } });
+    const alvo = Math.max(Number(ano), ultimo._max.ano ? Number(ultimo._max.ano) : 0);
+    await this.calcularPartBNativa(companyId, String(alvo), userId);
+    return this.getSaldosIniciais(companyId, ano);
+  }
+
+  // CRIADO 20/09/2026: saldo devedor (D - C) da conta de Prejuizo do Exercicio ate 31/12 do ano anterior,
+  // SEM lancamentos de encerramento e sem excluidos - ou seja, o que veio de saldo de abertura
+  // (Lancamento de Abertura). Os encerramentos ficam de fora porque o prejuizo de cada ano ja entra
+  // na Parte B pelo proprio calculo (novoPrejuizo).
+  private async getSaldoAberturaPrejuizo(companyId: string, contaId: string | null, ano: number): Promise<number> {
+    if (!contaId) return 0;
+    const rows = await this.prisma.journalEntryItem.groupBy({
+      by: ['type'],
+      where: {
+        accountId: contaId,
+        journalEntry: { companyId, deletedAt: null, isClosingEntry: false, date: { lt: new Date(Date.UTC(ano, 0, 1)) } },
+      },
+      _sum: { value: true },
+    });
+    let debito = 0, credito = 0;
+    for (const r of rows) {
+      const v = Number(r._sum.value ?? 0);
+      if (r.type === 'DEBIT') debito += v;
+      else credito += v;
+    }
+    return debito - credito;
+  }
+
   // CRIADO 26/08/2026: dados formatados para o Livro LALUR oficial
   // (Relatorios -> Contabilidade), Parte A + Parte B, ano completo.
   async getLivroLalur(companyId: string, ano: string) {
+    // NOVO 20/09/2026: recalcula a Parte B nativa (cadeia) ao abrir o Livro. Antes era so um retrato
+    // gravado no ultimo clique em "Calcular Parte B" e ficava defasado a cada lancamento, encerramento
+    // ou ajuste da Parte A. Idempotente (upsert por empresa/ano/tributo); se falhar, o Livro ainda abre
+    // com o ultimo retrato gravado.
+    try {
+      await this.calcularPartBNativa(companyId, ano);
+    } catch (e) {
+      console.error('[LALUR] Falha ao recalcular Parte B nativa:', e);
+    }
+
     const competenciaIni = `${ano}-01`;
     const competenciaFim = `${ano}-12`;
 

@@ -7,6 +7,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { useCompany } from '@/contexts/CompanyContext';
 import api from '@/services/api';
+import { useNavigate } from 'react-router-dom';
 
 interface LalurItemRow {
   id: string; competencia: string; tipo: string; imposto: string;
@@ -15,6 +16,7 @@ interface LalurItemRow {
 interface PartBRow {
   ano: string; tipoTributo: string; saldoInicial: number;
   novoPrejuizo: number; compensacao: number; saldoFinal: number; lucroRealAno: number | null;
+  saldoInicialManual?: number | string | null;
 }
 
 const tributoLabel: Record<string, string> = { I: 'IRPJ', C: 'CSLL' };
@@ -24,7 +26,11 @@ const fmtCnpj = (cnpj: string) => {
   const d = (cnpj || '').replace(/\D/g, '');
   return d.length === 14 ? `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}` : cnpj;
 };
-const fmt = (v: number) => (v ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmt = (v: number | string | null | undefined) => {
+  const n = Number(v ?? 0);
+  const s = Math.abs(n).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return n < 0 ? `(${s})` : s;
+};
 
 export const LivroLalurPage: React.FC = () => {
   const { activeCompany } = useCompany();
@@ -34,6 +40,13 @@ export const LivroLalurPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [calculando, setCalculando] = useState(false);
   const [accountingConfig, setAccountingConfig] = useState<any>({});
+  const navigate = useNavigate();
+  // Saldo inicial da Parte B (modal)
+  const [saldoModal, setSaldoModal] = useState(false);
+  const [saldoInfo, setSaldoInfo] = useState<Record<string, { automatico: number; manual: number | null; efetivo: number }> | null>(null);
+  const [saldoForm, setSaldoForm] = useState<Record<string, string>>({ I: '', C: '' });
+  const [saldoSaving, setSaldoSaving] = useState(false);
+  const [saldoError, setSaldoError] = useState('');
 
   const load = useCallback(async () => {
     if (!activeCompany?.id) return;
@@ -68,6 +81,46 @@ export const LivroLalurPage: React.FC = () => {
       alert(e?.response?.data?.message || 'Erro ao calcular Parte B.');
     } finally {
       setCalculando(false);
+    }
+  };
+
+  const fmtInput = (v: number | null | undefined) =>
+    v === null || v === undefined ? '' : Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const parseInput = (s: string): number | null => {
+    const t = s.trim();
+    if (!t) return null;
+    const n = Number(t.replace(/\./g, '').replace(',', '.'));
+    return Number.isFinite(n) ? n : NaN;
+  };
+
+  const abrirSaldoInicial = async () => {
+    setSaldoError(''); setSaldoInfo(null); setSaldoModal(true);
+    try {
+      const res = await api.get(`/apuracao/lalur-part-b/${ano}/saldo-inicial`);
+      const s = res.data?.saldos || {};
+      setSaldoInfo(s);
+      setSaldoForm({ I: fmtInput(s.I?.manual), C: fmtInput(s.C?.manual) });
+    } catch (e: any) {
+      setSaldoError(e?.response?.data?.message || 'Erro ao carregar os saldos iniciais.');
+    }
+  };
+
+  const salvarSaldoInicial = async () => {
+    const I = parseInput(saldoForm.I);
+    const C = parseInput(saldoForm.C);
+    if (Number.isNaN(I) || Number.isNaN(C)) {
+      setSaldoError('Valor inválido. Use o formato 0,00 (ou deixe em branco para usar o automático).');
+      return;
+    }
+    setSaldoSaving(true); setSaldoError('');
+    try {
+      await api.put(`/apuracao/lalur-part-b/${ano}/saldo-inicial`, { I, C });
+      setSaldoModal(false);
+      await load();
+    } catch (e: any) {
+      setSaldoError(e?.response?.data?.message || 'Erro ao salvar o saldo inicial.');
+    } finally {
+      setSaldoSaving(false);
     }
   };
 
@@ -146,8 +199,14 @@ export const LivroLalurPage: React.FC = () => {
               <option key={a} value={a}>{a}</option>
             ))}
           </select>
+          <button onClick={() => navigate('/app/fiscal/apuracao')} title="Abre Fiscal > Apuração de Impostos (aba LALUR) para lançar adições e exclusões" style={{ padding: '8px 16px', background: '#fff', color: '#374151', border: '1px solid #E5E7EB', borderRadius: 6, fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
+            Lançar ajustes
+          </button>
+          <button onClick={abrirSaldoInicial} title="Informar o saldo inicial de prejuízo fiscal / base negativa do ano" style={{ padding: '8px 16px', background: '#fff', color: '#374151', border: '1px solid #E5E7EB', borderRadius: 6, fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
+            Saldo inicial
+          </button>
           <button onClick={handleCalcular} disabled={calculando} style={{ padding: '8px 16px', background: '#2563EB', color: '#fff', border: 'none', borderRadius: 6, fontSize: 13, fontWeight: 500, cursor: 'pointer', opacity: calculando ? 0.6 : 1 }}>
-            {calculando ? 'Calculando...' : 'Calcular Parte B'}
+            {calculando ? 'Recalculando...' : 'Recalcular Parte B'}
           </button>
           <button onClick={handlePrint} style={{ padding: '8px 16px', background: '#111827', color: '#fff', border: 'none', borderRadius: 6, fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
             Imprimir Livro
@@ -177,7 +236,7 @@ export const LivroLalurPage: React.FC = () => {
                     <td style={{ padding: '7px 12px', borderBottom: '0.5px solid #F5F5F5', fontSize: 12 }}>{tipoLabel[i.tipo] || i.tipo}</td>
                     <td style={{ padding: '7px 12px', borderBottom: '0.5px solid #F5F5F5', fontSize: 11, color: '#9CA3AF' }}>{i.imposto}</td>
                     <td style={{ padding: '7px 12px', borderBottom: '0.5px solid #F5F5F5', fontSize: 12 }}>{i.descricao}</td>
-                    <td style={{ padding: '7px 12px', borderBottom: '0.5px solid #F5F5F5', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontSize: 12 }}>{fmt(i.valor)}</td>
+                    <td style={{ padding: '7px 12px', borderBottom: '0.5px solid #F5F5F5', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontSize: 12, color: Number(i.valor) < 0 ? '#B91C1C' : undefined }}>{fmt(i.valor)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -207,16 +266,76 @@ export const LivroLalurPage: React.FC = () => {
                         {tributoLabel[b.tipoTributo] || b.tipoTributo}
                       </span>
                     </td>
-                    <td style={{ padding: '7px 12px', borderBottom: '0.5px solid #F5F5F5', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontSize: 12, color: '#9CA3AF' }}>{fmt(b.saldoInicial)}</td>
+                    <td style={{ padding: '7px 12px', borderBottom: '0.5px solid #F5F5F5', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontSize: 12, color: Number(b.saldoInicial) < 0 ? '#B91C1C' : '#9CA3AF' }}>{b.saldoInicialManual != null && <span title="Saldo inicial informado manualmente" style={{ fontSize: 9, fontWeight: 600, color: '#2563EB', background: '#EFF6FF', padding: '1px 5px', borderRadius: 3, marginRight: 6 }}>MANUAL</span>}{fmt(b.saldoInicial)}</td>
                     <td style={{ padding: '7px 12px', borderBottom: '0.5px solid #F5F5F5', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontSize: 12, color: b.novoPrejuizo > 0 ? '#B91C1C' : '#D1D5DB' }}>{b.novoPrejuizo > 0 ? `+${fmt(b.novoPrejuizo)}` : '—'}</td>
                     <td style={{ padding: '7px 12px', borderBottom: '0.5px solid #F5F5F5', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontSize: 12, color: b.compensacao > 0 ? '#059669' : '#D1D5DB' }}>{b.compensacao > 0 ? `-${fmt(b.compensacao)}` : '—'}</td>
-                    <td style={{ padding: '7px 12px', borderBottom: '0.5px solid #F5F5F5', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontSize: 12, fontWeight: 700 }}>{fmt(b.saldoFinal)}</td>
+                    <td style={{ padding: '7px 12px', borderBottom: '0.5px solid #F5F5F5', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontSize: 12, fontWeight: 700, color: Number(b.saldoFinal) < 0 ? '#B91C1C' : undefined }}>{fmt(b.saldoFinal)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         </>
+      )}
+
+      {saldoModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div style={{ background: '#fff', borderRadius: 14, width: '100%', maxWidth: 540, maxHeight: '88vh', display: 'flex', flexDirection: 'column', boxShadow: '0 8px 32px rgba(0,0,0,0.12)' }}>
+            <div style={{ padding: '16px 20px', borderBottom: '0.5px solid #E5E7EB', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#EFF6FF', borderRadius: '14px 14px 0 0', flexShrink: 0 }}>
+              <div>
+                <span style={{ fontSize: 11, fontWeight: 600, color: '#1D4ED8' }}>◆ Contábil</span>
+                <h2 style={{ margin: '2px 0 0', fontSize: 15, fontWeight: 500, color: '#111' }}>Saldo inicial da Parte B — {ano}</h2>
+              </div>
+              <button onClick={() => setSaldoModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6B7280', fontSize: 18 }}>✕</button>
+            </div>
+
+            <div style={{ padding: 24, overflowY: 'auto', flex: 1 }}>
+              <p style={{ fontSize: 12, color: '#6B7280', margin: '0 0 16px' }}>
+                Prejuízo fiscal (IRPJ) e base negativa (CSLL) trazidos de períodos anteriores. Deixe em branco para usar o valor
+                automático (saldo final do ano anterior + saldo de abertura da contabilidade).
+              </p>
+
+              {saldoError && (
+                <div style={{ background: '#FCEBEB', border: '0.5px solid #F5C6C6', borderRadius: 8, padding: 12, marginBottom: 16, color: '#B91C1C', fontSize: 13 }}>
+                  {saldoError}
+                </div>
+              )}
+
+              {!saldoInfo && !saldoError && (
+                <div style={{ color: '#9CA3AF', fontSize: 13, padding: '16px 0' }}>Carregando…</div>
+              )}
+
+              {saldoInfo && (['I', 'C'] as const).map(t => (
+                <div key={t} style={{ marginBottom: 16 }}>
+                  <label style={{ fontSize: 11, color: '#6B7280', display: 'block', marginBottom: 4 }}>{tributoLabel[t]}</label>
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <input
+                      value={saldoForm[t]}
+                      onChange={e => setSaldoForm(f => ({ ...f, [t]: e.target.value }))}
+                      placeholder="Automático"
+                      style={{ ...selSt, width: 180, textAlign: 'right', fontFamily: 'monospace' }}
+                    />
+                    <span style={{ fontSize: 11, color: '#9CA3AF' }}>Automático: R$ {fmt(saldoInfo[t]?.automatico)}</span>
+                    {saldoForm[t] && (
+                      <button onClick={() => setSaldoForm(f => ({ ...f, [t]: '' }))} style={{ fontSize: 11, color: '#2563EB', background: 'none', border: 'none', cursor: 'pointer' }}>
+                        Usar automático
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ padding: '14px 20px', borderTop: '0.5px solid #E5E7EB', display: 'flex', justifyContent: 'flex-end', gap: 8, background: '#FAFAFA', borderRadius: '0 0 14px 14px', flexShrink: 0 }}>
+              <button onClick={() => setSaldoModal(false)} style={{ padding: '8px 16px', borderRadius: 8, border: '0.5px solid #D1D5DB', background: '#fff', color: '#374151', fontSize: 13, cursor: 'pointer' }}>
+                Cancelar
+              </button>
+              <button onClick={salvarSaldoInicial} disabled={saldoSaving || !saldoInfo} style={{ padding: '8px 18px', borderRadius: 8, border: 'none', background: saldoInfo ? '#2563EB' : '#D1D5DB', color: '#fff', fontSize: 13, fontWeight: 500, cursor: saldoInfo ? 'pointer' : 'not-allowed' }}>
+                {saldoSaving ? 'Salvando...' : 'Salvar'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
