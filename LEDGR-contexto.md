@@ -9624,3 +9624,12 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - O script Python valida cada âncora (contagem == 1), localiza arquivos por rglob quando o caminho pode variar, preserva CRLF/LF e aborta sem alterar nada se algo não bater; patches de vários arquivos validam tudo antes de gravar qualquer um.
 - Migração de banco (docker cp/exec + prisma generate) vai no mesmo bloco, protegida por `$LASTEXITCODE -eq 0`, rodando da raiz do repositório.
 - Patch testado numa cópia antes de entregar; a entrega sempre traz "como testar" e o resultado esperado.
+
+## 2026-09-20 12:51 - Complemento: registro tardio das sessoes 16-18/09/2026 [COMPLEMENTO-2026-09-16-18]
+(reconstituido dos comentarios datados do codigo; apenas itens ainda nao registrados neste arquivo)
+
+- Ativo Imobilizado (18/09): AssetsList ganhou "Gerar Pendentes" (gera de uma vez todos os lançamentos contábeis de depreciação pendentes); fetchMonthly reutilizável ("Atualizar" recarrega também o mês aberto) e correção ao mudar Ano inicial/final; AssetFormModal: "Início da Depreciação" passa a ser D+1 da aquisição (sem default fixo; não sobrescreve na edição); assets.service.update() recalcula landValueAmount ao editar landValuePercent.
+- Equivalência Patrimonial (18/09): backend para reverter um cálculo já apurado (equity-method.service/controller); botão "Reverter Cálculo" no front ainda pendente.
+- Sugestão De/Para (16/09): data de fechamento agora obrigatória e lista dos exercícios (lotes ECD, sempre 31/12) disponíveis; botão flutuante de impressão (usePrintHandler); mesmo padrão de filtros do Razão.
+- Diário Geral (16/09): filtro de fontes com default vazio = Todas as fontes.
+- Tabela Comparativa ECD x Matriz (16/09): exibe o saldo real da conta "1 - Ativo" (Balanço Contábil e Matriz) e o total ECD do Ativo a partir das linhas de destino (conferir); barra de impressão/exportação compartilhada.
