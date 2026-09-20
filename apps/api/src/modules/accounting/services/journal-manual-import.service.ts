@@ -116,6 +116,7 @@ function parseManualFile(content: string): {
   }
 
   const rawLines: RawManualLine[] = [];
+  const deslocadas: number[] = [];
 
   for (let i = 1; i < lines.length; i++) {
     const parts = lines[i].split('|');
@@ -127,6 +128,14 @@ function parseManualFile(content: string): {
     }
 
     const [rawDate, , contaDebitoRaw, contaCreditoRaw, rawHistorico, , , rawValor] = parts;
+
+    // NOVO 20/09/2026: colunas deslocadas - NrLancto (2a coluna, deve ficar VAZIA) preenchida com codigo de conta
+    // e Credito vazio. Acontece quando falta a coluna vazia logo apos a data (Data|Deb|Cred|... em vez de
+    // Data||Deb|Cred|...). Conta as linhas e da UMA mensagem no fim, em vez de dezenas de erros de grupo.
+    const nrLancto = (parts[1] || '').trim();
+    if (/^\d{3,}$/.test(nrLancto) && contaDebitoRaw.trim() && !contaCreditoRaw.trim()) {
+      deslocadas.push(i + 1);
+    }
     const d = rawDate.trim();
 
     if (!/^\d{8}$/.test(d)) {
@@ -174,6 +183,14 @@ function parseManualFile(content: string): {
 
   // ── Agrupamento: partida simples fecha sozinha; partida dobrada
   //    acumula (mesma data obrigatoria) ate debito = credito ──────
+  if (deslocadas.length > 0) {
+    issues.push({
+      severity: 'error', ref: '?', lineNum: deslocadas[0],
+      reason: 'Layout com colunas deslocadas em ' + deslocadas.length + ' linha(s) (ex.: linhas ' + deslocadas.slice(0, 3).join(', ') + '): a 2ª coluna (NrLancto, que deve ficar VAZIA) traz um código de conta e a coluna Crédito está vazia. Provavelmente faltou a coluna vazia logo após a data. Use Data||Débito|Crédito|Histórico|HP|Complemento|Valor (ex.: 05082024||1206|2316|Histórico|||10000,00), corrija o arquivo e valide novamente.',
+    });
+    return { companyTaxId, tipo, entries: [], issues };
+  }
+
   const entries: ParsedManualEntry[] = [];
   let openGroup: {
     dateStr: string; dateBR: string; items: ParsedManualItem[];
@@ -211,11 +228,14 @@ function parseManualFile(content: string): {
     }
 
     if (openGroup && (openGroup as any).dateStr !== l.dateStr) {
+      // CORRIGIDO 20/09/2026: um erro por grupo que nao fechou antes de mudar de data; o grupo aberto e descartado e
+      // a linha atual abre um novo (antes cada linha seguinte gerava outro erro "Data divergente" em cascata).
+      const g = openGroup as any;
       issues.push({
-        severity: 'error', ref: `grupo linha ${(openGroup as any).lineNums[0]}`, lineNum: l.lineNum,
-        reason: `Data divergente dentro do mesmo grupo de partida dobrada: grupo em ${(openGroup as any).dateBR}, linha com ${l.dateBR}.`,
+        severity: 'error', ref: `grupo linha ${g.lineNums[0]}`, lineNum: g.lineNums[0],
+        reason: `Grupo de partida dobrada (linhas ${g.lineNums.join(', ')}, data ${g.dateBR}) não fechou antes da linha ${l.lineNum} (data ${l.dateBR}): débito ${g.runDebit.toFixed(2)} ≠ crédito ${g.runCredit.toFixed(2)}.`,
       });
-      continue;
+      openGroup = null;
     }
 
     if (!openGroup) {
