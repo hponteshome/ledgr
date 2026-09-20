@@ -642,8 +642,10 @@ const JournalPage: React.FC = () => {
                 </div>
             )}
 
-            {/* Barra superior */}
-            <div className="bg-white rounded-xl border border-gray-100 shadow-sm px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
+            {/* Barra superior - NOVO (17/09/2026): sticky no topo da rolagem
+                da pagina, pra ficar visivel mesmo com o formulario "Novo
+                lancamento" empurrando a lista pra baixo. */}
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm px-4 py-3 flex items-center justify-between gap-3 flex-wrap sticky top-0 z-20">
                 <div className="flex items-center gap-3 flex-wrap">
                     <span className="text-base font-medium text-gray-800">Diário de lançamentos</span>
                     <span className="text-sm text-gray-400">{activeCompany.legalName || activeCompany.tradeName}</span>
@@ -937,16 +939,21 @@ const JournalPage: React.FC = () => {
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
                 <div className="px-4 py-2.5 border-b border-gray-100 bg-gray-50 flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
+                        {/* CORRIGIDO (17/09/2026): select e input estavam dentro do MESMO
+                            <div className="relative"> (pensado so pro icone da lupa) -
+                            ficavam espremidos, o campo de busca parecia discreto. Agora
+                            cada um tem seu proprio container, com "Fontes" primeiro
+                            (pedido do usuario, trocar a ordem). */}
+                        <select value={fSource} onChange={e => { setFSource(e.target.value); setPage(1); }}
+                            className="h-7 border border-gray-200 rounded-lg px-2 text-[13px] bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 w-36">
+                            <option value="">Todas as fontes</option>
+                            {sourceModules.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                        </select>
                         <div className="relative">
                             <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={13} />
                             <input type="text" value={search} onChange={e => { setSearch(e.target.value); setPage(1); }}
                                 placeholder="Filtrar conta, histórico..."
-                                className="h-7 border border-gray-200 rounded-lg pl-8 pr-3 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-500 w-52" />
-                            <select value={fSource} onChange={e => { setFSource(e.target.value); setPage(1); }}
-                                className="h-7 border border-gray-200 rounded-lg px-2 text-[13px] bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 w-36">
-                                <option value="">Todas as fontes</option>
-                                {sourceModules.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-                            </select>
+                                className="h-7 border border-gray-200 rounded-lg pl-8 pr-3 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-500 w-64" />
                         </div>
                         {data && <span className="text-[13px] text-gray-400">{data.total} lançamentos</span>}
                     </div>
@@ -1027,7 +1034,7 @@ const JournalPage: React.FC = () => {
                                         <tr key={entry.id} className="hover:bg-blue-50/30 group transition-colors border-b border-gray-50">
                                             <td className="px-3 py-2 font-mono text-gray-600 whitespace-nowrap">{fmtDate(entry.date)}</td>
                                             <td className="px-3 py-2 font-mono text-gray-400 whitespace-nowrap text-[13px]">{nrLanc}</td>
-                                            <td className="px-3 py-2 text-gray-500 text-[13px] max-w-[180px] overflow-hidden text-ellipsis whitespace-nowrap" title={entry.description}>{entry.description}</td>
+                                            <td className="px-3 py-2 text-gray-500 text-[13px] max-w-[420px] overflow-hidden text-ellipsis whitespace-nowrap" title={entry.description}>{entry.description}</td>
                                             <td className="px-3 py-2 font-mono text-blue-700 whitespace-nowrap"
                                                 title={debitTitle}>{debitCode}</td>
                                             <td className="px-3 py-2 font-mono text-green-700 whitespace-nowrap"

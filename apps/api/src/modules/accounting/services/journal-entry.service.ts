@@ -12,6 +12,14 @@ export interface CreateJournalEntryDto {
   historyCode?: string;
   type?:        'MANUAL' | 'PROVISION' | 'ADJUSTMENT';
   costCenter?:  string;
+  // NOVO (17/09/2026): permite o CHAMADOR declarar a origem real do
+  // lancamento (ECD_IMPORT, PROVISION, RESULT_TRANSFER, etc) - antes
+  // create() sempre gravava 'ACCOUNTING' fixo, ignorando qualquer coisa
+  // passada aqui, entao TODO lancamento (inclusive vindos de importacao
+  // ECD, Abertura, Encerramento) aparecia como "Manual" pro usuario. Opcional
+  // e default 'ACCOUNTING' para nao quebrar quem ja chama sem passar isso
+  // (ex: o proprio formulario manual do Diario).
+  sourceModule?: string;
   items: Array<{
     accountId:   string;
     accountCode: string;
@@ -279,7 +287,7 @@ account: { select: { id: true, code: true, name: true, type: true, nature: true,
         date:         this.toUTC(dto.date),
         description:  dto.description || '',
         reference:    dto.reference   || null,
-        sourceModule: 'ACCOUNTING',
+        sourceModule: (dto.sourceModule as any) || 'ACCOUNTING',
         createdById:  userId,
         items: {
           create: resolvedItems.map(i => ({
