@@ -553,6 +553,9 @@ export default function ApuracaoImpostosPage() {
 
               <div style={S.card}>
                 <div style={S.secTit}>Adicionar Item ao LALUR/LACS</div>
+                <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', margin: '-6px 0 10px' }}>
+                  A compensação de prejuízos fiscais é calculada automaticamente na Parte B do Livro LALUR (limite de 30% do lucro real).
+                </div>
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 120px 120px 120px auto', gap:10, alignItems:'flex-end' }}>
                   <div>
                     <label style={{ fontSize:10, color:'var(--color-text-secondary)', display:'block', marginBottom:4 }}>Descrição</label>
@@ -563,7 +566,6 @@ export default function ApuracaoImpostosPage() {
                     <select style={S.input} value={lalurTipo} onChange={e=>setLalurTipo(e.target.value)}>
                       <option value="ADICAO">Adição</option>
                       <option value="EXCLUSAO">Exclusão</option>
-                      <option value="COMPENSACAO">Compensação</option>
                     </select>
                   </div>
                   <div>

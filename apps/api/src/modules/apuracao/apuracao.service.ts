@@ -228,6 +228,11 @@ export class ApuracaoService {
   }
 
   async addLalurItem(companyId: string, competencia: string, dto: any, userId: string) {
+    // NOVO 20/09/2026: a compensacao de prejuizos fiscais nao e lancada aqui - a Parte B nativa a calcula
+    // sozinha (saldo disponivel e trava de 30% do lucro real). Itens COMPENSACAO antigos continuam visiveis.
+    if (dto?.tipo === 'COMPENSACAO') {
+      throw new BadRequestException('A compensação de prejuízos fiscais é calculada automaticamente na Parte B do Livro LALUR (limite de 30% do lucro real) e não é lançada como ajuste.');
+    }
     // Buscar ou criar apuracao IRPJ_CSLL
     let apuracao = await this.prisma.apuracaoImpostos.findFirst({
       where: { companyId, competencia, tipo: 'IRPJ_CSLL' as any },
