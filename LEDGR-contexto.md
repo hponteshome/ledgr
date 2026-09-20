@@ -9633,3 +9633,11 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - Sugestão De/Para (16/09): data de fechamento agora obrigatória e lista dos exercícios (lotes ECD, sempre 31/12) disponíveis; botão flutuante de impressão (usePrintHandler); mesmo padrão de filtros do Razão.
 - Diário Geral (16/09): filtro de fontes com default vazio = Todas as fontes.
 - Tabela Comparativa ECD x Matriz (16/09): exibe o saldo real da conta "1 - Ativo" (Balanço Contábil e Matriz) e o total ECD do Ativo a partir das linhas de destino (conferir); barra de impressão/exportação compartilhada.
+
+## 2026-09-20 13:12 - Encerramento: trava por empresa no confirmar/reverter [ENCERRAMENTO-TRAVA-2026-09-20]
+- encerramento-exercicio.service: confirmar() e reverter() passam por comTrava (pg_advisory_xact_lock(hashtext('encerramento:'+companyId)) numa $transaction longa, maxWait 120s / timeout 300s), serializando por empresa (a cascata mexe em outras datas); métodos internos confirmarSemTrava/reverterSemTrava.
+- confirmarSemTrava com compensação: se a 2ª etapa, a marcação isClosingEntry ou a cascata falharem, os lançamentos gravados são anulados (soft-delete), sem "Etapa 1/2" órfão. Não usa transação única para não contornar o journalEntryService.create (validações, ex.: competência fechada).
+- Modal: sem resposta da API (timeout/rede) bloqueia Confirmar/Reverter por 15s ("Aguardando a API...") e depois reconfere prévia e fechamentos.
+- Efeito: cliques repetidos/timeouts não geram mais pares duplicados (o 2º recebe "já possui lançamento de encerramento"); a sequência deliberada confirmar-reverter-confirmar continua válida.
+- Pendência 1 da nota de 20/09 RESOLVIDA. Restam: lentidão do listarExercicios, tipo Compensação, getReceitasBrutas, validador do importador manual, botão Reverter Cálculo (front).
+- Teste manual recomendado (2 abas com o mesmo ano aberto, Confirmar quase simultâneo): só um par ativo (SQL count = 2).
