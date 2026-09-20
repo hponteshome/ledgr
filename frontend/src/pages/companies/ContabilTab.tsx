@@ -151,6 +151,11 @@ export const ContabilTab: React.FC<Props> = ({ companyId, labelCls, inputCls, pa
           <AccountPicker label="Lucro do Exercício" value={config.encerramentoContaLucroExercicioId||''} onChange={v=>upd('encerramentoContaLucroExercicioId', v)} accounts={accounts} />
           <AccountPicker label="Prejuízo do Exercício" value={config.encerramentoContaPrejuizoExercicioId||''} onChange={v=>upd('encerramentoContaPrejuizoExercicioId', v)} accounts={accounts} />
         </div>
+        <p className="text-xs text-gray-500 pt-1">Saldo anterior (opcional): o Livro LALUR lê o saldo de abertura de prejuízos da conta indicada em Prejuízos Acumulados. Se ficar em branco, usa a conta de Prejuízo do Exercício.</p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <AccountPicker label="Lucros Acumulados (saldo anterior)" value={config.encerramentoContaLucrosAcumuladosId||''} onChange={v=>upd('encerramentoContaLucrosAcumuladosId', (v || null) as any)} accounts={accounts} />
+          <AccountPicker label="Prejuízos Acumulados (saldo anterior)" value={config.encerramentoContaPrejuizosAcumuladosId||''} onChange={v=>upd('encerramentoContaPrejuizosAcumuladosId', (v || null) as any)} accounts={accounts} />
+        </div>
       </div>
 
       {/* Representante Legal */}

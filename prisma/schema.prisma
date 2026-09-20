@@ -3585,6 +3585,8 @@ model CompanyAccountingConfig {
   encerramentoContaApuracaoResultadoId String? @map("encerramento_conta_apuracao_resultado_id") @db.Uuid // Conta transitoria ARE
   encerramentoContaLucroExercicioId    String? @map("encerramento_conta_lucro_exercicio_id") @db.Uuid // Lucro do Exercicio (resultado positivo)
   encerramentoContaPrejuizoExercicioId String? @map("encerramento_conta_prejuizo_exercicio_id") @db.Uuid // Prejuizo do Exercicio (resultado negativo)
+  encerramentoContaLucrosAcumuladosId    String? @map("encerramento_conta_lucros_acumulados_id") @db.Uuid // Lucros Acumulados (saldo anterior)
+  encerramentoContaPrejuizosAcumuladosId String? @map("encerramento_conta_prejuizos_acumulados_id") @db.Uuid // Prejuizos Acumulados (saldo anterior - LALUR)
 
   // Configuracao contabil
   moeda         String? @default("BRL") @map("moeda") @db.VarChar(3)

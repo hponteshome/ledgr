@@ -552,7 +552,8 @@ export class ApuracaoService {
     // Exercicio configurada no encerramento - a Parte B nativa comecava sempre do zero e ignorava o
     // prejuizo acumulado que veio de exercicios anteriores ao primeiro ano escriturado no LEDGR.
     const configEnc = await this.prisma.companyAccountingConfig.findUnique({ where: { companyId } });
-    const contaPrejuizoId = configEnc?.encerramentoContaPrejuizoExercicioId ?? null;
+    // Saldo anterior de prejuizos: conta indicada em "Prejuizos Acumulados" (aba Contabil); sem ela, a de Prejuizo do Exercicio.
+    const contaPrejuizoId = configEnc?.encerramentoContaPrejuizosAcumuladosId ?? configEnc?.encerramentoContaPrejuizoExercicioId ?? null;
 
     const itensAno = await this.prisma.lalurItem.findMany({
       where: { companyId, competencia: { gte: competenciaIni, lte: competenciaFim } },
@@ -626,7 +627,8 @@ export class ApuracaoService {
   // NOVO 20/09/2026: saldos iniciais do ano (IRPJ e CSLL) para a tela: automatico, manual (se houver) e efetivo.
   async getSaldosIniciais(companyId: string, ano: string) {
     const configEnc = await this.prisma.companyAccountingConfig.findUnique({ where: { companyId } });
-    const contaPrejuizoId = configEnc?.encerramentoContaPrejuizoExercicioId ?? null;
+    // Saldo anterior de prejuizos: conta indicada em "Prejuizos Acumulados" (aba Contabil); sem ela, a de Prejuizo do Exercicio.
+    const contaPrejuizoId = configEnc?.encerramentoContaPrejuizosAcumuladosId ?? configEnc?.encerramentoContaPrejuizoExercicioId ?? null;
     const saldos: Record<string, { automatico: number; manual: number | null; efetivo: number }> = {};
     for (const tipoTributo of ['I', 'C']) {
       const automatico = await this.calcularSaldoInicialAuto(companyId, ano, tipoTributo, contaPrejuizoId);
