@@ -3,7 +3,6 @@
 import React, { useState, useCallback } from 'react';
 import { FiSearch, FiLoader, FiAlertCircle } from 'react-icons/fi';
 import api from '../../services/api';
-import { SmartDateInput } from '../../components/SmartDateInput';
 import { useCompany } from '../../contexts/CompanyContext';
 import { ReportToolbar } from '../../components/accounting/ReportToolbar';
 
@@ -84,6 +83,9 @@ const DEF = {
     reducedFrom: '',
     reducedTo: '',
     showZero: false,
+    // NOVO (16/09/2026): filtro de fonte/tipo de lancamento, mesmo padrao
+    // do Diario Geral - vazio = Todas as fontes (sem filtro).
+    sources: [] as string[],
 };
 type F = typeof DEF;
 
@@ -105,86 +107,161 @@ const buildSeqMap = (entries: JournalEntry[]): Map<string, string> => {
 
 
 
-// ── Modal de filtros ───────────────────────────────────────────
-const FilterModal: React.FC<{ f: F; onApply: (f: F) => void }> = ({ f: init, onApply }) => {
-    const [f, setF] = useState<F>({ ...init });
-    const s = (p: Partial<F>) => setF(prev => ({ ...prev, ...p }));
-    const inp: React.CSSProperties = {
-        height: 32, border: '0.5px solid #E5E7EB', borderRadius: 6,
-        padding: '0 10px', fontSize: 13, width: '100%', outline: 'none', background: '#fff',
+// ── Autocomplete de conta (usa as contas ja carregadas no relatorio,
+// sem chamada nova a API) ───────────────────────────────────────
+const AccountAutocomplete: React.FC<{
+    accounts: AccountInfo[];
+    value: string;
+    onChange: (code: string) => void;
+    placeholder?: string;
+    style?: React.CSSProperties;
+}> = ({ accounts, value, onChange, placeholder, style }) => {
+    const [aberto, setAberto] = useState(false);
+    const [busca, setBusca] = useState('');
+    const wrapRef = React.useRef<HTMLDivElement>(null);
+
+    React.useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setAberto(false);
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
+
+    const termo = (aberto ? busca : value).toLowerCase();
+    const filtradas = (termo
+        ? accounts.filter(a => a.code.toLowerCase().includes(termo) || a.name.toLowerCase().includes(termo))
+        : accounts
+    ).slice(0, 30);
+
+    return (
+        <div ref={wrapRef} style={{ position: 'relative' }}>
+            <input
+                type="text"
+                value={aberto ? busca : value}
+                placeholder={placeholder}
+                onFocus={() => { setAberto(true); setBusca(value); }}
+                onChange={e => { setBusca(e.target.value); onChange(e.target.value); }}
+                style={style}
+            />
+            {aberto && filtradas.length > 0 && (
+                <div style={{
+                    position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 40, background: '#fff',
+                    border: '1px solid #E5E7EB', borderRadius: 6, marginTop: 2, maxHeight: 220, overflowY: 'auto',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                }}>
+                    {filtradas.map(a => (
+                        <div
+                            key={a.id}
+                            onMouseDown={e => e.preventDefault()}
+                            onClick={() => { onChange(a.code); setBusca(a.code); setAberto(false); }}
+                            style={{ padding: '6px 10px', fontSize: 12, cursor: 'pointer', borderBottom: '0.5px solid #F5F5F5' }}
+                        >
+                            <span style={{ fontFamily: 'monospace', color: '#2563EB', marginRight: 6 }}>{a.code}</span>
+                            {a.name}
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
+
+// ── Autocomplete por Codigo Reduzido ───────────────────────────
+// Campo proprio: busca SOMENTE em reducedCode (numerico, prefixo). Evita
+// conflito com codigos de grupo/nivel (1, 11, 111...) que o campo
+// "Conta unica" tambem casa por texto.
+const ReducedCodeAutocomplete: React.FC<{
+    accounts: AccountInfo[];
+    selectedCode: string;
+    onSelect: (account: AccountInfo | null) => void;
+    placeholder?: string;
+    style?: React.CSSProperties;
+}> = ({ accounts, selectedCode, onSelect, placeholder, style }) => {
+    const [aberto, setAberto] = useState(false);
+    const [busca, setBusca] = useState('');
+    const [ativo, setAtivo] = useState(0);
+    const wrapRef = React.useRef<HTMLDivElement>(null);
+
+    React.useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setAberto(false);
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
+
+    const comReduzido = React.useMemo(
+        () => accounts
+            .filter(a => !!a.reducedCode)
+            .sort((a, b) => (a.reducedCode as string).localeCompare(b.reducedCode as string, undefined, { numeric: true })),
+        [accounts]
+    );
+
+    const selecionada = selectedCode ? accounts.find(a => a.code === selectedCode) : undefined;
+    const valorSelecionado = selecionada?.reducedCode || '';
+
+    const filtradas = (busca
+        ? comReduzido.filter(a => (a.reducedCode as string).startsWith(busca))
+        : comReduzido
+    ).slice(0, 30);
+
+    const escolher = (a: AccountInfo) => {
+        onSelect(a);
+        setBusca(a.reducedCode || '');
+        setAberto(false);
     };
 
     return (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-            <div style={{ background: '#fff', borderRadius: 10, width: '100%', maxWidth: 520, overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.18)' }}>
-                <div style={{ padding: '12px 20px', borderBottom: '0.5px solid #E5E7EB', background: '#F9FAFB', display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 13, fontWeight: 600, padding: '3px 10px', borderRadius: 20, background: '#EFF6FF', color: '#1D4ED8' }}>◆ Contábil</span>
-                    <span style={{ fontSize: 14, fontWeight: 500, color: '#111' }}>Razão Analítico — Parâmetros de Emissão</span>
-                </div>
-                <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
-                    <div>
-                        <p style={{ fontSize: 10, fontWeight: 500, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 8 }}>Período</p>
-                        <div style={{ display: 'flex', gap: 12 }}>
-                            <div style={{ flex: 1 }}>
-                                <label style={{ fontSize: 13, color: '#6B7280', display: 'block', marginBottom: 4 }}>Data inicial</label>
-                                <SmartDateInput value={f.startDate} onChange={v => s({ startDate: v })} style={inp} />
-                            </div>
-                            <div style={{ flex: 1 }}>
-                                <label style={{ fontSize: 13, color: '#6B7280', display: 'block', marginBottom: 4 }}>Data final</label>
-                                <SmartDateInput value={f.endDate} onChange={v => s({ endDate: v })} style={inp} />
-                            </div>
+        <div ref={wrapRef} style={{ position: 'relative' }}>
+            <input
+                type="text"
+                inputMode="numeric"
+                value={aberto ? busca : valorSelecionado}
+                placeholder={placeholder}
+                onFocus={() => { setAberto(true); setBusca(valorSelecionado); setAtivo(0); }}
+                onChange={e => {
+                    const digitos = e.target.value.replace(/\D/g, '');
+                    setBusca(digitos);
+                    setAtivo(0);
+                    if (!digitos && valorSelecionado) onSelect(null);
+                }}
+                onKeyDown={e => {
+                    if (e.key === 'ArrowDown') { e.preventDefault(); setAtivo(i => Math.min(i + 1, Math.max(filtradas.length - 1, 0))); }
+                    else if (e.key === 'ArrowUp') { e.preventDefault(); setAtivo(i => Math.max(i - 1, 0)); }
+                    else if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const alvo = filtradas.find(a => a.reducedCode === busca) || filtradas[ativo];
+                        if (alvo) escolher(alvo);
+                    }
+                    else if (e.key === 'Escape') setAberto(false);
+                }}
+                style={style}
+            />
+            {aberto && filtradas.length > 0 && (
+                <div style={{
+                    position: 'absolute', top: '100%', left: 0, minWidth: 380, zIndex: 40, background: '#fff',
+                    border: '1px solid #E5E7EB', borderRadius: 6, marginTop: 2, maxHeight: 240, overflowY: 'auto',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                }}>
+                    {filtradas.map((a, i) => (
+                        <div
+                            key={a.id}
+                            onMouseDown={e => e.preventDefault()}
+                            onMouseEnter={() => setAtivo(i)}
+                            onClick={() => escolher(a)}
+                            style={{
+                                padding: '6px 10px', fontSize: 12, cursor: 'pointer', borderBottom: '0.5px solid #F5F5F5',
+                                display: 'flex', gap: 8, alignItems: 'baseline', background: i === ativo ? '#EFF6FF' : '#fff',
+                            }}
+                        >
+                            <span style={{ fontFamily: 'monospace', color: '#1D4ED8', fontWeight: 700, minWidth: 42 }}>{a.reducedCode}</span>
+                            <span style={{ fontFamily: 'monospace', color: '#6B7280', fontSize: 11 }}>{a.code}</span>
+                            <span style={{ color: '#111' }}>{a.name}</span>
                         </div>
-                    </div>
-                    <div>
-                        <p style={{ fontSize: 10, fontWeight: 500, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 8 }}>Seleção de contas</p>
-                        <div style={{ marginBottom: 10 }}>
-                            <label style={{ fontSize: 13, color: '#6B7280', display: 'block', marginBottom: 4 }}>Filtrar por</label>
-                            <select value={f.filterMode} onChange={e => s({ filterMode: e.target.value as any })} style={inp}>
-
-                                <option value="all">Todas as contas analíticas</option>
-                                <option value="one">Apenas uma conta</option>
-                                <option value="range">Faixa de contas</option>
-                                <option value="list">Lista de contas (separe por ;)</option>
-                            </select>
-                        </div>
-                        {(f.filterMode === 'one' || f.filterMode === 'range' || f.filterMode === 'list') && (
-                            <div style={{ display: 'flex', gap: 12 }}>
-                                <div style={{ flex: 1 }}>
-                                    <label style={{ fontSize: 13, color: '#6B7280', display: 'block', marginBottom: 4 }}>
-                                        {f.filterMode === 'list' ? 'Contas (separadas por ;)' : f.filterMode === 'range' ? 'Conta (de)' : 'Conta'}
-                                    </label>
-                                    {f.filterMode === 'list' ? (
-                                        <textarea value={f.accountList} onChange={e => s({ accountList: e.target.value })} placeholder='Ex: 11102010001;11104030002' style={{ ...inp, height: 60, resize: 'vertical' as any }} />
-                                    ) : (
-                                        <input type='text' value={f.accountFrom} placeholder='Ex: 1.1.4.01.001' onChange={e => s({ accountFrom: e.target.value })} style={inp} />
-                                    )}
-                                </div>
-                                {f.filterMode === 'range' && (
-                                    <div style={{ flex: 1 }}>
-                                        <label style={{ fontSize: 13, color: '#6B7280', display: 'block', marginBottom: 4 }}>Conta (até)</label>
-                                        <input type='text' value={f.accountTo} placeholder='Ex: 2.9.9.99' onChange={e => s({ accountTo: e.target.value })} style={inp} />
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                    <div>
-                        <p style={{ fontSize: 10, fontWeight: 500, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 8 }}>Opções</p>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, padding: 12, background: '#F9FAFB', borderRadius: 6, border: '0.5px solid #E5E7EB' }}>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 13, color: '#374151', cursor: 'pointer' }}>
-                                <input type="checkbox" checked={f.showZero} onChange={e => s({ showZero: e.target.checked })} style={{ accentColor: '#2563EB' }} />
-                                Listar contas sem movimento
-                            </label>
-                        </div>
-                    </div>
+                    ))}
                 </div>
-                <div style={{ padding: '12px 20px', borderTop: '0.5px solid #E5E7EB', background: '#F9FAFB', display: 'flex', justifyContent: 'flex-end' }}>
-                    <button onClick={() => onApply(f)}
-                        style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 20px', borderRadius: 8, border: 'none', background: '#111', fontSize: 13, fontWeight: 500, color: '#fff', cursor: 'pointer' }}>
-                        <FiSearch size={13} /> Gerar Razão
-                    </button>
-                </div>
-            </div>
+            )}
         </div>
     );
 };
@@ -193,14 +270,38 @@ const FilterModal: React.FC<{ f: F; onApply: (f: F) => void }> = ({ f: init, onA
 const RazaoAnaliticoPage: React.FC = () => {
     const { activeCompany } = useCompany();
     const [filters, setFilters] = useState<F>(() => { const yr = getActiveYear(); return { ...DEF, startDate: yr + '-01-01', endDate: yr + '-12-31' }; });
-    const f = filters;
-    const [showModal, setShowModal] = useState(true);
     const [reportData, setReportData] = useState<ReportData | null>(null);
-    React.useEffect(() => { if (activeCompany) { setReportData(null); setShowModal(true); } }, [activeCompany?.id]);
+    React.useEffect(() => { if (activeCompany) { setReportData(null); } }, [activeCompany?.id]);
     const [allEntries, setAllEntries] = useState<JournalEntry[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
+
+    // A ReportToolbar e sticky (top:12, zIndex 40) e cobria a barra de filtros
+    // (sticky em top:0). Mede a altura real da toolbar e encaixa a barra logo abaixo.
+    const [stickyTop, setStickyTop] = useState(84);
+    React.useEffect(() => {
+        const el = document.querySelector('.report-toolbar') as HTMLElement | null;
+        if (!el) return;
+        const upd = () => setStickyTop(12 + el.offsetHeight + 8);
+        upd();
+        const ro = new ResizeObserver(upd);
+        ro.observe(el);
+        return () => ro.disconnect();
+    }, []);
+
+    // NOVO (16/09/2026): contas pro autocomplete de "Conta unica" - busca
+    // independente do relatorio gerado (Plano de Contas), pra funcionar
+    // mesmo antes de clicar em "Gerar Razao" pela primeira vez. Achado
+    // real: usando so reportData.balances, a lista ficava vazia ate o
+    // primeiro relatorio ser gerado.
+    const [allAccounts, setAllAccounts] = useState<AccountInfo[]>([]);
+    React.useEffect(() => {
+        if (!activeCompany?.id) { setAllAccounts([]); return; }
+        api.get('/chart-of-accounts', { params: { onlyAnalytic: true, limit: 1000 } })
+            .then(r => setAllAccounts(r.data?.items || []))
+            .catch(() => setAllAccounts([]));
+    }, [activeCompany?.id]);
 
     // ── Load exclusivamente baseado em lançamentos ─────────────
     const load = useCallback(async (f: F) => {
@@ -218,6 +319,13 @@ const RazaoAnaliticoPage: React.FC = () => {
                 allJournal = [...allJournal, ...(r.data.entries || [])];
                 if (pg >= r.data.pages) break;
                 pg++;
+            }
+
+            // Filtro de fonte em memória (mesmo padrão do Diário Geral) -
+            // aplicado antes de separar saldo anterior/período, pra manter
+            // as duas partes consistentes com o mesmo conjunto de fontes.
+            if (f.sources.length > 0) {
+                allJournal = allJournal.filter(e => f.sources.includes(e.sourceModule));
             }
 
             // Separa lançamentos antes e dentro do período
@@ -283,8 +391,6 @@ const RazaoAnaliticoPage: React.FC = () => {
             setError(e.response?.data?.message || 'Erro ao carregar.');
         } finally { setLoading(false); }
     }, [activeCompany]);
-
-    const handleApply = (f: F) => { setFilters(f); setShowModal(false); load(f); };
 
     // Filtro local por conta/nome
     const rows = React.useMemo((): BalanceRow[] => {
@@ -354,6 +460,14 @@ const RazaoAnaliticoPage: React.FC = () => {
         const empresa = activeCompany.legalName || activeCompany.tradeName || '';
         const cnpj = (activeCompany.taxId || '').replace(/\D/g,'').replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/,'$1.$2.$3/$4-$5');
         const periodo = filters.startDate.split('-').reverse().join('/') + ' a ' + filters.endDate.split('-').reverse().join('/');
+        const raizCnpj = (activeCompany.taxId || '').replace(/\D/g, '').substring(0, 8).replace(/(\d{2})(\d{3})(\d{3})/, '$1.$2.$3');
+        const prefixoArq = raizCnpj.length === 10 ? raizCnpj : (activeCompany.tradeName || activeCompany.legalName || '');
+        let escopoArq = 'Razão Completo';
+        if (filters.filterMode === 'one' && filters.accountFrom) escopoArq = 'Razão Conta ' + filters.accountFrom;
+        else if (filters.filterMode === 'range' && filters.accountFrom) escopoArq = 'Razão Contas ' + filters.accountFrom + (filters.accountTo ? ' a ' + filters.accountTo : ' em diante');
+        else if (filters.filterMode === 'list' && filters.accountList) escopoArq = 'Razão Contas selecionadas';
+        const periodoArq = filters.startDate.split('-').reverse().join('-') + ' a ' + filters.endDate.split('-').reverse().join('-');
+        const tituloArquivo = (prefixoArq + ' - ' + escopoArq + ' - ' + periodoArq).replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ').trim();
         const hoje = new Date().toLocaleDateString('pt-BR');
         const hora = new Date().toLocaleTimeString('pt-BR');
 
@@ -386,7 +500,7 @@ const RazaoAnaliticoPage: React.FC = () => {
                         saldo += (isD ? val : -val) * nature;
                         body += "<tr>";
                         body += "<td>" + entry.date.substring(0,10).split('-').reverse().join('/') + "</td>";
-                        body += "<td class='hist'>" + (entry.description || '').substring(0,60) + "</td>";
+                        body += "<td class='hist'>" + (entry.description || '') + "</td>";
                         body += "<td>" + loteLctoLabel(entry) + "</td>";
                         body += "<td class='num'>" + (isD ? fmtSaldo(val) : '') + "</td>";
                         body += "<td class='num'>" + (!isD ? fmtSaldo(val) : '') + "</td>";
@@ -414,7 +528,12 @@ const RazaoAnaliticoPage: React.FC = () => {
             ".header-center{text-align:center;font-size:13pt;font-weight:700;letter-spacing:1px}" +
             ".header-right{text-align:right;font-size:8pt;color:#555}" +
             ".periodo{font-size:9pt;font-weight:600;border-bottom:0.5px solid #ccc;padding-bottom:4px;margin-bottom:8px}" +
-            ".conta-bloco{margin-bottom:12px;page-break-inside:avoid}" +
+            ".conta-bloco{margin-bottom:12px}" +
+            ".conta-header,.sem-movimento{break-after:avoid;page-break-after:avoid}" +
+            "thead{display:table-header-group}" +
+            "tr{break-inside:avoid;page-break-inside:avoid}" +
+            ".conta-footer{break-inside:avoid;page-break-inside:avoid}" +
+            "@media screen{body{max-width:1000px;margin:0 auto;padding:16px}}" +
             ".conta-header{display:flex;justify-content:space-between;align-items:baseline;background:#F3F4F6;border-top:1px solid #374151;border-bottom:0.5px solid #D1D5DB;padding:3px 6px}" +
             ".conta-info{display:flex;align-items:baseline;gap:10px}" +
             ".conta-code{font-family:monospace;font-size:9pt;color:#1D4ED8;font-weight:700}" +
@@ -422,12 +541,12 @@ const RazaoAnaliticoPage: React.FC = () => {
             ".conta-name{font-size:9pt;font-weight:600;color:#111}" +
             ".saldo-anterior{font-size:9pt;color:#374151;white-space:nowrap}" +
             ".sem-movimento{color:#9CA3AF;font-style:italic;font-size:8pt;padding:4px 6px}" +
-            "table{width:100%;border-collapse:collapse;font-size:8pt}" +
+            "table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:8pt}" +
             "th{padding:3px 5px;border-bottom:1px solid #111;text-align:left;font-weight:700;font-size:8pt}" +
             "td{padding:2px 5px;border-bottom:0.5px solid #F3F4F6}" +
             ".num{text-align:right;font-family:monospace}" +
-            ".w90{width:70px}.w80{width:70px}.w100{width:85px}.w110{width:90px}" +
-            ".hist{max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}" +
+            ".w90{width:62px}.w80{width:64px}.w100{width:82px}.w110{width:90px}" +
+            ".hist{overflow-wrap:anywhere;word-break:break-word}" +
             ".saldo-neg{color:#B91C1C}" +
             ".saldo-pos{color:#111}" +
             ".conta-footer{display:flex;gap:20px;justify-content:flex-end;padding:3px 6px;font-size:8pt;border-top:1px solid #374151;background:#F9FAFB}" +
@@ -435,7 +554,7 @@ const RazaoAnaliticoPage: React.FC = () => {
 
         const html =
             "<!DOCTYPE html><html lang='pt-BR'><head><meta charset='UTF-8'/>" +
-            "<title>Razao Analitico - " + empresa + "</title>" +
+            "<title>" + tituloArquivo + "</title>" +
             "<style>" + css + "</style></head><body>" +
             "<div class='header'>" +
             "<div class='header-left'><h2>" + empresa + "</h2><p>CNPJ: " + cnpj + "</p></div>" +
@@ -485,10 +604,7 @@ const RazaoAnaliticoPage: React.FC = () => {
     };
 
     return (
-        <div style={{ padding: 24, background: 'var(--color-background-tertiary)', minHeight: '100vh' }}>
-
-            {/* Modal — abre na primeira visita */}
-            {showModal && <FilterModal f={filters} onApply={handleApply} />}
+        <div style={{ padding: '8px 24px 24px', background: 'var(--color-background-tertiary)', minHeight: '100vh' }}>
 
             {/* Toolbar flutuante */}
             <ReportToolbar
@@ -502,23 +618,105 @@ const RazaoAnaliticoPage: React.FC = () => {
                     setFilters(f);
                     load(f);
                 }}
-                onFilter={() => setShowModal(true)}
+                onFilter={() => load(filters)}
+                filterLabel={loading ? 'Gerando...' : 'Gerar Razão'}
                 onPrint={printLivroRazao}
                 onExportCSV={reportData ? exportCSV : undefined}
                 hasData={!!reportData}
             />
 
-            {/* Busca de conta */}
-            {reportData && (
-                <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'flex-end' }}>
-                    <div style={{ position: 'relative' }}>
-                        <FiSearch size={12} style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: '#9CA3AF' }} />
-                        <input type="text" value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
-                            placeholder="Filtrar por código ou nome da conta..."
-                            style={{ height: 32, border: '0.5px solid #E5E7EB', borderRadius: 8, paddingLeft: 28, paddingRight: 12, fontSize: 13, width: 300, outline: 'none', background: '#fff' }} />
+            {/* NOVO (16/09/2026): card compacto fixo (sticky) no topo, no lugar
+                do modal antigo. Selecao de contas e "Sem movimento" ja aplicam
+                na hora (rows() ja reage a mudanca de filters em memoria, sem
+                precisar recarregar do servidor); Fonte precisa clicar
+                "Gerar Razao" pois muda o que e buscado da API. */}
+            <div style={{
+                position: 'sticky', top: stickyTop, zIndex: 30, background: '#fff', border: '0.5px solid #E5E7EB',
+                borderRadius: 10, padding: '8px 14px', marginBottom: 10, boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
+            }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'flex-end' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: '#374151', cursor: 'pointer', height: 30 }}>
+                        <input
+                            type="checkbox"
+                            checked={filters.filterMode === 'all'}
+                            onChange={e => setFilters(prev => e.target.checked
+                                ? { ...prev, filterMode: 'all', accountFrom: '', accountList: '' }
+                                : { ...prev, filterMode: 'one' })}
+                            style={{ accentColor: '#2563EB' }}
+                        />
+                        Todas as Contas
+                    </label>
+                    <div style={{ width: 200 }}>
+                        <label style={{ fontSize: 10, color: '#9CA3AF', display: 'block', marginBottom: 2, textTransform: 'uppercase' }}>Conta única</label>
+                        <AccountAutocomplete
+                            accounts={allAccounts}
+                            value={filters.filterMode === 'one' ? filters.accountFrom : ''}
+                            onChange={v => {
+                                setFilters(prev => (!v && !prev.accountList)
+                                    ? { ...prev, filterMode: 'all', accountFrom: '' }
+                                    : { ...prev, filterMode: 'one', accountFrom: v, accountList: '' });
+                            }}
+                            placeholder="Código ou nome..."
+                            style={{ height: 30, border: '0.5px solid #E5E7EB', borderRadius: 6, padding: '0 8px', fontSize: 12, outline: 'none', background: '#fff', width: '100%' }}
+                        />
                     </div>
+                    <div style={{ width: 110 }}>
+                        <label style={{ fontSize: 10, color: '#9CA3AF', display: 'block', marginBottom: 2, textTransform: 'uppercase' }}>Cód. reduzido</label>
+                        <ReducedCodeAutocomplete
+                            accounts={allAccounts}
+                            selectedCode={filters.filterMode === 'one' ? filters.accountFrom : ''}
+                            onSelect={a => setFilters(prev => a
+                                ? { ...prev, filterMode: 'one', accountFrom: a.code, accountList: '' }
+                                : (prev.filterMode === 'one' ? { ...prev, filterMode: 'all', accountFrom: '' } : prev))}
+                            placeholder="Ex: 1003"
+                            style={{ height: 30, border: '0.5px solid #E5E7EB', borderRadius: 6, padding: '0 8px', fontSize: 12, outline: 'none', background: '#fff', width: '100%', fontFamily: 'monospace' }}
+                        />
+                    </div>
+                    <div style={{ width: 240 }}>
+                        <label style={{ fontSize: 10, color: '#9CA3AF', display: 'block', marginBottom: 2, textTransform: 'uppercase' }}>Várias contas (separadas por ;)</label>
+                        <input
+                            type="text"
+                            value={filters.filterMode === 'list' ? filters.accountList : ''}
+                            placeholder="Ex: 11102010001;11104030002"
+                            onChange={e => {
+                                const v = e.target.value;
+                                setFilters(prev => (!v && !prev.accountFrom)
+                                    ? { ...prev, filterMode: 'all', accountList: '' }
+                                    : { ...prev, filterMode: 'list', accountList: v, accountFrom: '' });
+                            }}
+                            style={{ height: 30, border: '0.5px solid #E5E7EB', borderRadius: 6, padding: '0 8px', fontSize: 12, outline: 'none', background: '#fff', width: '100%' }}
+                        />
+                    </div>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: '#374151', cursor: 'pointer', height: 30 }}>
+                        <input type="checkbox" checked={filters.showZero} onChange={e => setFilters(prev => ({ ...prev, showZero: e.target.checked }))} style={{ accentColor: '#2563EB' }} />
+                        Sem movimento
+                    </label>
+                    <div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+                            <span style={{ fontSize: 10, color: '#9CA3AF', textTransform: 'uppercase' }}>Fonte:</span>
+                            {[['ECD_IMPORT', 'ECD'], ['ACCOUNTING', 'Manual'], ['PROVISION', 'Provisão'], ['BANK_IMPORT', 'Banco'], ['FISCAL', 'Fiscal'], ['JOURNAL_IMPORT', 'Importação']].map(([v, l]) => (
+                                <label key={v} style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 12, color: '#374151', cursor: 'pointer' }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={filters.sources.includes(v)}
+                                        onChange={() => setFilters(prev => ({ ...prev, sources: prev.sources.includes(v) ? prev.sources.filter(x => x !== v) : [...prev.sources, v] }))}
+                                        style={{ accentColor: '#2563EB' }}
+                                    />{l}
+                                </label>
+                            ))}
+                        </div>
+                        <p style={{ fontSize: 9, color: '#D1D5DB', margin: '2px 0 0' }}>Nenhuma marcada = todas incluídas</p>
+                    </div>
+                    {reportData && (
+                        <div style={{ position: 'relative', marginLeft: 'auto' }}>
+                            <FiSearch size={11} style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: '#9CA3AF' }} />
+                            <input type="text" value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
+                                placeholder="Filtrar por código ou nome..."
+                                style={{ height: 30, border: '0.5px solid #E5E7EB', borderRadius: 6, paddingLeft: 26, paddingRight: 10, fontSize: 12, width: 220, outline: 'none', background: '#fff' }} />
+                        </div>
+                    )}
                 </div>
-            )}
+            </div>
 
             {loading ? (
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 80, gap: 12, color: '#9CA3AF' }}>
@@ -685,7 +883,11 @@ const RazaoAnaliticoPage: React.FC = () => {
                 <div style={{ textAlign: 'center', padding: 80, border: '0.5px dashed #E5E7EB', borderRadius: 10, color: '#9CA3AF', fontSize: 13 }}>
                     Nenhuma conta analítica com movimento no período selecionado.
                 </div>
-            ) : null}
+            ) : (
+                <div style={{ textAlign: 'center', padding: 80, border: '0.5px dashed #E5E7EB', borderRadius: 10, color: '#9CA3AF', fontSize: 13 }}>
+                    Escolha o período e os filtros acima e clique em "Gerar Razão".
+                </div>
+            )}
         </div>
     );
 };
