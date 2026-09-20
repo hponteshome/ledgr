@@ -12,7 +12,13 @@ export const formatCurrency = (v: any) => {
   });
 };
 
-export const formatDate = (v: any) => v ? new Date(v).toLocaleDateString('pt-BR') : '---';
+// CORRIGIDO (18/09/2026): faltava timeZone: 'UTC' - em fuso negativo
+// (Brasil, UTC-3), meia-noite UTC de uma data vira 21h do dia ANTERIOR em
+// hora local, entao toLocaleDateString() sem travar o fuso mostrava um dia
+// a menos (achado real: Ativo Imobilizado cadastrado com Data de Aquisicao
+// 31/07 exibia 30/07 na tela). Mesmo padrao ja usado certo em
+// RentalContractsListPage.tsx e no comentario de journal-entry.service.ts.
+export const formatDate = (v: any) => v ? new Date(v).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : '---';
 
 export const cleanRaw = (v: string) => v?.replace(/\D/g, '') || '';
 
