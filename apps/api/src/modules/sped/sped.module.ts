@@ -24,12 +24,14 @@ import { EcdViewerController } from './ecd/controllers/ecd-viewer.controller';
 import { EfdModule } from './efd/efd.module';
 // ECF
 import { EcfModule } from './ecf/ecf.module';
+import { EcdArquivoModule } from './ecd-arquivo/ecd-arquivo.module';
 
 @Module({
   imports: [
     PrismaModule,
     EfdModule,
     EcfModule,
+    EcdArquivoModule,
     MulterModule.register({
       limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
     }),

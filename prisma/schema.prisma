@@ -5234,3 +5234,131 @@ model MenuUsageStat {
 
   @@map("menu_usage_stats")
 }
+
+// =============================================================================
+// ARQUIVO FIEL DA ECD - CRIADO 21/09/2026
+// Copia fiel do conteudo dos arquivos SPED ECD (I050/I155/I200/I250/I075),
+// INDEPENDENTE do Contabil: nao ha relacao com journal_entries, chart_of_accounts
+// nem account_balances. companyId e escalar (FK so no SQL) para nao alterar Company.
+// Bloco C (dados recuperados da ECD anterior) fica separado pela coluna "bloco".
+// Migracao manual: prisma/migrations-manuais/20260921_ecd_arquivo_fiel.sql
+// =============================================================================
+
+model EcdArquivo {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId       String   @map("company_id") @db.Uuid
+  fileName        String   @map("file_name") @db.VarChar
+  fileSize        Int?     @map("file_size")
+  cnpj            String?  @db.VarChar(14)
+  nomeEmpresarial String?  @map("nome_empresarial") @db.VarChar
+  dtIni           DateTime @map("dt_ini") @db.Date
+  dtFin           DateTime @map("dt_fin") @db.Date
+  codVerLc        String?  @map("cod_ver_lc") @db.VarChar(10)
+  indEsc          String?  @map("ind_esc") @db.VarChar(1)
+  indFinEsc       String?  @map("ind_fin_esc") @db.VarChar(1)
+  codHashSub      String?  @map("cod_hash_sub") @db.VarChar(64)
+  stats           Json?    @db.JsonB
+  loadedBy        String?  @map("loaded_by") @db.Uuid
+  loadedAt        DateTime @default(now()) @map("loaded_at") @db.Timestamp(6)
+
+  contas      EcdArqConta[]
+  saldos      EcdArqSaldo[]
+  lancamentos EcdArqLancamento[]
+  partidas    EcdArqPartida[]
+  historicos  EcdArqHistorico[]
+
+  @@unique([companyId, dtIni, dtFin])
+  @@map("ecd_arquivos")
+}
+
+model EcdArqConta {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  arquivoId  String    @map("arquivo_id") @db.Uuid
+  bloco      String    @default("I") @db.VarChar(1)
+  codCta     String    @map("cod_cta") @db.VarChar(255)
+  codCtaSup  String?   @map("cod_cta_sup") @db.VarChar(255)
+  nome       String    @db.VarChar
+  codNat     String?   @map("cod_nat") @db.VarChar(2)
+  indCta     String?   @map("ind_cta") @db.VarChar(1)
+  nivel      Int?
+  dtAlt      DateTime? @map("dt_alt") @db.Date
+  codCtaRef  String?   @map("cod_cta_ref") @db.VarChar(60)
+
+  arquivo EcdArquivo @relation(fields: [arquivoId], references: [id], onDelete: Cascade)
+
+  @@unique([arquivoId, bloco, codCta])
+  @@map("ecd_arq_contas")
+}
+
+model EcdArqSaldo {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  arquivoId String   @map("arquivo_id") @db.Uuid
+  bloco     String   @default("I") @db.VarChar(1)
+  dtIni     DateTime @map("dt_ini") @db.Date
+  dtFin     DateTime @map("dt_fin") @db.Date
+  codCta    String   @map("cod_cta") @db.VarChar(255)
+  codCcus   String?  @map("cod_ccus") @db.VarChar(255)
+  vlSldIni  Decimal  @map("vl_sld_ini") @db.Decimal(18, 2)
+  indDcIni  String   @map("ind_dc_ini") @db.VarChar(1)
+  vlDeb     Decimal  @map("vl_deb") @db.Decimal(18, 2)
+  vlCred    Decimal  @map("vl_cred") @db.Decimal(18, 2)
+  vlSldFin  Decimal  @map("vl_sld_fin") @db.Decimal(18, 2)
+  indDcFin  String   @map("ind_dc_fin") @db.VarChar(1)
+
+  arquivo EcdArquivo @relation(fields: [arquivoId], references: [id], onDelete: Cascade)
+
+  @@index([arquivoId, bloco, codCta, dtIni], map: "ecd_arq_saldos_idx")
+  @@map("ecd_arq_saldos")
+}
+
+model EcdArqLancamento {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  arquivoId String    @map("arquivo_id") @db.Uuid
+  seq       Int
+  numLcto   String    @map("num_lcto") @db.VarChar(255)
+  dtLcto    DateTime  @map("dt_lcto") @db.Date
+  vlLcto    Decimal?  @map("vl_lcto") @db.Decimal(18, 2)
+  indLcto   String?   @map("ind_lcto") @db.VarChar(1)
+  dtLctoExt DateTime? @map("dt_lcto_ext") @db.Date
+
+  arquivo  EcdArquivo      @relation(fields: [arquivoId], references: [id], onDelete: Cascade)
+  partidas EcdArqPartida[]
+
+  @@index([arquivoId, dtLcto, seq], map: "ecd_arq_lanc_data_idx")
+  @@index([arquivoId, numLcto], map: "ecd_arq_lanc_num_idx")
+  @@map("ecd_arq_lancamentos")
+}
+
+model EcdArqPartida {
+  id           String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  arquivoId    String  @map("arquivo_id") @db.Uuid
+  lancamentoId String  @map("lancamento_id") @db.Uuid
+  seq          Int
+  codCta       String  @map("cod_cta") @db.VarChar(255)
+  codCcus      String? @map("cod_ccus") @db.VarChar(255)
+  vlDc         Decimal @map("vl_dc") @db.Decimal(18, 2)
+  indDc        String  @map("ind_dc") @db.VarChar(1)
+  numArq       String? @map("num_arq") @db.VarChar(255)
+  codHistPad   String? @map("cod_hist_pad") @db.VarChar(255)
+  hist         String? @db.Text
+  codPart      String? @map("cod_part") @db.VarChar(255)
+
+  arquivo    EcdArquivo       @relation(fields: [arquivoId], references: [id], onDelete: Cascade)
+  lancamento EcdArqLancamento @relation(fields: [lancamentoId], references: [id], onDelete: Cascade)
+
+  @@index([arquivoId, codCta], map: "ecd_arq_part_cta_idx")
+  @@index([lancamentoId], map: "ecd_arq_part_lanc_idx")
+  @@map("ecd_arq_partidas")
+}
+
+model EcdArqHistorico {
+  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  arquivoId String  @map("arquivo_id") @db.Uuid
+  codHist   String  @map("cod_hist") @db.VarChar(255)
+  descrHist String? @map("descr_hist") @db.Text
+
+  arquivo EcdArquivo @relation(fields: [arquivoId], references: [id], onDelete: Cascade)
+
+  @@unique([arquivoId, codHist])
+  @@map("ecd_arq_historicos")
+}
