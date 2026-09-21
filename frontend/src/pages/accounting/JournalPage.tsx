@@ -420,6 +420,10 @@ const JournalPage: React.FC = () => {
 
     // ── Carregamento ───────────────────────────────────────────
 
+    // NOVO (21/09/2026): link "... mostrar mais" no fim do grid - cada clique soma mais um bloco ao limite da consulta
+    const [moreCount, setMoreCount] = useState(0);
+    useEffect(() => { setMoreCount(0); }, [activeCompany, search, fSource, usePeriodo, periodoFrom, periodoTo, currentMonth.from, showRecent, fDate, sortBy, sortDir]);
+
     const loadEntries = useCallback(async () => {
         if (!activeCompany) return;
         if (!loteFilter && !usePeriodo && !currentMonth.valid) return;
@@ -428,10 +432,10 @@ const JournalPage: React.FC = () => {
             const params = loteFilter
                 ? { importLoteId: loteFilter.id, page, limit: 1000, orderBy: sortBy, orderDir: sortDir }
                 : usePeriodo
-                ? { dateFrom: periodoFrom, dateTo: periodoTo, search: search || undefined, sources: fSource || undefined, page, limit: 100, orderBy: sortBy, orderDir: sortDir }
+                ? { dateFrom: periodoFrom, dateTo: periodoTo, search: search || undefined, sources: fSource || undefined, page, limit: 100 * (1 + moreCount), orderBy: sortBy, orderDir: sortDir }
                 : showRecent
-                ? { dateTo: fDate, search: search || undefined, sources: fSource || undefined, page, limit: 50, orderBy: sortBy, orderDir: sortDir }
-                : { dateFrom: currentMonth.from, dateTo: currentMonth.to, search: search || undefined, page, limit: 100, orderBy: sortBy, orderDir: sortDir };
+                ? { dateTo: fDate, search: search || undefined, sources: fSource || undefined, page, limit: 50 * (1 + moreCount), orderBy: sortBy, orderDir: sortDir }
+                : { dateFrom: currentMonth.from, dateTo: currentMonth.to, search: search || undefined, page, limit: 100 * (1 + moreCount), orderBy: sortBy, orderDir: sortDir };
             const r = await api.get('/accounting/journal', { params });
             let entries = r.data.entries;
             if (sortBy === 'debitCode' || sortBy === 'creditCode') {
@@ -452,7 +456,7 @@ const JournalPage: React.FC = () => {
             setData({ ...r.data, entries });
         } catch (e) { console.error(e); }
         finally { setLoading(false); }
-    }, [activeCompany, currentMonth.from, currentMonth.valid, search, page, showRecent, fDate, fSource, sortBy, sortDir, usePeriodo, periodoFrom, periodoTo, loteFilter]);
+    }, [activeCompany, currentMonth.from, currentMonth.valid, search, page, showRecent, fDate, fSource, sortBy, sortDir, usePeriodo, periodoFrom, periodoTo, loteFilter, moreCount]);
 
     const loadTotals = useCallback(async () => {
         if (!activeCompany) return;
@@ -937,7 +941,7 @@ const JournalPage: React.FC = () => {
 
             {/* Grid de lançamentos */}
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-                <div className="px-4 py-2.5 border-b border-gray-100 bg-gray-50 flex items-center justify-between gap-3">
+                <div className="px-4 py-2.5 bg-blue-50 flex items-center justify-between gap-3" style={{ borderLeft: '4px solid #2563EB', borderBottom: '1px solid #BFDBFE' }}>
                     <div className="flex items-center gap-3">
                         {/* CORRIGIDO (17/09/2026): select e input estavam dentro do MESMO
                             <div className="relative"> (pensado so pro icone da lupa) -
@@ -955,7 +959,23 @@ const JournalPage: React.FC = () => {
                                 placeholder="Filtrar conta, histórico..."
                                 className="h-7 border border-gray-200 rounded-lg pl-8 pr-3 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-500 w-64" />
                         </div>
-                        {data && <span className="text-[13px] text-gray-400">{data.total} lançamentos</span>}
+                        {/* NOVO (21/09/2026): filtro de periodo na barra do grid - usa o MESMO estado do botao Periodo do cabecalho (usePeriodo/periodoFrom/periodoTo), os dois ficam sincronizados */}
+                        <div className={`flex items-center gap-1.5 h-7 rounded-lg border px-2 bg-white ${usePeriodo ? 'border-blue-500 ring-1 ring-blue-200' : 'border-gray-200'}`}>
+                            <FiFilter size={12} className={usePeriodo ? 'text-blue-600' : 'text-gray-400'} />
+                            <SmartDateInput value={periodoFrom} onChange={v => { setPeriodoFrom(v); if (/^\d{4}-\d{2}-\d{2}$/.test(v)) setUsePeriodo(true); setPage(1); }}
+                                className="h-5 border-none bg-transparent text-[13px] font-medium text-gray-700 outline-none w-24" />
+                            <span className="text-[13px] text-gray-400">até</span>
+                            <SmartDateInput value={periodoTo} onChange={v => { setPeriodoTo(v); if (/^\d{4}-\d{2}-\d{2}$/.test(v)) setUsePeriodo(true); setPage(1); }}
+                                className="h-5 border-none bg-transparent text-[13px] font-medium text-gray-700 outline-none w-24" />
+                            {usePeriodo && (
+                                <button onClick={() => { setUsePeriodo(false); setPage(1); }} title="Limpar filtro de período" className="text-gray-400 hover:text-red-500">
+                                    <FiX size={13} />
+                                </button>
+                            )}
+                        </div>
+                        {data && (
+                            <span className="text-[13px] font-semibold text-white bg-blue-600 rounded-full px-3 py-0.5 shadow-sm">{data.total} lançamentos</span>
+                        )}
                     </div>
                     <button onClick={() => setShowBulkDelete(true)}
                         className="text-[13px] px-3 py-1.5 rounded-lg border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 flex items-center gap-1.5">
@@ -1057,6 +1077,14 @@ const JournalPage: React.FC = () => {
                                 })}
                             </tbody>
                         </table>
+                        {data && !loteFilter && data.entries.length < data.total && (
+                            <div className="py-3 text-center border-t border-gray-100">
+                                <button onClick={() => setMoreCount(n => n + 1)}
+                                    className="text-[13px] font-medium text-blue-600 hover:text-blue-800 hover:underline">
+                                    ... mostrar mais ({data.entries.length} de {data.total})
+                                </button>
+                            </div>
+                        )}
                     </div>
                 )}
 
