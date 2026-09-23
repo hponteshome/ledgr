@@ -43,6 +43,11 @@ export class EcdArquivoController {
     return this.service.listar(companyId);
   }
 
+  @Get('resultado-anual')
+  resultadoAnual(@Company() companyId: string) {
+    return this.service.resultadoAnual(companyId);
+  }
+
   @Get(':id/contas')
   contas(
     @Company() companyId: string,

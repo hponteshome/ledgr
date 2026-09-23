@@ -25,6 +25,7 @@ import { EfdModule } from './efd/efd.module';
 // ECF
 import { EcfModule } from './ecf/ecf.module';
 import { EcdArquivoModule } from './ecd-arquivo/ecd-arquivo.module';
+import { EcfArquivoModule } from './ecf-arquivo/ecf-arquivo.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { EcdArquivoModule } from './ecd-arquivo/ecd-arquivo.module';
     EfdModule,
     EcfModule,
     EcdArquivoModule,
+    EcfArquivoModule,
     MulterModule.register({
       limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
     }),

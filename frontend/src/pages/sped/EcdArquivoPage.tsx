@@ -128,7 +128,16 @@ function BlocoConta({ r, rolagem }: { r: RazaoResp; rolagem: boolean }) {
       </div>
 
       <div className={rolagem ? 'overflow-auto' : ''} style={rolagem ? { maxHeight: 'calc(100vh - 470px)' } : undefined}>
-        <table className="w-full border-collapse">
+        <table className="w-full border-collapse table-fixed">
+          <colgroup>
+            <col style={{ width: '96px' }} />
+            <col style={{ width: '84px' }} />
+            <col />
+            <col style={{ width: '150px' }} />
+            <col style={{ width: '115px' }} />
+            <col style={{ width: '115px' }} />
+            <col style={{ width: '145px' }} />
+          </colgroup>
           <thead className={'bg-gray-50 ' + (rolagem ? 'sticky top-0 z-10' : '')}>
             <tr>
               <th className={thBase + ' text-left'}>Data</th>

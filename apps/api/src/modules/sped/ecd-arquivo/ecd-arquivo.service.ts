@@ -223,6 +223,53 @@ export class EcdArquivoService {
     });
   }
 
+  // -- Resultado anual reconstruido da ECD (para conferencia com o L300 da ECF)
+  // Formula: soma(vl_cred - vl_deb) da conta "RESULTADO DO EXERCICIO" (bloco I,
+  // achada pelo nome porque o codigo muda entre planos), somando TODOS os meses
+  // do arquivo. O sinal ja sai direto compativel com o L300 (C=lucro positivo,
+  // D=prejuizo negativo) - confirmado nos 6 anos com ECD e ECF vigentes juntas
+  // (2020-2025), sem nenhuma correcao de sinal necessaria.
+  async resultadoAnual(companyId: string) {
+    const arquivos = await this.prisma.ecdArquivo.findMany({
+      where: { companyId },
+      orderBy: { dtIni: 'asc' },
+      select: { id: true, dtIni: true },
+    });
+    const out: {
+      ano: string;
+      arquivoId: string;
+      resultado: number | null;
+      contaCodigo: string | null;
+      contaNome: string | null;
+      status: 'ok' | 'conta_nao_encontrada' | 'conta_ambigua';
+    }[] = [];
+    for (const a of arquivos) {
+      const contas = await this.prisma.ecdArqConta.findMany({
+        where: { arquivoId: a.id, bloco: 'I', indCta: 'A', nome: { contains: 'RESULTADO DO EXERC', mode: 'insensitive' } },
+        select: { codCta: true, nome: true },
+      });
+      const ano = iso10(a.dtIni).substring(0, 4);
+      if (contas.length !== 1) {
+        out.push({
+          ano,
+          arquivoId: a.id,
+          resultado: null,
+          contaCodigo: null,
+          contaNome: null,
+          status: contas.length === 0 ? 'conta_nao_encontrada' : 'conta_ambigua',
+        });
+        continue;
+      }
+      const soma = await this.prisma.ecdArqSaldo.aggregate({
+        where: { arquivoId: a.id, bloco: 'I', codCta: contas[0].codCta },
+        _sum: { vlCred: true, vlDeb: true },
+      });
+      const resultado = Number(soma._sum.vlCred ?? 0) - Number(soma._sum.vlDeb ?? 0);
+      out.push({ ano, arquivoId: a.id, resultado, contaCodigo: contas[0].codCta, contaNome: contas[0].nome, status: 'ok' });
+    }
+    return out;
+  }
+
   async contas(companyId: string, arquivoId: string, bloco: string) {
     await this.garantirArquivo(companyId, arquivoId);
     return this.prisma.ecdArqConta.findMany({
