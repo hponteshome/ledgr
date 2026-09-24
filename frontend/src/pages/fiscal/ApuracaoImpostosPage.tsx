@@ -1,6 +1,7 @@
 // frontend/src/pages/finance/ApuracaoImpostosPage.tsx
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../../services/api';
+import { useCompany } from '../../contexts/CompanyContext';
 const API = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3000';
 
 const fmtBR = (v: number | null | undefined) =>
@@ -33,10 +34,11 @@ const S = {
 const MESES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
 export default function ApuracaoImpostosPage() {
+  const { activeCompetencia } = useCompany();
   const anoAtual = new Date().getFullYear();
   const mesAtual = new Date().getMonth() + 1;
-  const [ano, setAno] = useState(String(anoAtual));
-  const [mes, setMes] = useState(String(mesAtual).padStart(2, '0'));
+  const [ano, setAno] = useState(String(activeCompetencia ? activeCompetencia.getFullYear() : anoAtual));
+  const [mes, setMes] = useState(String(activeCompetencia ? activeCompetencia.getMonth() + 1 : mesAtual).padStart(2, '0'));
   // sem abas — tela unica
   const [dados, setDados] = useState<any>(null);
   const [loading, setLoading] = useState(false);

@@ -268,8 +268,8 @@ const ReducedCodeAutocomplete: React.FC<{
 
 // ── Página ─────────────────────────────────────────────────────
 const RazaoAnaliticoPage: React.FC = () => {
-    const { activeCompany } = useCompany();
-    const [filters, setFilters] = useState<F>(() => { const yr = getActiveYear(); return { ...DEF, startDate: yr + '-01-01', endDate: yr + '-12-31' }; });
+    const { activeCompany, activeCompetencia } = useCompany();
+    const [filters, setFilters] = useState<F>(() => { const yr = activeCompetencia ? activeCompetencia.getFullYear() : getActiveYear(); return { ...DEF, startDate: yr + '-01-01', endDate: yr + '-12-31' }; });
     const [reportData, setReportData] = useState<ReportData | null>(null);
     React.useEffect(() => { if (activeCompany) { setReportData(null); } }, [activeCompany?.id]);
     const [allEntries, setAllEntries] = useState<JournalEntry[]>([]);

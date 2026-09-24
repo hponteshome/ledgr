@@ -33,8 +33,8 @@ const fmt = (v: number | string | null | undefined) => {
 };
 
 export const LivroLalurPage: React.FC = () => {
-  const { activeCompany } = useCompany();
-  const [ano, setAno] = useState(String(new Date().getFullYear() - 1));
+  const { activeCompany, activeCompetencia } = useCompany();
+  const [ano, setAno] = useState(activeCompetencia ? String(activeCompetencia.getFullYear()) : String(new Date().getFullYear() - 1));
   const [parteA, setParteA] = useState<LalurItemRow[]>([]);
   const [parteB, setParteB] = useState<PartBRow[]>([]);
   const [loading, setLoading] = useState(false);

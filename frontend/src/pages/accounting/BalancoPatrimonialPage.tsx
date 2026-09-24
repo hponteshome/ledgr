@@ -27,8 +27,8 @@ const fmtNum = (v: number) => {
 const fmtCnpj = (v: string) => { const d = v.replace(/\D/g,''); return d.length === 14 ? d.slice(0,2)+'.'+d.slice(2,5)+'.'+d.slice(5,8)+'/'+d.slice(8,12)+'-'+d.slice(12) : v; };
 
 const BalancoPatrimonialPage: React.FC = () => {
-    const { activeCompany } = useCompany();
-    const yr = getActiveYear();
+    const { activeCompany, activeCompetencia } = useCompany();
+    const yr = activeCompetencia ? activeCompetencia.getFullYear() : getActiveYear();
     const [dateFrom, setDateFrom] = useState(yr + '-01-01');
     const [dateTo, setDateTo] = useState(yr + '-12-31');
     const [data, setData] = useState<BPItem[]>([]);

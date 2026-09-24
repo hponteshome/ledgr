@@ -1,5 +1,5 @@
 // apps/web/src/pages/accounting/TrialBalanceView.tsx
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
     FiCalendar,
     FiSearch,
@@ -70,6 +70,12 @@ const fmt = (v: number) =>
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
     });
+
+const formatDDMMYYYYFromDate = (d: Date): string => {
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    return `${dd}/${mm}/${d.getFullYear()}`;
+};
 
 const convertToISODate = (d: string): string => {
     const clean = d.trim().replace(/[-\/]/g, '/');
@@ -369,16 +375,24 @@ function collectByTypeMonthly(
 
 // ─── ClosingPanel ─────────────────────────────────────────────────────────────
 
+interface ResultadoRealPeriodo {
+    receita: number;
+    despesa: number;
+    resultado: number;
+}
+
 interface ClosingPanelProps {
     verRoots: VerificationBalanceItem[];
     monthlyRoots: MonthlyBalanceItem[];
     viewMode: ViewMode;
+    resultadoReal: ResultadoRealPeriodo | null;
 }
 
 const ClosingPanel: React.FC<ClosingPanelProps> = ({
     verRoots,
     monthlyRoots,
     viewMode,
+    resultadoReal,
 }) => {
     const hasData =
         viewMode === 'verification'
@@ -409,6 +423,15 @@ const ClosingPanel: React.FC<ClosingPanelProps> = ({
     const despesa      = Math.abs(despesaRaw);
     const passivoTotal = Math.abs(passivoRaw + plRaw);
     const resultado    = -(receitaRaw + despesaRaw);
+    // NOVO: apos o encerramento, receita/despesa/resultado acima ficam
+    // zerados (currentBalance ja fechado contra o PL) - servem so para a
+    // checagem de equilibrio (diferenca). Para exibicao no card, usa os
+    // totais REAIS do periodo (resultadoReal, buscado com excludeClosing=
+    // true - mesmo calculo ja validado na Lista de Encerramento) quando
+    // disponivel; senao cai no valor acima (ex: Balancete Mensal).
+    const receitaExibicao   = resultadoReal ? resultadoReal.receita   : receita;
+    const despesaExibicao   = resultadoReal ? resultadoReal.despesa   : despesa;
+    const resultadoExibicao = resultadoReal ? resultadoReal.resultado : resultado;
     // Diferenca Apurada: Ativo + Passivo + PL + Resultado (tudo com sinal contabil)
     // deve fechar em zero - resultado entra com o mesmo sinal D-C que teria se ja
     // estivesse incorporado ao PL (ainda nao esta, antes do encerramento)
@@ -462,14 +485,14 @@ const ClosingPanel: React.FC<ClosingPanelProps> = ({
                         <span style={{ fontSize: 10, color: "#9CA3AF" }}>PL: {fmt(pl)}</span>
                     </div>
                 </div>
-                <div style={{ background: resultado >= 0 ? "#F0FDF4" : "#FEF2F2", border: DS.border, borderRadius: DS.radius.md, padding: "12px 16px" }}>
+                <div style={{ background: resultadoExibicao >= 0 ? "#F0FDF4" : "#FEF2F2", border: DS.border, borderRadius: DS.radius.md, padding: "12px 16px" }}>
                     <div style={{ fontSize: 10, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: "0.3px", marginBottom: 4 }}>Resultado do Exercício</div>
-                    <div style={{ fontSize: 20, fontWeight: 500, color: resultado >= 0 ? "#15803D" : "#B91C1C", fontFamily: "monospace" }}>
-                        {resultado >= 0 ? "" : "–"}{fmt(Math.abs(resultado))}
+                    <div style={{ fontSize: 20, fontWeight: 500, color: resultadoExibicao >= 0 ? "#15803D" : "#B91C1C", fontFamily: "monospace" }}>
+                        {resultadoExibicao >= 0 ? "" : "–"}{fmt(Math.abs(resultadoExibicao))}
                     </div>
                     <div style={{ display: "flex", gap: 12, marginTop: 4 }}>
-                        <span style={{ fontSize: 10, color: "#15803D" }}>Rec: {fmt(receita)}</span>
-                        <span style={{ fontSize: 10, color: "#B91C1C" }}>Desp: {fmt(despesa)}</span>
+                        <span style={{ fontSize: 10, color: "#15803D" }}>Rec: {fmt(receitaExibicao)}</span>
+                        <span style={{ fontSize: 10, color: "#B91C1C" }}>Desp: {fmt(despesaExibicao)}</span>
                     </div>
                 </div>
                 <div style={{ background: temDiferenca ? "#FEF2F2" : "#F0FDF4", border: DS.border, borderRadius: DS.radius.md, padding: "12px 16px" }}>
@@ -541,21 +564,98 @@ const ToggleButton: React.FC<{
 // ─── Main component ───────────────────────────────────────────────────────────
 
 const TrialBalanceView: React.FC = () => {
-    const { activeCompany } = useCompany();
+    const { activeCompany, activeCompetencia } = useCompany();
     const { token } = useAuth();
 
     const [viewMode, setViewMode] = useState<ViewMode>('verification');
 
-    // Datas padrão: 01/01/2025 → 31/12/2025
-    const [displayDate, setDisplayDate] = useState('31/12/2026');
-    const [startDisplayDate, setStartDisplayDate] = useState('01/01/2026');
-    const [endDisplayDate, setEndDisplayDate] = useState('31/12/2026');
+    // Datas padrão: competência ativa (CompanyContext, persistida por usuário+
+    // empresa no backend); sem competência definida, cai no ano corrente.
+    const [displayDate, setDisplayDate] = useState(() =>
+        activeCompetencia ? formatDDMMYYYYFromDate(activeCompetencia) : '31/12/2026'
+    );
+    const [startDisplayDate, setStartDisplayDate] = useState(() =>
+        activeCompetencia ? `01/01/${activeCompetencia.getFullYear()}` : '01/01/2026'
+    );
+    const [endDisplayDate, setEndDisplayDate] = useState(() =>
+        activeCompetencia ? formatDDMMYYYYFromDate(activeCompetencia) : '31/12/2026'
+    );
 
     const [monthlyItems, setMonthlyItems] = useState<MonthlyBalanceItem[]>([]);
     const [verificationItems, setVerificationItems] = useState<
         VerificationBalanceItem[]
     >([]);
     const [summary, setSummary] = useState<SummaryData | null>(null);
+    const [resultadoReal, setResultadoReal] = useState<ResultadoRealPeriodo | null>(null);
+
+    // ── NOVO: largura das colunas do Balancete, redimensionavel por arrasto,
+    // persistida no localStorage do navegador (por usuario, nao vai ao banco).
+    const COL_WIDTHS_KEY = 'ledgr:trial-balance:col-widths';
+    const COL_WIDTHS_DEFAULT = {
+        codigo: 130,
+        conta: 340,
+        saldoAnterior: 130,
+        debitos: 130,
+        creditos: 130,
+        saldoFinal: 130,
+    };
+    const [colWidths, setColWidths] = useState<Record<string, number>>(() => {
+        try {
+            const raw = window.localStorage.getItem(COL_WIDTHS_KEY);
+            if (!raw) return COL_WIDTHS_DEFAULT;
+            const parsed = JSON.parse(raw);
+            return { ...COL_WIDTHS_DEFAULT, ...parsed };
+        } catch {
+            return COL_WIDTHS_DEFAULT;
+        }
+    });
+    const resizing = useRef<{ col: string; startX: number; startWidth: number } | null>(null);
+
+    const startResize = (col: string) => (e: React.MouseEvent) => {
+        e.preventDefault();
+        resizing.current = { col, startX: e.clientX, startWidth: colWidths[col] ?? 100 };
+        const onMove = (ev: MouseEvent) => {
+            if (!resizing.current) return;
+            const delta = ev.clientX - resizing.current.startX;
+            const novaLargura = Math.max(60, resizing.current.startWidth + delta);
+            setColWidths(prev => ({ ...prev, [resizing.current!.col]: novaLargura }));
+        };
+        const onUp = () => {
+            resizing.current = null;
+            window.removeEventListener('mousemove', onMove);
+            window.removeEventListener('mouseup', onUp);
+            setColWidths(prev => {
+                try {
+                    window.localStorage.setItem(COL_WIDTHS_KEY, JSON.stringify(prev));
+                } catch {
+                    // localStorage indisponivel - redimensionamento continua funcionando so nesta sessao
+                }
+                return prev;
+            });
+        };
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('mouseup', onUp);
+    };
+
+    // Puxador de redimensionamento: fica na borda direita de cada <th>
+    const ResizeHandle: React.FC<{ col: string }> = ({ col }) => (
+        <span
+            onMouseDown={startResize(col)}
+            title="Arraste para redimensionar"
+            style={{
+                position: 'absolute',
+                top: 0,
+                right: 0,
+                width: 6,
+                height: '100%',
+                cursor: 'col-resize',
+                userSelect: 'none',
+                zIndex: 2,
+            }}
+            onMouseEnter={e => { (e.currentTarget.style.background = 'rgba(37, 99, 235, 0.25)'); }}
+            onMouseLeave={e => { (e.currentTarget.style.background = 'transparent'); }}
+        />
+    );
     const [loading, setLoading] = useState(false);
     const [search, setSearch] = useState('');
     const [error, setError] = useState<string | null>(null);
@@ -649,9 +749,40 @@ const TrialBalanceView: React.FC = () => {
                 } catch {
                     setSummary(null);
                 }
+                // NOVO: totais REAIS de Receita/Despesa/Resultado do periodo
+                // (sem o lancamento de encerramento zerar a conta) - mesmo
+                // endpoint e mesmo parametro excludeClosing ja validados no
+                // DRE e na Lista de Encerramento. So para o card; a tabela
+                // continua mostrando o saldo final real (zerado apos o
+                // encerramento).
+                try {
+                    const realRes = await api.get('/accounting/trial-balance/verification', {
+                        params: { startDate: startISO, endDate: endISO, excludeClosing: true },
+                        headers: {
+                            'x-company-id': activeCompany.id,
+                            Authorization: `Bearer ${token}`,
+                        },
+                    });
+                    const realBalances: any[] = realRes.data?.balances ?? [];
+                    let receitaReal = 0, despesaReal = 0;
+                    for (const b of realBalances) {
+                        if (b.account?.level !== 1) continue;
+                        const movimento = (b.debits ?? 0) - (b.credits ?? 0);
+                        if (b.account.type === 'REVENUE') receitaReal += movimento;
+                        else if (b.account.type === 'EXPENSE') despesaReal += movimento;
+                    }
+                    setResultadoReal({
+                        receita: Math.abs(receitaReal),
+                        despesa: Math.abs(despesaReal),
+                        resultado: -(receitaReal + despesaReal),
+                    });
+                } catch {
+                    setResultadoReal(null);
+                }
             } else {
                 setVerificationItems([]);
                 setSummary(null);
+                setResultadoReal(null);
             }
         } catch (err: any) {
             setError(
@@ -660,6 +791,7 @@ const TrialBalanceView: React.FC = () => {
             );
             setVerificationItems([]);
             setSummary(null);
+            setResultadoReal(null);
         } finally {
             setLoading(false);
         }
@@ -831,6 +963,8 @@ const TrialBalanceView: React.FC = () => {
         color: '#374151',
         textAlign: align,
         whiteSpace: 'nowrap',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
     });
 
     const inputStyle: React.CSSProperties = {
@@ -1456,6 +1590,7 @@ const TrialBalanceView: React.FC = () => {
                         verRoots={verRoots}
                         monthlyRoots={monthlyRoots}
                         viewMode={viewMode}
+                        resultadoReal={viewMode === 'verification' ? resultadoReal : null}
                     />
                 )}
 
@@ -1520,39 +1655,46 @@ const TrialBalanceView: React.FC = () => {
                                     width: '100%',
                                     borderCollapse: 'collapse',
                                     minWidth: 720,
+                                    tableLayout: 'fixed',
                                 }}
                             >
+                                <colgroup>
+                                    <col style={{ width: colWidths.codigo }} />
+                                    <col style={{ width: colWidths.conta }} />
+                                    {viewMode === 'verification' && (
+                                        <col style={{ width: colWidths.saldoAnterior }} />
+                                    )}
+                                    <col style={{ width: colWidths.debitos }} />
+                                    <col style={{ width: colWidths.creditos }} />
+                                    <col style={{ width: colWidths.saldoFinal }} />
+                                </colgroup>
                                 <thead>
                                     <tr>
-                                        <th style={{ ...thStyle, textAlign: 'left', width: 130 }}>
+                                        <th style={{ ...thStyle, textAlign: 'left', position: 'relative' }}>
                                             Código
+                                            <ResizeHandle col="codigo" />
                                         </th>
-                                        <th style={{ ...thStyle, textAlign: 'left' }}>Conta</th>
+                                        <th style={{ ...thStyle, textAlign: 'left', position: 'relative' }}>
+                                            Conta
+                                            <ResizeHandle col="conta" />
+                                        </th>
                                         {viewMode === 'verification' && (
-                                            <th
-                                                style={{
-                                                    ...thStyle,
-                                                    textAlign: 'right',
-                                                    width: 130,
-                                                }}
-                                            >
+                                            <th style={{ ...thStyle, textAlign: 'right', position: 'relative' }}>
                                                 Saldo Anterior
+                                                <ResizeHandle col="saldoAnterior" />
                                             </th>
                                         )}
-                                        <th
-                                            style={{ ...thStyle, textAlign: 'right', width: 130 }}
-                                        >
+                                        <th style={{ ...thStyle, textAlign: 'right', position: 'relative' }}>
                                             {viewMode === 'monthly' ? 'Débito' : 'Débitos'}
+                                            <ResizeHandle col="debitos" />
                                         </th>
-                                        <th
-                                            style={{ ...thStyle, textAlign: 'right', width: 130 }}
-                                        >
+                                        <th style={{ ...thStyle, textAlign: 'right', position: 'relative' }}>
                                             {viewMode === 'monthly' ? 'Crédito' : 'Créditos'}
+                                            <ResizeHandle col="creditos" />
                                         </th>
-                                        <th
-                                            style={{ ...thStyle, textAlign: 'right', width: 130 }}
-                                        >
+                                        <th style={{ ...thStyle, textAlign: 'right', position: 'relative' }}>
                                             Saldo Final
+                                            <ResizeHandle col="saldoFinal" />
                                         </th>
                                     </tr>
                                 </thead>

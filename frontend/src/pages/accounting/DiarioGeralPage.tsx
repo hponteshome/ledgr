@@ -166,8 +166,8 @@ const TD: React.CSSProperties = { padding: '3px 8px', fontSize: 15, color: '#111
 
 // ── Página ─────────────────────────────────────────────────────
 const DiarioGeralPage: React.FC = () => {
-    const { activeCompany } = useCompany();
-    const [filters, setFilters] = useState<F>(() => { const yr = getActiveYear(); return { ...DEF, dateFrom: yr + '-01-01', dateTo: yr + '-12-31' }; });
+    const { activeCompany, activeCompetencia } = useCompany();
+    const [filters, setFilters] = useState<F>(() => { const yr = activeCompetencia ? activeCompetencia.getFullYear() : getActiveYear(); return { ...DEF, dateFrom: yr + '-01-01', dateTo: yr + '-12-31' }; });
     const [showModal, setShowModal] = useState(true);
     const [data, setData] = useState<JournalResponse | null>(null);
     const [loading, setLoading] = useState(false);
