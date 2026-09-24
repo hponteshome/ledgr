@@ -162,6 +162,71 @@ export class EncerramentoExercicioService {
     const destinoAccount = await this.prisma.chartOfAccounts.findUnique({ where: { id: destinoId } });
     if (!destinoAccount) throw new BadRequestException('Conta de Lucro/Prejuízo do Exercício configurada não foi encontrada.');
 
+    // NOVO 23/09/2026: antes de lançar o resultado deste ano, reclassifica o
+    // saldo que Lucro/Prejuízo do Exercício carregava dos anos ANTERIORES
+    // (essa conta nunca era zerada entre um encerramento e outro - acumulava
+    // o resultado de todos os anos misturado com o do ano corrente, achado
+    // real na Sunsys: 8 encerramentos somados na mesma conta) para as contas
+    // de Lucros/Prejuízos Acumulados (saldo anterior) já previstas no schema
+    // e na aba Contábil, mas nunca usadas aqui. Só roda quando há saldo de
+    // fato a mover (primeiro encerramento de sempre não move nada). Falha
+    // ANTES de gravar qualquer coisa se faltar configurar as contas.
+    const dataAnoAnterior = `${year - 1}-12-31`;
+    const antes = await this.trialBalance.getVerificationBalance(
+      companyId, this.toUTC(dataAnoAnterior), this.toUTCEnd(dataAnoAnterior),
+    );
+    const saldoAntesMap = new Map<string, number>(
+      (antes.balances as any[]).map((b) => [b.account.id, b.currentBalance]),
+    );
+    const idsRelacionados = [
+      config.encerramentoContaLucroExercicioId,
+      config.encerramentoContaPrejuizoExercicioId,
+      config.encerramentoContaLucrosAcumuladosId,
+      config.encerramentoContaPrejuizosAcumuladosId,
+    ].filter((id): id is string => !!id);
+    const contasRelacionadas = await this.prisma.chartOfAccounts.findMany({ where: { id: { in: idsRelacionados } } });
+    const codeById = new Map(contasRelacionadas.map((c) => [c.id, c.code]));
+
+    const itemsReclassificacao: { accountId: string; accountCode: string; value: number; type: 'DEBIT' | 'CREDIT' }[] = [];
+    const missingAcumulados: string[] = [];
+
+    const montarReclassificacao = (
+      contaExercicioId: string | null,
+      contaAcumuladosId: string | null,
+      rotuloAcumulados: string,
+    ) => {
+      if (!contaExercicioId) return;
+      const saldo = saldoAntesMap.get(contaExercicioId) ?? 0;
+      if (Math.abs(saldo) < 0.01) return;
+      if (!contaAcumuladosId || !codeById.has(contaAcumuladosId)) {
+        missingAcumulados.push(rotuloAcumulados);
+        return;
+      }
+      const tipoZeragem: 'DEBIT' | 'CREDIT' = saldo > 0 ? 'CREDIT' : 'DEBIT';
+      const tipoDestino: 'DEBIT' | 'CREDIT' = saldo > 0 ? 'DEBIT' : 'CREDIT';
+      itemsReclassificacao.push(
+        { accountId: contaExercicioId, accountCode: codeById.get(contaExercicioId)!, value: Math.abs(saldo), type: tipoZeragem },
+        { accountId: contaAcumuladosId, accountCode: codeById.get(contaAcumuladosId)!, value: Math.abs(saldo), type: tipoDestino },
+      );
+    };
+
+    montarReclassificacao(
+      config.encerramentoContaLucroExercicioId,
+      config.encerramentoContaLucrosAcumuladosId,
+      'Lucros Acumulados (saldo anterior)',
+    );
+    montarReclassificacao(
+      config.encerramentoContaPrejuizoExercicioId,
+      config.encerramentoContaPrejuizosAcumuladosId,
+      'Prejuízos Acumulados (saldo anterior)',
+    );
+
+    if (missingAcumulados.length > 0) {
+      throw new BadRequestException(
+        `Configure antes de encerrar (reclassificação do resultado acumulado de anos anteriores): ${missingAcumulados.join(', ')}.`,
+      );
+    }
+
     // Etapa 1: zera cada conta de Receita/Despesa contra a ARE
     const itemsEtapa1 = prev.accounts.map((a) => ({
       accountId: a.id,
@@ -184,9 +249,18 @@ export class EncerramentoExercicioService {
     // "Transferencia de Resultado").
     // NOVO 20/09/2026: se qualquer etapa abaixo falhar (2o lancamento, marcacao ou cascata), o que ja foi
     // gravado e desfeito (soft-delete) - evita lancamento "Etapa 1/2" orfao e encerramento pela metade.
+    let entry0: any = null;
     let entry1: any = null;
     let entry2: any = null;
     try {
+    if (itemsReclassificacao.length > 0) {
+      entry0 = await this.journalEntryService.create(companyId, userId, {
+        date: closingDate,
+        description: `Encerramento do Exercício ${year} (${closingDate}) - Reclassificação do Resultado Acumulado de Anos Anteriores (Etapa 1/3)`,
+        items: itemsReclassificacao,
+        sourceModule: 'RESULT_TRANSFER',
+      });
+    }
     entry1 = await this.journalEntryService.create(companyId, userId, {
       date: closingDate,
       description: `Encerramento do Exercício ${year} (${closingDate}) - Apuração do Resultado (Etapa 1/2)`,
@@ -219,7 +293,7 @@ export class EncerramentoExercicioService {
     // estruturado, em vez de depender so do texto da description (que continua
     // existindo para leitura humana, mas nao e mais a fonte de verdade).
     await this.prisma.journalEntry.updateMany({
-      where: { id: { in: [entry1.id, entry2.id] } },
+      where: { id: { in: [entry0?.id, entry1.id, entry2.id].filter(Boolean) } },
       data: { isClosingEntry: true },
     });
 
@@ -247,9 +321,9 @@ export class EncerramentoExercicioService {
       });
     }
 
-    return { entry1, entry2, resultado: prev.resultado, resultadoTipo: prev.resultadoTipo, anosReabertos };
+    return { entry0, entry1, entry2, resultado: prev.resultado, resultadoTipo: prev.resultadoTipo, anosReabertos };
     } catch (e) {
-      const ids = [entry1?.id, entry2?.id].filter(Boolean) as string[];
+      const ids = [entry0?.id, entry1?.id, entry2?.id].filter(Boolean) as string[];
       if (ids.length > 0) {
         try {
           await this.prisma.journalEntry.updateMany({ where: { id: { in: ids } }, data: { deletedAt: new Date() } });
