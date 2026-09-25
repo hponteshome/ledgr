@@ -56,7 +56,7 @@ const fmtDiff = (value: number | null | undefined) => {
         return <span className="text-slate-300 text-[13px]">-</span>;
     }
     if (Math.abs(value) < 0.01) {
-        return <span className="text-green-500 text-[13px]">check</span>;
+        return <span className="text-green-500 text-[13px]" title="Sem divergência">✓</span>;
     }
     const abs = Math.abs(value).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     return (
@@ -203,11 +203,11 @@ const TreeRow: React.FC<{
 
                 {renderBalances ? renderBalances(node) : (
                     <>
-                        <td className="text-right font-mono text-[13px] pr-3">
+                        <td className="text-right font-mono text-[13px] pr-3 truncate">
                             <span className={isSynthetic ? 'font-bold' : ''}>{fmt(calculatedBalance)}</span>
                         </td>
-                        <td className="text-right font-mono text-[13px] text-slate-400 pr-3">{fmt(ecdBalance)}</td>
-                        <td className="text-right font-mono pr-2">{fmtDiff(difference)}</td>
+                        <td className="text-right font-mono text-[13px] text-slate-400 pr-3 truncate">{fmt(ecdBalance)}</td>
+                        <td className="text-right font-mono pr-2 truncate">{fmtDiff(difference)}</td>
                     </>
                 )}
 
