@@ -281,9 +281,15 @@ async getActiveCompetencia(userId: string, companyId: string) {
 }
 
 async setActiveCompetencia(userId: string, companyId: string, date: Date) {
-  return this.prisma.userCompany.update({
+  // CORRIGIDO 24/09/2026: era .update(), que falha silenciosamente (P2025)
+  // quando o usuario nao tem linha propria em user_companies para aquela
+  // empresa (comum em Master Admin, cujo acesso nao depende dessa tabela) -
+  // a competencia nunca era persistida de verdade, so ficava no cache local
+  // do navegador. .upsert() cria o vinculo na hora, se faltar.
+  return this.prisma.userCompany.upsert({
     where: { userId_companyId: { userId, companyId } },
-    data: { activeCompetencia: date },
+    create: { userId, companyId, activeCompetencia: date },
+    update: { activeCompetencia: date },
   });
 }
 
