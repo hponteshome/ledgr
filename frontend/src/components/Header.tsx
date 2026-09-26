@@ -318,7 +318,7 @@ export const Header: React.FC<{ sidebarOpen: boolean }> = ({ sidebarOpen }) => {
                 </button>
 
                 {isCompanyOpen && (
-                  <div className="company-dropdown absolute top-full left-0 mt-2 w-80 bg-white border border-gray-200 rounded-xl shadow-xl p-2 z-[110]">
+                  <div className="company-dropdown absolute top-full left-0 mt-2 bg-white border border-gray-200 rounded-xl shadow-xl p-2 z-[110]" style={{ width: 480, maxWidth: '90vw' }}>
                     <div className="px-3 py-2 border-b border-gray-100">
                       <p className="text-xs font-bold text-gray-400 uppercase mb-2">Selecionar Empresa</p>
                       <div className="relative">
@@ -334,7 +334,7 @@ export const Header: React.FC<{ sidebarOpen: boolean }> = ({ sidebarOpen }) => {
                       </div>
                     </div>
 
-                    <div className="max-h-48 overflow-y-scroll mt-1" style={{ scrollbarWidth: 'thin', scrollbarColor: '#CBD5E1 #F1F5F9' }}>
+                    <div className="overflow-y-auto mt-1" style={{ maxHeight: 'calc(100vh - 200px)', scrollbarWidth: 'thin', scrollbarColor: '#CBD5E1 #F1F5F9' }}>
                       {/* OPÇÃO MODO GLOBAL */}
                       <button
                         onClick={() => handleSelectCompany(null)}

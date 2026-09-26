@@ -70,11 +70,15 @@ export const BalanceComparisonPage = () => {
   const [sortKey, setSortKey] = useState<SortKey>('conta');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [apenasMovimentacao, setApenasMovimentacao] = useState(false);
+  // NOVO 26/09/2026: oculta contas com saldo zero em todo o periodo exibido (default marcado)
+  const [ocultarSaldoZero, setOcultarSaldoZero] = useState(true);
+  // NOVO 26/09/2026: visao anual - oculta colunas "Movimento" (so saldo final de cada ano)
+  const [ocultarMovimento, setOcultarMovimento] = useState(true);
 
   // NOVO: visao anual com movimento intercalado (12/09/2026)
   const [viewMode, setViewMode] = useState<'mensal' | 'anual'>('anual');
-  const [anoIniAnual, setAnoIniAnual] = useState(anoAtual - 2);
-  const [anoFimAnual, setAnoFimAnual] = useState(anoAtual);
+  const [anoIniAnual, setAnoIniAnual] = useState(2018); // default fixo a pedido (26/09/2026)
+  const [anoFimAnual, setAnoFimAnual] = useState(2025); // default fixo a pedido (26/09/2026)
   const [anosAnuais, setAnosAnuais] = useState<number[]>([]);
   const [dataAnual, setDataAnual] = useState<ContaRowAnual[]>([]);
 
@@ -154,7 +158,11 @@ export const BalanceComparisonPage = () => {
     ? data.filter((row) => periodos.some((p) => (row.saldos?.[p] ?? 0) !== 0))
     : data;
 
-  const sorted = [...dataFiltrada].sort((a, b) => {
+  const dataVisivel = ocultarSaldoZero
+    ? dataFiltrada.filter((row) => periodos.some((p) => Math.abs(row.saldos?.[p] ?? 0) >= 0.005))
+    : dataFiltrada;
+
+  const sorted = [...dataVisivel].sort((a, b) => {
     let valA: string | number;
     let valB: string | number;
     if (sortKey === 'conta') {
@@ -216,7 +224,12 @@ export const BalanceComparisonPage = () => {
     ? dataAnual.filter((row) => anosAnuais.some((a) => Math.abs(row.movimentos?.[a as any] ?? 0) >= 0.005))
     : dataAnual;
 
-  const sortedAnual = [...dataFiltradaAnual].sort((a, b) => {
+  const dataVisivelAnual = ocultarSaldoZero
+    ? dataFiltradaAnual.filter((row) => Math.abs(row.saldoAnterior ?? 0) >= 0.005
+        || anosAnuais.some((a) => Math.abs(row.saldos?.[a as any] ?? 0) >= 0.005))
+    : dataFiltradaAnual;
+
+  const sortedAnual = [...dataVisivelAnual].sort((a, b) => {
     let valA: string | number;
     let valB: string | number;
     if (sortKey === 'conta') {
@@ -254,11 +267,11 @@ export const BalanceComparisonPage = () => {
       const anoAnteriorLbl = anosAnuais[0] ? anosAnuais[0] - 1 : anoIniAnual - 1;
       const headers = [
         'Conta', 'Descricao', `Saldo Anterior (Dez ${anoAnteriorLbl})`,
-        ...anosAnuais.flatMap(a => [`Movimento ${a}`, `Saldo ${a}`]),
+        ...anosAnuais.flatMap(a => ocultarMovimento ? [`Saldo ${a}`] : [`Movimento ${a}`, `Saldo ${a}`]),
       ];
       const csvRows = sortedAnual.map(row => [
         `"${row.conta}"`, `"${row.descricao}"`, row.saldoAnterior,
-        ...anosAnuais.flatMap(a => [row.movimentos?.[a as any] ?? 0, row.saldos?.[a as any] ?? 0]),
+        ...anosAnuais.flatMap(a => ocultarMovimento ? [row.saldos?.[a as any] ?? 0] : [row.movimentos?.[a as any] ?? 0, row.saldos?.[a as any] ?? 0]),
       ].join(','));
       const csvContent = '\uFEFF' + [headers.join(','), ...csvRows].join('\n');
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -291,7 +304,7 @@ export const BalanceComparisonPage = () => {
     if (viewMode === 'mensal') {
       const linhas = sorted.map(row => `
         <tr>
-          <td style="padding-left:${8 + (row.level - 1) * 14}px">${row.conta}</td>
+          <td style="padding-left:8px">${row.conta}</td>
           <td>${row.descricao}</td>
           ${periodos.map(p => `<td class="num">${(row.saldos?.[p] ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`).join('')}
         </tr>`).join('');
@@ -308,15 +321,15 @@ export const BalanceComparisonPage = () => {
       const anoAnteriorLbl = anosAnuais[0] ? anosAnuais[0] - 1 : anoIniAnual - 1;
       const linhas = sortedAnual.map(row => `
         <tr>
-          <td style="padding-left:${8 + (row.level - 1) * 14}px">${row.conta}</td>
+          <td style="padding-left:8px">${row.conta}</td>
           <td>${row.descricao}</td>
           <td class="num">${row.saldoAnterior.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
           ${anosAnuais.map(ano => `
-            <td class="num">${(row.movimentos?.[ano as any] ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+            ${ocultarMovimento ? '' : `<td class="num">${(row.movimentos?.[ano as any] ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`}
             <td class="num">${(row.saldos?.[ano as any] ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
           `).join('')}
         </tr>`).join('');
-      const corpoHtml = `<table><thead><tr><th>Código</th><th>Conta</th><th class="num">Saldo Anterior (Dez/${anoAnteriorLbl})</th>${anosAnuais.map(ano => `<th class="num">Movimento ${ano}</th><th class="num">Saldo ${ano}</th>`).join('')}</tr></thead><tbody>${linhas}</tbody></table>`;
+      const corpoHtml = `<table><thead><tr><th>Código</th><th>Conta</th><th class="num">Saldo Anterior (Dez/${anoAnteriorLbl})</th>${anosAnuais.map(ano => `${ocultarMovimento ? '' : `<th class="num">Movimento ${ano}</th>`}<th class="num">Saldo ${ano}</th>`).join('')}</tr></thead><tbody>${linhas}</tbody></table>`;
       imprimirRelatorio({
         titulo: 'COMPARATIVO DE SALDOS (ANUAL)',
         empresaNome: activeCompany.legalName || activeCompany.tradeName || '',
@@ -331,7 +344,7 @@ export const BalanceComparisonPage = () => {
   usePrintHandler(
     gerado ? handleImprimir : null,
     'Imprimir Comparativo de Saldos',
-    [viewMode, sorted, sortedAnual, periodos, anosAnuais, activeCompany, anoIniAnual],
+    [viewMode, sorted, sortedAnual, periodos, anosAnuais, activeCompany, anoIniAnual, ocultarMovimento],
   );
 
   const summaryTdStyle = (val: number, isDash: boolean): React.CSSProperties => ({
@@ -437,6 +450,27 @@ export const BalanceComparisonPage = () => {
           />
           Exibir apenas movimentações
         </label>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#6B7280', cursor: 'pointer', paddingBottom: 8 }}>
+          <input
+            type="checkbox"
+            checked={ocultarSaldoZero}
+            onChange={(e) => setOcultarSaldoZero(e.target.checked)}
+          />
+          Ocultar contas saldo zero no período
+        </label>
+        {viewMode === 'anual' && (
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#6B7280', cursor: 'pointer', paddingBottom: 8 }}>
+            <input
+              type="checkbox"
+              checked={ocultarMovimento}
+              onChange={(e) => {
+                setOcultarMovimento(e.target.checked);
+                if (e.target.checked && sortKey.startsWith('mov-')) { setSortKey('conta'); setSortDir('asc'); }
+              }}
+            />
+            Exibir apenas saldo final de cada ano
+          </label>
+        )}
         <button
           onClick={handleGerar}
           disabled={loading}
@@ -519,7 +553,7 @@ export const BalanceComparisonPage = () => {
                       position: 'sticky', left: 0, top: isAtivoRow ? 122 : undefined,
                       background: isAtivoRow ? '#F3F4F6' : 'inherit', zIndex: isAtivoRow ? 9 : 5,
                       boxShadow: isAtivoRow ? '2px 2px 4px -1px rgba(0,0,0,0.10)' : '2px 0 4px -1px rgba(0,0,0,0.06)',
-                      fontFamily: 'monospace', paddingLeft: 14 + (row.level - 1) * 14,
+                      fontFamily: 'monospace', paddingLeft: 14,
                       fontWeight: row.isAnalytic ? 400 : 600,
                     }}>
                       <span style={{ color: '#0369A1' }}>{row.conta}</span>
@@ -562,9 +596,11 @@ export const BalanceComparisonPage = () => {
                 </th>
                 {anosAnuais.map(ano => (
                   <React.Fragment key={ano}>
+                    {!ocultarMovimento && (
                     <th style={{ ...thBase, textAlign: 'right', minWidth: 100, color: '#9CA3AF' }} onClick={() => handleSort(`mov-${ano}`)}>
                       Movimento {ano} <SortIcon col={`mov-${ano}`} />
                     </th>
+                    )}
                     <th style={{ ...thBase, textAlign: 'right', minWidth: 110 }} onClick={() => handleSort(`saldo-${ano}`)}>
                       Saldo {ano} <SortIcon col={`saldo-${ano}`} />
                     </th>
@@ -580,7 +616,7 @@ export const BalanceComparisonPage = () => {
                 <td style={{ ...summaryTdStyle(diferencaAnteriorAnual, false), position: 'sticky', top: 42, background: '#F0FDF4', zIndex: 8 }}>{fmtSummary(diferencaAnteriorAnual)}</td>
                 {anosAnuais.map(ano => (
                   <React.Fragment key={`dif-${ano}`}>
-                    <td style={{ ...summaryTdStyle(0, true), position: 'sticky', top: 42, background: '#F0FDF4', zIndex: 8 }}>—</td>
+                    {!ocultarMovimento && <td style={{ ...summaryTdStyle(0, true), position: 'sticky', top: 42, background: '#F0FDF4', zIndex: 8 }}>—</td>}
                     <td style={{ ...summaryTdStyle(diferencaSaldoPorAno[ano] ?? 0, false), position: 'sticky', top: 42, background: '#F0FDF4', zIndex: 8 }}>{fmtSummary(diferencaSaldoPorAno[ano] ?? 0)}</td>
                   </React.Fragment>
                 ))}
@@ -592,7 +628,7 @@ export const BalanceComparisonPage = () => {
                 <td style={{ ...summaryTdStyle(resultadoAnteriorAnual, false), position: 'sticky', top: 82, background: '#EFF6FF', zIndex: 8 }}>{fmtSummary(resultadoAnteriorAnual)}</td>
                 {anosAnuais.map(ano => (
                   <React.Fragment key={`res-${ano}`}>
-                    <td style={{ ...summaryTdStyle(resultadoMovimentoPorAno[ano] ?? 0, false), position: 'sticky', top: 82, background: '#EFF6FF', zIndex: 8 }}>{fmtSummary(resultadoMovimentoPorAno[ano] ?? 0)}</td>
+                    {!ocultarMovimento && <td style={{ ...summaryTdStyle(resultadoMovimentoPorAno[ano] ?? 0, false), position: 'sticky', top: 82, background: '#EFF6FF', zIndex: 8 }}>{fmtSummary(resultadoMovimentoPorAno[ano] ?? 0)}</td>}
                     <td style={{ ...summaryTdStyle(resultadoSaldoPorAno[ano] ?? 0, false), position: 'sticky', top: 82, background: '#EFF6FF', zIndex: 8 }}>{fmtSummary(resultadoSaldoPorAno[ano] ?? 0)}</td>
                   </React.Fragment>
                 ))}
@@ -609,7 +645,7 @@ export const BalanceComparisonPage = () => {
                       position: 'sticky', left: 0, top: isAtivoRow ? 122 : undefined,
                       background: isAtivoRow ? '#F3F4F6' : 'inherit', zIndex: isAtivoRow ? 9 : 5,
                       boxShadow: isAtivoRow ? '2px 2px 4px -1px rgba(0,0,0,0.10)' : '2px 0 4px -1px rgba(0,0,0,0.06)',
-                      fontFamily: 'monospace', paddingLeft: 14 + (row.level - 1) * 14,
+                      fontFamily: 'monospace', paddingLeft: 14,
                       fontWeight: row.isAnalytic ? 400 : 600,
                     }}>
                       <span style={{ color: '#0369A1' }}>{row.conta}</span>
@@ -634,6 +670,7 @@ export const BalanceComparisonPage = () => {
                       const sal = row.saldos?.[ano as any] ?? 0;
                       return (
                         <React.Fragment key={ano}>
+                          {!ocultarMovimento && (
                           <td style={{
                             padding: '9px 14px', borderBottom: '0.5px solid #F5F5F5', textAlign: 'right',
                             fontVariantNumeric: 'tabular-nums',
@@ -646,6 +683,7 @@ export const BalanceComparisonPage = () => {
                           }}>
                             {mov.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </td>
+                          )}
                           <td style={{
                             padding: '9px 14px', borderBottom: '0.5px solid #F5F5F5', textAlign: 'right',
                             fontVariantNumeric: 'tabular-nums', fontWeight: 500,
