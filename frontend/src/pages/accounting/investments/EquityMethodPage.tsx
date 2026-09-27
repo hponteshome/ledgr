@@ -1,7 +1,7 @@
 // frontend/src/pages/accounting/investments/EquityMethodPage.tsx
 import React, { useState, useCallback, useEffect } from 'react';
 import toast from 'react-hot-toast';
-import { FiPlus, FiTrendingUp, FiTrendingDown } from 'react-icons/fi';
+import { FiPlus, FiTrendingUp, FiTrendingDown, FiEdit2, FiTrash2 } from 'react-icons/fi';
 import api from '../../../services/api';
 import { useCompany } from '../../../contexts/CompanyContext';
 
@@ -26,6 +26,10 @@ interface CalculoPreview {
   equityValue: number;
   previousBookValue: number;
   adjustment: number;
+  valorZeragemInvestimento?: number | null;
+  valorProvisao?: number | null;
+  previousProvisionBalance?: number | null;
+  provisionBalanceAfter?: number | null;
 }
 
 const fmtNum = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -46,6 +50,17 @@ const EquityMethodPage: React.FC = () => {
   const [fCost, setFCost] = useState('');
   const [fDate, setFDate] = useState('');
   const [saving, setSaving] = useState(false);
+
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [ePercent, setEPercent] = useState('');
+  const [eInvestAccount, setEInvestAccount] = useState('');
+  const [eGainAccount, setEGainAccount] = useState('');
+  const [eLossAccount, setELossAccount] = useState('');
+  const [eReductionAccount, setEReductionAccount] = useState('');
+  const [eProvisionAccount, setEProvisionAccount] = useState('');
+  const [eCost, setECost] = useState('');
+  const [eDate, setEDate] = useState('');
+  const [eSaving, setESaving] = useState(false);
 
   const [refDate, setRefDate] = useState('');
   const [preview, setPreview] = useState<CalculoPreview | null>(null);
@@ -120,6 +135,55 @@ const EquityMethodPage: React.FC = () => {
     } catch (e: any) {
       toast.error(e?.response?.data?.message || 'Erro ao atualizar percentual.');
     } finally { setAtualizandoPercentual(false); }
+  };
+
+  const abrirEdicao = () => {
+    if (!selected) return;
+    setEPercent(String(selected.percentOwned).replace('.', ','));
+    setEInvestAccount(selected.investmentAccount.code);
+    setEGainAccount(selected.gainAccount.code);
+    setELossAccount(selected.lossAccount.code);
+    setEReductionAccount('');
+    setEProvisionAccount('');
+    setECost(String(selected.initialCost).replace('.', ','));
+    setEDate(selected.acquisitionDate.substring(0, 10));
+    setShowEditModal(true);
+  };
+
+  const handleSalvarEdicao = async () => {
+    if (!selected) return;
+    setESaving(true);
+    try {
+      const body: any = {
+        percentOwned: parseFloat(ePercent.replace(',', '.')),
+        investmentAccountCode: eInvestAccount,
+        gainAccountCode: eGainAccount,
+        lossAccountCode: eLossAccount,
+        initialCost: parseFloat(eCost.replace(',', '.')),
+        acquisitionDate: eDate,
+      };
+      if (eReductionAccount.trim()) body.reductionAccountCode = eReductionAccount.trim();
+      if (eProvisionAccount.trim()) body.provisionAccountCode = eProvisionAccount.trim();
+      await api.patch(`/accounting/equity-method/${selected.id}`, body);
+      toast.success('Participação atualizada.');
+      setShowEditModal(false);
+      carregar();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || 'Erro ao atualizar participação.');
+    } finally { setESaving(false); }
+  };
+
+  const handleApagar = async () => {
+    if (!selected) return;
+    if (!window.confirm(`Excluir a participação em ${selected.investeeCompany.legalName || selected.investeeCompany.tradeName}? Esta ação não pode ser desfeita.`)) return;
+    try {
+      await api.delete(`/accounting/equity-method/${selected.id}`);
+      toast.success('Participação excluída.');
+      setSelected(null);
+      carregar();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || 'Erro ao excluir participação.');
+    }
   };
 
   const handleCriar = async () => {
@@ -211,9 +275,21 @@ const EquityMethodPage: React.FC = () => {
         <div style={{ width: 340, flexShrink: 0 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: '#6B7280', textTransform: 'uppercase' }}>Participações</span>
-            <button onClick={() => setShowForm(v => !v)} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#2563EB', background: 'transparent', border: 'none', cursor: 'pointer' }}>
-              <FiPlus size={14} /> Nova
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              {selected && (
+                <>
+                  <button onClick={abrirEdicao} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#2563EB', background: 'transparent', border: 'none', cursor: 'pointer' }}>
+                    <FiEdit2 size={13} /> Editar
+                  </button>
+                  <button onClick={handleApagar} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#DC2626', background: 'transparent', border: 'none', cursor: 'pointer' }}>
+                    <FiTrash2 size={13} /> Apagar
+                  </button>
+                </>
+              )}
+              <button onClick={() => setShowForm(v => !v)} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#2563EB', background: 'transparent', border: 'none', cursor: 'pointer' }}>
+                <FiPlus size={14} /> Nova
+              </button>
+            </div>
           </div>
 
           {showForm && (
@@ -309,6 +385,66 @@ const EquityMethodPage: React.FC = () => {
                   Participação: {fmtPct(Number(selected.percentOwned))} · Conta Investimento: {selected.investmentAccount.code} - {selected.investmentAccount.name} · Ganho: {selected.gainAccount.code} · Perda: {selected.lossAccount.code}
                 </div>
 
+                {showEditModal && (
+                  <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+                    <div style={{ background: '#fff', borderRadius: 10, padding: 20, width: 420, maxHeight: '85vh', overflowY: 'auto' }}>
+                      <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 14 }}>Editar Participação</div>
+                      <div style={{ marginBottom: 8 }}>
+                        <label style={{ fontSize: 11, color: '#9CA3AF' }}>% Participação</label>
+                        <input value={ePercent} onChange={ev => setEPercent(ev.target.value)} placeholder="Ex: 99,9204"
+                          style={{ width: '100%', padding: '6px 8px', border: '1px solid #E5E7EB', borderRadius: 6, fontSize: 13 }} />
+                      </div>
+                      <div style={{ marginBottom: 8 }}>
+                        <label style={{ fontSize: 11, color: '#9CA3AF' }}>Conta de Investimentos</label>
+                        <input value={eInvestAccount} onChange={ev => setEInvestAccount(ev.target.value)} placeholder="Código"
+                          style={{ width: '100%', padding: '6px 8px', border: '1px solid #E5E7EB', borderRadius: 6, fontSize: 13 }} />
+                      </div>
+                      <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                        <div style={{ flex: 1 }}>
+                          <label style={{ fontSize: 11, color: '#9CA3AF' }}>Conta de Ganho (EP)</label>
+                          <input value={eGainAccount} onChange={ev => setEGainAccount(ev.target.value)} placeholder="Código"
+                            style={{ width: '100%', padding: '6px 8px', border: '1px solid #E5E7EB', borderRadius: 6, fontSize: 13 }} />
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <label style={{ fontSize: 11, color: '#9CA3AF' }}>Conta de Perda (EP)</label>
+                          <input value={eLossAccount} onChange={ev => setELossAccount(ev.target.value)} placeholder="Código"
+                            style={{ width: '100%', padding: '6px 8px', border: '1px solid #E5E7EB', borderRadius: 6, fontSize: 13 }} />
+                        </div>
+                      </div>
+                      <div style={{ marginBottom: 8 }}>
+                        <label style={{ fontSize: 11, color: '#9CA3AF' }}>Conta Redutora do Investimento (mais-valia) — deixe em branco para não alterar</label>
+                        <input value={eReductionAccount} onChange={ev => setEReductionAccount(ev.target.value)} placeholder="Código (opcional)"
+                          style={{ width: '100%', padding: '6px 8px', border: '1px solid #E5E7EB', borderRadius: 6, fontSize: 13 }} />
+                      </div>
+                      <div style={{ marginBottom: 8 }}>
+                        <label style={{ fontSize: 11, color: '#9CA3AF' }}>Conta de Provisão para Perda Excedente (CPC 18) — deixe em branco para não alterar</label>
+                        <input value={eProvisionAccount} onChange={ev => setEProvisionAccount(ev.target.value)} placeholder="Código (opcional)"
+                          style={{ width: '100%', padding: '6px 8px', border: '1px solid #E5E7EB', borderRadius: 6, fontSize: 13 }} />
+                      </div>
+                      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+                        <div style={{ flex: 1 }}>
+                          <label style={{ fontSize: 11, color: '#9CA3AF' }}>Custo de Aquisição</label>
+                          <input value={eCost} onChange={ev => setECost(ev.target.value)} placeholder="0,00"
+                            style={{ width: '100%', padding: '6px 8px', border: '1px solid #E5E7EB', borderRadius: 6, fontSize: 13 }} />
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <label style={{ fontSize: 11, color: '#9CA3AF' }}>Data de Aquisição</label>
+                          <input type="date" value={eDate} onChange={ev => setEDate(ev.target.value)}
+                            style={{ width: '100%', padding: '6px 8px', border: '1px solid #E5E7EB', borderRadius: 6, fontSize: 13 }} />
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                        <button onClick={() => setShowEditModal(false)} style={{ padding: '7px 14px', fontSize: 13, border: '1px solid #E5E7EB', borderRadius: 6, background: '#fff', cursor: 'pointer' }}>
+                          Cancelar
+                        </button>
+                        <button onClick={handleSalvarEdicao} disabled={eSaving} style={{ padding: '7px 14px', fontSize: 13, border: 'none', borderRadius: 6, background: '#2563EB', color: '#fff', cursor: 'pointer', opacity: eSaving ? 0.6 : 1 }}>
+                          {eSaving ? 'Salvando...' : 'Salvar'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {sugestaoSelecionado?.found && sugestaoSelecionado.percentOwned !== null &&
                   Math.abs(Number(sugestaoSelecionado.percentOwned) - Number(selected.percentOwned)) > 0.0001 && (
                   <div style={{
@@ -354,7 +490,7 @@ const EquityMethodPage: React.FC = () => {
                   <div style={{ borderTop: '1px solid #E5E7EB', paddingTop: 16 }}>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, marginBottom: 16 }}>
                       <div style={{ background: '#F9FAFB', borderRadius: 8, padding: 12 }}>
-                        <div style={{ fontSize: 11, color: '#9CA3AF', textTransform: 'uppercase' }}>PL da Investida</div>
+                        <div style={{ fontSize: 11, color: '#9CA3AF', textTransform: 'uppercase' }}>Resultado do Exercício (Investida)</div>
                         <div style={{ fontSize: 16, fontWeight: 700, fontFamily: 'monospace' }}>{fmtNum(preview.investeePl)}</div>
                       </div>
                       <div style={{ background: '#F9FAFB', borderRadius: 8, padding: 12 }}>
@@ -390,6 +526,28 @@ const EquityMethodPage: React.FC = () => {
                         {lancando ? 'Gerando...' : 'Gerar Lançamento'}
                       </button>
                     </div>
+
+                    {preview.valorProvisao !== undefined && preview.valorProvisao !== null && preview.valorProvisao > 0.005 && (
+                      <div style={{ marginTop: 12, border: '1px solid #FED7AA', borderRadius: 8, padding: 12, background: '#FFF7ED' }}>
+                        <div style={{ fontSize: 11, color: '#9A3412', textTransform: 'uppercase', fontWeight: 600, marginBottom: 8 }}>
+                          Perda excedente ao saldo do investimento — vai para Provisão (CPC 18)
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+                          <div>
+                            <div style={{ fontSize: 10, color: '#9CA3AF', textTransform: 'uppercase' }}>Valor para Provisão</div>
+                            <div style={{ fontSize: 14, fontWeight: 700, fontFamily: 'monospace', color: '#9A3412' }}>{fmtNum(preview.valorProvisao)}</div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: 10, color: '#9CA3AF', textTransform: 'uppercase' }}>Saldo Anterior da Provisão</div>
+                            <div style={{ fontSize: 14, fontWeight: 700, fontFamily: 'monospace' }}>{preview.previousProvisionBalance !== undefined && preview.previousProvisionBalance !== null ? fmtNum(preview.previousProvisionBalance) : '—'}</div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: 10, color: '#9CA3AF', textTransform: 'uppercase' }}>Saldo Após o Lançamento</div>
+                            <div style={{ fontSize: 14, fontWeight: 700, fontFamily: 'monospace' }}>{preview.provisionBalanceAfter !== undefined && preview.provisionBalanceAfter !== null ? fmtNum(preview.provisionBalanceAfter) : '—'}</div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

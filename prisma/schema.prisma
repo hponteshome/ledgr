@@ -1359,6 +1359,19 @@ model EquityMethodInvestment {
   investeeCompanyId   String    @map("investee_company_id") @db.Uuid
   percentOwned        Decimal   @map("percent_owned") @db.Decimal(8, 4)
   investmentAccountId String    @map("investment_account_id") @db.Uuid
+  // NOVO 25/09/2026: conta redutora do investimento (ex.: "Ganho Nao
+  // Realizado na Integralizacao"), quando o valor de mercado atribuido na
+  // integralizacao e maior que o valor contabil liquido dos ativos
+  // conferidos. Soma-se ao investmentAccountId para achar o saldo liquido
+  // real do investimento usado no calculo da MEP. Opcional.
+  reductionAccountId  String?   @map("reduction_account_id") @db.Uuid
+  // NOVO 25/09/2026: conta de provisao (passivo), usada quando a perda de
+  // equivalencia patrimonial excede o saldo do investimento e ha obrigacao
+  // legal/construtiva de cobrir prejuizo da investida (CPC 18/IAS 28) - o
+  // excedente vira provisao em vez de simplesmente parar de ser reconhecido.
+  // PENDENTE (registrado para depois): reversao da provisao quando a
+  // investida voltar a dar lucro - nao implementado ainda.
+  provisionAccountId  String?   @map("provision_account_id") @db.Uuid
   // CORRIGIDO 13/09/2026: ganho e perda de equivalencia patrimonial vao em
   // contas de resultado SEPARADAS (uma REVENUE, outra EXPENSE) - nao uma
   // unica "conta de resultado" generica.
@@ -2465,6 +2478,7 @@ model ArEntry {
   agendaEventId       String? @unique @map("agenda_event_id") @db.Uuid
   revenueAccountId    String? @map("revenue_account_id") @db.Uuid
   receivableAccountId String? @map("receivable_account_id") @db.Uuid
+  rentalContractId    String? @map("rental_contract_id") @db.Uuid // NOVO 25/09/2026: recorrencia de aluguel
 
   notes         String? @map("notes") @db.Text
   attachmentUrl String? @map("attachment_url") @db.VarChar(500)
@@ -2479,6 +2493,7 @@ model ArEntry {
   customer   Person?     @relation("ArEntryCustomer", fields: [customerId], references: [id])
   property   Property?   @relation("ArEntryProperty", fields: [propertyId], references: [id])
   fixedAsset FixedAsset? @relation("ArEntryAsset", fields: [fixedAssetId], references: [id])
+  rentalContract RentalContract? @relation(fields: [rentalContractId], references: [id])
   payments   ARPayment[]
 
   @@index([companyId])
@@ -2488,6 +2503,7 @@ model ArEntry {
   @@index([propertyId])
   @@index([dueDate])
   @@index([status])
+  @@unique([rentalContractId, competenceMonth])
   @@map("ar_entries")
 }
 
@@ -2655,6 +2671,7 @@ model RentalContract {
   company    Company    @relation(fields: [companyId], references: [id])
   fixedAsset FixedAsset @relation("RentalContractAsset", fields: [fixedAssetId], references: [id])
   tenant     Person?    @relation("RentalContractTenant", fields: [tenantId], references: [id])
+  arEntries  ArEntry[]
 
   @@index([companyId, status])
   @@index([fixedAssetId])
@@ -3587,6 +3604,10 @@ model CompanyAccountingConfig {
   encerramentoContaPrejuizoExercicioId String? @map("encerramento_conta_prejuizo_exercicio_id") @db.Uuid // Prejuizo do Exercicio (resultado negativo)
   encerramentoContaLucrosAcumuladosId    String? @map("encerramento_conta_lucros_acumulados_id") @db.Uuid // Lucros Acumulados (saldo anterior)
   encerramentoContaPrejuizosAcumuladosId String? @map("encerramento_conta_prejuizos_acumulados_id") @db.Uuid // Prejuizos Acumulados (saldo anterior - LALUR)
+
+  // Contas contabeis - Locacao de Imoveis (recorrencia mensal de aluguel)
+  locacaoContaReceitaAlugueisId  String? @map("locacao_conta_receita_alugueis_id") @db.Uuid
+  locacaoContaAlugueisAReceberId String? @map("locacao_conta_alugueis_a_receber_id") @db.Uuid
 
   // Configuracao contabil
   moeda         String? @default("BRL") @map("moeda") @db.VarChar(3)

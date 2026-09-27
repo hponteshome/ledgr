@@ -14,6 +14,22 @@ export interface CreateEquityMethodDto {
   notes?: string;
 }
 
+export interface UpdateEquityMethodDto {
+  percentOwned?: number;
+  investmentAccountCode?: string;
+  gainAccountCode?: string;
+  lossAccountCode?: string;
+  // NOVO 25/09/2026: conta redutora (mais-valia) - so altera se informada,
+  // deixar em branco preserva o valor ja gravado.
+  reductionAccountCode?: string;
+  // NOVO 25/09/2026: conta de provisao para perda excedente ao saldo do
+  // investimento - so altera se informada.
+  provisionAccountCode?: string;
+  initialCost?: number;
+  acquisitionDate?: string;
+  notes?: string;
+}
+
 @Injectable()
 export class EquityMethodService {
   constructor(
@@ -133,6 +149,62 @@ export class EquityMethodService {
     });
   }
 
+  async update(companyId: string, investmentId: string, dto: UpdateEquityMethodDto) {
+    const existing = await this.prisma.equityMethodInvestment.findFirst({
+      where: { id: investmentId, investorCompanyId: companyId, deletedAt: null },
+    });
+    if (!existing) throw new NotFoundException("Participacao nao encontrada.");
+
+    if (dto.percentOwned !== undefined && (dto.percentOwned <= 0 || dto.percentOwned > 100)) {
+      throw new BadRequestException("Percentual de participacao deve estar entre 0 e 100.");
+    }
+
+    const data: any = {};
+    if (dto.percentOwned !== undefined) data.percentOwned = dto.percentOwned;
+    if (dto.initialCost !== undefined) data.initialCost = dto.initialCost;
+    if (dto.acquisitionDate !== undefined) data.acquisitionDate = new Date(dto.acquisitionDate + "T00:00:00Z");
+    if (dto.notes !== undefined) data.notes = dto.notes;
+
+    const resolverConta = async (code: string, rotulo: string) => {
+      const conta = await this.prisma.chartOfAccounts.findFirst({ where: { companyId, code, deletedAt: null } });
+      if (!conta) throw new BadRequestException("Conta de " + rotulo + " \"" + code + "\" nao encontrada.");
+      return conta.id;
+    };
+    if (dto.investmentAccountCode) data.investmentAccountId = await resolverConta(dto.investmentAccountCode, "Investimentos");
+    if (dto.gainAccountCode) data.gainAccountId = await resolverConta(dto.gainAccountCode, "Ganho de Equivalencia Patrimonial");
+    if (dto.lossAccountCode) data.lossAccountId = await resolverConta(dto.lossAccountCode, "Perda de Equivalencia Patrimonial");
+    // reductionAccountCode so altera se vier preenchido - em branco preserva
+    // o vinculo ja gravado (ex.: Hotelsys/Sunsys, configurado via SQL hoje).
+    if (dto.reductionAccountCode) data.reductionAccountId = await resolverConta(dto.reductionAccountCode, "Redutora do Investimento");
+    if (dto.provisionAccountCode) data.provisionAccountId = await resolverConta(dto.provisionAccountCode, "Provisao para Perdas em Investimentos");
+
+    return this.prisma.equityMethodInvestment.update({ where: { id: investmentId }, data });
+  }
+
+  // Exclusao (soft-delete) da participacao. Bloqueada se ja existir
+  // qualquer apuracao registrada - evita orfanizar equity_method_calculations
+  // (usuario deve reverter todas as apuracoes primeiro, uma a uma).
+  async remove(companyId: string, investmentId: string) {
+    const existing = await this.prisma.equityMethodInvestment.findFirst({
+      where: { id: investmentId, investorCompanyId: companyId, deletedAt: null },
+    });
+    if (!existing) throw new NotFoundException("Participacao nao encontrada.");
+
+    const calculoExistente = await this.prisma.equityMethodCalculation.findFirst({
+      where: { investmentId },
+    });
+    if (calculoExistente) {
+      throw new BadRequestException(
+        "Existem apuracoes de Equivalencia Patrimonial registradas para esta participacao. Reverta todas as apuracoes (historico) antes de excluir.",
+      );
+    }
+
+    return this.prisma.equityMethodInvestment.update({
+      where: { id: investmentId },
+      data: { deletedAt: new Date(), isActive: false },
+    });
+  }
+
   private async getInvestimentoOuFalha(companyId: string, investmentId: string) {
     const investimento = await this.prisma.equityMethodInvestment.findFirst({
       where: { id: investmentId, investorCompanyId: companyId, deletedAt: null },
@@ -148,21 +220,50 @@ export class EquityMethodService {
   private async calcularPLInvestida(investeeCompanyId: string, referenceDate: Date) {
     const beginning = new Date(Date.UTC(1900, 0, 1));
     const { balances } = await this.trialBalance.getVerificationBalance(investeeCompanyId, beginning, referenceDate);
+
+    // CORRIGIDO 25/09/2026: o filtro antigo (type==='EQUITY' && level===1) so
+    // funciona quando o PL e uma raiz PROPRIA de nivel 1. No plano padrao da
+    // Matriz, "23 Patrimonio Liquido" e EQUITY mas fica no nivel 2, dentro de
+    // uma raiz unica "2 PASSIVO" (LIABILITY) - o filtro antigo nunca
+    // encontrava nada, investeePl saia sempre 0, e o "adjustment" virava uma
+    // baixa quase total do saldo do investimento (achado real: Hotelsys /
+    // Sunsys). Novo criterio: soma toda conta EQUITY cujo PAI nao seja
+    // tambem EQUITY - acha a(s) raiz(es) do PL onde quer que estejam na
+    // arvore, sem depender de um numero de nivel fixo. So soma as raizes
+    // (nao os descendentes) porque currentBalance de uma conta sintetica ja
+    // e o rollup de baixo pra cima - somar filho e pai juntos dobraria.
+    const contasEquity = await this.prisma.chartOfAccounts.findMany({
+      where: { companyId: investeeCompanyId, deletedAt: null, type: 'EQUITY' as any },
+      select: { id: true, nature: true, parentId: true },
+    });
+    const idsEquity = new Set(contasEquity.map(c => c.id));
+    const balancePorId = new Map((balances as any[]).map(b => [b.account.id, b]));
+
     let pl = 0;
-    for (const b of balances as any[]) {
-      const acc = b.account;
-      if (acc.type === 'EQUITY' && acc.level === 1) {
-        pl += acc.nature === 'CREDIT' ? -b.currentBalance : b.currentBalance;
-      }
+    for (const c of contasEquity) {
+      if (c.parentId && idsEquity.has(c.parentId)) continue; // pai tambem EQUITY - nao e raiz, ja esta no rollup do pai
+      const b = balancePorId.get(c.id);
+      if (!b) continue;
+      pl += c.nature === 'CREDIT' ? -b.currentBalance : b.currentBalance;
     }
     return pl;
   }
 
-  private async saldoContabilInvestimento(companyId: string, accountId: string, referenceDate: Date) {
+  // CORRIGIDO 25/09/2026: soma tambem a conta redutora (reductionAccountId),
+  // quando configurada - o saldo liquido real do investimento (ex.: valor de
+  // mercado na integralizacao MENOS o ganho nao realizado registrado em
+  // conta propria) precisa entrar inteiro como "saldo anterior" da MEP,
+  // senao o calculo ignora a reducao e infla o valor de referencia.
+  private async saldoContabilInvestimento(companyId: string, accountId: string, reductionAccountId: string | null, referenceDate: Date) {
     const beginning = new Date(Date.UTC(1900, 0, 1));
     const { balances } = await this.trialBalance.getVerificationBalance(companyId, beginning, referenceDate);
     const linha = (balances as any[]).find(b => b.account.id === accountId);
-    return linha ? linha.currentBalance : 0;
+    let total = linha ? linha.currentBalance : 0;
+    if (reductionAccountId) {
+      const linhaRed = (balances as any[]).find(b => b.account.id === reductionAccountId);
+      total += linhaRed ? linhaRed.currentBalance : 0;
+    }
+    return total;
   }
 
   // CRIADO 13/09/2026: sem o encerramento do exercicio rodado na investida,
@@ -183,6 +284,26 @@ export class EquityMethodService {
     return !!encerramento;
   }
 
+  // Resultado do exercicio (lucro/prejuizo) da investida no ano, mesma
+  // tecnica ja validada de getResultadoContabil/getReceitasBrutas: soma o
+  // movimento (credito-debito) das contas REVENUE/EXPENSE dentro do ano,
+  // excluindo lancamentos de encerramento. NOVO 25/09/2026.
+  private async getResultadoExercicioInvestida(investeeCompanyId: string, ano: number): Promise<number> {
+    const ini = new Date(Date.UTC(ano, 0, 1));
+    const fim = new Date(Date.UTC(ano, 11, 31, 23, 59, 59, 999));
+    const rows = await this.prisma.journalEntryItem.groupBy({
+      by: ["type"],
+      where: {
+        journalEntry: { companyId: investeeCompanyId, deletedAt: null, isClosingEntry: false, date: { gte: ini, lte: fim } },
+        account: { type: { in: ["REVENUE", "EXPENSE"] } as any },
+      },
+      _sum: { value: true },
+    });
+    const credito = Number(rows.find(r => r.type === "CREDIT")?._sum.value ?? 0);
+    const debito = Number(rows.find(r => r.type === "DEBIT")?._sum.value ?? 0);
+    return credito - debito;
+  }
+
   async calcular(companyId: string, investmentId: string, referenceDateStr: string) {
     const investimento = await this.getInvestimentoOuFalha(companyId, investmentId);
     const referenceDate = new Date(referenceDateStr + 'T23:59:59Z');
@@ -190,11 +311,70 @@ export class EquityMethodService {
 
     const investeeYearClosed = await this.anoEncerradoNaInvestida(investimento.investeeCompanyId, ano);
 
-    const investeePl = await this.calcularPLInvestida(investimento.investeeCompanyId, referenceDate);
+    // CORRIGIDO 25/09/2026 (redesenho final): MEP correto e a participacao
+    // no RESULTADO DO EXERCICIO da investida (lucro/prejuizo do periodo),
+    // nao a variacao total do PL entre duas datas - essa ultima misturava
+    // aportes de capital e outros movimentos de patrimonio como se fossem
+    // "ganho" do investidor, alem de exigir uma cadeia fragil de apuracoes
+    // anteriores (achados reais hoje: Hotelsys/Sunsys e Sunrise/Hotelsys,
+    // ambos com resultado calculado muito acima do resultado real do
+    // exercicio). Resultado do exercicio calculado com a MESMA tecnica ja
+    // validada de getResultadoContabil/getReceitasBrutas
+    // (apuracao.service.ts): movimento REVENUE/EXPENSE do ano, excluindo
+    // encerramento. Cada ano passa a ser INDEPENDENTE - nao precisa mais de
+    // cadeia por apuracao anterior nem de data de aquisicao para calcular.
     const percent = Number(investimento.percentOwned);
-    const equityValue = investeePl * (percent / 100);
-    const previousBookValue = await this.saldoContabilInvestimento(companyId, investimento.investmentAccountId, referenceDate);
-    const adjustment = equityValue - previousBookValue;
+    const resultadoExercicio = await this.getResultadoExercicioInvestida(investimento.investeeCompanyId, ano);
+    const investeePl = resultadoExercicio;
+    const investeePlBase = 0;
+    const adjustmentBruto = resultadoExercicio * (percent / 100);
+    const previousBookValue = await this.saldoContabilInvestimento(companyId, investimento.investmentAccountId, (investimento as any).reductionAccountId ?? null, referenceDate);
+
+    // NOVO 25/09/2026: piso zero (CPC 18 / IAS 28) - o investidor so
+    // reconhece perda de equivalencia patrimonial ate o saldo contabil do
+    // investimento zerar. Perda que exceder isso NAO e lancada (so seria,
+    // separadamente, se houvesse obrigacao legal/construtiva de cobrir
+    // prejuizo da investida - fora do escopo desta correcao). Sem o piso,
+    // o saldo do investimento ficava negativo (achado real: Sunsys, saldo
+    // R$654.714,83 com perda calculada de R$1.763.693,31).
+    const equityValueBruto = previousBookValue + adjustmentBruto;
+    const limitadoZero = equityValueBruto < 0;
+    const provisionAccountId = (investimento as any).provisionAccountId ?? null;
+
+    // NOVO 25/09/2026: quando ha conta de provisao configurada, a perda
+    // excedente ao saldo do investimento NAO e mais descartada - a perda
+    // economica INTEGRAL do periodo e reconhecida, dividida entre zerar o
+    // investimento (valorZeragemInvestimento) e constituir/aumentar a
+    // provisao (valorProvisao). Sem conta de provisao configurada, mantem o
+    // comportamento anterior (para de reconhecer perda alem do saldo).
+    let equityValue = equityValueBruto;
+    let adjustment = adjustmentBruto;
+    let valorZeragemInvestimento: number | null = null;
+    let valorProvisao: number | null = null;
+    let previousProvisionBalance: number | null = null;
+    let provisionBalanceAfter: number | null = null;
+
+    if (limitadoZero) {
+      if (provisionAccountId) {
+        const perdaTotal = Math.abs(adjustmentBruto);
+        valorZeragemInvestimento = Math.max(0, Math.min(previousBookValue, perdaTotal));
+        valorProvisao = perdaTotal - valorZeragemInvestimento;
+        equityValue = 0;
+        adjustment = adjustmentBruto;
+
+        // NOVO 25/09/2026: saldo anterior/apos da conta de provisao, para
+        // exibir na tela junto do valor que vai pra la (transparencia do
+        // calculo, a pedido do usuario).
+        const provisionRaw = await this.saldoContabilInvestimento(companyId, provisionAccountId, null, referenceDate);
+        const provisionAccount = await this.prisma.chartOfAccounts.findUnique({ where: { id: provisionAccountId }, select: { nature: true } });
+        const sinal = provisionAccount?.nature === 'CREDIT' ? -1 : 1;
+        previousProvisionBalance = provisionRaw * sinal;
+        provisionBalanceAfter = previousProvisionBalance + valorProvisao;
+      } else {
+        equityValue = 0;
+        adjustment = -previousBookValue;
+      }
+    }
 
     return {
       investment: investimento,
@@ -202,10 +382,17 @@ export class EquityMethodService {
       investeeYear: ano,
       investeeYearClosed,
       investeePl,
+      investeePlBase,
       percentApplied: percent,
       equityValue,
       previousBookValue,
       adjustment,
+      adjustmentBruto,
+      limitadoZero,
+      valorZeragemInvestimento,
+      valorProvisao,
+      previousProvisionBalance,
+      provisionBalanceAfter,
     };
   }
 
@@ -234,6 +421,28 @@ export class EquityMethodService {
     const empresaInvestida = investment.investeeCompany.legalName || investment.investeeCompany.tradeName;
     const descricao = `Ajuste de Equivalência Patrimonial - ${empresaInvestida} - ${referenceDateStr.split('-').reverse().join('/')}`;
 
+    // NOVO 25/09/2026: perda que excede o saldo do investimento, com conta
+    // de provisao configurada - divide o credito entre zerar o investimento
+    // (se sobrar algo) e constituir/aumentar a provisao pelo restante.
+    const temSplitProvisao = !ganho && preview.valorProvisao !== null && preview.valorProvisao !== undefined && preview.valorProvisao > 0.005;
+    const items = temSplitProvisao
+      ? [
+          { accountId: investment.lossAccountId, type: 'DEBIT' as const, value: valorAbs },
+          ...(preview.valorZeragemInvestimento && preview.valorZeragemInvestimento > 0.005
+            ? [{ accountId: investment.investmentAccountId, type: 'CREDIT' as const, value: preview.valorZeragemInvestimento }]
+            : []),
+          { accountId: (investment as any).provisionAccountId, type: 'CREDIT' as const, value: preview.valorProvisao! },
+        ]
+      : ganho
+        ? [
+            { accountId: investment.investmentAccountId, type: 'DEBIT' as const, value: valorAbs },
+            { accountId: investment.gainAccountId, type: 'CREDIT' as const, value: valorAbs },
+          ]
+        : [
+            { accountId: investment.lossAccountId, type: 'DEBIT' as const, value: valorAbs },
+            { accountId: investment.investmentAccountId, type: 'CREDIT' as const, value: valorAbs },
+          ];
+
     const journalEntry = await this.prisma.journalEntry.create({
       data: {
         companyId,
@@ -241,17 +450,7 @@ export class EquityMethodService {
         description: descricao,
         sourceModule: 'INVESTMENT',
         createdById: userId,
-        items: {
-          create: ganho
-            ? [
-                { accountId: investment.investmentAccountId, type: 'DEBIT', value: valorAbs },
-                { accountId: investment.gainAccountId, type: 'CREDIT', value: valorAbs },
-              ]
-            : [
-                { accountId: investment.lossAccountId, type: 'DEBIT', value: valorAbs },
-                { accountId: investment.investmentAccountId, type: 'CREDIT', value: valorAbs },
-              ],
-        },
+        items: { create: items },
       },
     });
 

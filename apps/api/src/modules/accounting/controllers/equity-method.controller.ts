@@ -1,8 +1,8 @@
 // apps/api/src/modules/accounting/controllers/equity-method.controller.ts
-import { Controller, Get, Post, Body, Param, Query, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, Query, Req, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../../../auth/guards/jwt.guard';
 import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
-import { EquityMethodService, CreateEquityMethodDto } from '../services/equity-method.service';
+import { EquityMethodService, CreateEquityMethodDto, UpdateEquityMethodDto } from '../services/equity-method.service';
 
 @UseGuards(JwtAuthGuard)
 @Controller('accounting/equity-method')
@@ -17,6 +17,16 @@ export class EquityMethodController {
   @Post()
   create(@Req() req: any, @CurrentUser('object') user: any, @Body() dto: CreateEquityMethodDto) {
     return this.svc.create(req.headers['x-company-id'], user, dto);
+  }
+
+  @Patch(':id')
+  update(@Req() req: any, @Param('id') id: string, @Body() dto: UpdateEquityMethodDto) {
+    return this.svc.update(req.headers['x-company-id'], id, dto);
+  }
+
+  @Delete(':id')
+  remove(@Req() req: any, @Param('id') id: string) {
+    return this.svc.remove(req.headers['x-company-id'], id);
   }
 
   // Rota estatica antes das rotas ':id/...' (Regra 7)
