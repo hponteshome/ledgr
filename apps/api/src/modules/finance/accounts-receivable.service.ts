@@ -53,6 +53,7 @@ export class AccountsReceivableService {
           receivableAccountId: dto.receivableAccountId,
           journalEntryId:  journalEntry.id,
           fixedAssetId:    dto.fixedAssetId ?? null,
+          rentalContractId: dto.rentalContractId ?? null,
           notes:           dto.notes ?? null,
           createdById:     userId,
         },

@@ -18,6 +18,14 @@ export class RentalContractsController {
     return this.svc.prepareSignersByDocument(companyId, documentId);
   }
 
+  @Post('gerar-lancamentos')
+  @RequireResourceAccess('rental-contracts', 'EDIT')
+  gerarLancamentos(@Req() req: any, @Body('competencia') competencia: string) {
+    const companyId = req.headers['x-company-id'] ?? '';
+    const userId = req.user?.id ?? req.user?.sub ?? '';
+    return this.svc.gerarLancamentos(companyId, userId, competencia);
+  }
+
   @Get()
   @RequireResourceAccess('rental-contracts', 'VIEW')
   findAll(@Req() req: any, @Query('status') status?: string) {

@@ -158,6 +158,16 @@ export const ContabilTab: React.FC<Props> = ({ companyId, labelCls, inputCls, pa
         </div>
       </div>
 
+      {/* Locacao de Imoveis */}
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4">
+        <div className="text-xs font-bold text-gray-500 uppercase tracking-widest border-l-4 border-blue-500 pl-3">Locação de Imóveis</div>
+        <p className="text-xs text-gray-500">Contas usadas para gerar automaticamente a receita mensal de aluguéis (Contratos de Locação → Gerar Lançamentos).</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <AccountPicker label="Receita de Aluguéis" value={config.locacaoContaReceitaAlugueisId||''} onChange={v=>upd('locacaoContaReceitaAlugueisId', (v || null) as any)} accounts={accounts} />
+          <AccountPicker label="Aluguéis a Receber" value={config.locacaoContaAlugueisAReceberId||''} onChange={v=>upd('locacaoContaAlugueisAReceberId', (v || null) as any)} accounts={accounts} />
+        </div>
+      </div>
+
       {/* Representante Legal */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4">
         <div className="text-xs font-bold text-gray-500 uppercase tracking-widest border-l-4 border-purple-500 pl-3">Representante Legal</div>

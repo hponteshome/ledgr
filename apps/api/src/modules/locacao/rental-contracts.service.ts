@@ -72,6 +72,97 @@ export class RentalContractsService {
     return found;
   }
 
+  // Recorrencia mensal de aluguel: gera o ArEntry (origin ALUGUEL) + JournalEntry
+  // (Debito Alugueis a Receber / Credito Receita de Alugueis, cada partida ja
+  // marcada com assetId do imovel) para cada contrato ATIVO vigente na
+  // competencia, uma unica vez por contrato+mes (idempotente via
+  // @@unique([rentalContractId, competenceMonth])). Espelha o padrao ja
+  // validado do ProvisaoService.gerarLancamentos() (lado despesa), agora
+  // para o lado receita. NOVO 25/09/2026.
+  async gerarLancamentos(companyId: string, userId: string, competencia: string) {
+    const config = await this.prisma.companyAccountingConfig.findUnique({ where: { companyId } });
+    if (!config?.locacaoContaReceitaAlugueisId || !config?.locacaoContaAlugueisAReceberId) {
+      throw new BadRequestException(
+        "Configure as contas de Receita de Aluguéis e Aluguéis a Receber na aba Contábil antes de gerar os lançamentos.",
+      );
+    }
+
+    const [y, m] = competencia.split('-').map(Number);
+    const inicioMes = new Date(Date.UTC(y, m - 1, 1));
+    const fimMes = new Date(Date.UTC(y, m, 0, 23, 59, 59, 999));
+
+    const contratos = await this.prisma.rentalContract.findMany({
+      where: {
+        companyId,
+        deletedAt: null,
+        status: "ATIVO",
+        startDate: { lte: fimMes },
+        OR: [{ endDate: null }, { endDate: { gte: inicioMes } }],
+      },
+      include: { fixedAsset: { select: { id: true, internalCode: true, description: true } } },
+    });
+
+    const results: any[] = [];
+    for (const contrato of contratos) {
+      const existing = await this.prisma.arEntry.findFirst({
+        where: { rentalContractId: contrato.id, competenceMonth: competencia },
+      });
+      if (existing) {
+        results.push({ contratoId: contrato.id, imovel: contrato.fixedAsset.internalCode, status: "ja_existia" });
+        continue;
+      }
+
+      const venc = new Date(Date.UTC(y, m - 1, contrato.dueDay, 12));
+      if (venc.getUTCMonth() !== m - 1) venc.setUTCDate(0);
+
+      const amount = contrato.rentAmount;
+      const titulo = "Aluguel " + contrato.fixedAsset.internalCode + " - " + competencia;
+
+      const arEntry = await this.prisma.$transaction(async (tx) => {
+        const journalEntry = await tx.journalEntry.create({
+          data: {
+            companyId,
+            date: venc,
+            description: "Receita de competência: " + titulo,
+            sourceModule: "FINANCE",
+            createdById: userId,
+            items: {
+              create: [
+                { accountId: config.locacaoContaAlugueisAReceberId!, value: amount, type: "DEBIT", assetId: contrato.fixedAssetId },
+                { accountId: config.locacaoContaReceitaAlugueisId!, value: amount, type: "CREDIT", assetId: contrato.fixedAssetId },
+              ],
+            },
+          },
+        });
+
+        return tx.arEntry.create({
+          data: {
+            companyId,
+            title: titulo,
+            origin: "ALUGUEL",
+            issueDate: inicioMes,
+            dueDate: venc,
+            competenceMonth: competencia,
+            amount,
+            customerName: contrato.tenantName,
+            customerCnpjCpf: contrato.tenantTaxId,
+            customerId: contrato.tenantId,
+            fixedAssetId: contrato.fixedAssetId,
+            rentalContractId: contrato.id,
+            revenueAccountId: config.locacaoContaReceitaAlugueisId!,
+            receivableAccountId: config.locacaoContaAlugueisAReceberId!,
+            journalEntryId: journalEntry.id,
+            createdById: userId,
+          },
+        });
+      });
+
+      results.push({ contratoId: contrato.id, imovel: contrato.fixedAsset.internalCode, status: "gerado", arEntryId: arEntry.id });
+    }
+
+    return { competencia, total: contratos.length, results };
+  }
+
   async create(companyId: string, userId: string, dto: CreateRentalContractDto) {
     return this.prisma.rentalContract.create({
       data: {
