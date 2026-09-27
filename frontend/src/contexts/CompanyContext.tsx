@@ -35,14 +35,27 @@ export const CompanyProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const competenciaKey = (companyId: string) => `@ledgr:activeCompetencia:${companyId}`;
   const lastDayOfMonth = (year: number, month: number) => new Date(year, month + 1, 0);
 
+  // CORRIGIDO 25/09/2026: o backend devolve a data (db.Date) como meia-noite
+  // UTC (ex: "2025-12-31T00:00:00.000Z"). new Date(iso) direto fica ancorado
+  // nesse instante UTC - lido com getters LOCAIS (getDate(), usado em
+  // Header.tsx/formatDDMMYYYY) em fuso negativo (Brasil, UTC-3) sempre mostra
+  // o dia ANTERIOR (achado real: banco com 2025-12-31 correto, tela
+  // mostrando 30/12/2025). Extrai so a parte AAAA-MM-DD e monta a data com
+  // o construtor LOCAL (new Date(ano, mes, dia)) - mesmo principio ja usado
+  // em rental-contracts.service.ts (toDate()) para campos so-data.
+  const parseDateOnly = (value: string): Date => {
+    const [y, m, d] = value.substring(0, 10).split('-').map(Number);
+    return new Date(y, m - 1, d);
+  };
+
   const loadActiveCompetencia = async (companyId: string) => {
     const cached = localStorage.getItem(competenciaKey(companyId));
-    if (cached) setActiveCompetenciaState(new Date(cached));
+    if (cached) setActiveCompetenciaState(parseDateOnly(cached));
     try {
       const response = await api.get(`/companies/${companyId}/active-competencia`);
       const iso = response.data?.activeCompetencia;
       const today = new Date();
-      const date = iso ? new Date(iso) : lastDayOfMonth(today.getFullYear(), today.getMonth());
+      const date = iso ? parseDateOnly(iso) : lastDayOfMonth(today.getFullYear(), today.getMonth());
       setActiveCompetenciaState(date);
       localStorage.setItem(competenciaKey(companyId), date.toISOString());
     } catch {

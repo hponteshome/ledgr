@@ -156,7 +156,7 @@ const TreeRow: React.FC<{
             >
                 <td className="py-1.5 px-3">
                     <div className="flex items-center min-w-0">
-                        <div style={{ width: `${depth * 16}px`, flexShrink: 0 }} />
+                        {/* Deslocamento por nivel removido a pedido do usuario (25/09/2026) - codigo/conta sempre alinhados a esquerda */}
                         <span className="text-slate-400 mr-1.5 flex-shrink-0">
                             {hasChildren
                                 ? (isOpen ? <FiChevronDown size={14} /> : <FiChevronRight size={14} />)
@@ -302,7 +302,7 @@ export const AccountTree: React.FC<AccountTreeProps> = ({ nodes, renderBalances,
 
     const othersSum = cols
         .filter(c => c.key !== 'name')
-        .reduce((s, c) => s + Math.max(c.min, overrides[c.key] ?? c.def), 0);
+        .reduce((s, c) => s + Math.max(c.min, (c.key === 'actions' ? c.def : (overrides[c.key] ?? c.def))), 0);
 
     const widthOf = (c: typeof COLS[number]): number => {
         const o = overrides[c.key];

@@ -92,9 +92,14 @@ export class CreateAssetDto {
   @MaxLength(30)
   internalCode: string;
 
+  // Limite elevado de 255 -> 1000 em 25/09/2026: descricoes reais de
+  // ativos (ex.: imoveis com matricula, historico de aquisicao, doacao
+  // a dependentes) legitimamente passam de 255 caracteres - coluna no
+  // banco e Text (sem limite), a validacao era artificialmente baixa e
+  // travava qualquer edicao de um ativo ja salvo acima do teto antigo.
   @IsString()
   @IsNotEmpty()
-  @MaxLength(255)
+  @MaxLength(1000)
   description: string;
 
   @IsEnum(AssetGroup)
@@ -394,9 +399,10 @@ export class CreateImprovementDto {
   @IsEnum(ImprovementType)
   type: ImprovementType;
 
+  // Mesmo ajuste de limite do ativo principal (255 -> 1000), 25/09/2026.
   @IsString()
   @IsNotEmpty()
-  @MaxLength(255)
+  @MaxLength(1000)
   description: string;
 
   @IsOptional()

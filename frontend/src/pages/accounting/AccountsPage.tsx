@@ -125,15 +125,14 @@ export default function AccountsPage() {
     const montarLinhasImpressao = (nodes: Account[]): string => {
         let html = '';
         for (const n of nodes) {
-            const indent = '&nbsp;&nbsp;'.repeat(Math.max(0, n.level - 1));
             html += `<tr${n.isAnalytic ? '' : ' class="total"'}>
-                <td>${indent}${n.code}</td>
+                <td>${n.code}</td>
                 <td>${n.name}</td>
                 <td>${TYPE_LABEL[n.type] || n.type}</td>
                 <td>${n.reducedCode || ''}</td>
                 <td class="num">${fmtMoeda(n.calculatedBalance)}</td>
                 <td class="num">${fmtMoeda(n.ecdBalance)}</td>
-                <td class="num">${n.difference !== null ? fmtMoeda(n.difference) : 'check'}</td>
+                <td class="num">${n.difference !== null ? fmtMoeda(n.difference) : '-'}</td>
             </tr>`;
             if (n.children) html += montarLinhasImpressao(n.children);
         }

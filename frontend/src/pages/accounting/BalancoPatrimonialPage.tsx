@@ -68,9 +68,14 @@ const BalancoPatrimonialPage: React.FC = () => {
     // Filtro de nivel (so afeta o que e exibido/impresso - totais acima
     // sempre usam os arrays completos, nunca os "visiveis").
     const passaNivel = (lvl: number) => maxDepth === null ? true : (soNivelExato ? lvl === maxDepth : lvl <= maxDepth);
-    const ativoVisivel = ativo.filter(i => passaNivel(i.account.level));
-    const passivoVisivel = passivo.filter(i => passaNivel(i.account.level));
-    const plVisivel = pl.filter(i => passaNivel(i.account.level));
+    // NOVO 25/09/2026: conta/grupo com saldo zero (currentBalance ~0) nao
+    // entra na exibicao (tela e impressao, que reaproveita os mesmos
+    // arrays) - reduz ruido visual. Totais acima continuam usando os
+    // arrays completos (ativo/passivo/pl), nunca os "visiveis".
+    const temSaldo = (i: BPItem) => Math.abs(i.currentBalance) > 0.005;
+    const ativoVisivel = ativo.filter(i => passaNivel(i.account.level) && temSaldo(i));
+    const passivoVisivel = passivo.filter(i => passaNivel(i.account.level) && temSaldo(i));
+    const plVisivel = pl.filter(i => passaNivel(i.account.level) && temSaldo(i));
 
     const BPRow = ({ item, depth = 0 }: { item: BPItem; depth?: number }) => (
         <tr>

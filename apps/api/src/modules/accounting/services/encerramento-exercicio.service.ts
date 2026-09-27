@@ -228,18 +228,27 @@ export class EncerramentoExercicioService {
     }
 
     // Etapa 1: zera cada conta de Receita/Despesa contra a ARE
-    const itemsEtapa1 = prev.accounts.map((a) => ({
-      accountId: a.id,
-      accountCode: a.code,
-      value: a.zeragemValor,
-      type: a.zeragemTipo,
-    }));
-    itemsEtapa1.push({
-      accountId: areId,
-      accountCode: areAccount.code,
-      value: prev.resultado,
-      type: prev.resultadoTipo === 'LUCRO' ? 'CREDIT' : 'DEBIT',
-    });
+    // NOVO 25/09/2026: a ARE ganha uma linha PAREADA por conta zerada (mesmo
+    // valor, tipo espelhado), em vez de uma unica linha agregada com o
+    // resultado liquido do ano - o total de debitos/creditos nao muda, so
+    // passa a existir a composicao completa (linha a linha) no proprio Razao
+    // da ARE. So vale para encerramentos daqui pra frente (decisao do
+    // usuario, 25/09/2026) - nao reprocessa os ja confirmados.
+    const itemsEtapa1: { accountId: string; accountCode: string; value: number; type: 'DEBIT' | 'CREDIT' }[] = [];
+    for (const a of prev.accounts) {
+      itemsEtapa1.push({
+        accountId: a.id,
+        accountCode: a.code,
+        value: a.zeragemValor,
+        type: a.zeragemTipo,
+      });
+      itemsEtapa1.push({
+        accountId: areId,
+        accountCode: areAccount.code,
+        value: a.zeragemValor,
+        type: a.zeragemTipo === 'DEBIT' ? 'CREDIT' : 'DEBIT',
+      });
+    }
 
     // CORRIGIDO (17/09/2026): journalEntryService.create() so passou a
     // aceitar sourceModule hoje - antes gravava 'ACCOUNTING' fixo pra

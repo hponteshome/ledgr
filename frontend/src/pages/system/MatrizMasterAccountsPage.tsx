@@ -3,7 +3,7 @@
 // importar/criar o plano de contas de qualquer empresa). Substitui a edicao
 // manual do arquivo texto PlanoContasMatrizLEDGR.txt - fonte de bugs reais
 // (desalinhamento de coluna, encoding) corrigidos nesta mesma sessao.
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { FiPlus, FiEdit2, FiEyeOff, FiEye, FiX } from 'react-icons/fi';
 import api from '../../services/api';
 
@@ -111,6 +111,56 @@ export const MatrizMasterAccountsPage: React.FC = () => {
   // sempre pelo botao generico "Nova Conta" do topo.
   const [paiPreSelecionado, setPaiPreSelecionado] = useState<MatrizAccount | null>(null);
 
+  // Colunas redimensionaveis por arrasto, largura salva no navegador
+  // (chave propria do Plano Matriz, separada da tabela das empresas).
+  const COL_WIDTHS_KEY = 'ledgr:matrizAccounts:colWidths:v1';
+  const COL_WIDTHS_DEFAULT: Record<string, number> = {
+    codigo: 140, nome: 320, nivel: 70, tipo: 90, nat: 60, bloco: 100, codred: 100, acoes: 110,
+  };
+  const [colWidths, setColWidths] = useState<Record<string, number>>(() => {
+    try {
+      const raw = window.localStorage.getItem(COL_WIDTHS_KEY);
+      if (!raw) return COL_WIDTHS_DEFAULT;
+      const parsed = JSON.parse(raw);
+      return { ...COL_WIDTHS_DEFAULT, ...parsed };
+    } catch {
+      return COL_WIDTHS_DEFAULT;
+    }
+  });
+  const resizing = useRef<{ col: string; startX: number; startWidth: number } | null>(null);
+
+  const startResize = (col: string) => (e: React.MouseEvent) => {
+    e.preventDefault();
+    resizing.current = { col, startX: e.clientX, startWidth: colWidths[col] ?? 100 };
+    const onMove = (ev: MouseEvent) => {
+      if (!resizing.current) return;
+      const delta = ev.clientX - resizing.current.startX;
+      const novaLargura = Math.max(50, resizing.current.startWidth + delta);
+      setColWidths(prev => ({ ...prev, [resizing.current!.col]: novaLargura }));
+    };
+    const onUp = () => {
+      resizing.current = null;
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      setColWidths(prev => {
+        try { window.localStorage.setItem(COL_WIDTHS_KEY, JSON.stringify(prev)); } catch {}
+        return prev;
+      });
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
+
+  const ResizeHandle: React.FC<{ col: string }> = ({ col }) => (
+    <span
+      onMouseDown={startResize(col)}
+      title="Arraste para redimensionar"
+      style={{ position: 'absolute', top: 0, right: 0, width: 6, height: '100%', cursor: 'col-resize', userSelect: 'none', zIndex: 2 }}
+      onMouseEnter={e => { (e.currentTarget.style.background = 'rgba(37, 99, 235, 0.25)'); }}
+      onMouseLeave={e => { (e.currentTarget.style.background = 'transparent'); }}
+    />
+  );
+
   const fetchContas = async () => {
     setLoading(true);
     try {
@@ -191,33 +241,48 @@ export const MatrizMasterAccountsPage: React.FC = () => {
       </div>
 
       <div style={{ overflowX: 'auto', border: '1px solid #E5E7EB', borderRadius: 8 }}>
-        <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+        <table style={{ borderCollapse: 'collapse', width: '100%', tableLayout: 'fixed' }}>
+          <colgroup>
+            <col style={{ width: colWidths.codigo }} />
+            <col style={{ width: colWidths.nome }} />
+            <col style={{ width: colWidths.nivel }} />
+            <col style={{ width: colWidths.tipo }} />
+            <col style={{ width: colWidths.nat }} />
+            <col style={{ width: colWidths.bloco }} />
+            <col style={{ width: colWidths.codred }} />
+            <col style={{ width: colWidths.acoes }} />
+          </colgroup>
           <thead>
             <tr style={{ background: '#F9FAFB' }}>
-              {['Código', 'Nome', 'Nível', 'Tipo', 'Nat.', 'Bloco', 'Cód. Red.', ''].map(h => (
-                <th key={h} style={{ padding: '8px 10px', fontSize: 11, color: '#9CA3AF', textTransform: 'uppercase', textAlign: 'left', borderBottom: '1px solid #E5E7EB' }}>{h}</th>
-              ))}
+              <th style={{ padding: '8px 10px', fontSize: 11, color: '#9CA3AF', textTransform: 'uppercase', textAlign: 'left', borderBottom: '1px solid #E5E7EB', position: 'relative' }}>Código<ResizeHandle col="codigo" /></th>
+              <th style={{ padding: '8px 10px', fontSize: 11, color: '#9CA3AF', textTransform: 'uppercase', textAlign: 'left', borderBottom: '1px solid #E5E7EB', position: 'relative' }}>Nome<ResizeHandle col="nome" /></th>
+              <th style={{ padding: '8px 10px', fontSize: 11, color: '#9CA3AF', textTransform: 'uppercase', textAlign: 'left', borderBottom: '1px solid #E5E7EB', position: 'relative' }}>Nível<ResizeHandle col="nivel" /></th>
+              <th style={{ padding: '8px 10px', fontSize: 11, color: '#9CA3AF', textTransform: 'uppercase', textAlign: 'left', borderBottom: '1px solid #E5E7EB', position: 'relative' }}>Tipo<ResizeHandle col="tipo" /></th>
+              <th style={{ padding: '8px 10px', fontSize: 11, color: '#9CA3AF', textTransform: 'uppercase', textAlign: 'left', borderBottom: '1px solid #E5E7EB', position: 'relative' }}>Nat.<ResizeHandle col="nat" /></th>
+              <th style={{ padding: '8px 10px', fontSize: 11, color: '#9CA3AF', textTransform: 'uppercase', textAlign: 'left', borderBottom: '1px solid #E5E7EB', position: 'relative' }}>Bloco<ResizeHandle col="bloco" /></th>
+              <th style={{ padding: '8px 10px', fontSize: 11, color: '#9CA3AF', textTransform: 'uppercase', textAlign: 'left', borderBottom: '1px solid #E5E7EB', position: 'relative' }}>Cód. Red.<ResizeHandle col="codred" /></th>
+              <th style={{ padding: '8px 10px', fontSize: 11, color: '#9CA3AF', textTransform: 'uppercase', textAlign: 'left', borderBottom: '1px solid #E5E7EB', position: 'relative' }}><ResizeHandle col="acoes" /></th>
             </tr>
           </thead>
           <tbody>
             {contasVisiveis.map((c, idx) => (
               <tr key={c.id} style={{ opacity: c.isActive ? 1 : 0.45, background: idx % 2 === 0 ? '#FFFFFF' : '#F1F5F9' }}>
-                <td style={{ padding: '6px 10px', fontSize: 12, fontFamily: 'monospace', fontWeight: c.isAnalytic ? 400 : 600, color: c.isAnalytic ? '#111827' : '#374151', borderBottom: '0.5px solid #F3F4F6', paddingLeft: 10 + (c.level - 1) * 16, borderLeft: c.isAnalytic ? '3px solid #10B981' : '3px solid transparent' }}>
+                <td style={{ padding: '6px 10px', fontSize: 12, fontFamily: 'monospace', fontWeight: c.isAnalytic ? 400 : 600, color: c.isAnalytic ? '#111827' : '#374151', borderBottom: '0.5px solid #F3F4F6', paddingLeft: 10, borderLeft: c.isAnalytic ? '3px solid #10B981' : '3px solid transparent', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {c.code}
                 </td>
-                <td style={{ padding: '6px 10px', fontSize: 13, fontWeight: c.isAnalytic ? 400 : 600, color: c.isAnalytic ? '#111827' : '#374151', textTransform: c.isAnalytic ? 'none' : 'uppercase', letterSpacing: c.isAnalytic ? 'normal' : '0.3px', borderBottom: '0.5px solid #F3F4F6' }}>
+                <td style={{ padding: '6px 10px', fontSize: 13, fontWeight: c.isAnalytic ? 400 : 600, color: c.isAnalytic ? '#111827' : '#374151', textTransform: c.isAnalytic ? 'none' : 'uppercase', letterSpacing: c.isAnalytic ? 'normal' : '0.3px', borderBottom: '0.5px solid #F3F4F6', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {c.name}
                 </td>
                 <td style={{ padding: '6px 10px', fontSize: 12, color: '#9CA3AF', borderBottom: '0.5px solid #F3F4F6' }}>{c.level}</td>
-                <td style={{ padding: '6px 10px', fontSize: 12, borderBottom: '0.5px solid #F3F4F6' }}>{typeLabel[c.type] || c.type}</td>
+                <td style={{ padding: '6px 10px', fontSize: 12, borderBottom: '0.5px solid #F3F4F6', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{typeLabel[c.type] || c.type}</td>
                 <td style={{ padding: '6px 10px', fontSize: 12, borderBottom: '0.5px solid #F3F4F6' }}>{c.nature === 'DEBIT' ? 'D' : 'C'}</td>
-                <td style={{ padding: '6px 10px', fontSize: 11, borderBottom: '0.5px solid #F3F4F6' }}>
+                <td style={{ padding: '6px 10px', fontSize: 11, borderBottom: '0.5px solid #F3F4F6', overflow: 'hidden' }}>
                   {c.bloco !== 'NUCLEO' && (
                     <span style={{ background: '#FEF3C7', color: '#92400E', padding: '2px 6px', borderRadius: 3 }}>{c.bloco}</span>
                   )}
                 </td>
-                <td style={{ padding: '6px 10px', fontSize: 12, fontFamily: 'monospace', color: c.isAnalytic ? '#059669' : '#D1D5DB', fontWeight: c.isAnalytic ? 500 : 400, borderBottom: '0.5px solid #F3F4F6' }}>{c.reducedCode || '-'}</td>
-                <td style={{ padding: '6px 10px', borderBottom: '0.5px solid #F3F4F6', whiteSpace: 'nowrap' }}>
+                <td style={{ padding: '6px 10px', fontSize: 12, fontFamily: 'monospace', color: c.isAnalytic ? '#059669' : '#D1D5DB', fontWeight: c.isAnalytic ? 500 : 400, borderBottom: '0.5px solid #F3F4F6', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.reducedCode || '-'}</td>
+                <td style={{ padding: '6px 10px', borderBottom: '0.5px solid #F3F4F6', whiteSpace: 'nowrap', overflow: 'hidden' }}>
                   <button onClick={() => { setPaiPreSelecionado(c); setContaEditando(null); setModalAberto('novo'); }} title="Adicionar conta filha" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#2563EB', marginRight: 8 }}>
                     <FiPlus size={14} />
                   </button>
