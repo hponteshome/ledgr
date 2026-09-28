@@ -146,7 +146,13 @@ const DrePage: React.FC = () => {
     const valTotal = (items: DREItem[]) => items.filter(i => i.account.level === 1).reduce((s, i) => s + val(i), 0);
     const totalReceitas = valTotal(receitas);
     const totalDespesas = valTotal(despesas);
-    const resultado = totalReceitas + totalDespesas;
+    // CORRIGIDO 26/09/2026: resultado nao depende mais da natureza da conta raiz
+    // (antes R + D somava as duas quando a raiz de despesas era devedora, e o
+    // rotulo LUCRO/PREJUIZO nunca mudava). Creditos - debitos de todas as
+    // contas de resultado nivel 1: positivo = lucro, negativo = prejuizo.
+    const resultado = [...receitas, ...despesas]
+        .filter(i => i.account.level === 1)
+        .reduce((s, i) => s + (i.credits - i.debits), 0);
 
     // Filtro de nivel (so afeta o que e exibido/impresso - totais acima
     // sempre usam os arrays completos, nunca os "visiveis").
