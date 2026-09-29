@@ -124,7 +124,7 @@ export default function RentalContractsListPage() {
                                 className="hover:bg-gray-50 cursor-pointer"
                                 onClick={() => {
                                     setDetailId(c.id);
-                                    setDetailTitle(`Quadro Resumo — ${c.fixedAsset?.internalCode ?? ''}`);
+                                    setDetailTitle(`Quadro Resumo - ${c.fixedAsset?.internalCode ?? ''}`);
                                 }}
                             >
                                 <td className="px-3 py-2.5">

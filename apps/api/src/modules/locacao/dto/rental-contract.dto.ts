@@ -2,7 +2,7 @@
 import { PartialType } from '@nestjs/mapped-types';
 import {
   IsString, IsOptional, IsUUID, IsNumber, IsInt, IsBoolean,
-  IsEnum, IsDateString, MaxLength, Min, Max,
+  IsEnum, IsDateString, MaxLength, Min, Max, IsIn,
 } from 'class-validator';
 import {
   RentalDuePeriodicity,
@@ -34,6 +34,12 @@ export class CreateRentalContractDto {
   tenantProfession?: string;
   @IsOptional() @IsEnum(MaritalStatus)
   tenantMaritalStatus?: MaritalStatus;
+  @IsOptional() @IsIn(['M', 'F', ''])
+  tenantGender?: string;
+  @IsOptional() @IsIn(['M', 'F', ''])
+  guarantorGender?: string;
+  @IsOptional() @IsString()
+  specificClauses?: string;
   @IsOptional() @IsString()
   tenantNationality?: string;
   @IsOptional() @IsString()

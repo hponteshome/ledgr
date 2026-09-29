@@ -2,7 +2,8 @@
 // frontend/src/pages/documentos/RepositorioPage.tsx
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { FiFileText, FiCheckCircle, FiClock, FiArchive, FiDownload, FiEye, FiShield, FiFilter, FiUpload, FiEdit2 } from 'react-icons/fi';
+import { FiFileText, FiCheckCircle, FiClock, FiArchive, FiDownload, FiEye, FiShield, FiFilter, FiUpload, FiEdit2, FiFile, FiUploadCloud } from 'react-icons/fi';
+import { toast } from 'react-hot-toast';
 import { SignatureValidateModal } from '../documents/signatures/SignatureValidateModal';
 import { DocumentViewModal } from './DocumentViewModal';
 import { DocumentEditModal } from './DocumentEditModal';
@@ -102,6 +103,48 @@ export const RepositorioPage: React.FC = () => {
     }
   };
 
+  // Download PDF / Word e importacao de versao revisada (29/09/2026)
+  const baixarArquivo = async (docId: string, formato: 'pdf' | 'docx', titulo: string) => {
+    try {
+      const res = await api.get(`/documents/${docId}/${formato}`, { responseType: 'blob' });
+      const disp = String(res.headers['content-disposition'] ?? '');
+      const utf = disp.match(/filename\*=UTF-8''([^;]+)/);
+      const ascii = disp.match(/filename="([^"]+)"/);
+      const nome = utf ? decodeURIComponent(utf[1]) : ascii ? ascii[1] : titulo.replace(/\.pdf$/i, '') + '.' + formato;
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(res.data);
+      a.download = nome;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+    } catch {
+      toast.error(formato === 'pdf' ? 'Não foi possível gerar o PDF.' : 'Não foi possível gerar o arquivo Word.');
+    }
+  };
+
+  const importInputRef = React.useRef<HTMLInputElement | null>(null);
+  const [importTarget, setImportTarget] = useState<string | null>(null);
+
+  const importarRevisao = async (file: File) => {
+    const alvo = importTarget;
+    setImportTarget(null);
+    if (importInputRef.current) importInputRef.current.value = '';
+    if (!alvo) return;
+    if (!window.confirm('Importar este arquivo Word como nova versão do documento? O texto atual continua no histórico de versões.')) return;
+    const fd = new FormData();
+    fd.append('file', file);
+    try {
+      // multipart explicito: com o Content-Type JSON padrao do api, o axios
+      // converte o FormData em JSON e o arquivo nao chega ao backend.
+      await api.post(`/documents/${alvo}/import-revision`, fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      toast.success('Versão revisada importada.');
+      setTimeout(() => window.location.reload(), 800);
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message ?? 'Não foi possível importar a versão revisada.');
+    }
+  };
+
   return (
     <div className="space-y-5">
       <div className="flex justify-between items-center">
@@ -179,8 +222,14 @@ export const RepositorioPage: React.FC = () => {
                         <button title="Editar" onClick={() => setEditDoc({id: doc.id, title: doc.title})}
                           className="p-1.5 text-gray-400 hover:text-blue-700 hover:bg-blue-50 rounded"><FiEdit2 size={14} /></button>
                       )}
-                      <button title="Baixar PDF"
+                      <button title="Baixar PDF" onClick={() => baixarArquivo(doc.id, 'pdf', doc.title)}
                         className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded"><FiDownload size={14} /></button>
+                      <button title="Baixar versão editável (Word)" onClick={() => baixarArquivo(doc.id, 'docx', doc.title)}
+                        className="p-1.5 text-gray-400 hover:text-blue-700 hover:bg-blue-50 rounded"><FiFile size={14} /></button>
+                      {doc.status === 'RASCUNHO' && (
+                        <button title="Importar versão revisada (Word)" onClick={() => { setImportTarget(doc.id); importInputRef.current?.click(); }}
+                          className="p-1.5 text-gray-400 hover:text-green-700 hover:bg-green-50 rounded"><FiUploadCloud size={14} /></button>
+                      )}
                       <button title="Validar Assinatura" onClick={() => setValidateDocId(doc.id)}
                         className="p-1.5 text-gray-400 hover:text-purple-700 hover:bg-purple-50 rounded"><FiShield size={14} /></button>
                     </div>
@@ -221,6 +270,8 @@ export const RepositorioPage: React.FC = () => {
         </table>
       </div>
 
+      <input ref={importInputRef} type="file" accept=".docx" className="hidden"
+        onChange={e => { const f = e.target.files?.[0]; if (f) importarRevisao(f); }} />
       {showRedigir && <RedigirProcuracaoModal onClose={() => setShowRedigir(false)} onSuccess={() => window.location.reload()} />}
       {showImport  && <ImportarDocumentoModal onClose={() => setShowImport(false)}  onSuccess={() => window.location.reload()} />}
       {viewDoc !== null && (

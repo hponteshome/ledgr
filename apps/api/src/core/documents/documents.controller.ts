@@ -48,13 +48,13 @@ export class DocumentsController {
 
   // ── CRUD ─────────────────────────────────────────────────────
 
-  // POST /documents — cria documento digitado (sem arquivo)
+  // POST /documents - cria documento digitado (sem arquivo)
   @Post()
   create(@Request() req, @Body() dto: CreateDocumentDto) {
     return this.documentsService.create(dto, req.user.id);
   }
 
-  // POST /documents/upload — cria documento via upload .docx
+  // POST /documents/upload - cria documento via upload .docx
   // Extrai texto com mammoth.js, gera hash SHA-256, persiste
   @Post('upload')
   @UseInterceptors(FileInterceptor('file'))
@@ -66,7 +66,7 @@ export class DocumentsController {
     return this.documentsService.createFromUpload(file, dto, req.user.id);
   }
 
-  // PATCH /documents/:id — salva edição (cria nova DocumentVersion automaticamente)
+  // PATCH /documents/:id - salva edição (cria nova DocumentVersion automaticamente)
   @Patch(':id')
   update(
     @Param('id') id: string,
@@ -76,7 +76,7 @@ export class DocumentsController {
     return this.documentsService.update(id, dto, req.user.id);
   }
 
-  // DELETE /documents/:id — soft delete
+  // DELETE /documents/:id - soft delete
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.documentsService.remove(id);
@@ -84,13 +84,13 @@ export class DocumentsController {
 
   // ── Versões ──────────────────────────────────────────────────
 
-  // GET /documents/:id/versions — histórico completo de versões
+  // GET /documents/:id/versions - histórico completo de versões
   @Get(':id/versions')
   getVersions(@Param('id') id: string) {
     return this.documentsService.getVersions(id);
   }
 
-  // POST /documents/:id/versions/:version/restore — restaurar versão anterior
+  // POST /documents/:id/versions/:version/restore - restaurar versão anterior
   @Post(':id/versions/:version/restore')
   restoreVersion(
     @Param('id') id: string,
@@ -102,7 +102,7 @@ export class DocumentsController {
 
   // ── Exportação ───────────────────────────────────────────────
 
-  // GET /documents/:id/pdf — gera e baixa PDF
+  // GET /documents/:id/pdf - gera e baixa PDF
   @Get(':id/pdf')
   async generatePdf(
     @Param('id') id: string,
@@ -120,7 +120,7 @@ export class DocumentsController {
     res.send(pdfBuffer);
   }
 
-  // GET /documents/:id/preview — retorna HTML para visualização inline
+  // GET /documents/:id/preview - retorna HTML para visualização inline
   @Get(':id/preview')
   async previewHtml(
     @Param('id') id: string,
@@ -131,21 +131,36 @@ export class DocumentsController {
     res.send(html);
   }
 
-  // GET /documents/:id/docx — exporta como .docx
-  // TODO: implementar DocumentsService.exportDocx()
-  // @Get(':id/docx')
-  // async exportDocx(@Param('id') id: string, @Res() res: Response) {
-  //   const buffer = await this.documentsService.exportDocx(id);
-  //   res.set({
-  //     'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  //     'Content-Disposition': `attachment; filename="documento-${id}.docx"`,
-  //   });
-  //   res.send(buffer);
-  // }
+  // GET /documents/:id/docx - versao editavel (.docx), espelhando o PDF (29/09/2026)
+  @Get(':id/docx')
+  async exportDocx(@Param('id') id: string, @Res() res: Response) {
+    const buffer = await this.documentsService.exportDocx(id);
+    const fileName = (await this.documentsService.buildDownloadFilename(id)).replace(/\.pdf$/i, '.docx');
+    const asciiFileName = fileName
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^\x20-\x7E]/g, '_');
+    res.set({
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'Content-Disposition': `attachment; filename="${asciiFileName}"; filename*=UTF-8''${encodeURIComponent(fileName)}`,
+    });
+    res.send(buffer);
+  }
+
+  // POST /documents/:id/import-revision - importa versao revisada (.docx) como nova versao (so em RASCUNHO)
+  @Post(':id/import-revision')
+  @UseInterceptors(FileInterceptor('file', { storage: require('multer').memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } }))
+  importRevision(
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Request() req: any,
+  ) {
+    if (!file) throw new BadRequestException('Arquivo .docx nao enviado.');
+    return this.documentsService.importRevision(id, file, req.user?.id);
+  }
 
   // ── Signatários ──────────────────────────────────────────────
 
-  // POST /documents/:id/signers — adiciona signatário esperado
+  // POST /documents/:id/signers - adiciona signatário esperado
   @Post(':id/signers')
   addSigner(
     @Param('id') id: string,
@@ -154,7 +169,7 @@ export class DocumentsController {
     return this.documentsService.addSigner(id, dto);
   }
 
-  // DELETE /documents/:id/signers/:signerId — remove signatário
+  // DELETE /documents/:id/signers/:signerId - remove signatário
   @Delete(':id/signers/:signerId')
   removeSigner(
     @Param('id') id: string,
@@ -165,7 +180,7 @@ export class DocumentsController {
 
   // ── Assinatura Digital ───────────────────────────────────────
 
-  // POST /documents/:id/sign — aplica assinatura (gov.br ou cert digital)
+  // POST /documents/:id/sign - aplica assinatura (gov.br ou cert digital)
   @Post(':id/sign')
   @HttpCode(HttpStatus.OK)
   sign(
@@ -176,7 +191,7 @@ export class DocumentsController {
     return this.documentsService.sign(id, dto, req.user);
   }
 
-  // GET /documents/:id/sign/govbr/init — inicia OAuth gov.br (retorna URL redirect)
+  // GET /documents/:id/sign/govbr/init - inicia OAuth gov.br (retorna URL redirect)
   @Get(':id/sign/govbr/init')
   initGovBrSign(
     @Param('id') id: string,
@@ -185,7 +200,7 @@ export class DocumentsController {
     return this.documentsService.initGovBrOAuth(id, req.user.id);
   }
 
-  // POST /documents/:id/sign/govbr/callback — recebe code do OAuth gov.br
+  // POST /documents/:id/sign/govbr/callback - recebe code do OAuth gov.br
   // TODO: implementar DocumentsService.handleGovBrCallback()
   @Post(':id/sign/govbr/callback')
   @HttpCode(HttpStatus.OK)
@@ -197,13 +212,13 @@ export class DocumentsController {
     return this.documentsService.handleGovBrCallback(id, body.code, body.state, req.user);
   }
 
-  // GET /documents/:id/signatures — lista assinaturas do documento
+  // GET /documents/:id/signatures - lista assinaturas do documento
   @Get(':id/signatures')
   getSignatures(@Param('id') id: string) {
     return this.documentsService.getSignatures(id);
   }
 
-  // POST /documents/:id/signers/:signerId/sign-physical — marca signatario como
+  // POST /documents/:id/signers/:signerId/sign-physical - marca signatario como
   // assinado fisicamente (sem certificado/gov.br), com auditoria
   @Post(':id/signers/:signerId/sign-physical')
   @HttpCode(HttpStatus.OK)
@@ -231,7 +246,7 @@ export class DocumentsController {
     return this.documentsService.signPhysical(id, signerId, evidenceUrl, req.user?.id);
   }
 
-  // POST /documents/:id/reopen — reabre documento (EM_REVISAO ou
+  // POST /documents/:id/reopen - reabre documento (EM_REVISAO ou
   // AGUARDANDO_ASSINATURA -> RASCUNHO), apaga assinaturas/signatarios existentes
   @Post(':id/reopen')
   @HttpCode(HttpStatus.OK)
@@ -241,7 +256,7 @@ export class DocumentsController {
 
   // ── Status e Visibilidade ────────────────────────────────────
 
-  // PATCH /documents/:id/status — altera status manualmente (ex: arquivar)
+  // PATCH /documents/:id/status - altera status manualmente (ex: arquivar)
   @Patch(':id/status')
   updateStatus(
     @Param('id') id: string,
@@ -251,7 +266,7 @@ export class DocumentsController {
     return this.documentsService.updateStatus(id, body.status, req.user?.id);
   }
 
-  // PATCH /documents/:id/visibility — altera classificação de visibilidade
+  // PATCH /documents/:id/visibility - altera classificação de visibilidade
   @Patch(':id/visibility')
   updateVisibility(
     @Param('id') id: string,
@@ -260,7 +275,7 @@ export class DocumentsController {
     return this.documentsService.updateVisibility(id, body.visibility);
   }
 
-  // POST /documents/import-signed — importa PDF assinado para o Arquivo
+  // POST /documents/import-signed - importa PDF assinado para o Arquivo
   @Post('import-signed')
   @UseInterceptors(FileInterceptor('file', { storage: require('multer').memoryStorage() }))
   async importSigned(

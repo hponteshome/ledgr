@@ -461,7 +461,7 @@ export default function AssetsList() {
             {rentalModalAsset && (
                 <RentalContractDetailModal
                     contractId={rentalModalAsset.rentalContracts?.[0]?.id}
-                    title={`Quadro Resumo — ${rentalModalAsset.internalCode}`}
+                    title={`Quadro Resumo - ${rentalModalAsset.internalCode}`}
                     onClose={() => setRentalModalAsset(null)}
                 />
             )}

@@ -124,7 +124,7 @@ export class DocumentsService {
         signers: {
           select: { id: true, name: true, status: true },
         },
-        // Última versão — para exibir changeNote na listagem
+        // Última versão - para exibir changeNote na listagem
         versions: {
           orderBy: { version: 'desc' },
           take: 1,
@@ -252,6 +252,13 @@ export class DocumentsService {
   async update(id: string, dto: UpdateDocumentDto, userId: string) {
     this.validateUuid(userId, 'userId');
     const doc = await this.getDocumentOrFail(id);
+    // Integridade (29/09/2026): conteudo so e editavel em RASCUNHO. Fora dele,
+    // o caminho e Reabrir (POST /documents/:id/reopen).
+    if (dto.content !== undefined && dto.content !== doc.content && doc.status !== 'RASCUNHO') {
+      throw new BadRequestException(
+        `Documento com status ${doc.status} nao pode ter o conteudo editado. Use Reabrir para voltar a Rascunho.`,
+      );
+    }
     const newVersion = doc.currentVersion + 1;
     const hash = dto.content ? this.sha256(dto.content) : doc.contentHash;
 
@@ -262,7 +269,7 @@ export class DocumentsService {
           version:     newVersion,
           content:     dto.content,
           contentHash: hash,
-          changeNote:  dto.changeNote ?? `Edição — v${newVersion}`,
+          changeNote:  dto.changeNote ?? `Edição - v${newVersion}`,
           createdById: userId,
         },
       });
@@ -399,7 +406,7 @@ export class DocumentsService {
     const enderecoLine1 = [
       [this.toTitleCase(company.street), company.number].filter(Boolean).join(', '),
       this.toTitleCase(company.neighborhood),
-    ].filter(Boolean).join(' — ');
+    ].filter(Boolean).join(' - ');
     const enderecoLine2 = [
       [this.toTitleCase(company.city), company.state].filter(Boolean).join(' - '),
       cepFmt ?? '',
@@ -415,6 +422,22 @@ export class DocumentsService {
     if (method === 'GOVBR') return 'gov.br';
     if (method === 'FISICO') return 'Assinatura Física (evidência anexada)';
     return 'Certificado ICP-Brasil';
+  }
+
+  // Corpo do PDF (29/09/2026): conteudo HTML (templates) entra como esta - antes
+  // era quebrado em <p> por linha em branco, o que aninhava <h2>/<p> dentro de <p>
+  // e anulava as regras de quebra. Texto puro continua virando paragrafos. Cada
+  // titulo (h1-h3) e agrupado com o paragrafo seguinte num .keep-with-next
+  // (break-inside: avoid) para nunca ficar isolado no pe da pagina.
+  private buildPdfBody(content: string | null | undefined): string {
+    const c = content ?? '';
+    if (!/^\s*</.test(c)) {
+      return c.split('\n\n').map((p: string) => `<p>${p.trim()}</p>`).join('\n');
+    }
+    return c.replace(
+      /(<h([1-3])\b[^>]*>[\s\S]*?<\/h\2>)(\s*)(<p\b[^>]*>[\s\S]*?<\/p>)/gi,
+      '<div class="keep-with-next">$1$3$4</div>',
+    );
   }
 
   async generatePdf(id: string): Promise<Buffer> {
@@ -443,14 +466,16 @@ export class DocumentsService {
           <span>Página <span class="pageNumber"></span> de <span class="totalPages"></span></span>
         </div>
       `;
-      letterheadMargin = { top: '35mm', bottom: '22mm', left: '30mm', right: '20mm' };
+      // Margens laterais 0: o recuo lateral vira padding do body (body.com-timbrado),
+      // que se repete em todas as paginas, liberando a faixa da tarja a 15 mm da borda.
+      letterheadMargin = { top: '35mm', bottom: '22mm', left: '0mm', right: '0mm' };
     }
 
     const visibilityWatermark: Record<string, string> = {
       PUBLICO:     '',
       RESERVADO:   'RESERVADO',
       RESTRITO:    'RESTRITO',
-      CONTROLADO:  'CONTROLADO — CONFIDENCIAL',
+      CONTROLADO:  'CONTROLADO - CONFIDENCIAL',
     };
 
     const watermarkText = doc.status === 'RASCUNHO'
@@ -467,7 +492,9 @@ export class DocumentsService {
           body { font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.8; color: #000; }
           h1 { text-align: center; font-size: 14pt; text-transform: uppercase; letter-spacing: 2px; }
           h2 { text-align: center; font-size: 12pt; text-transform: uppercase; letter-spacing: 1px; margin-top: 24pt; }
-          p { text-align: justify; margin: 6pt 0; }
+          p { text-align: justify; margin: 6pt 0; orphans: 3; widows: 3; }
+          .keep-with-next { break-inside: avoid; page-break-inside: avoid; }
+          h1, h2, h3 { break-after: avoid; page-break-after: avoid; }
           .signature-block { margin-top: 48pt; border-top: 1px solid #000; padding-top: 16pt; }
           .watermark {
             position: fixed; top: 50%; left: 50%;
@@ -482,27 +509,28 @@ export class DocumentsService {
             letter-spacing: 2px;
           }
           .vertical-tarja {
-            position: fixed; left: 2cm; top: 50%;
-            transform: translateY(-50%) rotate(-90deg);
-            transform-origin: center;
-            font-size: 8pt; font-weight: bold; letter-spacing: 3px; color: #666; white-space: nowrap;
+            position: fixed; left: 15mm; top: 50%;
+            transform-origin: left top;
+            transform: rotate(-90deg) translateX(-50%);
+            font-size: 8pt; line-height: 1; font-weight: bold; letter-spacing: 3px; color: #666; white-space: nowrap;
           }
+          body.com-timbrado { padding: 0 20mm 0 30mm; }
         </style>
       </head>
-      <body>
+      <body class="${letterhead ? 'com-timbrado' : ''}">
         ${watermarkText ? `<div class="watermark">${watermarkText}</div>` : ''}
         ${(doc.visibility !== 'PUBLICO' && doc.type === 'CONTRATO_LOCACAO') ? `<div class="vertical-tarja">CLASSIFICAÇÃO: ${doc.visibility}</div>` : ''}
-        ${doc.content.split('\n\n').map((p: string) => `<p>${p.trim()}</p>`).join('\n')}
+        ${this.buildPdfBody(doc.content)}
         ${doc.signatures?.length > 0 ? `
           <div class="signature-block">
             <p><strong>ASSINATURAS DIGITAIS</strong></p>
             ${(doc.signatures as any[]).map(s => `
-              <p>✓ ${s.signerName} — ${this.signatureMethodLabel(s.method)} — ${new Date(s.signedAt).toLocaleDateString('pt-BR')}</p>
+              <p>✓ ${s.signerName} - ${this.signatureMethodLabel(s.method)} - ${new Date(s.signedAt).toLocaleDateString('pt-BR')}</p>
             `).join('')}
           </div>
         ` : ''}
         ${(doc.visibility !== 'PUBLICO' && doc.type !== 'CONTRATO_LOCACAO')
-          ? `<div class="classification-bar">LEDGR — CLASSIFICAÇÃO: ${doc.visibility}</div>`
+          ? `<div class="classification-bar">LEDGR - CLASSIFICAÇÃO: ${doc.visibility}</div>`
           : ''}
       </body>
       </html>
@@ -523,6 +551,102 @@ export class DocumentsService {
     await browser.close();
 
     return pdfBuffer;
+  }
+
+  // Corpo do Word (29/09/2026): remove <style>, converte blocos <div> em paragrafos
+  // (linhas de assinatura viram tracos de texto), <em> -> <i> (a html-to-docx so
+  // reconhece <i>) e limpa quebras soltas entre blocos.
+  private buildDocxBody(content: string | null | undefined): string {
+    const c = content ?? '';
+    let h = /^\s*</.test(c)
+      ? c.replace(/<style[\s\S]*?<\/style>/gi, '')
+      : c.split('\n\n').map((p: string) => `<p>${p.trim()}</p>`).join('');
+    h = h
+      .replace(/<div class="linha-assinatura">([\s\S]*?)<\/div>/gi, '<p style="text-align:center">______________________________________<br>$1</p>')
+      .replace(/<div class="testemunha">([\s\S]*?)<\/div>/gi, '<p>$1</p>')
+      .replace(/<\/?div\b[^>]*>/gi, '')
+      .replace(/<(\/?)em\b[^>]*>/gi, '<$1i>')
+      .replace(/>\s*\n\s*</g, '><')
+      .replace(/(<\/(?:p|h[1-6])>)(?:<br\s*\/?>)+/gi, '$1')
+      .replace(/(?:<br\s*\/?>)+(<(?:p|h[1-6])\b)/gi, '$1');
+    // Fonte explicita em todo paragrafo/titulo: Times New Roman 11 pt (titulos
+    // centralizados). Cabecalho e rodape mantem tamanhos proprios.
+    const base = 'font-family:Times New Roman;font-size:11pt;';
+    h = h.replace(/<(p|h[1-6])\b([^>]*)>/gi, (_m: string, tag: string, attrs: string) => {
+      const extra = /^h/i.test(tag) ? 'text-align:center;' : '';
+      if (/style\s*=\s*"/i.test(attrs)) return `<${tag}${attrs.replace(/style\s*=\s*"/i, `style="${base}${extra}`)}>`;
+      return `<${tag}${attrs} style="${base}${extra}">`;
+    });
+    return h.trim();
+  }
+
+  // Exportacao Word (29/09/2026): mesmo corpo do PDF (buildPdfBody), sem <style>;
+  // timbrado no cabecalho, nome do arquivo + numero da pagina no rodape. Margens = PDF.
+  async exportDocx(id: string): Promise<Buffer> {
+    const doc = await this.getDocumentOrFail(id);
+    const letterhead = await this.buildLetterheadInfo(doc);
+    const fileName = (await this.buildDownloadFilename(id)).replace(/\.pdf$/i, '.docx');
+    const body = this.buildDocxBody(doc.content);
+    const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"></head><body>${body}</body></html>`;
+    const texto = letterhead
+      ? `<p style="text-align:right;font-family:Arial;font-size:8pt;"><strong>${letterhead.legalName}</strong><br>${letterhead.enderecoLine1}<br>${letterhead.enderecoLine2}<br>CNPJ: ${letterhead.cnpjFmt}</p>`
+      : '';
+    const footer = `<p style="font-family:Arial;font-size:8pt;color:#888888;">${fileName}</p>`;
+    const options = {
+      orientation: 'portrait',
+      pageSize: { width: 11906, height: 16838 },
+      margins: { top: 1984, right: 1134, bottom: 1247, left: 1701, header: 567, footer: 567, gutter: 0 },
+      header: !!letterhead,
+      footer: true,
+      pageNumber: true,
+      font: 'Times New Roman',
+      fontSize: 22,
+      lang: 'pt-BR',
+      title: doc.title,
+    };
+    const HTMLtoDOCX = require('html-to-docx');
+    let out: any;
+    try {
+      out = await HTMLtoDOCX(html, letterhead ? (letterhead.logoImg ?? '') + texto : null, options, footer);
+    } catch {
+      out = await HTMLtoDOCX(html, texto || null, options, footer);
+    }
+    return Buffer.isBuffer(out) ? out : Buffer.from(await out.arrayBuffer());
+  }
+
+  // Importar versao revisada (29/09/2026): .docx -> HTML (mammoth) como nova versao.
+  // So em RASCUNHO. Mantem o <style> do conteudo atual. Marca revisionImportedAt,
+  // que impede a locacao de gerar o documento de novo por cima sem confirmacao.
+  async importRevision(id: string, file: Express.Multer.File, userId: string) {
+    this.validateUuid(userId, 'userId');
+    const doc = await this.getDocumentOrFail(id);
+    if (doc.status !== 'RASCUNHO') {
+      throw new BadRequestException(`Documento com status ${doc.status}: a versao revisada so pode ser importada em Rascunho. Use Reabrir.`);
+    }
+    if (!/\.docx$/i.test(file.originalname ?? '')) {
+      throw new BadRequestException('Envie um arquivo Word (.docx).');
+    }
+    const result = await mammoth.convertToHtml({ buffer: file.buffer });
+    const corpo = (result.value ?? '').trim();
+    if (!corpo) throw new BadRequestException('O arquivo nao tem conteudo legivel.');
+    const estilo = (doc.content ?? '').match(/<style[\s\S]*?<\/style>/i)?.[0] ?? '';
+    const content = (estilo ? estilo + '\n\n' : '') + corpo;
+    const hash = this.sha256(content);
+    const newVersion = doc.currentVersion + 1;
+    await this.prisma.documentVersion.create({
+      data: {
+        documentId: id,
+        version: newVersion,
+        content,
+        contentHash: hash,
+        changeNote: `Versao revisada importada do Word (${file.originalname}) - v${newVersion}`,
+        createdById: userId,
+      },
+    });
+    return this.prisma.document.update({
+      where: { id },
+      data: { content, contentHash: hash, currentVersion: newVersion, revisionImportedAt: new Date(), updatedAt: new Date() },
+    });
   }
 
   private async buildLocacaoBaseFilename(doc: any): Promise<string | null> {
@@ -554,14 +678,14 @@ export class DocumentsService {
     const letterhead = await this.buildLetterheadInfo(doc);
     const visibilityLabel: Record<string, string> = {
       PUBLICO: '', RESERVADO: 'RESERVADO',
-      RESTRITO: 'RESTRITO', CONTROLADO: 'CONTROLADO — CONFIDENCIAL',
+      RESTRITO: 'RESTRITO', CONTROLADO: 'CONTROLADO - CONFIDENCIAL',
     };
     const watermark = doc.status === 'RASCUNHO' ? 'RASCUNHO' : (visibilityLabel[doc.visibility] ?? '');
     const signaturesHtml = (doc.signatures as any[])?.length > 0 ? `
       <div style="margin-top:48pt;border-top:1px solid #000;padding-top:16pt;">
         <p><strong>ASSINATURAS DIGITAIS</strong></p>
         ${(doc.signatures as any[]).map(s => `
-          <p>✓ ${s.signerName} — ${this.signatureMethodLabel(s.method)} — ${new Date(s.signedAt).toLocaleDateString('pt-BR')}</p>
+          <p>✓ ${s.signerName} - ${this.signatureMethodLabel(s.method)} - ${new Date(s.signedAt).toLocaleDateString('pt-BR')}</p>
         `).join('')}
       </div>` : '';
 
@@ -684,7 +808,7 @@ export class DocumentsService {
   </div>
   ${doc.content ? doc.content.split('\n\n').map((p: string) => `<p>${p.trim()}</p>`).join('\n') : '<p><em>Sem conteúdo</em></p>'}
   ${signaturesHtml}
-  ${doc.visibility !== 'PUBLICO' ? `<div class="classification-bar">LEDGR — CLASSIFICAÇÃO: ${doc.visibility}</div>` : ''}
+  ${doc.visibility !== 'PUBLICO' ? `<div class="classification-bar">LEDGR - CLASSIFICAÇÃO: ${doc.visibility}</div>` : ''}
 </body>
 </html>`;
   }
@@ -922,7 +1046,7 @@ if (!(dto as any).certId && !dto.signatureHash) {
       });
     }
   }
-// TODO: integração OAuth Gov.br — Lei 14.063/2020
+// TODO: integração OAuth Gov.br - Lei 14.063/2020
 // Recebe o code retornado pelo redirect, troca pelo token, aplica assinatura
 async handleGovBrCallback(
   documentId: string,
@@ -930,7 +1054,7 @@ async handleGovBrCallback(
   state: string,
   user: any,
 ): Promise<any> {
-  throw new Error('handleGovBrCallback: não implementado — aguardando integração Gov.br');
+  throw new Error('handleGovBrCallback: não implementado - aguardando integração Gov.br');
 }
 
 

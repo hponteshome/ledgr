@@ -29,6 +29,7 @@
     "exceljs": "^4.4.0",
     "fast-xml-parser": "^5.9.3",
     "handlebars": "^4.7.9",
+    "html-to-docx": "^1.8.0",
     "mammoth": "^1.11.0",
     "multer": "^2.1.1",
     "node-forge": "^1.4.0",

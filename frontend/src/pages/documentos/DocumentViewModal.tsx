@@ -45,6 +45,23 @@ export const DocumentViewModal: React.FC<Props> = ({ documentId, documentTitle, 
   const company = JSON.parse(localStorage.getItem('@ledgr:activeCompany') ?? '{}');
   const headers = { Authorization: 'Bearer ' + token, 'x-company-id': company.id ?? '' };
 
+  // Visualizacao = o proprio PDF gerado pelo backend (espelho fiel, 29/09/2026).
+  // /preview (HTML) fica apenas como fallback se a geracao do PDF falhar.
+  const loadPdfPreview = async () => {
+    const r = await fetch(API + '/documents/' + documentId + '/pdf', { headers });
+    if (r.ok) {
+      const blob = await r.blob();
+      setPdfUrl(prev => {
+        if (prev.startsWith('blob:')) URL.revokeObjectURL(prev.split('#')[0]);
+        return URL.createObjectURL(blob) + '#navpanes=0&view=FitH';
+      });
+      return;
+    }
+    const res = await fetch(API + '/documents/' + documentId + '/preview', { headers });
+    if (!res.ok) throw new Error('Erro ao carregar documento');
+    setHtml(await res.text());
+  };
+
   useEffect(() => {
     const load = async () => {
       setLoading(true);
@@ -55,9 +72,7 @@ export const DocumentViewModal: React.FC<Props> = ({ documentId, documentTitle, 
         if (d.fileUrl) {
           setPdfUrl(API + d.fileUrl);
         } else {
-          const res = await fetch(API + '/documents/' + documentId + '/preview', { headers });
-          if (!res.ok) throw new Error('Erro ao carregar documento');
-          setHtml(await res.text());
+          await loadPdfPreview();
         }
       } catch (e: any) { setError(e.message); }
       setLoading(false);
@@ -98,8 +113,7 @@ export const DocumentViewModal: React.FC<Props> = ({ documentId, documentTitle, 
       if (d.fileUrl) {
         setPdfUrl(API + d.fileUrl);
       } else {
-        const res = await fetch(API + '/documents/' + documentId + '/preview', { headers });
-        if (res.ok) setHtml(await res.text());
+        await loadPdfPreview();
       }
     } catch {
       // silencioso - status/lista de signatarios ja atualizaram via setDoc acima

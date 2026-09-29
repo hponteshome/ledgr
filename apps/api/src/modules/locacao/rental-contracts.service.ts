@@ -1,5 +1,5 @@
 // apps/api/src/modules/locacao/rental-contracts.service.ts
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '@prisma/prisma.service';
 import { Prisma, DocumentType, DocumentStatus, DocumentVisibility } from '@prisma/client';
 import { CreateRentalContractDto, UpdateRentalContractDto } from './dto/rental-contract.dto';
@@ -16,6 +16,9 @@ import {
   maritalStatusLabel,
   guaranteeTypeLabel,
   readjustmentIndexLabel,
+  resolveGender,
+  termosLocatario,
+  termosFiador,
 } from './utils/contract-format.util';
 
 function toDecimal(value: number | string | undefined | null): Prisma.Decimal | undefined {
@@ -176,6 +179,9 @@ export class RentalContractsService {
         tenantRg: dto.tenantRg,
         tenantProfession: dto.tenantProfession,
         tenantMaritalStatus: dto.tenantMaritalStatus,
+        tenantGender: dto.tenantGender === '' ? null : dto.tenantGender,
+        guarantorGender: dto.guarantorGender === '' ? null : dto.guarantorGender,
+        specificClauses: dto.specificClauses === '' ? null : dto.specificClauses,
         tenantNationality: dto.tenantNationality,
         tenantStreet: dto.tenantStreet,
         tenantNumber: dto.tenantNumber,
@@ -235,6 +241,9 @@ export class RentalContractsService {
         tenantRg: dto.tenantRg,
         tenantProfession: dto.tenantProfession,
         tenantMaritalStatus: dto.tenantMaritalStatus,
+        tenantGender: dto.tenantGender === '' ? null : dto.tenantGender,
+        guarantorGender: dto.guarantorGender === '' ? null : dto.guarantorGender,
+        specificClauses: dto.specificClauses === '' ? null : dto.specificClauses,
         tenantNationality: dto.tenantNationality,
         tenantStreet: dto.tenantStreet,
         tenantNumber: dto.tenantNumber,
@@ -288,7 +297,7 @@ export class RentalContractsService {
     });
   }
 
-  async generateDocument(companyId: string, userId: string, id: string) {
+  async generateDocument(companyId: string, userId: string, id: string, force = false) {
     const contract = await this.prisma.rentalContract.findFirst({
       where: { id, companyId, deletedAt: null },
       include: { fixedAsset: true, company: true },
@@ -307,11 +316,11 @@ export class RentalContractsService {
       throw new NotFoundException('Nenhum template ativo de Contrato de Locacao encontrado.');
     }
 
-    let existingDoc: { id: string; status: string; currentVersion: number } | null = null;
+    let existingDoc: { id: string; status: string; currentVersion: number; revisionImportedAt: Date | null } | null = null;
     if (contract.documentId) {
       existingDoc = await this.prisma.document.findUnique({
         where: { id: contract.documentId },
-        select: { id: true, status: true, currentVersion: true },
+        select: { id: true, status: true, currentVersion: true, revisionImportedAt: true },
       });
       if (existingDoc && existingDoc.status !== 'RASCUNHO') {
         throw new BadRequestException(
@@ -320,8 +329,26 @@ export class RentalContractsService {
       }
     }
 
+    if (existingDoc?.revisionImportedAt && !force) {
+      throw new ConflictException(
+        'Este documento tem uma versao revisada importada do Word. Gerar novamente substitui o texto pela versao do template (a revisao continua no historico de versoes).',
+      );
+    }
+
     const isFianca = contract.guaranteeType === 'FIANCA';
     const rentAmountNumber = Number(contract.rentAmount);
+
+    const gLoc = resolveGender(contract.tenantGender, contract.tenantTaxId);
+    const gFia = resolveGender(contract.guarantorGender, null);
+
+    // Disposicoes especificas (29/09/2026): texto proprio do contrato, fora do template.
+    // Blocos separados por linha em branco; 1o = caput, demais = paragrafos rotulados.
+    const ORD = ['primeiro', 'segundo', 'terceiro', 'quarto', 'quinto', 'sexto', 'sétimo', 'oitavo', 'nono', 'décimo'];
+    const blocos = (contract.specificClauses ?? '').split(/\n\s*\n/).map((s) => s.replace(/\s+/g, ' ').trim()).filter(Boolean);
+    const clausulasEspecificas = blocos.map((texto, i) => ({
+      texto,
+      rotulo: i === 0 ? '' : blocos.length === 2 ? 'Parágrafo único' : `Parágrafo ${ORD[i - 1] ?? i + 'º'}`,
+    }));
 
     const dados = {
       empresa: {
@@ -338,7 +365,7 @@ export class RentalContractsService {
       contrato: {
         tenantName: contract.tenantName,
         tenantNationality: contract.tenantNationality,
-        tenantMaritalStatus: maritalStatusLabel(contract.tenantMaritalStatus),
+        tenantMaritalStatus: maritalStatusLabel(contract.tenantMaritalStatus, gLoc),
         tenantProfession: contract.tenantProfession,
         tenantRg: contract.tenantRg,
         tenantTaxId: formatCpfCnpj(contract.tenantTaxId),
@@ -359,6 +386,10 @@ export class RentalContractsService {
         readjustmentIndex: readjustmentIndexLabel(contract.readjustmentIndex, contract.readjustmentIndexOther),
         guaranteeType: guaranteeTypeLabel(contract.guaranteeType),
         isFianca,
+        loc: termosLocatario(gLoc),
+        fia: termosFiador(gFia),
+        temClausulasEspecificas: clausulasEspecificas.length > 0,
+        clausulasEspecificas,
         guaranteeDescription: contract.guaranteeDescription,
         penaltyDescription: contract.penaltyDescription,
         numeroVias: isFianca ? 3 : 2,
@@ -406,7 +437,7 @@ export class RentalContractsService {
       });
       document = await this.prisma.document.update({
         where: { id: existingDoc.id },
-        data: { title: documentTitle, content: html, contentHash, currentVersion: newVersion, updatedAt: new Date() },
+        data: { title: documentTitle, content: html, contentHash, currentVersion: newVersion, revisionImportedAt: null, updatedAt: new Date() },
       });
       await this.prisma.rentalContract.update({
         where: { id: contract.id },

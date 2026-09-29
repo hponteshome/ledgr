@@ -953,6 +953,7 @@ model Document {
 
   content        String? @map("content") @db.Text
   contentHash    String? @map("content_hash") @db.VarChar(64)
+  revisionImportedAt DateTime? @map("revision_imported_at")
   currentVersion Int     @default(1) @map("current_version")
 
   fileUrl          String? @map("file_url") @db.VarChar
@@ -2601,6 +2602,9 @@ model RentalContract {
   tenantRg            String?        @map("tenant_rg") @db.VarChar(20)
   tenantProfession    String?        @map("tenant_profession") @db.VarChar(100)
   tenantMaritalStatus MaritalStatus? @map("tenant_marital_status")
+  tenantGender String? @map("tenant_gender") @db.VarChar(1)
+  guarantorGender String? @map("guarantor_gender") @db.VarChar(1)
+  specificClauses String? @map("specific_clauses") @db.Text
   tenantNationality   String?        @default("Brasileira") @map("tenant_nationality") @db.VarChar
   tenantStreet        String?        @map("tenant_street") @db.VarChar
   tenantNumber        String?        @map("tenant_number") @db.VarChar(20)

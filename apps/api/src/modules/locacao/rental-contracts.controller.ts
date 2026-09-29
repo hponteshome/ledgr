@@ -65,10 +65,10 @@ export class RentalContractsController {
 
   @Post(':id/generate-document')
   @RequireResourceAccess('rental-contracts', 'EDIT')
-  generateDocument(@Req() req: any, @Param('id') id: string) {
+  generateDocument(@Req() req: any, @Param('id') id: string, @Body('force') force?: boolean) {
     const companyId = req.headers['x-company-id'] ?? '';
     const userId = req.user?.id ?? req.user?.sub ?? '';
-    return this.svc.generateDocument(companyId, userId, id);
+    return this.svc.generateDocument(companyId, userId, id, force === true);
   }
 
   @Post(':id/prepare-signers')

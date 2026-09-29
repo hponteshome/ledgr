@@ -1,6 +1,6 @@
 // ============================================================
-// LEDGR — frontend/src/pages/assets/modals/RentalContractDetailModal.tsx
-// Quadro Resumo do Contrato de Locação — visualização + geração do Contrato Completo
+// LEDGR - frontend/src/pages/assets/modals/RentalContractDetailModal.tsx
+// Quadro Resumo do Contrato de Locação - visualização + geração do Contrato Completo
 // ============================================================
 import { useState, useEffect } from 'react';
 import { Loader, FileText, CheckCircle, Edit3, Lock } from 'lucide-react';
@@ -48,6 +48,11 @@ const MARITAL_STATUS_OPTIONS = [
     { value: 'VIUVO', label: 'Viúvo(a)' },
 ];
 
+const GENDER_OPTIONS = [
+    { value: 'M', label: 'Masculino' },
+    { value: 'F', label: 'Feminino' },
+];
+
 const DOC_STATUS_LABELS: Record<string, string> = {
     RASCUNHO: 'Rascunho',
     EM_REVISAO: 'Em Revisão',
@@ -58,11 +63,12 @@ const DOC_STATUS_LABELS: Record<string, string> = {
     CANCELADO: 'Cancelado',
 };
 
-type QualField = { key: string; label: string; type: 'text' | 'select' | 'cep'; maxLength?: number };
+type QualField = { key: string; label: string; type: 'text' | 'select' | 'cep' | 'gender'; maxLength?: number };
 
 const QUALIFICATION_FIELDS: QualField[] = [
     { key: 'tenantRg', label: 'RG', type: 'text' },
     { key: 'tenantProfession', label: 'Profissão', type: 'text' },
+    { key: 'tenantGender', label: 'Gênero', type: 'gender' },
     { key: 'tenantMaritalStatus', label: 'Estado Civil', type: 'select' },
     { key: 'tenantNationality', label: 'Nacionalidade', type: 'text' },
     { key: 'tenantStreet', label: 'Logradouro', type: 'text' },
@@ -76,14 +82,14 @@ const QUALIFICATION_FIELDS: QualField[] = [
 
 function fmtCurrency(v: number | string | undefined): string {
     const n = typeof v === 'string' ? parseFloat(v) : v;
-    if (n === undefined || isNaN(n)) return '—';
+    if (n === undefined || isNaN(n)) return '-';
     return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
 function fmtDate(v: string | undefined): string {
-    if (!v) return '—';
+    if (!v) return '-';
     const d = new Date(v);
-    if (isNaN(d.getTime())) return '—';
+    if (isNaN(d.getTime())) return '-';
     return d.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
 }
 
@@ -99,7 +105,7 @@ function formatVigencia(startStr: string | undefined, endStr: string | undefined
     if (!startStr || !endStr) return 'Indeterminado';
     const [y1, m1, d1] = startStr.slice(0, 10).split('-').map(Number);
     let [y2, m2, d2] = endStr.slice(0, 10).split('-').map(Number);
-    if (!y1 || !m1 || !d1 || !y2 || !m2 || !d2) return '—';
+    if (!y1 || !m1 || !d1 || !y2 || !m2 || !d2) return '-';
 
     d2 += 1;
     if (d2 > daysInMonth(y2, m2)) {
@@ -196,7 +202,7 @@ export function RentalContractDetailModal({ contractId, title, onClose }: { cont
         return QUALIFICATION_FIELDS.filter(f => !contract[f.key]);
     }
 
-    async function handleGenerate() {
+    async function handleGenerate(force = false) {
         setSaving(true);
         setGenError('');
         try {
@@ -207,9 +213,15 @@ export function RentalContractDetailModal({ contractId, title, onClose }: { cont
                     'Authorization': `Bearer ${token}`,
                     'x-company-id': activeCompany?.id ?? '',
                 },
+                body: JSON.stringify({ force }),
             });
             if (!res.ok) {
                 const errBody = await res.json().catch(() => null);
+                if (res.status === 409 && !force && window.confirm((errBody?.message ?? '') + '\n\nGerar novamente mesmo assim?')) {
+                    setSaving(false);
+                    await handleGenerate(true);
+                    return;
+                }
                 throw new Error(errBody?.message ?? '');
             }
             await res.json();
@@ -317,7 +329,7 @@ export function RentalContractDetailModal({ contractId, title, onClose }: { cont
                                     </button>
                                 ) : (
                                     <span
-                                        title={`Documento já ${DOC_STATUS_LABELS[contract.document.status] ?? contract.document.status} — não é possível editar o contrato. Exclua o documento em Arquivos Digitais para reiniciar.`}
+                                        title={`Documento já ${DOC_STATUS_LABELS[contract.document.status] ?? contract.document.status} - não é possível editar o contrato. Exclua o documento em Arquivos Digitais para reiniciar.`}
                                         className="p-1 text-gray-300 cursor-not-allowed"
                                     >
                                         <Lock className="w-4 h-4" />
@@ -448,14 +460,14 @@ export function RentalContractDetailModal({ contractId, title, onClose }: { cont
                                     {QUALIFICATION_FIELDS.filter(f => f.key in formValues).map(f => (
                                         <div key={f.key}>
                                             <label className="block text-xs font-medium text-gray-500 mb-1">{f.label}</label>
-                                            {f.type === 'select' ? (
+                                            {(f.type === 'select' || f.type === 'gender') ? (
                                                 <select
                                                     className="w-full text-sm border border-gray-300 rounded-md px-2 py-1.5"
                                                     value={formValues[f.key] ?? ''}
                                                     onChange={e => setFormValues(prev => ({ ...prev, [f.key]: e.target.value }))}
                                                 >
                                                     <option value="">Selecione...</option>
-                                                    {MARITAL_STATUS_OPTIONS.map(opt => (
+                                                    {(f.type === 'gender' ? GENDER_OPTIONS : MARITAL_STATUS_OPTIONS).map(opt => (
                                                         <option key={opt.value} value={opt.value}>{opt.label}</option>
                                                     ))}
                                                 </select>

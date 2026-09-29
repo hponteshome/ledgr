@@ -1,6 +1,6 @@
 // ============================================================
-// LEDGR — frontend/src/pages/assets/modals/RentalContractFormModal.tsx
-// Novo Contrato de Locação — cria RentalContract vinculado ao FixedAsset
+// LEDGR - frontend/src/pages/assets/modals/RentalContractFormModal.tsx
+// Novo Contrato de Locação - cria RentalContract vinculado ao FixedAsset
 // ============================================================
 import { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
@@ -29,6 +29,12 @@ const READJUSTMENT_OPTIONS = [
     { value: 'INPC', label: 'INPC' },
     { value: 'IGPDI', label: 'IGP-DI' },
     { value: 'OUTRO', label: 'Outro' },
+];
+
+const GENDER_OPTIONS = [
+    { value: '', label: 'Não informado' },
+    { value: 'M', label: 'Masculino' },
+    { value: 'F', label: 'Feminino' },
 ];
 
 function fmtNum(val: string | number | undefined): string {
@@ -67,6 +73,9 @@ export function RentalContractFormModal({ asset, contractId, documentStatus, onC
 
     const [tenantName, setTenantName] = useState('');
     const [tenantTaxId, setTenantTaxId] = useState('');
+    const [tenantGender, setTenantGender] = useState('');
+    const [guarantorGender, setGuarantorGender] = useState('');
+    const [specificClauses, setSpecificClauses] = useState('');
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     const [vigenciaMeses, setVigenciaMeses] = useState('');
@@ -95,6 +104,9 @@ export function RentalContractFormModal({ asset, contractId, documentStatus, onC
             .then(data => {
                 setTenantName(data.tenantName ?? '');
                 setTenantTaxId(data.tenantTaxId ?? '');
+                setTenantGender(data.tenantGender ?? '');
+                setGuarantorGender(data.guarantorGender ?? '');
+                setSpecificClauses(data.specificClauses ?? '');
                 setStartDate(data.startDate ? String(data.startDate).slice(0, 10) : '');
                 setEndDate(data.endDate ? String(data.endDate).slice(0, 10) : '');
                 setRentAmountDisplay(fmtNum(data.rentAmount));
@@ -136,6 +148,9 @@ export function RentalContractFormModal({ asset, contractId, documentStatus, onC
             fixedAssetId: asset.id,
             tenantName: tenantName.trim(),
             tenantTaxId: tenantTaxId.trim() || undefined,
+            tenantGender,
+            guarantorGender: guaranteeType === 'FIANCA' ? guarantorGender : '',
+            specificClauses,
             startDate,
             endDate: endDate || undefined,
             rentAmount,
@@ -176,6 +191,8 @@ export function RentalContractFormModal({ asset, contractId, documentStatus, onC
                 });
                 if (regenRes.ok) {
                     toast.success('Rascunho atualizado automaticamente.');
+                } else if (regenRes.status === 409) {
+                    toast.error('Dados salvos. O documento tem versão revisada importada do Word e não foi gerado de novo. Use "Gerar Contrato Novamente" no Quadro Resumo se quiser substituí-la.', { duration: 8000 });
                 }
             }
             onSuccess();
@@ -187,7 +204,7 @@ export function RentalContractFormModal({ asset, contractId, documentStatus, onC
     }
 
     return (
-        <ModalWrapper title={contractId ? `Editar Contrato de Locação — ${asset.internalCode}` : `Novo Contrato de Locação — ${asset.internalCode}`} onClose={onClose}>
+        <ModalWrapper title={contractId ? `Editar Contrato de Locação - ${asset.internalCode}` : `Novo Contrato de Locação - ${asset.internalCode}`} onClose={onClose}>
             <div className="p-6 space-y-4">
                 {error && (
                     <div className="bg-[#FCEBEB] text-red-700 text-sm rounded-lg px-3 py-2">{error}</div>
@@ -198,10 +215,17 @@ export function RentalContractFormModal({ asset, contractId, documentStatus, onC
                         placeholder="Nome do locatário" />
                 </Field>
 
-                <Field label="CPF/CNPJ do Locatário">
-                    <input className={inputSt} value={tenantTaxId} onChange={e => setTenantTaxId(e.target.value)}
-                        placeholder="Opcional" />
-                </Field>
+                <div className="grid grid-cols-2 gap-4">
+                    <Field label="CPF/CNPJ do Locatário">
+                        <input className={inputSt} value={tenantTaxId} onChange={e => setTenantTaxId(e.target.value)}
+                            placeholder="Opcional" />
+                    </Field>
+                    <Field label="Gênero do Locatário">
+                        <select className={inputSt} value={tenantGender} onChange={e => setTenantGender(e.target.value)}>
+                            {GENDER_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                        </select>
+                    </Field>
+                </div>
 
                 <div className="grid grid-cols-3 gap-4">
                     <Field label="Início do Contrato" required>
@@ -244,13 +268,22 @@ export function RentalContractFormModal({ asset, contractId, documentStatus, onC
                             {GUARANTEE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                         </select>
                     </Field>
-                    {guaranteeType && (
-                        <Field label="Detalhe da Garantia">
-                            <input className={inputSt} value={guaranteeDescription}
-                                onChange={e => setGuaranteeDescription(e.target.value)} />
+                    {guaranteeType === 'FIANCA' && (
+                        <Field label="Gênero do(a) Fiador(a)">
+                            <select className={inputSt} value={guarantorGender} onChange={e => setGuarantorGender(e.target.value)}>
+                                {GENDER_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                            </select>
                         </Field>
                     )}
                 </div>
+
+                {guaranteeType && (
+                    <Field label="Detalhe da Garantia">
+                        <textarea className={inputSt} rows={3} value={guaranteeDescription}
+                            placeholder={guaranteeType === 'FIANCA' ? 'Qualificação completa: nome, nacionalidade, estado civil, profissão, RG, CPF e endereço' : ''}
+                            onChange={e => setGuaranteeDescription(e.target.value)} />
+                    </Field>
+                )}
 
                 <div className="grid grid-cols-2 gap-4">
                     <Field label="Índice de Reajuste">
@@ -265,6 +298,12 @@ export function RentalContractFormModal({ asset, contractId, documentStatus, onC
                         </Field>
                     )}
                 </div>
+
+                <Field label="Disposições Específicas deste contrato">
+                    <textarea className={inputSt} rows={5} value={specificClauses}
+                        placeholder="Texto que vale só para este contrato. Separe os parágrafos com uma linha em branco. Entra como cláusula própria, antes do Foro."
+                        onChange={e => setSpecificClauses(e.target.value)} />
+                </Field>
 
                 <Field label="Nº do Contrato">
                     <input className={inputSt} value={contractNumber} onChange={e => setContractNumber(e.target.value)}
