@@ -2605,6 +2605,8 @@ model RentalContract {
   tenantGender String? @map("tenant_gender") @db.VarChar(1)
   guarantorGender String? @map("guarantor_gender") @db.VarChar(1)
   specificClauses String? @map("specific_clauses") @db.Text
+  guarantorHasSpouse Boolean @default(false) @map("guarantor_has_spouse")
+  instrumentDate DateTime? @map("instrument_date") @db.Date
   tenantNationality   String?        @default("Brasileira") @map("tenant_nationality") @db.VarChar
   tenantStreet        String?        @map("tenant_street") @db.VarChar
   tenantNumber        String?        @map("tenant_number") @db.VarChar(20)

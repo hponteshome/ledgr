@@ -9,6 +9,7 @@ import { useCompany } from '../../../contexts/CompanyContext';
 import { ModalWrapper, Field } from './ModalComponents';
 import { DocumentViewModal } from '../../documentos/DocumentViewModal';
 import { RentalContractFormModal } from './RentalContractFormModal';
+import { SmartDateInput } from '../../../components/SmartDateInput';
 
 const API = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3000';
 
@@ -150,6 +151,14 @@ function formatCpfCnpj(value: string | undefined | null): string {
     return value;
 }
 
+const MESES_EXTENSO = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+
+function fmtDataExtenso(iso: string): string {
+    const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
+    if (!y || !m || !d) return iso;
+    return `${d} de ${MESES_EXTENSO[m - 1]} de ${y}`;
+}
+
 function onlyDigits(v: string): string {
     return v.replace(/\D/g, '');
 }
@@ -174,6 +183,10 @@ export function RentalContractDetailModal({ contractId, title, onClose }: { cont
     const [genError, setGenError] = useState('');
     const [genSuccess, setGenSuccess] = useState(false);
     const [viewDoc, setViewDoc] = useState(false);
+    // Data do instrumento (29/09/2026): sempre solicitada e confirmada a cada geracao
+    const [askDate, setAskDate] = useState<{ force: boolean } | null>(null);
+    const [instrumentDate, setInstrumentDate] = useState('');
+    const [dateConfirmed, setDateConfirmed] = useState(false);
 
     function loadContract() {
         if (!contractId) { setError('Contrato não encontrado.'); setLoading(false); return; }
@@ -202,7 +215,14 @@ export function RentalContractDetailModal({ contractId, title, onClose }: { cont
         return QUALIFICATION_FIELDS.filter(f => !contract[f.key]);
     }
 
-    async function handleGenerate(force = false) {
+    async function handleGenerate(force = false, dataInstrumento?: string) {
+        if (!dataInstrumento) {
+            setSaving(false);
+            setInstrumentDate(contract?.instrumentDate ? String(contract.instrumentDate).slice(0, 10) : '');
+            setDateConfirmed(false);
+            setAskDate({ force });
+            return;
+        }
         setSaving(true);
         setGenError('');
         try {
@@ -213,13 +233,13 @@ export function RentalContractDetailModal({ contractId, title, onClose }: { cont
                     'Authorization': `Bearer ${token}`,
                     'x-company-id': activeCompany?.id ?? '',
                 },
-                body: JSON.stringify({ force }),
+                body: JSON.stringify({ force, dataInstrumento }),
             });
             if (!res.ok) {
                 const errBody = await res.json().catch(() => null);
                 if (res.status === 409 && !force && window.confirm((errBody?.message ?? '') + '\n\nGerar novamente mesmo assim?')) {
                     setSaving(false);
-                    await handleGenerate(true);
+                    await handleGenerate(true, dataInstrumento);
                     return;
                 }
                 throw new Error(errBody?.message ?? '');
@@ -424,6 +444,32 @@ export function RentalContractDetailModal({ contractId, title, onClose }: { cont
                                 </div>
                             )}
 
+                            {askDate && (
+                                <div className="space-y-3 bg-amber-50 border border-amber-200 rounded-lg p-4">
+                                    <div className="text-sm font-medium text-gray-900">Data do instrumento</div>
+                                    <div className="text-xs text-gray-600">Informe a data que constará no fechamento do contrato (local e data, antes das assinaturas).</div>
+                                    <SmartDateInput className="w-full text-sm border border-gray-300 rounded-md px-2 py-1.5" value={instrumentDate}
+                                        onChange={(v: string) => { setInstrumentDate(v); setDateConfirmed(false); }} />
+                                    {instrumentDate && (
+                                        <label className="flex items-start gap-2 text-sm text-gray-800">
+                                            <input type="checkbox" className="mt-1" checked={dateConfirmed} onChange={e => setDateConfirmed(e.target.checked)} />
+                                            <span>Confirmo que a data do instrumento é <strong>{fmtDataExtenso(instrumentDate)}</strong>.</span>
+                                        </label>
+                                    )}
+                                    <div className="flex gap-2">
+                                        <button type="button" onClick={() => setAskDate(null)}
+                                            className="flex-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg px-4 py-2">
+                                            Cancelar
+                                        </button>
+                                        <button type="button" disabled={!instrumentDate || !dateConfirmed || saving}
+                                            onClick={() => { const f = askDate.force; setAskDate(null); handleGenerate(f, instrumentDate); }}
+                                            className="flex-1 text-sm font-medium text-white bg-gray-900 hover:bg-gray-800 disabled:opacity-50 rounded-lg px-4 py-2">
+                                            Confirmar data e gerar
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
                             {genError && (
                                 <div className="text-xs text-red-600 bg-red-50 rounded-md px-3 py-2">{genError}</div>
                             )}
@@ -515,7 +561,7 @@ export function RentalContractDetailModal({ contractId, title, onClose }: { cont
                 contractId={contractId}
                 documentStatus={contract.document?.status ?? null}
                 onClose={() => setEditingContract(false)}
-                onSuccess={() => { setEditingContract(false); loadContract(); }}
+                onSuccess={() => { setEditingContract(false); loadContract(); if (contract.documentId && (!contract.document?.status || contract.document.status === 'RASCUNHO')) handleGenerate(); }}
             />
         )}
         {viewDoc && contract.documentId && (

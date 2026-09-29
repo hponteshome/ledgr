@@ -40,6 +40,8 @@ export class CreateRentalContractDto {
   guarantorGender?: string;
   @IsOptional() @IsString()
   specificClauses?: string;
+  @IsOptional() @IsBoolean()
+  guarantorHasSpouse?: boolean;
   @IsOptional() @IsString()
   tenantNationality?: string;
   @IsOptional() @IsString()

@@ -182,6 +182,7 @@ export class RentalContractsService {
         tenantGender: dto.tenantGender === '' ? null : dto.tenantGender,
         guarantorGender: dto.guarantorGender === '' ? null : dto.guarantorGender,
         specificClauses: dto.specificClauses === '' ? null : dto.specificClauses,
+        guarantorHasSpouse: dto.guarantorHasSpouse,
         tenantNationality: dto.tenantNationality,
         tenantStreet: dto.tenantStreet,
         tenantNumber: dto.tenantNumber,
@@ -244,6 +245,7 @@ export class RentalContractsService {
         tenantGender: dto.tenantGender === '' ? null : dto.tenantGender,
         guarantorGender: dto.guarantorGender === '' ? null : dto.guarantorGender,
         specificClauses: dto.specificClauses === '' ? null : dto.specificClauses,
+        guarantorHasSpouse: dto.guarantorHasSpouse,
         tenantNationality: dto.tenantNationality,
         tenantStreet: dto.tenantStreet,
         tenantNumber: dto.tenantNumber,
@@ -297,12 +299,19 @@ export class RentalContractsService {
     });
   }
 
-  async generateDocument(companyId: string, userId: string, id: string, force = false) {
+  async generateDocument(companyId: string, userId: string, id: string, force = false, dataInstrumento?: string) {
+    // Data do instrumento (29/09/2026): obrigatoria a cada geracao, confirmada pelo usuario no Quadro Resumo.
+    const dataInst = /^\d{4}-\d{2}-\d{2}$/.test(dataInstrumento ?? '') ? (dataInstrumento as string) : '';
+    if (!dataInst) throw new BadRequestException('Informe e confirme a data do instrumento para gerar o contrato.');
+    const [yi, mi, di] = dataInst.split('-').map(Number);
+    const dataInstUtc = new Date(Date.UTC(yi, mi - 1, di));
+
     const contract = await this.prisma.rentalContract.findFirst({
       where: { id, companyId, deletedAt: null },
       include: { fixedAsset: true, company: true },
     });
     if (!contract) throw new NotFoundException('Contrato de locacao nao encontrado.');
+    await this.prisma.rentalContract.update({ where: { id: contract.id }, data: { instrumentDate: toDate(dataInst) } });
 
     let template = await this.prisma.documentTemplate.findFirst({
       where: { type: DocumentType.CONTRATO_LOCACAO, isActive: true, companyId },
@@ -388,12 +397,14 @@ export class RentalContractsService {
         isFianca,
         loc: termosLocatario(gLoc),
         fia: termosFiador(gFia),
+        fiadorNome: isFianca ? (contract.guaranteeDescription ?? '').split(',')[0].trim() : '',
+        fiadorComConjuge: isFianca && !!contract.guarantorHasSpouse,
         temClausulasEspecificas: clausulasEspecificas.length > 0,
         clausulasEspecificas,
         guaranteeDescription: contract.guaranteeDescription,
         penaltyDescription: contract.penaltyDescription,
         numeroVias: isFianca ? 3 : 2,
-        dataAssinatura: formatDateExtenso(new Date()),
+        dataAssinatura: formatDateExtenso(dataInstUtc),
       },
       imovel: {
         street: contract.fixedAsset.street,

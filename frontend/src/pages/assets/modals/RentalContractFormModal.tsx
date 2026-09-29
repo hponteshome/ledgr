@@ -76,6 +76,7 @@ export function RentalContractFormModal({ asset, contractId, documentStatus, onC
     const [tenantGender, setTenantGender] = useState('');
     const [guarantorGender, setGuarantorGender] = useState('');
     const [specificClauses, setSpecificClauses] = useState('');
+    const [guarantorHasSpouse, setGuarantorHasSpouse] = useState(false);
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     const [vigenciaMeses, setVigenciaMeses] = useState('');
@@ -107,6 +108,7 @@ export function RentalContractFormModal({ asset, contractId, documentStatus, onC
                 setTenantGender(data.tenantGender ?? '');
                 setGuarantorGender(data.guarantorGender ?? '');
                 setSpecificClauses(data.specificClauses ?? '');
+                setGuarantorHasSpouse(!!data.guarantorHasSpouse);
                 setStartDate(data.startDate ? String(data.startDate).slice(0, 10) : '');
                 setEndDate(data.endDate ? String(data.endDate).slice(0, 10) : '');
                 setRentAmountDisplay(fmtNum(data.rentAmount));
@@ -151,6 +153,7 @@ export function RentalContractFormModal({ asset, contractId, documentStatus, onC
             tenantGender,
             guarantorGender: guaranteeType === 'FIANCA' ? guarantorGender : '',
             specificClauses,
+            guarantorHasSpouse: guaranteeType === 'FIANCA' ? guarantorHasSpouse : false,
             startDate,
             endDate: endDate || undefined,
             rentAmount,
@@ -182,18 +185,8 @@ export function RentalContractFormModal({ asset, contractId, documentStatus, onC
                 throw new Error(err.message ?? `Erro ${res.status}`);
             }
             if (contractId && documentStatus === 'RASCUNHO') {
-                const regenRes = await fetch(`${API}/rental-contracts/${contractId}/generate-document`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'x-company-id': activeCompany?.id ?? '',
-                    },
-                });
-                if (regenRes.ok) {
-                    toast.success('Rascunho atualizado automaticamente.');
-                } else if (regenRes.status === 409) {
-                    toast.error('Dados salvos. O documento tem versão revisada importada do Word e não foi gerado de novo. Use "Gerar Contrato Novamente" no Quadro Resumo se quiser substituí-la.', { duration: 8000 });
-                }
+                // Nova geracao exige a data do instrumento: o Quadro Resumo abre a confirmacao ao salvar.
+                toast('Dados salvos. Confirme a data do instrumento para gerar a nova versão do documento.', { duration: 5000 });
             }
             onSuccess();
         } catch (e: any) {
@@ -276,6 +269,13 @@ export function RentalContractFormModal({ asset, contractId, documentStatus, onC
                         </Field>
                     )}
                 </div>
+
+                {guaranteeType === 'FIANCA' && (
+                    <label className="flex items-center gap-2 text-sm text-gray-700">
+                        <input type="checkbox" checked={guarantorHasSpouse} onChange={e => setGuarantorHasSpouse(e.target.checked)} />
+                        Fiador(a) casado(a) (exceto separação absoluta de bens) - o cônjuge assina a outorga
+                    </label>
+                )}
 
                 {guaranteeType && (
                     <Field label="Detalhe da Garantia">

@@ -451,9 +451,9 @@ export class DocumentsService {
     if (letterhead) {
       const pdfFileName = await this.buildDownloadFilename(id);
       headerTemplate = `
-        <div style="font-size:9px; width:100%; margin:0; box-sizing:border-box; padding:10mm 20mm 10mm 30mm; display:flex; align-items:center; justify-content:space-between; font-family:Arial,sans-serif; color:#333; border-bottom:1px solid #ddd;">
+        <div style="font-size:9px; width:100%; margin:0; box-sizing:border-box; padding:6mm 20mm 1.5mm 30mm; display:flex; align-items:center; justify-content:space-between; font-family:Arial,sans-serif; color:#333; border-bottom:1px solid #ddd;">
           <div>${letterhead.logoImg}</div>
-          <div style="text-align:right; line-height:1.4;">
+          <div style="text-align:right; line-height:1;">
             <div style="font-weight:bold; font-size:1em;">${letterhead.legalName}</div>
             <div style="font-size:0.8em;">${letterhead.enderecoLine1}<br>${letterhead.enderecoLine2}</div>
             <div style="font-size:0.8em;">CNPJ: ${letterhead.cnpjFmt}</div>
@@ -468,7 +468,7 @@ export class DocumentsService {
       `;
       // Margens laterais 0: o recuo lateral vira padding do body (body.com-timbrado),
       // que se repete em todas as paginas, liberando a faixa da tarja a 15 mm da borda.
-      letterheadMargin = { top: '35mm', bottom: '22mm', left: '0mm', right: '0mm' };
+      letterheadMargin = { top: '20mm', bottom: '20mm', left: '0mm', right: '0mm' };
     }
 
     const visibilityWatermark: Record<string, string> = {
@@ -488,7 +488,9 @@ export class DocumentsService {
       <head>
         <meta charset="UTF-8">
         <style>
-          @page { size: A4; margin: 25mm 20mm 25mm 30mm; }
+          /* Com timbrado: margens laterais 0 (recuo lateral via body.com-timbrado) e
+             superior/inferior iguais as do Puppeteer - o @page do CSS prevalece no Chrome. */
+          @page { size: A4; margin: ${letterhead ? '20mm 0 20mm 0' : '25mm 20mm 25mm 30mm'}; }
           body { font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.8; color: #000; }
           h1 { text-align: center; font-size: 14pt; text-transform: uppercase; letter-spacing: 2px; }
           h2 { text-align: center; font-size: 12pt; text-transform: uppercase; letter-spacing: 1px; margin-top: 24pt; }
@@ -514,7 +516,14 @@ export class DocumentsService {
             transform: rotate(-90deg) translateX(-50%);
             font-size: 8pt; line-height: 1; font-weight: bold; letter-spacing: 3px; color: #666; white-space: nowrap;
           }
-          body.com-timbrado { padding: 0 20mm 0 30mm; }
+          /* margem do body do template (40px 50px) neutralizada: texto exatamente a 3 cm / 2 cm */
+          body.com-timbrado { margin: 0 !important; padding: 0 20mm 0 30mm; }
+          body.com-timbrado table { width: 100%; border-collapse: collapse; }
+          body.com-timbrado td { vertical-align: top; padding: 16mm 0 0 0; border: none; }
+          body.com-timbrado td:nth-child(2) { text-align: right; }
+          body.com-timbrado td[colspan] { text-align: center; }
+          body.com-timbrado td p { margin: 0; line-height: 1.25; text-align: inherit; }
+          body.com-timbrado tr { break-inside: avoid; page-break-inside: avoid; }
         </style>
       </head>
       <body class="${letterhead ? 'com-timbrado' : ''}">
@@ -569,6 +578,15 @@ export class DocumentsService {
       .replace(/>\s*\n\s*</g, '><')
       .replace(/(<\/(?:p|h[1-6])>)(?:<br\s*\/?>)+/gi, '$1')
       .replace(/(?:<br\s*\/?>)+(<(?:p|h[1-6])\b)/gi, '$1');
+    // Tabelas de assinatura (29/09/2026): alinhamento vindo das classes do template,
+    // bordas brancas (o "sem borda" da html-to-docx gera XML invalido) e linhas em
+    // branco antes de cada linha de assinatura (espaco para assinar).
+    h = h
+      .replace(/<td class="dir"([^>]*)><p>/gi, '<td$1><p style="text-align:right">')
+      .replace(/<td class="centro"([^>]*)><p>/gi, '<td$1><p style="text-align:center">')
+      .replace(/<(table|td)\b([^>]*)>/gi, (_m: string, tag: string, attrs: string) =>
+        `<${tag}${attrs.replace(/\sclass="[^"]*"/i, '').replace(/\sstyle="[^"]*"/i, '')} style="border:0px solid #ffffff;${tag.toLowerCase() === 'table' ? 'width:100%;' : ''}">`)
+      .replace(/<p([^>]*)>((?:\d\.\s*)?_{10,})/gi, '<p$1><br><br><br>$2');
     // Fonte explicita em todo paragrafo/titulo: Times New Roman 11 pt (titulos
     // centralizados). Cabecalho e rodape mantem tamanhos proprios.
     const base = 'font-family:Times New Roman;font-size:11pt;';
@@ -589,13 +607,13 @@ export class DocumentsService {
     const body = this.buildDocxBody(doc.content);
     const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"></head><body>${body}</body></html>`;
     const texto = letterhead
-      ? `<p style="text-align:right;font-family:Arial;font-size:8pt;"><strong>${letterhead.legalName}</strong><br>${letterhead.enderecoLine1}<br>${letterhead.enderecoLine2}<br>CNPJ: ${letterhead.cnpjFmt}</p>`
+      ? `<p style="text-align:right;font-family:Arial;font-size:8pt;line-height:100%;"><strong>${letterhead.legalName}</strong><br>${letterhead.enderecoLine1}<br>${letterhead.enderecoLine2}<br>CNPJ: ${letterhead.cnpjFmt}</p>`
       : '';
     const footer = `<p style="font-family:Arial;font-size:8pt;color:#888888;">${fileName}</p>`;
     const options = {
       orientation: 'portrait',
       pageSize: { width: 11906, height: 16838 },
-      margins: { top: 1984, right: 1134, bottom: 1247, left: 1701, header: 567, footer: 567, gutter: 0 },
+      margins: { top: 1134, right: 1134, bottom: 1134, left: 1701, header: 340, footer: 340, gutter: 0 },
       header: !!letterhead,
       footer: true,
       pageNumber: true,
@@ -694,7 +712,7 @@ export class DocumentsService {
       const headerHtmlEsc = JSON.stringify(`
         <div class="letterhead-header">
           <div>${letterhead.logoImg}</div>
-          <div style="text-align:right; line-height:1.4;">
+          <div style="text-align:right; line-height:1;">
             <div style="font-weight:bold; font-size:1em;">${letterhead.legalName}</div>
             <div style="font-size:0.8em;">${letterhead.enderecoLine1}<br>${letterhead.enderecoLine2}</div>
             <div style="font-size:0.8em;">CNPJ: ${letterhead.cnpjFmt}</div>
