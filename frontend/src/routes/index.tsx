@@ -116,6 +116,7 @@ import MenuUsageAuditPage from '../pages/sistema/MenuUsageAuditPage';
 import ShareholdersPage from '../pages/corporate/shareholders/ShareholdersPage';
 import { RepositorioPage } from '../pages/documentos/RepositorioPage';
 import { LogotiposPage } from '../pages/documentos/LogotiposPage';
+import { DocumentTemplatesPage } from '../pages/documentos/DocumentTemplatesPage';
 import { CertificatesPage } from '../pages/certificates/CertificatesPage';
 import AglutinacaoRfbPage from '../pages/sped/AglutinacaoRfbPage';
 import CalculadoraCorrecaoPage from '../pages/sistema/CalculadoraCorrecaoPage';
@@ -314,6 +315,7 @@ export const AppRoutes = () => {
                 <Route path="app/arquivo/rh/acordos" element={<ProtectedRoute><RepositorioPage /></ProtectedRoute>} />
                 <Route path="app/arquivo/locacao" element={<ProtectedRoute><RepositorioPage /></ProtectedRoute>} />
                 <Route path="app/arquivo/templates/logotipos" element={<ProtectedRoute><LogotiposPage /></ProtectedRoute>} />
+                <Route path="app/arquivo/templates/documentos" element={<ProtectedRoute><DocumentTemplatesPage /></ProtectedRoute>} />
 
                 {/* Configurações */}
                 <Route path="app/settings/data-management" element={<ProtectedRoute><TableManager /></ProtectedRoute>} />

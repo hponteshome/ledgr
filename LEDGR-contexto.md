@@ -9740,3 +9740,22 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - DrePage: arquivo tinha reformatacao total (Format On Save - 424 linhas) + inversao manual do rotulo (resultado <= 0 = LUCRO). Causa real: resultado = totalReceitas + totalDespesas com sinal pela natureza da raiz - raiz de despesas devedora fazia somar. Descartado com git restore e corrigido: resultado = creditos - debitos das contas de resultado nivel 1. Validado pelo usuario.
 - LICAO: desligar Format On Save para .tsx - reformatacao esconde mudancas reais no diff. Quando um script falha numa ancora, nada e gravado - conferir a saida antes de assumir que o patch entrou (caso do "Ocultar saldo zero", que so entrou no 2o bloco). Vite HMR preserva useState: mudanca de default so aparece com F5.
 - PENDENCIAS: DRE comparativo por ano (resultadoPorAnoComp) ainda soma receitas + despesas - mesmo defeito, aplicar creditos - debitos. Reversao da provisao de perdas da MEP quando a investida voltar a dar lucro.
+
+## 30/09/2026 - Templates de Documentos (gestao, versoes, Word, escolha na geracao)
+- Banco: document_templates + is_default, version, deleted_at, updated_by_id; nova tabela
+  document_template_versions (historico); documents.template_id/template_version; rental_contracts.template_id.
+  Template original = "Locação Residencial - Padrão" (global, padrao, v1).
+- API /document-templates (core/documents): listar (com documentos gerados), detalhar (com versoes),
+  duplicar (Global ou Empresa), salvar (texto novo = nova versao; sintaxe validada com Handlebars.precompile),
+  ativar/desativar (padrao nao desativa), definir padrao (um por tipo+abrangencia), excluir (so sem documentos),
+  Word: GET :id/docx (marcadores de bloco em paragrafos/linhas proprios) e POST :id/import-docx (volta para o editor, nao grava).
+- Locacao: resolveTemplate (escolhido > padrao empresa > padrao global > ativo mais recente); buildContext extraido;
+  renderTemplate remove paragrafos/linhas vazios dos blocos condicionais; POST /rental-contracts/:id/preview-template
+  (PDF do texto em edicao com dados de um contrato real). documents.service: renderPdf/renderDocx aceitam documento virtual.
+- Frontend: Arquivo Digital > Templates > Documentos (DocumentTemplatesPage): lista, duplicar, editor com
+  pre-visualizacao obrigatoria antes de salvar texto novo, catalogo de marcadores, historico, Word nos dois sentidos.
+- Quadro Resumo: 1o passo = template + data do instrumento (confirmacao cita os dois), depois qualificacao e geracao.
+- PDF com timbrado: margem superior do corpo 28 mm (timbrado ocupa ~25 mm; texto nao invade o cabecalho da pag. 2+).
+- Diagnostico: o paragrafo quinto com fiadora separada vinha do v10 importado do Word (texto antigo), nao do template.
+- Pendencias: cores exatas FIN/FIN_ACCENT/FIN_LIGHT no editor de templates, Fiador estruturado, locatario PJ no template,
+  botao "Excluir contrato", travessoes em outros modulos, assinatura gov.br.

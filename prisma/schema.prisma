@@ -954,6 +954,8 @@ model Document {
   content        String? @map("content") @db.Text
   contentHash    String? @map("content_hash") @db.VarChar(64)
   revisionImportedAt DateTime? @map("revision_imported_at")
+  templateId         String?   @map("template_id") @db.Uuid
+  templateVersion    Int?      @map("template_version")
   currentVersion Int     @default(1) @map("current_version")
 
   fileUrl          String? @map("file_url") @db.VarChar
@@ -1068,14 +1070,35 @@ model DocumentTemplate {
   content     String       @map("content") @db.Text
   variables   Json?        @map("variables") @db.Json
   isActive    Boolean      @default(true) @map("is_active")
+  isDefault   Boolean      @default(false) @map("is_default")
+  version     Int          @default(1) @map("version")
+  deletedAt   DateTime?    @map("deleted_at") @db.Timestamp(6)
+  updatedById String?      @map("updated_by_id") @db.Uuid
   createdById String       @map("created_by_id") @db.Uuid
   createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt   DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
 
   company   Company? @relation(fields: [companyId], references: [id])
   createdBy User     @relation(fields: [createdById], references: [id])
+  versions  DocumentTemplateVersion[]
 
   @@map("document_templates")
+}
+
+/// Historico de versoes dos templates de documento (30/09/2026)
+model DocumentTemplateVersion {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  templateId  String   @map("template_id") @db.Uuid
+  version     Int      @map("version")
+  content     String   @map("content") @db.Text
+  changeNote  String?  @map("change_note") @db.Text
+  createdById String   @map("created_by_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+
+  template DocumentTemplate @relation(fields: [templateId], references: [id])
+
+  @@unique([templateId, version])
+  @@map("document_template_versions")
 }
 
 /// Certificados digitais A1/A3 armazenados com chave criptografada (AES-256-GCM).
@@ -2607,6 +2630,7 @@ model RentalContract {
   specificClauses String? @map("specific_clauses") @db.Text
   guarantorHasSpouse Boolean @default(false) @map("guarantor_has_spouse")
   instrumentDate DateTime? @map("instrument_date") @db.Date
+  templateId String? @map("template_id") @db.Uuid
   tenantNationality   String?        @default("Brasileira") @map("tenant_nationality") @db.VarChar
   tenantStreet        String?        @map("tenant_street") @db.VarChar
   tenantNumber        String?        @map("tenant_number") @db.VarChar(20)

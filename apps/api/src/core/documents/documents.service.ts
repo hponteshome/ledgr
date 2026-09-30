@@ -442,6 +442,11 @@ export class DocumentsService {
 
   async generatePdf(id: string): Promise<Buffer> {
     const doc = await this.getDocumentOrFail(id);
+    return this.renderPdf(doc, await this.buildDownloadFilename(id));
+  }
+
+  // Renderizacao do PDF a partir de um documento real ou virtual (pre-visualizacao de template, 30/09/2026).
+  async renderPdf(doc: any, pdfFileName: string): Promise<Buffer> {
     const letterhead = await this.buildLetterheadInfo(doc);
 
     let headerTemplate: string | undefined;
@@ -449,7 +454,6 @@ export class DocumentsService {
     let letterheadMargin: { top: string; bottom: string; left: string; right: string } | undefined;
 
     if (letterhead) {
-      const pdfFileName = await this.buildDownloadFilename(id);
       headerTemplate = `
         <div style="font-size:9px; width:100%; margin:0; box-sizing:border-box; padding:6mm 20mm 1.5mm 30mm; display:flex; align-items:center; justify-content:space-between; font-family:Arial,sans-serif; color:#333; border-bottom:1px solid #ddd;">
           <div>${letterhead.logoImg}</div>
@@ -468,7 +472,9 @@ export class DocumentsService {
       `;
       // Margens laterais 0: o recuo lateral vira padding do body (body.com-timbrado),
       // que se repete em todas as paginas, liberando a faixa da tarja a 15 mm da borda.
-      letterheadMargin = { top: '20mm', bottom: '20mm', left: '0mm', right: '0mm' };
+      // Topo 28 mm: o timbrado ocupa ~25 mm; o corpo comeca abaixo dele em todas as paginas
+      // (como o Word faz quando o cabecalho e mais alto que a margem).
+      letterheadMargin = { top: '28mm', bottom: '20mm', left: '0mm', right: '0mm' };
     }
 
     const visibilityWatermark: Record<string, string> = {
@@ -490,7 +496,7 @@ export class DocumentsService {
         <style>
           /* Com timbrado: margens laterais 0 (recuo lateral via body.com-timbrado) e
              superior/inferior iguais as do Puppeteer - o @page do CSS prevalece no Chrome. */
-          @page { size: A4; margin: ${letterhead ? '20mm 0 20mm 0' : '25mm 20mm 25mm 30mm'}; }
+          @page { size: A4; margin: ${letterhead ? '28mm 0 20mm 0' : '25mm 20mm 25mm 30mm'}; }
           body { font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.8; color: #000; }
           h1 { text-align: center; font-size: 14pt; text-transform: uppercase; letter-spacing: 2px; }
           h2 { text-align: center; font-size: 12pt; text-transform: uppercase; letter-spacing: 1px; margin-top: 24pt; }
@@ -602,8 +608,12 @@ export class DocumentsService {
   // timbrado no cabecalho, nome do arquivo + numero da pagina no rodape. Margens = PDF.
   async exportDocx(id: string): Promise<Buffer> {
     const doc = await this.getDocumentOrFail(id);
+    return this.renderDocx(doc, (await this.buildDownloadFilename(id)).replace(/\.pdf$/i, '.docx'));
+  }
+
+  // Renderizacao do Word a partir de um documento real ou virtual (Word de templates, 30/09/2026).
+  async renderDocx(doc: any, fileName: string): Promise<Buffer> {
     const letterhead = await this.buildLetterheadInfo(doc);
-    const fileName = (await this.buildDownloadFilename(id)).replace(/\.pdf$/i, '.docx');
     const body = this.buildDocxBody(doc.content);
     const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"></head><body>${body}</body></html>`;
     const texto = letterhead

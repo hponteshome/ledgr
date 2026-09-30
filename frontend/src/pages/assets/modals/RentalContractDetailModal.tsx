@@ -187,6 +187,12 @@ export function RentalContractDetailModal({ contractId, title, onClose }: { cont
     const [askDate, setAskDate] = useState<{ force: boolean } | null>(null);
     const [instrumentDate, setInstrumentDate] = useState('');
     const [dateConfirmed, setDateConfirmed] = useState(false);
+    // Template (30/09/2026): escolhido junto com a data, com o padrao pre-selecionado
+    const [templates, setTemplates] = useState<{ id: string; name: string; escopo: string; isDefault: boolean; isActive: boolean; version: number }[]>([]);
+    const [templateId, setTemplateId] = useState('');
+    // Fluxo de geracao (30/09/2026): template + data confirmados ANTES da qualificacao do locatario
+    const [startFlow, setStartFlow] = useState(false);
+    const [chosen, setChosen] = useState<{ data: string; tpl?: string } | null>(null);
 
     function loadContract() {
         if (!contractId) { setError('Contrato não encontrado.'); setLoading(false); return; }
@@ -215,11 +221,25 @@ export function RentalContractDetailModal({ contractId, title, onClose }: { cont
         return QUALIFICATION_FIELDS.filter(f => !contract[f.key]);
     }
 
-    async function handleGenerate(force = false, dataInstrumento?: string) {
+    async function handleGenerate(force = false, dataInstrumento?: string, tplId?: string) {
         if (!dataInstrumento) {
             setSaving(false);
             setInstrumentDate(contract?.instrumentDate ? String(contract.instrumentDate).slice(0, 10) : '');
             setDateConfirmed(false);
+            fetch(`${API}/document-templates?type=CONTRATO_LOCACAO`, {
+                headers: { 'Authorization': `Bearer ${token}`, 'x-company-id': activeCompany?.id ?? '' },
+            })
+                .then(r => (r.ok ? r.json() : []))
+                .then((lista: any[]) => {
+                    const ativos = (Array.isArray(lista) ? lista : []).filter(t => t.isActive);
+                    setTemplates(ativos);
+                    const pref = ativos.find(t => t.id === contract?.templateId)
+                        ?? ativos.find(t => t.isDefault && t.escopo === 'EMPRESA')
+                        ?? ativos.find(t => t.isDefault)
+                        ?? ativos[0];
+                    setTemplateId(pref?.id ?? '');
+                })
+                .catch(() => { setTemplates([]); setTemplateId(''); });
             setAskDate({ force });
             return;
         }
@@ -233,13 +253,13 @@ export function RentalContractDetailModal({ contractId, title, onClose }: { cont
                     'Authorization': `Bearer ${token}`,
                     'x-company-id': activeCompany?.id ?? '',
                 },
-                body: JSON.stringify({ force, dataInstrumento }),
+                body: JSON.stringify({ force, dataInstrumento, templateId: tplId }),
             });
             if (!res.ok) {
                 const errBody = await res.json().catch(() => null);
                 if (res.status === 409 && !force && window.confirm((errBody?.message ?? '') + '\n\nGerar novamente mesmo assim?')) {
                     setSaving(false);
-                    await handleGenerate(true, dataInstrumento);
+                    await handleGenerate(true, dataInstrumento, tplId);
                     return;
                 }
                 throw new Error(errBody?.message ?? '');
@@ -268,6 +288,15 @@ export function RentalContractDetailModal({ contractId, title, onClose }: { cont
                 );
                 return;
             }
+        }
+        // 1o passo: template + data do instrumento (abre o painel de escolha)
+        setStartFlow(true);
+        await handleGenerate();
+    }
+
+    // 2o passo (apos a escolha confirmada): qualificacao do locatario, se necessaria, e geracao
+    async function continueStart(data: string, tpl?: string) {
+        if (contract.documentId) {
             const initial: Record<string, string> = {};
             QUALIFICATION_FIELDS.forEach(f => { initial[f.key] = contract[f.key] ?? ''; });
             setFormValues(initial);
@@ -276,7 +305,7 @@ export function RentalContractDetailModal({ contractId, title, onClose }: { cont
         }
         const missing = missingQualificationFields();
         if (missing.length === 0) {
-            await handleGenerate();
+            await handleGenerate(false, data, tpl);
             return;
         }
         const initial: Record<string, string> = {};
@@ -309,7 +338,7 @@ export function RentalContractDetailModal({ contractId, title, onClose }: { cont
                 body: JSON.stringify(payload),
             });
             if (!patchRes.ok) throw new Error();
-            await handleGenerate();
+            await handleGenerate(false, chosen?.data, chosen?.tpl);
         } catch {
             setGenError('Não foi possível salvar a qualificação do locatário. Verifique os campos e tente novamente.');
             setSaving(false);
@@ -446,23 +475,40 @@ export function RentalContractDetailModal({ contractId, title, onClose }: { cont
 
                             {askDate && (
                                 <div className="space-y-3 bg-amber-50 border border-amber-200 rounded-lg p-4">
-                                    <div className="text-sm font-medium text-gray-900">Data do instrumento</div>
+                                    <div className="text-sm font-medium text-gray-900">Template e data do instrumento</div>
+                                    <div>
+                                        <div className="text-xs text-gray-600 mb-1">Template</div>
+                                        <select className="w-full text-sm border border-gray-300 rounded-md px-2 py-1.5 bg-white" value={templateId}
+                                            onChange={e => { setTemplateId(e.target.value); setDateConfirmed(false); }}>
+                                            {templates.length === 0 && <option value="">Padrão do sistema</option>}
+                                            {templates.map(t => (
+                                                <option key={t.id} value={t.id}>
+                                                    {t.name} (v{t.version}{t.escopo === 'EMPRESA' ? ', da empresa' : ''}{t.isDefault ? ', padrão' : ''})
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
                                     <div className="text-xs text-gray-600">Informe a data que constará no fechamento do contrato (local e data, antes das assinaturas).</div>
                                     <SmartDateInput className="w-full text-sm border border-gray-300 rounded-md px-2 py-1.5" value={instrumentDate}
                                         onChange={(v: string) => { setInstrumentDate(v); setDateConfirmed(false); }} />
                                     {instrumentDate && (
                                         <label className="flex items-start gap-2 text-sm text-gray-800">
                                             <input type="checkbox" className="mt-1" checked={dateConfirmed} onChange={e => setDateConfirmed(e.target.checked)} />
-                                            <span>Confirmo que a data do instrumento é <strong>{fmtDataExtenso(instrumentDate)}</strong>.</span>
+                                            <span>Confirmo a data do instrumento <strong>{fmtDataExtenso(instrumentDate)}</strong>{templateId ? <> e o template <strong>{templates.find(t => t.id === templateId)?.name}</strong></> : null}.</span>
                                         </label>
                                     )}
                                     <div className="flex gap-2">
-                                        <button type="button" onClick={() => setAskDate(null)}
+                                        <button type="button" onClick={() => { setAskDate(null); setStartFlow(false); }}
                                             className="flex-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg px-4 py-2">
                                             Cancelar
                                         </button>
                                         <button type="button" disabled={!instrumentDate || !dateConfirmed || saving}
-                                            onClick={() => { const f = askDate.force; setAskDate(null); handleGenerate(f, instrumentDate); }}
+                                            onClick={() => {
+                                                const f = askDate.force; const tpl = templateId || undefined;
+                                                setAskDate(null);
+                                                if (startFlow) { setStartFlow(false); setChosen({ data: instrumentDate, tpl }); continueStart(instrumentDate, tpl); }
+                                                else { handleGenerate(f, instrumentDate, tpl); }
+                                            }}
                                             className="flex-1 text-sm font-medium text-white bg-gray-900 hover:bg-gray-800 disabled:opacity-50 rounded-lg px-4 py-2">
                                             Confirmar data e gerar
                                         </button>

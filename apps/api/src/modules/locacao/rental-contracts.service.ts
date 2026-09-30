@@ -5,6 +5,7 @@ import { Prisma, DocumentType, DocumentStatus, DocumentVisibility } from '@prism
 import { CreateRentalContractDto, UpdateRentalContractDto } from './dto/rental-contract.dto';
 import * as crypto from 'crypto';
 import * as Handlebars from 'handlebars';
+import { DocumentsService } from '../../core/documents/documents.service';
 import { valorPorExtenso } from './utils/extenso.util';
 import {
   formatDateBR,
@@ -42,7 +43,7 @@ function toDate(value: string | undefined | null): Date | undefined {
 
 @Injectable()
 export class RentalContractsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private documents: DocumentsService) {}
 
   async findAll(companyId: string, status?: string) {
     return this.prisma.rentalContract.findMany({
@@ -299,7 +300,7 @@ export class RentalContractsService {
     });
   }
 
-  async generateDocument(companyId: string, userId: string, id: string, force = false, dataInstrumento?: string) {
+  async generateDocument(companyId: string, userId: string, id: string, force = false, dataInstrumento?: string, templateId?: string) {
     // Data do instrumento (29/09/2026): obrigatoria a cada geracao, confirmada pelo usuario no Quadro Resumo.
     const dataInst = /^\d{4}-\d{2}-\d{2}$/.test(dataInstrumento ?? '') ? (dataInstrumento as string) : '';
     if (!dataInst) throw new BadRequestException('Informe e confirme a data do instrumento para gerar o contrato.');
@@ -313,17 +314,8 @@ export class RentalContractsService {
     if (!contract) throw new NotFoundException('Contrato de locacao nao encontrado.');
     await this.prisma.rentalContract.update({ where: { id: contract.id }, data: { instrumentDate: toDate(dataInst) } });
 
-    let template = await this.prisma.documentTemplate.findFirst({
-      where: { type: DocumentType.CONTRATO_LOCACAO, isActive: true, companyId },
-    });
-    if (!template) {
-      template = await this.prisma.documentTemplate.findFirst({
-        where: { type: DocumentType.CONTRATO_LOCACAO, isActive: true, companyId: null },
-      });
-    }
-    if (!template) {
-      throw new NotFoundException('Nenhum template ativo de Contrato de Locacao encontrado.');
-    }
+    const template = await this.resolveTemplate(companyId, templateId);
+    await this.prisma.rentalContract.update({ where: { id: contract.id }, data: { templateId: template.id } });
 
     let existingDoc: { id: string; status: string; currentVersion: number; revisionImportedAt: Date | null } | null = null;
     if (contract.documentId) {
@@ -344,6 +336,88 @@ export class RentalContractsService {
       );
     }
 
+    const dados = this.buildContext(contract, dataInstUtc);
+    const html = this.renderTemplate(template.content, dados);
+    const contentHash = crypto.createHash('sha256').update(html).digest('hex');
+
+    const ddmmyy = (d: Date) => {
+      const dd = String(d.getUTCDate()).padStart(2, '0');
+      const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+      const yy = String(d.getUTCFullYear()).slice(-2);
+      return `${dd}${mm}${yy}`;
+    };
+    const inicio = ddmmyy(contract.startDate);
+    const fim = contract.endDate ? ddmmyy(contract.endDate) : 'indeterminado';
+    const documentTitle = `Locação_${contract.fixedAsset.internalCode}_${inicio}a${fim}.pdf`;
+
+    let document;
+    if (existingDoc) {
+      const newVersion = existingDoc.currentVersion + 1;
+      await this.prisma.documentVersion.create({
+        data: {
+          documentId: existingDoc.id,
+          version: newVersion,
+          content: html,
+          contentHash,
+          changeNote: `Contrato regerado (template: ${template.name} v${template.version}) - v${newVersion}`,
+          createdById: userId,
+        },
+      });
+      document = await this.prisma.document.update({
+        where: { id: existingDoc.id },
+        data: { title: documentTitle, content: html, contentHash, currentVersion: newVersion, revisionImportedAt: null, templateId: template.id, templateVersion: template.version, updatedAt: new Date() },
+      });
+      await this.prisma.rentalContract.update({
+        where: { id: contract.id },
+        data: { updatedById: userId },
+      });
+    } else {
+      document = await this.prisma.document.create({
+        data: {
+          companyId,
+          type: DocumentType.CONTRATO_LOCACAO,
+          status: DocumentStatus.RASCUNHO,
+          visibility: DocumentVisibility.RESERVADO,
+          title: documentTitle,
+          date: new Date(),
+          content: html,
+          contentHash,
+          templateId: template.id,
+          templateVersion: template.version,
+          createdById: userId,
+        },
+      });
+      await this.prisma.rentalContract.update({
+        where: { id: contract.id },
+        data: { documentId: document.id, updatedById: userId },
+      });
+    }
+
+    return document;
+  }
+
+  // Template (30/09/2026): o escolhido na geracao ou, sem escolha, o padrao da empresa,
+  // depois o padrao global e, por fim, o ativo mais recente.
+  private async resolveTemplate(companyId: string, templateId?: string) {
+    const base = { type: DocumentType.CONTRATO_LOCACAO, isActive: true, deletedAt: null };
+    if (templateId) {
+      const t = await this.prisma.documentTemplate.findFirst({
+        where: { ...base, id: templateId, OR: [{ companyId: null }, { companyId }] },
+      });
+      if (!t) throw new BadRequestException('Template selecionado nao encontrado ou inativo.');
+      return t;
+    }
+    const t =
+      (await this.prisma.documentTemplate.findFirst({ where: { ...base, companyId, isDefault: true } })) ??
+      (await this.prisma.documentTemplate.findFirst({ where: { ...base, companyId: null, isDefault: true } })) ??
+      (await this.prisma.documentTemplate.findFirst({ where: { ...base, companyId }, orderBy: { updatedAt: 'desc' } })) ??
+      (await this.prisma.documentTemplate.findFirst({ where: { ...base, companyId: null }, orderBy: { updatedAt: 'desc' } }));
+    if (!t) throw new NotFoundException('Nenhum template ativo de Contrato de Locacao encontrado.');
+    return t;
+  }
+
+  // Contexto do template (30/09/2026): extraido do generateDocument para servir tambem a pre-visualizacao.
+  private buildContext(contract: any, dataInstUtc: Date) {
     const isFianca = contract.guaranteeType === 'FIANCA';
     const rentAmountNumber = Number(contract.rentAmount);
 
@@ -418,63 +492,38 @@ export class RentalContractsService {
         registryOffice: contract.fixedAsset.registryOffice,
       },
     };
+    return dados;
+  }
 
-    const compiled = Handlebars.compile(template.content);
-    const html = compiled(dados);
-    const contentHash = crypto.createHash('sha256').update(html).digest('hex');
-
-    const ddmmyy = (d: Date) => {
-      const dd = String(d.getUTCDate()).padStart(2, '0');
-      const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
-      const yy = String(d.getUTCFullYear()).slice(-2);
-      return `${dd}${mm}${yy}`;
-    };
-    const inicio = ddmmyy(contract.startDate);
-    const fim = contract.endDate ? ddmmyy(contract.endDate) : 'indeterminado';
-    const documentTitle = `Locação_${contract.fixedAsset.internalCode}_${inicio}a${fim}.pdf`;
-
-    let document;
-    if (existingDoc) {
-      const newVersion = existingDoc.currentVersion + 1;
-      await this.prisma.documentVersion.create({
-        data: {
-          documentId: existingDoc.id,
-          version: newVersion,
-          content: html,
-          contentHash,
-          changeNote: `Contrato regerado a partir dos dados atuais - v${newVersion}`,
-          createdById: userId,
-        },
-      });
-      document = await this.prisma.document.update({
-        where: { id: existingDoc.id },
-        data: { title: documentTitle, content: html, contentHash, currentVersion: newVersion, revisionImportedAt: null, updatedAt: new Date() },
-      });
-      await this.prisma.rentalContract.update({
-        where: { id: contract.id },
-        data: { updatedById: userId },
-      });
-    } else {
-      document = await this.prisma.document.create({
-        data: {
-          companyId,
-          type: DocumentType.CONTRATO_LOCACAO,
-          status: DocumentStatus.RASCUNHO,
-          visibility: DocumentVisibility.RESERVADO,
-          title: documentTitle,
-          date: new Date(),
-          content: html,
-          contentHash,
-          createdById: userId,
-        },
-      });
-      await this.prisma.rentalContract.update({
-        where: { id: contract.id },
-        data: { documentId: document.id, updatedById: userId },
-      });
+  // Compila o template e remove paragrafos/linhas de tabela vazios que sobram dos blocos
+  // condicionais (templates editados pelo Word levam os marcadores em paragrafos proprios).
+  private renderTemplate(content: string, dados: any): string {
+    let html: string;
+    try {
+      html = Handlebars.compile(content)(dados);
+    } catch (e: any) {
+      throw new BadRequestException(`Erro ao aplicar o template: ${e?.message ?? e}`);
     }
+    return html
+      .replace(/<tr>\s*<td[^>]*>\s*(?:<p[^>]*>\s*<\/p>)?\s*<\/td>\s*<\/tr>/gi, '')
+      .replace(/<p[^>]*>\s*<\/p>/gi, '');
+  }
 
-    return document;
+  // Pre-visualizacao (30/09/2026): PDF de um texto de template (em edicao) com os dados deste contrato. Nao grava nada.
+  async previewTemplate(companyId: string, id: string, content: string, dataInstrumento?: string) {
+    if (!content?.trim()) throw new BadRequestException('Informe o conteudo do template.');
+    const contract = await this.prisma.rentalContract.findFirst({
+      where: { id, companyId, deletedAt: null },
+      include: { fixedAsset: true, company: true },
+    });
+    if (!contract) throw new NotFoundException('Contrato de locacao nao encontrado.');
+    const iso = /^\d{4}-\d{2}-\d{2}$/.test(dataInstrumento ?? '') ? (dataInstrumento as string) : new Date().toISOString().slice(0, 10);
+    const [y, m, d] = iso.split('-').map(Number);
+    const html = this.renderTemplate(content, this.buildContext(contract, new Date(Date.UTC(y, m - 1, d))));
+    return this.documents.renderPdf(
+      { type: DocumentType.CONTRATO_LOCACAO, companyId, status: 'RASCUNHO', visibility: 'RESERVADO', title: 'Pre-visualizacao', content: html, signatures: [] },
+      'Pre-visualizacao do template.pdf',
+    );
   }
 
   async prepareSigners(companyId: string, id: string) {

@@ -1,5 +1,6 @@
 // apps/api/src/modules/locacao/rental-contracts.controller.ts
-import { Controller, Get, Post, Patch, Delete, Body, Param, Query, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, Query, Req, Res, UseGuards } from '@nestjs/common';
+import { Response } from 'express';
 import { JwtAuthGuard } from '../../auth/guards/jwt.guard';
 import { SidebarResourceGuard } from '../../auth/guards/sidebar-resource.guard';
 import { RequireResourceAccess } from '../../auth/decorators/require-resource-access.decorator';
@@ -70,10 +71,26 @@ export class RentalContractsController {
     @Param('id') id: string,
     @Body('force') force?: boolean,
     @Body('dataInstrumento') dataInstrumento?: string,
+    @Body('templateId') templateId?: string,
   ) {
     const companyId = req.headers['x-company-id'] ?? '';
     const userId = req.user?.id ?? req.user?.sub ?? '';
-    return this.svc.generateDocument(companyId, userId, id, force === true, dataInstrumento);
+    return this.svc.generateDocument(companyId, userId, id, force === true, dataInstrumento, templateId || undefined);
+  }
+
+  // POST /rental-contracts/:id/preview-template - PDF do texto de um template (em edicao) com os dados deste contrato
+  @Post(':id/preview-template')
+  @RequireResourceAccess('rental-contracts', 'VIEW')
+  async previewTemplate(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Body('content') content: string,
+    @Body('dataInstrumento') dataInstrumento: string | undefined,
+    @Res() res: Response,
+  ) {
+    const buffer = await this.svc.previewTemplate(req.headers['x-company-id'] ?? '', id, content, dataInstrumento);
+    res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': 'inline; filename="previsualizacao.pdf"' });
+    res.send(buffer);
   }
 
   @Post(':id/prepare-signers')
