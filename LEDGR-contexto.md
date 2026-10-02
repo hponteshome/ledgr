@@ -9783,3 +9783,21 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 ### Aprendizados
 - Protocolo reafirmado: ancoras multilinha falharam (espaco invisivel); usar localizacao por indice de linha com validacao por `strip()` desde a primeira tentativa.
 - Protocolo reafirmado: `cls` imediatamente antes da execucao/confirmacao, depois de gravar o script.
+
+## [PROJETOS] Sessao 02/10/2026 (cont.) - Fase 0A.2: CompanyInterceptor valida UserCompany
+
+### Concluido
+- `company.interceptor.ts` reescrito: usuario nao Master so opera em empresa com vinculo em `UserCompany` (empresa nao excluida); fora disso 404 "Empresa nao encontrada" (regra 5.5.6 da bussola).
+- Whitelist por `request.path` (sem query string): fecha o bypass `?x=/auth/`.
+- `/companies/<uuid>` deixou de ser publica: exige vinculo com a empresa consultada.
+- Fail closed: rota que exige empresa sem usuario autenticado recebe 401.
+- Criterio unico de Master Admin exportado: `isMasterAdmin(user)` = `profile.permissions.all === true`. Master com comportamento inalterado.
+- `PrismaModule` marcado como `@Global()` (necessario para injecao no interceptor, usado tambem via `@UseInterceptors` em ~35 controllers).
+- Teste: API compilou e subiu; navegacao como Master sem regressao.
+
+### Pendencias registradas
+- 8 modulos declaram `PrismaService` como provider proprio (auth, system, profiles, accounting, corporate, sped, ecd-arquivo, ecf-arquivo): 9 PrismaClient/pools de conexao. Com o modulo global, remover a linha de cada um.
+- `CompanyGuard` (sempre true, ~25 controllers) e `ProfileGuard` (ID fixo): migrar para `isMasterAdmin()` ou remover.
+- `@UseInterceptors(CompanyInterceptor)` repetido em ~35 controllers: redundante com o global (executa 2x por request).
+- Auditoria de `companyId` vindo de query/body em 10 arquivos (documents.service 7, contratos.service 5, certificates.controller 5, sidebar-permissions.controller 2, users.service 2, balance-import, accounting, documents.controller, chat.service).
+- Testes de negacao com usuario nao Master: criar conta de teste dedicada.
