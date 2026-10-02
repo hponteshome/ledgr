@@ -9819,3 +9819,35 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - Controller de Documentos sem `SidebarResourceGuard`: perfil nao restringe acoes (Fase C).
 - Listagem de templates por usuario nao Master: `empresaEfetiva` forca o `companyId` e pode ocultar templates globais; revisar ao criar a conta de teste.
 - Teste de negacao depende da conta de teste dedicada (proximo passo).
+
+## [PROJETOS] PAUSA 02/10/2026 - onde paramos (Fase 0A em andamento)
+
+### Commits do dia
+- docs: bussola `docs/LEDGR-OceanProject.md` (decisoes D1-D7, modelo de acesso, protocolos, fases 0-4)
+- seg(0A.8): contas de teste desativadas com AuditLog
+- seg(0A.6 parcial): login valida estado da conta, bloqueio apos 5 tentativas, JWT_SECRET obrigatorio (rotacionado), logs sensiveis removidos
+- seg(0A.2): CompanyInterceptor valida UserCompany, whitelist por request.path, isMasterAdmin() unico, PrismaModule @Global
+- seg(0A): escopo de empresa em Documentos (DocumentScopeInterceptor + empresaEfetiva)
+
+### Em andamento - conta de teste qa.hotelsys@ledgr.local
+- Perfil Operador, vinculo so Hotelsys, janela SCHEDULED 0-6 00:00-23:59.
+- Status na pausa: CRIADA e DESATIVADA na pausa (AuditLog USER_DEACTIVATE). Reativar no inicio da sessao de teste; senha esta com o Hpontes.
+- Modelo SQL: `prisma/migrations-manuais/20261002_seg_conta_teste_qa_hotelsys.sql` (hash injetado em execucao, sem credencial no arquivo).
+
+### Retomar nesta ordem
+1. Conta de teste: criar (se pendente) ou reativar; teste inicial em janela anonima (so Hotelsys no seletor; Documentos so da Hotelsys).
+2. Script de testes de negacao via API com o token da conta QA: outra empresa pelo header, pela query, por :id de documento e por /companies/<uuid> - todos devem dar 404.
+3. Revisar listagem de templates globais para nao Master (empresaEfetiva pode oculta-los).
+4. Auditoria de companyId vindo de query/body nos arquivos restantes: contratos.service (5), certificates.controller (5), sidebar-permissions.controller (2), users.service (2), balance-import.controller, accounting.controller, chat.service.
+5. CompanyGuard (sempre true) e ProfileGuard (ID fixo) -> isMasterAdmin() ou remocao; desativar perfil "Administrador Master" (all=true, 0 usuarios).
+6. Remover PrismaService dos providers de 8 modulos (auth, system, profiles, accounting, corporate, sped, ecd-arquivo, ecf-arquivo).
+7. Remover @UseInterceptors(CompanyInterceptor) redundante (~35 controllers).
+8. 0A.6 restante: sessao curta + refresh token; aceitar ?token= so nas rotas de SSE.
+9. Fase C: SidebarResourceGuard nos modulos (Documentos ainda sem).
+10. 0A.7 AuditLog ampliado; Fase 0B (infra remota); identificar processo Node na porta 7778; trade_name vazio (Sunsys, Jose Silva, GRB) e '.' (Pontes).
+
+### Regras reafirmadas na sessao
+- Ancoras por indice de linha com validacao por strip(); nunca multilinha como primeira estratégia.
+- cls imediatamente antes da execucao/confirmacao.
+- Conferir estrutura real das tabelas (information_schema) antes de SQL de escrita em tabela nao inspecionada.
+- Conta de teste inativa fora das sessoes de teste.
