@@ -9801,3 +9801,21 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - `@UseInterceptors(CompanyInterceptor)` repetido em ~35 controllers: redundante com o global (executa 2x por request).
 - Auditoria de `companyId` vindo de query/body em 10 arquivos (documents.service 7, contratos.service 5, certificates.controller 5, sidebar-permissions.controller 2, users.service 2, balance-import, accounting, documents.controller, chat.service).
 - Testes de negacao com usuario nao Master: criar conta de teste dedicada.
+
+## [PROJETOS] Sessao 02/10/2026 (cont.) - Fase 0A: escopo de empresa no modulo Documentos
+
+### Achado
+- Modulo Documentos nao usava `request.companyId` em nenhum ponto: `GET /documents` lia `companyId` da query; create/upload/import-signed gravavam `dto.companyId`; as 20 rotas `:id` buscavam so pelo id (IDOR); `removeSigner` excluia pelo `signerId` sem conferir o documento.
+
+### Concluido
+- Novo `core/documents/document-scope.interceptor.ts` (nivel de controller, roda depois do CompanyInterceptor global e antes do FileInterceptor da rota):
+  - rotas `:id`: documento de outra empresa, excluido ou inexistente = 404; template global = leitura liberada, alteracao so Master.
+  - `:signerId` deve pertencer ao documento da rota (vale tambem para o Master - integridade).
+  - upload em `import-revision`/`sign-physical` so ocorre se o escopo for valido.
+- `documents.controller.ts`: `empresaEfetiva()` em findAll/create/upload/import-signed (nao Master: sempre `request.companyId`, divergente = 404); `bloquearTemplateNaoMaster()` em create/upload.
+- Master: comportamento inalterado. Teste como Master sem regressao.
+
+### Pendencias
+- Controller de Documentos sem `SidebarResourceGuard`: perfil nao restringe acoes (Fase C).
+- Listagem de templates por usuario nao Master: `empresaEfetiva` forca o `companyId` e pode ocultar templates globais; revisar ao criar a conta de teste.
+- Teste de negacao depende da conta de teste dedicada (proximo passo).

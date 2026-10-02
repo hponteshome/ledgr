@@ -3,7 +3,7 @@ import {
   Controller, Get, Post, Patch, Delete,
   Param, Body, Query, Request, Req,
   UseGuards, UseInterceptors, UploadedFile,
-  Res, HttpCode, HttpStatus, BadRequestException,
+  Res, HttpCode, HttpStatus, BadRequestException, NotFoundException, ForbiddenException,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/guards/jwt.guard';
 import { DocumentsService } from './documents.service';
@@ -13,11 +13,30 @@ import {
   CreateDocumentDto, UpdateDocumentDto,
   AddSignerDto, SignDocumentDto,
 } from './create-documents.dto';
+import { DocumentScopeInterceptor } from './document-scope.interceptor';
+import { isMasterAdmin } from '../../multi-company/company.interceptor';
 
 @UseGuards(JwtAuthGuard)
+@UseInterceptors(DocumentScopeInterceptor)
 @Controller('documents')
 export class DocumentsController {
   constructor(private readonly documentsService: DocumentsService) { }
+
+  // Seguranca 0A (02/10/2026): empresa efetiva nas rotas sem :id.
+  // Master: comportamento inalterado. Demais: sempre request.companyId; divergente = 404.
+  private empresaEfetiva(req: any, informada?: string): string | undefined {
+    if (isMasterAdmin(req.user)) return informada;
+    if (informada && informada !== req.companyId) {
+      throw new NotFoundException('Empresa nao encontrada.');
+    }
+    return req.companyId;
+  }
+
+  private bloquearTemplateNaoMaster(req: any, isTemplate: any): void {
+    if (!isMasterAdmin(req.user) && (isTemplate === true || isTemplate === 'true')) {
+      throw new ForbiddenException('Templates globais so podem ser criados pelo administrador.');
+    }
+  }
 
   // ── Listagem e busca ─────────────────────────────────────────
 
@@ -32,7 +51,7 @@ export class DocumentsController {
     @Query('isTemplate') isTemplate?: string,
   ) {
     return this.documentsService.findAll({
-      companyId,
+      companyId: this.empresaEfetiva(req, companyId),
       type,
       status,
       visibility,
@@ -51,6 +70,8 @@ export class DocumentsController {
   // POST /documents - cria documento digitado (sem arquivo)
   @Post()
   create(@Request() req, @Body() dto: CreateDocumentDto) {
+    this.bloquearTemplateNaoMaster(req, dto.isTemplate);
+    dto.companyId = this.empresaEfetiva(req, dto.companyId);
     return this.documentsService.create(dto, req.user.id);
   }
 
@@ -63,6 +84,8 @@ export class DocumentsController {
     @UploadedFile() file: Express.Multer.File,
     @Body() dto: CreateDocumentDto,
   ) {
+    this.bloquearTemplateNaoMaster(req, dto.isTemplate);
+    dto.companyId = this.empresaEfetiva(req, dto.companyId);
     return this.documentsService.createFromUpload(file, dto, req.user.id);
   }
 
@@ -291,6 +314,7 @@ export class DocumentsController {
     },
   ) {
     if (!file) throw new Error('Arquivo PDF não enviado');
+    body.companyId = this.empresaEfetiva(req, body.companyId) as string;
     return this.documentsService.importSignedPdf(file, body, req.user.id);
   }
 }
