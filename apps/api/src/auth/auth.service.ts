@@ -107,14 +107,50 @@ export class AuthService {
       return null;
     }
 
+    // Seguranca 0A.6 (02/10/2026): estado da conta, bloqueio por tentativas e ultimo acesso
+    const LOGIN_MAX_TENTATIVAS = 5;
+    const LOGIN_BLOQUEIO_MINUTOS = 15;
+    const conta = await this.prisma.user.findUnique({
+      where: { id: user.id },
+      select: { isActive: true, status: true, deletedAt: true, failedAttempts: true, blockedUntil: true },
+    });
+    if (!conta || conta.deletedAt) {
+      return null;
+    }
+    const agora = new Date();
+    if (conta.blockedUntil && conta.blockedUntil > agora) {
+      throw new ForbiddenException('Acesso temporariamente bloqueado por excesso de tentativas. Tente novamente mais tarde.');
+    }
+
     const isMatch = await bcrypt.compare(password, user.passwordHash);
 
-    if (isMatch) {
-      const { passwordHash, ...result } = user;
-      return result;
+    if (!isMatch) {
+      const tentativas = (conta.failedAttempts ?? 0) + 1;
+      const bloquear = tentativas >= LOGIN_MAX_TENTATIVAS;
+      const bloqueadoAte = bloquear ? new Date(agora.getTime() + LOGIN_BLOQUEIO_MINUTOS * 60000) : null;
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: bloquear ? { failedAttempts: 0, blockedUntil: bloqueadoAte } : { failedAttempts: tentativas },
+      });
+      if (bloquear) {
+        await this.prisma.auditLog.create({
+          data: { actorId: user.id, action: 'LOGIN_BLOCKED', targetId: user.id, after: { blockedUntil: bloqueadoAte!.toISOString(), tentativas } },
+        });
+      }
+      return null;
     }
-    
-    return null;
+
+    if (!conta.isActive || conta.status !== 'active') {
+      throw new ForbiddenException('Usuario inativo ou aguardando aprovacao. Contate o administrador.');
+    }
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { failedAttempts: 0, blockedUntil: null, lastAccess: agora },
+    });
+
+    const { passwordHash, ...result } = user;
+    return result;
   }
 
   private isWithinAccessWindow(schedule: any): { ok: boolean; reason?: string } {
@@ -197,8 +233,6 @@ export class AuthService {
       companyName: firstCompany?.legalName || firstCompany?.tradeName,
       companyTaxId: firstCompany?.taxId
     };
-
-    console.log('🔑 Payload do token:', payload);
 
     const token = this.jwtService.sign(payload);
 

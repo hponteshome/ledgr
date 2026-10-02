@@ -9759,3 +9759,27 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - Diagnostico: o paragrafo quinto com fiadora separada vinha do v10 importado do Word (texto antigo), nao do template.
 - Pendencias: cores exatas FIN/FIN_ACCENT/FIN_LIGHT no editor de templates, Fiador estruturado, locatario PJ no template,
   botao "Excluir contrato", travessoes em outros modulos, assinatura gov.br.
+## [PROJETOS] Sessao 02/10/2026 - Fase 0A: contas de teste, autenticacao e segredo JWT
+
+**Contexto:** inicio da Fase 0 da bussola `docs/LEDGR-OceanProject.md` (dominio Projetos / Recife Ocean Residences).
+
+### Concluido
+- 0A.8: `teste.qa@ledgr.local` (Master Admin) e 4 contas de teste sem uso (adm@, oper@, ver@, teste.visualizador@) desativadas, com `AuditLog` (USER_DEACTIVATE) e `refresh_token` anulado. Migracoes em `prisma/migrations-manuais/20261002_seg_*.sql`. Unico usuario ativo: hpontes@ledgr.com.
+- 0A.6 (parcial): `validateUser` agora recusa conta excluida, inativa ou pendente (mensagem so apos senha correta); bloqueio de 15 min apos 5 senhas erradas, com `AuditLog` LOGIN_BLOCKED; `lastAccess` gravado no sucesso.
+- `JwtStrategy.validate`: token so vale para conta ativa e nao excluida. Decisao: NAO derruba sessao por `blockedUntil` (evita que tentativas de terceiros expulsem sessao legitima).
+- Segredo JWT: removido fallback `'secretKey'`; API nao sobe sem `JWT_SECRET` >= 64 caracteres. Segredo rotacionado (128 hex, mesmo valor em `.env` e `apps\api\.env`); backup em `D:\Backups\env\20261002_133204`. Nenhum `.env` versionado no git.
+- Removidos logs de payload do token (login) e de perfil/permissoes (a cada request).
+- Testes manuais OK: conta inativa recusada, bloqueio na 5a tentativa, auditoria registrada, login Master com `lastAccess`.
+
+### Achados pendentes (proximos itens da Fase 0A)
+- `CompanyInterceptor` (global via APP_INTERCEPTOR): so verifica presenca do `x-company-id`, nao valida `UserCompany`. Whitelist por `url.includes` inclui query string (`?x=/auth/` faz bypass e deixa `companyId` undefined, que o Prisma ignora no `where`). Rota `/companies/<uuid>` publica.
+- `CompanyGuard` sempre retorna true; usado em ~25 controllers. Interceptor repetido em ~35 controllers via `@UseInterceptors`.
+- Criterio de Master Admin divergente (interceptor: `permissions.all`; guard: `profileName`; `ProfileGuard`: ID fixo).
+- JWT aceito via query string (`?token=`) para SSE: restringir as rotas de SSE.
+- `expiresIn: '1d'`: sessao curta + refresh fica para o restante do 0A.6.
+- Processo Node na porta 7778 (desde 01/10): identificar e incluir no inventario da Fase 0B.
+- Qualidade de dados: `trade_name` vazio em Sunsys, Jose Silva e GRB; `'.'` na Pontes.
+
+### Aprendizados
+- Protocolo reafirmado: ancoras multilinha falharam (espaco invisivel); usar localizacao por indice de linha com validacao por `strip()` desde a primeira tentativa.
+- Protocolo reafirmado: `cls` imediatamente antes da execucao/confirmacao, depois de gravar o script.

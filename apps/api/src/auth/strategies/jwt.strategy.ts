@@ -3,6 +3,15 @@ import { PassportStrategy } from '@nestjs/passport';
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service'; // ← IMPORTAR
 
+// Seguranca 0A (02/10/2026): sem fallback - a API nao sobe sem segredo forte
+function requireJwtSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret || secret.length < 64) {
+    throw new Error('JWT_SECRET ausente ou fraco (minimo 64 caracteres). Configure o .env da API.');
+  }
+  return secret;
+}
+
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(private prisma: PrismaService) {  // ← INJETAR PRISMA
@@ -12,37 +21,26 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         (req: any) => req?.query?.token || null, // permite SSE/EventSource, que nao envia headers customizados
       ]),
       ignoreExpiration: false,
-      secretOrKey: process.env.JWT_SECRET || 'secretKey',
+      secretOrKey: requireJwtSecret(),
     });
   }
 
   async validate(payload: any) {
-    // Buscar o usuário completo no banco com o perfil
+    // Seguranca 0A (02/10/2026): token so vale para conta ativa e nao excluida
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
-      include: {
-        profile: true  // ← INCLUIR O PERFIL!
-      }
+      include: { profile: true },
     });
 
-    if (!user) {
+    if (!user || user.deletedAt || !user.isActive || user.status !== 'active') {
       throw new UnauthorizedException();
     }
 
-    console.log('🔍 [JwtStrategy] Usuário encontrado:', {
-      id: user.id,
-      email: user.email,
-      profileId: user.profile?.id,
-      profileName: user.profile?.name,
-      permissions: user.profile?.permissions
-    });
-
-    // Retornar o usuário COMPLETO com o perfil
     return {
       id: user.id,
       email: user.email,
       fullName: user.fullName,
-      profile: user.profile  // ← AGORA É O OBJETO COMPLETO!
+      profile: user.profile,
     };
   }
 }
