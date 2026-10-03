@@ -56,6 +56,17 @@ export class ProjectsController {
     });
   }
 
+  @Get('perfis')
+  @UseGuards(MasterOnlyGuard)
+  @ProjAcao('autenticado') // decisao do MasterOnlyGuard do metodo (403 consistente)
+  perfis() {
+    return this.prisma.projPerfil.findMany({
+      where: { ativo: true },
+      orderBy: { nome: 'asc' },
+      select: { codigo: true, nome: true, descricao: true, acoes: true, nivelPadrao: true },
+    });
+  }
+
   @Get(':projetoId/concessoes')
   @UseGuards(MasterOnlyGuard)
   @ProjAcao('autenticado') // decisao do MasterOnlyGuard do metodo (403 consistente)

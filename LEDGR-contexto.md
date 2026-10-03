@@ -10076,3 +10076,10 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - Proximo: 1.3 tela de administracao de concessoes; 1.2b RLS nas tabelas proj_*.
 - Protocolo: antes da suite, esperar a API RESPONDER (GET /auth/test), nao so a porta 3000 abrir; a primeira rodada falhou no login por a API ainda estar inicializando.
 
+
+## [PROJETOS] 03/10/2026 - Fase 1.3: tela de concessoes
+
+- Pagina `pages/projects/ConcessoesPage.tsx` em /app/projetos/concessoes: seletor de projeto, tabela (usuario, escopo, perfil, nivel, validade, situacao Ativa/Vencida/Revogada), modais de conceder e revogar (motivo obrigatorio) no padrao APPayModal (cores FIN, SmartDateInput, Esc/clique fora).
+- Backend: GET /projects/perfis (so Master), declarada antes de :projetoId.
+- Menu: grupo "Projetos" (ordem 15) e item "Concessoes de acesso" (recurso proj-concessoes, sem permissao em perfis: so Master ve). migrations-manuais/20261003_proj_1_3_menu.sql.
+- Protocolo aplicado: suite so roda depois de a API responder em /auth/test.

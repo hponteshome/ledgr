@@ -53,6 +53,7 @@ import EcfArquivoPage from '../pages/sped/EcfArquivoPage';
 import EcdLancamentosImportPage from '../pages/accounting/EcdLancamentosImportPage';
 import TabelaComparativaPage from '../pages/accounting/TabelaComparativaPage';
 import HistoricoPadraoPage from '../pages/accounting/HistoricoPadraoPage';
+import ConcessoesPage from '../pages/projects/ConcessoesPage';
 import AberturaLancamentosPage from '../pages/accounting/AberturaLancamentosPage';
 import EcdValidationPage from '../pages/accounting/EcdValidationPage';
 import EcdPage from '../pages/sped/EcdPage';
@@ -183,6 +184,7 @@ export const AppRoutes = () => {
                 <Route path="app/accounting/sugestao-de-para" element={<ProtectedRoute><SugestaoDeParaPage /></ProtectedRoute>} />
                 <Route path="app/accounting/tabela-comparativa" element={<ProtectedRoute><TabelaComparativaPage /></ProtectedRoute>} />
                 <Route path="app/accounting/historico-padrao" element={<ProtectedRoute><HistoricoPadraoPage /></ProtectedRoute>} />
+                <Route path="app/projetos/concessoes" element={<ProtectedRoute><ConcessoesPage /></ProtectedRoute>} />
                 <Route path="app/accounting/abertura" element={<ProtectedRoute><AberturaLancamentosPage /></ProtectedRoute>} />
                 <Route path="app/accounting/ecd-lancamentos" element={<ProtectedRoute><EcdLancamentosImportPage /></ProtectedRoute>} />
                 <Route path="app/accounting/journal" element={<ProtectedRoute><JournalPage /></ProtectedRoute>} />

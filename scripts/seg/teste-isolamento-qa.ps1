@@ -132,6 +132,7 @@ if ($global:tok) {
   Teste "Projetos: operacao inexistente/alheia"        GET    "/projects/operacoes/${zero}/participacoes"    404
   Teste "Projetos: ver concessoes (so Master)"         GET    "/projects/${projId}/concessoes"               403
   Teste "Projetos: conceder acesso (so Master)"        POST   "/projects/concessoes"                         403 -corpo '{}'
+  Teste "Projetos: listar perfis (so Master)"           GET    "/projects/perfis"                             403
   docker exec ledgr-postgres psql -U ledgr -d ledgr_app -c "UPDATE proj_concessoes SET valido_ate = now() - interval '1 minute' WHERE user_id = (SELECT id FROM users WHERE email = 'qa.hotelsys@ledgr.local') AND cancelado_em IS NULL;" | Out-Null
   Teste "Projetos: concessao vencida - lista vazia"    GET    "/projects"                                    200 -qtd 0
   Teste "Projetos: concessao vencida - operacao 404"   GET    "/projects/operacoes/${opId}/participacoes"    404
