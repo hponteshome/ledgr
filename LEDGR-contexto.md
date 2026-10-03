@@ -10109,3 +10109,13 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - Sem app.user_id: zero linhas (falha fechada). O nucleo do LEDGR nao usa o ProjDbService e nunca ve dados do dominio.
 - API: novo ProjDbService.comoUsuario(userId, fn) - transacao com set_config('app.user_id', ..., true); ConcessoesService e ProjectsController 100% via comoUsuario. Guard (camada 1) + RLS (camada 2).
 - Suite: scripts/seg/teste-rls-proj.sql (SET ROLE ledgr_api, sempre ROLLBACK) com 9 verificacoes direto no banco, independentes da API.
+
+## [PROJETOS] 03/10/2026 - Fase 1.6: 58 creditos historicos da Operacao Ancora
+
+- Adquirente Ancora: VAL INVESTIMENTOS S/A, CNPJ 55.016.325/0001-54 (nao e remetente: os 58 creditos sao de terceiros para a Conta Individual da VAL).
+- proj_creditos: dado de origem (nome do remetente como no extrato; referencia bancaria; recebedora SUNSYS; origem HISTORICO/EXTRATO/MANUAL), valor > 0 e (remetente OU pendencia) garantidos pelo banco; chave de idempotencia unica por operacao; RLS (leitura se a operacao for visivel; gravacao so Master).
+- Contrapartes: uma por documento (nome mais completo); nome do extrato preservado em cada credito; participacao REMETENTE na Operacao Ancora. 19 remetentes (12 PF, 7 PJ), todos com digitos validos; 3 creditos sem remetente (n 16, 41 e 42, R$ 68.554,20) com pendencia de identificacao.
+- LGPD: arquivo de dados FORA do repositorio (D:\Dados\RecifeOcean); script de carga versionado sem dados e sem imprimir documentos; CPF so na contraparte; API devolve CPF mascarado.
+- Carga robusta: le UTF-8/UTF-16/cp1252 e reconhece a linha pelo conteudo (tabulacao ou espacos). Atualizacoes futuras da planilha: exportar como "Texto (separado por tabulacoes)" direto para D:\Dados\RecifeOcean.
+- Decisao do Hpontes: base historica = R$ 3.495.791,15, planilha ainda em conciliacao/auditoria. Saldo informado de R$ 3.295.265,82 em 31/12/2025 fica como PENDENCIA DE CONCILIACAO (diferenca R$ 200.525,33; nenhuma combinacao de ate 4 creditos explica). Ajustes futuros: novos registros ou cancelamentos com motivo, nunca sobrescrevendo.
+- API: GET /projects/operacoes/:id/creditos e /resumo (totalAteDataBase x valorControle, conferido). Criterio de aceite n 1 virou teste automatico. Idempotencia comprovada (2a carga insere 0).

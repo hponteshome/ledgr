@@ -128,7 +128,11 @@ if ($global:tok) {
   $opId = (docker exec ledgr-postgres psql -U ledgr -d ledgr_app -tA -c "SELECT o.id FROM proj_operacoes o JOIN proj_projetos p ON p.id = o.projeto_id WHERE p.codigo = 'RECIFE-OCEAN' AND o.codigo = 'ANCORA';" | Out-String).Trim()
   Teste "Projetos: lista com concessao"                GET    "/projects"                                    200 -qtd 1
   Teste "Projetos: detalhe do projeto concedido"       GET    "/projects/${projId}"                          200
-  Teste "Projetos: participacoes da Operacao Ancora"   GET    "/projects/operacoes/${opId}/participacoes"    200 -qtd 5
+  Teste "Projetos: participacoes da Operacao Ancora"   GET    "/projects/operacoes/${opId}/participacoes"    200 -qtd 24
+  Teste "Projetos: creditos da Operacao Ancora"        GET    "/projects/operacoes/${opId}/creditos"         200 -qtd 58
+  Teste "Projetos: resumo - 58 creditos conferidos"     GET    "/projects/operacoes/${opId}/resumo"           200 -msg '"conferido":true'
+  Teste "Projetos: resumo - total historico exato"      GET    "/projects/operacoes/${opId}/resumo"           200 -msg '"totalAteDataBase":"3495791.15"'
+  Teste "Projetos: creditos de operacao inexistente"   GET    "/projects/operacoes/${zero}/creditos"         404
   Teste "Projetos: operacao inexistente/alheia"        GET    "/projects/operacoes/${zero}/participacoes"    404
   Teste "Projetos: ver concessoes (so Master)"         GET    "/projects/${projId}/concessoes"               403
   Teste "Projetos: conceder acesso (so Master)"        POST   "/projects/concessoes"                         403 -corpo '{}'
@@ -136,6 +140,7 @@ if ($global:tok) {
   docker exec ledgr-postgres psql -U ledgr -d ledgr_app -c "UPDATE proj_concessoes SET valido_ate = now() - interval '1 minute' WHERE user_id = (SELECT id FROM users WHERE email = 'qa.hotelsys@ledgr.local') AND cancelado_em IS NULL;" | Out-Null
   Teste "Projetos: concessao vencida - lista vazia"    GET    "/projects"                                    200 -qtd 0
   Teste "Projetos: concessao vencida - operacao 404"   GET    "/projects/operacoes/${opId}/participacoes"    404
+  Teste "Projetos: concessao vencida - creditos 404"    GET    "/projects/operacoes/${opId}/creditos"         404
   docker exec ledgr-postgres psql -U ledgr -d ledgr_app -c "UPDATE proj_concessoes SET valido_ate = NULL WHERE user_id = (SELECT id FROM users WHERE email = 'qa.hotelsys@ledgr.local') AND cancelado_em IS NULL;" | Out-Null
   $rn = $null; try { $rn = Invoke-RestMethod -Method Post -Uri "$base/auth/refresh" -ContentType 'application/json' -Body (@{ refreshToken = $global:refresh } | ConvertTo-Json) } catch {}
   if ($rn.access_token -and $rn.refresh_token -and $rn.refresh_token -ne $global:refresh) { Write-Host "OK     esperado rotacao | obtido rotacao | Sessao: refresh valido renova e rotaciona" -ForegroundColor Green; $global:tok = $rn.access_token; $global:refresh = $rn.refresh_token } else { $global:falhas++; Write-Host "FALHA  Sessao: refresh valido nao renovou ou nao rotacionou" -ForegroundColor Red }
@@ -147,7 +152,7 @@ if ($global:tok) {
   Teste "Sessao: refresh apos logout recusado"         POST   "/auth/refresh"                401 -corpo (@{ refreshToken = $global:refresh } | ConvertTo-Json)
   docker cp "$PSScriptRoot\teste-rls-proj.sql" ledgr-postgres:/tmp/teste-rls-proj.sql | Out-Null
   $rls = docker exec ledgr-postgres psql -U ledgr -d ledgr_app -tA -v ON_ERROR_STOP=1 -f /tmp/teste-rls-proj.sql 2>&1
-  $esperado = [ordered]@{ sem_contexto = '0'; qa_projetos = '1'; qa_operacoes = '1'; qa_participacoes = '5'; qa_contrapartes = '1'; qa_concessoes_de_outros = '0'; qa_update_operacoes = '0'; master_projetos = '1'; master_operacoes = '1' }
+  $esperado = [ordered]@{ sem_contexto = '0'; qa_projetos = '1'; qa_operacoes = '1'; qa_participacoes = '24'; qa_contrapartes = '20'; qa_concessoes_de_outros = '0'; qa_update_operacoes = '0'; sem_contexto_creditos = '0'; qa_creditos = '58'; qa_update_creditos = '0'; master_projetos = '1'; master_operacoes = '1' }
   $obtido = @{}; foreach ($ln in $rls) { if ("$ln" -match '^(\w+)=(.*)$') { $obtido[$matches[1]] = $matches[2].Trim() } }
   foreach ($k in $esperado.Keys) { $okR = ($obtido[$k] -eq $esperado[$k]); if (-not $okR) { $global:falhas++ }; Write-Host ("{0,-6} esperado {1} | obtido {2} | RLS: {3}" -f $(if ($okR) {'OK'} else {'FALHA'}), $esperado[$k], $(if ($null -ne $obtido[$k]) { $obtido[$k] } else { '?' }), $k) -ForegroundColor $(if ($okR) {'Green'} else {'Red'}) }
   Write-Host ("`nResultado: {0}" -f $(if ($global:falhas -eq 0) {'TODOS OS TESTES PASSARAM'} else {"$global:falhas FALHA(S)"})) -ForegroundColor $(if ($global:falhas -eq 0) {'Green'} else {'Red'})

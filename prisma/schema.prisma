@@ -5574,6 +5574,7 @@ model ProjOperacao {
   projeto       ProjProjeto        @relation(fields: [projetoId], references: [id])
   participacoes ProjParticipacao[]
   concessoes    ProjConcessao[]
+  creditos      ProjCredito[]
 
   @@unique([projetoId, codigo])
   @@map("proj_operacoes")
@@ -5616,6 +5617,7 @@ model ProjContraparte {
   motivoCancelamento String?   @map("motivo_cancelamento")
 
   participacoes ProjParticipacao[]
+  creditos      ProjCredito[]
 
   @@map("proj_contrapartes")
 }
@@ -5692,5 +5694,39 @@ model ProjConcessao {
 
   @@index([userId])
   @@map("proj_concessoes")
+}
+
+/// Fase 1.6 (03/10/2026): creditos da operacao - dado de origem (nunca sobrescrito por classificacao).
+/// origem: HISTORICO | EXTRATO | MANUAL. Sem remetente so com identificacaoPendente (CHECK no banco).
+/// CPF fica so na contraparte (minimizacao LGPD). RLS: visivel se a operacao for visivel; gravacao so Master.
+model ProjCredito {
+  id                    String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  operacaoId            String    @map("operacao_id") @db.Uuid
+  numeroOrdem           Int?      @map("numero_ordem")
+  dataCredito           DateTime  @map("data_credito") @db.Date
+  valor                 Decimal   @db.Decimal(18, 2)
+  remetenteId           String?   @map("remetente_id") @db.Uuid
+  remetenteNomeExtrato  String?   @map("remetente_nome_extrato") @db.VarChar(200)
+  referenciaBancaria    String?   @map("referencia_bancaria") @db.VarChar(200)
+  recebedoraCompanyId   String?   @map("recebedora_company_id") @db.Uuid
+  origem                String    @db.VarChar(20)
+  identificacaoPendente Boolean   @default(false) @map("identificacao_pendente")
+  chaveIdempotencia     String    @map("chave_idempotencia") @db.VarChar(64)
+  bankTransactionId     String?   @map("bank_transaction_id") @db.Uuid
+  observacao            String?
+  criadoEm              DateTime  @default(now()) @map("criado_em") @db.Timestamp(6)
+  criadoPorId           String?   @map("criado_por_id") @db.Uuid
+  atualizadoEm          DateTime  @default(now()) @updatedAt @map("atualizado_em") @db.Timestamp(6)
+  atualizadoPorId       String?   @map("atualizado_por_id") @db.Uuid
+  canceladoEm           DateTime? @map("cancelado_em") @db.Timestamp(6)
+  canceladoPorId        String?   @map("cancelado_por_id") @db.Uuid
+  motivoCancelamento    String?   @map("motivo_cancelamento")
+
+  operacao  ProjOperacao     @relation(fields: [operacaoId], references: [id])
+  remetente ProjContraparte? @relation(fields: [remetenteId], references: [id])
+
+  @@unique([operacaoId, chaveIdempotencia])
+  @@index([operacaoId, dataCredito])
+  @@map("proj_creditos")
 }
 

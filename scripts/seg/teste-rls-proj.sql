@@ -3,11 +3,14 @@
 BEGIN;
 SET LOCAL ROLE ledgr_api;
 SELECT 'sem_contexto=' || count(*) FROM proj_projetos;
+SELECT 'sem_contexto_creditos=' || count(*) FROM proj_creditos;
 SELECT 'ctx_qa=' || (set_config('app.user_id', (SELECT id::text FROM users WHERE email = 'qa.hotelsys@ledgr.local'), true) IS NOT NULL)::text;
 SELECT 'qa_projetos=' || count(*) FROM proj_projetos;
 SELECT 'qa_operacoes=' || count(*) FROM proj_operacoes;
 SELECT 'qa_participacoes=' || count(*) FROM proj_participacoes;
 SELECT 'qa_contrapartes=' || count(*) FROM proj_contrapartes;
+SELECT 'qa_creditos=' || count(*) FROM proj_creditos;
+WITH u AS (UPDATE proj_creditos SET valor = valor RETURNING 1) SELECT 'qa_update_creditos=' || count(*) FROM u;
 SELECT 'qa_concessoes_de_outros=' || count(*) FROM proj_concessoes WHERE user_id <> proj_ctx_user();
 WITH u AS (UPDATE proj_operacoes SET nome = nome RETURNING 1) SELECT 'qa_update_operacoes=' || count(*) FROM u;
 SELECT 'ctx_master=' || (set_config('app.user_id', (SELECT id::text FROM users WHERE email = 'hpontes@ledgr.com'), true) IS NOT NULL)::text;
