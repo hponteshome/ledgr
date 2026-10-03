@@ -10051,3 +10051,6 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - Proximo: Fase 1 local - 1.1 desenho do schema do dominio (Projeto, Operacao, Participantes/papeis), 1.2 modelo de concessoes.
 - Retomada: bloco de reativacao da QA e depois: scripts\controle\sessao.ps1 inicio -Fase 1 -Item "1.1 Schema do dominio"
 
+
+- Correcao 03/10: o stash da pausa 2 nao foi criado (codigo permaneceu nos arquivos e foi commitado em 1de53a0). Removida do controle de horas a linha 'em stash', que duplicava o intervalo a partir de 11:48.
+
