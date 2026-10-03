@@ -10054,3 +10054,13 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 
 - Correcao 03/10: o stash da pausa 2 nao foi criado (codigo permaneceu nos arquivos e foi commitado em 1de53a0). Removida do controle de horas a linha 'em stash', que duplicava o intervalo a partir de 11:48.
 
+
+## [PROJETOS] 03/10/2026 - Fase 1.1: schema do dominio (projeto, operacao, papeis, participacoes)
+
+- Decisoes do Hpontes: contrapartes em tabela propria do dominio (vinculo opcional com Person; modulo Pessoas e global hoje); Adquirente Ancora com identificacao provisoria ate o Termo.
+- Modelos (proj_*): ProjProjeto, ProjProjetoEmpresa, ProjOperacao (data_base, valor_controle so para conferencia), ProjPapel (catalogo, sem enum), ProjContraparte, ProjParticipacao (operacao x papel x empresa OU contraparte).
+- FKs para companies so no banco (sem relacao no Prisma): Company nao referencia o dominio (dependencia unidirecional da bussola).
+- Regras no banco: CHECK proj_participacoes_alvo_ck (exatamente um alvo); unicos parciais por operacao/papel/alvo ativos; documento de contraparte unico entre ativas.
+- Carga idempotente: RECIFE-OCEAN; SUNRISE, HOTELSYS, SUNSYS no projeto; Operacao Ancora (31/12/2025; controle R$ 3.495.791,15); 9 papeis; Adquirente provisorio; 5 participacoes (HOTELSYS beneficiaria; SUNSYS recebedora e pagadora por conta; SUNRISE interveniente; Adquirente). AuditLog PROJ_CARGA_INICIAL.
+- Migracoes: 20261003_proj_1_1_schema.sql e 20261003_proj_1_1_carga.sql.
+- Proximo: 1.2 modelo de concessoes (usuario x escopo x perfil x nivel) + guard de escopo + RLS.

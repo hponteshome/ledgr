@@ -5500,3 +5500,147 @@ model UserSession {
   @@index([userId])
   @@map("user_sessions")
 }
+
+/// ============================================================================================
+/// DOMINIO PROJETOS (Recife Ocean Residences) - Fase 1.1 (03/10/2026)
+/// Bussola: docs/LEDGR-OceanProject.md. Tabelas proj_*, modelos Proj*.
+/// Dependencia unidirecional: FKs para o nucleo (companies) existem so no banco, sem relacao no
+/// Prisma, para que o modelo Company nao referencie o dominio.
+/// Sem exclusao fisica: cancelamento com motivo.
+/// ============================================================================================
+
+model ProjProjeto {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  codigo             String    @unique @db.VarChar(40)
+  nome               String    @db.VarChar(200)
+  descricao          String?
+  status             String    @default("ATIVO") @db.VarChar(20)
+  dataInicio         DateTime? @map("data_inicio") @db.Date
+  criadoEm           DateTime  @default(now()) @map("criado_em") @db.Timestamp(6)
+  criadoPorId        String?   @map("criado_por_id") @db.Uuid
+  atualizadoEm       DateTime  @default(now()) @updatedAt @map("atualizado_em") @db.Timestamp(6)
+  atualizadoPorId    String?   @map("atualizado_por_id") @db.Uuid
+  canceladoEm        DateTime? @map("cancelado_em") @db.Timestamp(6)
+  canceladoPorId     String?   @map("cancelado_por_id") @db.Uuid
+  motivoCancelamento String?   @map("motivo_cancelamento")
+
+  empresas  ProjProjetoEmpresa[]
+  operacoes ProjOperacao[]
+
+  @@map("proj_projetos")
+}
+
+/// Empresas do LEDGR que participam do projeto (base do nivel de acesso EMPRESA_PROJETO).
+model ProjProjetoEmpresa {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  projetoId          String    @map("projeto_id") @db.Uuid
+  companyId          String    @map("company_id") @db.Uuid
+  observacao         String?
+  criadoEm           DateTime  @default(now()) @map("criado_em") @db.Timestamp(6)
+  criadoPorId        String?   @map("criado_por_id") @db.Uuid
+  atualizadoEm       DateTime  @default(now()) @updatedAt @map("atualizado_em") @db.Timestamp(6)
+  atualizadoPorId    String?   @map("atualizado_por_id") @db.Uuid
+  canceladoEm        DateTime? @map("cancelado_em") @db.Timestamp(6)
+  canceladoPorId     String?   @map("cancelado_por_id") @db.Uuid
+  motivoCancelamento String?   @map("motivo_cancelamento")
+
+  projeto ProjProjeto @relation(fields: [projetoId], references: [id])
+
+  @@unique([projetoId, companyId])
+  @@map("proj_projeto_empresas")
+}
+
+/// Operacao Ancora e futuras. valorControle e so referencia para conferencia: saldo sempre calculado.
+model ProjOperacao {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  projetoId          String    @map("projeto_id") @db.Uuid
+  codigo             String    @db.VarChar(40)
+  nome               String    @db.VarChar(200)
+  tipo               String    @db.VarChar(40)
+  status             String    @default("ATIVA") @db.VarChar(20)
+  dataBase           DateTime? @map("data_base") @db.Date
+  valorControle      Decimal?  @map("valor_controle") @db.Decimal(18, 2)
+  moeda              String    @default("BRL") @db.VarChar(3)
+  descricao          String?
+  criadoEm           DateTime  @default(now()) @map("criado_em") @db.Timestamp(6)
+  criadoPorId        String?   @map("criado_por_id") @db.Uuid
+  atualizadoEm       DateTime  @default(now()) @updatedAt @map("atualizado_em") @db.Timestamp(6)
+  atualizadoPorId    String?   @map("atualizado_por_id") @db.Uuid
+  canceladoEm        DateTime? @map("cancelado_em") @db.Timestamp(6)
+  canceladoPorId     String?   @map("cancelado_por_id") @db.Uuid
+  motivoCancelamento String?   @map("motivo_cancelamento")
+
+  projeto       ProjProjeto        @relation(fields: [projetoId], references: [id])
+  participacoes ProjParticipacao[]
+
+  @@unique([projetoId, codigo])
+  @@map("proj_operacoes")
+}
+
+/// Catalogo de papeis (ampliavel sem codigo). aplicaA: EMPRESA | CONTRAPARTE | AMBOS.
+model ProjPapel {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  codigo             String    @unique @db.VarChar(40)
+  nome               String    @db.VarChar(120)
+  descricao          String?
+  aplicaA            String    @default("AMBOS") @map("aplica_a") @db.VarChar(20)
+  ativo              Boolean   @default(true)
+  criadoEm           DateTime  @default(now()) @map("criado_em") @db.Timestamp(6)
+  criadoPorId        String?   @map("criado_por_id") @db.Uuid
+  atualizadoEm       DateTime  @default(now()) @updatedAt @map("atualizado_em") @db.Timestamp(6)
+  atualizadoPorId    String?   @map("atualizado_por_id") @db.Uuid
+
+  participacoes ProjParticipacao[]
+
+  @@map("proj_papeis")
+}
+
+/// Partes de fora do grupo (adquirentes, remetentes, fornecedores). Dados pessoais restritos ao dominio.
+model ProjContraparte {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tipoPessoa         String?   @map("tipo_pessoa") @db.VarChar(2)
+  documento          String?   @db.VarChar(14)
+  nome               String    @db.VarChar(200)
+  email              String?   @db.VarChar(200)
+  telefone           String?   @db.VarChar(20)
+  personId           String?   @map("person_id") @db.Uuid
+  observacoes        String?
+  criadoEm           DateTime  @default(now()) @map("criado_em") @db.Timestamp(6)
+  criadoPorId        String?   @map("criado_por_id") @db.Uuid
+  atualizadoEm       DateTime  @default(now()) @updatedAt @map("atualizado_em") @db.Timestamp(6)
+  atualizadoPorId    String?   @map("atualizado_por_id") @db.Uuid
+  canceladoEm        DateTime? @map("cancelado_em") @db.Timestamp(6)
+  canceladoPorId     String?   @map("cancelado_por_id") @db.Uuid
+  motivoCancelamento String?   @map("motivo_cancelamento")
+
+  participacoes ProjParticipacao[]
+
+  @@map("proj_contrapartes")
+}
+
+/// Operacao x papel x (empresa do LEDGR OU contraparte). CHECK no banco garante exatamente um alvo.
+model ProjParticipacao {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  operacaoId         String    @map("operacao_id") @db.Uuid
+  papelId            String    @map("papel_id") @db.Uuid
+  companyId          String?   @map("company_id") @db.Uuid
+  contraparteId      String?   @map("contraparte_id") @db.Uuid
+  vigenciaInicio     DateTime? @map("vigencia_inicio") @db.Date
+  vigenciaFim        DateTime? @map("vigencia_fim") @db.Date
+  observacao         String?
+  criadoEm           DateTime  @default(now()) @map("criado_em") @db.Timestamp(6)
+  criadoPorId        String?   @map("criado_por_id") @db.Uuid
+  atualizadoEm       DateTime  @default(now()) @updatedAt @map("atualizado_em") @db.Timestamp(6)
+  atualizadoPorId    String?   @map("atualizado_por_id") @db.Uuid
+  canceladoEm        DateTime? @map("cancelado_em") @db.Timestamp(6)
+  canceladoPorId     String?   @map("cancelado_por_id") @db.Uuid
+  motivoCancelamento String?   @map("motivo_cancelamento")
+
+  operacao    ProjOperacao     @relation(fields: [operacaoId], references: [id])
+  papel       ProjPapel        @relation(fields: [papelId], references: [id])
+  contraparte ProjContraparte? @relation(fields: [contraparteId], references: [id])
+
+  @@index([operacaoId])
+  @@map("proj_participacoes")
+}
+
