@@ -10029,3 +10029,10 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - Recurso asset-maintenances sem item de menu; import-balances: revisar service (CNPJ do arquivo) e devolver aos nao Master; chat.service (companyId do cliente).
 - Modulo Pessoas global (decisao de arquitetura); users.service defesa em profundidade; Dashboard repete chamadas em erro; trade_name vazio/'.'; /companies/headquarters.
 - Navegador salvando downloads na pasta do repositorio: mudar a pasta de downloads.
+
+## [PROJETOS] PAUSA 03/10/2026 (2) - retomada
+
+- Sessao curta + refresh token: NAO concluida - rodar de novo o bloco da sessao curta (mensagem de 03/10) ou reconstruir a partir da nota.
+- Pendencia de UI confirmada no codigo: api.ts derrubava a sessao em qualquer 401 (codigo 2FA errado de usuario logado); a correcao esta no bloco da sessao curta.
+- Retomar: bloco de retomada (reativa QA, abre sessao, mostra esta nota); depois Fase 0B.
+
