@@ -62,4 +62,4 @@ DROP POLICY IF EXISTS proj_concessoes_gravar ON proj_concessoes;
 CREATE POLICY proj_concessoes_ler ON proj_concessoes FOR SELECT USING (proj_ctx_master() OR user_id = proj_ctx_user());
 CREATE POLICY proj_concessoes_gravar ON proj_concessoes FOR ALL USING (proj_ctx_master()) WITH CHECK (proj_ctx_master());
 COMMIT;
-SELECT tablename, rowsecurity AS rls, forcerowsecurity AS forcado FROM pg_tables t JOIN pg_class c ON c.relname = t.tablename WHERE tablename LIKE 'proj_%' ORDER BY 1;
+SELECT c.relname AS tabela, c.relrowsecurity AS rls, c.relforcerowsecurity AS forcado, (SELECT COUNT(*) FROM pg_policies p WHERE p.tablename = c.relname) AS politicas FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'public' AND c.relkind = 'r' AND c.relname LIKE 'proj_%' ORDER BY 1;
