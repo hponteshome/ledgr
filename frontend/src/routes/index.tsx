@@ -54,6 +54,8 @@ import EcdLancamentosImportPage from '../pages/accounting/EcdLancamentosImportPa
 import TabelaComparativaPage from '../pages/accounting/TabelaComparativaPage';
 import HistoricoPadraoPage from '../pages/accounting/HistoricoPadraoPage';
 import ConcessoesPage from '../pages/projects/ConcessoesPage';
+import ProjetosHomePage from '../pages/projects/ProjetosHomePage';
+import ProjetoWorkspace from '../pages/projects/workspace/ProjetoWorkspace';
 import AberturaLancamentosPage from '../pages/accounting/AberturaLancamentosPage';
 import EcdValidationPage from '../pages/accounting/EcdValidationPage';
 import EcdPage from '../pages/sped/EcdPage';
@@ -158,6 +160,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 export const AppRoutes = () => {
     return (
         <Routes>
+          <Route path="/projetos/:projetoId/*" element={<ProjetoWorkspace />} /> {/* D8: espaco segregado, fora do Layout do LEDGR */}
             <Route path="/register" element={<Register />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
@@ -185,6 +188,7 @@ export const AppRoutes = () => {
                 <Route path="app/accounting/tabela-comparativa" element={<ProtectedRoute><TabelaComparativaPage /></ProtectedRoute>} />
                 <Route path="app/accounting/historico-padrao" element={<ProtectedRoute><HistoricoPadraoPage /></ProtectedRoute>} />
                 <Route path="app/projetos/concessoes" element={<ProtectedRoute><ConcessoesPage /></ProtectedRoute>} />
+                <Route path="app/projetos/lista" element={<ProtectedRoute><ProjetosHomePage /></ProtectedRoute>} />
                 <Route path="app/accounting/abertura" element={<ProtectedRoute><AberturaLancamentosPage /></ProtectedRoute>} />
                 <Route path="app/accounting/ecd-lancamentos" element={<ProtectedRoute><EcdLancamentosImportPage /></ProtectedRoute>} />
                 <Route path="app/accounting/journal" element={<ProtectedRoute><JournalPage /></ProtectedRoute>} />

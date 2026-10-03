@@ -58,8 +58,8 @@ export class ProjectsController {
   @ProjAcao('ver')
   participacoes(@Param('operacaoId') operacaoId: string, @Req() req: any) {
     if (!UUID_RE.test(operacaoId)) throw new NotFoundException('Registro nao encontrado.');
-    return this.db.comoUsuario(req.user.id, (tx) =>
-      tx.projParticipacao.findMany({
+    return this.db.comoUsuario(req.user.id, async (tx) => {
+      const lista = await tx.projParticipacao.findMany({
         where: { operacaoId, canceladoEm: null },
         orderBy: { criadoEm: 'asc' },
         select: {
@@ -67,8 +67,15 @@ export class ProjectsController {
           papel: { select: { codigo: true, nome: true } },
           contraparte: { select: { id: true, nome: true, tipoPessoa: true } },
         },
-      }),
-    );
+      });
+      // D8: nome da empresa do grupo junto (o dominio le o nucleo; o nucleo nao conhece o dominio)
+      const ids = [...new Set(lista.map((p) => p.companyId).filter((x): x is string => !!x))];
+      const empresas = ids.length
+        ? await tx.company.findMany({ where: { id: { in: ids } }, select: { id: true, legalName: true, tradeName: true } })
+        : [];
+      const nomes = new Map(empresas.map((e) => [e.id, e.tradeName && e.tradeName.trim().length > 1 ? e.tradeName : e.legalName]));
+      return lista.map((p) => ({ ...p, empresaNome: p.companyId ? nomes.get(p.companyId) ?? null : null }));
+    });
   }
 
   @Get('operacoes/:operacaoId/creditos')

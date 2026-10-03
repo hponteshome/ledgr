@@ -10119,3 +10119,11 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - Carga robusta: le UTF-8/UTF-16/cp1252 e reconhece a linha pelo conteudo (tabulacao ou espacos). Atualizacoes futuras da planilha: exportar como "Texto (separado por tabulacoes)" direto para D:\Dados\RecifeOcean.
 - Decisao do Hpontes: base historica = R$ 3.495.791,15, planilha ainda em conciliacao/auditoria. Saldo informado de R$ 3.295.265,82 em 31/12/2025 fica como PENDENCIA DE CONCILIACAO (diferenca R$ 200.525,33; nenhuma combinacao de ate 4 creditos explica). Ajustes futuros: novos registros ou cancelamentos com motivo, nunca sobrescrevendo.
 - API: GET /projects/operacoes/:id/creditos e /resumo (totalAteDataBase x valorControle, conferido). Criterio de aceite n 1 virou teste automatico. Idempotencia comprovada (2a carga insere 0).
+
+## [PROJETOS] 03/10/2026 - D8: espaco segregado do projeto (primeira versao)
+
+- Rota /projetos/:projetoId/* IRMA de "/" (fora do Layout do LEDGR): nenhum menu, cabecalho ou seletor de empresas do LEDGR e montado. Mesma autenticacao e API; autorizacao por concessao + RLS.
+- pages/projects/workspace: ProjetoWorkspace (menu proprio: Painel, Creditos, Participantes; Concessoes so Master; "em breve": Pendencias, Extratos e conciliacao, Documentos; Voltar ao LEDGR so Master; Sair), PainelProjeto (4 indicadores, creditos por mes + acumulado, principais remetentes), CreditosProjeto (busca, filtro de pendentes, CPF mascarado, nome do extrato), ParticipantesProjeto, projetoTema (cor #134E4A / #0F766E).
+- LEDGR: Projetos > Meus projetos (/app/projetos/lista) abre o espaco em nova aba. migrations-manuais/20261003_proj_d8_menu.sql.
+- Backend: participacoes devolvem empresaNome (dominio le o nucleo; nucleo nao conhece o dominio).
+- Pendente: redirecionar direto ao espaco do projeto, apos o login, quem so tem concessao (sem UserCompany) - fazer quando existir o primeiro usuario assim, para testar com caso real.
