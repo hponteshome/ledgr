@@ -115,7 +115,7 @@ export default function ProjetoWorkspace() {
           ) : (
             <Routes>
               <Route index element={<PainelProjeto projeto={projeto} operacao={operacao} />} />
-              <Route path="creditos" element={<CreditosProjeto operacao={operacao} />} />
+              <Route path="creditos" element={<CreditosProjeto operacao={operacao} master={master} />} />
               <Route path="participantes" element={<ParticipantesProjeto operacao={operacao} />} />
               {master && <Route path="concessoes" element={<ConcessoesPage />} />}
               <Route path="*" element={<Navigate to={base} replace />} />

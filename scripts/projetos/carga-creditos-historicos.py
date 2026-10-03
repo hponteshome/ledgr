@@ -101,6 +101,12 @@ for r in sorted(regs, key=lambda x: x["num"]):
     sql.append(("INSERT INTO proj_creditos (operacao_id, numero_ordem, data_credito, valor, remetente_id, remetente_nome_extrato, referencia_bancaria, recebedora_company_id, origem, identificacao_pendente, chave_idempotencia, observacao, criado_por_id) "
                 "VALUES (%s, %d, DATE %s, %s, %s, %s, %s, %s, 'HISTORICO', %s, %s, %s, %s) ON CONFLICT (operacao_id, chave_idempotencia) DO NOTHING;")
                % (OP, r["num"], q(r["data"].isoformat()), r["valor"], rem, q(r["nome"]), q(r["ref"]), q(SUNSYS), "true" if r["pend"] else "false", q(chave), obs, HP))
+sql.append(("INSERT INTO proj_credito_vinculos (credito_id, situacao, adquirente_id, motivo, criado_por_id) "
+            "SELECT c.id, 'VINCULADO', (SELECT pp.contraparte_id FROM proj_participacoes pp JOIN proj_papeis pa ON pa.id = pp.papel_id "
+            "WHERE pp.operacao_id = %s AND pa.codigo = 'ADQUIRENTE' AND pp.cancelado_em IS NULL), "
+            "'Vinculo inicial na carga: credito de terceiro em favor do Adquirente da operacao', %s "
+            "FROM proj_creditos c WHERE c.operacao_id = %s AND c.cancelado_em IS NULL "
+            "AND NOT EXISTS (SELECT 1 FROM proj_credito_vinculos v WHERE v.credito_id = c.id);") % (OP, HP, OP))
 sql.append(("INSERT INTO audit_logs (actor_id, acao, target_id, depois) SELECT %s, 'PROJ_CARGA_CREDITOS_HISTORICOS', %s::text, "
             "jsonb_build_object('inseridos', (SELECT count(*) FROM proj_creditos WHERE origem = 'HISTORICO' AND criado_em = now()), 'total_arquivo', '%s', 'quantidade_arquivo', %d, 'arquivo_sha256', '%s');")
            % (HP, OP, total, len(regs), sha_arquivo))

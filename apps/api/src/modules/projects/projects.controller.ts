@@ -4,7 +4,9 @@
 // Administracao de concessoes: so Master (bussola 5.3).
 // Fase 1.2b (03/10/2026): consultas via ProjDbService.comoUsuario - o banco aplica o RLS das tabelas proj_*
 // como segunda barreira (defesa em profundidade sobre o guard).
-import { Controller, Get, Post, Param, Body, Req, UseGuards, NotFoundException } from '@nestjs/common';
+// Fase 1.6 / D8 / 1.6b (03/10/2026): creditos, resumo, participacoes com nome da empresa e vinculo do credito
+// a Conta Individual (alterar ou desvincular: so Master, com motivo; historico imutavel no banco).
+import { Controller, Get, Post, Param, Body, Req, UseGuards, NotFoundException, BadRequestException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { JwtAuthGuard } from '../../auth/guards/jwt.guard';
 import { MasterOnlyGuard } from '../../auth/guards/master-only.guard';
@@ -90,15 +92,79 @@ export class ProjectsController {
           id: true, numeroOrdem: true, dataCredito: true, valor: true, remetenteNomeExtrato: true,
           referenciaBancaria: true, origem: true, identificacaoPendente: true, observacao: true,
           remetente: { select: { id: true, nome: true, tipoPessoa: true, documento: true } },
+          vinculos: {
+            where: { canceladoEm: null },
+            select: { situacao: true, motivo: true, criadoEm: true, adquirente: { select: { id: true, nome: true } } },
+          },
         },
       }),
     );
-    return lista.map((c) => ({
+    return lista.map(({ vinculos, remetente, ...c }) => ({
       ...c,
-      remetente: c.remetente
-        ? { id: c.remetente.id, nome: c.remetente.nome, tipoPessoa: c.remetente.tipoPessoa, documentoMascarado: mascararDocumento(c.remetente.documento) }
+      remetente: remetente
+        ? { id: remetente.id, nome: remetente.nome, tipoPessoa: remetente.tipoPessoa, documentoMascarado: mascararDocumento(remetente.documento) }
         : null,
+      vinculoAtual: vinculos[0] ?? null,
     }));
+  }
+
+  @Get('operacoes/:operacaoId/creditos/:creditoId/vinculos')
+  @ProjAcao('ver')
+  historicoVinculos(@Param('operacaoId') operacaoId: string, @Param('creditoId') creditoId: string, @Req() req: any) {
+    if (!UUID_RE.test(operacaoId) || !UUID_RE.test(creditoId)) throw new NotFoundException('Registro nao encontrado.');
+    return this.db.comoUsuario(req.user.id, async (tx) => {
+      const c = await tx.projCredito.findFirst({ where: { id: creditoId, operacaoId, canceladoEm: null }, select: { id: true } });
+      if (!c) throw new NotFoundException('Registro nao encontrado.');
+      return tx.projCreditoVinculo.findMany({
+        where: { creditoId },
+        orderBy: { criadoEm: 'desc' },
+        select: { id: true, situacao: true, motivo: true, criadoEm: true, canceladoEm: true, motivoCancelamento: true, adquirente: { select: { id: true, nome: true } } },
+      });
+    });
+  }
+
+  @Post('operacoes/:operacaoId/creditos/:creditoId/vinculo')
+  @UseGuards(MasterOnlyGuard)
+  @ProjAcao('autenticado') // decisao do MasterOnlyGuard do metodo (403 consistente)
+  async alterarVinculo(@Param('operacaoId') operacaoId: string, @Param('creditoId') creditoId: string, @Body() body: any, @Req() req: any) {
+    if (!UUID_RE.test(operacaoId) || !UUID_RE.test(creditoId)) throw new NotFoundException('Registro nao encontrado.');
+    const acao = String(body?.acao || '');
+    const motivo = String(body?.motivo || '').trim();
+    const adquirenteId = body?.adquirenteId ? String(body.adquirenteId) : null;
+    if (!['VINCULAR', 'DESVINCULAR'].includes(acao)) throw new BadRequestException('Acao invalida (VINCULAR ou DESVINCULAR).');
+    if (motivo.length < 10) throw new BadRequestException('Informe o motivo (minimo 10 caracteres). Ele fica na trilha de auditoria.');
+    if (acao === 'VINCULAR' && (!adquirenteId || !UUID_RE.test(adquirenteId))) throw new BadRequestException('Informe o Adquirente.');
+    return this.db.comoUsuario(req.user.id, async (tx) => {
+      const credito = await tx.projCredito.findFirst({ where: { id: creditoId, operacaoId, canceladoEm: null }, select: { id: true, numeroOrdem: true } });
+      if (!credito) throw new NotFoundException('Credito nao encontrado nesta operacao.');
+      if (acao === 'VINCULAR') {
+        const adq = await tx.projParticipacao.findFirst({
+          where: { operacaoId, contraparteId: adquirenteId, canceladoEm: null, papel: { codigo: 'ADQUIRENTE' } },
+          select: { id: true },
+        });
+        if (!adq) throw new BadRequestException('O titular precisa ser Adquirente desta operacao.');
+      }
+      const atual = await tx.projCreditoVinculo.findFirst({ where: { creditoId, canceladoEm: null }, select: { id: true, situacao: true, adquirenteId: true } });
+      if (atual && acao === 'VINCULAR' && atual.situacao === 'VINCULADO' && atual.adquirenteId === adquirenteId) throw new BadRequestException('O credito ja esta vinculado a este Adquirente.');
+      if (atual && acao === 'DESVINCULAR' && atual.situacao === 'DESVINCULADO') throw new BadRequestException('O credito ja esta desvinculado.');
+      if (atual) {
+        await tx.projCreditoVinculo.update({ where: { id: atual.id }, data: { canceladoEm: new Date(), canceladoPorId: req.user.id, motivoCancelamento: motivo } });
+      }
+      const novo = await tx.projCreditoVinculo.create({
+        data: { creditoId, situacao: acao === 'VINCULAR' ? 'VINCULADO' : 'DESVINCULADO', adquirenteId: acao === 'VINCULAR' ? adquirenteId : null, motivo, criadoPorId: req.user.id },
+      });
+      await tx.auditLog.create({
+        data: {
+          actorId: req.user.id, action: 'PROJ_CREDITO_VINCULO_ALTERADO', targetId: creditoId,
+          after: {
+            numeroOrdem: credito.numeroOrdem, motivo,
+            antes: atual ? { situacao: atual.situacao, adquirenteId: atual.adquirenteId } : null,
+            depois: { situacao: novo.situacao, adquirenteId: novo.adquirenteId },
+          },
+        },
+      });
+      return novo;
+    });
   }
 
   @Get('operacoes/:operacaoId/resumo')
@@ -117,13 +183,31 @@ export class ProjectsController {
         ? await tx.projCredito.aggregate({ where: { ...base, dataCredito: { lte: op.dataBase } }, _count: { _all: true }, _sum: { valor: true } })
         : null;
       const pendentes = await tx.projCredito.count({ where: { ...base, identificacaoPendente: true } });
-      return { op, geral, ateBase, pendentes };
+      const vinc = await tx.projCreditoVinculo.findMany({
+        where: { canceladoEm: null, credito: { operacaoId, canceladoEm: null } },
+        select: { situacao: true, adquirente: { select: { id: true, nome: true } }, credito: { select: { valor: true } } },
+      });
+      return { op, geral, ateBase, pendentes, vinc };
     });
     if (!r) throw new NotFoundException('Registro nao encontrado.');
     const zero = new Prisma.Decimal(0);
     const totalGeral = r.geral._sum.valor ?? zero;
     const totalBase = r.ateBase?._sum.valor ?? zero;
     const controle = r.op.valorControle;
+    const contas = new Map<string, { adquirenteId: string; nome: string; quantidade: number; total: Prisma.Decimal }>();
+    let desvQtd = 0;
+    let desvTotal = new Prisma.Decimal(0);
+    for (const v of r.vinc) {
+      if (v.situacao === 'VINCULADO' && v.adquirente) {
+        const c = contas.get(v.adquirente.id) || { adquirenteId: v.adquirente.id, nome: v.adquirente.nome, quantidade: 0, total: new Prisma.Decimal(0) };
+        c.quantidade += 1;
+        c.total = c.total.plus(v.credito.valor);
+        contas.set(v.adquirente.id, c);
+      } else {
+        desvQtd += 1;
+        desvTotal = desvTotal.plus(v.credito.valor);
+      }
+    }
     return {
       operacao: { codigo: r.op.codigo, nome: r.op.nome, dataBase: r.op.dataBase },
       quantidadeCreditos: r.geral._count._all,
@@ -134,6 +218,9 @@ export class ProjectsController {
       diferencaControle: controle ? totalBase.minus(controle).toFixed(2) : null,
       conferido: controle ? totalBase.equals(controle) : null,
       pendentesIdentificacao: r.pendentes,
+      contasIndividuais: [...contas.values()].map((c) => ({ adquirenteId: c.adquirenteId, nome: c.nome, quantidade: c.quantidade, total: c.total.toFixed(2) })),
+      desvinculados: { quantidade: desvQtd, total: desvTotal.toFixed(2) },
+      semVinculo: r.geral._count._all - r.vinc.length,
     };
   }
 

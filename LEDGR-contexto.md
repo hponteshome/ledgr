@@ -10127,3 +10127,12 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - LEDGR: Projetos > Meus projetos (/app/projetos/lista) abre o espaco em nova aba. migrations-manuais/20261003_proj_d8_menu.sql.
 - Backend: participacoes devolvem empresaNome (dominio le o nucleo; nucleo nao conhece o dominio).
 - Pendente: redirecionar direto ao espaco do projeto, apos o login, quem so tem concessao (sem UserCompany) - fazer quando existir o primeiro usuario assim, para testar com caso real.
+
+## [PROJETOS] 03/10/2026 - Fase 1.6b: vinculo dos creditos a Conta Individual (VAL INVESTIMENTOS S/A)
+
+- Pedido do Hpontes: vincular os 58 creditos a VAL, com possibilidade de ALTERAR ou REMOVER o vinculo se uma auditoria identificar que o credito se refere a coisa diversa da operacao.
+- Desenho: o credito e o fato bancario (intocado); o vinculo e a interpretacao, em proj_credito_vinculos com HISTORICO: VINCULADO (adquirente) ou DESVINCULADO. Alterar = encerrar o vigente (com motivo) + criar outro.
+- Garantias no banco: motivo >= 10 caracteres; um vigente por credito (indice parcial); titular precisa ser ADQUIRENTE da operacao (trigger); vinculo IMUTAVEL (so encerra, uma vez, com motivo - trigger); sem DELETE (sem politica e REVOKE). RLS: leitura se o credito for visivel; inserir/encerrar so Master.
+- Carga inicial: 58 creditos vinculados a VAL (AuditLog PROJ_CREDITOS_VINCULADOS). Script de carga vincula creditos novos ao Adquirente; desvinculados nunca sao revinculados automaticamente.
+- API: creditos com vinculoAtual; historico (GET .../creditos/:id/vinculos); alteracao (POST .../creditos/:id/vinculo, so Master, AuditLog PROJ_CREDITO_VINCULO_ALTERADO); resumo com contasIndividuais, desvinculados e semVinculo.
+- Tela: coluna Titular (Conta Individual), modal Vinculo (situacao, vincular/remover, motivo, historico); painel com Contas Individuais; grafico com meses sem credito.

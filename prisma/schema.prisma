@@ -5618,6 +5618,7 @@ model ProjContraparte {
 
   participacoes ProjParticipacao[]
   creditos      ProjCredito[]
+  vinculos      ProjCreditoVinculo[]
 
   @@map("proj_contrapartes")
 }
@@ -5723,10 +5724,33 @@ model ProjCredito {
   motivoCancelamento    String?   @map("motivo_cancelamento")
 
   operacao  ProjOperacao     @relation(fields: [operacaoId], references: [id])
+  vinculos  ProjCreditoVinculo[]
   remetente ProjContraparte? @relation(fields: [remetenteId], references: [id])
 
   @@unique([operacaoId, chaveIdempotencia])
   @@index([operacaoId, dataCredito])
   @@map("proj_creditos")
+}
+
+/// Fase 1.6b (03/10/2026): vinculo do credito a Conta Individual do Adquirente - historico imutavel.
+/// situacao: VINCULADO (adquirente obrigatorio) | DESVINCULADO (credito de coisa diversa da operacao).
+/// No banco: um vigente por credito; titular precisa ser ADQUIRENTE da operacao; so encerra (com motivo); sem DELETE.
+model ProjCreditoVinculo {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  creditoId          String    @map("credito_id") @db.Uuid
+  situacao           String    @db.VarChar(15)
+  adquirenteId       String?   @map("adquirente_id") @db.Uuid
+  motivo             String
+  criadoEm           DateTime  @default(now()) @map("criado_em") @db.Timestamp(6)
+  criadoPorId        String?   @map("criado_por_id") @db.Uuid
+  canceladoEm        DateTime? @map("cancelado_em") @db.Timestamp(6)
+  canceladoPorId     String?   @map("cancelado_por_id") @db.Uuid
+  motivoCancelamento String?   @map("motivo_cancelamento")
+
+  credito    ProjCredito      @relation(fields: [creditoId], references: [id])
+  adquirente ProjContraparte? @relation(fields: [adquirenteId], references: [id])
+
+  @@index([adquirenteId])
+  @@map("proj_credito_vinculos")
 }
 

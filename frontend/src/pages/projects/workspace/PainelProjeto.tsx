@@ -1,13 +1,16 @@
 // frontend/src/pages/projects/workspace/PainelProjeto.tsx
-// D8 (03/10/2026): painel da operacao - conferencia com o valor de controle, pendencias, evolucao mensal e remetentes.
+// D8 (03/10/2026): painel da operacao - conferencia com o valor de controle, Contas Individuais, pendencias,
+// evolucao mensal (todos os meses, inclusive sem credito) e principais remetentes.
 import React, { useEffect, useMemo, useState } from 'react';
 import { ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from 'recharts';
 import api from '../../../services/api';
-import { PROJ, PROJ_ACCENT, Operacao, Projeto, Credito, fmtBRL, fmtData, cardSt, thSt, tdSt, erroSt, secTitle, tituloSt, subtituloSt } from './projetoTema';
+import { PROJ, PROJ_ACCENT, PROJ_LIGHT, Operacao, Projeto, Credito, fmtBRL, fmtData, cardSt, thSt, tdSt, erroSt, secTitle, tituloSt, subtituloSt } from './projetoTema';
 
 interface Resumo {
   quantidadeCreditos: number; totalGeral: string; quantidadeAteDataBase: number; totalAteDataBase: string;
   valorControle: string | null; diferencaControle: string | null; conferido: boolean | null; pendentesIdentificacao: number;
+  contasIndividuais: { adquirenteId: string; nome: string; quantidade: number; total: string }[];
+  desvinculados: { quantidade: number; total: string }; semVinculo: number;
 }
 
 function Kpi({ titulo, valor, detalhe, cor }: { titulo: string; valor: string; detalhe?: string; cor?: string }) {
@@ -34,14 +37,22 @@ export default function PainelProjeto({ projeto, operacao }: { projeto: Projeto;
   }, [operacao]);
 
   const mensal = useMemo(() => {
+    if (!creditos.length) return [];
     const m = new Map<string, number>();
     creditos.forEach((c) => { const k = c.dataCredito.slice(0, 7); m.set(k, (m.get(k) || 0) + Number(c.valor)); });
+    const chaves = [...m.keys()].sort();
+    let [a, mm] = chaves[0].split('-').map(Number);
+    const [af, mf] = chaves[chaves.length - 1].split('-').map(Number);
+    const out: { mes: string; valor: number; acumulado: number }[] = [];
     let acum = 0;
-    return [...m.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => {
+    while (a < af || (a === af && mm <= mf)) {
+      const k = `${a}-${String(mm).padStart(2, '0')}`;
+      const v = m.get(k) || 0;
       acum += v;
-      const [a, mm] = k.split('-');
-      return { mes: `${mm}/${a.slice(2)}`, valor: Number(v.toFixed(2)), acumulado: Number(acum.toFixed(2)) };
-    });
+      out.push({ mes: `${String(mm).padStart(2, '0')}/${String(a).slice(2)}`, valor: Number(v.toFixed(2)), acumulado: Number(acum.toFixed(2)) });
+      mm += 1; if (mm > 12) { mm = 1; a += 1; }
+    }
+    return out;
   }, [creditos]);
 
   const totalCreditos = useMemo(() => creditos.reduce((s, c) => s + Number(c.valor), 0), [creditos]);
@@ -80,6 +91,29 @@ export default function PainelProjeto({ projeto, operacao }: { projeto: Projeto;
             cor={resumo.pendentesIdentificacao > 0 ? '#B45309' : '#166534'}
           />
           <Kpi titulo="Total geral de créditos" valor={fmtBRL(resumo.totalGeral)} detalhe={`${resumo.quantidadeCreditos} créditos em todas as datas`} />
+        </div>
+      )}
+      {resumo && (
+        <div style={{ ...cardSt, padding: 16 }}>
+          <div style={secTitle}>Contas Individuais</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {resumo.contasIndividuais.map((c) => (
+              <div key={c.adquirenteId} style={{ display: 'flex', alignItems: 'center', gap: 14, background: PROJ_LIGHT, borderLeft: `3px solid ${PROJ_ACCENT}`, borderRadius: 8, padding: '10px 14px' }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: '#111827' }}>{c.nome}</div>
+                  <div style={{ fontSize: 12, color: '#6B7280' }}>Adquirente · {c.quantidade} créditos vinculados</div>
+                </div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: PROJ }}>{fmtBRL(c.total)}</div>
+              </div>
+            ))}
+            {resumo.contasIndividuais.length === 0 && <div style={{ fontSize: 13, color: '#9CA3AF' }}>Nenhum crédito vinculado a Conta Individual.</div>}
+            {resumo.desvinculados.quantidade > 0 && (
+              <div style={{ fontSize: 12, color: '#6B7280' }}>
+                Desvinculados por auditoria: <b>{resumo.desvinculados.quantidade}</b> crédito(s), {fmtBRL(resumo.desvinculados.total)} (permanecem registrados como fato bancário, fora da Conta Individual).
+              </div>
+            )}
+            {resumo.semVinculo > 0 && <div style={{ fontSize: 12, color: '#B45309' }}>{resumo.semVinculo} crédito(s) sem vínculo definido.</div>}
+          </div>
         </div>
       )}
       <div style={{ ...cardSt, padding: 16 }}>
