@@ -10036,3 +10036,6 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - Pendencia de UI confirmada no codigo: api.ts derrubava a sessao em qualquer 401 (codigo 2FA errado de usuario logado); a correcao esta no bloco da sessao curta.
 - Retomar: bloco de retomada (reativa QA, abre sessao, mostra esta nota); depois Fase 0B.
 
+
+- [PAUSA 2] Codigo da sessao curta guardado em git stash (WIP 03/10). Retomar: git stash pop; aplicar a migracao 20261003_user_sessions.sql (idempotente); prisma generate; checar tipos; subir a API; rodar a suite; commit.
+
