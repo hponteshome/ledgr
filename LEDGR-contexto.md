@@ -10083,3 +10083,11 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - Backend: GET /projects/perfis (so Master), declarada antes de :projetoId.
 - Menu: grupo "Projetos" (ordem 15) e item "Concessoes de acesso" (recurso proj-concessoes, sem permissao em perfis: so Master ve). migrations-manuais/20261003_proj_1_3_menu.sql.
 - Protocolo aplicado: suite so roda depois de a API responder em /auth/test.
+
+## [PROJETOS] 03/10/2026 - Fase 1.3: ajustes apos teste da tela
+
+- Teste manual da tela de concessoes: conceder e revogar funcionaram; a revogacao tem efeito imediato (a suite perdeu o acesso no instante seguinte).
+- FIXTURE DA SUITE: a concessao CONSULTA da conta QA na Operacao Ancora sustenta os testes do dominio. Em testes manuais de revogacao, criar uma concessao descartavel (outro perfil ou escopo) e revogar ESSA. Restaurada em 03/10 com nova concessao + AuditLog (a revogada permanece no historico).
+- Seletor de usuarios do modal: lista so usuarios ativos (decisao mantida; mais seguro).
+- iconRegistry: FiFolder (grupo Projetos) e FiKey (Concessoes de acesso) registrados.
+- Protocolo reafirmado: cls imediatamente antes da execucao, DEPOIS de definir here-strings e gravar arquivos.
