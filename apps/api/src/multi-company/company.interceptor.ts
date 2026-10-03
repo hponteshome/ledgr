@@ -71,7 +71,7 @@ export class CompanyInterceptor implements NestInterceptor {
     }
 
     // 4. /companies/<uuid>: exige vinculo com a empresa consultada
-    const rotaEmpresa = path.match(/\/companies\/([0-9a-f-]{36})$/i);
+    const rotaEmpresa = path.match(/\/companies\/([0-9a-f-]{36})(\/active-competencia)?$/i);
     if (rotaEmpresa) {
       await this.exigirVinculo(user, rotaEmpresa[1]);
       return;

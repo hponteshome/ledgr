@@ -22,7 +22,7 @@ import { JwtAuthGuard } from '../../auth/guards/jwt.guard';
 import { SidebarResourceGuard } from '../../auth/guards/sidebar-resource.guard';
 import { RequireResourceAccess } from '../../auth/decorators/require-resource-access.decorator';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
-import { SkipCompanyCheck } from '../../multi-company/company.interceptor';
+import { SkipCompanyCheck, isMasterAdmin } from '../../multi-company/company.interceptor';
 import { CompanyService } from './company.service';
 import { CompanyDto } from '../../core/dto/company.dto';
 
@@ -75,21 +75,19 @@ export class CompanyController {
    * como padrao inicial de periodo/exercicio.
    */
   @Get(':id/active-competencia')
-  @SkipCompanyCheck()
   async getActiveCompetencia(@Param('id') id: string, @CurrentUser('object') user: any) {
     const activeCompetencia = await this.companyService.getActiveCompetencia(user.id, id);
     return { activeCompetencia };
   }
 
   @Patch(':id/active-competencia')
-  @SkipCompanyCheck()
   async setActiveCompetencia(
     @Param('id') id: string,
     @Body() body: { activeCompetencia: string },
     @CurrentUser('object') user: any,
   ) {
     const date = new Date(body.activeCompetencia);
-    await this.companyService.setActiveCompetencia(user.id, id, date);
+    await this.companyService.setActiveCompetencia(user.id, id, date, isMasterAdmin(user));
     return { activeCompetencia: date };
   }
 
@@ -107,19 +105,18 @@ export class CompanyController {
   }
 
   @Get()
-  async findAll(@Query('role') role?: string) {
-    const companies = await this.companyService.findAll(role);
+  async findAll(@Query('role') role?: string, @CurrentUser('object') user?: any) {
+    const companies = await this.companyService.findAll(role, isMasterAdmin(user) ? undefined : user?.id ?? '00000000-0000-0000-0000-000000000000');
     return companies.map(c => new CompanyDto(c));
   }
 
   @Get('taxid/:taxId')
-  async findByTaxId(@Param('taxId') taxId: string) {
-    const company = await this.companyService.findByTaxId(taxId);
+  async findByTaxId(@Param('taxId') taxId: string, @CurrentUser('object') user?: any) {
+    const company = await this.companyService.findByTaxId(taxId, isMasterAdmin(user) ? undefined : user?.id ?? '00000000-0000-0000-0000-000000000000');
     if (!company) throw new NotFoundException('Empresa não encontrada');
     return company;
   }
 
-  @SkipCompanyCheck()
   @Get(':id')
   async findOne(@Param('id') id: string) {
     const company = await this.companyService.findById(id);

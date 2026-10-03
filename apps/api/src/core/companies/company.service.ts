@@ -24,21 +24,21 @@ export class CompanyService {
   }
 
   // CORREÇÃO: Adicionado filtro para esconder a Global da listagem geral
-  async findAll(role?: string) {
+  async findAll(role?: string, somenteDoUsuario?: string) {
     return this.prisma.company.findMany({
       where: {
         id: { not: GLOBAL_COMPANY_ID },
-        ...(role ? { roles: { has: role } } : {}),
+        ...(role ? { roles: { has: role } } : {}), ...(somenteDoUsuario ? { users: { some: { userId: somenteDoUsuario } } } : {}),
       },
       orderBy: { legalName: 'asc' },
     });
   }
 
   // CORREÇÃO: findUnique trocado por findFirst para suportar o filtro NOT
-  async findByTaxId(taxId: string) {
+  async findByTaxId(taxId: string, somenteDoUsuario?: string) {
     const clean = taxId.replace(/\D/g, '');
     return this.prisma.company.findFirst({
-      where: { taxId: { contains: clean } },
+      where: somenteDoUsuario ? { taxId: clean, users: { some: { userId: somenteDoUsuario } } } : { taxId: { contains: clean } },
     });
   }
 
@@ -250,6 +250,7 @@ export class CompanyService {
 
 async findAvailable(user: any) {
   const isMasterAdmin = (user?.profile?.permissions as any)?.all === true;
+  if (!isMasterAdmin && !user?.id) return []; // Seguranca 0A: fail closed
 
   return this.prisma.company.findMany({
     where: {
@@ -257,7 +258,7 @@ async findAvailable(user: any) {
       deletedAt: null,
       roles: { has: 'LEDGR_USER' },
       // Master Admin vê todas — usuário normal só vê ativas
-      ...(isMasterAdmin ? {} : { status: { in: ['active', 'ATIVA'] } }),
+      ...(isMasterAdmin ? {} : { status: { in: ['active', 'ATIVA'] }, users: { some: { userId: user.id } } }), // Seguranca 0A: nao Master so ve vinculadas
     },
     select: {
       id:            true,
@@ -280,17 +281,30 @@ async getActiveCompetencia(userId: string, companyId: string) {
   return uc?.activeCompetencia ?? null;
 }
 
-async setActiveCompetencia(userId: string, companyId: string, date: Date) {
+async setActiveCompetencia(userId: string, companyId: string, date: Date, podeCriarVinculo = false) {
   // CORRIGIDO 24/09/2026: era .update(), que falha silenciosamente (P2025)
   // quando o usuario nao tem linha propria em user_companies para aquela
   // empresa (comum em Master Admin, cujo acesso nao depende dessa tabela) -
   // a competencia nunca era persistida de verdade, so ficava no cache local
   // do navegador. .upsert() cria o vinculo na hora, se faltar.
-  return this.prisma.userCompany.upsert({
-    where: { userId_companyId: { userId, companyId } },
-    create: { userId, companyId, activeCompetencia: date },
-    update: { activeCompetencia: date },
+  // Seguranca 0A (02/10/2026): upsert (criacao de vinculo) somente para o Master,
+  // motivo da correcao de 24/09. Para os demais, so atualiza vinculo existente:
+  // criar UserCompany por esta rota seria escalacao de privilegio.
+  if (podeCriarVinculo) {
+    return this.prisma.userCompany.upsert({
+      where: { userId_companyId: { userId, companyId } },
+      create: { userId, companyId, activeCompetencia: date },
+      update: { activeCompetencia: date },
+    });
+  }
+  const r = await this.prisma.userCompany.updateMany({
+    where: { userId, companyId },
+    data: { activeCompetencia: date },
   });
+  if (r.count === 0) {
+    throw new NotFoundException('Empresa nao encontrada.');
+  }
+  return r;
 }
 
 async findHeadquarters() {

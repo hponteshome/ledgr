@@ -9851,3 +9851,25 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - cls imediatamente antes da execucao/confirmacao.
 - Conferir estrutura real das tabelas (information_schema) antes de SQL de escrita em tabela nao inspecionada.
 - Conta de teste inativa fora das sessoes de teste.
+
+## [PROJETOS] Sessao 03/10/2026 - Fase 0A: rotas de empresas e escalacao de privilegio
+
+### Achados (teste com a conta QA nao Master)
+- Backend: 48 chamadas do Dashboard com header da GRB voltaram 404 - CompanyInterceptor funcionando.
+- Vazamento: seletor listava as 10 empresas (nome + CNPJ) para a conta QA. `findAvailable` e `findAll` nao filtravam por UserCompany.
+- `GET /companies/:id` tinha @SkipCompanyCheck, que e avaliado antes da regra de vinculo do interceptor: a protecao de 02/10 nao se aplicava.
+- `findByTaxId` usava `contains`: CNPJ parcial permitia enumerar empresas.
+- ESCALACAO DE PRIVILEGIO: `setActiveCompetencia` usava upsert (correcao de 24/09 para o Master). Qualquer usuario que chamasse PATCH /companies/<id>/active-competencia ganhava vinculo UserCompany (role padrao ADMIN) com a empresa. Nao explorado: conta QA permaneceu com 1 vinculo.
+
+### Concluido
+- Service: upsert so para o Master; demais so atualizam vinculo existente (sem vinculo = 404). findAvailable/findAll filtrados por UserCompany (fail closed sem usuario). findByTaxId exato e vinculado para nao Master (Master mantem contains).
+- Controller: removidos 3 @SkipCompanyCheck (GET :id, GET/PATCH active-competencia); usuario repassado ao service.
+- Interceptor: regra de vinculo cobre /companies/<uuid>/active-competencia.
+- Suite de regressao `scripts/seg/teste-isolamento-qa.ps1` (12 testes, credencial DPAPI fora do repo): 12/12 OK.
+- Senha da conta QA redefinida (AuditLog PASSWORD_RESET) e guardada cifrada em %USERPROFILE%\.ledgr\qa-hotelsys.cred.xml.
+
+### Pendencias novas
+- Frontend: opcao "Nenhuma empresa ativa / Acessar Plano de Contas Mestre" aparece para nao Master.
+- Frontend: empresa ativa guardada no navegador nao e revalidada contra a lista disponivel (abriu na GRB).
+- Dashboard repete chamadas quando recebe erro (aging repetido, >600 requisicoes).
+- `GET /companies/headquarters` devolve a empresa sede para qualquer usuario (avaliar).
