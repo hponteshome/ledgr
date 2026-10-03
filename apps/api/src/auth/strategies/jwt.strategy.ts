@@ -18,7 +18,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     super({
       jwtFromRequest: ExtractJwt.fromExtractors([
         ExtractJwt.fromAuthHeaderAsBearerToken(),
-        (req: any) => req?.query?.token || null, // permite SSE/EventSource, que nao envia headers customizados
+        (req: any) => (String(req?.headers?.accept || '').includes('text/event-stream') ? req?.query?.token || null : null), // Seguranca 0A.6: token na URL so para SSE
       ]),
       ignoreExpiration: false,
       secretOrKey: requireJwtSecret(),

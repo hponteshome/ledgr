@@ -21,7 +21,7 @@ import { TwoFactorService } from './two-factor/two-factor.service';
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
         secret: config.get('JWT_SECRET'),
-        signOptions: { expiresIn: '1d' },
+        signOptions: { expiresIn: (config.get('JWT_ACCESS_TTL') || '15m') as any }, // Seguranca 0A.6: access token curto
       }),
     }),
      UsersModule,

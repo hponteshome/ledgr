@@ -140,6 +140,7 @@ export class TwoFactorService {
         twoFactorRecoveryCodes: [], twoFactorTrustVersion: { increment: 1 },
       },
     });
+    await this.prisma.userSession.updateMany({ where: { userId, revokedAt: null }, data: { revokedAt: new Date() } }); // Seguranca 0A.6
     await this.prisma.auditLog.create({ data: { actorId: adminId, action: '2FA_RESET', targetId: userId } });
     return { reset: true };
   }

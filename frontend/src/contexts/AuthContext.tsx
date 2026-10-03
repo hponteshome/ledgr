@@ -60,7 +60,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const chaveConfianca = (email: string) => `@ledgr:2faTrust:${(email || '').trim().toLowerCase()}`;
 
   const concluirLogin = (data: any, email: string) => {
-    const { access_token, user: loggedUser, trustToken } = data;
+    const { access_token, user: loggedUser, trustToken, refresh_token } = data;
+    if (refresh_token) localStorage.setItem('@ledgr:refresh', refresh_token); // Seguranca 0A.6
     if (trustToken) localStorage.setItem(chaveConfianca(email), trustToken);
     api.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
     localStorage.setItem('@ledgr:token', access_token);
@@ -110,6 +111,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const signOut = () => {
+    // Seguranca 0A.6: revoga a sessao no servidor (refresh token)
+    const rt = localStorage.getItem('@ledgr:refresh');
+    if (rt) api.post('/auth/logout', { refreshToken: rt }).catch(() => {});
+    localStorage.removeItem('@ledgr:refresh');
     localStorage.removeItem('@ledgr:token');
     localStorage.removeItem('@ledgr:user');
     localStorage.removeItem('@ledgr:activeCompany');

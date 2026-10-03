@@ -8,7 +8,7 @@ import {
   UseGuards,
   Request,
   UnauthorizedException,
-  Param,
+  Param, HttpCode,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LocalAuthGuard } from './guards/local.guard';
@@ -93,6 +93,19 @@ export class AuthController {
     } catch(e: any) {
       throw new (require('@nestjs/common').BadRequestException)(e.message);
     }
+  }
+
+  // -- Sessao (Seguranca 0A.6, 03/10/2026) -------------------------------------
+  @Post('refresh')
+  @HttpCode(200)
+  renovarSessao(@Body() body: { refreshToken: string }) {
+    return this.authService.renovarSessao(body?.refreshToken);
+  }
+
+  @Post('logout')
+  @HttpCode(200)
+  encerrarSessao(@Body() body: { refreshToken: string }) {
+    return this.authService.encerrarSessao(body?.refreshToken);
   }
 
   // -- 2FA (Seguranca 0A.6, 03/10/2026) --------------------------------------

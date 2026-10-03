@@ -25,9 +25,10 @@ try {
     $global:desafio = $r1.challengeToken
     $seg = (Import-Clixml "$env:USERPROFILE\.ledgr\qa-hotelsys-2fa.xml").GetNetworkCredential().Password
     $vb = @{ challengeToken = $r1.challengeToken; code = (Totp $seg) } | ConvertTo-Json
-    $global:tok = (Invoke-RestMethod -Method Post -Uri "$base/auth/2fa/verify" -ContentType 'application/json' -Body $vb).access_token
+    $r2 = Invoke-RestMethod -Method Post -Uri "$base/auth/2fa/verify" -ContentType 'application/json' -Body $vb
+    $global:tok = $r2.access_token; $global:refresh = $r2.refresh_token
     $seg = $null; $vb = $null
-  } else { $global:tok = $r1.access_token }
+  } else { $global:tok = $r1.access_token; $global:refresh = $r1.refresh_token }
 } catch { Write-Host "ERRO no login da conta QA: $($_.Exception.Message)" -ForegroundColor Red }
 $lb = $null; $cred = $null
 $global:falhas = 0
@@ -123,6 +124,14 @@ if ($global:tok) {
   Teste "2FA: token de desafio NAO vale como acesso"  GET    "/users/me"                    401
   $global:tok = $acesso
   Teste "2FA: codigo errado recusado"                  POST   "/auth/2fa/verify"             401 -corpo (@{ challengeToken = $global:desafio; code = '000000' } | ConvertTo-Json)
+  $rn = $null; try { $rn = Invoke-RestMethod -Method Post -Uri "$base/auth/refresh" -ContentType 'application/json' -Body (@{ refreshToken = $global:refresh } | ConvertTo-Json) } catch {}
+  if ($rn.access_token -and $rn.refresh_token -and $rn.refresh_token -ne $global:refresh) { Write-Host "OK     esperado rotacao | obtido rotacao | Sessao: refresh valido renova e rotaciona" -ForegroundColor Green; $global:tok = $rn.access_token; $global:refresh = $rn.refresh_token } else { $global:falhas++; Write-Host "FALHA  Sessao: refresh valido nao renovou ou nao rotacionou" -ForegroundColor Red }
+  Teste "Sessao: refresh invalido recusado"            POST   "/auth/refresh"                401 -corpo '{"refreshToken":"invalido"}'
+  $acesso = $global:tok; $global:tok = ''
+  Teste "Sessao: ?token= fora de SSE recusado"         GET    "/users/me?token=$acesso"      401
+  $global:tok = $acesso
+  Teste "Sessao: logout"                               POST   "/auth/logout"                 200 -corpo (@{ refreshToken = $global:refresh } | ConvertTo-Json)
+  Teste "Sessao: refresh apos logout recusado"         POST   "/auth/refresh"                401 -corpo (@{ refreshToken = $global:refresh } | ConvertTo-Json)
   Write-Host ("`nResultado: {0}" -f $(if ($global:falhas -eq 0) {'TODOS OS TESTES PASSARAM'} else {"$global:falhas FALHA(S)"})) -ForegroundColor $(if ($global:falhas -eq 0) {'Green'} else {'Red'})
 }
 $global:tok = $null

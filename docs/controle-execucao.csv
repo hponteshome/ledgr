@@ -2,3 +2,4 @@ tipo|fase|item|inicio|fim|horas|obs
 SESSAO|0A|Bussola, contas de teste, autenticacao, CompanyInterceptor, Documentos|2026-10-02 09:00|2026-10-02 14:00|5|Retroativa. Informado 09:00-13:30; fim ajustado ao ultimo commit da sessao (13:56)
 SESSAO|0A|Escalacao de privilegio, seletor de empresas, Certificados, Contratos, administracao de acessos|2026-10-03 09:15|2026-10-03 11:47|2.55|Seletor e rotas de empresas, Documentos, Contratos, Certificados, Financeiro, Bancos, Contabil, administracao de acessos, 2FA etapas 1 a 3; suite 62 testes
 SESSAO|0A|Sessao curta e refresh token (codigo aplicado, em stash)|2026-10-03 11:48|2026-10-03 12:01|0.23|Registro manual: sessao havia sido cancelada por engano
+SESSAO|0A|Sessao curta e refresh token|2026-10-03 11:48|2026-10-03 12:05|0.29|Registro manual (sessao cancelada por engano)

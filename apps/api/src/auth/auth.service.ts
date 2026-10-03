@@ -1,9 +1,10 @@
 // src/auth/auth.service.ts
-import { Injectable, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { UnauthorizedException, Injectable, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { UsersService } from '../core/users/users.service';
 import { RegisterDto } from './dto/register.dto';
 import * as bcrypt from 'bcryptjs';
+import { randomBytes, createHash } from 'crypto';
 import * as crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
@@ -239,6 +240,7 @@ export class AuthService {
     // Retornar token + dados do usuário
     return {
       access_token: token,
+      refresh_token: (await this.criarSessao(fullUser!.id)).token, // Seguranca 0A.6
       user: {
         id: fullUser.id,
         email: fullUser.email,
@@ -255,6 +257,70 @@ export class AuthService {
         })) || []
       },
     };
+  }
+
+  // -- Sessoes (Seguranca 0A.6, 03/10/2026) -----------------------------------
+  // Access token curto (JWT_ACCESS_TTL, padrao 15m) + refresh token opaco com rotacao.
+  // O banco guarda so o hash (sha256). Inatividade: SESSION_IDLE_HOURS (8 h). Limite absoluto: SESSION_MAX_DAYS (7 dias).
+  // Refresh ja rotacionado reapresentado fora da tolerancia de 30 s = possivel copia: revoga todas as sessoes.
+  private hashToken(t: string): string {
+    return createHash('sha256').update(t).digest('hex');
+  }
+
+  private async criarSessao(userId: string, expiresAt?: Date): Promise<{ token: string; id: string }> {
+    const token = randomBytes(48).toString('hex');
+    const dias = Number(process.env.SESSION_MAX_DAYS || 7);
+    const s = await this.prisma.userSession.create({
+      data: { userId, tokenHash: this.hashToken(token), expiresAt: expiresAt ?? new Date(Date.now() + dias * 86400000) },
+      select: { id: true },
+    });
+    return { token, id: s.id };
+  }
+
+  async renovarSessao(refreshToken: string) {
+    const negar = () => new UnauthorizedException('Sessao expirada. Faca login novamente.');
+    if (!refreshToken || typeof refreshToken !== 'string') throw negar();
+    const agora = new Date();
+    const s = await this.prisma.userSession.findUnique({ where: { tokenHash: this.hashToken(refreshToken) } });
+    if (!s) throw negar();
+    if (s.revokedAt) {
+      const dentroTolerancia = !!s.replacedById && agora.getTime() - s.revokedAt.getTime() < 30000;
+      if (!dentroTolerancia) {
+        if (s.replacedById) {
+          await this.prisma.userSession.updateMany({ where: { userId: s.userId, revokedAt: null }, data: { revokedAt: agora } });
+          await this.prisma.auditLog.create({ data: { actorId: s.userId, action: 'SESSION_REUSE_DETECTED', targetId: s.userId, after: { sessao: s.id } } });
+        }
+        throw negar();
+      }
+    }
+    const horas = Number(process.env.SESSION_IDLE_HOURS || 8);
+    if (s.expiresAt <= agora || s.lastUsedAt.getTime() + horas * 3600000 <= agora.getTime()) {
+      await this.prisma.userSession.update({ where: { id: s.id }, data: { revokedAt: s.revokedAt ?? agora } });
+      throw negar();
+    }
+    const u = await this.prisma.user.findUnique({
+      where: { id: s.userId },
+      select: { id: true, email: true, isActive: true, status: true, deletedAt: true },
+    });
+    if (!u || u.deletedAt || !u.isActive || u.status !== 'active') {
+      await this.prisma.userSession.updateMany({ where: { userId: s.userId, revokedAt: null }, data: { revokedAt: agora } });
+      throw negar();
+    }
+    const nova = await this.criarSessao(u.id, s.expiresAt);
+    if (!s.revokedAt) {
+      await this.prisma.userSession.update({ where: { id: s.id }, data: { revokedAt: agora, replacedById: nova.id } });
+    }
+    return { access_token: this.jwtService.sign({ sub: u.id, email: u.email }), refresh_token: nova.token };
+  }
+
+  async encerrarSessao(refreshToken: string) {
+    if (refreshToken && typeof refreshToken === 'string') {
+      await this.prisma.userSession.updateMany({
+        where: { tokenHash: this.hashToken(refreshToken), revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+    }
+    return { ok: true };
   }
 
   async requestUnlock(email: string, message: string) {

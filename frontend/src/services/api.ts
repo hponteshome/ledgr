@@ -49,23 +49,57 @@ api.interceptors.request.use(
   }
 );
 
-// Interceptor for global error handling
+// Seguranca 0A.6 (03/10/2026): access token curto + renovacao automatica pelo refresh token.
+// Em 401, tenta renovar UMA vez (requisicoes simultaneas compartilham a mesma renovacao) e repete.
+// Rotas de autenticacao (login, 2fa, refresh, logout) nunca disparam renovacao nem logout:
+// um codigo 2FA errado (401) nao pode derrubar a sessao do usuario logado.
+let renovando: Promise<string | null> | null = null;
+
+async function renovarAcesso(): Promise<string | null> {
+  const rt = localStorage.getItem('@ledgr:refresh');
+  if (!rt) return null;
+  try {
+    const r = await axios.post(`${api.defaults.baseURL}/auth/refresh`, { refreshToken: rt });
+    const { access_token, refresh_token } = r.data || {};
+    if (!access_token || !refresh_token) return null;
+    localStorage.setItem('@ledgr:token', access_token);
+    localStorage.setItem('@ledgr:refresh', refresh_token);
+    api.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
+    return access_token;
+  } catch {
+    return null;
+  }
+}
+
+function encerrarSessaoLocal() {
+  ['@ledgr:token', '@ledgr:refresh', '@ledgr:user', '@ledgr:activeCompany', '@ledgr:companyId'].forEach((k) => localStorage.removeItem(k));
+  if (window.location.pathname !== '/') {
+    window.location.href = '/';
+  }
+}
+
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    const isLoginRequest = error.config?.url?.includes('/auth/login');
+  async (error) => {
+    const url: string = error.config?.url || '';
+    const rotaAuth = ['/auth/login', '/auth/2fa', '/auth/refresh', '/auth/logout'].some((r) => url.includes(r));
+    const original: any = error.config;
 
-    if (error.response?.status === 401 && !isLoginRequest) {
-      console.warn('[API] Token expired or invalid. Redirecting...');
-      
-      localStorage.removeItem('@ledgr:token');
-      localStorage.removeItem('@ledgr:user');
-      localStorage.removeItem('@ledgr:activeCompany');
-      localStorage.removeItem('@ledgr:companyId');
-      
-      if (window.location.pathname !== '/') {
-        window.location.href = '/';
+    if (error.response?.status === 401 && !rotaAuth) {
+      if (original && !original._renovado) {
+        original._renovado = true;
+        if (!renovando) {
+          renovando = renovarAcesso().finally(() => { setTimeout(() => { renovando = null; }, 0); });
+        }
+        const novo = await renovando;
+        if (novo) {
+          original.headers = original.headers || {};
+          original.headers.Authorization = `Bearer ${novo}`;
+          return api(original);
+        }
       }
+      console.warn('[API] Sessao expirada. Redirecionando...');
+      encerrarSessaoLocal();
     }
 
     if (error.response?.status === 403) {

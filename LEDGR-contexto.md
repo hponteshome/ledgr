@@ -10039,3 +10039,8 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 
 - [PAUSA 2] Codigo da sessao curta guardado em git stash (WIP 03/10). Retomar: git stash pop; aplicar a migracao 20261003_user_sessions.sql (idempotente); prisma generate; checar tipos; subir a API; rodar a suite; commit.
 
+
+## [PROJETOS] 03/10/2026 - Sessao curta CONCLUIDA
+
+- Access token 15 min; refresh opaco com rotacao, deteccao de reuso (tolerancia 30 s) e revogacao em user_sessions; /auth/refresh e /auth/logout; ?token= so em SSE; frontend renova automaticamente; rotas de auth nao derrubam mais a sessao (bug do 401 no 2FA corrigido). Proximo: Fase 0B.
+
