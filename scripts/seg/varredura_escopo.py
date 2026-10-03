@@ -9,7 +9,7 @@ alvo = os.path.join(BASE, sys.argv[1] if len(sys.argv) > 1 else r"apps\api\src\m
 ROTA = re.compile(r"^\s*@(Get|Post|Put|Patch|Delete)\(\s*(?:['\"]([^'\"]*)['\"])?")
 PRISMA = re.compile(r"this\.prisma\.(\w+)\.(findUnique|findFirst|findMany|update|updateMany|delete|deleteMany|upsert|count|aggregate|groupBy)\(")
 CLIENTE = re.compile(r"@Query\('companyId'\)|@Body\('companyId'\)|query\??\.companyId|body\??\.companyId|dto\.companyId|filters\.companyId|@Query\(\)\s*\w+")
-REQ = re.compile(r"req(uest)?\??\.companyId|@CompanyId\(|empresaEfetiva\(")
+REQ = re.compile(r"req(uest)?\??\.companyId|@CompanyId\(|@Company\(\)|empresaEfetiva\(")
 
 def ler(p):
     with open(p, encoding="utf-8", errors="ignore") as f:

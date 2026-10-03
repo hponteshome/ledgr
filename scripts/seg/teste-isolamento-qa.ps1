@@ -11,7 +11,7 @@ $global:tok = $null
 try { $global:tok = (Invoke-RestMethod -Method Post -Uri "$base/auth/login" -ContentType 'application/json' -Body $lb).access_token } catch { Write-Host "ERRO no login da conta QA: $($_.Exception.Message)" -ForegroundColor Red }
 $lb = $null; $cred = $null
 $global:falhas = 0
-function Teste($nome, $metodo, $rota, $esperado, $empresa = $HOT, $corpo = $null, $qtd = $null) {
+function Teste($nome, $metodo, $rota, $esperado, $empresa = $HOT, $corpo = $null, $qtd = $null, $msg = $null) {
   $h = @{ Authorization = "Bearer $global:tok"; 'x-company-id' = $empresa }
   $st = 0; $conteudo = ''
   try {
@@ -19,9 +19,10 @@ function Teste($nome, $metodo, $rota, $esperado, $empresa = $HOT, $corpo = $null
     if ($corpo) { $p.ContentType = 'application/json'; $p.Body = $corpo }
     $r = Invoke-WebRequest @p
     $st = [int]$r.StatusCode; $conteudo = $r.Content
-  } catch { if ($_.Exception.Response) { $st = [int]$_.Exception.Response.StatusCode } else { $st = -1 } }
+  } catch { if ($_.Exception.Response) { $st = [int]$_.Exception.Response.StatusCode } else { $st = -1 }; $conteudo = "$($_.ErrorDetails.Message)" }
   $ok = ($st -eq $esperado); $extra = ''
   if ($ok -and $null -ne $qtd) { $n = @($conteudo | ConvertFrom-Json).Count; $extra = " (itens=$n)"; if ($n -ne $qtd) { $ok = $false } }
+  if ($ok -and $msg -and $conteudo -notmatch $msg) { $ok = $false; $extra = " (mensagem diferente: $conteudo)" }
   if (-not $ok) { $global:falhas++ }
   Write-Host ("{0,-6} esperado {1} | obtido {2}{3} | {4}" -f $(if ($ok) {'OK'} else {'FALHA'}), $esperado, $st, $extra, $nome) -ForegroundColor $(if ($ok) {'Green'} else {'Red'})
 }
@@ -83,6 +84,7 @@ if ($global:tok) {
   if ($jeGrb)  { Teste "Lancamento da GRB por ID"               GET    "/accounting/journal/${jeGrb}"                 404 } else { Write-Host "SEM DADOS - lancamento da GRB" -ForegroundColor DarkGray }
   if ($coaGrb) { Teste "Conta do plano da GRB por ID"           GET    "/chart-of-accounts/${coaGrb}"                 404
                  Teste "Saldo de conta da GRB"                  GET    "/chart-of-accounts/${coaGrb}/balance"         404 } else { Write-Host "SEM DADOS - conta da GRB" -ForegroundColor DarkGray }
+  if ($coaGrb) { Teste "Lancamento com conta do plano da GRB" POST "/accounting/journal" 400 -corpo ('{"date":"2026-10-01","description":"QA isolamento","items":[{"accountId":"' + $coaGrb + '","value":1,"type":"DEBIT"}]}') -msg 'nao pertence' }
   if ($eqAlh)  { Teste "MEP de outra investidora (historico)"   GET    "/accounting/equity-method/${eqAlh}/historico" 404 } else { Write-Host "SEM DADOS - MEP de outra investidora" -ForegroundColor DarkGray }
   Teste "Lancamento: alterar inexistente/alheio"       PUT    "/accounting/journal/${zero}"                       404 -corpo '{}'
   Teste "Plano de contas: excluir inexistente/alheia"  DELETE "/chart-of-accounts/${zero}"                        404

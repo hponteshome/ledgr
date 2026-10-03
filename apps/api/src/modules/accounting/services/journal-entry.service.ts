@@ -527,13 +527,23 @@ async bulkDelete(companyId: string, filters: BulkDeleteFilters) {
   // ── Helpers ───────────────────────────────────────────────────────────────
 
   private async resolveItems(companyId: string, items: CreateJournalEntryDto['items']) {
-    return Promise.all(items.map(async item => {
+    const resolvidos = await Promise.all(items.map(async item => {
       // Se já tem accountId, usa direto
       if (item.accountId) return item;
       // Senão, resolve pelo código
       const account = await this.lookupAccount(companyId, item.accountCode);
       return { ...item, accountId: account.id };
     }));
+    // Seguranca 0A (03/10/2026): toda conta do lancamento deve ser do plano da propria empresa
+    // (accountId informado direto nao era conferido). Base verificada: 0 itens fora da empresa.
+    const ids = [...new Set(resolvidos.map((i: any) => i.accountId).filter(Boolean))] as string[];
+    if (ids.length) {
+      const validas = await this.prisma.chartOfAccounts.count({ where: { id: { in: ids }, companyId } });
+      if (validas !== ids.length) {
+        throw new BadRequestException('Lancamento com conta que nao pertence ao plano da empresa.');
+      }
+    }
+    return resolvidos;
   }
 
 private validateItems(items: Array<{ type: string; value: number }>) {

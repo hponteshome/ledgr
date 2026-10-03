@@ -9952,3 +9952,20 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - Corrigido integration.service:107: conta de despesa (doc.expenseAccountId) buscada so por ID permitia lancamento da empresa ativa debitando conta do plano de OUTRA empresa (integridade contabil). Agora findFirst(id + companyId + nao excluida), mesmo criterio do helper find(). Base verificada: 0 documentos divergentes (correcao preventiva).
 - expenseAccountId e gravado sem validacao em AP, Caixa Pequeno e Documento Fiscal, mas integration.service e o UNICO consumidor que lanca com ele.
 - Financeiro/Bancos: 15 arquivos revisados, 6 rotas corrigidas (Fechamento 2, Provisao 3, integracao 1), item de menu restaurado. Suite 38/38.
+
+## [PROJETOS] Sessao 03/10/2026 (cont.) - Fase 0A: Contabil (controllers)
+
+- Varredura: 32 rotas e 83 consultas apontadas; 15 controllers com CompanyInterceptor sem suspeitos.
+- Novo `multi-company/escopo-por-id.interceptor.ts`: EscopoPorId(modelo, campoEmpresa) - interceptor generico de classe para rotas :id (outra empresa = 404; registro global = leitura liberada, escrita so Master; Master inalterado). Aplicado em journal-entry, chart-of-accounts (companyId opcional = contas globais) e equity-method (investorCompanyId). Padrao para controllers novos, inclusive do dominio Projetos.
+- balance-comparison (empresa no caminho da URL) e accounting/accounts (companyId opcional na query): empresaEfetiva.
+- import-balances: restrito ao Master (service prioriza o CNPJ do arquivo como empresa de destino - risco de importar saldos em outra empresa). Revisar o service para devolver aos nao Master.
+- CDI e Matriz master (dados globais): MasterOnlyGuard na classe, leituras com @AcessoAutenticado.
+- Suite: +17 testes (leitura com registros reais da GRB; escrita com UUID inexistente). Resultado: 55/55. Commit 386e34c.
+
+## [PROJETOS] Sessao 03/10/2026 (cont.) - Fase 0A: Contabil CONCLUIDO
+
+- Importadores do Contabil nao resolvem a empresa pelo CNPJ do arquivo (unica ocorrencia valida o arquivo contra a empresa ativa). Comentario do balance-import.controller provavelmente desatualizado; rota segue restrita ao Master ate revisao do service.
+- accounting-mask: falso positivo (@Company() + closeMask confere id + companyId). Varredura passou a reconhecer @Company().
+- journal-entry.service.resolveItems: accountId informado direto nao era conferido (lancamento debitando conta de outra empresa). Agora todas as contas do lancamento sao conferidas contra o plano da empresa em uma consulta (create e update). Base verificada: 0 itens fora da empresa.
+- Suite: funcao Teste ganhou -msg (confere mensagem do erro); teste nao destrutivo com lancamento desbalanceado e conta da GRB. Resultado: TODOS OS TESTES PASSARAM.
+
