@@ -2,6 +2,7 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { useAuth } from './AuthContext';
 import api from '../services/api';
+import { isMasterAdmin } from '../utils/isMasterAdmin';
 
 interface Company {
   id: string;
@@ -128,7 +129,7 @@ export const CompanyProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const lastCompanyId = localStorage.getItem('@ledgr:lastCompanyId');
 
       // LÓGICA DE RESTAURAÇÃO: Respeita o 'none' para manter Modo Global após refresh
-      if (lastCompanyId === 'none') {
+      if (lastCompanyId === 'none' && isMasterAdmin(user)) { // Seguranca 0A: so o Master restaura o Modo Global
         console.log('🌐 Restaurando Modo Global (Nenhuma empresa ativa)');
         setActiveCompany(null);
         setActiveCompetenciaState(null);
@@ -169,6 +170,7 @@ export const CompanyProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, [user, token]);
 
   const selectCompany = (company: Company | null) => {
+    if (!company && !isMasterAdmin(user)) return; // Seguranca 0A: Modo Global so para o Master
     if (company) {
       console.log('🔄 Empresa selecionada:', company.tradeName || company.legalName);
       setActiveCompany(company);

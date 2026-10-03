@@ -9873,3 +9873,19 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - Frontend: empresa ativa guardada no navegador nao e revalidada contra a lista disponivel (abriu na GRB).
 - Dashboard repete chamadas quando recebe erro (aging repetido, >600 requisicoes).
 - `GET /companies/headquarters` devolve a empresa sede para qualquer usuario (avaliar).
+
+## [PROJETOS] Sessao 03/10/2026 (cont.) - Fase 0A: frontend do seletor de empresas
+
+### Achado
+- `Header.tsx` calculava `isMaster` por `profileName === 'Administrador Master' || user.permissions.all`. O user do AuthContext vem da resposta do login (permissoes em `user.profile.permissions`) e o perfil real chama "Master Admin": `isMaster` era falso para todos. Efeito: contadores de pendentes/desbloqueio nunca apareciam.
+- Correcao de registro anterior: a revalidacao da empresa guardada no navegador JA existia (busca na lista de /companies/available). A conta QA abriu na GRB porque a lista vinha completa; resolvido pelo filtro no backend. Unico furo era o marcador 'none' (Modo Global).
+
+### Concluido
+- Novo `frontend/src/utils/isMasterAdmin.ts`: criterio unico de Master no frontend, espelhando o backend.
+- `Header.tsx`: isMaster via helper; opcao "Nenhuma empresa ativa / Acessar Plano de Contas Mestre" so para o Master.
+- `CompanyContext.tsx`: 'none' so restaura Modo Global para o Master; `selectCompany(null)` ignorado para nao Master.
+- Teste: Master com Modo Global normal; QA ve so a Hotelsys, sem opcao do Plano Mestre.
+
+### Pendencias
+- Outros pontos do frontend com deteccao propria de Master (ProfileList, Layout, routes/index, CompanyList, useSidebarPermissions): migrar para o helper.
+- Banner "Nenhuma empresa ativa (Modo Global)" no Header nao distingue Master (cosmetico).

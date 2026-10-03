@@ -6,6 +6,7 @@ import {
   FiAlertTriangle, FiInfo, FiX, FiSearch, FiMessageSquare,
 } from 'react-icons/fi';
 import { useAuth } from '../contexts/AuthContext';
+import { isMasterAdmin } from '../utils/isMasterAdmin';
 import { useSidebarPermissions } from '../contexts/SidebarPermissionsContext';
 import { useCompany } from '../contexts/CompanyContext';
 import { useNavigate } from 'react-router-dom';
@@ -57,7 +58,7 @@ export const Header: React.FC<{ sidebarOpen: boolean }> = ({ sidebarOpen }) => {
   const { user, signIn, signOut } = useAuth();
   // Extrai o nome do perfil corretamente (se for objeto, pega o name)
   const profileName = (user as any)?.profile?.name || (user as any)?.profile || 'Usuário';
-  const isMaster = profileName === 'Administrador Master' || (user as any)?.permissions?.all === true;
+  const isMaster = isMasterAdmin(user); // Seguranca 0A: criterio unico (antes falhava para o perfil 'Master Admin')
   const pendentesCount = usePendentesCount(!!user && isMaster);
   const unlockRequestsCount = useUnlockRequestsCount(isMaster);
   const { companies, activeCompany, selectCompany, activeCompetencia, setActiveCompetencia } = useCompany();
@@ -336,6 +337,7 @@ export const Header: React.FC<{ sidebarOpen: boolean }> = ({ sidebarOpen }) => {
 
                     <div className="overflow-y-auto mt-1" style={{ maxHeight: 'calc(100vh - 200px)', scrollbarWidth: 'thin', scrollbarColor: '#CBD5E1 #F1F5F9' }}>
                       {/* OPÇÃO MODO GLOBAL */}
+                      {isMaster && ( /* Seguranca 0A: Modo Global / Plano Mestre so para o Master */
                       <button
                         onClick={() => handleSelectCompany(null)}
                         className={`w-full text-left px-3 py-3 hover:bg-amber-50 rounded-lg transition-colors border-b border-gray-100 mb-1 ${!activeCompany ? 'bg-amber-50 border-l-4 border-amber-500' : ''
@@ -347,6 +349,7 @@ export const Header: React.FC<{ sidebarOpen: boolean }> = ({ sidebarOpen }) => {
                         </div>
                         <p className="text-[10px] text-amber-600 mt-0.5 ml-5">Acessar Plano de Contas Mestre</p>
                       </button>
+                      )}
 
                       {filteredCompanies.length > 0 ? (
                         filteredCompanies.map((company) => (
