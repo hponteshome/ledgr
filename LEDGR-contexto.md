@@ -10139,3 +10139,6 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 
 - Suite (03/10): testes nao fixam dados que a auditoria pode mudar. Conta Individual testada pela REGRA (VAL presente, semVinculo = 0, contas + desvinculados = total geral). O total historico (R$ 3.495.791,15 ate a data-base) segue fixo, por ser fato bancario.
 
+
+- 03/10/2026: credito n 24 (R$ 10,00, 26/02/2025) ESTORNADO DE FATO (confirmado pelo Hpontes) - desvinculado da Conta Individual com motivo 'valor estornado'. Conta Individual VAL: 57 creditos, R$ 3.495.781,15. Diferenca para o saldo informado (R$ 3.295.265,82): R$ 200.515,33, em conciliacao. Pendente (1.7): ligar o debito do estorno no extrato da SUNSYS ao credito n 24.
+
