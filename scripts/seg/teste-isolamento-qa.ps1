@@ -132,7 +132,11 @@ if ($global:tok) {
   Teste "Projetos: creditos da Operacao Ancora"        GET    "/projects/operacoes/${opId}/creditos"         200 -qtd 58
   Teste "Projetos: resumo - 58 creditos conferidos"     GET    "/projects/operacoes/${opId}/resumo"           200 -msg '"conferido":true'
   Teste "Projetos: resumo - total historico exato"      GET    "/projects/operacoes/${opId}/resumo"           200 -msg '"totalAteDataBase":"3495791.15"'
-  Teste "Projetos: conta individual da VAL (58 creditos)" GET    "/projects/operacoes/${opId}/resumo"           200 -msg 'VAL INVESTIMENTOS S/A","quantidade":58,"total":"3495791.15"'
+  Teste "Projetos: VAL aparece como Conta Individual"   GET    "/projects/operacoes/${opId}/resumo"           200 -msg '"nome":"VAL INVESTIMENTOS S/A"'
+  Teste "Projetos: nenhum credito sem decisao de vinculo" GET  "/projects/operacoes/${opId}/resumo"           200 -msg '"semVinculo":0'
+  $rs = $null; try { $rs = Invoke-RestMethod -Uri "$base/projects/operacoes/${opId}/resumo" -Headers @{ Authorization = "Bearer $global:tok" } } catch {}
+  $somaContas = 0; if ($rs) { foreach ($ci in @($rs.contasIndividuais)) { $somaContas += [decimal]$ci.total }; $somaContas += [decimal]$rs.desvinculados.total }
+  if ($rs -and $somaContas -eq [decimal]$rs.totalGeral) { Write-Host ("OK     esperado fecha | obtido fecha ({0}) | Projetos: contas individuais + desvinculados = total" -f $somaContas) -ForegroundColor Green } else { $global:falhas++; Write-Host ("FALHA  contas individuais + desvinculados ({0}) diferente do total ({1})" -f $somaContas, $rs.totalGeral) -ForegroundColor Red }
   Teste "Projetos: creditos trazem o vinculo vigente"     GET    "/projects/operacoes/${opId}/creditos"         200 -msg '"situacao":"VINCULADO"'
   Teste "Projetos: alterar vinculo (so Master)"           POST   "/projects/operacoes/${opId}/creditos/${zero}/vinculo" 403 -corpo '{}'
   Teste "Projetos: creditos de operacao inexistente"   GET    "/projects/operacoes/${zero}/creditos"         404

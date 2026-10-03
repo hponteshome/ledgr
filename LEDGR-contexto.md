@@ -10136,3 +10136,6 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - Carga inicial: 58 creditos vinculados a VAL (AuditLog PROJ_CREDITOS_VINCULADOS). Script de carga vincula creditos novos ao Adquirente; desvinculados nunca sao revinculados automaticamente.
 - API: creditos com vinculoAtual; historico (GET .../creditos/:id/vinculos); alteracao (POST .../creditos/:id/vinculo, so Master, AuditLog PROJ_CREDITO_VINCULO_ALTERADO); resumo com contasIndividuais, desvinculados e semVinculo.
 - Tela: coluna Titular (Conta Individual), modal Vinculo (situacao, vincular/remover, motivo, historico); painel com Contas Individuais; grafico com meses sem credito.
+
+- Suite (03/10): testes nao fixam dados que a auditoria pode mudar. Conta Individual testada pela REGRA (VAL presente, semVinculo = 0, contas + desvinculados = total geral). O total historico (R$ 3.495.791,15 ate a data-base) segue fixo, por ser fato bancario.
+
