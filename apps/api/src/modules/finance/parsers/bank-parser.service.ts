@@ -114,23 +114,32 @@ function normalizeCellValue(v) {
     if ('result' in v) return (v).result;
     if ('richText' in v) return (v).richText.map((t) => t.text).join('');
     if ('text' in v) return (v).text;
+    if ('formula' in v) return (v).result ?? ''; // Fase 1.7: formula sem resultado calculado gravado
     return String(v);
   }
   return v ?? '';
 }
 
-async function readRowsAsArrays(buffer) {
-  const stream = Readable.from(buffer);
-  const workbookReader = new ExcelJS.stream.xlsx.WorkbookReader(stream, {});
-  const rows = [];
+// Fase 1.7 (03/10/2026): le TODAS as abas. No modo streaming, a ordem das abas dentro do arquivo pode diferir da
+// ordem exibida no Excel; as abas sao devolvidas ordenadas pelo id (a aba 1 e a primeira exibida).
+// Array.from preenche celulas vazias (linhas esparsas).
+async function readSheetsAsArrays(buffer): Promise<{ id: number; name: string; rows: any[][] }[]> {
+  const workbookReader = new ExcelJS.stream.xlsx.WorkbookReader(Readable.from(buffer), {});
+  const abas: { id: number; name: string; rows: any[][] }[] = [];
   for await (const worksheetReader of workbookReader) {
+    const rows: any[][] = [];
     for await (const row of worksheetReader) {
-      rows[row.number - 1] = (row.values as any[]).slice(1).map(normalizeCellValue);
+      rows[row.number - 1] = Array.from((row.values as any[]) || []).slice(1).map(normalizeCellValue);
     }
-    break;
+    for (let i = 0; i < rows.length; i++) if (!rows[i]) rows[i] = [];
+    abas.push({ id: Number((worksheetReader as any).id) || 0, name: String((worksheetReader as any).name || ''), rows });
   }
-  for (let i = 0; i < rows.length; i++) if (!rows[i]) rows[i] = [];
-  return rows;
+  return abas.sort((a, b) => a.id - b.id);
+}
+
+async function readRowsAsArrays(buffer) {
+  const abas = await readSheetsAsArrays(buffer);
+  return abas[0]?.rows ?? [];
 }
 
 @Injectable()
@@ -154,14 +163,16 @@ export class BankParserService {
 
   // ── Parser XLS/XLSX — detecta banco pelo conteúdo ─────────
   private async parseXLS(buffer: Buffer): Promise<ParsedStatement> {
-    const rows: any[][] = await readRowsAsArrays(buffer);
+    // Fase 1.7: le todas as abas; usa a que tiver o layout do Itau Empresas (o arquivo pode ter abas de resumo)
+    const abas = await readSheetsAsArrays(buffer);
+    for (const aba of abas) {
+      const itauEmpresas = this.detectarItauEmpresas(aba.rows);
+      if (itauEmpresas) return this.parseItauEmpresas(aba.rows, itauEmpresas);
+    }
+    const rows: any[][] = abas[0]?.rows ?? [];
 
     // Detecção do banco pela presença de células-chave
     const flatText = rows.slice(0, 15).map(r => r.join(' ')).join(' ').toUpperCase();
-
-    // Fase 1.7: Itau Empresas (com Razao Social e CPF/CNPJ) - reconhecido pelo cabecalho das colunas
-    const itauEmpresas = this.detectarItauEmpresas(rows);
-    if (itauEmpresas) return this.parseItauEmpresas(rows, itauEmpresas);
 
     if (flatText.includes('BANCO DO BRASIL') || flatText.includes('BB.COM.BR')) {
       return this.parseBB(rows);
