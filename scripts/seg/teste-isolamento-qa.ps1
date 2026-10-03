@@ -5,10 +5,30 @@
 # Uso: powershell -File scripts\seg\teste-isolamento-qa.ps1
 param([string]$base = 'http://localhost:3000')
 $HOT = 'c2d48edc-28b7-4fd8-9272-b486449ab2cc'; $GRB = 'd0d70dc6-446c-430b-9f62-3f6e73db3874'
+function Totp([string]$b32) {
+  $alf = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'
+  $bits = ($b32.ToUpper().TrimEnd('=').ToCharArray() | ForEach-Object { [Convert]::ToString($alf.IndexOf($_), 2).PadLeft(5, '0') }) -join ''
+  $key = [byte[]]@(for ($i = 0; $i + 8 -le $bits.Length; $i += 8) { [Convert]::ToByte($bits.Substring($i, 8), 2) })
+  $msg = [BitConverter]::GetBytes([long][Math]::Floor([DateTimeOffset]::UtcNow.ToUnixTimeSeconds() / 30)); [Array]::Reverse($msg)
+  $h = (New-Object System.Security.Cryptography.HMACSHA1 (,$key)).ComputeHash($msg)
+  $o = $h[19] -band 0x0f
+  $v = (($h[$o] -band 0x7f) -shl 24) -bor (($h[$o + 1] -band 0xff) -shl 16) -bor (($h[$o + 2] -band 0xff) -shl 8) -bor ($h[$o + 3] -band 0xff)
+  ($v % 1000000).ToString('000000')
+}
 $cred = Import-Clixml "$env:USERPROFILE\.ledgr\qa-hotelsys.cred.xml"
 $lb = @{ email = $cred.UserName; password = $cred.GetNetworkCredential().Password } | ConvertTo-Json
 $global:tok = $null
-try { $global:tok = (Invoke-RestMethod -Method Post -Uri "$base/auth/login" -ContentType 'application/json' -Body $lb).access_token } catch { Write-Host "ERRO no login da conta QA: $($_.Exception.Message)" -ForegroundColor Red }
+$global:desafio = $null
+try {
+  $r1 = Invoke-RestMethod -Method Post -Uri "$base/auth/login" -ContentType 'application/json' -Body $lb
+  if ($r1.requires2fa) {
+    $global:desafio = $r1.challengeToken
+    $seg = (Import-Clixml "$env:USERPROFILE\.ledgr\qa-hotelsys-2fa.xml").GetNetworkCredential().Password
+    $vb = @{ challengeToken = $r1.challengeToken; code = (Totp $seg) } | ConvertTo-Json
+    $global:tok = (Invoke-RestMethod -Method Post -Uri "$base/auth/2fa/verify" -ContentType 'application/json' -Body $vb).access_token
+    $seg = $null; $vb = $null
+  } else { $global:tok = $r1.access_token }
+} catch { Write-Host "ERRO no login da conta QA: $($_.Exception.Message)" -ForegroundColor Red }
 $lb = $null; $cred = $null
 $global:falhas = 0
 function Teste($nome, $metodo, $rota, $esperado, $empresa = $HOT, $corpo = $null, $qtd = $null, $msg = $null) {
@@ -98,6 +118,11 @@ if ($global:tok) {
   Teste "2FA: status da propria conta"              GET    "/auth/2fa/me"                 200
   Teste "2FA: desafio invalido recusado"            POST   "/auth/2fa/verify"             401 -corpo '{"challengeToken":"invalido","code":"123456"}'
   Teste "2FA: reset de outro usuario (so Master)"   POST   "/auth/2fa/reset/${zero}"      403 -corpo '{}'
+  if ($global:desafio) { Write-Host "OK     esperado desafio | obtido desafio | 2FA: login exige o segundo fator" -ForegroundColor Green } else { $global:falhas++; Write-Host "FALHA  2FA: login NAO exigiu o segundo fator" -ForegroundColor Red }
+  $acesso = $global:tok; $global:tok = $global:desafio
+  Teste "2FA: token de desafio NAO vale como acesso"  GET    "/users/me"                    401
+  $global:tok = $acesso
+  Teste "2FA: codigo errado recusado"                  POST   "/auth/2fa/verify"             401 -corpo (@{ challengeToken = $global:desafio; code = '000000' } | ConvertTo-Json)
   Write-Host ("`nResultado: {0}" -f $(if ($global:falhas -eq 0) {'TODOS OS TESTES PASSARAM'} else {"$global:falhas FALHA(S)"})) -ForegroundColor $(if ($global:falhas -eq 0) {'Green'} else {'Red'})
 }
 $global:tok = $null

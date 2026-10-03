@@ -9998,3 +9998,10 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - Header: sequencia de sucesso extraida para finalizarLogin() (login direto ou apos o 2FA); modal aberto conforme o resultado; item "Verificacao em duas etapas" no menu do usuario (copiado do botao Sign Out).
 - Teste manual com a conta QA: ativacao pelo menu, codigos de recuperacao, novo login pedindo o codigo.
 - Consequencia esperada: conta QA com 2FA ativo - a suite nao autentica ate a etapa 3 (ativacao por script com segredo em DPAPI e TOTP gerado pela propria suite).
+
+## [PROJETOS] Sessao 03/10/2026 (cont.) - Fase 0A.6: 2FA etapa 3 (suite com 2FA)
+
+- Novo `scripts/seg/qa-2fa-setup.ps1`: reinicia o 2FA da conta QA (AuditLog 2FA_RESET), reativa por script pelas rotas da API e guarda o segredo TOTP cifrado (DPAPI) em %USERPROFILE%\.ledgr\qa-hotelsys-2fa.xml. Reexecutavel.
+- Suite: gerador TOTP proprio (RFC 6238, HMAC-SHA1) e login em dois passos automatico. +3 testes: login exige o segundo fator; token de desafio NAO vale como acesso (garante que o 2FA nao e contornado so com a senha); codigo errado recusado.
+- Conta do Hpontes segue SEM 2FA por decisao (fase de testes local). Etapa 4 (obrigatoriedade) apenas apos a Fase 0B.
+- `.gitignore`: ledgr-codigos-recuperacao*.txt (o navegador salvou o arquivo de codigos na raiz do repositorio; apagado).
