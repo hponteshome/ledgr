@@ -271,7 +271,7 @@ export class BankParserService {
   // Colunas localizadas PELO NOME do cabeçalho; só as colunas do banco são lidas (anotações manuais são ignoradas).
   private detectarItauEmpresas(rows: any[][]): { header: number; data: number; lanc: number; razao: number; doc: number; valor: number; saldo: number } | null {
     for (let i = 0; i < Math.min(rows.length, 30); i++) {
-      const cel = (rows[i] || []).map((c: any) => normalizeText(String(c ?? '')));
+      const cel: string[] = Array.from(rows[i] || [], (c: any) => normalizeText(String(c ?? ''))); // Array.from preenche celulas vazias (linha esparsa)
       const data = cel.indexOf('DATA');
       const lanc = cel.indexOf('LANCAMENTO');
       const razao = cel.indexOf('RAZAO SOCIAL');
