@@ -33,6 +33,19 @@ export function isMasterAdmin(user: any): boolean {
   return (user?.profile?.permissions as any)?.all === true;
 }
 
+/**
+ * Seguranca 0A (03/10/2026): empresa efetiva para rotas que recebem companyId do cliente
+ * (query/body). Master: usa a informada (comportamento inalterado). Demais: sempre
+ * request.companyId (ja validado contra UserCompany); companyId divergente = 404.
+ */
+export function empresaEfetiva(req: any, informada?: string): string | undefined {
+  if (isMasterAdmin(req?.user)) return informada;
+  if (informada && informada !== req?.companyId) {
+    throw new NotFoundException('Empresa nao encontrada.');
+  }
+  return req?.companyId;
+}
+
 @Injectable()
 export class CompanyInterceptor implements NestInterceptor {
   constructor(

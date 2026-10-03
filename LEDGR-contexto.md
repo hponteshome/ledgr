@@ -9889,3 +9889,26 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 ### Pendencias
 - Outros pontos do frontend com deteccao propria de Master (ProfileList, Layout, routes/index, CompanyList, useSidebarPermissions): migrar para o helper.
 - Banner "Nenhuma empresa ativa (Modo Global)" no Header nao distingue Master (cosmetico).
+
+## [PROJETOS] Sessao 03/10/2026 (cont.) - Fase 0A: Certificados e Contratos
+
+### Achados
+- Certificados: companyId vinha do cliente (query/body) em findAll, findOne, import, update e remove. O service filtra por id + companyId, mas com a empresa informada pelo proprio cliente: qualquer usuario listava, alterava, desativava e IMPORTAVA certificados A1 em nome de qualquer empresa. `evict` nao conferia empresa.
+- Contratos: findAll sem companyId na query devolvia contratos de TODAS as empresas; rotas :id sem checagem; create gravava no companyId informado. Teste confirmou: conta QA listou e abriu contrato da GRB antes da correcao.
+- Correcao de registro anterior: item 3 (templates globais ocultos para nao Master) NAO procede - conta QA ve o template global normalmente.
+
+### Concluido
+- `empresaEfetiva(req, informada)` agora compartilhada em `multi-company/company.interceptor.ts` (Documentos ainda usa copia privada - unificar depois).
+- certificates.controller: empresa efetiva em findAll/findOne/import/update/remove; evict confere o certificado na empresa ativa.
+- contratos.controller: DocumentScopeInterceptor (contratos sao registros de `documents`); empresa efetiva em findAll/create.
+- Suite de regressao: +10 testes nao destrutivos (por ID buscam dados reais da GRB; sem dados = SEM DADOS). Resultado: 19/19 OK.
+
+### Aprendizados
+- Apos patch no backend, confirmar que a API reiniciou DEPOIS da gravacao antes de rodar testes: com erro de compilacao, o watch mantem o processo antigo e os testes rodam contra o codigo anterior.
+- Parametro inserido em assinatura TS deve ficar antes de parametros opcionais (TS1016).
+- Testes da suite contra dados reais devem ser nao destrutivos (sem DELETE/PATCH em registros de outras empresas).
+
+### Pendencias novas
+- Modulo Pessoas global (@SkipCompanyCheck no controller): `contratos/socio/:personId/qualificacao` e /persons expoem dados de qualquer pessoa. Decisao de arquitetura: pessoas sao cadastro compartilhado ou por empresa?
+- Contratos e Certificados sem SidebarResourceGuard (Fase C).
+- Restantes da auditoria query/body: sidebar-permissions.controller (2), users.service (2), balance-import.controller, accounting.controller, chat.service.

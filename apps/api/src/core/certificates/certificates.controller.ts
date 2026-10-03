@@ -12,6 +12,7 @@ import { JwtAuthGuard }      from '../../auth/guards/jwt.guard';
 import { CertificatesService } from './certificates.service';
 import { ImportCertificateDto, UpdateCertificateDto } from './certificates.dto';
 import { SigningService } from './signing.service';
+import { isMasterAdmin, empresaEfetiva } from '../../multi-company/company.interceptor';
 
 // ── Limite de tamanho: 2 MB (certificados típicos < 10 KB) ──────
 const MAX_CERT_SIZE = 2 * 1024 * 1024;
@@ -28,9 +29,10 @@ export class CertificatesController {
   @Get()
   findAll(
     @Query('companyId') companyId: string,
+    @Request() req: any,
     @Query('onlyActive') onlyActive?: string,
   ) {
-    return this.svc.findAll(companyId, onlyActive === 'true');
+    return this.svc.findAll(empresaEfetiva(req, companyId) as string, onlyActive === 'true');
   }
 
   // ── GET /certificates/:id?companyId=xxx ──────────────────────
@@ -38,8 +40,9 @@ export class CertificatesController {
   findOne(
     @Param('id')         id:        string,
     @Query('companyId')  companyId: string,
+    @Request() req: any,
   ) {
-    return this.svc.findOne(id, companyId);
+    return this.svc.findOne(id, empresaEfetiva(req, companyId) as string);
   }
 
   // ── POST /certificates/import ────────────────────────────────
@@ -64,7 +67,7 @@ export class CertificatesController {
     @Body('companyId') companyId: string,
     @Request()         req: any,
   ) {
-    return this.svc.import(companyId, dto, file.buffer);
+    return this.svc.import(empresaEfetiva(req, companyId) as string, dto, file.buffer);
   }
 
   // ── POST /certificates/preview ───────────────────────────────
@@ -90,8 +93,9 @@ export class CertificatesController {
     @Param('id')         id:        string,
     @Query('companyId')  companyId: string,
     @Body()              dto:       UpdateCertificateDto,
+    @Request() req: any,
   ) {
-    return this.svc.update(id, companyId, dto);
+    return this.svc.update(id, empresaEfetiva(req, companyId) as string, dto);
   }
 
   // ── DELETE /certificates/:id ─────────────────────────────────
@@ -101,15 +105,17 @@ export class CertificatesController {
   async remove(
     @Param('id')         id:        string,
     @Query('companyId')  companyId: string,
+    @Request() req: any,
   ) {
-    await this.svc.remove(id, companyId);
+    await this.svc.remove(id, empresaEfetiva(req, companyId) as string);
   }
 
   // ── POST /certificates/:id/evict ─────────────────────────────
   // Remove a chave do cache em memória imediatamente
   @Post(':id/evict')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async evict(@Param('id') id: string) {
+  async evict(@Param('id') id: string, @Request() req: any) {
+    if (!isMasterAdmin(req.user)) await this.svc.findOne(id, req.companyId); // Seguranca 0A: certificado da empresa ativa
     this.signing.evictKey(id);
   }
 }

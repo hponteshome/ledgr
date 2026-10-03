@@ -38,6 +38,22 @@ if ($global:tok) {
   Teste "Header da GRB (/companies/me)"               GET   "/companies/me"                        404 -empresa $GRB
   Teste "Documentos da GRB pela query string"         GET   "/documents?companyId=$GRB"            404
   Teste "Documentos da propria empresa"               GET   "/documents"                           200
+  Teste "Certificados da GRB pela query string"     GET   "/certificates?companyId=$GRB"          404
+  Teste "Certificados da propria empresa"           GET   "/certificates"                         200
+  Teste "Contratos da GRB pela query string"        GET   "/contratos?companyId=$GRB"             404
+  Teste "Contratos da propria empresa"              GET   "/contratos"                            200
+  $docGrb  = (docker exec ledgr-postgres psql -U ledgr -d ledgr_app -tA -c "SELECT id FROM documents WHERE company_id = '$GRB' AND deleted_at IS NULL LIMIT 1;" | Out-String).Trim()
+  $certGrb = (docker exec ledgr-postgres psql -U ledgr -d ledgr_app -tA -c "SELECT id FROM certificates WHERE company_id = '$GRB' LIMIT 1;" | Out-String).Trim()
+  if ($docGrb) {
+    Teste "Documento da GRB por ID"                 GET   "/documents/${docGrb}"                  404
+    Teste "Versoes de documento da GRB"             GET   "/documents/${docGrb}/versions"         404
+    Teste "Contrato da GRB por ID"                  GET   "/contratos/${docGrb}"                  404
+  } else { Write-Host "SEM DADOS - nenhum documento da GRB para testes por ID" -ForegroundColor DarkGray }
+  if ($certGrb) {
+    Teste "Certificado da GRB por ID (query GRB)"   GET   "/certificates/${certGrb}?companyId=${GRB}" 404
+    Teste "Certificado da GRB por ID (sem query)"   GET   "/certificates/${certGrb}"              404
+    Teste "Evict de certificado da GRB"             POST  "/certificates/${certGrb}/evict"        404
+  } else { Write-Host "SEM DADOS - nenhum certificado da GRB para testes por ID" -ForegroundColor DarkGray }
   Write-Host ("`nResultado: {0}" -f $(if ($global:falhas -eq 0) {'TODOS OS TESTES PASSARAM'} else {"$global:falhas FALHA(S)"})) -ForegroundColor $(if ($global:falhas -eq 0) {'Green'} else {'Red'})
 }
 $global:tok = $null

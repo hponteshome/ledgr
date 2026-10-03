@@ -2,15 +2,18 @@
 import {
   Controller, Get, Post, Patch, Delete,
   Param, Body, Query, Request,
-  HttpCode, HttpStatus, UseGuards,
+  HttpCode, HttpStatus, UseGuards, UseInterceptors,
 } from '@nestjs/common';
 import { JwtAuthGuard }    from '../../auth/guards/jwt.guard';
 import { ContratosService } from './contratos.service';
 import {
   CreateContratoDto, UpdateContratoDto, ContratoFilters,
 } from './contratos.dto';
+import { DocumentScopeInterceptor } from '../documents/document-scope.interceptor';
+import { empresaEfetiva } from '../../multi-company/company.interceptor';
 
 @UseGuards(JwtAuthGuard)
+@UseInterceptors(DocumentScopeInterceptor) // Seguranca 0A: contratos sao registros da tabela documents
 @Controller('contratos')
 export class ContratosController {
   constructor(private readonly service: ContratosService) {}
@@ -18,7 +21,8 @@ export class ContratosController {
   // ── GET /contratos ────────────────────────────────────────
   // Query params: companyId, type, status, search
   @Get()
-  findAll(@Query() filters: ContratoFilters) {
+  findAll(@Query() filters: ContratoFilters, @Request() req: any) {
+    filters.companyId = empresaEfetiva(req, filters.companyId) as any; // Seguranca 0A
     return this.service.findAll(filters);
   }
 
@@ -46,6 +50,7 @@ export class ContratosController {
   // ── POST /contratos ───────────────────────────────────────
   @Post()
   create(@Request() req, @Body() dto: CreateContratoDto) {
+    dto.companyId = empresaEfetiva(req, dto.companyId) as string; // Seguranca 0A
     return this.service.create(dto, req.user.id);
   }
 
