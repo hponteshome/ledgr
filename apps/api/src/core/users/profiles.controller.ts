@@ -16,6 +16,7 @@ import { RequireResourceAccess } from '../../auth/decorators/require-resource-ac
 import { SkipCompanyCheck } from '../../multi-company/company.interceptor';
 import { ProfilesService } from './profiles.service';
 import { Req, Post } from '@nestjs/common';
+import { MasterOnlyGuard, AcessoAutenticado } from '../../auth/guards/master-only.guard';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PROBLEMAS CORRIGIDOS:
@@ -28,7 +29,7 @@ import { Req, Post } from '@nestjs/common';
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Controller('profiles')
-@UseGuards(JwtAuthGuard, SidebarResourceGuard)
+@UseGuards(JwtAuthGuard, SidebarResourceGuard, MasterOnlyGuard) // Seguranca 0A: administracao so Master
 @SkipCompanyCheck() // Perfis são globais — não exigem empresa ativa
 export class ProfilesController {
 
@@ -40,11 +41,13 @@ export class ProfilesController {
     return this.profilesService.create(data);
   }
   @Get()
+  @AcessoAutenticado() // Seguranca 0A: liberada a qualquer usuario autenticado
   async findAll() {
     return this.profilesService.findAll();
   }
 
   @Get(':id')
+  @AcessoAutenticado() // Seguranca 0A: liberada a qualquer usuario autenticado
   async findOne(@Param('id') id: string) {
     const profile = await this.profilesService.findById(id);
     if (!profile) throw new NotFoundException('Perfil não encontrado.');

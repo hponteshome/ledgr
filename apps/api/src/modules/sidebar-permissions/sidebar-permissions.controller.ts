@@ -2,24 +2,28 @@ import { Controller, Get, Post, Delete, Body, Param, Req, UseGuards } from '@nes
 import { SidebarPermissionsService } from './sidebar-permissions.service';
 import { SkipCompanyCheck } from '../../multi-company/company.interceptor';
 import { JwtAuthGuard } from '../../auth/guards/jwt.guard';
+import { MasterOnlyGuard, AcessoAutenticado } from '../../auth/guards/master-only.guard';
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, MasterOnlyGuard) // Seguranca 0A: edicao de permissoes so Master
 @Controller('sidebar-permissions')
 export class SidebarPermissionsController {
   constructor(private svc: SidebarPermissionsService) {}
 
   // GET /sidebar-permissions/items
   @Get('items')
+  @AcessoAutenticado() // Seguranca 0A: liberada a qualquer usuario autenticado
   @SkipCompanyCheck()
   listItems() { return this.svc.listItems(); }
 
   // GET /sidebar-permissions/tree
   @Get('tree')
+  @AcessoAutenticado() // Seguranca 0A: liberada a qualquer usuario autenticado
   @SkipCompanyCheck()
   getTree() { return this.svc.getTree(); }
 
   // GET /sidebar-permissions/resolve
   @Get('resolve')
+  @AcessoAutenticado() // Seguranca 0A: liberada a qualquer usuario autenticado
   @SkipCompanyCheck()
   resolve(@Req() req: any) {
     const userId = req.user?.id ?? req.user?.sub ?? '';

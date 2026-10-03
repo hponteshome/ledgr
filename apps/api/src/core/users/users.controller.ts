@@ -21,6 +21,7 @@ import { SkipCompanyCheck } from '../../multi-company/company.interceptor';
 import { UsersService } from './users.service';
 import { UserDto } from '../../auth/dto/user.dto';
 import { CreateUserDto } from '../dto/create-user.dto';
+import { MasterOnlyGuard, AcessoAutenticado } from '../../auth/guards/master-only.guard';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PROBLEMAS CORRIGIDOS:
@@ -35,7 +36,7 @@ import { CreateUserDto } from '../dto/create-user.dto';
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Controller('users')
-@UseGuards(JwtAuthGuard, SidebarResourceGuard)
+@UseGuards(JwtAuthGuard, SidebarResourceGuard, MasterOnlyGuard) // Seguranca 0A: administracao so Master
 @SkipCompanyCheck() // Usuários são globais — não exigem empresa ativa
 export class UsersController {
 
@@ -44,6 +45,7 @@ export class UsersController {
   // ── Rotas estáticas SEMPRE antes de rotas com parâmetro (':id') ─────────────
 
   @Get('me')
+  @AcessoAutenticado() // Seguranca 0A: liberada a qualquer usuario autenticado
   async getMe(@CurrentUser('object') user: any) {
     const found = await this.usersService.findById(user.id);
     if (!found) throw new NotFoundException('Usuário não encontrado.');

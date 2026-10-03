@@ -9912,3 +9912,19 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - Modulo Pessoas global (@SkipCompanyCheck no controller): `contratos/socio/:personId/qualificacao` e /persons expoem dados de qualquer pessoa. Decisao de arquitetura: pessoas sao cadastro compartilhado ou por empresa?
 - Contratos e Certificados sem SidebarResourceGuard (Fase C).
 - Restantes da auditoria query/body: sidebar-permissions.controller (2), users.service (2), balance-import.controller, accounting.controller, chat.service.
+
+## [PROJETOS] Sessao 03/10/2026 (cont.) - Fase 0A: administracao de acessos restrita ao Master
+
+### Achados (escalacao para Master Admin por qualquer usuario autenticado)
+- POST /users/:id/aprovar sem permissao alguma: cadastro publico (/auth/register) + auto-aprovacao com profileId do Master e companyIds livres.
+- sidebar-permissions.controller so com JwtAuthGuard: qualquer usuario gravava as proprias permissoes (bulk) ou reescrevia as de um perfil inteiro.
+- updateUser nao impedia atribuir o perfil Master a usuario de nivel menor.
+- GET /users/:id, /users/document/:document e lista de pendentes sem permissao.
+
+### Concluido
+- Novo `auth/guards/master-only.guard.ts` (MasterOnlyGuard + @AcessoAutenticado). Aplicado na CLASSE de users, profiles e sidebar-permissions: rota nova nasce restrita ao Master; liberar exige decisao explicita. Base: bussola 5.3 ("conceder acessos - restrito ao Hpontes").
+- Liberadas a qualquer autenticado: GET /users/me; GET /profiles e /profiles/:id; GET /sidebar-permissions/items, tree, resolve.
+- Suite: +12 testes de escalacao, nao destrutivos (UUID inexistente / listas vazias). Resultado: 31/31 OK.
+
+### Pendencia
+- Defesa em profundidade no users.service (create/aprovar/updateUser recusarem perfil Master vindo de nao Master) - hoje coberto so pelo guard.

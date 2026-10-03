@@ -54,6 +54,20 @@ if ($global:tok) {
     Teste "Certificado da GRB por ID (sem query)"   GET   "/certificates/${certGrb}"              404
     Teste "Evict de certificado da GRB"             POST  "/certificates/${certGrb}/evict"        404
   } else { Write-Host "SEM DADOS - nenhum certificado da GRB para testes por ID" -ForegroundColor DarkGray }
+  $qaId = (docker exec ledgr-postgres psql -U ledgr -d ledgr_app -tA -c "SELECT id FROM users WHERE email = 'qa.hotelsys@ledgr.local';" | Out-String).Trim()
+  $zero = '00000000-0000-0000-0000-000000000000'
+  Teste "Proprio usuario (/users/me)"               GET    "/users/me"                                  200
+  Teste "Listar usuarios"                           GET    "/users"                                     403
+  Teste "Listar cadastros pendentes"                GET    "/users/pendentes"                           403
+  Teste "ESCALACAO: aprovar cadastro como Master"   POST   "/users/${zero}/aprovar"                     403 -corpo '{"profileId":"61a30be0-010d-4b8e-8470-f775bfd871ee","level":0,"companyIds":[]}'
+  Teste "ESCALACAO: editar usuario"                 PATCH  "/users/${zero}"                             403 -corpo '{}'
+  Teste "Listar perfis (leitura liberada)"          GET    "/profiles"                                  200
+  Teste "ESCALACAO: editar perfil"                  PATCH  "/profiles/${zero}"                          403 -corpo '{}'
+  Teste "Resolver proprias permissoes de menu"      GET    "/sidebar-permissions/resolve"               200
+  Teste "Ler permissoes de usuario"                 GET    "/sidebar-permissions/user/${qaId}"          403
+  Teste "ESCALACAO: gravar permissoes proprias"     POST   "/sidebar-permissions/user/${qaId}/bulk"     403 -corpo '{"items":[]}'
+  Teste "ESCALACAO: gravar permissoes de perfil"    POST   "/sidebar-permissions/profile/${zero}"       403 -corpo '{"items":[]}'
+  Teste "ESCALACAO: remover permissao de usuario"   DELETE "/sidebar-permissions/user/${zero}/${zero}"  403
   Write-Host ("`nResultado: {0}" -f $(if ($global:falhas -eq 0) {'TODOS OS TESTES PASSARAM'} else {"$global:falhas FALHA(S)"})) -ForegroundColor $(if ($global:falhas -eq 0) {'Green'} else {'Red'})
 }
 $global:tok = $null
