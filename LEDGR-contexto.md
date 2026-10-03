@@ -10151,3 +10151,11 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - bank_transactions: counterparty_name e counterparty_doc (contraparte do extrato). Migracao 20261003_bancos_contraparte.sql.
 - Importacao: protecao contra duplicidade (data, tipo, valor, descricao e saldo) para todos os bancos; arquivo repetido e recusado com mensagem clara.
 - Arquivo do extrato fica em D:\Dados\RecifeOcean (fora do repositorio).
+
+## [PROJETOS] 03/10/2026 - Fase 1.7: prova bancaria dos creditos (extrato Itau SUNSYS)
+
+- Extrato Itau Empresas da SUNSYS importado (01/08/2024 a 25/08/2026; 592 transacoes: 130 entradas, 462 saidas), pelo envio comum, SEM gerar lancamentos (0 lancamentos BANK_IMPORT).
+- Cobertura: 58 de 58 creditos com transacao unica no extrato (55 com data, valor e CPF/CNPJ; 3 com data e valor - os 3 sem remetente). 0 ambiguos, 0 sem correspondencia.
+- proj_credito_provas: ligacao credito x bank_transactions (nucleo) com criterio e motivo; historico imutavel, sem DELETE; uma vigente por credito; uma transacao comprova no maximo um credito; trigger exige entrada do mesmo valor na conta da recebedora. Ligacao automatica so com transacao unica e nunca com CPF/CNPJ divergente.
+- Achados: estorno do credito n 24 NAO aparece no extrato Itau (nenhuma saida de R$ 10,00 nem para o CPF do remetente ate 08/2026) - confirmar como ocorreu. Os 3 sem remetente (n 16 deposito em caixa; n 41 e 42 SISPAG) nao trazem pagador no extrato: identificacao depende de outra fonte.
+- Proximo: tela de Pendencias (revisao manual de provas; entradas do extrato apos 31/12/2025 que podem pertencer a operacao; identificacao dos 3 remetentes).

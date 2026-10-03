@@ -10,7 +10,7 @@ interface Resumo {
   quantidadeCreditos: number; totalGeral: string; quantidadeAteDataBase: number; totalAteDataBase: string;
   valorControle: string | null; diferencaControle: string | null; conferido: boolean | null; pendentesIdentificacao: number;
   contasIndividuais: { adquirenteId: string; nome: string; quantidade: number; total: string }[];
-  desvinculados: { quantidade: number; total: string }; semVinculo: number;
+  desvinculados: { quantidade: number; total: string }; semVinculo: number; comProvaBancaria: number; semProvaBancaria: number;
 }
 
 function Kpi({ titulo, valor, detalhe, cor }: { titulo: string; valor: string; detalhe?: string; cor?: string }) {
@@ -91,6 +91,7 @@ export default function PainelProjeto({ projeto, operacao }: { projeto: Projeto;
             cor={resumo.pendentesIdentificacao > 0 ? '#B45309' : '#166534'}
           />
           <Kpi titulo="Total geral de créditos" valor={fmtBRL(resumo.totalGeral)} detalhe={`${resumo.quantidadeCreditos} créditos em todas as datas`} />
+          <Kpi titulo="Prova bancária" valor={`${resumo.comProvaBancaria} de ${resumo.quantidadeCreditos}`} detalhe={resumo.semProvaBancaria === 0 ? 'todos comprovados no extrato' : `${resumo.semProvaBancaria} sem prova bancária`} cor={resumo.semProvaBancaria === 0 ? '#166534' : '#B45309'} />
         </div>
       )}
       {resumo && (

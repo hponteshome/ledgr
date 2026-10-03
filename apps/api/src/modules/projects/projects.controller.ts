@@ -92,6 +92,7 @@ export class ProjectsController {
           id: true, numeroOrdem: true, dataCredito: true, valor: true, remetenteNomeExtrato: true,
           referenciaBancaria: true, origem: true, identificacaoPendente: true, observacao: true,
           remetente: { select: { id: true, nome: true, tipoPessoa: true, documento: true } },
+          provas: { where: { canceladoEm: null }, select: { criterio: true, bankTransactionId: true } },
           vinculos: {
             where: { canceladoEm: null },
             select: { situacao: true, motivo: true, criadoEm: true, adquirente: { select: { id: true, nome: true } } },
@@ -99,12 +100,24 @@ export class ProjectsController {
         },
       }),
     );
-    return lista.map(({ vinculos, remetente, ...c }) => ({
+    // Fase 1.7: prova bancaria - dados da transacao do extrato (dominio le o nucleo)
+    const txIds = lista.flatMap((c) => c.provas.map((p) => p.bankTransactionId));
+    const txs = txIds.length
+      ? await this.db.comoUsuario(req.user.id, (tx) => tx.bankTransaction.findMany({ where: { id: { in: txIds } }, select: { id: true, transactionDate: true, description: true, amount: true } }))
+      : [];
+    const txMapa = new Map(txs.map((t) => [t.id, t]));
+    return lista.map(({ vinculos, remetente, provas, ...c }) => ({
       ...c,
       remetente: remetente
         ? { id: remetente.id, nome: remetente.nome, tipoPessoa: remetente.tipoPessoa, documentoMascarado: mascararDocumento(remetente.documento) }
         : null,
       vinculoAtual: vinculos[0] ?? null,
+      provaAtual: (() => {
+        const p = provas[0];
+        if (!p) return null;
+        const t = txMapa.get(p.bankTransactionId);
+        return { criterio: p.criterio, transacao: t ? { data: t.transactionDate, descricao: t.description, valor: t.amount } : null };
+      })(),
     }));
   }
 
@@ -187,7 +200,8 @@ export class ProjectsController {
         where: { canceladoEm: null, credito: { operacaoId, canceladoEm: null } },
         select: { situacao: true, adquirente: { select: { id: true, nome: true } }, credito: { select: { valor: true } } },
       });
-      return { op, geral, ateBase, pendentes, vinc };
+      const provas = await tx.projCreditoProva.count({ where: { canceladoEm: null, credito: { operacaoId, canceladoEm: null } } });
+      return { op, geral, ateBase, pendentes, vinc, provas };
     });
     if (!r) throw new NotFoundException('Registro nao encontrado.');
     const zero = new Prisma.Decimal(0);
@@ -221,6 +235,8 @@ export class ProjectsController {
       contasIndividuais: [...contas.values()].map((c) => ({ adquirenteId: c.adquirenteId, nome: c.nome, quantidade: c.quantidade, total: c.total.toFixed(2) })),
       desvinculados: { quantidade: desvQtd, total: desvTotal.toFixed(2) },
       semVinculo: r.geral._count._all - r.vinc.length,
+      comProvaBancaria: r.provas,
+      semProvaBancaria: r.geral._count._all - r.provas,
     };
   }
 

@@ -13,6 +13,7 @@ export interface Credito {
   referenciaBancaria: string | null; origem: string; identificacaoPendente: boolean; observacao: string | null;
   remetente: { id: string; nome: string; tipoPessoa: string | null; documentoMascarado: string | null } | null;
   vinculoAtual: { situacao: string; motivo: string; criadoEm: string; adquirente: { id: string; nome: string } | null } | null;
+  provaAtual?: { criterio: string; transacao: { data: string; descricao: string; valor: string } | null } | null;
 }
 
 export const fmtBRL = (v: number | string | null | undefined) =>

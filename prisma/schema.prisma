@@ -5727,6 +5727,7 @@ model ProjCredito {
 
   operacao  ProjOperacao     @relation(fields: [operacaoId], references: [id])
   vinculos  ProjCreditoVinculo[]
+  provas    ProjCreditoProva[]
   remetente ProjContraparte? @relation(fields: [remetenteId], references: [id])
 
   @@unique([operacaoId, chaveIdempotencia])
@@ -5756,3 +5757,22 @@ model ProjCreditoVinculo {
   @@map("proj_credito_vinculos")
 }
 
+/// Fase 1.7 (03/10/2026): prova bancaria do credito - ligacao com a transacao do extrato (bank_transactions, nucleo).
+/// criterio: AUTO_DOC_DATA_VALOR | AUTO_DATA_VALOR | MANUAL. No banco: uma vigente por credito, uma transacao comprova
+/// no maximo um credito, entrada do mesmo valor na conta da recebedora; so encerra (com motivo); sem DELETE.
+model ProjCreditoProva {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  creditoId          String    @map("credito_id") @db.Uuid
+  bankTransactionId  String    @map("bank_transaction_id") @db.Uuid
+  criterio           String    @db.VarChar(30)
+  motivo             String
+  criadoEm           DateTime  @default(now()) @map("criado_em") @db.Timestamp(6)
+  criadoPorId        String?   @map("criado_por_id") @db.Uuid
+  canceladoEm        DateTime? @map("cancelado_em") @db.Timestamp(6)
+  canceladoPorId     String?   @map("cancelado_por_id") @db.Uuid
+  motivoCancelamento String?   @map("motivo_cancelamento")
+
+  credito ProjCredito @relation(fields: [creditoId], references: [id])
+
+  @@map("proj_credito_provas")
+}

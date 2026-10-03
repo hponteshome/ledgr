@@ -56,13 +56,13 @@ export default function CreditosProjeto({ operacao, master }: { operacao: Operac
           <thead>
             <tr>
               <th style={thSt}>Nº</th><th style={thSt}>Data</th><th style={thSt}>Remetente (pago por)</th><th style={thSt}>Documento</th>
-              <th style={{ ...thSt, textAlign: 'right' }}>Valor</th><th style={thSt}>Titular (Conta Individual)</th><th style={thSt}>Referência bancária</th>
+              <th style={{ ...thSt, textAlign: 'right' }}>Valor</th><th style={thSt}>Titular (Conta Individual)</th><th style={thSt}>Prova bancária</th><th style={thSt}>Referência bancária</th>
               <th style={thSt}>Situação</th>{master && <th style={thSt}></th>}
             </tr>
           </thead>
           <tbody>
             {!carregando && filtrados.length === 0 && (
-              <tr><td colSpan={master ? 9 : 8} style={{ ...tdSt, textAlign: 'center', color: '#9CA3AF', padding: 24 }}>Nenhum crédito para exibir.</td></tr>
+              <tr><td colSpan={master ? 10 : 9} style={{ ...tdSt, textAlign: 'center', color: '#9CA3AF', padding: 24 }}>Nenhum crédito para exibir.</td></tr>
             )}
             {filtrados.map((c) => (
               <tr key={c.id}>
@@ -82,6 +82,11 @@ export default function CreditosProjeto({ operacao, master }: { operacao: Operac
                     : c.vinculoAtual?.situacao === 'DESVINCULADO'
                       ? <span title={c.vinculoAtual.motivo} style={{ fontSize: 11, fontWeight: 600, color: '#6B7280', background: '#F3F4F6', borderRadius: 999, padding: '2px 8px', whiteSpace: 'nowrap' }}>Desvinculado</span>
                       : <span style={{ fontSize: 11, color: '#B45309' }}>Sem vínculo</span>}
+                </td>
+                <td style={{ ...tdSt, whiteSpace: 'nowrap' }}>
+                  {c.provaAtual?.transacao
+                    ? <span title={`${c.provaAtual.transacao.descricao} · ${c.provaAtual.criterio === 'AUTO_DOC_DATA_VALOR' ? 'data, valor e CPF/CNPJ conferidos' : c.provaAtual.criterio === 'AUTO_DATA_VALOR' ? 'data e valor conferidos' : 'ligação manual'}`} style={{ fontSize: 11, fontWeight: 600, color: '#166534', background: '#DCFCE7', borderRadius: 999, padding: '2px 8px', cursor: 'help' }}>Extrato {fmtData(c.provaAtual.transacao.data)}</span>
+                    : <span style={{ fontSize: 11, color: '#B45309' }}>Sem prova</span>}
                 </td>
                 <td style={{ ...tdSt, fontSize: 12, color: '#374151' }}>{c.referenciaBancaria || '-'}</td>
                 <td style={tdSt}>
