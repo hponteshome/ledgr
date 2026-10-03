@@ -5,10 +5,11 @@ import { Module } from '@nestjs/common';
 import { ProjectsController } from './projects.controller';
 import { ConcessoesService } from './concessoes.service';
 import { ProjEscopoGuard } from './proj-escopo.guard';
+import { ProjDbService } from './proj-db.service';
 
 @Module({
   controllers: [ProjectsController],
-  providers: [ConcessoesService, ProjEscopoGuard],
+  providers: [ConcessoesService, ProjEscopoGuard, ProjDbService],
   exports: [ConcessoesService],
 })
 export class ProjectsModule {}

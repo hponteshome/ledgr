@@ -145,6 +145,11 @@ if ($global:tok) {
   $global:tok = $acesso
   Teste "Sessao: logout"                               POST   "/auth/logout"                 200 -corpo (@{ refreshToken = $global:refresh } | ConvertTo-Json)
   Teste "Sessao: refresh apos logout recusado"         POST   "/auth/refresh"                401 -corpo (@{ refreshToken = $global:refresh } | ConvertTo-Json)
+  docker cp "$PSScriptRoot\teste-rls-proj.sql" ledgr-postgres:/tmp/teste-rls-proj.sql | Out-Null
+  $rls = docker exec ledgr-postgres psql -U ledgr -d ledgr_app -tA -v ON_ERROR_STOP=1 -f /tmp/teste-rls-proj.sql 2>&1
+  $esperado = [ordered]@{ sem_contexto = '0'; qa_projetos = '1'; qa_operacoes = '1'; qa_participacoes = '5'; qa_contrapartes = '1'; qa_concessoes_de_outros = '0'; qa_update_operacoes = '0'; master_projetos = '1'; master_operacoes = '1' }
+  $obtido = @{}; foreach ($ln in $rls) { if ("$ln" -match '^(\w+)=(.*)$') { $obtido[$matches[1]] = $matches[2].Trim() } }
+  foreach ($k in $esperado.Keys) { $okR = ($obtido[$k] -eq $esperado[$k]); if (-not $okR) { $global:falhas++ }; Write-Host ("{0,-6} esperado {1} | obtido {2} | RLS: {3}" -f $(if ($okR) {'OK'} else {'FALHA'}), $esperado[$k], $(if ($null -ne $obtido[$k]) { $obtido[$k] } else { '?' }), $k) -ForegroundColor $(if ($okR) {'Green'} else {'Red'}) }
   Write-Host ("`nResultado: {0}" -f $(if ($global:falhas -eq 0) {'TODOS OS TESTES PASSARAM'} else {"$global:falhas FALHA(S)"})) -ForegroundColor $(if ($global:falhas -eq 0) {'Green'} else {'Red'})
 }
 $global:tok = $null

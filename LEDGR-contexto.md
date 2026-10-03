@@ -10101,3 +10101,11 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - Validado: conexoes da API como ledgr_api (pg_stat_activity); suite completa; navegacao manual como Master nos modulos principais.
 - Lembrete: a senha do ledgr_api so existe nos .env - incluir na copia dos .env guardada no gerenciador de senhas.
 - Proximo: passo B - RLS nas tabelas proj_* com o usuario da requisicao informado ao banco.
+
+## [PROJETOS] 03/10/2026 - Fase 1.2b passo B: RLS nas tabelas proj_*
+
+- Funcoes: proj_ctx_user() (app.user_id), proj_ctx_master() (decidido PELO BANCO via users/profiles, nao por flag da aplicacao), proj_tem_projeto(), proj_tem_operacao() (concessao ativa, valida e de perfil ativo).
+- Politicas (ENABLE + FORCE): projetos e projeto_empresas (concessao no projeto); operacoes (projeto inteiro ou a operacao); participacoes (operacao visivel - politicas se compoem); contrapartes (presentes em participacao visivel); concessoes (proprias; Master todas). Gravacao: so Master. Catalogos proj_perfis/proj_papeis sem RLS.
+- Sem app.user_id: zero linhas (falha fechada). O nucleo do LEDGR nao usa o ProjDbService e nunca ve dados do dominio.
+- API: novo ProjDbService.comoUsuario(userId, fn) - transacao com set_config('app.user_id', ..., true); ConcessoesService e ProjectsController 100% via comoUsuario. Guard (camada 1) + RLS (camada 2).
+- Suite: scripts/seg/teste-rls-proj.sql (SET ROLE ledgr_api, sempre ROLLBACK) com 9 verificacoes direto no banco, independentes da API.
