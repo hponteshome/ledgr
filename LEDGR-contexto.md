@@ -10005,3 +10005,27 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - Suite: gerador TOTP proprio (RFC 6238, HMAC-SHA1) e login em dois passos automatico. +3 testes: login exige o segundo fator; token de desafio NAO vale como acesso (garante que o 2FA nao e contornado so com a senha); codigo errado recusado.
 - Conta do Hpontes segue SEM 2FA por decisao (fase de testes local). Etapa 4 (obrigatoriedade) apenas apos a Fase 0B.
 - `.gitignore`: ledgr-codigos-recuperacao*.txt (o navegador salvou o arquivo de codigos na raiz do repositorio; apagado).
+
+## [PROJETOS] PAUSA 03/10/2026 - onde paramos (Fase 0A em andamento)
+
+### Concluido hoje (03/10)
+- Seletor e rotas de empresas: escalacao de privilegio em active-competencia fechada; listagens filtradas por UserCompany; isMasterAdmin() unico no front e no back.
+- Isolamento: Documentos, Contratos, Certificados, Financeiro e Bancos (Fechamento, Provisao, integracao fiscal), Contabil (EscopoPorId generico, balance-comparison, accounts, lancamentos so com contas da propria empresa).
+- Administracao de acessos restrita ao Master (MasterOnlyGuard): users, profiles, sidebar-permissions, CDI, Matriz, import-balances.
+- 2FA etapas 1 a 3: backend (TOTP cifrado, tokens intermediarios com chave propria, recuperacao, dispositivo confiavel 24 h), frontend (TwoFactorModal) e suite com TOTP proprio.
+- Ferramentas: varredura_escopo.py, suite de regressao com 62 testes, controle de execucao (sessao.ps1).
+
+### Retomar nesta ordem
+1. Reativar a conta QA (bloco de retomada) e abrir a sessao: scripts\controle\sessao.ps1 inicio -Fase 0A -Item "Sessao curta e refresh token".
+2. 0A.6 restante: sessao curta (access token curto) + refresh token com rotacao e revogacao; aceitar ?token= so nas rotas de SSE.
+3. Fase 0B: servidor, VPN/tunel, TLS, backup com restauracao testada, API sob gerenciador de servico (sem processos orfaos), backup dos .env fora da maquina, inventario da porta 7778.
+4. 2FA etapa 4 (apos a 0B): TWO_FACTOR_OBRIGATORIO=true; ativacao do 2FA na conta do Hpontes com dispositivo confiavel 24 h.
+
+### Coluna 2 (higiene, em paralelo a Fase 1)
+- 9 PrismaClient (log mostra 9 "Database conectado"): remover PrismaService dos providers de auth, system, profiles, accounting, corporate, sped, ecd-arquivo, ecf-arquivo.
+- Logs: "DEBUG ACCOUNTING" imprime IDs no console.
+- CompanyGuard (sempre true) e ProfileGuard (ID fixo): migrar para isMasterAdmin() ou remover; desativar perfil "Administrador Master" (all=true, 0 usuarios).
+- @UseInterceptors(CompanyInterceptor) redundante (~35 controllers).
+- Recurso asset-maintenances sem item de menu; import-balances: revisar service (CNPJ do arquivo) e devolver aos nao Master; chat.service (companyId do cliente).
+- Modulo Pessoas global (decisao de arquitetura); users.service defesa em profundidade; Dashboard repete chamadas em erro; trade_name vazio/'.'; /companies/headquarters.
+- Navegador salvando downloads na pasta do repositorio: mudar a pasta de downloads.
