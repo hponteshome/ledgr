@@ -9928,3 +9928,20 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 
 ### Pendencia
 - Defesa em profundidade no users.service (create/aprovar/updateUser recusarem perfil Master vindo de nao Master) - hoje coberto so pelo guard.
+
+## [PROJETOS] Sessao 03/10/2026 (cont.) - Fase 0A: Financeiro (Fechamento, Provisao) e recurso de menu
+
+### Varredura automatizada
+- Novo `scripts/seg/varredura_escopo.py <pasta>`: aponta rotas que recebem companyId do cliente, rotas :id sem empresa do request e consultas Prisma por ID/listas sem companyId. Heuristica: falso positivo conhecido = service que confere com findOne/findFirst(id + companyId) e depois altera por id.
+- Financeiro: 10 rotas e 52 consultas apontadas. Confirmados SEGUROS por leitura: Contas a Pagar (@Company() le request.companyId; findOne(companyId, id) antes de alterar; buildWhere campo a campo) e Bancos (deleteStatement confere extrato id + companyId; cascata escopada pelo extrato).
+
+### Corrigido
+- Fechamento: conferir/ignorar item por ID sem empresa -> service exige item de fechamento da empresa ativa (relacao fechamento.companyId).
+- Provisao: deleteConfig, conferirNF e rateio por ID sem empresa -> conferencia id + companyId; rateio valida empresaId contra UserCompany para nao Master.
+- Item de menu "Fechamento Mensal" sem `resource`: SidebarResourceGuard devolvia NONE e a tela estava inacessivel para TODO nao Master. Gravado resource = 'fechamento-mensal' (AuditLog SIDEBAR_RESOURCE_SET; migrations-manuais/20261003_sidebar_resource_fechamento.sql).
+- Suite: +6 testes com UUID inexistente (corrigido = 404; vulneravel = 500 ou 200), nao destrutivos. Resultado: 38/38 OK.
+
+### Pendencias
+- Ler os updates por ID de AR, finance.service (fiscalDocument), agenda, integration e petty-cash (controllers repassam empresa; confirmar conferencia previa).
+- Recurso `asset-maintenances` (assets.controller) sem item no banco: tela bloqueada para nao Master (coluna 2, fora do caminho do Recife Ocean).
+- Provisao sem SidebarResourceGuard (Fase C).

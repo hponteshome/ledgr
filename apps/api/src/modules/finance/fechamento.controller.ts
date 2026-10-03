@@ -32,13 +32,13 @@ export class FechamentoController {
   @RequireResourceAccess('fechamento-mensal', 'EDIT')
   @Put('itens/:id/conferir')
   conferirItem(@Param('id') id: string, @Body() dto: any, @Request() req: any) {
-    return this.svc.conferirItem(id, req.user.id, dto);
+    return this.svc.conferirItem(id, req.user.id, dto, req.companyId); // Seguranca 0A
   }
 
   @RequireResourceAccess('fechamento-mensal', 'EDIT')
   @Put('itens/:id/ignorar')
-  ignorarItem(@Param('id') id: string) {
-    return this.svc.ignorarItem(id);
+  ignorarItem(@Param('id') id: string, @Request() req: any) {
+    return this.svc.ignorarItem(id, req.companyId); // Seguranca 0A
   }
 
   @RequireResourceAccess('fechamento-mensal', 'EDIT')

@@ -68,6 +68,12 @@ if ($global:tok) {
   Teste "ESCALACAO: gravar permissoes proprias"     POST   "/sidebar-permissions/user/${qaId}/bulk"     403 -corpo '{"items":[]}'
   Teste "ESCALACAO: gravar permissoes de perfil"    POST   "/sidebar-permissions/profile/${zero}"       403 -corpo '{"items":[]}'
   Teste "ESCALACAO: remover permissao de usuario"   DELETE "/sidebar-permissions/user/${zero}/${zero}"  403
+  Teste "Fechamento: conferir item inexistente/alheio"  PUT    "/finance/fechamento/itens/${zero}/conferir"            404 -corpo '{}'
+  Teste "Fechamento: ignorar item inexistente/alheio"   PUT    "/finance/fechamento/itens/${zero}/ignorar"             404 -corpo '{}'
+  Teste "Provisao: excluir config inexistente/alheia"   DELETE "/finance/provisoes/configs/${zero}"                    404
+  Teste "Provisao: conferir NF inexistente/alheia"      PUT    "/finance/provisoes/lancamentos/${zero}/conferir-nf"    404 -corpo '{}'
+  Teste "Provisao: rateio em config inexistente/alheia" PUT    "/finance/provisoes/configs/${zero}/rateio/2026-10"     404 -corpo '{"rateios":[]}'
+  Teste "Contas a pagar da propria empresa"             GET    "/finance/accounts-payable"                             200
   Write-Host ("`nResultado: {0}" -f $(if ($global:falhas -eq 0) {'TODOS OS TESTES PASSARAM'} else {"$global:falhas FALHA(S)"})) -ForegroundColor $(if ($global:falhas -eq 0) {'Green'} else {'Red'})
 }
 $global:tok = $null

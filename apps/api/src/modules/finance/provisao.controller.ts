@@ -3,6 +3,7 @@ import { Controller, Get, Post, Put, Delete, Body, Param, Query, Request, UseGua
 import { JwtAuthGuard } from '@/auth/guards/jwt.guard';
 import { CompanyGuard } from '@/multi-company/multi-company.guard';
 import { ProvisaoService } from './provisao.service';
+import { isMasterAdmin } from '../../multi-company/company.interceptor';
 
 @UseGuards(JwtAuthGuard, CompanyGuard)
 @Controller('finance/provisoes')
@@ -25,8 +26,8 @@ export class ProvisaoController {
   }
 
   @Delete('configs/:id')
-  deleteConfig(@Param('id') id: string) {
-    return this.svc.deleteConfig(id);
+  deleteConfig(@Param('id') id: string, @Request() req: any) {
+    return this.svc.deleteConfig(id, req.companyId); // Seguranca 0A
   }
 
   @Post('gerar')
@@ -40,12 +41,12 @@ export class ProvisaoController {
   }
 
   @Put('lancamentos/:id/conferir-nf')
-  conferirNF(@Param('id') id: string, @Body() dto: any) {
-    return this.svc.conferirNF(id, dto);
+  conferirNF(@Param('id') id: string, @Body() dto: any, @Request() req: any) {
+    return this.svc.conferirNF(id, dto, req.companyId); // Seguranca 0A
   }
 
   @Put('configs/:id/rateio/:competencia')
-  updateRateio(@Param('id') id: string, @Param('competencia') competencia: string, @Body() body: any) {
-    return this.svc.updateRateioCompetencia(id, competencia, body.rateios ?? []);
+  updateRateio(@Param('id') id: string, @Param('competencia') competencia: string, @Body() body: any, @Request() req: any) {
+    return this.svc.updateRateioCompetencia(id, competencia, body.rateios ?? [], req.companyId, isMasterAdmin(req.user) ? undefined : req.user?.id); // Seguranca 0A
   }
 }

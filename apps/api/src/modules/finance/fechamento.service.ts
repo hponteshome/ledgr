@@ -1,5 +1,5 @@
 // apps/api/src/modules/finance/fechamento.service.ts
-import { Injectable, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { NotFoundException, Injectable, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
@@ -199,7 +199,17 @@ export class FechamentoService {
 
   // ── Conferir item ─────────────────────────────────────────────────────────
 
-  async conferirItem(itemId: string, userId: string, dto: { valorConfirmado?: number; obs?: string }) {
+  // Seguranca 0A (03/10/2026): item deve pertencer a fechamento da empresa ativa
+  private async exigirItemDaEmpresa(itemId: string, companyId: string) {
+    const item = await this.prisma.fechamentoItem.findFirst({
+      where: { id: itemId, fechamento: { companyId } },
+      select: { id: true },
+    });
+    if (!item) throw new NotFoundException('Item de fechamento nao encontrado.');
+  }
+
+  async conferirItem(itemId: string, userId: string, dto: { valorConfirmado?: number; obs?: string }, companyId: string) {
+    await this.exigirItemDaEmpresa(itemId, companyId); // Seguranca 0A
     return this.prisma.fechamentoItem.update({
       where: { id: itemId },
       data: {
@@ -212,7 +222,8 @@ export class FechamentoService {
     });
   }
 
-  async ignorarItem(itemId: string) {
+  async ignorarItem(itemId: string, companyId: string) {
+    await this.exigirItemDaEmpresa(itemId, companyId); // Seguranca 0A
     return this.prisma.fechamentoItem.update({
       where: { id: itemId },
       data: { status: 'IGNORADO' },

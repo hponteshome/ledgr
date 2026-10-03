@@ -68,7 +68,14 @@ export class ProvisaoService {
     return config;
   }
 
-  async deleteConfig(id: string) {
+  // Seguranca 0A (03/10/2026): configuracao de provisao deve pertencer a empresa ativa
+  private async exigirConfigDaEmpresa(id: string, companyId: string) {
+    const cfg = await this.prisma.provisaoConfig.findFirst({ where: { id, companyId, deletedAt: null }, select: { id: true } });
+    if (!cfg) throw new NotFoundException('Provisao nao encontrada.');
+  }
+
+  async deleteConfig(id: string, companyId: string) {
+    await this.exigirConfigDaEmpresa(id, companyId); // Seguranca 0A
     return this.prisma.provisaoConfig.update({
       where: { id },
       data: { deletedAt: new Date(), ativo: false },
@@ -188,14 +195,24 @@ export class ProvisaoService {
     });
   }
 
-  async conferirNF(id: string, dto: { nfNumero?: string; nfChave?: string }) {
+  async conferirNF(id: string, dto: { nfNumero?: string; nfChave?: string }, companyId: string) {
+    const lanc = await this.prisma.provisaoLancamento.findFirst({ where: { id, companyId }, select: { id: true } }); // Seguranca 0A
+    if (!lanc) throw new NotFoundException('Lancamento nao encontrado.');
     return this.prisma.provisaoLancamento.update({
       where: { id },
       data: { nfNumero: dto.nfNumero, nfChave: dto.nfChave, nfConferida: true, nfConferidaEm: new Date(), status: 'PROVISIONADO' },
     });
   }
 
-  async updateRateioCompetencia(provisaoId: string, competencia: string, rateios: any[]) {
+  async updateRateioCompetencia(provisaoId: string, competencia: string, rateios: any[], companyId: string, userIdRestrito?: string) {
+    await this.exigirConfigDaEmpresa(provisaoId, companyId); // Seguranca 0A
+    if (userIdRestrito) { // Seguranca 0A: nao Master so rateia entre empresas vinculadas
+      const ids = [...new Set((rateios ?? []).map((r: any) => r.empresaId).filter(Boolean))] as string[];
+      if (ids.length) {
+        const vinc = await this.prisma.userCompany.count({ where: { userId: userIdRestrito, companyId: { in: ids } } });
+        if (vinc !== ids.length) throw new NotFoundException('Empresa nao encontrada.');
+      }
+    }
     await this.prisma.provisaoRateioConfig.deleteMany({ where: { provisaoId, competencia } });
     if (rateios.length) {
       await this.prisma.provisaoRateioConfig.createMany({
