@@ -10159,3 +10159,6 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - proj_credito_provas: ligacao credito x bank_transactions (nucleo) com criterio e motivo; historico imutavel, sem DELETE; uma vigente por credito; uma transacao comprova no maximo um credito; trigger exige entrada do mesmo valor na conta da recebedora. Ligacao automatica so com transacao unica e nunca com CPF/CNPJ divergente.
 - Achados: estorno do credito n 24 NAO aparece no extrato Itau (nenhuma saida de R$ 10,00 nem para o CPF do remetente ate 08/2026) - confirmar como ocorreu. Os 3 sem remetente (n 16 deposito em caixa; n 41 e 42 SISPAG) nao trazem pagador no extrato: identificacao depende de outra fonte.
 - Proximo: tela de Pendencias (revisao manual de provas; entradas do extrato apos 31/12/2025 que podem pertencer a operacao; identificacao dos 3 remetentes).
+
+- RETIFICACAO 03/10/2026: o credito n 24 (R$ 10,00) NAO foi estornado (nao ha saida no extrato Itau). Motivo real do desvinculo: o credito nao e aporte da VAL INVESTIMENTOS. Vinculo retificado (encerrado o registro com motivo 'valor estornado' e aberto novo desvinculo com o motivo correto). A nota anterior sobre estorno fica superada.
+
