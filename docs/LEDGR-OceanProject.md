@@ -4,7 +4,7 @@
 
 | Campo | Valor |
 |---|---|
-| Versão | 1.0 |
+| Versão | 1.1 |
 | Data | 02/10/2026 |
 | Responsável | Hpontes |
 | Documento de origem | `Plataforma_Gestao_Recife_Ocean_Residences.md` (referência funcional e de dados) |
@@ -442,3 +442,34 @@ Não cristalizar como regra de código:
 | Versão | Data | Alteração |
 |---|---|---|
 | 1.0 | 02/10/2026 | Criação: decisões D1-D7, modelo de acesso, protocolos e fases 0 a 4 |
+| 1.1 | 03/10/2026 | Seção 14: controle de execução (planejado x realizado) |
+---
+
+## 14. Controle de execução (planejado x realizado)
+
+Objetivo: comparar, ao final do projeto, o tempo planejado com o realizado em cada fase.
+
+### 14.1 Regras
+
+1. Toda sessão de trabalho do domínio é registrada com início e fim, indicando fase e item: `scripts/controle/sessao.ps1 inicio -Fase <fase> -Item "<item>"` e `... fim -Obs "<resumo>"`.
+2. Pausas encerram a sessão; a retomada abre uma nova. As horas registradas são de trabalho efetivo.
+3. Ao concluir uma fase, registra-se a conclusão com data/hora: `scripts/controle/sessao.ps1 concluir -Fase <fase>`. O relatório é exibido em seguida.
+4. Registros em `docs/controle-execucao.csv` (separador `|`, Regra 12), versionado no Git.
+5. A faixa planejada abaixo é a **linha de base congelada em 02/10/2026** e não é alterada. Replanejamentos ficam registrados como observação, para que a comparação final seja honesta.
+6. A cada fase concluída, o relatório é anexado à nota de sessão do `LEDGR-contexto.md`.
+
+### 14.2 Linha de base (02/10/2026)
+
+| Fase | Escopo | Planejado (h) |
+|---|---|---|
+| 0A | Segurança de aplicação | 50-85 |
+| 0B | Infraestrutura de acesso remoto | 15-30 |
+| 1 | Base confiável (Operação Âncora) | 130-210 |
+| 2 | Gestão financeira e contábil | 120-190 |
+| 3 | Gestão integral do projeto | 150-240 |
+| 4 | Automação e integrações | 60-120 |
+| **Total** | | **525-875** |
+
+### 14.3 Observações de replanejamento
+
+- 03/10/2026: ponto de controle da Fase 0. Restante obrigatório antes do acesso da equipe (isolamento em Financeiro, Bancos e Contábil; 2FA; sessão curta; Fase 0B) estimado em 41-73 h. Higiene do LEDGR fora do caminho crítico pode correr em paralelo à Fase 1. Linha de base mantida.
