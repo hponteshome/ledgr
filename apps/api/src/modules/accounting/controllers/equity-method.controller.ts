@@ -3,8 +3,11 @@ import { Controller, Get, Post, Patch, Delete, Body, Param, Query, Req, UseGuard
 import { JwtAuthGuard } from '../../../auth/guards/jwt.guard';
 import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
 import { EquityMethodService, CreateEquityMethodDto, UpdateEquityMethodDto } from '../services/equity-method.service';
+import { UseInterceptors } from '@nestjs/common';
+import { EscopoPorId } from '../../../multi-company/escopo-por-id.interceptor';
 
 @UseGuards(JwtAuthGuard)
+@UseInterceptors(EscopoPorId('equityMethodInvestment', 'investorCompanyId')) // Seguranca 0A: escopo de empresa nas rotas :id
 @Controller('accounting/equity-method')
 export class EquityMethodController {
   constructor(private readonly svc: EquityMethodService) {}

@@ -5,12 +5,14 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '@auth/guards/jwt.guard';
 import { CompanyGuard } from '@multi-company/multi-company.guard';
 import { BalanceImportService } from '../services/balance-import.service';
+import { MasterOnlyGuard } from '../../../auth/guards/master-only.guard';
 
 @Controller('accounting/import-balances')
 @UseGuards(JwtAuthGuard, CompanyGuard)
 export class BalanceImportController {
   constructor(private readonly balanceImportService: BalanceImportService) {}
 
+  @UseGuards(MasterOnlyGuard) // Seguranca 0A: service prioriza o CNPJ do arquivo - restrito ao Master ate revisao
   @Post()
   @UseInterceptors(FileInterceptor('file'))
   async importBalances(

@@ -1,5 +1,6 @@
 // src/modules/accounting/accounting.controller.ts
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, Req, UseGuards } from '@nestjs/common';
+import { empresaEfetiva } from '../../../multi-company/company.interceptor';
 import { JwtAuthGuard } from '@/auth/guards/jwt.guard';
 import { CompanyGuard } from '@/multi-company/multi-company.guard';
 import { AccountingService } from '../services/accounting.service';
@@ -10,7 +11,7 @@ export class AccountingController {
   constructor(private readonly accountingService: AccountingService) {}
 
   @Get('accounts')
-  async findAll(@Query('companyId') companyId?: string) {
-    return this.accountingService.findAllAccounts(companyId);
+  async findAll(@Req() req: any, @Query('companyId') companyId?: string) {
+    return this.accountingService.findAllAccounts(empresaEfetiva(req, companyId) as any); // Seguranca 0A
   }
 }

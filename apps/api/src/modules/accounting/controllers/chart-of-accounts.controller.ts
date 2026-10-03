@@ -29,7 +29,10 @@ import {
   AccountMoveDto,
   ImportAccountsDto
 } from '../dto/chart-of-accounts.dto';
+import { UseInterceptors } from '@nestjs/common';
+import { EscopoPorId } from '../../../multi-company/escopo-por-id.interceptor';
 
+@UseInterceptors(EscopoPorId('chartOfAccounts')) // Seguranca 0A: escopo de empresa nas rotas :id
 @Controller('chart-of-accounts')
 @UseGuards(JwtAuthGuard, CompanyGuard)
 export class ChartOfAccountsController {

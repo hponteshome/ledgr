@@ -2,13 +2,15 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../../../auth/guards/jwt.guard';
 import { MatrizMasterAccountService } from '../services/matriz-master-account.service';
+import { MasterOnlyGuard, AcessoAutenticado } from '../../../auth/guards/master-only.guard';
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, MasterOnlyGuard) // Seguranca 0A: Matriz global - escrita so Master
 @Controller('accounting/matriz-master')
 export class MatrizMasterAccountController {
   constructor(private readonly svc: MatrizMasterAccountService) {}
 
   @Get()
+  @AcessoAutenticado() // Seguranca 0A: leitura liberada
   list() {
     return this.svc.list();
   }

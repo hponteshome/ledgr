@@ -14,7 +14,10 @@ import {
   CreateJournalEntryDto,
   BulkDeleteFilters,
 } from '../services/journal-entry.service';
+import { UseInterceptors } from '@nestjs/common';
+import { EscopoPorId } from '../../../multi-company/escopo-por-id.interceptor';
 
+@UseInterceptors(EscopoPorId('journalEntry')) // Seguranca 0A: escopo de empresa nas rotas :id
 @Controller('accounting/journal')
 @UseGuards(JwtAuthGuard, CompanyGuard, SidebarResourceGuard)
 export class JournalEntryController {

@@ -74,6 +74,25 @@ if ($global:tok) {
   Teste "Provisao: conferir NF inexistente/alheia"      PUT    "/finance/provisoes/lancamentos/${zero}/conferir-nf"    404 -corpo '{}'
   Teste "Provisao: rateio em config inexistente/alheia" PUT    "/finance/provisoes/configs/${zero}/rateio/2026-10"     404 -corpo '{"rateios":[]}'
   Teste "Contas a pagar da propria empresa"             GET    "/finance/accounts-payable"                             200
+  Teste "Comparativo de balancete da GRB (URL)"      GET    "/reports/balance-comparison/${GRB}?startMonth=2026-01&endMonth=2026-01"  404
+  Teste "Plano de contas da GRB pela query string"     GET    "/accounting/accounts?companyId=${GRB}"                                   404
+  Teste "Plano de contas da propria empresa"           GET    "/accounting/accounts"                                                    200
+  $jeGrb  = (docker exec ledgr-postgres psql -U ledgr -d ledgr_app -tA -c "SELECT id FROM journal_entries WHERE company_id = '$GRB' AND deleted_at IS NULL LIMIT 1;" | Out-String).Trim()
+  $coaGrb = (docker exec ledgr-postgres psql -U ledgr -d ledgr_app -tA -c "SELECT id FROM chart_of_accounts WHERE company_id = '$GRB' AND deleted_at IS NULL LIMIT 1;" | Out-String).Trim()
+  $eqAlh  = (docker exec ledgr-postgres psql -U ledgr -d ledgr_app -tA -c "SELECT id FROM equity_method_investments WHERE investor_company_id <> '$HOT' AND deleted_at IS NULL LIMIT 1;" | Out-String).Trim()
+  if ($jeGrb)  { Teste "Lancamento da GRB por ID"               GET    "/accounting/journal/${jeGrb}"                 404 } else { Write-Host "SEM DADOS - lancamento da GRB" -ForegroundColor DarkGray }
+  if ($coaGrb) { Teste "Conta do plano da GRB por ID"           GET    "/chart-of-accounts/${coaGrb}"                 404
+                 Teste "Saldo de conta da GRB"                  GET    "/chart-of-accounts/${coaGrb}/balance"         404 } else { Write-Host "SEM DADOS - conta da GRB" -ForegroundColor DarkGray }
+  if ($eqAlh)  { Teste "MEP de outra investidora (historico)"   GET    "/accounting/equity-method/${eqAlh}/historico" 404 } else { Write-Host "SEM DADOS - MEP de outra investidora" -ForegroundColor DarkGray }
+  Teste "Lancamento: alterar inexistente/alheio"       PUT    "/accounting/journal/${zero}"                       404 -corpo '{}'
+  Teste "Plano de contas: excluir inexistente/alheia"  DELETE "/chart-of-accounts/${zero}"                        404
+  Teste "MEP: excluir inexistente/alheio"              DELETE "/accounting/equity-method/${zero}"                 404
+  Teste "Importar saldos (restrito ao Master)"         POST   "/accounting/import-balances"                       403 -corpo '{}'
+  Teste "CDI: leitura liberada"                        GET    "/accounting/cdi/latest"                            200
+  Teste "CDI GLOBAL: apagar taxa"                      DELETE "/accounting/cdi/2000-01-01"                        403
+  Teste "CDI GLOBAL: importar taxas"                   POST   "/accounting/cdi/import"                            403 -corpo '{"rows":[]}'
+  Teste "Matriz: leitura liberada"                     GET    "/accounting/matriz-master"                         200
+  Teste "Matriz GLOBAL: alterar conta"                 PATCH  "/accounting/matriz-master/${zero}"                 403 -corpo '{}'
   Write-Host ("`nResultado: {0}" -f $(if ($global:falhas -eq 0) {'TODOS OS TESTES PASSARAM'} else {"$global:falhas FALHA(S)"})) -ForegroundColor $(if ($global:falhas -eq 0) {'Green'} else {'Red'})
 }
 $global:tok = $null
