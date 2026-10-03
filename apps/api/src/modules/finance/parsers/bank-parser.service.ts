@@ -20,6 +20,8 @@ export interface ParsedTransaction {
   creditCode?:     string;  // codigo da conta credito (plano de contas)
   propertyTag?:    string;  // tag do ativo (ex: MARE, LANDMARK, COTIA)
   referencia?:     string;  // referencia original do extrato LM
+  counterpartyName?: string;  // Fase 1.7: nome de quem pagou/recebeu (quando o extrato traz)
+  counterpartyDoc?:  string;  // Fase 1.7: CPF/CNPJ so com digitos
 }
 
 export interface ParsedStatement {
@@ -157,6 +159,10 @@ export class BankParserService {
     // Detecção do banco pela presença de células-chave
     const flatText = rows.slice(0, 15).map(r => r.join(' ')).join(' ').toUpperCase();
 
+    // Fase 1.7: Itau Empresas (com Razao Social e CPF/CNPJ) - reconhecido pelo cabecalho das colunas
+    const itauEmpresas = this.detectarItauEmpresas(rows);
+    if (itauEmpresas) return this.parseItauEmpresas(rows, itauEmpresas);
+
     if (flatText.includes('BANCO DO BRASIL') || flatText.includes('BB.COM.BR')) {
       return this.parseBB(rows);
     }
@@ -259,6 +265,79 @@ export class BankParserService {
     stmt.openingBalance = openingBalance;
     return stmt;
   }
+
+  // ── Itaú Empresas XLSX (layout com Razão Social e CPF/CNPJ) ── Fase 1.7 (03/10/2026)
+  // Topo: Atualização / Nome / Agência / Conta / Período "dd/mm/aaaa até dd/mm/aaaa" (sem o nome do banco).
+  // Colunas localizadas PELO NOME do cabeçalho; só as colunas do banco são lidas (anotações manuais são ignoradas).
+  private detectarItauEmpresas(rows: any[][]): { header: number; data: number; lanc: number; razao: number; doc: number; valor: number; saldo: number } | null {
+    for (let i = 0; i < Math.min(rows.length, 30); i++) {
+      const cel = (rows[i] || []).map((c: any) => normalizeText(String(c ?? '')));
+      const data = cel.indexOf('DATA');
+      const lanc = cel.indexOf('LANCAMENTO');
+      const razao = cel.indexOf('RAZAO SOCIAL');
+      const doc = cel.indexOf('CPF/CNPJ');
+      const valor = cel.findIndex((c: string) => c.startsWith('VALOR'));
+      const saldo = cel.findIndex((c: string) => c.startsWith('SALDO'));
+      if (data >= 0 && lanc >= 0 && razao >= 0 && doc >= 0 && valor >= 0) return { header: i, data, lanc, razao, doc, valor, saldo };
+    }
+    return null;
+  }
+
+  private parseItauEmpresas(rows: any[][], c: { header: number; data: number; lanc: number; razao: number; doc: number; valor: number; saldo: number }): ParsedStatement {
+    const stmt: ParsedStatement = {
+      bankCode: 'ITAU', bankName: 'Banco Itaú S/A (Itaú Empresas)',
+      periodFrom: new Date(), periodTo: new Date(),
+      transactions: [],
+    };
+    let periodFrom: Date | null = null;
+    let periodTo: Date | null = null;
+    let openingBalance: number | undefined;
+
+    for (const row of rows.slice(0, c.header)) {
+      const rotulo = normalizeText(String(row[0] ?? ''));
+      const valor = String(row[1] ?? '').trim();
+      if (rotulo.startsWith('AGENCIA') && valor) stmt.agency = valor;
+      if (rotulo.startsWith('CONTA') && valor) stmt.account = valor;
+      const m = row.map((x: any) => String(x ?? '')).join(' ').toUpperCase().match(/(\d{2}\/\d{2}\/\d{4})\s+AT[EÉ]\s+(\d{2}\/\d{2}\/\d{4})/);
+      if (m) { periodFrom = parseDateBR(m[1]); periodTo = parseDateBR(m[2]); }
+    }
+
+    for (const row of rows.slice(c.header + 1)) {
+      const dt = parseDateBR(row[c.data]);
+      const desc = String(row[c.lanc] ?? '').trim();
+      if (!dt || !desc) continue;
+      const descN = normalizeText(desc);
+      if (descN.startsWith('SALDO')) {
+        if (descN.includes('ANTERIOR') && openingBalance === undefined && c.saldo >= 0) openingBalance = parseBRL(row[c.saldo]);
+        if (descN.includes('DISPONIVEL') && c.saldo >= 0) stmt.closingBalance = parseBRL(row[c.saldo]);
+        continue;
+      }
+      const raw = row[c.valor];
+      const num = typeof raw === 'number' ? raw : parseFloat(String(raw ?? '').replace(/\s/g, '').replace(/\./g, '').replace(',', '.'));
+      if (!num || isNaN(num)) continue;
+      const razao = String(row[c.razao] ?? '').trim();
+      const doc = String(row[c.doc] ?? '').replace(/\D/g, '');
+      const saldoRaw = c.saldo >= 0 ? row[c.saldo] : undefined;
+      stmt.transactions.push({
+        transactionDate: dt,
+        description:     desc,
+        descriptionNorm: descN,
+        amount:          Math.abs(num),
+        type:            num < 0 ? 'DEBIT' : 'CREDIT',
+        balance:         saldoRaw !== undefined && saldoRaw !== null && saldoRaw !== '' ? parseBRL(saldoRaw) : undefined,
+        counterpartyName: razao || undefined,
+        counterpartyDoc:  doc.length === 11 || doc.length === 14 ? doc : undefined,
+      });
+      if (!periodFrom || dt < periodFrom) periodFrom = dt;
+      if (!periodTo || dt > periodTo) periodTo = dt;
+    }
+
+    stmt.periodFrom = periodFrom ?? new Date();
+    stmt.periodTo = periodTo ?? new Date();
+    stmt.openingBalance = openingBalance;
+    return stmt;
+  }
+
 
   // ── Bradesco XLS (Net Empresa) ────────────────────────────
   // Layout: col A=data, B=lançamento, C=Dcto, D=crédito, E=débito, F=saldo

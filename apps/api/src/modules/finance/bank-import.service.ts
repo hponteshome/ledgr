@@ -108,6 +108,21 @@ export class BankImportService {
       throw new BadRequestException('Nenhuma transação encontrada no arquivo.');
     }
 
+    // Fase 1.7 (03/10/2026): evita duplicidade ao reimportar o mesmo periodo - transacoes ja existentes na empresa
+    // (mesma data, tipo, valor, descricao e saldo) sao descartadas; arquivo inteiramente repetido e recusado.
+    const datas = parsed.transactions.map(t => t.transactionDate.getTime());
+    const existentes = await this.prisma.bankTransaction.findMany({
+      where: { companyId, transactionDate: { gte: new Date(Math.min(...datas) - 86400000), lte: new Date(Math.max(...datas) + 86400000) } },
+      select: { transactionDate: true, type: true, amount: true, descriptionNorm: true, balance: true },
+    });
+    const chaveTx = (d: Date, tipo: string, valor: string, desc: string, saldo: string) => [d.toISOString().slice(0, 10), tipo, valor, desc, saldo].join('|');
+    const jaExiste = new Set(existentes.map(e => chaveTx(e.transactionDate, String(e.type), e.amount.toFixed(2), e.descriptionNorm ?? '', e.balance != null ? e.balance.toFixed(2) : '')));
+    const totalLido = parsed.transactions.length;
+    parsed.transactions = parsed.transactions.filter(t => !jaExiste.has(chaveTx(t.transactionDate, t.type, t.amount.toFixed(2), t.descriptionNorm, t.balance != null ? t.balance.toFixed(2) : '')));
+    if (parsed.transactions.length === 0) {
+      throw new BadRequestException(`Nenhuma transação nova: as ${totalLido} transações do arquivo já foram importadas.`);
+    }
+
     // Calcula totais
     const totalDebits  = parsed.transactions.filter(t => t.type === 'DEBIT')
       .reduce((s, t) => s + t.amount, 0);
@@ -153,6 +168,8 @@ export class BankImportService {
       balance:             tx.balance != null ? new Prisma.Decimal(tx.balance.toFixed(2)) : null,
       bankRef:             tx.bankRef,
       agency:              tx.agency,
+      counterpartyName:    (tx as any).counterpartyName ?? null, // Fase 1.7
+      counterpartyDoc:     (tx as any).counterpartyDoc ?? null,
       groupKey:            buildGroupKey(tx.descriptionNorm),
       suggestedAccountId:  suggestions[i].accountId,
       suggestionSource:    suggestions[i].source,

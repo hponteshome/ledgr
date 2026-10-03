@@ -2865,6 +2865,8 @@ model BankTransaction {
   transactionDate      DateTime         @map("transaction_date") @db.Timestamp(6)
   description          String           @map("description") @db.VarChar
   descriptionNorm      String           @map("description_norm") @db.VarChar
+  counterpartyName      String?  @map("counterparty_name") @db.VarChar(200) // Fase 1.7: contraparte (Itau Empresas)
+  counterpartyDoc       String?  @map("counterparty_doc") @db.VarChar(14)
   amount               Decimal          @map("amount") @db.Decimal(15, 2)
   type                 TransactionType  @map("type")
   balance              Decimal?         @map("balance") @db.Decimal(15, 2)

@@ -10142,3 +10142,12 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 
 - 03/10/2026: credito n 24 (R$ 10,00, 26/02/2025) ESTORNADO DE FATO (confirmado pelo Hpontes) - desvinculado da Conta Individual com motivo 'valor estornado'. Conta Individual VAL: 57 creditos, R$ 3.495.781,15. Diferenca para o saldo informado (R$ 3.295.265,82): R$ 200.515,33, em conciliacao. Pendente (1.7): ligar o debito do estorno no extrato da SUNSYS ao credito n 24.
 
+
+## [PROJETOS] 03/10/2026 - Fase 1.7 (preparacao): importador do Itau Empresas e protecao contra duplicidade
+
+- Diagnostico: a SUNSYS nao tinha nenhum extrato no LEDGR (nenhuma empresa tinha). O extrato do Itau Empresas (XLSX com Razao Social e CPF/CNPJ) foi recusado: o parser so reconhecia o Itau pela palavra "ITAU" no topo, e esse layout nao a tem.
+- Importacao segura para exercicios fechados: o envio comum (POST bank-import/upload) grava extrato e transacoes PENDENTES; lancamentos so em "Confirmar e Gerar Lancamentos". O botao verde (planilha mapeada, upload-excel) lanca na hora - NAO usar para extratos.
+- Parser: novo layout Itau Empresas, reconhecido pelo cabecalho das colunas e com colunas localizadas pelo nome; le so as colunas do banco (anotacoes manuais, como "Referencia", ignoradas).
+- bank_transactions: counterparty_name e counterparty_doc (contraparte do extrato). Migracao 20261003_bancos_contraparte.sql.
+- Importacao: protecao contra duplicidade (data, tipo, valor, descricao e saldo) para todos os bancos; arquivo repetido e recusado com mensagem clara.
+- Arquivo do extrato fica em D:\Dados\RecifeOcean (fora do repositorio).
