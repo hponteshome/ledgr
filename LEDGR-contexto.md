@@ -10044,3 +10044,10 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 
 - Access token 15 min; refresh opaco com rotacao, deteccao de reuso (tolerancia 30 s) e revogacao em user_sessions; /auth/refresh e /auth/logout; ?token= so em SSE; frontend renova automaticamente; rotas de auth nao derrubam mais a sessao (bug do 401 no 2FA corrigido). Proximo: Fase 0B.
 
+
+## [PROJETOS] 03/10/2026 - Decisao: Fase 1 antes da 0B
+
+- Servidor de producao: Lenovo ThinkServer TS150 (Fase 0B), mas so antes da entrada em producao.
+- Proximo: Fase 1 local - 1.1 desenho do schema do dominio (Projeto, Operacao, Participantes/papeis), 1.2 modelo de concessoes.
+- Retomada: bloco de reativacao da QA e depois: scripts\controle\sessao.ps1 inicio -Fase 1 -Item "1.1 Schema do dominio"
+

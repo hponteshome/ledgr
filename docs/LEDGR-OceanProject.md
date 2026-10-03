@@ -473,3 +473,4 @@ Objetivo: comparar, ao final do projeto, o tempo planejado com o realizado em ca
 ### 14.3 Observações de replanejamento
 
 - 03/10/2026: ponto de controle da Fase 0. Restante obrigatório antes do acesso da equipe (isolamento em Financeiro, Bancos e Contábil; 2FA; sessão curta; Fase 0B) estimado em 41-73 h. Higiene do LEDGR fora do caminho crítico pode correr em paralelo à Fase 1. Linha de base mantida.
+- 03/10/2026: decisao do Hpontes - servidor de producao sera o Lenovo ThinkServer TS150, mas a entrada em producao fica para depois da Fase 1. A Fase 1 (Recife Ocean) sera desenvolvida e testada localmente. Fase 0B, etapa 4 do 2FA e restante da 0A passam a ser pre-requisitos da entrada em producao, nao do inicio da Fase 1. Linha de base mantida.
