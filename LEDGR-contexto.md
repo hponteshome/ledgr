@@ -10091,3 +10091,13 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - Seletor de usuarios do modal: lista so usuarios ativos (decisao mantida; mais seguro).
 - iconRegistry: FiFolder (grupo Projetos) e FiKey (Concessoes de acesso) registrados.
 - Protocolo reafirmado: cls imediatamente antes da execucao, DEPOIS de definir here-strings e gravar arquivos.
+
+## [PROJETOS] 03/10/2026 - Fase 1.2b passo A: usuario de banco da API (menor privilegio)
+
+- Diagnostico: o usuario `ledgr` (criado pela imagem Docker do PostgreSQL) e SUPERUSUARIO e tem BYPASSRLS; a API conectava com ele. RLS seria ignorado, e qualquer injecao de SQL teria privilegio total (inclusive COPY TO PROGRAM).
+- Criado `ledgr_api`: NOSUPERUSER, NOBYPASSRLS, sem criar bancos ou usuarios. SELECT/INSERT/UPDATE/DELETE nas 143 tabelas, sequencias e funcoes; ALTER DEFAULT PRIVILEGES para tabelas futuras criadas pelo `ledgr`. Senha aleatoria (48 hex) so nos .env.
+- AUDITORIA IMUTAVEL PELO BANCO: REVOKE UPDATE, DELETE, TRUNCATE ON audit_logs FROM ledgr_api (verificado: nenhum codigo da API altera ou apaga AuditLog).
+- .env: DATABASE_URL -> ledgr_api; URL antiga preservada como DATABASE_URL_ADMIN. Migracoes, backup e `docker exec ... -U ledgr` continuam com o `ledgr`.
+- Validado: conexoes da API como ledgr_api (pg_stat_activity); suite completa; navegacao manual como Master nos modulos principais.
+- Lembrete: a senha do ledgr_api so existe nos .env - incluir na copia dos .env guardada no gerenciador de senhas.
+- Proximo: passo B - RLS nas tabelas proj_* com o usuario da requisicao informado ao banco.
