@@ -9945,3 +9945,10 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - Ler os updates por ID de AR, finance.service (fiscalDocument), agenda, integration e petty-cash (controllers repassam empresa; confirmar conferencia previa).
 - Recurso `asset-maintenances` (assets.controller) sem item no banco: tela bloqueada para nao Master (coluna 2, fora do caminho do Recife Ocean).
 - Provisao sem SidebarResourceGuard (Fase C).
+
+## [PROJETOS] Sessao 03/10/2026 (cont.) - Fase 0A: Financeiro e Bancos CONCLUIDO
+
+- Revisados os 10 alertas restantes da varredura: AR, finance.service (fiscalDocument) e agenda seguem o padrao seguro (findOne(companyId, id) antes de alterar). integration.service:308 e tratamento de erro de documento ja validado.
+- Corrigido integration.service:107: conta de despesa (doc.expenseAccountId) buscada so por ID permitia lancamento da empresa ativa debitando conta do plano de OUTRA empresa (integridade contabil). Agora findFirst(id + companyId + nao excluida), mesmo criterio do helper find(). Base verificada: 0 documentos divergentes (correcao preventiva).
+- expenseAccountId e gravado sem validacao em AP, Caixa Pequeno e Documento Fiscal, mas integration.service e o UNICO consumidor que lanca com ele.
+- Financeiro/Bancos: 15 arquivos revisados, 6 rotas corrigidas (Fechamento 2, Provisao 3, integracao 1), item de menu restaurado. Suite 38/38.

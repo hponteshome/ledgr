@@ -104,7 +104,7 @@ export class IntegrationService {
       // TOMADOR: recebeu a nota — AP
       const apAcc  = await find(['Fornecedores', 'Contas a Pagar'], 'Fornecedores');
       const expAcc = doc.expenseAccountId
-        ? await this.prisma.chartOfAccounts.findUnique({ where: { id: doc.expenseAccountId }, select: { id: true, code: true, name: true } })
+        ? await this.prisma.chartOfAccounts.findFirst({ where: { id: doc.expenseAccountId, companyId, deletedAt: null }, select: { id: true, code: true, name: true } }) // Seguranca 0A: so conta da propria empresa
         : await find(['Despesas Gerais', 'Serviços de Terceiros'], 'Despesa Serviços');
       return { apAcc, expAcc, warnings };
     }
