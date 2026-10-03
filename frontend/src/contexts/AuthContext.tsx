@@ -9,11 +9,20 @@ export interface User {
   permissions?: any;
 }
 
+// Seguranca 0A.6: resultado do login - direto ou exigindo o segundo fator
+export type SignInResult =
+  | { status: 'ok' }
+  | { status: '2fa'; challengeToken: string }
+  | { status: '2fa-setup'; setupToken: string };
+
 interface AuthContextData {
   user: User | null;
   token: string | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<void>;
+  signIn: (email: string, password: string) => Promise<SignInResult>;
+  verify2fa: (challengeToken: string, code: string, trustDevice: boolean, email: string) => Promise<void>;
+  setup2fa: (setupToken?: string) => Promise<{ otpauthUrl: string; qrDataUrl: string; secret: string }>;
+  activate2fa: (code: string, setupToken: string | undefined, trustDevice: boolean, email: string) => Promise<string[]>;
   signOut: () => void;
   loadUser: () => Promise<void>;
 }
@@ -46,26 +55,58 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     loadStorageData();
   }, []);
 
-  const signIn = async (email: string, password: string) => {
+  // Seguranca 0A.6 (03/10/2026): login em dois passos. Token de dispositivo confiavel
+  // (24 h, emitido apos o 2FA) guardado por email e enviado no login.
+  const chaveConfianca = (email: string) => `@ledgr:2faTrust:${(email || '').trim().toLowerCase()}`;
+
+  const concluirLogin = (data: any, email: string) => {
+    const { access_token, user: loggedUser, trustToken } = data;
+    if (trustToken) localStorage.setItem(chaveConfianca(email), trustToken);
+    api.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
+    localStorage.setItem('@ledgr:token', access_token);
+    localStorage.setItem('@ledgr:user', JSON.stringify(loggedUser));
+    setToken(access_token);
+    setUser(loggedUser);
+  };
+
+  const signIn = async (email: string, password: string): Promise<SignInResult> => {
     setLoading(true);
     try {
-      const response = await api.post('/auth/login', { email, password });
-      const { access_token, user: loggedUser } = response.data;
-
-      api.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
-      localStorage.setItem('@ledgr:token', access_token);
-      localStorage.setItem('@ledgr:user', JSON.stringify(loggedUser));
-
-      setToken(access_token);
-      setUser(loggedUser);
-
-      console.log('✅ Login realizado com sucesso para:', loggedUser.fullName);
+      const trustToken = localStorage.getItem(chaveConfianca(email)) || undefined;
+      const response = await api.post('/auth/login', { email, password, trustToken });
+      const data = response.data;
+      if (data?.requires2fa) return { status: '2fa', challengeToken: data.challengeToken };
+      if (data?.requires2faSetup) return { status: '2fa-setup', setupToken: data.setupToken };
+      concluirLogin(data, email);
+      return { status: 'ok' };
     } catch (error: any) {
-      console.error('❌ Login error:', error.response?.data || error.message);
+      console.error('Login error:', error.response?.data || error.message);
       throw error;
     } finally {
       setLoading(false);
     }
+  };
+
+  const verify2fa = async (challengeToken: string, code: string, trustDevice: boolean, email: string) => {
+    const response = await api.post('/auth/2fa/verify', { challengeToken, code, trustDevice });
+    concluirLogin(response.data, email);
+  };
+
+  const setup2fa = async (setupToken?: string) => {
+    const response = setupToken
+      ? await api.post('/auth/2fa/setup', { setupToken })
+      : await api.post('/auth/2fa/me/setup');
+    return response.data as { otpauthUrl: string; qrDataUrl: string; secret: string };
+  };
+
+  const activate2fa = async (code: string, setupToken: string | undefined, trustDevice: boolean, email: string): Promise<string[]> => {
+    if (setupToken) {
+      const response = await api.post('/auth/2fa/activate', { setupToken, code, trustDevice });
+      concluirLogin(response.data, email);
+      return response.data?.recoveryCodes || [];
+    }
+    const response = await api.post('/auth/2fa/me/activate', { code });
+    return response.data?.recoveryCodes || [];
   };
 
   const signOut = () => {
@@ -92,7 +133,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, signIn, signOut, loadUser }}>
+    <AuthContext.Provider value={{ user, token, loading, signIn, signOut, loadUser, verify2fa, setup2fa, activate2fa }}>
       {children}
     </AuthContext.Provider>
   );

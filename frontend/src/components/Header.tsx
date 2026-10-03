@@ -1,7 +1,7 @@
 // Header.tsx
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  FiBriefcase, FiChevronDown, FiUser, FiLogOut, FiSettings,
+  FiBriefcase, FiChevronDown, FiUser, FiLogOut, FiSettings, FiShield,
   FiEye, FiEyeOff, FiCalendar, FiChevronLeft, FiChevronRight,
   FiAlertTriangle, FiInfo, FiX, FiSearch, FiMessageSquare,
 } from 'react-icons/fi';
@@ -13,6 +13,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { UserPen } from 'lucide-react';
 import { OPEN_COMMAND_PALETTE_EVENT } from './CommandPalette';
+import { TwoFactorModal } from './TwoFactorModal';
 
 // ── DEV: Controle de versão do seed/bcrypt ────────────────────
 const DEV_SEED_VERSION = 'seed-v3-bcryptjs';
@@ -87,6 +88,8 @@ export const Header: React.FC<{ sidebarOpen: boolean }> = ({ sidebarOpen }) => {
   const [unlockMessage, setUnlockMessage] = useState('');
   const [unlockSending, setUnlockSending] = useState(false);
   const [unlockSent, setUnlockSent] = useState(false);
+  const [twoFactorMode, setTwoFactorMode] = useState<null | 'verify' | 'setup' | 'me'>(null); // Seguranca 0A.6
+  const [twoFactorPending, setTwoFactorPending] = useState<any>(null);
 
   // Banners
   const [noCompanyDismissed, setNoCompanyDismissed] = useState(false);
@@ -182,16 +185,22 @@ export const Header: React.FC<{ sidebarOpen: boolean }> = ({ sidebarOpen }) => {
     return date.toLocaleDateString('pt-BR', { weekday: 'long' });
   };
 
+  // Seguranca 0A.6: sequencia pos-login (direto ou apos o segundo fator)
+  const finalizarLogin = () => {
+    if (rememberMe) localStorage.setItem('@ledgr:savedEmail', email);
+    else localStorage.removeItem('@ledgr:savedEmail');
+    setPassword('');
+    navigate('/app/dashboard');
+  };
+  
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError('');
     setIsLoggingIn(true);
     try {
-      await signIn(email, password);
-      if (rememberMe) localStorage.setItem('@ledgr:savedEmail', email);
-      else localStorage.removeItem('@ledgr:savedEmail');
-      setPassword('');
-      navigate('/app/dashboard');
+      const r = await signIn(email, password);
+      if (r.status !== 'ok') { setTwoFactorPending(r); setTwoFactorMode(r.status === '2fa' ? 'verify' : 'setup'); return; } // Seguranca 0A.6
+      finalizarLogin();
     } catch (error: any) {
       const status = error?.response?.status;
       setCanRequestUnlock(false);
@@ -294,6 +303,15 @@ export const Header: React.FC<{ sidebarOpen: boolean }> = ({ sidebarOpen }) => {
         </div>
       )}
 
+      {twoFactorMode && ( /* Seguranca 0A.6: verificacao em duas etapas */
+        <TwoFactorModal
+          mode={twoFactorMode}
+          email={twoFactorMode === 'me' ? ((user as any)?.email || '') : email}
+          pending={twoFactorPending}
+          onClose={() => { setTwoFactorMode(null); setTwoFactorPending(null); }}
+          onSuccess={() => { const era = twoFactorMode; setTwoFactorMode(null); setTwoFactorPending(null); if (era !== 'me') finalizarLogin(); }}
+        />
+      )}
       <header className="h-16 bg-white border-b border-gray-200 flex items-center px-6 shadow-sm w-full">
         <div className="flex-1 flex justify-center">
           {user ? (
@@ -479,6 +497,9 @@ export const Header: React.FC<{ sidebarOpen: boolean }> = ({ sidebarOpen }) => {
                     </button>
                   </div>
                   <div className="border-t border-gray-100 mt-1 pt-1">
+                    <button onClick={() => { setIsUserOpen(false); setTwoFactorMode('me'); }} className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-gray-50 text-gray-600 rounded-lg text-sm font-semibold">
+                      <FiShield size={16} /> Verificação em duas etapas
+                    </button>
                     <button onClick={handleLogout} className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-red-50 text-red-600 rounded-lg text-sm font-semibold">
                       <FiLogOut size={16} /> Sign Out
                     </button>

@@ -9990,3 +9990,11 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - Bloco para colar no console: no nivel de cima, todo `else` fica na MESMA linha da chave que fecha o `if` (`} else {`). Um `else` iniciando linha vira comando invalido.
 - Parar a API: encerrar a ARVORE (watch do Nest + cmd + node). Matar so o servidor deixa o watch reiniciar; matar so o watch pode deixar um node orfao ocupando a porta 3000. Fase 0B: rodar a API sob gerenciador de servico.
 - Get-History + Invoke-History reexecuta um bloco longo sem colar de novo.
+
+## [PROJETOS] Sessao 03/10/2026 (cont.) - Fase 0A.6: 2FA etapa 2 (frontend)
+
+- Novo `components/TwoFactorModal.tsx` (padrao APPayModal): telas de codigo (com "Confiar neste navegador por 24 horas"), QR code + chave manual, codigos de recuperacao (exibidos uma vez; copiar e baixar .txt) e situacao (novos codigos).
+- AuthContext: signIn devolve SignInResult (ok | 2fa | 2fa-setup) em vez de presumir sucesso; envia o token de dispositivo confiavel guardado por email (@ledgr:2faTrust:<email>); novas funcoes verify2fa, setup2fa, activate2fa.
+- Header: sequencia de sucesso extraida para finalizarLogin() (login direto ou apos o 2FA); modal aberto conforme o resultado; item "Verificacao em duas etapas" no menu do usuario (copiado do botao Sign Out).
+- Teste manual com a conta QA: ativacao pelo menu, codigos de recuperacao, novo login pedindo o codigo.
+- Consequencia esperada: conta QA com 2FA ativo - a suite nao autentica ate a etapa 3 (ativacao por script com segredo em DPAPI e TOTP gerado pela propria suite).
