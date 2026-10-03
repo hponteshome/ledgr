@@ -10,6 +10,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { PrismaService } from '@/prisma/prisma.service';
 import { MailModule } from '../mail/mail.module';
 import { ChatModule } from '../chat/chat.module';
+import { TwoFactorService } from './two-factor/two-factor.service';
 
 @Module({
   imports: [
@@ -27,7 +28,7 @@ import { ChatModule } from '../chat/chat.module';
     MailModule,
     ChatModule,
   ],
-  providers: [AuthService, LocalStrategy, JwtStrategy, PrismaService],
+  providers: [AuthService, LocalStrategy, JwtStrategy, PrismaService, TwoFactorService],
   controllers: [AuthController],
   exports: [AuthService],
 })

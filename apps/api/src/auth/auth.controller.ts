@@ -14,6 +14,8 @@ import { AuthService } from './auth.service';
 import { LocalAuthGuard } from './guards/local.guard';
 import { JwtAuthGuard } from './guards/jwt.guard';
 import { SkipCompanyCheck } from '../multi-company/company.interceptor';
+import { TwoFactorService } from './two-factor/two-factor.service';
+import { MasterOnlyGuard } from './guards/master-only.guard';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PROBLEMAS CORRIGIDOS:
@@ -27,7 +29,7 @@ import { SkipCompanyCheck } from '../multi-company/company.interceptor';
 @SkipCompanyCheck() // Auth nunca exige empresa ativa
 export class AuthController {
 
-  constructor(private readonly authService: AuthService) {}
+  constructor(private readonly authService: AuthService, private readonly twoFactor: TwoFactorService) {}
 
   @Get('test')
   test() {
@@ -39,7 +41,7 @@ export class AuthController {
   async login(@Request() req: any) {
     const user = req.user?.user || req.user;
     if (!user) throw new UnauthorizedException('Usuário não encontrado no contexto da requisição.');
-    return this.authService.login(user);
+    return this.twoFactor.avaliarLogin(user, req.body?.trustToken); // Seguranca 0A.6: 2FA
   }
 
   @Post('request-unlock')
@@ -91,5 +93,51 @@ export class AuthController {
     } catch(e: any) {
       throw new (require('@nestjs/common').BadRequestException)(e.message);
     }
+  }
+
+  // -- 2FA (Seguranca 0A.6, 03/10/2026) --------------------------------------
+  @Post('2fa/verify')
+  verificar2fa(@Body() body: { challengeToken: string; code: string; trustDevice?: boolean }) {
+    return this.twoFactor.verificarLogin(body?.challengeToken, body?.code, body?.trustDevice === true);
+  }
+
+  @Post('2fa/setup')
+  setup2fa(@Body() body: { setupToken: string }) {
+    return this.twoFactor.setupPreLogin(body?.setupToken);
+  }
+
+  @Post('2fa/activate')
+  ativar2fa(@Body() body: { setupToken: string; code: string; trustDevice?: boolean }) {
+    return this.twoFactor.ativarPreLogin(body?.setupToken, body?.code, body?.trustDevice === true);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('2fa/me')
+  status2fa(@Request() req: any) {
+    return this.twoFactor.status(req.user.id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('2fa/me/setup')
+  setupMe2fa(@Request() req: any) {
+    return this.twoFactor.iniciarSetup(req.user.id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('2fa/me/activate')
+  async ativarMe2fa(@Request() req: any, @Body() body: { code: string }) {
+    return { recoveryCodes: await this.twoFactor.ativar(req.user.id, body?.code) };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('2fa/me/recovery-codes')
+  async regenerar2fa(@Request() req: any, @Body() body: { code: string }) {
+    return { recoveryCodes: await this.twoFactor.regenerarCodigos(req.user.id, body?.code) };
+  }
+
+  @UseGuards(JwtAuthGuard, MasterOnlyGuard)
+  @Post('2fa/reset/:userId')
+  resetar2fa(@Param('userId') userId: string, @Request() req: any) {
+    return this.twoFactor.resetar(req.user.id, userId);
   }
 }

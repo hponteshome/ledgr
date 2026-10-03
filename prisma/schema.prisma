@@ -43,6 +43,9 @@ model User {
   isDocumentConfirmed Boolean   @default(false) @map("is_document_confirmed")
   twoFactorSecret     String?   @map("two_factor_secret") @db.VarChar
   isTwoFactorActive   Boolean   @default(false) @map("two_factor_active")
+  twoFactorRecoveryCodes String[] @default([]) @map("two_factor_recovery_codes")
+  twoFactorEnabledAt     DateTime? @map("two_factor_enabled_at") @db.Timestamp(6)
+  twoFactorTrustVersion  Int       @default(0) @map("two_factor_trust_version")
   lastAccess          DateTime? @map("last_access") @db.Timestamp(6)
   failedAttempts      Int       @default(0) @map("failed_attempts")
   blockedUntil        DateTime? @map("blocked_until") @db.Timestamp(6)

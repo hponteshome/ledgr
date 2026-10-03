@@ -9969,3 +9969,24 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - journal-entry.service.resolveItems: accountId informado direto nao era conferido (lancamento debitando conta de outra empresa). Agora todas as contas do lancamento sao conferidas contra o plano da empresa em uma consulta (create e update). Base verificada: 0 itens fora da empresa.
 - Suite: funcao Teste ganhou -msg (confere mensagem do erro); teste nao destrutivo com lancamento desbalanceado e conta da GRB. Resultado: TODOS OS TESTES PASSARAM.
 
+
+## [PROJETOS] Sessao 03/10/2026 (cont.) - Fase 0A.6: 2FA etapa 1 (backend)
+
+### Decisoes (confirmadas pelo Hpontes)
+- 2FA obrigatorio para TODOS, inclusive o Master; regra global (sem interruptor por perfil por ora); 10 codigos de recuperacao regeneraveis.
+- Fase de testes: obrigatoriedade DESLIGADA (TWO_FACTOR_OBRIGATORIO=false) enquanto o LEDGR estiver so na maquina local. Liga apos a Fase 0B.
+- Dispositivo confiavel por 24 h (TWO_FACTOR_TRUST_HOURS=24): senha sempre pedida; dispensa so o codigo; vale para o navegador; revogado ao reiniciar o 2FA (twoFactorTrustVersion).
+
+### Concluido
+- `auth/two-factor/two-factor.service.ts` (otplib 12.0.1, qrcode 1.5.4): segredo TOTP cifrado (AES-256-GCM, TWO_FACTOR_ENC_KEY); tokens intermediarios assinados com JWT_2FA_SECRET (chave diferente da de acesso - JwtStrategy nunca os aceita); codigo errado conta no bloqueio de 5 tentativas; recuperacao com hash (bcryptjs); AuditLog 2FA_ENABLED, 2FA_RECOVERY_USED, 2FA_RECOVERY_REGENERATED, 2FA_RESET.
+- Rotas: POST /auth/2fa/verify, /setup, /activate (pre-login); GET /auth/2fa/me; POST /auth/2fa/me/setup, /me/activate, /me/recovery-codes; POST /auth/2fa/reset/:userId (so Master).
+- Login: POST /auth/login devolve { requires2fa, challengeToken } quando o 2FA esta ativo (ou { requires2faSetup, setupToken } com obrigatoriedade ligada); sem 2FA, resposta inalterada.
+- Colunas: two_factor_recovery_codes, two_factor_enabled_at, two_factor_trust_version (migrations-manuais/20261003_2fa_colunas.sql).
+
+### ATENCAO
+- TWO_FACTOR_ENC_KEY e CRITICA: perdida, todos os segredos 2FA ficam ilegiveis. O backup do PostgreSQL NAO inclui o .env. Guardar copia dos dois .env no gerenciador de senhas; incluir backup do .env fora da maquina na Fase 0B.
+
+### Aprendizados de protocolo
+- Bloco para colar no console: no nivel de cima, todo `else` fica na MESMA linha da chave que fecha o `if` (`} else {`). Um `else` iniciando linha vira comando invalido.
+- Parar a API: encerrar a ARVORE (watch do Nest + cmd + node). Matar so o servidor deixa o watch reiniciar; matar so o watch pode deixar um node orfao ocupando a porta 3000. Fase 0B: rodar a API sob gerenciador de servico.
+- Get-History + Invoke-History reexecuta um bloco longo sem colar de novo.

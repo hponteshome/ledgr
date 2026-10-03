@@ -95,6 +95,9 @@ if ($global:tok) {
   Teste "CDI GLOBAL: importar taxas"                   POST   "/accounting/cdi/import"                            403 -corpo '{"rows":[]}'
   Teste "Matriz: leitura liberada"                     GET    "/accounting/matriz-master"                         200
   Teste "Matriz GLOBAL: alterar conta"                 PATCH  "/accounting/matriz-master/${zero}"                 403 -corpo '{}'
+  Teste "2FA: status da propria conta"              GET    "/auth/2fa/me"                 200
+  Teste "2FA: desafio invalido recusado"            POST   "/auth/2fa/verify"             401 -corpo '{"challengeToken":"invalido","code":"123456"}'
+  Teste "2FA: reset de outro usuario (so Master)"   POST   "/auth/2fa/reset/${zero}"      403 -corpo '{}'
   Write-Host ("`nResultado: {0}" -f $(if ($global:falhas -eq 0) {'TODOS OS TESTES PASSARAM'} else {"$global:falhas FALHA(S)"})) -ForegroundColor $(if ($global:falhas -eq 0) {'Green'} else {'Red'})
 }
 $global:tok = $null
