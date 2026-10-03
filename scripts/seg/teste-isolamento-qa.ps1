@@ -42,7 +42,7 @@ function Teste($nome, $metodo, $rota, $esperado, $empresa = $HOT, $corpo = $null
     $st = [int]$r.StatusCode; $conteudo = $r.Content
   } catch { if ($_.Exception.Response) { $st = [int]$_.Exception.Response.StatusCode } else { $st = -1 }; $conteudo = "$($_.ErrorDetails.Message)" }
   $ok = ($st -eq $esperado); $extra = ''
-  if ($ok -and $null -ne $qtd) { $n = @($conteudo | ConvertFrom-Json).Count; $extra = " (itens=$n)"; if ($n -ne $qtd) { $ok = $false } }
+  if ($ok -and $null -ne $qtd) { $o = ConvertFrom-Json -InputObject $conteudo; $n = if ($null -eq $o) { 0 } else { @($o).Count }; $extra = " (itens=$n)"; if ($n -ne $qtd) { $ok = $false } }
   if ($ok -and $msg -and $conteudo -notmatch $msg) { $ok = $false; $extra = " (mensagem diferente: $conteudo)" }
   if (-not $ok) { $global:falhas++ }
   Write-Host ("{0,-6} esperado {1} | obtido {2}{3} | {4}" -f $(if ($ok) {'OK'} else {'FALHA'}), $esperado, $st, $extra, $nome) -ForegroundColor $(if ($ok) {'Green'} else {'Red'})
@@ -124,6 +124,18 @@ if ($global:tok) {
   Teste "2FA: token de desafio NAO vale como acesso"  GET    "/users/me"                    401
   $global:tok = $acesso
   Teste "2FA: codigo errado recusado"                  POST   "/auth/2fa/verify"             401 -corpo (@{ challengeToken = $global:desafio; code = '000000' } | ConvertTo-Json)
+  $projId = (docker exec ledgr-postgres psql -U ledgr -d ledgr_app -tA -c "SELECT id FROM proj_projetos WHERE codigo = 'RECIFE-OCEAN';" | Out-String).Trim()
+  $opId = (docker exec ledgr-postgres psql -U ledgr -d ledgr_app -tA -c "SELECT o.id FROM proj_operacoes o JOIN proj_projetos p ON p.id = o.projeto_id WHERE p.codigo = 'RECIFE-OCEAN' AND o.codigo = 'ANCORA';" | Out-String).Trim()
+  Teste "Projetos: lista com concessao"                GET    "/projects"                                    200 -qtd 1
+  Teste "Projetos: detalhe do projeto concedido"       GET    "/projects/${projId}"                          200
+  Teste "Projetos: participacoes da Operacao Ancora"   GET    "/projects/operacoes/${opId}/participacoes"    200 -qtd 5
+  Teste "Projetos: operacao inexistente/alheia"        GET    "/projects/operacoes/${zero}/participacoes"    404
+  Teste "Projetos: ver concessoes (so Master)"         GET    "/projects/${projId}/concessoes"               403
+  Teste "Projetos: conceder acesso (so Master)"        POST   "/projects/concessoes"                         403 -corpo '{}'
+  docker exec ledgr-postgres psql -U ledgr -d ledgr_app -c "UPDATE proj_concessoes SET valido_ate = now() - interval '1 minute' WHERE user_id = (SELECT id FROM users WHERE email = 'qa.hotelsys@ledgr.local') AND cancelado_em IS NULL;" | Out-Null
+  Teste "Projetos: concessao vencida - lista vazia"    GET    "/projects"                                    200 -qtd 0
+  Teste "Projetos: concessao vencida - operacao 404"   GET    "/projects/operacoes/${opId}/participacoes"    404
+  docker exec ledgr-postgres psql -U ledgr -d ledgr_app -c "UPDATE proj_concessoes SET valido_ate = NULL WHERE user_id = (SELECT id FROM users WHERE email = 'qa.hotelsys@ledgr.local') AND cancelado_em IS NULL;" | Out-Null
   $rn = $null; try { $rn = Invoke-RestMethod -Method Post -Uri "$base/auth/refresh" -ContentType 'application/json' -Body (@{ refreshToken = $global:refresh } | ConvertTo-Json) } catch {}
   if ($rn.access_token -and $rn.refresh_token -and $rn.refresh_token -ne $global:refresh) { Write-Host "OK     esperado rotacao | obtido rotacao | Sessao: refresh valido renova e rotaciona" -ForegroundColor Green; $global:tok = $rn.access_token; $global:refresh = $rn.refresh_token } else { $global:falhas++; Write-Host "FALHA  Sessao: refresh valido nao renovou ou nao rotacionou" -ForegroundColor Red }
   Teste "Sessao: refresh invalido recusado"            POST   "/auth/refresh"                401 -corpo '{"refreshToken":"invalido"}'

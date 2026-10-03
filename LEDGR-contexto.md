@@ -10064,3 +10064,15 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - Carga idempotente: RECIFE-OCEAN; SUNRISE, HOTELSYS, SUNSYS no projeto; Operacao Ancora (31/12/2025; controle R$ 3.495.791,15); 9 papeis; Adquirente provisorio; 5 participacoes (HOTELSYS beneficiaria; SUNSYS recebedora e pagadora por conta; SUNRISE interveniente; Adquirente). AuditLog PROJ_CARGA_INICIAL.
 - Migracoes: 20261003_proj_1_1_schema.sql e 20261003_proj_1_1_carga.sql.
 - Proximo: 1.2 modelo de concessoes (usuario x escopo x perfil x nivel) + guard de escopo + RLS.
+
+## [PROJETOS] 03/10/2026 - Fase 1.2a: concessoes e ProjEscopoGuard
+
+- Decisoes do Hpontes: perfis do projeto separados dos perfis do LEDGR; rotas do dominio autorizadas por concessao (nao pela empresa ativa) e concessao NAO cria UserCompany (EMPRESA_COMPLETA exige vinculo a parte); RLS fica para o 1.2b.
+- Modelos: ProjPerfil (8 perfis da bussola 5.3 com acoes) e ProjConcessao (usuario x projeto/operacao x perfil x nivel, validade, cancelamento com motivo). Unico ativo por usuario/escopo (indice parcial).
+- modules/projects: ProjEscopoGuard (404 sem escopo, 403 sem acao, FALHA FECHADA sem @ProjAcao), ConcessoesService, ProjectsController (GET /projects, GET /projects/:projetoId com operacoes filtradas, GET /projects/operacoes/:operacaoId/participacoes; conceder, listar e revogar concessoes so Master). @SkipCompanyCheck na classe.
+- Ordem de guards: guard de classe roda antes do de metodo. Rotas so-Master usam @ProjAcao('autenticado') e a decisao fica com o MasterOnlyGuard (403 consistente).
+- DEFEITO DA SUITE CORRIGIDO: no PowerShell 5.1, ConvertFrom-Json devolve o array como um unico objeto na pipeline; @(...).Count resultava sempre 1. Testes antigos com -qtd 1 passavam por coincidencia e nunca verificaram a contagem. Agora: ConvertFrom-Json -InputObject + @($o).Count.
+- Conta QA: concessao CONSULTA na Operacao Ancora. Suite +8, incluindo concessao vencida (valido_ate no passado e restaurada no proprio teste).
+- Proximo: 1.3 tela de administracao de concessoes; 1.2b RLS nas tabelas proj_*.
+- Protocolo: antes da suite, esperar a API RESPONDER (GET /auth/test), nao so a porta 3000 abrir; a primeira rodada falhou no login por a API ainda estar inicializando.
+

@@ -13,6 +13,7 @@ import { AuthModule } from './auth/auth.module';
 import { CompaniesModule } from './core/companies/company.module';
 import { UsersModule } from './core/users/users.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { ProjectsModule } from './modules/projects/projects.module';
 import { CertificatesModule } from './core/certificates/certificates.module';
 import { CompanyInterceptor } from './multi-company/company.interceptor';
 import { AuditModule } from './core/audit/audit.module';
@@ -44,6 +45,7 @@ import { ChatModule } from './chat/chat.module';
       envFilePath: join(process.cwd(), '../../.env'),
     }),
     PrismaModule,
+    ProjectsModule, // Dominio Projetos (Recife Ocean) - Fase 1
     CertificatesModule,
     UsersModule,
     AuthModule,

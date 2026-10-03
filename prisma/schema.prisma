@@ -5526,6 +5526,7 @@ model ProjProjeto {
 
   empresas  ProjProjetoEmpresa[]
   operacoes ProjOperacao[]
+  concessoes ProjConcessao[]
 
   @@map("proj_projetos")
 }
@@ -5572,6 +5573,7 @@ model ProjOperacao {
 
   projeto       ProjProjeto        @relation(fields: [projetoId], references: [id])
   participacoes ProjParticipacao[]
+  concessoes    ProjConcessao[]
 
   @@unique([projetoId, codigo])
   @@map("proj_operacoes")
@@ -5642,5 +5644,53 @@ model ProjParticipacao {
 
   @@index([operacaoId])
   @@map("proj_participacoes")
+}
+
+/// Fase 1.2a (03/10/2026): perfis do projeto (catalogo, separado dos perfis do LEDGR). acoes: ver, criar,
+/// editar, conciliar, aprovar, exportar, administrar. nivelPadrao: OPERACAO | EMPRESA_PROJETO | EMPRESA_COMPLETA.
+model ProjPerfil {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  codigo             String    @unique @db.VarChar(40)
+  nome               String    @db.VarChar(120)
+  descricao          String?
+  acoes              String[]  @default([])
+  nivelPadrao        String    @default("OPERACAO") @map("nivel_padrao") @db.VarChar(20)
+  ativo              Boolean   @default(true)
+  criadoEm           DateTime  @default(now()) @map("criado_em") @db.Timestamp(6)
+  criadoPorId        String?   @map("criado_por_id") @db.Uuid
+  atualizadoEm       DateTime  @default(now()) @updatedAt @map("atualizado_em") @db.Timestamp(6)
+  atualizadoPorId    String?   @map("atualizado_por_id") @db.Uuid
+
+  concessoes ProjConcessao[]
+
+  @@map("proj_perfis")
+}
+
+/// Fase 1.2a (03/10/2026): concessao = usuario x escopo (projeto inteiro ou operacao) x perfil x nivel.
+/// FK para users so no banco (nucleo nao referencia o dominio). Unico ativo por usuario/escopo (indice parcial no banco).
+model ProjConcessao {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId             String    @map("user_id") @db.Uuid
+  projetoId          String    @map("projeto_id") @db.Uuid
+  operacaoId         String?   @map("operacao_id") @db.Uuid
+  perfilId           String    @map("perfil_id") @db.Uuid
+  nivel              String    @db.VarChar(20)
+  validoDe           DateTime  @default(now()) @map("valido_de") @db.Timestamp(6)
+  validoAte          DateTime? @map("valido_ate") @db.Timestamp(6)
+  observacao         String?
+  criadoEm           DateTime  @default(now()) @map("criado_em") @db.Timestamp(6)
+  criadoPorId        String?   @map("criado_por_id") @db.Uuid
+  atualizadoEm       DateTime  @default(now()) @updatedAt @map("atualizado_em") @db.Timestamp(6)
+  atualizadoPorId    String?   @map("atualizado_por_id") @db.Uuid
+  canceladoEm        DateTime? @map("cancelado_em") @db.Timestamp(6)
+  canceladoPorId     String?   @map("cancelado_por_id") @db.Uuid
+  motivoCancelamento String?   @map("motivo_cancelamento")
+
+  projeto  ProjProjeto   @relation(fields: [projetoId], references: [id])
+  operacao ProjOperacao? @relation(fields: [operacaoId], references: [id])
+  perfil   ProjPerfil    @relation(fields: [perfilId], references: [id])
+
+  @@index([userId])
+  @@map("proj_concessoes")
 }
 
