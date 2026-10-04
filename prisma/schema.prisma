@@ -5876,3 +5876,23 @@ model ProjAplicacao {
   @@index([operacaoId])
   @@map("proj_aplicacoes")
 }
+
+/// Fase 1.11 parte B (04/10/2026): saldo informado - referencia externa (contabilidade, auditoria) so para conferencia.
+/// tipo: CONTA_INDIVIDUAL | INTERCOMPANY_RECEBEDORA | INTERCOMPANY_BENEFICIARIA. Imutavel (so encerra, com motivo), sem DELETE, RLS.
+model ProjSaldoInformado {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  operacaoId         String    @map("operacao_id") @db.Uuid
+  tipo               String    @db.VarChar(30)
+  dataReferencia     DateTime  @map("data_referencia") @db.Date
+  valor              Decimal   @db.Decimal(18, 2)
+  contaContabil      String?   @map("conta_contabil") @db.VarChar(40)
+  fonte              String
+  criadoEm           DateTime  @default(now()) @map("criado_em") @db.Timestamp(6)
+  criadoPorId        String?   @map("criado_por_id") @db.Uuid
+  canceladoEm        DateTime? @map("cancelado_em") @db.Timestamp(6)
+  canceladoPorId     String?   @map("cancelado_por_id") @db.Uuid
+  motivoCancelamento String?   @map("motivo_cancelamento")
+
+  @@index([operacaoId, tipo, dataReferencia])
+  @@map("proj_saldos_informados")
+}

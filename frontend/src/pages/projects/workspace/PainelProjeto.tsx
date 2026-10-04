@@ -9,6 +9,7 @@ import api from '../../../services/api';
 import { SmartDateInput } from '../../../components/SmartDateInput';
 import { PROJ, PROJ_ACCENT, PROJ_LIGHT, Operacao, Projeto, Credito, fmtBRL, fmtData, cardSt, thSt, tdSt, erroSt, secTitle, tituloSt, subtituloSt } from './projetoTema';
 import { ModalProjeto, Secao, ErroModal, Campo, BotaoSec, BotaoPri, inputModal, erroApi } from './ModalProjeto';
+import SaldoInformadoModal from './SaldoInformadoModal';
 
 interface Resumo {
   quantidadeCreditos: number; totalGeral: string; quantidadeAteDataBase: number; totalAteDataBase: string;
@@ -16,6 +17,8 @@ interface Resumo {
   contasIndividuais: { adquirenteId: string; nome: string; quantidade: number; total: string }[];
   desvinculados: { quantidade: number; total: string }; semVinculo: number; semVinculoTotal: string;
   comProvaBancaria: number; semProvaBancaria: number;
+  aplicacoes: { quantidade: number; total: string }; devolucoesAdquirente: { quantidade: number; total: string };
+  saldoContratual: string; saldoInformado: { data: string; valor: string; fonte: string } | null;
 }
 
 function Kpi({ titulo, valor, detalhe, cor }: { titulo: string; valor: string; detalhe?: string; cor?: string }) {
@@ -45,6 +48,8 @@ export default function PainelProjeto({ projeto, operacao, master, onAlterado }:
   const [erro, setErro] = useState('');
   const [editandoOp, setEditandoOp] = useState(false);
   const [editandoProj, setEditandoProj] = useState(false);
+  const [registrandoSaldo, setRegistrandoSaldo] = useState(false);
+  const [versaoResumo, setVersaoResumo] = useState(0);
 
   useEffect(() => {
     if (!operacao) return;
@@ -52,7 +57,7 @@ export default function PainelProjeto({ projeto, operacao, master, onAlterado }:
     Promise.all([api.get(`/projects/operacoes/${operacao.id}/resumo`), api.get(`/projects/operacoes/${operacao.id}/creditos`)])
       .then(([r, c]) => { setResumo(r.data); setCreditos(c.data || []); })
       .catch((e) => setErro(e?.response?.data?.message || 'Falha ao carregar o painel.'));
-  }, [operacao]);
+  }, [operacao, versaoResumo]);
 
   const mensal = useMemo(() => {
     if (!creditos.length) return [];
@@ -113,7 +118,10 @@ export default function PainelProjeto({ projeto, operacao, master, onAlterado }:
       )}
       {resumo && (
         <div style={{ ...cardSt, padding: 16 }}>
-          <div style={secTitle}>Contas Individuais</div>
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <div style={{ ...secTitle, flex: 1 }}>Contas Individuais</div>
+            {master && <button style={botaoEdicao} onClick={() => setRegistrandoSaldo(true)}>Registrar saldo informado</button>}
+          </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {resumo.contasIndividuais.map((c) => (
               <div key={c.adquirenteId} style={{ display: 'flex', alignItems: 'center', gap: 14, background: PROJ_LIGHT, borderLeft: `3px solid ${PROJ_ACCENT}`, borderRadius: 8, padding: '10px 14px' }}>
@@ -131,6 +139,19 @@ export default function PainelProjeto({ projeto, operacao, master, onAlterado }:
               </div>
             )}
             {resumo.semVinculo > 0 && <div style={{ fontSize: 12, color: '#B45309' }}>{resumo.semVinculo} crédito(s) aguardando decisão de vínculo ({fmtBRL(resumo.semVinculoTotal)}).</div>}
+            <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 6 }}>
+              <tbody>
+                <tr><td style={tdSt}>Créditos vinculados (aportes)</td><td style={{ ...tdSt, textAlign: 'right' }}>{fmtBRL(resumo.contasIndividuais.reduce((s, c) => s + Number(c.total), 0))}</td></tr>
+                <tr><td style={tdSt}>(−) Devoluções ao Adquirente{resumo.devolucoesAdquirente.quantidade ? ` (${resumo.devolucoesAdquirente.quantidade})` : ''}</td><td style={{ ...tdSt, textAlign: 'right' }}>{fmtBRL(resumo.devolucoesAdquirente.total)}</td></tr>
+                <tr><td style={{ ...tdSt, fontWeight: 700 }}>(=) Saldo contratual</td><td style={{ ...tdSt, textAlign: 'right', fontWeight: 700, color: PROJ }}>{fmtBRL(resumo.saldoContratual)}</td></tr>
+                {resumo.saldoInformado && (
+                  <>
+                    <tr><td style={tdSt}>Saldo informado em {fmtData(resumo.saldoInformado.data)}<div style={{ fontSize: 11, color: '#6B7280' }}>{resumo.saldoInformado.fonte}</div></td><td style={{ ...tdSt, textAlign: 'right' }}>{fmtBRL(resumo.saldoInformado.valor)}</td></tr>
+                    <tr><td style={{ ...tdSt, fontWeight: 600 }}>Diferença (calculado − informado)</td><td style={{ ...tdSt, textAlign: 'right', fontWeight: 700, color: Math.abs(Number(resumo.saldoContratual) - Number(resumo.saldoInformado.valor)) < 0.005 ? '#166534' : '#A32D2D' }}>{fmtBRL(Number(resumo.saldoContratual) - Number(resumo.saldoInformado.valor))}</td></tr>
+                  </>
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
@@ -170,6 +191,7 @@ export default function PainelProjeto({ projeto, operacao, master, onAlterado }:
         </table>
       </div>
       {editandoOp && <EditarOperacaoModal operacao={operacao} onClose={() => setEditandoOp(false)} onFeito={() => { setEditandoOp(false); onAlterado(); }} />}
+      {registrandoSaldo && <SaldoInformadoModal operacaoId={operacao.id} tipoInicial="CONTA_INDIVIDUAL" onClose={() => setRegistrandoSaldo(false)} onFeito={() => { setRegistrandoSaldo(false); setVersaoResumo((v) => v + 1); }} />}
       {editandoProj && <EditarProjetoModal projeto={projeto} onClose={() => setEditandoProj(false)} onFeito={() => { setEditandoProj(false); onAlterado(); }} />}
     </div>
   );

@@ -216,7 +216,10 @@ export class ProjectsController {
       });
       const provas = await tx.projCreditoProva.count({ where: { canceladoEm: null, credito: { operacaoId, canceladoEm: null } } });
       const semVinc = await tx.projCredito.aggregate({ where: { ...base, vinculos: { none: { canceladoEm: null } } }, _sum: { valor: true } });
-      return { op, geral, ateBase, pendentes, vinc, provas, semVinc };
+      const devs = await tx.projAplicacao.aggregate({ where: { operacaoId, canceladoEm: null, natureza: { tipo: 'DEVOLUCAO' } }, _count: { _all: true }, _sum: { valor: true } });
+      const apls = await tx.projAplicacao.aggregate({ where: { operacaoId, canceladoEm: null, natureza: { tipo: 'APLICACAO' } }, _count: { _all: true }, _sum: { valor: true } });
+      const informado = await tx.projSaldoInformado.findFirst({ where: { operacaoId, canceladoEm: null, tipo: 'CONTA_INDIVIDUAL' }, orderBy: [{ dataReferencia: 'desc' }, { criadoEm: 'desc' }], select: { dataReferencia: true, valor: true, fonte: true } });
+      return { op, geral, ateBase, pendentes, vinc, provas, semVinc, devs, apls, informado };
     });
     if (!r) throw new NotFoundException('Registro nao encontrado.');
     const zero = new Prisma.Decimal(0);
@@ -252,6 +255,11 @@ export class ProjectsController {
       semVinculo: r.geral._count._all - r.vinc.length,
       semVinculoTotal: (r.semVinc._sum.valor ?? zero).toFixed(2),
       comProvaBancaria: r.provas,
+      // Fase 1.11 parte B: Conta Individual liquida (devolucoes ao Adquirente reduzem o saldo contratual)
+      aplicacoes: { quantidade: r.apls._count._all, total: (r.apls._sum.valor ?? zero).toFixed(2) },
+      devolucoesAdquirente: { quantidade: r.devs._count._all, total: (r.devs._sum.valor ?? zero).toFixed(2) },
+      saldoContratual: [...contas.values()].reduce((s, c) => s.plus(c.total), new Prisma.Decimal(0)).minus(r.devs._sum.valor ?? zero).toFixed(2),
+      saldoInformado: r.informado ? { data: r.informado.dataReferencia, valor: r.informado.valor.toFixed(2), fonte: r.informado.fonte } : null,
       semProvaBancaria: r.geral._count._all - r.provas,
     };
   }
@@ -463,6 +471,112 @@ export class ProjectsController {
       await tx.projAplicacao.update({ where: { id: ap.id }, data: { canceladoEm: new Date(), canceladoPorId: req.user.id, motivoCancelamento: motivo } });
       await tx.auditLog.create({ data: { actorId: req.user.id, action: 'PROJ_APLICACAO_ENCERRADA', targetId: ap.id, after: { operacaoId, natureza: ap.natureza.codigo, valor: ap.valor.toFixed(2), motivo } } });
       return { id: ap.id };
+    });
+  }
+
+  // -- Saldos informados e Intercompany (Fase 1.11 parte B, 04/10/2026) -------------------------------------
+  // Saldos informados = referencia externa (contabilidade, auditoria) so para conferencia; nunca entram no calculo.
+  @Get('operacoes/:operacaoId/saldos-informados')
+  @ProjAcao('ver')
+  saldosInformados(@Param('operacaoId') operacaoId: string, @Req() req: any) {
+    if (!UUID_RE.test(operacaoId)) throw new NotFoundException('Registro nao encontrado.');
+    return this.db.comoUsuario(req.user.id, (tx) =>
+      tx.projSaldoInformado.findMany({
+        where: { operacaoId, canceladoEm: null },
+        orderBy: [{ dataReferencia: 'desc' }, { criadoEm: 'desc' }],
+        select: { id: true, tipo: true, dataReferencia: true, valor: true, contaContabil: true, fonte: true, criadoEm: true },
+      }),
+    );
+  }
+
+  @Post('operacoes/:operacaoId/saldos-informados')
+  @UseGuards(MasterOnlyGuard)
+  @ProjAcao('autenticado') // decisao do MasterOnlyGuard do metodo (403 consistente)
+  registrarSaldoInformado(@Param('operacaoId') operacaoId: string, @Body() b: any, @Req() req: any) {
+    if (!UUID_RE.test(operacaoId)) throw new NotFoundException('Registro nao encontrado.');
+    const tipo = String(b?.tipo || '');
+    if (!['CONTA_INDIVIDUAL', 'INTERCOMPANY_RECEBEDORA', 'INTERCOMPANY_BENEFICIARIA'].includes(tipo)) throw new BadRequestException('Tipo de saldo invalido.');
+    const data = b?.dataReferencia ? new Date(String(b.dataReferencia).slice(0, 10) + 'T00:00:00Z') : null;
+    if (!data || isNaN(data.getTime())) throw new BadRequestException('Informe a data de referencia.');
+    let bruto = String(b?.valor ?? '').trim().replace(/\s|R\$/g, '');
+    if (bruto.includes(',')) bruto = bruto.replace(/\./g, '').replace(',', '.');
+    const valor = new Prisma.Decimal(bruto || 'NaN');
+    if (valor.isNaN()) throw new BadRequestException('Valor invalido.');
+    const fonte = String(b?.fonte || '').trim();
+    if (fonte.length < 10) throw new BadRequestException('Informe a fonte (minimo 10 caracteres). Ex.: balancete de 12/2025 da contabilidade.');
+    const contaContabil = b?.contaContabil ? String(b.contaContabil).trim().slice(0, 40) || null : null;
+    return this.db.comoUsuario(req.user.id, async (tx) => {
+      const op = await tx.projOperacao.findFirst({ where: { id: operacaoId, canceladoEm: null }, select: { id: true } });
+      if (!op) throw new NotFoundException('Operacao nao encontrada.');
+      const s = await tx.projSaldoInformado.create({ data: { operacaoId, tipo, dataReferencia: data, valor, contaContabil, fonte, criadoPorId: req.user.id }, select: { id: true } });
+      await tx.auditLog.create({ data: { actorId: req.user.id, action: 'PROJ_SALDO_INFORMADO_REGISTRADO', targetId: s.id, after: { operacaoId, tipo, data: data.toISOString().slice(0, 10), valor: valor.toFixed(2), contaContabil, fonte } } });
+      return s;
+    });
+  }
+
+  @Post('operacoes/:operacaoId/saldos-informados/:saldoId/encerrar')
+  @UseGuards(MasterOnlyGuard)
+  @ProjAcao('autenticado') // decisao do MasterOnlyGuard do metodo (403 consistente)
+  encerrarSaldoInformado(@Param('operacaoId') operacaoId: string, @Param('saldoId') saldoId: string, @Body() b: any, @Req() req: any) {
+    if (!UUID_RE.test(operacaoId) || !UUID_RE.test(saldoId)) throw new NotFoundException('Registro nao encontrado.');
+    const motivo = String(b?.motivo || '').trim();
+    if (motivo.length < 10) throw new BadRequestException('Informe o motivo (minimo 10 caracteres).');
+    return this.db.comoUsuario(req.user.id, async (tx) => {
+      const s = await tx.projSaldoInformado.findFirst({ where: { id: saldoId, operacaoId, canceladoEm: null }, select: { id: true } });
+      if (!s) throw new NotFoundException('Saldo informado vigente nao encontrado.');
+      await tx.projSaldoInformado.update({ where: { id: s.id }, data: { canceladoEm: new Date(), canceladoPorId: req.user.id, motivoCancelamento: motivo } });
+      await tx.auditLog.create({ data: { actorId: req.user.id, action: 'PROJ_SALDO_INFORMADO_ENCERRADO', targetId: s.id, after: { operacaoId, motivo } } });
+      return { id: s.id };
+    });
+  }
+
+  // Intercompany: recebedora deve a beneficiaria = creditos VINCULADOS - aplicacoes por conta - devolucoes ao Adquirente.
+  // Mes a mes, com o saldo acumulado e os saldos informados das contas espelho (ultimo de cada mes).
+  @Get('operacoes/:operacaoId/intercompany')
+  @ProjAcao('ver')
+  intercompany(@Param('operacaoId') operacaoId: string, @Req() req: any) {
+    if (!UUID_RE.test(operacaoId)) throw new NotFoundException('Registro nao encontrado.');
+    return this.db.comoUsuario(req.user.id, async (tx) => {
+      const vinc = await tx.projCreditoVinculo.findMany({
+        where: { canceladoEm: null, situacao: 'VINCULADO', credito: { operacaoId, canceladoEm: null } },
+        select: { credito: { select: { dataCredito: true, valor: true } } },
+      });
+      const apls = await tx.projAplicacao.findMany({ where: { operacaoId, canceladoEm: null }, select: { dataAplicacao: true, valor: true, natureza: { select: { tipo: true } } } });
+      const infs = await tx.projSaldoInformado.findMany({
+        where: { operacaoId, canceladoEm: null, tipo: { in: ['INTERCOMPANY_RECEBEDORA', 'INTERCOMPANY_BENEFICIARIA'] } },
+        orderBy: [{ dataReferencia: 'asc' }, { criadoEm: 'asc' }],
+        select: { tipo: true, dataReferencia: true, valor: true },
+      });
+      const pend = await tx.projCredito.aggregate({ where: { operacaoId, canceladoEm: null, vinculos: { none: { canceladoEm: null } } }, _count: { _all: true }, _sum: { valor: true } });
+      type Mes = { entradas: number; aplicacoes: number; devolucoes: number; recebedora?: number; beneficiaria?: number };
+      const meses = new Map<string, Mes>();
+      const chave = (d: Date) => d.toISOString().slice(0, 7);
+      const mes = (k: string) => { const x = meses.get(k) || { entradas: 0, aplicacoes: 0, devolucoes: 0 }; meses.set(k, x); return x; };
+      const cent = (v: any) => Math.round(Number(v) * 100);
+      const fmt = (c: number) => (c / 100).toFixed(2);
+      vinc.forEach((v) => { mes(chave(v.credito.dataCredito)).entradas += cent(v.credito.valor); });
+      apls.forEach((a) => { const x = mes(chave(a.dataAplicacao)); if (a.natureza.tipo === 'DEVOLUCAO') x.devolucoes += cent(a.valor); else x.aplicacoes += cent(a.valor); });
+      infs.forEach((i) => { const x = mes(chave(i.dataReferencia)); if (i.tipo === 'INTERCOMPANY_RECEBEDORA') x.recebedora = cent(i.valor); else x.beneficiaria = cent(i.valor); });
+      const chaves = [...meses.keys()].sort();
+      const out: any[] = [];
+      if (chaves.length) {
+        let [a, m] = chaves[0].split('-').map(Number);
+        const [af, mf] = chaves[chaves.length - 1].split('-').map(Number);
+        let acum = 0;
+        while (a < af || (a === af && m <= mf)) {
+          const k = `${a}-${String(m).padStart(2, '0')}`;
+          const x = meses.get(k) || { entradas: 0, aplicacoes: 0, devolucoes: 0 };
+          const saldoMes = x.entradas - x.aplicacoes - x.devolucoes;
+          acum += saldoMes;
+          out.push({
+            mes: k, entradas: fmt(x.entradas), aplicacoes: fmt(x.aplicacoes), devolucoes: fmt(x.devolucoes), saldoMes: fmt(saldoMes), saldoAcumulado: fmt(acum),
+            informadoRecebedora: x.recebedora !== undefined ? fmt(x.recebedora) : null, diferencaRecebedora: x.recebedora !== undefined ? fmt(acum - x.recebedora) : null,
+            informadoBeneficiaria: x.beneficiaria !== undefined ? fmt(x.beneficiaria) : null, diferencaBeneficiaria: x.beneficiaria !== undefined ? fmt(acum - x.beneficiaria) : null,
+          });
+          m += 1; if (m > 12) { m = 1; a += 1; }
+        }
+      }
+      return { meses: out, pendentesDecisao: { quantidade: pend._count._all, total: (pend._sum.valor ?? new Prisma.Decimal(0)).toFixed(2) } };
     });
   }
 

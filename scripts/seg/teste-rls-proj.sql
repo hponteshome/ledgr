@@ -10,6 +10,7 @@ SELECT 'total_vinculos=' || count(*) FROM proj_credito_vinculos v JOIN proj_cred
 SELECT 'total_aplicacoes=' || count(*) FROM proj_aplicacoes a JOIN proj_operacoes o ON o.id = a.operacao_id WHERE o.codigo = 'ANCORA' AND a.cancelado_em IS NULL;
 SELECT 'total_projetos=' || count(*) FROM proj_projetos;
 SELECT 'total_operacoes=' || count(*) FROM proj_operacoes;
+SELECT 'total_saldos=' || count(*) FROM proj_saldos_informados s JOIN proj_operacoes o ON o.id = s.operacao_id WHERE o.codigo = 'ANCORA' AND s.cancelado_em IS NULL;
 SET LOCAL ROLE ledgr_api;
 SELECT 'sem_contexto=' || count(*) FROM proj_projetos;
 SELECT 'sem_contexto_creditos=' || count(*) FROM proj_creditos;
@@ -24,6 +25,7 @@ SELECT 'qa_vinculos=' || count(*) FROM proj_credito_vinculos WHERE cancelado_em 
 WITH u AS (UPDATE proj_credito_vinculos SET motivo_cancelamento = motivo_cancelamento RETURNING 1) SELECT 'qa_update_vinculos=' || count(*) FROM u;
 SELECT 'qa_provas=' || count(*) FROM proj_credito_provas WHERE cancelado_em IS NULL;
 SELECT 'qa_aplicacoes=' || count(*) FROM proj_aplicacoes WHERE cancelado_em IS NULL;
+SELECT 'qa_saldos=' || count(*) FROM proj_saldos_informados WHERE cancelado_em IS NULL;
 WITH u AS (UPDATE proj_credito_provas SET motivo_cancelamento = motivo_cancelamento RETURNING 1) SELECT 'qa_update_provas=' || count(*) FROM u;
 SELECT 'qa_concessoes_de_outros=' || count(*) FROM proj_concessoes WHERE user_id <> proj_ctx_user();
 WITH u AS (UPDATE proj_operacoes SET nome = nome RETURNING 1) SELECT 'qa_update_operacoes=' || count(*) FROM u;

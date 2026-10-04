@@ -10223,3 +10223,10 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - LEDGR: Encaminhar entradas com "Outra decisao" (transferencia interna com circuito ou nao pertence) e anotacao da planilha como apoio; Classificar saidas com o mesmo modal (DecisaoMovimentoModal); nova tela Projetos > Circuitos neutros (/app/projetos/circuitos): saiu x voltou x saldo por circuito, residuo destacado, Desfazer (encerra a decisao com motivo e devolve o movimento a triagem).
 - Projeto: Aplicacoes com Encerrar (Master, motivo); a saida volta a triagem.
 - API: POST projects-financeiro/{saidas|entradas}/:id/decidir, GET circuitos, POST decisoes/:id/encerrar; POST projects/operacoes/:id/aplicacoes/:id/encerrar.
+
+## [PROJETOS] 04/10/2026 - Fase 1.11 parte B: Conta Individual liquida e Intercompany
+
+- Resumo: aplicacoes, devolucoesAdquirente, saldoContratual (creditos vinculados - devolucoes ao Adquirente; com uma Adquirente na operacao, todas as devolucoes sao dela) e ultimo saldo informado da Conta Individual. Painel mostra o quadro e a diferenca.
+- proj_saldos_informados (CONTA_INDIVIDUAL, INTERCOMPANY_RECEBEDORA, INTERCOMPANY_BENEFICIARIA; data, valor, conta contabil, fonte): referencia externa so para conferencia, nunca entra no calculo; imutavel, sem DELETE, RLS.
+- Intercompany (GET .../intercompany e tela no projeto): mes a mes, creditos VINCULADOS - aplicacoes por conta - devolucoes = saldo esperado acumulado que a recebedora deve a beneficiaria; saldos informados das contas espelho (SUNSYS 22101050005, HOTELSYS 12101020022) e diferencas; aviso dos creditos aguardando decisao (fora da conta). Creditos desvinculados nao entram (nao geram divida intercompany).
+- Menu do projeto: Intercompany substitui "Extratos e conciliacao" (em breve); grupo "em breve" some quando vazio.

@@ -15,6 +15,7 @@ import ParticipantesProjeto from './ParticipantesProjeto';
 import PendenciasProjeto from './PendenciasProjeto';
 import DocumentosProjeto from './DocumentosProjeto';
 import AplicacoesProjeto from './AplicacoesProjeto';
+import IntercompanyProjeto from './IntercompanyProjeto';
 import { PROJ, PROJ_ACCENT, Projeto, erroSt } from './projetoTema';
 
 const itemSt = (ativo: boolean): React.CSSProperties => ({
@@ -31,11 +32,11 @@ const MENU: { to: string; label: string; icon: React.ElementType; end?: boolean 
   { to: '', label: 'Painel', icon: FiGrid, end: true },
   { to: 'creditos', label: 'Créditos', icon: FiDollarSign },
   { to: 'aplicacoes', label: 'Aplicações', icon: FiTrendingDown },
+  { to: 'intercompany', label: 'Intercompany', icon: FiRepeat },
   { to: 'participantes', label: 'Participantes', icon: FiUsers },
   { to: 'documentos', label: 'Documentos', icon: FiFileText },
 ];
 const EM_BREVE: { label: string; icon: React.ElementType }[] = [
-  { label: 'Extratos e conciliação', icon: FiRepeat },
 ];
 
 export default function ProjetoWorkspace() {
@@ -86,7 +87,7 @@ export default function ProjetoWorkspace() {
               <FiKey size={15} /> Concessões de acesso
             </NavLink>
           )}
-          <div style={{ fontSize: 10, letterSpacing: 1, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', margin: '18px 12px 6px' }}>Em breve</div>
+          {EM_BREVE.length > 0 && <div style={{ fontSize: 10, letterSpacing: 1, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', margin: '18px 12px 6px' }}>Em breve</div>}
           {EM_BREVE.map((m) => (
             <div key={m.label} style={{ ...itemSt(false), opacity: 0.45, cursor: 'default' }}>
               <m.icon size={15} /> {m.label}
@@ -124,6 +125,7 @@ export default function ProjetoWorkspace() {
               <Route index element={<PainelProjeto projeto={projeto} operacao={operacao} master={master} onAlterado={() => setVersao((v) => v + 1)} />} />
               <Route path="creditos" element={<CreditosProjeto operacao={operacao} master={master} />} />
               <Route path="aplicacoes" element={<AplicacoesProjeto operacao={operacao} master={master} />} />
+              <Route path="intercompany" element={<IntercompanyProjeto operacao={operacao} master={master} />} />
               <Route path="participantes" element={<ParticipantesProjeto operacao={operacao} master={master} />} />
               <Route path="documentos" element={<DocumentosProjeto operacao={operacao} master={master} />} />
               <Route path="pendencias" element={<PendenciasProjeto operacao={operacao} master={master} />} />

@@ -173,6 +173,11 @@ if ($global:tok) {
   Teste "Circuitos neutros (so Master)"                   GET    "/projects-financeiro/circuitos"               403
   Teste "Decisoes: desfazer (so Master)"                  POST   "/projects-financeiro/decisoes/${zero}/encerrar" 403 -corpo '{}'
   Teste "Projetos: encerrar aplicacao (so Master)"        POST   "/projects/operacoes/${opId}/aplicacoes/${zero}/encerrar" 403 -corpo '{}'
+  Teste "Projetos: resumo traz o saldo contratual"       GET    "/projects/operacoes/${opId}/resumo"           200 -msg '"saldoContratual":'
+  Teste "Projetos: intercompany mensal"                  GET    "/projects/operacoes/${opId}/intercompany"     200 -msg '"meses":'
+  Teste "Projetos: saldos informados"                    GET    "/projects/operacoes/${opId}/saldos-informados" 200
+  Teste "Projetos: registrar saldo informado (so Master)" POST  "/projects/operacoes/${opId}/saldos-informados" 403 -corpo '{}'
+  Teste "Projetos: encerrar saldo informado (so Master)" POST   "/projects/operacoes/${opId}/saldos-informados/${zero}/encerrar" 403 -corpo '{}'
   Teste "Projetos: alterar vinculo (so Master)"           POST   "/projects/operacoes/${opId}/creditos/${zero}/vinculo" 403 -corpo '{}'
   Teste "Projetos: creditos de operacao inexistente"   GET    "/projects/operacoes/${zero}/creditos"         404
   Teste "Projetos: operacao inexistente/alheia"        GET    "/projects/operacoes/${zero}/participacoes"    404
@@ -197,7 +202,7 @@ if ($global:tok) {
   $esperado = [ordered]@{ sem_contexto = '0'; qa_projetos = '1'; qa_operacoes = '1'; qa_concessoes_de_outros = '0'; qa_update_operacoes = '0'; sem_contexto_creditos = '0'; qa_update_creditos = '0'; qa_update_vinculos = '0'; qa_update_provas = '0'; vinculo_imutavel = 'sim'; vinculo_delete = 'negado'; prova_delete = 'negado'; anotacoes_acesso_direto = 'negado' }
   $obtido = @{}; foreach ($ln in $rls) { if ("$ln" -match '^(\w+)=(.*)$') { $obtido[$matches[1]] = $matches[2].Trim() } }
   foreach ($k in $esperado.Keys) { $okR = ($obtido[$k] -eq $esperado[$k]); if (-not $okR) { $global:falhas++ }; Write-Host ("{0,-6} esperado {1} | obtido {2} | RLS: {3}" -f $(if ($okR) {'OK'} else {'FALHA'}), $esperado[$k], $(if ($null -ne $obtido[$k]) { $obtido[$k] } else { '?' }), $k) -ForegroundColor $(if ($okR) {'Green'} else {'Red'}) }
-  foreach ($par in @(@('qa_participacoes','total_participacoes'), @('qa_contrapartes','total_contrapartes'), @('qa_creditos','total_creditos'), @('qa_provas','total_provas'), @('qa_vinculos','total_vinculos'), @('qa_aplicacoes','total_aplicacoes'), @('master_projetos','total_projetos'), @('master_operacoes','total_operacoes'))) { $v = $obtido[$par[0]]; $t = $obtido[$par[1]]; $okP = ($null -ne $v -and $null -ne $t -and $v -eq $t); if (-not $okP) { $global:falhas++ }; Write-Host ("{0,-6} esperado {1} | obtido {2} | RLS: {3} = total real" -f $(if ($okP) {'OK'} else {'FALHA'}), $t, $v, $par[0]) -ForegroundColor $(if ($okP) {'Green'} else {'Red'}) }
+  foreach ($par in @(@('qa_participacoes','total_participacoes'), @('qa_contrapartes','total_contrapartes'), @('qa_creditos','total_creditos'), @('qa_provas','total_provas'), @('qa_vinculos','total_vinculos'), @('qa_aplicacoes','total_aplicacoes'), @('qa_saldos','total_saldos'), @('master_projetos','total_projetos'), @('master_operacoes','total_operacoes'))) { $v = $obtido[$par[0]]; $t = $obtido[$par[1]]; $okP = ($null -ne $v -and $null -ne $t -and $v -eq $t); if (-not $okP) { $global:falhas++ }; Write-Host ("{0,-6} esperado {1} | obtido {2} | RLS: {3} = total real" -f $(if ($okP) {'OK'} else {'FALHA'}), $t, $v, $par[0]) -ForegroundColor $(if ($okP) {'Green'} else {'Red'}) }
   Write-Host ("`nResultado: {0}" -f $(if ($global:falhas -eq 0) {'TODOS OS TESTES PASSARAM'} else {"$global:falhas FALHA(S)"})) -ForegroundColor $(if ($global:falhas -eq 0) {'Green'} else {'Red'})
 }
 $global:tok = $null
