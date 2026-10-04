@@ -10197,3 +10197,6 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 
 - 04/10/2026: os 6 arquivos orfaos de apps/api/uploads (raiz e signatures) foram movidos para quarentena em D:\Dados\LedgrArquivos\quarentena-uploads\20261004, fora da API, sem apagar. Na pasta ficam so os logotipos.
 
+
+- Correcao 04/10/2026: foram 8 arquivos em quarentena (2 na raiz e 6 em signatures), nao 6. Incluem alteracao contratual da GRB, ata de AGE da F5 e evidencias de assinatura do contrato de locacao do Loft SP (com CPF e CNPJ no nome do arquivo). Avaliar se o contrato de locacao do Loft SP assinado precisa ser reanexado ao registro correspondente.
+
