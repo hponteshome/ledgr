@@ -10237,3 +10237,11 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - Demonstrativo: posicao em uma data; creditos vinculados (remetente com documento mascarado, prova bancaria) e devolucoes ao Adquirente (beneficiario, credito de origem, prova), saldo corrente; totais, saldo contratual, conferencia com o ultimo saldo informado ate a data; desvinculados e pendentes a parte. Codigo de conferencia = SHA-256 do conteudo (rodape do PDF, aba Conferencia do Excel); toda emissao no AuditLog (PROJ_DEMONSTRATIVO_EMITIDO, com o codigo).
 - Historico: AuditLog PROJ_* das entidades do projeto (operacao, projeto, creditos, vinculos, provas, aplicacoes, participacoes, contrapartes, saldos, concessoes) ou com after.operacaoId; decisoes sobre movimentos fora do projeto (nao pertence, transferencia interna) excluidas. Filtros e Excel.
 - Item 1.12 (versionamento/trilha) atendido na leitura: historico imutavel em todas as tabelas novas + tela de trilha.
+
+## [PROJETOS] 04/10/2026 - Fase 1.13: painel executivo
+
+- GET projects-relatorios/operacoes/:id/painel-executivo ('ver'): totais (vinculados, aplicacoes, devolucoes, saldo contratual, intercompany esperado), novos creditos apos a data-base, aplicacoes por natureza, documentos vigentes por tipo e pendencias ordenadas por gravidade com destino na tela.
+- Pendencias CRITICAS: valor de controle nao confere; Conta Individual x saldo informado; intercompany x saldo informado (recebedora e beneficiaria); creditos sem prova bancaria. DE ATENCAO: creditos aguardando decisao; remetentes nao identificados; devolucoes sem credito de origem; operacao sem Termo (TERMO vigente); Adquirente/intermediario sem IDENTIFICACAO.
+- Comparacoes com saldos informados sao calculadas NA DATA do saldo informado (credito posterior ao fechamento nao vira divergencia falsa).
+- Tela: VisaoExecutiva no topo do Painel (botao Abrir leva a tela da pendencia); atualiza apos registrar saldo informado.
+- Fase 1: so restam 1.9 (conciliacao: depende da classificacao das devolucoes e da planilha auditada).

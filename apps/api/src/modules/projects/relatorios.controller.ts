@@ -247,4 +247,89 @@ export class RelatoriosController {
       });
     });
   }
+
+  // -- Painel executivo (Fase 1.13, 04/10/2026) ------------------------------------------------------------
+  // Indicadores consolidados e pendencias ordenadas por gravidade, cada uma com o destino onde se resolve.
+  // Comparacoes com saldos informados sao feitas NA DATA do saldo informado (nao com a posicao de hoje).
+  @Get('operacoes/:operacaoId/painel-executivo')
+  @ProjAcao('ver')
+  painelExecutivo(@Param('operacaoId') operacaoId: string, @Req() req: any) {
+    if (!UUID_RE.test(operacaoId)) throw new NotFoundException('Registro nao encontrado.');
+    return this.db.comoUsuario(req.user.id, async (tx) => {
+      const op = await tx.projOperacao.findFirst({ where: { id: operacaoId, canceladoEm: null }, select: { dataBase: true, valorControle: true } });
+      if (!op) throw new NotFoundException('Operacao nao encontrada.');
+      const creditos = await tx.projCredito.findMany({ where: { operacaoId, canceladoEm: null }, select: { id: true, dataCredito: true, valor: true, identificacaoPendente: true } });
+      const ids = creditos.map((c) => c.id);
+      const vincs = await tx.projCreditoVinculo.findMany({ where: { canceladoEm: null, credito: { operacaoId, canceladoEm: null } }, select: { creditoId: true, situacao: true } });
+      const provas = ids.length ? await tx.projCreditoProva.findMany({ where: { canceladoEm: null, creditoId: { in: ids } }, select: { creditoId: true } }) : [];
+      const apls = await tx.projAplicacao.findMany({ where: { operacaoId, canceladoEm: null }, select: { valor: true, dataAplicacao: true, creditoId: true, natureza: { select: { codigo: true, nome: true, tipo: true } } } });
+      const docs = await tx.projDocumento.findMany({ where: { operacaoId, canceladoEm: null }, select: { contraparteId: true, tipo: { select: { codigo: true, nome: true } } } });
+      const pessoas = await tx.projParticipacao.findMany({
+        where: { operacaoId, canceladoEm: null, contraparteId: { not: null }, papel: { codigo: { in: ['ADQUIRENTE', 'INTERMEDIARIO'] } } },
+        select: { contraparteId: true, contraparte: { select: { nome: true } } },
+      });
+      const infs = await tx.projSaldoInformado.findMany({ where: { operacaoId, canceladoEm: null }, orderBy: [{ dataReferencia: 'desc' }, { criadoEm: 'desc' }], select: { tipo: true, dataReferencia: true, valor: true } });
+
+      const cent = (v: any) => Math.round(Number(v) * 100);
+      const fmt = (c: number) => (c / 100).toFixed(2);
+      const brl2 = (c: number) => (c / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+      const dataDe = new Map(creditos.map((c) => [c.id, c.dataCredito]));
+      const valorDe = new Map(creditos.map((c) => [c.id, cent(c.valor)]));
+      const vinculados = vincs.filter((v) => v.situacao === 'VINCULADO').map((v) => v.creditoId);
+      const comVinculo = new Set(vincs.map((v) => v.creditoId));
+      const comProva = new Set(provas.map((p) => p.creditoId));
+      const ate = (d: Date | null, x: Date) => !d || x.getTime() <= d.getTime();
+      const vincAte = (d: Date | null) => vinculados.reduce((s, id) => s + (ate(d, dataDe.get(id) as Date) ? valorDe.get(id) || 0 : 0), 0);
+      const aplAte = (d: Date | null, tipo: string) => apls.reduce((s, a) => s + (a.natureza.tipo === tipo && ate(d, a.dataAplicacao) ? cent(a.valor) : 0), 0);
+      const totVinc = vincAte(null);
+      const totDev = aplAte(null, 'DEVOLUCAO');
+      const totApl = aplAte(null, 'APLICACAO');
+
+      const pend: { nivel: 'CRITICA' | 'ATENCAO'; titulo: string; detalhe: string; destino: string }[] = [];
+      if (op.dataBase && op.valorControle) {
+        const ateBase = creditos.reduce((s, c) => s + (c.dataCredito.getTime() <= op.dataBase!.getTime() ? cent(c.valor) : 0), 0);
+        const dif = ateBase - cent(op.valorControle);
+        if (dif !== 0) pend.push({ nivel: 'CRITICA', titulo: 'Valor de controle não confere', detalhe: `Créditos até a data-base diferem do valor de controle em ${brl2(dif)}.`, destino: '' });
+      }
+      const infCI = infs.find((i) => i.tipo === 'CONTA_INDIVIDUAL');
+      if (infCI) {
+        const calc = vincAte(infCI.dataReferencia) - aplAte(infCI.dataReferencia, 'DEVOLUCAO');
+        const dif = calc - cent(infCI.valor);
+        if (dif !== 0) pend.push({ nivel: 'CRITICA', titulo: 'Conta Individual diverge do saldo informado', detalhe: `Na data do saldo informado (${infCI.dataReferencia.toISOString().slice(0, 10).split('-').reverse().join('/')}), a diferença é de ${brl2(dif)}.`, destino: 'demonstrativo' });
+      }
+      for (const [tipo, nome] of [['INTERCOMPANY_RECEBEDORA', 'recebedora'], ['INTERCOMPANY_BENEFICIARIA', 'beneficiária']]) {
+        const inf = infs.find((i) => i.tipo === tipo);
+        if (!inf) continue;
+        const calc = vincAte(inf.dataReferencia) - aplAte(inf.dataReferencia, 'APLICACAO') - aplAte(inf.dataReferencia, 'DEVOLUCAO');
+        const dif = calc - cent(inf.valor);
+        if (dif !== 0) pend.push({ nivel: 'CRITICA', titulo: `Intercompany diverge do saldo informado (${nome})`, detalhe: `Na data do saldo informado, a diferença é de ${brl2(dif)}.`, destino: 'intercompany' });
+      }
+      const semProva = creditos.filter((c) => !comProva.has(c.id));
+      if (semProva.length) pend.push({ nivel: 'CRITICA', titulo: 'Créditos sem prova bancária', detalhe: `${semProva.length} crédito(s), ${brl2(semProva.reduce((s, c) => s + cent(c.valor), 0))}.`, destino: 'creditos' });
+      const semDecisao = creditos.filter((c) => !comVinculo.has(c.id));
+      if (semDecisao.length) pend.push({ nivel: 'ATENCAO', titulo: 'Créditos aguardando decisão de vínculo', detalhe: `${semDecisao.length} crédito(s), ${brl2(semDecisao.reduce((s, c) => s + cent(c.valor), 0))}.`, destino: 'pendencias' });
+      const semRemetente = creditos.filter((c) => c.identificacaoPendente);
+      if (semRemetente.length) pend.push({ nivel: 'ATENCAO', titulo: 'Remetentes não identificados', detalhe: `${semRemetente.length} crédito(s), ${brl2(semRemetente.reduce((s, c) => s + cent(c.valor), 0))}.`, destino: 'pendencias' });
+      const devSemOrigem = apls.filter((a) => a.natureza.tipo === 'DEVOLUCAO' && !a.creditoId);
+      if (devSemOrigem.length) pend.push({ nivel: 'ATENCAO', titulo: 'Devoluções sem o crédito de origem', detalhe: `${devSemOrigem.length} devolução(ões), ${brl2(devSemOrigem.reduce((s, a) => s + cent(a.valor), 0))}. Informar a origem fortalece o demonstrativo.`, destino: 'aplicacoes' });
+      if (!docs.some((d) => d.tipo.codigo === 'TERMO')) pend.push({ nivel: 'ATENCAO', titulo: 'Operação sem o Termo', detalhe: 'Nenhum documento vigente do tipo "Termo, contrato ou aditivo".', destino: 'documentos' });
+      const comIdent = new Set(docs.filter((d) => d.tipo.codigo === 'IDENTIFICACAO' && d.contraparteId).map((d) => d.contraparteId as string));
+      const semIdent = [...new Map(pessoas.filter((p) => p.contraparteId && !comIdent.has(p.contraparteId)).map((p) => [p.contraparteId as string, p.contraparte?.nome || '-'])).values()];
+      if (semIdent.length) pend.push({ nivel: 'ATENCAO', titulo: 'Adquirente ou intermediário sem identificação', detalhe: semIdent.join(', ') + '.', destino: 'documentos' });
+
+      const nat = new Map<string, { nome: string; tipo: string; quantidade: number; centavos: number }>();
+      apls.forEach((a) => { const e = nat.get(a.natureza.codigo) || { nome: a.natureza.nome, tipo: a.natureza.tipo, quantidade: 0, centavos: 0 }; e.quantidade += 1; e.centavos += cent(a.valor); nat.set(a.natureza.codigo, e); });
+      const dt = new Map<string, number>();
+      docs.forEach((d) => dt.set(d.tipo.nome, (dt.get(d.tipo.nome) || 0) + 1));
+      const novos = op.dataBase ? creditos.filter((c) => c.dataCredito.getTime() > op.dataBase!.getTime()) : [];
+      return {
+        totais: { vinculados: fmt(totVinc), aplicacoes: fmt(totApl), devolucoes: fmt(totDev), saldoContratual: fmt(totVinc - totDev), intercompanyEsperado: fmt(totVinc - totApl - totDev) },
+        novosCreditos: { quantidade: novos.length, total: fmt(novos.reduce((s, c) => s + cent(c.valor), 0)) },
+        aplicacoesPorNatureza: [...nat.values()].sort((a, b) => b.centavos - a.centavos).map(({ centavos, ...n }) => ({ ...n, total: fmt(centavos) })),
+        documentos: { vigentes: docs.length, porTipo: [...dt.entries()].map(([nome, quantidade]) => ({ nome, quantidade })).sort((a, b) => b.quantidade - a.quantidade) },
+        pendencias: pend.sort((a, b) => (a.nivel === b.nivel ? 0 : a.nivel === 'CRITICA' ? -1 : 1)),
+      };
+    });
+  }
 }
+

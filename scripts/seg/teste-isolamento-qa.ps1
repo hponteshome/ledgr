@@ -182,6 +182,8 @@ if ($global:tok) {
   Teste "Relatorios: demonstrativo sem acesso"           GET    "/projects-relatorios/operacoes/${zero}/demonstrativo" 404
   Teste "Relatorios: historico da operacao"              GET    "/projects-relatorios/operacoes/${opId}/historico"     200
   Teste "Relatorios: historico sem acesso"               GET    "/projects-relatorios/operacoes/${zero}/historico"     404
+  Teste "Relatorios: painel executivo"                   GET    "/projects-relatorios/operacoes/${opId}/painel-executivo" 200 -msg '"pendencias":'
+  Teste "Relatorios: painel executivo sem acesso"        GET    "/projects-relatorios/operacoes/${zero}/painel-executivo" 404
   Teste "Projetos: alterar vinculo (so Master)"           POST   "/projects/operacoes/${opId}/creditos/${zero}/vinculo" 403 -corpo '{}'
   Teste "Projetos: creditos de operacao inexistente"   GET    "/projects/operacoes/${zero}/creditos"         404
   Teste "Projetos: operacao inexistente/alheia"        GET    "/projects/operacoes/${zero}/participacoes"    404

@@ -10,6 +10,7 @@ import { SmartDateInput } from '../../../components/SmartDateInput';
 import { PROJ, PROJ_ACCENT, PROJ_LIGHT, Operacao, Projeto, Credito, fmtBRL, fmtData, cardSt, thSt, tdSt, erroSt, secTitle, tituloSt, subtituloSt } from './projetoTema';
 import { ModalProjeto, Secao, ErroModal, Campo, BotaoSec, BotaoPri, inputModal, erroApi } from './ModalProjeto';
 import SaldoInformadoModal from './SaldoInformadoModal';
+import VisaoExecutiva from './VisaoExecutiva';
 
 interface Resumo {
   quantidadeCreditos: number; totalGeral: string; quantidadeAteDataBase: number; totalAteDataBase: string;
@@ -102,6 +103,7 @@ export default function PainelProjeto({ projeto, operacao, master, onAlterado }:
         {master && <button style={botaoEdicao} onClick={() => setEditandoOp(true)}>Editar operação</button>}
       </div>
       {erro && <div style={erroSt}>⚠ {erro}</div>}
+      <VisaoExecutiva operacao={operacao} versao={versaoResumo} />
       {resumo && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
           <Kpi titulo="Créditos até a data-base" valor={fmtBRL(resumo.totalAteDataBase)} detalhe={`${resumo.quantidadeAteDataBase} créditos`} />
