@@ -10230,3 +10230,10 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - proj_saldos_informados (CONTA_INDIVIDUAL, INTERCOMPANY_RECEBEDORA, INTERCOMPANY_BENEFICIARIA; data, valor, conta contabil, fonte): referencia externa so para conferencia, nunca entra no calculo; imutavel, sem DELETE, RLS.
 - Intercompany (GET .../intercompany e tela no projeto): mes a mes, creditos VINCULADOS - aplicacoes por conta - devolucoes = saldo esperado acumulado que a recebedora deve a beneficiaria; saldos informados das contas espelho (SUNSYS 22101050005, HOTELSYS 12101020022) e diferencas; aviso dos creditos aguardando decisao (fora da conta). Creditos desvinculados nao entram (nao geram divida intercompany).
 - Menu do projeto: Intercompany substitui "Extratos e conciliacao" (em breve); grupo "em breve" some quando vazio.
+
+## [PROJETOS] 04/10/2026 - Pacote de auditoria: Demonstrativo da Conta Individual e Historico
+
+- RelatoriosController (projects-relatorios, ProjEscopoGuard 'ver', RLS): GET operacoes/:id/demonstrativo?ate= (dados; registrar=XLSX registra a emissao), GET .../demonstrativo/pdf?ate= (puppeteer, como o DARF); GET operacoes/:id/historico?de=&ate=.
+- Demonstrativo: posicao em uma data; creditos vinculados (remetente com documento mascarado, prova bancaria) e devolucoes ao Adquirente (beneficiario, credito de origem, prova), saldo corrente; totais, saldo contratual, conferencia com o ultimo saldo informado ate a data; desvinculados e pendentes a parte. Codigo de conferencia = SHA-256 do conteudo (rodape do PDF, aba Conferencia do Excel); toda emissao no AuditLog (PROJ_DEMONSTRATIVO_EMITIDO, com o codigo).
+- Historico: AuditLog PROJ_* das entidades do projeto (operacao, projeto, creditos, vinculos, provas, aplicacoes, participacoes, contrapartes, saldos, concessoes) ou com after.operacaoId; decisoes sobre movimentos fora do projeto (nao pertence, transferencia interna) excluidas. Filtros e Excel.
+- Item 1.12 (versionamento/trilha) atendido na leitura: historico imutavel em todas as tabelas novas + tela de trilha.

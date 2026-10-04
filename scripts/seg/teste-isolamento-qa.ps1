@@ -178,6 +178,10 @@ if ($global:tok) {
   Teste "Projetos: saldos informados"                    GET    "/projects/operacoes/${opId}/saldos-informados" 200
   Teste "Projetos: registrar saldo informado (so Master)" POST  "/projects/operacoes/${opId}/saldos-informados" 403 -corpo '{}'
   Teste "Projetos: encerrar saldo informado (so Master)" POST   "/projects/operacoes/${opId}/saldos-informados/${zero}/encerrar" 403 -corpo '{}'
+  Teste "Relatorios: demonstrativo da Conta Individual"  GET    "/projects-relatorios/operacoes/${opId}/demonstrativo" 200 -msg '"linhas":'
+  Teste "Relatorios: demonstrativo sem acesso"           GET    "/projects-relatorios/operacoes/${zero}/demonstrativo" 404
+  Teste "Relatorios: historico da operacao"              GET    "/projects-relatorios/operacoes/${opId}/historico"     200
+  Teste "Relatorios: historico sem acesso"               GET    "/projects-relatorios/operacoes/${zero}/historico"     404
   Teste "Projetos: alterar vinculo (so Master)"           POST   "/projects/operacoes/${opId}/creditos/${zero}/vinculo" 403 -corpo '{}'
   Teste "Projetos: creditos de operacao inexistente"   GET    "/projects/operacoes/${zero}/creditos"         404
   Teste "Projetos: operacao inexistente/alheia"        GET    "/projects/operacoes/${zero}/participacoes"    404

@@ -5,7 +5,7 @@
 import React, { useEffect, useState } from 'react';
 import { Routes, Route, Navigate, NavLink, useNavigate, useParams } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import { FiGrid, FiDollarSign, FiUsers, FiKey, FiAlertCircle, FiRepeat, FiFileText, FiArrowLeft, FiLogOut, FiLayers, FiTrendingDown } from 'react-icons/fi';
+import { FiGrid, FiDollarSign, FiUsers, FiKey, FiAlertCircle, FiRepeat, FiFileText, FiArrowLeft, FiLogOut, FiLayers, FiTrendingDown, FiClipboard, FiClock } from 'react-icons/fi';
 import api from '../../../services/api';
 import { useAuth } from '../../../contexts/AuthContext';
 import ConcessoesPage from '../ConcessoesPage';
@@ -16,6 +16,8 @@ import PendenciasProjeto from './PendenciasProjeto';
 import DocumentosProjeto from './DocumentosProjeto';
 import AplicacoesProjeto from './AplicacoesProjeto';
 import IntercompanyProjeto from './IntercompanyProjeto';
+import DemonstrativoProjeto from './DemonstrativoProjeto';
+import HistoricoProjeto from './HistoricoProjeto';
 import { PROJ, PROJ_ACCENT, Projeto, erroSt } from './projetoTema';
 
 const itemSt = (ativo: boolean): React.CSSProperties => ({
@@ -33,6 +35,8 @@ const MENU: { to: string; label: string; icon: React.ElementType; end?: boolean 
   { to: 'creditos', label: 'Créditos', icon: FiDollarSign },
   { to: 'aplicacoes', label: 'Aplicações', icon: FiTrendingDown },
   { to: 'intercompany', label: 'Intercompany', icon: FiRepeat },
+  { to: 'demonstrativo', label: 'Demonstrativo', icon: FiClipboard },
+  { to: 'historico', label: 'Histórico', icon: FiClock },
   { to: 'participantes', label: 'Participantes', icon: FiUsers },
   { to: 'documentos', label: 'Documentos', icon: FiFileText },
 ];
@@ -126,6 +130,8 @@ export default function ProjetoWorkspace() {
               <Route path="creditos" element={<CreditosProjeto operacao={operacao} master={master} />} />
               <Route path="aplicacoes" element={<AplicacoesProjeto operacao={operacao} master={master} />} />
               <Route path="intercompany" element={<IntercompanyProjeto operacao={operacao} master={master} />} />
+              <Route path="demonstrativo" element={<DemonstrativoProjeto operacao={operacao} />} />
+              <Route path="historico" element={<HistoricoProjeto operacao={operacao} />} />
               <Route path="participantes" element={<ParticipantesProjeto operacao={operacao} master={master} />} />
               <Route path="documentos" element={<DocumentosProjeto operacao={operacao} master={master} />} />
               <Route path="pendencias" element={<PendenciasProjeto operacao={operacao} master={master} />} />
