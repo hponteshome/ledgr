@@ -10206,3 +10206,6 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - API projects-cadastros (CadastrosController, so Master, AuditLog antes/depois, ProjEscopoGuard + RLS): papeis; empresas; editar projeto (nome, descricao, situacao); editar operacao (data-base e valor de controle so com motivo); contraparte (criar ja com papel na operacao, consultar com documento mascarado, editar; CPF/CNPJ validado pelos digitos; documento gravado nao muda pela tela); participacoes (adicionar; encerrar com motivo, travas para Adquirente com creditos vinculados e Remetente com creditos); identificar remetente de credito pendente (motivo; cria participacao REMETENTE se preciso; nome do extrato preservado).
 - Frontend: ModalProjeto.tsx (modal compartilhado no padrao APPayModal); ParticipantesProjeto com adicionar/editar/encerrar.
 - Parte 2: identificacao de remetentes nas Pendencias e edicao de projeto/operacao no Painel.
+
+- 04/10/2026 - Fase 1.4-1.5 (parte 2): Painel com Editar projeto e Editar operacao (motivo exigido se data-base ou valor de controle mudarem; valor aceita 3.495.791,15 ou 3495791.15); Pendencias com Identificar remetente (contraparte existente ou nova, com a fonte); workspace recarrega o projeto apos edicoes. Itens 1.4 e 1.5 concluidos.
+

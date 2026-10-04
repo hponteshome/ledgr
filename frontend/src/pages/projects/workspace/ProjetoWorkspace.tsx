@@ -43,6 +43,7 @@ export default function ProjetoWorkspace() {
   const navigate = useNavigate();
   const [projeto, setProjeto] = useState<Projeto | null>(null);
   const [opId, setOpId] = useState('');
+  const [versao, setVersao] = useState(0); // Fase 1.4-1.5: recarrega o projeto apos edicoes
   const [erro, setErro] = useState('');
   const master = user?.profile?.permissions?.all === true;
 
@@ -52,7 +53,7 @@ export default function ProjetoWorkspace() {
     api.get(`/projects/${projetoId}`)
       .then((r) => { setProjeto(r.data); setOpId(r.data?.operacoes?.[0]?.id || ''); })
       .catch((e) => setErro(e?.response?.status === 404 ? 'Projeto não encontrado ou sem acesso.' : e?.response?.data?.message || 'Falha ao carregar o projeto.'));
-  }, [projetoId, user]);
+  }, [projetoId, user, versao]);
 
   if (loading) return <div style={{ padding: 40, color: '#6B7280' }}>Carregando...</div>;
   if (!user) return <Navigate to="/" replace />;
@@ -118,7 +119,7 @@ export default function ProjetoWorkspace() {
             <div style={{ color: '#6B7280' }}>Carregando...</div>
           ) : (
             <Routes>
-              <Route index element={<PainelProjeto projeto={projeto} operacao={operacao} />} />
+              <Route index element={<PainelProjeto projeto={projeto} operacao={operacao} master={master} onAlterado={() => setVersao((v) => v + 1)} />} />
               <Route path="creditos" element={<CreditosProjeto operacao={operacao} master={master} />} />
               <Route path="participantes" element={<ParticipantesProjeto operacao={operacao} master={master} />} />
               <Route path="documentos" element={<DocumentosProjeto operacao={operacao} master={master} />} />

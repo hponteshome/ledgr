@@ -1,16 +1,21 @@
 // frontend/src/pages/projects/workspace/PainelProjeto.tsx
-// D8 (03/10/2026): painel da operacao - conferencia com o valor de controle, Contas Individuais, pendencias,
-// evolucao mensal (todos os meses, inclusive sem credito) e principais remetentes.
+// D8 (03/10/2026): painel da operacao - conferencia com o valor de controle, Contas Individuais, prova bancaria,
+// pendencias, evolucao mensal (todos os meses) e principais remetentes.
+// Fase 1.4-1.5 (04/10/2026): edicao de projeto e operacao (Master); data-base e valor de controle exigem motivo.
 import React, { useEffect, useMemo, useState } from 'react';
 import { ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from 'recharts';
+import toast from 'react-hot-toast';
 import api from '../../../services/api';
+import { SmartDateInput } from '../../../components/SmartDateInput';
 import { PROJ, PROJ_ACCENT, PROJ_LIGHT, Operacao, Projeto, Credito, fmtBRL, fmtData, cardSt, thSt, tdSt, erroSt, secTitle, tituloSt, subtituloSt } from './projetoTema';
+import { ModalProjeto, Secao, ErroModal, Campo, BotaoSec, BotaoPri, inputModal, erroApi } from './ModalProjeto';
 
 interface Resumo {
   quantidadeCreditos: number; totalGeral: string; quantidadeAteDataBase: number; totalAteDataBase: string;
   valorControle: string | null; diferencaControle: string | null; conferido: boolean | null; pendentesIdentificacao: number;
   contasIndividuais: { adquirenteId: string; nome: string; quantidade: number; total: string }[];
-  desvinculados: { quantidade: number; total: string }; semVinculo: number; comProvaBancaria: number; semProvaBancaria: number;
+  desvinculados: { quantidade: number; total: string }; semVinculo: number; semVinculoTotal: string;
+  comProvaBancaria: number; semProvaBancaria: number;
 }
 
 function Kpi({ titulo, valor, detalhe, cor }: { titulo: string; valor: string; detalhe?: string; cor?: string }) {
@@ -23,10 +28,23 @@ function Kpi({ titulo, valor, detalhe, cor }: { titulo: string; valor: string; d
   );
 }
 
-export default function PainelProjeto({ projeto, operacao }: { projeto: Projeto; operacao: Operacao | null }) {
+// Aceita 3.495.791,15 / 3495791,15 / 3495791.15 e devolve no formato com virgula decimal (o servidor remove os pontos).
+function normalizarValor(s: string): string {
+  const t = s.trim().replace(/\s|R\$/g, '');
+  if (!t) return '';
+  if (t.includes(',')) return t.replace(/\./g, '');
+  if (/^\d+\.\d{1,2}$/.test(t)) return t.replace('.', ',');
+  return t.replace(/\./g, '');
+}
+const valorParaTela = (v: string | null) => (v ? Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '');
+const botaoEdicao: React.CSSProperties = { padding: '6px 12px', fontSize: 12, border: '0.5px solid #E5E7EB', borderRadius: 7, background: '#fff', color: '#134E4A', cursor: 'pointer' };
+
+export default function PainelProjeto({ projeto, operacao, master, onAlterado }: { projeto: Projeto; operacao: Operacao | null; master: boolean; onAlterado: () => void }) {
   const [resumo, setResumo] = useState<Resumo | null>(null);
   const [creditos, setCreditos] = useState<Credito[]>([]);
   const [erro, setErro] = useState('');
+  const [editandoOp, setEditandoOp] = useState(false);
+  const [editandoProj, setEditandoProj] = useState(false);
 
   useEffect(() => {
     if (!operacao) return;
@@ -70,28 +88,27 @@ export default function PainelProjeto({ projeto, operacao }: { projeto: Projeto;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-      <div>
-        <div style={tituloSt}>{operacao.nome}</div>
-        <div style={subtituloSt}>{projeto.nome} · data-base {fmtData(operacao.dataBase)}</div>
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10 }}>
+        <div style={{ flex: 1 }}>
+          <div style={tituloSt}>{operacao.nome}</div>
+          <div style={subtituloSt}>{projeto.nome} · data-base {fmtData(operacao.dataBase)} · situação {operacao.status}</div>
+        </div>
+        {master && <button style={botaoEdicao} onClick={() => setEditandoProj(true)}>Editar projeto</button>}
+        {master && <button style={botaoEdicao} onClick={() => setEditandoOp(true)}>Editar operação</button>}
       </div>
       {erro && <div style={erroSt}>⚠ {erro}</div>}
       {resumo && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
           <Kpi titulo="Créditos até a data-base" valor={fmtBRL(resumo.totalAteDataBase)} detalhe={`${resumo.quantidadeAteDataBase} créditos`} />
-          <Kpi
-            titulo="Valor de controle"
-            valor={fmtBRL(resumo.valorControle)}
+          <Kpi titulo="Valor de controle" valor={fmtBRL(resumo.valorControle)}
             detalhe={resumo.conferido === null ? 'sem valor de controle' : resumo.conferido ? 'Conferido com os créditos' : `Diferença de ${fmtBRL(resumo.diferencaControle)}`}
-            cor={resumo.conferido === false ? '#A32D2D' : undefined}
-          />
-          <Kpi
-            titulo="Pendências de identificação"
-            valor={String(resumo.pendentesIdentificacao)}
-            detalhe="créditos sem remetente identificado"
-            cor={resumo.pendentesIdentificacao > 0 ? '#B45309' : '#166534'}
-          />
+            cor={resumo.conferido === false ? '#A32D2D' : undefined} />
+          <Kpi titulo="Pendências de identificação" valor={String(resumo.pendentesIdentificacao)} detalhe="créditos sem remetente identificado"
+            cor={resumo.pendentesIdentificacao > 0 ? '#B45309' : '#166534'} />
           <Kpi titulo="Total geral de créditos" valor={fmtBRL(resumo.totalGeral)} detalhe={`${resumo.quantidadeCreditos} créditos em todas as datas`} />
-          <Kpi titulo="Prova bancária" valor={`${resumo.comProvaBancaria} de ${resumo.quantidadeCreditos}`} detalhe={resumo.semProvaBancaria === 0 ? 'todos comprovados no extrato' : `${resumo.semProvaBancaria} sem prova bancária`} cor={resumo.semProvaBancaria === 0 ? '#166534' : '#B45309'} />
+          <Kpi titulo="Prova bancária" valor={`${resumo.comProvaBancaria} de ${resumo.quantidadeCreditos}`}
+            detalhe={resumo.semProvaBancaria === 0 ? 'todos comprovados no extrato' : `${resumo.semProvaBancaria} sem prova bancária`}
+            cor={resumo.semProvaBancaria === 0 ? '#166534' : '#B45309'} />
         </div>
       )}
       {resumo && (
@@ -110,10 +127,10 @@ export default function PainelProjeto({ projeto, operacao }: { projeto: Projeto;
             {resumo.contasIndividuais.length === 0 && <div style={{ fontSize: 13, color: '#9CA3AF' }}>Nenhum crédito vinculado a Conta Individual.</div>}
             {resumo.desvinculados.quantidade > 0 && (
               <div style={{ fontSize: 12, color: '#6B7280' }}>
-                Desvinculados por auditoria: <b>{resumo.desvinculados.quantidade}</b> crédito(s), {fmtBRL(resumo.desvinculados.total)} (permanecem registrados como fato bancário, fora da Conta Individual).
+                Fora da Conta Individual: <b>{resumo.desvinculados.quantidade}</b> crédito(s), {fmtBRL(resumo.desvinculados.total)} (permanecem registrados como fato bancário).
               </div>
             )}
-            {resumo.semVinculo > 0 && <div style={{ fontSize: 12, color: '#B45309' }}>{resumo.semVinculo} crédito(s) sem vínculo definido.</div>}
+            {resumo.semVinculo > 0 && <div style={{ fontSize: 12, color: '#B45309' }}>{resumo.semVinculo} crédito(s) aguardando decisão de vínculo ({fmtBRL(resumo.semVinculoTotal)}).</div>}
           </div>
         </div>
       )}
@@ -152,6 +169,92 @@ export default function PainelProjeto({ projeto, operacao }: { projeto: Projeto;
           </tbody>
         </table>
       </div>
+      {editandoOp && <EditarOperacaoModal operacao={operacao} onClose={() => setEditandoOp(false)} onFeito={() => { setEditandoOp(false); onAlterado(); }} />}
+      {editandoProj && <EditarProjetoModal projeto={projeto} onClose={() => setEditandoProj(false)} onFeito={() => { setEditandoProj(false); onAlterado(); }} />}
     </div>
+  );
+}
+
+function EditarOperacaoModal({ operacao, onClose, onFeito }: { operacao: Operacao; onClose: () => void; onFeito: () => void }) {
+  const [nome, setNome] = useState(operacao.nome);
+  const [descricao, setDescricao] = useState((operacao as any).descricao || '');
+  const [status, setStatus] = useState(operacao.status);
+  const [dataBase, setDataBase] = useState(operacao.dataBase ? operacao.dataBase.slice(0, 10) : '');
+  const [valor, setValor] = useState(valorParaTela(operacao.valorControle));
+  const [motivo, setMotivo] = useState('');
+  const [erro, setErro] = useState('');
+  const [enviando, setEnviando] = useState(false);
+  const valorNovo = normalizarValor(valor);
+  const valorAntigo = normalizarValor(valorParaTela(operacao.valorControle));
+  const critico = dataBase !== (operacao.dataBase ? operacao.dataBase.slice(0, 10) : '') || valorNovo !== valorAntigo;
+  const valido = nome.trim().length >= 3 && (!critico || motivo.trim().length >= 10);
+  const enviar = async () => {
+    if (!valido) return;
+    setErro(''); setEnviando(true);
+    try {
+      await api.post(`/projects-cadastros/operacoes/${operacao.id}`, { nome: nome.trim(), descricao: descricao.trim(), status, dataBase: dataBase || null, valorControle: valorNovo || null, motivo: motivo.trim() });
+      toast.success('Operação atualizada.');
+      onFeito();
+    } catch (e: any) { setErro(erroApi(e, 'Falha ao salvar.')); } finally { setEnviando(false); }
+  };
+  return (
+    <ModalProjeto titulo="Editar operação" subtitulo={operacao.nome} onClose={onClose}
+      rodape={<><BotaoSec onClick={onClose}>Cancelar</BotaoSec><BotaoPri onClick={enviar} ativo={valido && !enviando}>{enviando ? 'Aguarde...' : 'Salvar'}</BotaoPri></>}>
+      <ErroModal msg={erro} />
+      <Secao titulo="IDENTIFICAÇÃO">
+        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12 }}>
+          <Campo rotulo="Nome *"><input style={inputModal} value={nome} onChange={(e) => setNome(e.target.value)} /></Campo>
+          <Campo rotulo="Situação">
+            <select style={inputModal} value={status} onChange={(e) => setStatus(e.target.value)}><option value="ATIVA">Ativa</option><option value="SUSPENSA">Suspensa</option><option value="ENCERRADA">Encerrada</option></select>
+          </Campo>
+          <Campo rotulo="Descrição" largo><textarea style={{ ...inputModal, minHeight: 56, resize: 'vertical' }} value={descricao} onChange={(e) => setDescricao(e.target.value)} /></Campo>
+        </div>
+      </Secao>
+      <Secao titulo="CONFERÊNCIA">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <Campo rotulo="Data-base"><SmartDateInput style={inputModal} value={dataBase} onChange={(v) => setDataBase(v)} /></Campo>
+          <Campo rotulo="Valor de controle (R$)"><input style={inputModal} value={valor} onChange={(e) => setValor(e.target.value)} placeholder="Ex.: 3.495.791,15" /></Campo>
+        </div>
+        <div style={{ fontSize: 11, color: '#6B7280', marginTop: 8 }}>A conferência do Painel compara os créditos até a data-base com o valor de controle. Alterar qualquer um dos dois exige motivo.</div>
+      </Secao>
+      {critico && (
+        <Secao titulo="MOTIVO DA ALTERAÇÃO *">
+          <textarea style={{ ...inputModal, minHeight: 64, resize: 'vertical' }} value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Mínimo de 10 caracteres. Ex.: planilha auditada em 10/2026." />
+        </Secao>
+      )}
+    </ModalProjeto>
+  );
+}
+
+function EditarProjetoModal({ projeto, onClose, onFeito }: { projeto: Projeto; onClose: () => void; onFeito: () => void }) {
+  const [nome, setNome] = useState(projeto.nome);
+  const [descricao, setDescricao] = useState(projeto.descricao || '');
+  const [status, setStatus] = useState(projeto.status);
+  const [erro, setErro] = useState('');
+  const [enviando, setEnviando] = useState(false);
+  const valido = nome.trim().length >= 3;
+  const enviar = async () => {
+    if (!valido) return;
+    setErro(''); setEnviando(true);
+    try {
+      await api.post(`/projects-cadastros/projetos/${projeto.id}`, { nome: nome.trim(), descricao: descricao.trim(), status });
+      toast.success('Projeto atualizado.');
+      onFeito();
+    } catch (e: any) { setErro(erroApi(e, 'Falha ao salvar.')); } finally { setEnviando(false); }
+  };
+  return (
+    <ModalProjeto titulo="Editar projeto" subtitulo={projeto.nome} onClose={onClose}
+      rodape={<><BotaoSec onClick={onClose}>Cancelar</BotaoSec><BotaoPri onClick={enviar} ativo={valido && !enviando}>{enviando ? 'Aguarde...' : 'Salvar'}</BotaoPri></>}>
+      <ErroModal msg={erro} />
+      <Secao titulo="PROJETO">
+        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12 }}>
+          <Campo rotulo="Nome *"><input style={inputModal} value={nome} onChange={(e) => setNome(e.target.value)} /></Campo>
+          <Campo rotulo="Situação">
+            <select style={inputModal} value={status} onChange={(e) => setStatus(e.target.value)}><option value="ATIVO">Ativo</option><option value="SUSPENSO">Suspenso</option><option value="ENCERRADO">Encerrado</option></select>
+          </Campo>
+          <Campo rotulo="Descrição" largo><textarea style={{ ...inputModal, minHeight: 56, resize: 'vertical' }} value={descricao} onChange={(e) => setDescricao(e.target.value)} /></Campo>
+        </div>
+      </Secao>
+    </ModalProjeto>
   );
 }
