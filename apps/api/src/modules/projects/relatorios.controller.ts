@@ -213,7 +213,7 @@ export class RelatoriosController {
   }
 
   @Get('operacoes/:operacaoId/historico')
-  @ProjAcao('ver')
+  @ProjAcao('exportar') // trilha: Administrador, Contabilidade, Financeiro e Auditoria (Consulta, Juridico, Gestao e Aprovador nao)
   historico(@Param('operacaoId') operacaoId: string, @Query('de') de: string, @Query('ate') ate: string, @Req() req: any) {
     if (!UUID_RE.test(operacaoId)) throw new NotFoundException('Registro nao encontrado.');
     return this.db.comoUsuario(req.user.id, async (tx) => {

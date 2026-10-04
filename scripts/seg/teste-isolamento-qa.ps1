@@ -180,7 +180,7 @@ if ($global:tok) {
   Teste "Projetos: encerrar saldo informado (so Master)" POST   "/projects/operacoes/${opId}/saldos-informados/${zero}/encerrar" 403 -corpo '{}'
   Teste "Relatorios: demonstrativo da Conta Individual"  GET    "/projects-relatorios/operacoes/${opId}/demonstrativo" 200 -msg '"linhas":'
   Teste "Relatorios: demonstrativo sem acesso"           GET    "/projects-relatorios/operacoes/${zero}/demonstrativo" 404
-  Teste "Relatorios: historico da operacao"              GET    "/projects-relatorios/operacoes/${opId}/historico"     200
+  Teste "Relatorios: historico (Consulta nao ve a trilha)" GET   "/projects-relatorios/operacoes/${opId}/historico"     403
   Teste "Relatorios: historico sem acesso"               GET    "/projects-relatorios/operacoes/${zero}/historico"     404
   Teste "Relatorios: painel executivo"                   GET    "/projects-relatorios/operacoes/${opId}/painel-executivo" 200 -msg '"pendencias":'
   Teste "Relatorios: painel executivo sem acesso"        GET    "/projects-relatorios/operacoes/${zero}/painel-executivo" 404

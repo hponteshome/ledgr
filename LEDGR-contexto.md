@@ -10245,3 +10245,6 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - Comparacoes com saldos informados sao calculadas NA DATA do saldo informado (credito posterior ao fechamento nao vira divergencia falsa).
 - Tela: VisaoExecutiva no topo do Painel (botao Abrir leva a tela da pendencia); atualiza apos registrar saldo informado.
 - Fase 1: so restam 1.9 (conciliacao: depende da classificacao das devolucoes e da planilha auditada).
+
+- 04/10/2026: Historico da operacao restrito a acao 'exportar' (Administrador do projeto, Contabilidade, Financeiro, Auditoria); Consulta, Juridico, Gestao e Aprovador recebem 403 com mensagem clara. Demonstrativo segue com 'ver' (relatorio).
+

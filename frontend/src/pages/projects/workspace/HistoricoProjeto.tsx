@@ -22,7 +22,7 @@ export default function HistoricoProjeto({ operacao }: { operacao: Operacao | nu
     if (!operacao) return;
     setErro('');
     api.get(`/projects-relatorios/operacoes/${operacao.id}/historico`, { params: { de: de || undefined, ate: ate || undefined } })
-      .then((r) => setLista(r.data || [])).catch((e) => setErro(e?.response?.data?.message || 'Falha ao carregar o histórico.'));
+      .then((r) => setLista(r.data || [])).catch((e) => setErro(e?.response?.status === 403 ? 'A trilha de auditoria é restrita aos perfis Administrador do projeto, Contabilidade, Financeiro e Auditoria.' : e?.response?.data?.message || 'Falha ao carregar o histórico.'));
   }, [operacao, de, ate]);
   useEffect(() => { carregar(); }, [carregar]);
   const tipos = useMemo(() => [...new Set(lista.map((e) => e.rotulo))].sort(), [lista]);
