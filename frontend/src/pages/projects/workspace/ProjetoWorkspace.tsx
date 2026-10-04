@@ -5,7 +5,7 @@
 import React, { useEffect, useState } from 'react';
 import { Routes, Route, Navigate, NavLink, useNavigate, useParams } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import { FiGrid, FiDollarSign, FiUsers, FiKey, FiAlertCircle, FiRepeat, FiFileText, FiArrowLeft, FiLogOut, FiLayers } from 'react-icons/fi';
+import { FiGrid, FiDollarSign, FiUsers, FiKey, FiAlertCircle, FiRepeat, FiFileText, FiArrowLeft, FiLogOut, FiLayers, FiTrendingDown } from 'react-icons/fi';
 import api from '../../../services/api';
 import { useAuth } from '../../../contexts/AuthContext';
 import ConcessoesPage from '../ConcessoesPage';
@@ -14,6 +14,7 @@ import CreditosProjeto from './CreditosProjeto';
 import ParticipantesProjeto from './ParticipantesProjeto';
 import PendenciasProjeto from './PendenciasProjeto';
 import DocumentosProjeto from './DocumentosProjeto';
+import AplicacoesProjeto from './AplicacoesProjeto';
 import { PROJ, PROJ_ACCENT, Projeto, erroSt } from './projetoTema';
 
 const itemSt = (ativo: boolean): React.CSSProperties => ({
@@ -29,6 +30,7 @@ const botaoRodape: React.CSSProperties = {
 const MENU: { to: string; label: string; icon: React.ElementType; end?: boolean }[] = [
   { to: '', label: 'Painel', icon: FiGrid, end: true },
   { to: 'creditos', label: 'Créditos', icon: FiDollarSign },
+  { to: 'aplicacoes', label: 'Aplicações', icon: FiTrendingDown },
   { to: 'participantes', label: 'Participantes', icon: FiUsers },
   { to: 'documentos', label: 'Documentos', icon: FiFileText },
 ];
@@ -121,6 +123,7 @@ export default function ProjetoWorkspace() {
             <Routes>
               <Route index element={<PainelProjeto projeto={projeto} operacao={operacao} master={master} onAlterado={() => setVersao((v) => v + 1)} />} />
               <Route path="creditos" element={<CreditosProjeto operacao={operacao} master={master} />} />
+              <Route path="aplicacoes" element={<AplicacoesProjeto operacao={operacao} />} />
               <Route path="participantes" element={<ParticipantesProjeto operacao={operacao} master={master} />} />
               <Route path="documentos" element={<DocumentosProjeto operacao={operacao} master={master} />} />
               <Route path="pendencias" element={<PendenciasProjeto operacao={operacao} master={master} />} />

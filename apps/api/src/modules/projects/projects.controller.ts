@@ -424,6 +424,32 @@ export class ProjectsController {
     });
   }
 
+  // -- Aplicacoes de recursos (Fase 1.11 parte A, 04/10/2026) -----------------------------------------------
+  // So o que o Financeiro classificou no LEDGR como da operacao (aplicacoes e devolucoes), com a prova no extrato.
+  @Get('operacoes/:operacaoId/aplicacoes')
+  @ProjAcao('ver')
+  aplicacoes(@Param('operacaoId') operacaoId: string, @Req() req: any) {
+    if (!UUID_RE.test(operacaoId)) throw new NotFoundException('Registro nao encontrado.');
+    return this.db.comoUsuario(req.user.id, async (tx) => {
+      const lista = await tx.projAplicacao.findMany({
+        where: { operacaoId, canceladoEm: null },
+        orderBy: { dataAplicacao: 'asc' },
+        select: { id: true, dataAplicacao: true, valor: true, descricao: true, motivo: true, bankTransactionId: true, beneficiarioId: true, creditoId: true, natureza: { select: { codigo: true, nome: true, tipo: true } } },
+      });
+      const ben = [...new Set(lista.map((a) => a.beneficiarioId).filter((x): x is string => !!x))];
+      const cre = [...new Set(lista.map((a) => a.creditoId).filter((x): x is string => !!x))];
+      const txs = [...new Set(lista.map((a) => a.bankTransactionId))];
+      const mb = new Map((ben.length ? await tx.projContraparte.findMany({ where: { id: { in: ben } }, select: { id: true, nome: true } }) : []).map((c) => [c.id, c.nome]));
+      const mc = new Map((cre.length ? await tx.projCredito.findMany({ where: { id: { in: cre } }, select: { id: true, numeroOrdem: true } }) : []).map((c) => [c.id, c.numeroOrdem]));
+      const mt = new Map((txs.length ? await tx.bankTransaction.findMany({ where: { id: { in: txs } }, select: { id: true, description: true } }) : []).map((t) => [t.id, t.description]));
+      return lista.map(({ bankTransactionId, beneficiarioId, creditoId, ...a }) => ({
+        ...a, lancamento: mt.get(bankTransactionId) || null,
+        beneficiario: beneficiarioId ? mb.get(beneficiarioId) ?? null : null,
+        creditoNumero: creditoId ? mc.get(creditoId) ?? null : null,
+      }));
+    });
+  }
+
   @Get('perfis')
   @UseGuards(MasterOnlyGuard)
   @ProjAcao('autenticado') // decisao do MasterOnlyGuard do metodo (403 consistente)

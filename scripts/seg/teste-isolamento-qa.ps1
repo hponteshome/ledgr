@@ -128,8 +128,8 @@ if ($global:tok) {
   $opId = (docker exec ledgr-postgres psql -U ledgr -d ledgr_app -tA -c "SELECT o.id FROM proj_operacoes o JOIN proj_projetos p ON p.id = o.projeto_id WHERE p.codigo = 'RECIFE-OCEAN' AND o.codigo = 'ANCORA';" | Out-String).Trim()
   Teste "Projetos: lista com concessao"                GET    "/projects"                                    200 -qtd 1
   Teste "Projetos: detalhe do projeto concedido"       GET    "/projects/${projId}"                          200
-  Teste "Projetos: participacoes da Operacao Ancora"   GET    "/projects/operacoes/${opId}/participacoes"    200 -qtd 24
-  Teste "Projetos: creditos da Operacao Ancora"        GET    "/projects/operacoes/${opId}/creditos"         200 -qtd 58
+  Teste "Projetos: participacoes da Operacao Ancora"   GET    "/projects/operacoes/${opId}/participacoes"    200 -msg '"codigo":"ADQUIRENTE"'
+  Teste "Projetos: creditos da Operacao Ancora"        GET    "/projects/operacoes/${opId}/creditos"         200 -msg '"numeroOrdem":1,'
   Teste "Projetos: resumo - 58 creditos conferidos"     GET    "/projects/operacoes/${opId}/resumo"           200 -msg '"conferido":true'
   Teste "Projetos: resumo - total historico exato"      GET    "/projects/operacoes/${opId}/resumo"           200 -msg '"totalAteDataBase":"3495791.15"'
   Teste "Projetos: VAL aparece como Conta Individual"   GET    "/projects/operacoes/${opId}/resumo"           200 -msg '"nome":"VAL INVESTIMENTOS S/A"'
@@ -141,7 +141,7 @@ if ($global:tok) {
   Teste "Projetos: pendencias do projeto (sem extrato)"   GET    "/projects/operacoes/${opId}/pendencias"        200
   Teste "Financeiro: entradas da empresa ativa (LEDGR)"   GET    "/projects-financeiro/entradas"                 200
   Teste "Financeiro: encaminhar entrada (so Master)"       POST   "/projects-financeiro/entradas/${zero}/encaminhar" 403 -corpo '{}'
-  Teste "Documentos: tipos"                              GET    "/projects/documento-tipos"                    200 -qtd 8
+  Teste "Documentos: tipos"                              GET    "/projects/documento-tipos"                    200 -msg '"codigo":"TERMO"'
   Teste "Documentos: lista da operacao"                  GET    "/projects/operacoes/${opId}/documentos"        200
   Teste "Documentos: enviar (so Master)"                 POST   "/projects/operacoes/${opId}/documentos"        403 -corpo '{}'
   Teste "Documentos: baixar inexistente"                 GET    "/projects/operacoes/${opId}/documentos/${zero}/arquivo" 404
@@ -157,13 +157,18 @@ if ($global:tok) {
     if ($comQa -eq 404) { Write-Host "OK     esperado 404 | obtido 404 | Uploads: arquivo sem registro, conta QA" -ForegroundColor Green } else { $global:falhas++; Write-Host "FALHA  esperado 404 | obtido $comQa | Uploads: arquivo sem registro, conta QA" -ForegroundColor Red }
   } else { Write-Host "SEM DADOS - nenhum arquivo em apps\api\uploads para testar" -ForegroundColor Yellow }
   Teste "Uploads: tentativa de sair da pasta"            GET    "/uploads/..%2F..%2F.env"                     404
-  Teste "Cadastros: catalogo de papeis"                  GET    "/projects-cadastros/papeis"                   200 -qtd 9
+  Teste "Cadastros: catalogo de papeis"                  GET    "/projects-cadastros/papeis"                   200 -msg '"codigo":"ADQUIRENTE"'
   Teste "Cadastros: empresas (so Master)"                GET    "/projects-cadastros/empresas"                 403
   Teste "Cadastros: editar projeto (so Master)"          POST   "/projects-cadastros/projetos/${projId}"       403 -corpo '{}'
   Teste "Cadastros: editar operacao (so Master)"         POST   "/projects-cadastros/operacoes/${opId}"        403 -corpo '{}'
   Teste "Cadastros: nova contraparte (so Master)"        POST   "/projects-cadastros/operacoes/${opId}/contrapartes" 403 -corpo '{}'
   Teste "Cadastros: nova participacao (so Master)"       POST   "/projects-cadastros/operacoes/${opId}/participacoes" 403 -corpo '{}'
   Teste "Cadastros: identificar remetente (so Master)"   POST   "/projects-cadastros/operacoes/${opId}/creditos/${zero}/remetente" 403 -corpo '{}'
+  Teste "Saidas: lista da empresa ativa (LEDGR)"          GET    "/projects-financeiro/saidas"                  200
+  Teste "Saidas: apoio a classificacao (so Master)"       GET    "/projects-financeiro/saidas/apoio"            403
+  Teste "Saidas: registrar aplicacao (so Master)"         POST   "/projects-financeiro/saidas/${zero}/aplicar"  403 -corpo '{}'
+  Teste "Saidas: transferencia interna (so Master)"       POST   "/projects-financeiro/saidas/${zero}/decidir"  403 -corpo '{}'
+  Teste "Projetos: aplicacoes da operacao"                GET    "/projects/operacoes/${opId}/aplicacoes"        200
   Teste "Projetos: alterar vinculo (so Master)"           POST   "/projects/operacoes/${opId}/creditos/${zero}/vinculo" 403 -corpo '{}'
   Teste "Projetos: creditos de operacao inexistente"   GET    "/projects/operacoes/${zero}/creditos"         404
   Teste "Projetos: operacao inexistente/alheia"        GET    "/projects/operacoes/${zero}/participacoes"    404
@@ -185,9 +190,10 @@ if ($global:tok) {
   Teste "Sessao: refresh apos logout recusado"         POST   "/auth/refresh"                401 -corpo (@{ refreshToken = $global:refresh } | ConvertTo-Json)
   docker cp "$PSScriptRoot\teste-rls-proj.sql" ledgr-postgres:/tmp/teste-rls-proj.sql | Out-Null
   $rls = docker exec ledgr-postgres psql -U ledgr -d ledgr_app -tA -v ON_ERROR_STOP=1 -f /tmp/teste-rls-proj.sql 2>&1
-  $esperado = [ordered]@{ sem_contexto = '0'; qa_projetos = '1'; qa_operacoes = '1'; qa_participacoes = '24'; qa_contrapartes = '20'; qa_concessoes_de_outros = '0'; qa_update_operacoes = '0'; sem_contexto_creditos = '0'; qa_creditos = '58'; qa_update_creditos = '0'; qa_vinculos = '58'; qa_update_vinculos = '0'; qa_provas = '58'; qa_update_provas = '0'; master_projetos = '1'; master_operacoes = '1'; vinculo_imutavel = 'sim'; vinculo_delete = 'negado'; prova_delete = 'negado' }
+  $esperado = [ordered]@{ sem_contexto = '0'; qa_projetos = '1'; qa_operacoes = '1'; qa_concessoes_de_outros = '0'; qa_update_operacoes = '0'; sem_contexto_creditos = '0'; qa_update_creditos = '0'; qa_update_vinculos = '0'; qa_update_provas = '0'; vinculo_imutavel = 'sim'; vinculo_delete = 'negado'; prova_delete = 'negado'; anotacoes_acesso_direto = 'negado' }
   $obtido = @{}; foreach ($ln in $rls) { if ("$ln" -match '^(\w+)=(.*)$') { $obtido[$matches[1]] = $matches[2].Trim() } }
   foreach ($k in $esperado.Keys) { $okR = ($obtido[$k] -eq $esperado[$k]); if (-not $okR) { $global:falhas++ }; Write-Host ("{0,-6} esperado {1} | obtido {2} | RLS: {3}" -f $(if ($okR) {'OK'} else {'FALHA'}), $esperado[$k], $(if ($null -ne $obtido[$k]) { $obtido[$k] } else { '?' }), $k) -ForegroundColor $(if ($okR) {'Green'} else {'Red'}) }
+  foreach ($par in @(@('qa_participacoes','total_participacoes'), @('qa_contrapartes','total_contrapartes'), @('qa_creditos','total_creditos'), @('qa_provas','total_provas'), @('qa_vinculos','total_vinculos'), @('qa_aplicacoes','total_aplicacoes'), @('master_projetos','total_projetos'), @('master_operacoes','total_operacoes'))) { $v = $obtido[$par[0]]; $t = $obtido[$par[1]]; $okP = ($null -ne $v -and $null -ne $t -and $v -eq $t); if (-not $okP) { $global:falhas++ }; Write-Host ("{0,-6} esperado {1} | obtido {2} | RLS: {3} = total real" -f $(if ($okP) {'OK'} else {'FALHA'}), $t, $v, $par[0]) -ForegroundColor $(if ($okP) {'Green'} else {'Red'}) }
   Write-Host ("`nResultado: {0}" -f $(if ($global:falhas -eq 0) {'TODOS OS TESTES PASSARAM'} else {"$global:falhas FALHA(S)"})) -ForegroundColor $(if ($global:falhas -eq 0) {'Green'} else {'Red'})
 }
 $global:tok = $null

@@ -143,4 +143,127 @@ export class ProjetosFinanceiroController {
       return { ok: true };
     });
   }
+
+  // Anotacoes da planilha do Financeiro (SO apoio; a API nao le a tabela direto, so por esta funcao da empresa ativa)
+  private async anotacoes(companyId: string): Promise<Map<string, string>> {
+    const rows = await this.prisma.$queryRaw<{ id: string; texto: string }[]>`SELECT bank_transaction_id::text AS id, texto FROM proj_anotacoes_da_empresa(${companyId}::uuid)`;
+    return new Map(rows.map((r) => [r.id, r.texto]));
+  }
+
+  // -- Saidas (Fase 1.11 parte A, 04/10/2026) ---------------------------------------------------------
+  // Triagem das saidas da empresa ativa: aplicacao por conta da beneficiaria, devolucao ao Adquirente,
+  // transferencia interna (neutra) ou nao pertence. O que nao for da operacao nunca sai do LEDGR.
+  @Get('saidas')
+  async saidas(@Req() req: any) {
+    const companyId = this.empresa(req);
+    const usadas = await this.destinadas(companyId);
+    const notas = await this.anotacoes(companyId);
+    const lista = await this.prisma.bankTransaction.findMany({
+      where: { companyId, type: 'DEBIT' as any },
+      orderBy: { transactionDate: 'asc' },
+      select: { id: true, transactionDate: true, amount: true, description: true, counterpartyName: true, counterpartyDoc: true },
+    });
+    return lista.filter((t) => !usadas.has(t.id)).map((t) => ({
+      id: t.id, data: t.transactionDate, valor: t.amount, lancamento: t.description,
+      favorecidoNome: t.counterpartyName || null, favorecidoDocumento: mascarar(t.counterpartyDoc), anotacao: notas.get(t.id) || null,
+    }));
+  }
+
+  @Get('saidas/apoio')
+  @UseGuards(MasterOnlyGuard)
+  async apoioSaidas(@Req() req: any) {
+    const companyId = this.empresa(req);
+    return this.db.comoUsuario(req.user.id, async (tx) => {
+      const naturezas = await tx.projNaturezaAplicacao.findMany({ where: { ativo: true }, orderBy: { nome: 'asc' }, select: { codigo: true, nome: true, tipo: true } });
+      const parts = await tx.projParticipacao.findMany({
+        where: { companyId, canceladoEm: null, papel: { codigo: 'RECEBEDORA_FINANCEIRA' }, operacao: { canceladoEm: null } },
+        select: { operacao: { select: { id: true, nome: true, projeto: { select: { nome: true } } } } },
+      });
+      const destinos: any[] = [];
+      for (const p of parts) {
+        const op = p.operacao;
+        const cps = await tx.projParticipacao.findMany({
+          where: { operacaoId: op.id, canceladoEm: null, contraparteId: { not: null } },
+          select: { papel: { select: { nome: true } }, contraparte: { select: { id: true, nome: true } } },
+        });
+        const papeis = new Map<string, { nome: string; papeis: string[] }>();
+        cps.forEach((c) => { if (c.contraparte) { const e = papeis.get(c.contraparte.id) || { nome: c.contraparte.nome, papeis: [] }; e.papeis.push(c.papel.nome); papeis.set(c.contraparte.id, e); } });
+        const creditos = await tx.projCredito.findMany({
+          where: { operacaoId: op.id, canceladoEm: null }, orderBy: { numeroOrdem: 'asc' },
+          select: { id: true, numeroOrdem: true, dataCredito: true, valor: true, remetente: { select: { nome: true } } },
+        });
+        destinos.push({
+          operacaoId: op.id, nome: op.projeto.nome + ' · ' + op.nome,
+          contrapartes: [...papeis.entries()].map(([id, e]) => ({ id, nome: e.nome, papeis: e.papeis.join(', ') })).sort((a, b) => a.nome.localeCompare(b.nome)),
+          creditos: creditos.map((c) => ({ id: c.id, rotulo: `Nº ${c.numeroOrdem ?? '-'} · ${c.dataCredito.toISOString().slice(0, 10)} · R$ ${c.valor.toFixed(2)} · ${c.remetente?.nome || 'sem remetente'}` })),
+        });
+      }
+      return { naturezas, destinos };
+    });
+  }
+
+  @Post('saidas/:transacaoId/aplicar')
+  @UseGuards(MasterOnlyGuard)
+  async aplicar(@Param('transacaoId') transacaoId: string, @Body() b: any, @Req() req: any) {
+    const companyId = this.empresa(req);
+    const operacaoId = String(b?.operacaoId || '');
+    const naturezaCodigo = String(b?.naturezaCodigo || '');
+    const motivo = String(b?.motivo || '').trim();
+    const beneficiarioId = b?.beneficiarioId ? String(b.beneficiarioId) : null;
+    const creditoId = b?.creditoId ? String(b.creditoId) : null;
+    for (const id of [transacaoId, operacaoId]) if (!UUID_RE.test(id)) throw new BadRequestException('Informe a saida e a operacao.');
+    for (const id of [beneficiarioId, creditoId]) if (id && !UUID_RE.test(id)) throw new BadRequestException('Identificador invalido.');
+    if (motivo.length < 10) throw new BadRequestException('Informe o motivo (minimo 10 caracteres). Ele fica na trilha de auditoria.');
+    if ((await this.destinadas(companyId)).has(transacaoId)) throw new BadRequestException('Esta saida ja foi destinada.');
+    return this.db.comoUsuario(req.user.id, async (tx) => {
+      const t = await tx.bankTransaction.findFirst({ where: { id: transacaoId, companyId }, select: { id: true, type: true, amount: true, transactionDate: true } });
+      if (!t || String(t.type) !== 'DEBIT') throw new NotFoundException('Saida nao encontrada nesta empresa.');
+      const receb = await tx.projParticipacao.findFirst({ where: { operacaoId, companyId, canceladoEm: null, papel: { codigo: 'RECEBEDORA_FINANCEIRA' } }, select: { id: true } });
+      if (!receb) throw new BadRequestException('A empresa ativa nao e recebedora da operacao escolhida.');
+      const nat = await tx.projNaturezaAplicacao.findFirst({ where: { codigo: naturezaCodigo, ativo: true }, select: { id: true, tipo: true } });
+      if (!nat) throw new BadRequestException('Natureza invalida.');
+      if (nat.tipo === 'DEVOLUCAO' && !beneficiarioId) throw new BadRequestException('Na devolucao, informe a quem foi devolvido (Adquirente ou intermediario).');
+      if (beneficiarioId && !(await tx.projParticipacao.findFirst({ where: { operacaoId, contraparteId: beneficiarioId, canceladoEm: null }, select: { id: true } }))) {
+        throw new BadRequestException('O beneficiario precisa participar da operacao.');
+      }
+      if (creditoId && !(await tx.projCredito.findFirst({ where: { id: creditoId, operacaoId, canceladoEm: null }, select: { id: true } }))) {
+        throw new BadRequestException('Credito nao encontrado nesta operacao.');
+      }
+      const ap = await tx.projAplicacao.create({
+        data: {
+          operacaoId, bankTransactionId: t.id, naturezaId: nat.id, dataAplicacao: t.transactionDate, valor: t.amount, beneficiarioId, creditoId,
+          descricao: b?.descricao ? String(b.descricao).trim().slice(0, 500) || null : null, motivo, criadoPorId: req.user.id,
+        },
+        select: { id: true },
+      });
+      await tx.auditLog.create({
+        data: { actorId: req.user.id, action: 'PROJ_APLICACAO_REGISTRADA', targetId: ap.id, after: { companyId, operacaoId, natureza: naturezaCodigo, valor: t.amount.toFixed(2), beneficiarioId, creditoId, motivo } },
+      });
+      return ap;
+    });
+  }
+
+  @Post('saidas/:transacaoId/decidir')
+  @UseGuards(MasterOnlyGuard)
+  async decidirSaida(@Param('transacaoId') transacaoId: string, @Body() b: any, @Req() req: any) {
+    const companyId = this.empresa(req);
+    const decisao = String(b?.decisao || '');
+    const motivo = String(b?.motivo || '').trim();
+    if (!UUID_RE.test(transacaoId)) throw new BadRequestException('Saida invalida.');
+    if (!['NAO_PERTENCE', 'TRANSFERENCIA_INTERNA'].includes(decisao)) throw new BadRequestException('Decisao invalida.');
+    if (motivo.length < 10) throw new BadRequestException('Informe o motivo (minimo 10 caracteres). Ele fica na trilha de auditoria.');
+    if ((await this.destinadas(companyId)).has(transacaoId)) throw new BadRequestException('Esta saida ja foi destinada.');
+    return this.db.comoUsuario(req.user.id, async (tx) => {
+      const t = await tx.bankTransaction.findFirst({ where: { id: transacaoId, companyId }, select: { id: true, type: true, amount: true } });
+      if (!t || String(t.type) !== 'DEBIT') throw new NotFoundException('Saida nao encontrada nesta empresa.');
+      const ops = await tx.projParticipacao.findMany({ where: { companyId, canceladoEm: null, papel: { codigo: 'RECEBEDORA_FINANCEIRA' } }, select: { operacaoId: true } });
+      const ids = [...new Set(ops.map((o) => o.operacaoId))];
+      if (!ids.length) throw new BadRequestException('A empresa ativa nao e recebedora de nenhuma operacao de projeto.');
+      for (const operacaoId of ids) {
+        await tx.projExtratoDecisao.create({ data: { operacaoId, bankTransactionId: t.id, decisao, motivo, criadoPorId: req.user.id } });
+      }
+      await tx.auditLog.create({ data: { actorId: req.user.id, action: 'PROJ_EXTRATO_SAIDA_DECIDIDA', targetId: t.id, after: { companyId, decisao, operacoes: ids, valor: t.amount.toFixed(2), motivo } } });
+      return { ok: true };
+    });
+  }
 }

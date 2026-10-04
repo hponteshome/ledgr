@@ -5782,7 +5782,7 @@ model ProjExtratoDecisao {
   id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   operacaoId         String    @map("operacao_id") @db.Uuid
   bankTransactionId  String    @map("bank_transaction_id") @db.Uuid
-  decisao            String    @db.VarChar(20)
+  decisao            String    @db.VarChar(30)
   motivo             String
   criadoEm           DateTime  @default(now()) @map("criado_em") @db.Timestamp(6)
   criadoPorId        String?   @map("criado_por_id") @db.Uuid
@@ -5835,4 +5835,43 @@ model ProjDocumento {
 
   @@index([operacaoId])
   @@map("proj_documentos")
+}
+
+/// Fase 1.11 parte A (04/10/2026): naturezas das aplicacoes de recursos (APLICACAO por conta da beneficiaria ou DEVOLUCAO ao Adquirente).
+model ProjNaturezaAplicacao {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  codigo     String   @unique @db.VarChar(30)
+  nome       String   @db.VarChar(120)
+  tipo       String   @db.VarChar(15)
+  ativo      Boolean  @default(true)
+  criadoEm   DateTime @default(now()) @map("criado_em") @db.Timestamp(6)
+
+  aplicacoes ProjAplicacao[]
+
+  @@map("proj_naturezas_aplicacao")
+}
+
+/// Fase 1.11 parte A (04/10/2026): aplicacao de recursos - saida do extrato da recebedora classificada pelo Financeiro (LEDGR)
+/// como da operacao. Imutavel (so encerra, com motivo), sem DELETE; uma saida = uma aplicacao vigente; RLS como o dominio.
+model ProjAplicacao {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  operacaoId         String    @map("operacao_id") @db.Uuid
+  bankTransactionId  String    @map("bank_transaction_id") @db.Uuid
+  naturezaId         String    @map("natureza_id") @db.Uuid
+  dataAplicacao      DateTime  @map("data_aplicacao") @db.Date
+  valor              Decimal   @db.Decimal(18, 2)
+  beneficiarioId     String?   @map("beneficiario_id") @db.Uuid
+  creditoId          String?   @map("credito_id") @db.Uuid
+  descricao          String?
+  motivo             String
+  criadoEm           DateTime  @default(now()) @map("criado_em") @db.Timestamp(6)
+  criadoPorId        String?   @map("criado_por_id") @db.Uuid
+  canceladoEm        DateTime? @map("cancelado_em") @db.Timestamp(6)
+  canceladoPorId     String?   @map("cancelado_por_id") @db.Uuid
+  motivoCancelamento String?   @map("motivo_cancelamento")
+
+  natureza ProjNaturezaAplicacao @relation(fields: [naturezaId], references: [id])
+
+  @@index([operacaoId])
+  @@map("proj_aplicacoes")
 }

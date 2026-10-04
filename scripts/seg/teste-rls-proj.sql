@@ -1,6 +1,15 @@
 -- scripts/seg/teste-rls-proj.sql
 -- Testes de RLS nas tabelas proj_* executados COMO ledgr_api (SET ROLE). Sempre desfeitos (ROLLBACK).
 BEGIN;
+-- Totais reais (superusuario, antes de assumir o ledgr_api): a QA, com concessao na Operacao Ancora, deve ver exatamente isto.
+SELECT 'total_participacoes=' || count(*) FROM proj_participacoes pp JOIN proj_operacoes o ON o.id = pp.operacao_id WHERE o.codigo = 'ANCORA';
+SELECT 'total_contrapartes=' || count(DISTINCT pp.contraparte_id) FROM proj_participacoes pp JOIN proj_operacoes o ON o.id = pp.operacao_id WHERE o.codigo = 'ANCORA' AND pp.contraparte_id IS NOT NULL;
+SELECT 'total_creditos=' || count(*) FROM proj_creditos c JOIN proj_operacoes o ON o.id = c.operacao_id WHERE o.codigo = 'ANCORA';
+SELECT 'total_provas=' || count(*) FROM proj_credito_provas p JOIN proj_creditos c ON c.id = p.credito_id JOIN proj_operacoes o ON o.id = c.operacao_id WHERE o.codigo = 'ANCORA' AND p.cancelado_em IS NULL;
+SELECT 'total_vinculos=' || count(*) FROM proj_credito_vinculos v JOIN proj_creditos c ON c.id = v.credito_id JOIN proj_operacoes o ON o.id = c.operacao_id WHERE o.codigo = 'ANCORA' AND v.cancelado_em IS NULL;
+SELECT 'total_aplicacoes=' || count(*) FROM proj_aplicacoes a JOIN proj_operacoes o ON o.id = a.operacao_id WHERE o.codigo = 'ANCORA' AND a.cancelado_em IS NULL;
+SELECT 'total_projetos=' || count(*) FROM proj_projetos;
+SELECT 'total_operacoes=' || count(*) FROM proj_operacoes;
 SET LOCAL ROLE ledgr_api;
 SELECT 'sem_contexto=' || count(*) FROM proj_projetos;
 SELECT 'sem_contexto_creditos=' || count(*) FROM proj_creditos;
@@ -14,6 +23,7 @@ WITH u AS (UPDATE proj_creditos SET valor = valor RETURNING 1) SELECT 'qa_update
 SELECT 'qa_vinculos=' || count(*) FROM proj_credito_vinculos WHERE cancelado_em IS NULL;
 WITH u AS (UPDATE proj_credito_vinculos SET motivo_cancelamento = motivo_cancelamento RETURNING 1) SELECT 'qa_update_vinculos=' || count(*) FROM u;
 SELECT 'qa_provas=' || count(*) FROM proj_credito_provas WHERE cancelado_em IS NULL;
+SELECT 'qa_aplicacoes=' || count(*) FROM proj_aplicacoes WHERE cancelado_em IS NULL;
 WITH u AS (UPDATE proj_credito_provas SET motivo_cancelamento = motivo_cancelamento RETURNING 1) SELECT 'qa_update_provas=' || count(*) FROM u;
 SELECT 'qa_concessoes_de_outros=' || count(*) FROM proj_concessoes WHERE user_id <> proj_ctx_user();
 WITH u AS (UPDATE proj_operacoes SET nome = nome RETURNING 1) SELECT 'qa_update_operacoes=' || count(*) FROM u;
@@ -29,4 +39,7 @@ SELECT 'vinculo_delete=' || r FROM t_del;
 CREATE TEMP TABLE t_delp (r text) ON COMMIT DROP;
 DO $$ BEGIN BEGIN DELETE FROM proj_credito_provas WHERE id = (SELECT id FROM proj_credito_provas LIMIT 1); INSERT INTO t_delp VALUES ('permitido'); EXCEPTION WHEN others THEN INSERT INTO t_delp VALUES ('negado'); END; END $$;
 SELECT 'prova_delete=' || r FROM t_delp;
+CREATE TEMP TABLE t_anot (r text) ON COMMIT DROP;
+DO $$ BEGIN BEGIN PERFORM 1 FROM proj_anotacoes_extrato LIMIT 1; INSERT INTO t_anot VALUES ('permitido'); EXCEPTION WHEN others THEN INSERT INTO t_anot VALUES ('negado'); END; END $$;
+SELECT 'anotacoes_acesso_direto=' || r FROM t_anot;
 ROLLBACK;

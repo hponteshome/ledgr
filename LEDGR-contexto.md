@@ -10209,3 +10209,9 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 
 - 04/10/2026 - Fase 1.4-1.5 (parte 2): Painel com Editar projeto e Editar operacao (motivo exigido se data-base ou valor de controle mudarem; valor aceita 3.495.791,15 ou 3495791.15); Pendencias com Identificar remetente (contraparte existente ou nova, com a fonte); workspace recarrega o projeto apos edicoes. Itens 1.4 e 1.5 concluidos.
 
+
+## [PROJETOS] 04/10/2026 - Fase 1.11 parte A: triagem das saidas e aplicacoes de recursos
+
+- proj_aplicacoes (debito do mesmo valor na conta da recebedora, imutavel, sem DELETE, RLS), naturezas (6 + devolucao ao Adquirente), papel INTERMEDIARIO, decisao TRANSFERENCIA_INTERNA. Anotacoes da planilha so como apoio (tabela sem privilegio para a API; funcao por empresa); carga 592 de 592. LEDGR: Classificar saidas. Projeto: Aplicacoes.
+- REGRA DOS TESTES (licao definitiva): nada de contagem fixa de dado vivo. RLS compara o que a QA ve com o total real da operacao (calculado como superusuario); API confere presenca de itens essenciais. Fixo so o fato historico (R$ 3.495.791,15 ate a data-base).
+
