@@ -13,6 +13,7 @@ import PainelProjeto from './PainelProjeto';
 import CreditosProjeto from './CreditosProjeto';
 import ParticipantesProjeto from './ParticipantesProjeto';
 import PendenciasProjeto from './PendenciasProjeto';
+import DocumentosProjeto from './DocumentosProjeto';
 import { PROJ, PROJ_ACCENT, Projeto, erroSt } from './projetoTema';
 
 const itemSt = (ativo: boolean): React.CSSProperties => ({
@@ -29,10 +30,10 @@ const MENU: { to: string; label: string; icon: React.ElementType; end?: boolean 
   { to: '', label: 'Painel', icon: FiGrid, end: true },
   { to: 'creditos', label: 'Créditos', icon: FiDollarSign },
   { to: 'participantes', label: 'Participantes', icon: FiUsers },
+  { to: 'documentos', label: 'Documentos', icon: FiFileText },
 ];
 const EM_BREVE: { label: string; icon: React.ElementType }[] = [
   { label: 'Extratos e conciliação', icon: FiRepeat },
-  { label: 'Documentos', icon: FiFileText },
 ];
 
 export default function ProjetoWorkspace() {
@@ -120,6 +121,7 @@ export default function ProjetoWorkspace() {
               <Route index element={<PainelProjeto projeto={projeto} operacao={operacao} />} />
               <Route path="creditos" element={<CreditosProjeto operacao={operacao} master={master} />} />
               <Route path="participantes" element={<ParticipantesProjeto operacao={operacao} />} />
+              <Route path="documentos" element={<DocumentosProjeto operacao={operacao} master={master} />} />
               <Route path="pendencias" element={<PendenciasProjeto operacao={operacao} master={master} />} />
               {master && <Route path="concessoes" element={<ConcessoesPage />} />}
               <Route path="*" element={<Navigate to={base} replace />} />

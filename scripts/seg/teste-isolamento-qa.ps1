@@ -141,6 +141,11 @@ if ($global:tok) {
   Teste "Projetos: pendencias do projeto (sem extrato)"   GET    "/projects/operacoes/${opId}/pendencias"        200
   Teste "Financeiro: entradas da empresa ativa (LEDGR)"   GET    "/projects-financeiro/entradas"                 200
   Teste "Financeiro: encaminhar entrada (so Master)"       POST   "/projects-financeiro/entradas/${zero}/encaminhar" 403 -corpo '{}'
+  Teste "Documentos: tipos"                              GET    "/projects/documento-tipos"                    200 -qtd 8
+  Teste "Documentos: lista da operacao"                  GET    "/projects/operacoes/${opId}/documentos"        200
+  Teste "Documentos: enviar (so Master)"                 POST   "/projects/operacoes/${opId}/documentos"        403 -corpo '{}'
+  Teste "Documentos: baixar inexistente"                 GET    "/projects/operacoes/${opId}/documentos/${zero}/arquivo" 404
+  Teste "Documentos: cancelar (so Master)"               POST   "/projects/operacoes/${opId}/documentos/${zero}/cancelar" 403 -corpo '{}'
   Teste "Projetos: alterar vinculo (so Master)"           POST   "/projects/operacoes/${opId}/creditos/${zero}/vinculo" 403 -corpo '{}'
   Teste "Projetos: creditos de operacao inexistente"   GET    "/projects/operacoes/${zero}/creditos"         404
   Teste "Projetos: operacao inexistente/alheia"        GET    "/projects/operacoes/${zero}/participacoes"    404

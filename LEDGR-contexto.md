@@ -10177,3 +10177,12 @@ independente da profundidade). Contraste ajustado a pedido do usuario
   - LEDGR: Projetos > Encaminhar entradas (/app/projetos/encaminhar), controller projects-financeiro com escopo da EMPRESA ATIVA (CompanyInterceptor + UserCompany). Encaminhar (cria credito origem EXTRATO + prova MANUAL, vinculo PENDENTE - decisao do projeto) ou Nao pertence (proj_extrato_decisoes). Acoes so Master por enquanto.
   - Banco: funcao SECURITY DEFINER proj_transacoes_destinadas(empresa) - devolve so ids das transacoes da empresa ja destinadas, sem expor dados do projeto.
 - Resumo: semVinculoTotal; suite confere contas individuais + desvinculados + pendentes = total.
+
+## [PROJETOS] 04/10/2026 - Fase 1.10: documentos do projeto
+
+- Decisao do Hpontes: funcionalidade preparada, sem documentos ainda; aportes continuam comprovados pelo proprio extrato. Documentos servem ao que o extrato nao prova (termo, anexos, societario, identificacao, correspondencia, laudos).
+- Armazenamento: PROJ_STORAGE_DIR (D:\Dados\LedgrArquivos\projetos), FORA do repositorio e de pasta publica; arquivo nomeado pelo SHA-256 do conteudo (deduplica, nunca sobrescreve; escrita atomica).
+- proj_documento_tipos (8 tipos, catalogo) e proj_documentos (operacao; credito OU contraparte; sha256; versao e documento_origem_id). Imutavel por trigger (so cancela, com motivo), sem DELETE, RLS (le quem ve a operacao; grava Master).
+- API: GET documento-tipos; GET/POST .../operacoes/:id/documentos; GET .../documentos/:id/arquivo (download autenticado, recalcula SHA-256 e recusa se divergir, AuditLog PROJ_DOCUMENTO_BAIXADO); POST .../documentos/:id/cancelar. Nova versao encerra a anterior com motivo.
+- Tela: Documentos no menu do espaco do projeto (lista, filtro de versoes/cancelados, envio, nova versao, cancelamento, download). Upload por fetch (axios corrompe multipart).
+- Backup: incluir D:\Dados\LedgrArquivos no plano de backup da Fase 0B.

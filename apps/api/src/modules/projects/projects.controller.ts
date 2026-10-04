@@ -6,7 +6,13 @@
 // como segunda barreira (defesa em profundidade sobre o guard).
 // Fase 1.6 / D8 / 1.6b (03/10/2026): creditos, resumo, participacoes com nome da empresa e vinculo do credito
 // a Conta Individual (alterar ou desvincular: so Master, com motivo; historico imutavel no banco).
-import { Controller, Get, Post, Param, Body, Req, UseGuards, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, Req, Res, UseGuards, UseInterceptors, UploadedFile, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
+import type { Response } from 'express';
+import * as crypto from 'crypto';
+import * as fs from 'fs';
+import * as path from 'path';
 import { Prisma } from '@prisma/client';
 import { JwtAuthGuard } from '../../auth/guards/jwt.guard';
 import { MasterOnlyGuard } from '../../auth/guards/master-only.guard';
@@ -266,6 +272,155 @@ export class ProjectsController {
       const aguardandoVinculo = await tx.projCredito.findMany({ where: { ...base, vinculos: { none: { canceladoEm: null } } }, orderBy: { numeroOrdem: 'asc' }, select: sel });
       const remetentesNaoIdentificados = await tx.projCredito.findMany({ where: { ...base, identificacaoPendente: true }, orderBy: { numeroOrdem: 'asc' }, select: sel });
       return { aguardandoVinculo, remetentesNaoIdentificados };
+    });
+  }
+
+  // -- Documentos do projeto (Fase 1.10, 04/10/2026) ----------------------------------------------
+  // Arquivos FORA de pasta publica (PROJ_STORAGE_DIR), enderecados pelo SHA-256 do conteudo; download so autenticado,
+  // com conferencia de integridade e registro no AuditLog. Registros imutaveis: nova versao ou cancelamento com motivo.
+  private dirArquivos(): string {
+    return process.env.PROJ_STORAGE_DIR || path.join(process.cwd(), 'storage', 'projetos');
+  }
+
+  @Get('documento-tipos')
+  @ProjAcao('autenticado')
+  documentoTipos(@Req() req: any) {
+    return this.db.comoUsuario(req.user.id, (tx) =>
+      tx.projDocumentoTipo.findMany({ where: { ativo: true }, orderBy: { nome: 'asc' }, select: { codigo: true, nome: true } }),
+    );
+  }
+
+  @Get('operacoes/:operacaoId/documentos')
+  @ProjAcao('ver')
+  documentos(@Param('operacaoId') operacaoId: string, @Req() req: any) {
+    if (!UUID_RE.test(operacaoId)) throw new NotFoundException('Registro nao encontrado.');
+    return this.db.comoUsuario(req.user.id, async (tx) => {
+      const docs = await tx.projDocumento.findMany({
+        where: { operacaoId },
+        orderBy: { criadoEm: 'desc' },
+        select: {
+          id: true, titulo: true, descricao: true, dataDocumento: true, creditoId: true, contraparteId: true, arquivoNome: true,
+          mime: true, tamanho: true, sha256: true, versao: true, documentoOrigemId: true, criadoEm: true, canceladoEm: true,
+          motivoCancelamento: true, tipo: { select: { codigo: true, nome: true } },
+        },
+      });
+      const credIds = [...new Set(docs.map((d) => d.creditoId).filter((x): x is string => !!x))];
+      const ctIds = [...new Set(docs.map((d) => d.contraparteId).filter((x): x is string => !!x))];
+      const creds = credIds.length ? await tx.projCredito.findMany({ where: { id: { in: credIds } }, select: { id: true, numeroOrdem: true } }) : [];
+      const cts = ctIds.length ? await tx.projContraparte.findMany({ where: { id: { in: ctIds } }, select: { id: true, nome: true } }) : [];
+      const mc = new Map(creds.map((c) => [c.id, c.numeroOrdem]));
+      const mt = new Map(cts.map((c) => [c.id, c.nome]));
+      return docs.map((d) => ({
+        ...d,
+        creditoNumero: d.creditoId ? mc.get(d.creditoId) ?? null : null,
+        contraparteNome: d.contraparteId ? mt.get(d.contraparteId) ?? null : null,
+      }));
+    });
+  }
+
+  @Post('operacoes/:operacaoId/documentos')
+  @UseGuards(MasterOnlyGuard)
+  @ProjAcao('autenticado') // decisao do MasterOnlyGuard do metodo (403 consistente)
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } }))
+  async enviarDocumento(@Param('operacaoId') operacaoId: string, @UploadedFile() file: Express.Multer.File, @Body() body: any, @Req() req: any) {
+    if (!UUID_RE.test(operacaoId)) throw new NotFoundException('Registro nao encontrado.');
+    if (!file || !file.buffer?.length) throw new BadRequestException('Arquivo nao enviado.');
+    const ext = (file.originalname.split('.').pop() || '').toLowerCase();
+    if (!['pdf', 'png', 'jpg', 'jpeg', 'webp', 'doc', 'docx', 'xls', 'xlsx'].includes(ext)) {
+      throw new BadRequestException('Formato nao aceito. Use PDF, imagem (PNG, JPG, WEBP), Word ou Excel.');
+    }
+    const titulo = String(body?.titulo || '').trim();
+    if (titulo.length < 3) throw new BadRequestException('Informe o titulo do documento.');
+    const tipoCodigo = String(body?.tipoCodigo || '');
+    const creditoId = body?.creditoId ? String(body.creditoId) : null;
+    const contraparteId = body?.contraparteId ? String(body.contraparteId) : null;
+    const substituiId = body?.substituiDocumentoId ? String(body.substituiDocumentoId) : null;
+    for (const id of [creditoId, contraparteId, substituiId]) if (id && !UUID_RE.test(id)) throw new BadRequestException('Identificador invalido.');
+    if (creditoId && contraparteId) throw new BadRequestException('Vincule o documento a um credito OU a uma contraparte.');
+    const motivoVersao = String(body?.motivoVersao || '').trim();
+    if (substituiId && motivoVersao.length < 10) throw new BadRequestException('Informe o motivo da nova versao (minimo 10 caracteres).');
+    const dataDoc = body?.dataDocumento ? new Date(String(body.dataDocumento) + 'T00:00:00') : null;
+    if (dataDoc && isNaN(dataDoc.getTime())) throw new BadRequestException('Data do documento invalida.');
+    const sha = crypto.createHash('sha256').update(file.buffer).digest('hex');
+    const chave = operacaoId + '/' + sha;
+    return this.db.comoUsuario(req.user.id, async (tx) => {
+      const op = await tx.projOperacao.findFirst({ where: { id: operacaoId, canceladoEm: null }, select: { id: true } });
+      if (!op) throw new NotFoundException('Operacao nao encontrada.');
+      const tipo = await tx.projDocumentoTipo.findFirst({ where: { codigo: tipoCodigo, ativo: true }, select: { id: true } });
+      if (!tipo) throw new BadRequestException('Tipo de documento invalido.');
+      if (creditoId && !(await tx.projCredito.findFirst({ where: { id: creditoId, operacaoId, canceladoEm: null }, select: { id: true } }))) {
+        throw new BadRequestException('Credito nao encontrado nesta operacao.');
+      }
+      if (contraparteId && !(await tx.projParticipacao.findFirst({ where: { operacaoId, contraparteId, canceladoEm: null }, select: { id: true } }))) {
+        throw new BadRequestException('Contraparte nao participa desta operacao.');
+      }
+      let versao = 1;
+      let origemId: string | null = null;
+      if (substituiId) {
+        const ant = await tx.projDocumento.findFirst({ where: { id: substituiId, operacaoId, canceladoEm: null }, select: { id: true, versao: true, documentoOrigemId: true } });
+        if (!ant) throw new BadRequestException('Documento a substituir nao encontrado (ou ja cancelado).');
+        versao = ant.versao + 1;
+        origemId = ant.documentoOrigemId ?? ant.id;
+        await tx.projDocumento.update({ where: { id: ant.id }, data: { canceladoEm: new Date(), canceladoPorId: req.user.id, motivoCancelamento: `Substituido pela versao ${versao}: ${motivoVersao}` } });
+      }
+      // grava o arquivo pelo hash (escrita atomica; o mesmo conteudo nunca e regravado nem sobrescrito)
+      const destino = path.join(this.dirArquivos(), operacaoId, sha);
+      if (!fs.existsSync(destino)) {
+        fs.mkdirSync(path.dirname(destino), { recursive: true });
+        const tmp = destino + '.tmp-' + process.pid + '-' + Date.now();
+        fs.writeFileSync(tmp, file.buffer);
+        fs.renameSync(tmp, destino);
+      }
+      const doc = await tx.projDocumento.create({
+        data: {
+          operacaoId, tipoId: tipo.id, titulo, descricao: body?.descricao ? String(body.descricao).trim() || null : null, dataDocumento: dataDoc,
+          creditoId, contraparteId, arquivoNome: file.originalname.slice(0, 250), mime: (file.mimetype || '').slice(0, 120), tamanho: file.size,
+          sha256: sha, chaveArmazenamento: chave, versao, documentoOrigemId: origemId, criadoPorId: req.user.id,
+        },
+      });
+      await tx.auditLog.create({
+        data: { actorId: req.user.id, action: 'PROJ_DOCUMENTO_ENVIADO', targetId: doc.id, after: { operacaoId, titulo, tipo: tipoCodigo, sha256: sha, tamanho: file.size, versao, creditoId, contraparteId } },
+      });
+      return { id: doc.id, versao, sha256: sha };
+    });
+  }
+
+  @Get('operacoes/:operacaoId/documentos/:documentoId/arquivo')
+  @ProjAcao('ver')
+  async baixarDocumento(@Param('operacaoId') operacaoId: string, @Param('documentoId') documentoId: string, @Req() req: any, @Res() res: Response) {
+    if (!UUID_RE.test(operacaoId) || !UUID_RE.test(documentoId)) throw new NotFoundException('Registro nao encontrado.');
+    const d = await this.db.comoUsuario(req.user.id, async (tx) => {
+      const doc = await tx.projDocumento.findFirst({ where: { id: documentoId, operacaoId }, select: { id: true, titulo: true, arquivoNome: true, mime: true, sha256: true, chaveArmazenamento: true } });
+      if (!doc) return null;
+      await tx.auditLog.create({ data: { actorId: req.user.id, action: 'PROJ_DOCUMENTO_BAIXADO', targetId: doc.id, after: { operacaoId, titulo: doc.titulo } } });
+      return doc;
+    });
+    if (!d) throw new NotFoundException('Registro nao encontrado.');
+    const caminho = path.join(this.dirArquivos(), ...d.chaveArmazenamento.split('/'));
+    if (!fs.existsSync(caminho)) throw new NotFoundException('Arquivo nao encontrado no armazenamento.');
+    const buf = fs.readFileSync(caminho);
+    if (crypto.createHash('sha256').update(buf).digest('hex') !== d.sha256) {
+      throw new ConflictException('Integridade violada: o arquivo armazenado difere do registrado.');
+    }
+    res.setHeader('Content-Type', d.mime || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(d.arquivoNome)}`);
+    res.setHeader('X-Documento-Sha256', d.sha256);
+    res.send(buf);
+  }
+
+  @Post('operacoes/:operacaoId/documentos/:documentoId/cancelar')
+  @UseGuards(MasterOnlyGuard)
+  @ProjAcao('autenticado') // decisao do MasterOnlyGuard do metodo (403 consistente)
+  cancelarDocumento(@Param('operacaoId') operacaoId: string, @Param('documentoId') documentoId: string, @Body() body: any, @Req() req: any) {
+    if (!UUID_RE.test(operacaoId) || !UUID_RE.test(documentoId)) throw new NotFoundException('Registro nao encontrado.');
+    const motivo = String(body?.motivo || '').trim();
+    if (motivo.length < 10) throw new BadRequestException('Informe o motivo (minimo 10 caracteres). Ele fica na trilha de auditoria.');
+    return this.db.comoUsuario(req.user.id, async (tx) => {
+      const doc = await tx.projDocumento.findFirst({ where: { id: documentoId, operacaoId, canceladoEm: null }, select: { id: true, titulo: true } });
+      if (!doc) throw new NotFoundException('Documento vigente nao encontrado.');
+      const r = await tx.projDocumento.update({ where: { id: doc.id }, data: { canceladoEm: new Date(), canceladoPorId: req.user.id, motivoCancelamento: motivo } });
+      await tx.auditLog.create({ data: { actorId: req.user.id, action: 'PROJ_DOCUMENTO_CANCELADO', targetId: doc.id, after: { operacaoId, titulo: doc.titulo, motivo } } });
+      return { id: r.id };
     });
   }
 
