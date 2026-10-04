@@ -10168,3 +10168,12 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - Medicao das 72 entradas do extrato sem ligacao: ate 31/12/2025 - 21 de outros pagadores (R$ 941.780,71) e 14 sem pagador (R$ 4.224,91), NENHUMA de remetente conhecido (planilha completa quanto aos 19 remetentes; a diferenca de R$ 200.515,33 nao vem dai). Depois de 31/12/2025 - 8 de remetentes conhecidos (R$ 398.000,00, candidatas a creditos novos), 21 de outros pagadores (R$ 829.005,00), 8 sem pagador (R$ 50.240,14).
 - API: GET .../operacoes/:id/pendencias (acao 'conciliar': expoe movimento da recebedora); POST .../extrato/:transacaoId/incluir (cria credito origem EXTRATO + prova MANUAL + vinculo; cadastra remetente pelo extrato se preciso; tudo numa transacao) e .../descartar (proj_extrato_decisoes NAO_PERTENCE, reversivel, imutavel, sem DELETE). So Master. Vinculo: acao RETIFICAR (so o motivo).
 - Tela: Pendencias no menu do espaco do projeto (Master), filtros por data-base e remetentes conhecidos, modais no padrao APPayModal; secao dos 3 remetentes nao identificados; "Retificar o motivo" no modal de Vinculo.
+
+## [PROJETOS] 03/10/2026 - Fase 1.8 REVISTA: triagem do extrato no LEDGR (principio de segregacao)
+
+- Principio definido pelo Hpontes: o extrato completo so pode ser visto no LEDGR; o projeto recebe apenas o que o Financeiro encaminhar. Nada que nao se refira ao projeto aparece no espaco do projeto.
+- A 1.8 original violava isso (Pendencias do projeto listava todas as entradas da SUNSYS, inclusive rendimentos e outros pagadores). Corrigido:
+  - Espaco do projeto: rota de entradas do extrato REMOVIDA, junto com incluir/descartar. Pendencias do projeto = creditos aguardando decisao de vinculo + remetentes nao identificados (acao 'ver'). Perfil 'conciliar' nao da mais acesso a movimento bancario.
+  - LEDGR: Projetos > Encaminhar entradas (/app/projetos/encaminhar), controller projects-financeiro com escopo da EMPRESA ATIVA (CompanyInterceptor + UserCompany). Encaminhar (cria credito origem EXTRATO + prova MANUAL, vinculo PENDENTE - decisao do projeto) ou Nao pertence (proj_extrato_decisoes). Acoes so Master por enquanto.
+  - Banco: funcao SECURITY DEFINER proj_transacoes_destinadas(empresa) - devolve so ids das transacoes da empresa ja destinadas, sem expor dados do projeto.
+- Resumo: semVinculoTotal; suite confere contas individuais + desvinculados + pendentes = total.

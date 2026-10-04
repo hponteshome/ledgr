@@ -74,11 +74,9 @@ export default function ProjetoWorkspace() {
               <m.icon size={15} /> {m.label}
             </NavLink>
           ))}
-          {master && (
-            <NavLink to={`${base}/pendencias`} style={({ isActive }) => itemSt(isActive)}>
-              <FiAlertCircle size={15} /> Pendências
-            </NavLink>
-          )}
+          <NavLink to={`${base}/pendencias`} style={({ isActive }) => itemSt(isActive)}>
+            <FiAlertCircle size={15} /> Pendências
+          </NavLink>
           {master && (
             <NavLink to={`${base}/concessoes`} style={({ isActive }) => itemSt(isActive)}>
               <FiKey size={15} /> Concessões de acesso
@@ -122,7 +120,7 @@ export default function ProjetoWorkspace() {
               <Route index element={<PainelProjeto projeto={projeto} operacao={operacao} />} />
               <Route path="creditos" element={<CreditosProjeto operacao={operacao} master={master} />} />
               <Route path="participantes" element={<ParticipantesProjeto operacao={operacao} />} />
-              {master && <Route path="pendencias" element={<PendenciasProjeto operacao={operacao} />} />}
+              <Route path="pendencias" element={<PendenciasProjeto operacao={operacao} master={master} />} />
               {master && <Route path="concessoes" element={<ConcessoesPage />} />}
               <Route path="*" element={<Navigate to={base} replace />} />
             </Routes>

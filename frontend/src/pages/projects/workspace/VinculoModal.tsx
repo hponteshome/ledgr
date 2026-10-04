@@ -48,7 +48,7 @@ export default function VinculoModal({ credito, operacaoId, onClose, onSuccess }
         .map((x: any) => ({ id: x.contraparte.id, nome: x.contraparte.nome }));
       setAdquirentes(adqs);
       setAdquirenteId(credito.vinculoAtual?.adquirente?.id || adqs[0]?.id || '');
-      setAcao(credito.vinculoAtual?.situacao === 'DESVINCULADO' ? 'VINCULAR' : 'DESVINCULAR');
+      setAcao(credito.vinculoAtual?.situacao === 'VINCULADO' ? 'DESVINCULAR' : 'VINCULAR');
     }).catch((e) => setErro(e?.response?.data?.message || 'Falha ao carregar o histórico do vínculo.'));
   }, [operacaoId, credito]);
 
