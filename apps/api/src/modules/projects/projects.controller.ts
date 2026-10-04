@@ -450,6 +450,22 @@ export class ProjectsController {
     });
   }
 
+  @Post('operacoes/:operacaoId/aplicacoes/:aplicacaoId/encerrar')
+  @UseGuards(MasterOnlyGuard)
+  @ProjAcao('autenticado') // decisao do MasterOnlyGuard do metodo (403 consistente)
+  encerrarAplicacao(@Param('operacaoId') operacaoId: string, @Param('aplicacaoId') aplicacaoId: string, @Body() b: any, @Req() req: any) {
+    if (!UUID_RE.test(operacaoId) || !UUID_RE.test(aplicacaoId)) throw new NotFoundException('Registro nao encontrado.');
+    const motivo = String(b?.motivo || '').trim();
+    if (motivo.length < 10) throw new BadRequestException('Informe o motivo (minimo 10 caracteres). Ele fica na trilha de auditoria.');
+    return this.db.comoUsuario(req.user.id, async (tx) => {
+      const ap = await tx.projAplicacao.findFirst({ where: { id: aplicacaoId, operacaoId, canceladoEm: null }, select: { id: true, valor: true, natureza: { select: { codigo: true } } } });
+      if (!ap) throw new NotFoundException('Aplicacao vigente nao encontrada.');
+      await tx.projAplicacao.update({ where: { id: ap.id }, data: { canceladoEm: new Date(), canceladoPorId: req.user.id, motivoCancelamento: motivo } });
+      await tx.auditLog.create({ data: { actorId: req.user.id, action: 'PROJ_APLICACAO_ENCERRADA', targetId: ap.id, after: { operacaoId, natureza: ap.natureza.codigo, valor: ap.valor.toFixed(2), motivo } } });
+      return { id: ap.id };
+    });
+  }
+
   @Get('perfis')
   @UseGuards(MasterOnlyGuard)
   @ProjAcao('autenticado') // decisao do MasterOnlyGuard do metodo (403 consistente)

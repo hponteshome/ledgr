@@ -10215,3 +10215,11 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - proj_aplicacoes (debito do mesmo valor na conta da recebedora, imutavel, sem DELETE, RLS), naturezas (6 + devolucao ao Adquirente), papel INTERMEDIARIO, decisao TRANSFERENCIA_INTERNA. Anotacoes da planilha so como apoio (tabela sem privilegio para a API; funcao por empresa); carga 592 de 592. LEDGR: Classificar saidas. Projeto: Aplicacoes.
 - REGRA DOS TESTES (licao definitiva): nada de contagem fixa de dado vivo. RLS compara o que a QA ve com o total real da operacao (calculado como superusuario); API confere presenca de itens essenciais. Fixo so o fato historico (R$ 3.495.791,15 ate a data-base).
 
+
+## [PROJETOS] 04/10/2026 - Fase 1.11 parte A2: circuitos neutros
+
+- Informacao do Hpontes: parte das "Devolucoes AV" sao devolucoes ao CAIXA da SUNSYS de valores sacados por Antonio Vieira (efeito nulo no projeto, como os movimentos da Josi); so as devolucoes efetivas ao Adquirente reduzem a Conta Individual.
+- proj_extrato_decisoes.circuito (rotulo obrigatorio para TRANSFERENCIA_INTERNA; CHECK NOT VALID para novos registros; imutavel pelo trigger).
+- LEDGR: Encaminhar entradas com "Outra decisao" (transferencia interna com circuito ou nao pertence) e anotacao da planilha como apoio; Classificar saidas com o mesmo modal (DecisaoMovimentoModal); nova tela Projetos > Circuitos neutros (/app/projetos/circuitos): saiu x voltou x saldo por circuito, residuo destacado, Desfazer (encerra a decisao com motivo e devolve o movimento a triagem).
+- Projeto: Aplicacoes com Encerrar (Master, motivo); a saida volta a triagem.
+- API: POST projects-financeiro/{saidas|entradas}/:id/decidir, GET circuitos, POST decisoes/:id/encerrar; POST projects/operacoes/:id/aplicacoes/:id/encerrar.

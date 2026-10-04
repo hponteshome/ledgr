@@ -57,6 +57,7 @@ import ConcessoesPage from '../pages/projects/ConcessoesPage';
 import ProjetosHomePage from '../pages/projects/ProjetosHomePage';
 import EncaminhamentoEntradasPage from '../pages/projects/EncaminhamentoEntradasPage';
 import TriagemSaidasPage from '../pages/projects/TriagemSaidasPage';
+import CircuitosNeutrosPage from '../pages/projects/CircuitosNeutrosPage';
 import ProjetoWorkspace from '../pages/projects/workspace/ProjetoWorkspace';
 import AberturaLancamentosPage from '../pages/accounting/AberturaLancamentosPage';
 import EcdValidationPage from '../pages/accounting/EcdValidationPage';
@@ -193,6 +194,7 @@ export const AppRoutes = () => {
                 <Route path="app/projetos/lista" element={<ProtectedRoute><ProjetosHomePage /></ProtectedRoute>} />
                 <Route path="app/projetos/encaminhar" element={<ProtectedRoute><EncaminhamentoEntradasPage /></ProtectedRoute>} />
                 <Route path="app/projetos/saidas" element={<ProtectedRoute><TriagemSaidasPage /></ProtectedRoute>} />
+                <Route path="app/projetos/circuitos" element={<ProtectedRoute><CircuitosNeutrosPage /></ProtectedRoute>} />
                 <Route path="app/accounting/abertura" element={<ProtectedRoute><AberturaLancamentosPage /></ProtectedRoute>} />
                 <Route path="app/accounting/ecd-lancamentos" element={<ProtectedRoute><EcdLancamentosImportPage /></ProtectedRoute>} />
                 <Route path="app/accounting/journal" element={<ProtectedRoute><JournalPage /></ProtectedRoute>} />

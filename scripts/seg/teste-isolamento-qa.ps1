@@ -169,6 +169,10 @@ if ($global:tok) {
   Teste "Saidas: registrar aplicacao (so Master)"         POST   "/projects-financeiro/saidas/${zero}/aplicar"  403 -corpo '{}'
   Teste "Saidas: transferencia interna (so Master)"       POST   "/projects-financeiro/saidas/${zero}/decidir"  403 -corpo '{}'
   Teste "Projetos: aplicacoes da operacao"                GET    "/projects/operacoes/${opId}/aplicacoes"        200
+  Teste "Entradas: transferencia interna (so Master)"     POST   "/projects-financeiro/entradas/${zero}/decidir" 403 -corpo '{}'
+  Teste "Circuitos neutros (so Master)"                   GET    "/projects-financeiro/circuitos"               403
+  Teste "Decisoes: desfazer (so Master)"                  POST   "/projects-financeiro/decisoes/${zero}/encerrar" 403 -corpo '{}'
+  Teste "Projetos: encerrar aplicacao (so Master)"        POST   "/projects/operacoes/${opId}/aplicacoes/${zero}/encerrar" 403 -corpo '{}'
   Teste "Projetos: alterar vinculo (so Master)"           POST   "/projects/operacoes/${opId}/creditos/${zero}/vinculo" 403 -corpo '{}'
   Teste "Projetos: creditos de operacao inexistente"   GET    "/projects/operacoes/${zero}/creditos"         404
   Teste "Projetos: operacao inexistente/alheia"        GET    "/projects/operacoes/${zero}/participacoes"    404

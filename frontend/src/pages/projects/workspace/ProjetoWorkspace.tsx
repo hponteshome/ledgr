@@ -123,7 +123,7 @@ export default function ProjetoWorkspace() {
             <Routes>
               <Route index element={<PainelProjeto projeto={projeto} operacao={operacao} master={master} onAlterado={() => setVersao((v) => v + 1)} />} />
               <Route path="creditos" element={<CreditosProjeto operacao={operacao} master={master} />} />
-              <Route path="aplicacoes" element={<AplicacoesProjeto operacao={operacao} />} />
+              <Route path="aplicacoes" element={<AplicacoesProjeto operacao={operacao} master={master} />} />
               <Route path="participantes" element={<ParticipantesProjeto operacao={operacao} master={master} />} />
               <Route path="documentos" element={<DocumentosProjeto operacao={operacao} master={master} />} />
               <Route path="pendencias" element={<PendenciasProjeto operacao={operacao} master={master} />} />

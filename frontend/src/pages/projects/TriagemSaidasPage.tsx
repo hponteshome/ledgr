@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 import api from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { ModalProjeto, Secao, ErroModal, Campo, BotaoSec, BotaoPri, inputModal, erroApi } from './workspace/ModalProjeto';
+import DecisaoMovimentoModal from './DecisaoMovimentoModal';
 
 const fmtBRL = (v: any) => Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const fmtData = (iso?: string | null) => { if (!iso) return '-'; const [a, m, d] = iso.slice(0, 10).split('-'); return `${d}/${m}/${a}`; };
@@ -27,6 +28,7 @@ export default function TriagemSaidasPage() {
   const [busca, setBusca] = useState('');
   const [aplicando, setAplicando] = useState<Saida | null>(null);
   const [decidindo, setDecidindo] = useState<Saida | null>(null);
+  const [rotulos, setRotulos] = useState<string[]>([]);
 
   const carregar = useCallback(() => {
     setErro('');
@@ -35,6 +37,7 @@ export default function TriagemSaidasPage() {
   useEffect(() => {
     carregar();
     if (master) api.get('/projects-financeiro/saidas/apoio').then((r) => setApoio(r.data)).catch(() => {});
+    if (master) api.get('/projects-financeiro/circuitos').then((r) => setRotulos((r.data || []).map((c: any) => c.circuito))).catch(() => {});
   }, [carregar, master]);
 
   const anos = useMemo(() => [...new Set(saidas.map((s) => s.data.slice(0, 4)))].sort(), [saidas]);
@@ -90,7 +93,7 @@ export default function TriagemSaidasPage() {
         </table>
       </div>
       {aplicando && apoio && <AplicarModal saida={aplicando} apoio={apoio} onClose={() => setAplicando(null)} onFeito={() => { setAplicando(null); carregar(); }} />}
-      {decidindo && <DecidirModal saida={decidindo} onClose={() => setDecidindo(null)} onFeito={() => { setDecidindo(null); carregar(); }} />}
+      {decidindo && <DecisaoMovimentoModal rota={`/projects-financeiro/saidas/${decidindo.id}/decidir`} mov={decidindo} rotulos={rotulos} onClose={() => setDecidindo(null)} onFeito={() => { setDecidindo(null); carregar(); }} />}
     </div>
   );
 }
@@ -158,41 +161,6 @@ function AplicarModal({ saida, apoio, onClose, onFeito }: { saida: Saida; apoio:
       )}
       <Secao titulo="MOTIVO *">
         <textarea style={{ ...inputModal, minHeight: 64, resize: 'vertical' }} value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Mínimo de 10 caracteres. Fica na trilha de auditoria." />
-      </Secao>
-    </ModalProjeto>
-  );
-}
-
-function DecidirModal({ saida, onClose, onFeito }: { saida: Saida; onClose: () => void; onFeito: () => void }) {
-  const [decisao, setDecisao] = useState<'TRANSFERENCIA_INTERNA' | 'NAO_PERTENCE'>('TRANSFERENCIA_INTERNA');
-  const [motivo, setMotivo] = useState('');
-  const [erro, setErro] = useState('');
-  const [enviando, setEnviando] = useState(false);
-  const valido = motivo.trim().length >= 10;
-  const enviar = async () => {
-    if (!valido) return;
-    setErro(''); setEnviando(true);
-    try {
-      await api.post(`/projects-financeiro/saidas/${saida.id}/decidir`, { decisao, motivo: motivo.trim() });
-      toast.success('Decisão registrada.');
-      onFeito();
-    } catch (e: any) { setErro(erroApi(e, 'Falha ao registrar.')); } finally { setEnviando(false); }
-  };
-  return (
-    <ModalProjeto titulo="Classificar saída" subtitulo={`${fmtData(saida.data)} · ${fmtBRL(saida.valor)} · ${saida.lancamento}`} largura={500} onClose={onClose}
-      rodape={<><BotaoSec onClick={onClose}>Cancelar</BotaoSec><BotaoPri onClick={enviar} ativo={valido && !enviando}>{enviando ? 'Aguarde...' : 'Registrar'}</BotaoPri></>}>
-      <ErroModal msg={erro} />
-      {saida.anotacao && <Secao titulo="ANOTAÇÃO DA PLANILHA (SÓ APOIO)"><div style={{ fontSize: 12, color: '#374151', fontStyle: 'italic' }}>{saida.anotacao}</div></Secao>}
-      <Secao titulo="DECISÃO">
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, marginBottom: 8, cursor: 'pointer' }}>
-          <input type="radio" checked={decisao === 'TRANSFERENCIA_INTERNA'} onChange={() => setDecisao('TRANSFERENCIA_INTERNA')} /> Transferência interna (neutra: o dinheiro volta ou paga algo a partir de outra conta)
-        </label>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
-          <input type="radio" checked={decisao === 'NAO_PERTENCE'} onChange={() => setDecisao('NAO_PERTENCE')} /> Não pertence à operação
-        </label>
-      </Secao>
-      <Secao titulo="MOTIVO *">
-        <textarea style={{ ...inputModal, minHeight: 64, resize: 'vertical' }} value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Mínimo de 10 caracteres." />
       </Secao>
     </ModalProjeto>
   );
