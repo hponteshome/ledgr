@@ -120,7 +120,7 @@ export default function ProjetoWorkspace() {
             <Routes>
               <Route index element={<PainelProjeto projeto={projeto} operacao={operacao} />} />
               <Route path="creditos" element={<CreditosProjeto operacao={operacao} master={master} />} />
-              <Route path="participantes" element={<ParticipantesProjeto operacao={operacao} />} />
+              <Route path="participantes" element={<ParticipantesProjeto operacao={operacao} master={master} />} />
               <Route path="documentos" element={<DocumentosProjeto operacao={operacao} master={master} />} />
               <Route path="pendencias" element={<PendenciasProjeto operacao={operacao} master={master} />} />
               {master && <Route path="concessoes" element={<ConcessoesPage />} />}

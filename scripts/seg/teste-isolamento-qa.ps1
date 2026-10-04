@@ -157,6 +157,13 @@ if ($global:tok) {
     if ($comQa -eq 404) { Write-Host "OK     esperado 404 | obtido 404 | Uploads: arquivo sem registro, conta QA" -ForegroundColor Green } else { $global:falhas++; Write-Host "FALHA  esperado 404 | obtido $comQa | Uploads: arquivo sem registro, conta QA" -ForegroundColor Red }
   } else { Write-Host "SEM DADOS - nenhum arquivo em apps\api\uploads para testar" -ForegroundColor Yellow }
   Teste "Uploads: tentativa de sair da pasta"            GET    "/uploads/..%2F..%2F.env"                     404
+  Teste "Cadastros: catalogo de papeis"                  GET    "/projects-cadastros/papeis"                   200 -qtd 9
+  Teste "Cadastros: empresas (so Master)"                GET    "/projects-cadastros/empresas"                 403
+  Teste "Cadastros: editar projeto (so Master)"          POST   "/projects-cadastros/projetos/${projId}"       403 -corpo '{}'
+  Teste "Cadastros: editar operacao (so Master)"         POST   "/projects-cadastros/operacoes/${opId}"        403 -corpo '{}'
+  Teste "Cadastros: nova contraparte (so Master)"        POST   "/projects-cadastros/operacoes/${opId}/contrapartes" 403 -corpo '{}'
+  Teste "Cadastros: nova participacao (so Master)"       POST   "/projects-cadastros/operacoes/${opId}/participacoes" 403 -corpo '{}'
+  Teste "Cadastros: identificar remetente (so Master)"   POST   "/projects-cadastros/operacoes/${opId}/creditos/${zero}/remetente" 403 -corpo '{}'
   Teste "Projetos: alterar vinculo (so Master)"           POST   "/projects/operacoes/${opId}/creditos/${zero}/vinculo" 403 -corpo '{}'
   Teste "Projetos: creditos de operacao inexistente"   GET    "/projects/operacoes/${zero}/creditos"         404
   Teste "Projetos: operacao inexistente/alheia"        GET    "/projects/operacoes/${zero}/participacoes"    404

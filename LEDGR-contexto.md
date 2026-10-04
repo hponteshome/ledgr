@@ -10200,3 +10200,9 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 
 - Correcao 04/10/2026: foram 8 arquivos em quarentena (2 na raiz e 6 em signatures), nao 6. Incluem alteracao contratual da GRB, ata de AGE da F5 e evidencias de assinatura do contrato de locacao do Loft SP (com CPF e CNPJ no nome do arquivo). Avaliar se o contrato de locacao do Loft SP assinado precisa ser reanexado ao registro correspondente.
 
+
+## [PROJETOS] 04/10/2026 - Fase 1.4-1.5 (parte 1): cadastros pela tela
+
+- API projects-cadastros (CadastrosController, so Master, AuditLog antes/depois, ProjEscopoGuard + RLS): papeis; empresas; editar projeto (nome, descricao, situacao); editar operacao (data-base e valor de controle so com motivo); contraparte (criar ja com papel na operacao, consultar com documento mascarado, editar; CPF/CNPJ validado pelos digitos; documento gravado nao muda pela tela); participacoes (adicionar; encerrar com motivo, travas para Adquirente com creditos vinculados e Remetente com creditos); identificar remetente de credito pendente (motivo; cria participacao REMETENTE se preciso; nome do extrato preservado).
+- Frontend: ModalProjeto.tsx (modal compartilhado no padrao APPayModal); ParticipantesProjeto com adicionar/editar/encerrar.
+- Parte 2: identificacao de remetentes nas Pendencias e edicao de projeto/operacao no Painel.
