@@ -10162,3 +10162,9 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 
 - RETIFICACAO 03/10/2026: o credito n 24 (R$ 10,00) NAO foi estornado (nao ha saida no extrato Itau). Motivo real do desvinculo: o credito nao e aporte da VAL INVESTIMENTOS. Vinculo retificado (encerrado o registro com motivo 'valor estornado' e aberto novo desvinculo com o motivo correto). A nota anterior sobre estorno fica superada.
 
+
+## [PROJETOS] 03/10/2026 - Fase 1.8: tela de Pendencias
+
+- Medicao das 72 entradas do extrato sem ligacao: ate 31/12/2025 - 21 de outros pagadores (R$ 941.780,71) e 14 sem pagador (R$ 4.224,91), NENHUMA de remetente conhecido (planilha completa quanto aos 19 remetentes; a diferenca de R$ 200.515,33 nao vem dai). Depois de 31/12/2025 - 8 de remetentes conhecidos (R$ 398.000,00, candidatas a creditos novos), 21 de outros pagadores (R$ 829.005,00), 8 sem pagador (R$ 50.240,14).
+- API: GET .../operacoes/:id/pendencias (acao 'conciliar': expoe movimento da recebedora); POST .../extrato/:transacaoId/incluir (cria credito origem EXTRATO + prova MANUAL + vinculo; cadastra remetente pelo extrato se preciso; tudo numa transacao) e .../descartar (proj_extrato_decisoes NAO_PERTENCE, reversivel, imutavel, sem DELETE). So Master. Vinculo: acao RETIFICAR (so o motivo).
+- Tela: Pendencias no menu do espaco do projeto (Master), filtros por data-base e remetentes conhecidos, modais no padrao APPayModal; secao dos 3 remetentes nao identificados; "Retificar o motivo" no modal de Vinculo.

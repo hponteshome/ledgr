@@ -144,7 +144,7 @@ export class ProjectsController {
     const acao = String(body?.acao || '');
     const motivo = String(body?.motivo || '').trim();
     const adquirenteId = body?.adquirenteId ? String(body.adquirenteId) : null;
-    if (!['VINCULAR', 'DESVINCULAR'].includes(acao)) throw new BadRequestException('Acao invalida (VINCULAR ou DESVINCULAR).');
+    if (!['VINCULAR', 'DESVINCULAR', 'RETIFICAR'].includes(acao)) throw new BadRequestException('Acao invalida (VINCULAR, DESVINCULAR ou RETIFICAR).');
     if (motivo.length < 10) throw new BadRequestException('Informe o motivo (minimo 10 caracteres). Ele fica na trilha de auditoria.');
     if (acao === 'VINCULAR' && (!adquirenteId || !UUID_RE.test(adquirenteId))) throw new BadRequestException('Informe o Adquirente.');
     return this.db.comoUsuario(req.user.id, async (tx) => {
@@ -158,6 +158,14 @@ export class ProjectsController {
         if (!adq) throw new BadRequestException('O titular precisa ser Adquirente desta operacao.');
       }
       const atual = await tx.projCreditoVinculo.findFirst({ where: { creditoId, canceladoEm: null }, select: { id: true, situacao: true, adquirenteId: true } });
+      if (acao === 'RETIFICAR') {
+        // Fase 1.8: retifica so o motivo - encerra o vigente e recria com a mesma situacao e o mesmo titular
+        if (!atual) throw new BadRequestException('Nao ha vinculo vigente para retificar.');
+        await tx.projCreditoVinculo.update({ where: { id: atual.id }, data: { canceladoEm: new Date(), canceladoPorId: req.user.id, motivoCancelamento: 'Retificacao do motivo: ' + motivo } });
+        const ret = await tx.projCreditoVinculo.create({ data: { creditoId, situacao: atual.situacao, adquirenteId: atual.adquirenteId, motivo, criadoPorId: req.user.id } });
+        await tx.auditLog.create({ data: { actorId: req.user.id, action: 'PROJ_CREDITO_VINCULO_ALTERADO', targetId: creditoId, after: { numeroOrdem: credito.numeroOrdem, motivo, retificacao: true, situacao: atual.situacao, adquirenteId: atual.adquirenteId } } });
+        return ret;
+      }
       if (atual && acao === 'VINCULAR' && atual.situacao === 'VINCULADO' && atual.adquirenteId === adquirenteId) throw new BadRequestException('O credito ja esta vinculado a este Adquirente.');
       if (atual && acao === 'DESVINCULAR' && atual.situacao === 'DESVINCULADO') throw new BadRequestException('O credito ja esta desvinculado.');
       if (atual) {
@@ -238,6 +246,148 @@ export class ProjectsController {
       comProvaBancaria: r.provas,
       semProvaBancaria: r.geral._count._all - r.provas,
     };
+  }
+
+  // -- Pendencias (Fase 1.8, 03/10/2026) -------------------------------------------------
+  // Entradas do extrato das recebedoras sem prova e sem decisao vigentes; remetentes nao identificados.
+  // Acao 'conciliar' (Contabilidade, Administrador do projeto, Master): expoe movimento bancario da recebedora.
+  @Get('operacoes/:operacaoId/pendencias')
+  @ProjAcao('conciliar')
+  pendencias(@Param('operacaoId') operacaoId: string, @Req() req: any) {
+    if (!UUID_RE.test(operacaoId)) throw new NotFoundException('Registro nao encontrado.');
+    return this.db.comoUsuario(req.user.id, async (tx) => {
+      const op = await tx.projOperacao.findFirst({ where: { id: operacaoId, canceladoEm: null }, select: { id: true, dataBase: true } });
+      if (!op) throw new NotFoundException('Registro nao encontrado.');
+      const recebedoras = await tx.projParticipacao.findMany({
+        where: { operacaoId, canceladoEm: null, companyId: { not: null }, papel: { codigo: 'RECEBEDORA_FINANCEIRA' } },
+        select: { companyId: true },
+      });
+      const empresas = recebedoras.map((r) => r.companyId).filter((x): x is string => !!x);
+      const provas = await tx.projCreditoProva.findMany({ where: { canceladoEm: null }, select: { bankTransactionId: true } });
+      const decisoes = await tx.projExtratoDecisao.findMany({ where: { operacaoId, canceladoEm: null }, select: { bankTransactionId: true } });
+      const usadas = [...provas.map((p) => p.bankTransactionId), ...decisoes.map((d) => d.bankTransactionId)];
+      const entradas = empresas.length
+        ? await tx.bankTransaction.findMany({
+            where: { companyId: { in: empresas }, type: 'CREDIT' as any, ...(usadas.length ? { id: { notIn: usadas } } : {}) },
+            orderBy: { transactionDate: 'asc' },
+            select: { id: true, transactionDate: true, amount: true, description: true, counterpartyName: true, counterpartyDoc: true },
+          })
+        : [];
+      const docs = [...new Set(entradas.map((e) => e.counterpartyDoc).filter((d): d is string => !!d))];
+      const conhecidas = docs.length
+        ? await tx.projContraparte.findMany({ where: { documento: { in: docs }, canceladoEm: null }, select: { id: true, nome: true, documento: true } })
+        : [];
+      const mapa = new Map(conhecidas.map((c) => [c.documento, c]));
+      const naoIdentificados = await tx.projCredito.findMany({
+        where: { operacaoId, canceladoEm: null, identificacaoPendente: true },
+        orderBy: { numeroOrdem: 'asc' },
+        select: { id: true, numeroOrdem: true, dataCredito: true, valor: true, referenciaBancaria: true, origem: true },
+      });
+      return {
+        dataBase: op.dataBase,
+        entradasSemLigacao: entradas.map((e) => {
+          const k = e.counterpartyDoc ? mapa.get(e.counterpartyDoc) : undefined;
+          return {
+            id: e.id, data: e.transactionDate, valor: e.amount, lancamento: e.description,
+            pagadorNome: e.counterpartyName || null, pagadorDocumento: mascararDocumento(e.counterpartyDoc),
+            remetenteConhecido: k ? { id: k.id, nome: k.nome } : null,
+            depoisDaDataBase: op.dataBase ? e.transactionDate > op.dataBase : false,
+          };
+        }),
+        remetentesNaoIdentificados: naoIdentificados,
+      };
+    });
+  }
+
+  @Post('operacoes/:operacaoId/extrato/:transacaoId/incluir')
+  @UseGuards(MasterOnlyGuard)
+  @ProjAcao('autenticado') // decisao do MasterOnlyGuard do metodo (403 consistente)
+  async incluirDoExtrato(@Param('operacaoId') operacaoId: string, @Param('transacaoId') transacaoId: string, @Body() body: any, @Req() req: any) {
+    if (!UUID_RE.test(operacaoId) || !UUID_RE.test(transacaoId)) throw new NotFoundException('Registro nao encontrado.');
+    const motivo = String(body?.motivo || '').trim();
+    const vincular = body?.vincular !== false;
+    if (motivo.length < 10) throw new BadRequestException('Informe o motivo (minimo 10 caracteres). Ele fica na trilha de auditoria.');
+    return this.db.comoUsuario(req.user.id, async (tx) => {
+      const t = await this.entradaValida(tx, operacaoId, transacaoId);
+      let remetenteId: string | null = null;
+      const doc = t.counterpartyDoc && (t.counterpartyDoc.length === 11 || t.counterpartyDoc.length === 14) ? t.counterpartyDoc : null;
+      if (doc) {
+        const existente = await tx.projContraparte.findFirst({ where: { documento: doc, canceladoEm: null }, select: { id: true } });
+        remetenteId = existente
+          ? existente.id
+          : (await tx.projContraparte.create({
+              data: { tipoPessoa: doc.length === 11 ? 'PF' : 'PJ', documento: doc, nome: t.counterpartyName || 'Remetente sem nome no extrato', observacoes: 'Remetente cadastrado a partir do extrato bancario', criadoPorId: req.user.id },
+              select: { id: true },
+            })).id;
+        const papel = await tx.projPapel.findFirst({ where: { codigo: 'REMETENTE' }, select: { id: true } });
+        if (papel) {
+          const part = await tx.projParticipacao.findFirst({ where: { operacaoId, contraparteId: remetenteId, papelId: papel.id, canceladoEm: null }, select: { id: true } });
+          if (!part) await tx.projParticipacao.create({ data: { operacaoId, papelId: papel.id, contraparteId: remetenteId, observacao: 'Remetente de credito incluido a partir do extrato', criadoPorId: req.user.id } });
+        }
+      }
+      const ultimo = await tx.projCredito.aggregate({ where: { operacaoId }, _max: { numeroOrdem: true } });
+      const credito = await tx.projCredito.create({
+        data: {
+          operacaoId, numeroOrdem: (ultimo._max.numeroOrdem ?? 0) + 1, dataCredito: t.transactionDate, valor: t.amount,
+          remetenteId, remetenteNomeExtrato: t.counterpartyName || null, referenciaBancaria: t.description, recebedoraCompanyId: t.companyId,
+          origem: 'EXTRATO', identificacaoPendente: !remetenteId, chaveIdempotencia: 'EXTRATO|' + t.id,
+          observacao: remetenteId ? null : 'Extrato sem pagador identificado', criadoPorId: req.user.id,
+        },
+      });
+      await tx.projCreditoProva.create({
+        data: { creditoId: credito.id, bankTransactionId: t.id, criterio: 'MANUAL', motivo: 'Credito incluido a partir da propria entrada do extrato: ' + motivo, criadoPorId: req.user.id },
+      });
+      if (vincular) {
+        const adq = await tx.projParticipacao.findMany({
+          where: { operacaoId, canceladoEm: null, contraparteId: { not: null }, papel: { codigo: 'ADQUIRENTE' } },
+          select: { contraparteId: true },
+        });
+        if (adq.length !== 1) throw new BadRequestException('Para vincular, a operacao precisa ter exatamente um Adquirente.');
+        await tx.projCreditoVinculo.create({ data: { creditoId: credito.id, situacao: 'VINCULADO', adquirenteId: adq[0].contraparteId, motivo, criadoPorId: req.user.id } });
+      } else {
+        await tx.projCreditoVinculo.create({ data: { creditoId: credito.id, situacao: 'DESVINCULADO', adquirenteId: null, motivo, criadoPorId: req.user.id } });
+      }
+      await tx.auditLog.create({
+        data: {
+          actorId: req.user.id, action: 'PROJ_CREDITO_INCLUIDO_EXTRATO', targetId: credito.id,
+          after: { operacaoId, bankTransactionId: t.id, numeroOrdem: credito.numeroOrdem, valor: t.amount.toFixed(2), vinculado: vincular, motivo },
+        },
+      });
+      return credito;
+    });
+  }
+
+  @Post('operacoes/:operacaoId/extrato/:transacaoId/descartar')
+  @UseGuards(MasterOnlyGuard)
+  @ProjAcao('autenticado') // decisao do MasterOnlyGuard do metodo (403 consistente)
+  async descartarDoExtrato(@Param('operacaoId') operacaoId: string, @Param('transacaoId') transacaoId: string, @Body() body: any, @Req() req: any) {
+    if (!UUID_RE.test(operacaoId) || !UUID_RE.test(transacaoId)) throw new NotFoundException('Registro nao encontrado.');
+    const motivo = String(body?.motivo || '').trim();
+    if (motivo.length < 10) throw new BadRequestException('Informe o motivo (minimo 10 caracteres). Ele fica na trilha de auditoria.');
+    return this.db.comoUsuario(req.user.id, async (tx) => {
+      const t = await this.entradaValida(tx, operacaoId, transacaoId);
+      const d = await tx.projExtratoDecisao.create({ data: { operacaoId, bankTransactionId: t.id, decisao: 'NAO_PERTENCE', motivo, criadoPorId: req.user.id } });
+      await tx.auditLog.create({
+        data: { actorId: req.user.id, action: 'PROJ_EXTRATO_ENTRADA_DESCARTADA', targetId: t.id, after: { operacaoId, valor: t.amount.toFixed(2), motivo } },
+      });
+      return d;
+    });
+  }
+
+  // Entrada do extrato apta a ser decidida: credito, na conta de uma recebedora da operacao, sem prova nem decisao vigentes.
+  private async entradaValida(tx: Prisma.TransactionClient, operacaoId: string, transacaoId: string) {
+    const op = await tx.projOperacao.findFirst({ where: { id: operacaoId, canceladoEm: null }, select: { id: true } });
+    if (!op) throw new NotFoundException('Operacao nao encontrada.');
+    const t = await tx.bankTransaction.findFirst({
+      where: { id: transacaoId },
+      select: { id: true, companyId: true, type: true, transactionDate: true, amount: true, description: true, counterpartyName: true, counterpartyDoc: true },
+    });
+    if (!t || String(t.type) !== 'CREDIT') throw new BadRequestException('A transacao precisa ser uma entrada do extrato.');
+    const receb = await tx.projParticipacao.findFirst({ where: { operacaoId, companyId: t.companyId, canceladoEm: null, papel: { codigo: 'RECEBEDORA_FINANCEIRA' } }, select: { id: true } });
+    if (!receb) throw new BadRequestException('A transacao nao e da conta de uma recebedora desta operacao.');
+    if (await tx.projCreditoProva.findFirst({ where: { bankTransactionId: t.id, canceladoEm: null }, select: { id: true } })) throw new BadRequestException('Esta entrada ja comprova um credito.');
+    if (await tx.projExtratoDecisao.findFirst({ where: { operacaoId, bankTransactionId: t.id, canceladoEm: null }, select: { id: true } })) throw new BadRequestException('Esta entrada ja foi marcada como nao pertencente a operacao.');
+    return t;
   }
 
   @Get('perfis')

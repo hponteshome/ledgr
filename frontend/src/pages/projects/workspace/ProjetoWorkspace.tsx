@@ -12,6 +12,7 @@ import ConcessoesPage from '../ConcessoesPage';
 import PainelProjeto from './PainelProjeto';
 import CreditosProjeto from './CreditosProjeto';
 import ParticipantesProjeto from './ParticipantesProjeto';
+import PendenciasProjeto from './PendenciasProjeto';
 import { PROJ, PROJ_ACCENT, Projeto, erroSt } from './projetoTema';
 
 const itemSt = (ativo: boolean): React.CSSProperties => ({
@@ -30,7 +31,6 @@ const MENU: { to: string; label: string; icon: React.ElementType; end?: boolean 
   { to: 'participantes', label: 'Participantes', icon: FiUsers },
 ];
 const EM_BREVE: { label: string; icon: React.ElementType }[] = [
-  { label: 'Pendências', icon: FiAlertCircle },
   { label: 'Extratos e conciliação', icon: FiRepeat },
   { label: 'Documentos', icon: FiFileText },
 ];
@@ -75,6 +75,11 @@ export default function ProjetoWorkspace() {
             </NavLink>
           ))}
           {master && (
+            <NavLink to={`${base}/pendencias`} style={({ isActive }) => itemSt(isActive)}>
+              <FiAlertCircle size={15} /> Pendências
+            </NavLink>
+          )}
+          {master && (
             <NavLink to={`${base}/concessoes`} style={({ isActive }) => itemSt(isActive)}>
               <FiKey size={15} /> Concessões de acesso
             </NavLink>
@@ -117,6 +122,7 @@ export default function ProjetoWorkspace() {
               <Route index element={<PainelProjeto projeto={projeto} operacao={operacao} />} />
               <Route path="creditos" element={<CreditosProjeto operacao={operacao} master={master} />} />
               <Route path="participantes" element={<ParticipantesProjeto operacao={operacao} />} />
+              {master && <Route path="pendencias" element={<PendenciasProjeto operacao={operacao} />} />}
               {master && <Route path="concessoes" element={<ConcessoesPage />} />}
               <Route path="*" element={<Navigate to={base} replace />} />
             </Routes>

@@ -25,7 +25,7 @@ export default function VinculoModal({ credito, operacaoId, onClose, onSuccess }
 }) {
   const [historico, setHistorico] = useState<Historico[]>([]);
   const [adquirentes, setAdquirentes] = useState<{ id: string; nome: string }[]>([]);
-  const [acao, setAcao] = useState<'VINCULAR' | 'DESVINCULAR'>('DESVINCULAR');
+  const [acao, setAcao] = useState<'VINCULAR' | 'DESVINCULAR' | 'RETIFICAR'>('DESVINCULAR');
   const [adquirenteId, setAdquirenteId] = useState('');
   const [motivo, setMotivo] = useState('');
   const [erro, setErro] = useState('');
@@ -52,7 +52,7 @@ export default function VinculoModal({ credito, operacaoId, onClose, onSuccess }
     }).catch((e) => setErro(e?.response?.data?.message || 'Falha ao carregar o histórico do vínculo.'));
   }, [operacaoId, credito]);
 
-  const valido = motivo.trim().length >= 10 && (acao === 'DESVINCULAR' || !!adquirenteId);
+  const valido = motivo.trim().length >= 10 && (acao !== 'VINCULAR' || !!adquirenteId);
 
   const enviar = async () => {
     if (!valido) return;
@@ -61,7 +61,7 @@ export default function VinculoModal({ credito, operacaoId, onClose, onSuccess }
       await api.post(`/projects/operacoes/${operacaoId}/creditos/${credito.id}/vinculo`, {
         acao, adquirenteId: acao === 'VINCULAR' ? adquirenteId : undefined, motivo: motivo.trim(),
       });
-      toast.success(acao === 'VINCULAR' ? 'Vínculo registrado.' : 'Vínculo removido.');
+      toast.success(acao === 'RETIFICAR' ? 'Motivo retificado.' : acao === 'VINCULAR' ? 'Vínculo registrado.' : 'Vínculo removido.');
       onSuccess();
     } catch (e: any) {
       setErro(e?.response?.data?.message || 'Falha ao registrar o vínculo.');
@@ -106,6 +106,11 @@ export default function VinculoModal({ credito, operacaoId, onClose, onSuccess }
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
               <input type="radio" checked={acao === 'DESVINCULAR'} onChange={() => setAcao('DESVINCULAR')} /> Remover o vínculo (o crédito se refere a coisa diversa da operação)
             </label>
+            {atual && (
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, marginTop: 8, cursor: 'pointer' }}>
+                <input type="radio" checked={acao === 'RETIFICAR'} onChange={() => setAcao('RETIFICAR')} /> Retificar o motivo (mantém a situação atual)
+              </label>
+            )}
           </div>
           <div style={secao}>
             <div style={secaoTit}>MOTIVO *</div>

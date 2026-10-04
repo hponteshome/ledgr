@@ -5776,3 +5776,19 @@ model ProjCreditoProva {
 
   @@map("proj_credito_provas")
 }
+
+/// Fase 1.8 (03/10/2026): decisao sobre entrada do extrato que NAO pertence a operacao (reversivel, historico imutavel).
+model ProjExtratoDecisao {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  operacaoId         String    @map("operacao_id") @db.Uuid
+  bankTransactionId  String    @map("bank_transaction_id") @db.Uuid
+  decisao            String    @db.VarChar(20)
+  motivo             String
+  criadoEm           DateTime  @default(now()) @map("criado_em") @db.Timestamp(6)
+  criadoPorId        String?   @map("criado_por_id") @db.Uuid
+  canceladoEm        DateTime? @map("cancelado_em") @db.Timestamp(6)
+  canceladoPorId     String?   @map("cancelado_por_id") @db.Uuid
+  motivoCancelamento String?   @map("motivo_cancelamento")
+
+  @@map("proj_extrato_decisoes")
+}

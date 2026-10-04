@@ -138,6 +138,9 @@ if ($global:tok) {
   $somaContas = 0; if ($rs) { foreach ($ci in @($rs.contasIndividuais)) { $somaContas += [decimal]$ci.total }; $somaContas += [decimal]$rs.desvinculados.total }
   if ($rs -and $somaContas -eq [decimal]$rs.totalGeral) { Write-Host ("OK     esperado fecha | obtido fecha ({0}) | Projetos: contas individuais + desvinculados = total" -f $somaContas) -ForegroundColor Green } else { $global:falhas++; Write-Host ("FALHA  contas individuais + desvinculados ({0}) diferente do total ({1})" -f $somaContas, $rs.totalGeral) -ForegroundColor Red }
   Teste "Projetos: creditos trazem o vinculo vigente"     GET    "/projects/operacoes/${opId}/creditos"         200 -msg '"situacao":"VINCULADO"'
+  Teste "Projetos: pendencias (exige conciliar)"          GET    "/projects/operacoes/${opId}/pendencias"        403
+  Teste "Projetos: incluir credito do extrato (so Master)" POST   "/projects/operacoes/${opId}/extrato/${zero}/incluir" 403 -corpo '{}'
+  Teste "Projetos: descartar entrada do extrato (so Master)" POST "/projects/operacoes/${opId}/extrato/${zero}/descartar" 403 -corpo '{}'
   Teste "Projetos: alterar vinculo (so Master)"           POST   "/projects/operacoes/${opId}/creditos/${zero}/vinculo" 403 -corpo '{}'
   Teste "Projetos: creditos de operacao inexistente"   GET    "/projects/operacoes/${zero}/creditos"         404
   Teste "Projetos: operacao inexistente/alheia"        GET    "/projects/operacoes/${zero}/participacoes"    404
