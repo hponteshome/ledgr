@@ -10194,3 +10194,6 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - Frontend: utils/arquivoProtegido (fetch com token + blob) em AgeView, StatuteView, CorporateBooks, DocumentView (2) e DocumentViewModal (iframe). Logotipos seguem em <img> publico. DocumentUpload (preview local) sem mudanca.
 - Suite: arquivo real da pasta - 401 sem login, 404 para a conta QA; tentativa de sair da pasta = 404.
 - Pendente (decisao do Hpontes): os 6 arquivos orfaos podem ir para uma quarentena fora da pasta, ou ser apagados.
+
+- 04/10/2026: os 6 arquivos orfaos de apps/api/uploads (raiz e signatures) foram movidos para quarentena em D:\Dados\LedgrArquivos\quarentena-uploads\20261004, fora da API, sem apagar. Na pasta ficam so os logotipos.
+
