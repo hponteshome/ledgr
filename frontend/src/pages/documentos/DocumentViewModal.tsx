@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { FiX, FiDownload, FiShield, FiHash, FiCalendar, FiFileText, FiEdit } from 'react-icons/fi';
 import { toast } from 'react-hot-toast';
+import { obterArquivoProtegido } from '../../utils/arquivoProtegido';
 
 const API = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3000';
 
@@ -70,7 +71,7 @@ export const DocumentViewModal: React.FC<Props> = ({ documentId, documentTitle, 
         const d = await docRes.json();
         setDoc(d);
         if (d.fileUrl) {
-          setPdfUrl(API + d.fileUrl);
+          setPdfUrl(await obterArquivoProtegido(d.fileUrl));
         } else {
           await loadPdfPreview();
         }
@@ -111,7 +112,7 @@ export const DocumentViewModal: React.FC<Props> = ({ documentId, documentTitle, 
       const d = await docRes.json();
       setDoc(d);
       if (d.fileUrl) {
-        setPdfUrl(API + d.fileUrl);
+        setPdfUrl(await obterArquivoProtegido(d.fileUrl));
       } else {
         await loadPdfPreview();
       }

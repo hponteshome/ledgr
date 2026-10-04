@@ -146,6 +146,17 @@ if ($global:tok) {
   Teste "Documentos: enviar (so Master)"                 POST   "/projects/operacoes/${opId}/documentos"        403 -corpo '{}'
   Teste "Documentos: baixar inexistente"                 GET    "/projects/operacoes/${opId}/documentos/${zero}/arquivo" 404
   Teste "Documentos: cancelar (so Master)"               POST   "/projects/operacoes/${opId}/documentos/${zero}/cancelar" 403 -corpo '{}'
+  # Seguranca 0A (04/10/2026): /uploads so autenticado e com escopo de empresa (arquivo real da pasta)
+  $arqReal = Get-ChildItem "$PSScriptRoot\..\..\apps\api\uploads\signatures", "$PSScriptRoot\..\..\apps\api\uploads" -File -ErrorAction SilentlyContinue | Select-Object -First 1
+  if ($arqReal) {
+    $sub = if ($arqReal.DirectoryName -match 'signatures$') { 'signatures/' } else { '' }
+    $urlReal = "$base/uploads/$sub" + [uri]::EscapeDataString($arqReal.Name)
+    $semLogin = try { (Invoke-WebRequest -UseBasicParsing $urlReal -TimeoutSec 5).StatusCode } catch { [int]$_.Exception.Response.StatusCode }
+    if ($semLogin -eq 401) { Write-Host "OK     esperado 401 | obtido 401 | Uploads: arquivo real sem login" -ForegroundColor Green } else { $global:falhas++; Write-Host "FALHA  esperado 401 | obtido $semLogin | Uploads: arquivo real sem login" -ForegroundColor Red }
+    $comQa = try { (Invoke-WebRequest -UseBasicParsing $urlReal -Headers @{ Authorization = "Bearer $global:tok" } -TimeoutSec 5).StatusCode } catch { [int]$_.Exception.Response.StatusCode }
+    if ($comQa -eq 404) { Write-Host "OK     esperado 404 | obtido 404 | Uploads: arquivo sem registro, conta QA" -ForegroundColor Green } else { $global:falhas++; Write-Host "FALHA  esperado 404 | obtido $comQa | Uploads: arquivo sem registro, conta QA" -ForegroundColor Red }
+  } else { Write-Host "SEM DADOS - nenhum arquivo em apps\api\uploads para testar" -ForegroundColor Yellow }
+  Teste "Uploads: tentativa de sair da pasta"            GET    "/uploads/..%2F..%2F.env"                     404
   Teste "Projetos: alterar vinculo (so Master)"           POST   "/projects/operacoes/${opId}/creditos/${zero}/vinculo" 403 -corpo '{}'
   Teste "Projetos: creditos de operacao inexistente"   GET    "/projects/operacoes/${zero}/creditos"         404
   Teste "Projetos: operacao inexistente/alheia"        GET    "/projects/operacoes/${zero}/participacoes"    404

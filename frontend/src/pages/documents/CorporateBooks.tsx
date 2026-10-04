@@ -7,6 +7,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useCompany } from '../../contexts/CompanyContext';
 import api from '../../services/api';
+import { abrirArquivoProtegido } from '../../utils/arquivoProtegido';
 
 interface CorporateBook {
     id: string;
@@ -228,7 +229,7 @@ export const CorporateBooks: React.FC = () => {
                                                 <div className="flex items-center justify-end gap-2">
                                                     {book.fileUrl && (
                                                         <button
-                                                            onClick={() => window.open(book.fileUrl)}
+                                                            onClick={() => abrirArquivoProtegido(book.fileUrl!)}
                                                             className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
                                                             title="Visualizar"
                                                         >

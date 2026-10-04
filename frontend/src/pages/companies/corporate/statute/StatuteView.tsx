@@ -11,6 +11,7 @@ import { StatuteArticle } from './StatuteArticle';
 import { Statute, Chapter } from './types';
 import api from '../../../../services/api';
 import { useCompany } from '../../../../contexts/CompanyContext';
+import { abrirArquivoProtegido } from '../../../../utils/arquivoProtegido';
 
 interface DocumentVersion {
     version: number;
@@ -317,7 +318,7 @@ export const StatuteView: React.FC = () => {
                 <span>Última atualização: {new Date(statute.updatedAt).toLocaleString('pt-BR')}</span>
                 {statute.fileUrl && (
                     <button
-                        onClick={() => window.open(statute.fileUrl)}
+                        onClick={() => abrirArquivoProtegido(statute.fileUrl!)}
                         className="flex items-center gap-2 text-blue-600 hover:text-blue-700"
                     >
                         <FiDownload size={16} />

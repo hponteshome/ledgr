@@ -10186,3 +10186,11 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - API: GET documento-tipos; GET/POST .../operacoes/:id/documentos; GET .../documentos/:id/arquivo (download autenticado, recalcula SHA-256 e recusa se divergir, AuditLog PROJ_DOCUMENTO_BAIXADO); POST .../documentos/:id/cancelar. Nova versao encerra a anterior com motivo.
 - Tela: Documentos no menu do espaco do projeto (lista, filtro de versoes/cancelados, envio, nova versao, cancelamento, download). Upload por fetch (axios corrompe multipart).
 - Backup: incluir D:\Dados\LedgrArquivos no plano de backup da Fase 0B.
+
+## [SEGURANCA 0A] 04/10/2026 - pasta uploads era servida publicamente
+
+- Achado (verificacao do 1.10): main.ts servia apps/api/uploads inteira em /uploads SEM login (useStaticAssets). Conteudo: 2 PDFs na raiz, 4 PDFs e 2 imagens em signatures (evidencias de assinatura), 2 logotipos. No banco, so os 2 logotipos estavam registrados; os 6 sensiveis eram orfaos, mas acessiveis por endereco.
+- Correcao: estatico restrito a /uploads/logos. Rota autenticada /uploads/* (core/arquivos): exige login, descobre a empresa dona pelo endereco registrado (documents, document_signatures, corporate_books, fiscal_documents, ap_entries, ar_entries), entrega so com vinculo UserCompany ou Master; sem registro = 404; bloqueia '..'; AuditLog ARQUIVO_ACESSADO.
+- Frontend: utils/arquivoProtegido (fetch com token + blob) em AgeView, StatuteView, CorporateBooks, DocumentView (2) e DocumentViewModal (iframe). Logotipos seguem em <img> publico. DocumentUpload (preview local) sem mudanca.
+- Suite: arquivo real da pasta - 401 sem login, 404 para a conta QA; tentativa de sair da pasta = 404.
+- Pendente (decisao do Hpontes): os 6 arquivos orfaos podem ir para uma quarentena fora da pasta, ou ser apagados.

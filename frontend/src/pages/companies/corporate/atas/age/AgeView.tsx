@@ -8,6 +8,7 @@ import {
 import api from '@/services/api';
 import { DOC_STYLES, RenderDocument } from '@/components/DocumentStylePicker';
 import { useCompany } from '@/contexts/CompanyContext';
+import { abrirArquivoProtegido } from '../../../../../utils/arquivoProtegido';
 
 interface AgeData {
     id: string;
@@ -228,7 +229,7 @@ export const AgeView: React.FC = () => {
                 <span>Última atualização: {new Date(age.updatedAt).toLocaleString('pt-BR')}</span>
                 {age.fileUrl && (
                     <button
-                        onClick={() => window.open(age.fileUrl)}
+                        onClick={() => abrirArquivoProtegido(age.fileUrl!)}
                         className="flex items-center gap-2 text-blue-600 hover:text-blue-700"
                     ><FiDownload size={16} />Baixar PDF</button>
                 )}

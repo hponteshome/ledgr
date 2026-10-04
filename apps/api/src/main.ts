@@ -49,8 +49,10 @@ async function bootstrap() {
     transform: true,
     transformOptions: { enableImplicitConversion: true },
   }));
-  (app as any).useStaticAssets(join(__dirname, '..', 'uploads'), { prefix: '/uploads' });
-  console.log('📁 Uploads servidos em http://localhost:3000/uploads');
+  // Seguranca 0A (04/10/2026): so os logotipos sao publicos; o restante de /uploads passa pela rota autenticada
+  // (core/arquivos: exige login e vinculo com a empresa dona do arquivo; arquivo sem registro = 404).
+  (app as any).useStaticAssets(join(__dirname, '..', 'uploads', 'logos'), { prefix: '/uploads/logos' });
+  console.log('📁 Logotipos publicos em /uploads/logos; demais arquivos so autenticados');
   app.use(require('express').json({
     limit: '10mb',
     verify: (req: any, _res, buf) => { req.rawBody = buf; },
