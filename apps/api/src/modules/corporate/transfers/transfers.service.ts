@@ -85,12 +85,13 @@ export class TransfersService {
       });
       const totalQty = allRecords.reduce((s, r) => s.add(new Decimal(r.quantity)), new Decimal(0));
       if (totalQty.gt(0)) {
-        await Promise.all(allRecords.map(r =>
-          tx.shareholderRecord.update({
+        // Sequencial (05/10/2026): dentro da transacao ha uma unica conexao; consultas em paralelo nela sao rejeitadas a partir do pg@9
+        for (const r of allRecords) {
+          await tx.shareholderRecord.update({
             where: { id: r.id },
             data: { percentOwned: new Decimal(r.quantity).div(totalQty).mul(100) },
-          })
-        ));
+          });
+        }
       }
       // 4. Registra a transferência (append-only)
       return tx.shareTransfer.create({

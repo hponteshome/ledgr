@@ -10331,3 +10331,6 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - Cada numero etiquetado: Apurado no LEDGR / Premissa do BP vN / Parametro contratual.
 - Frontend: menu "Kit do Investidor" so para Master (MENU com master?: true); pagina com as 6 secoes e botao do PDF. Painel (VisaoExecutiva) com o card da cota senior (progresso ou data de conclusao).
 - Etapa 3 (futura): acesso do investidor; apuracao do CDE e distribuicoes realizadas.
+
+- 05/10/2026: log do Prisma so com 'warn' (404 esperados nao aparecem mais como prisma:error); removidos 8 console.log de depuracao do accounting.service.findAllAccounts (imprimiam o id da empresa); transfers.service: percentuais dos socios atualizados em sequencia dentro da transacao (Promise.all na mesma conexao vira erro no pg@9). signature.service.getSignatureStatus: Promise.all fora de transacao, correto.
+

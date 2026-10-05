@@ -25,7 +25,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 
     super({
       adapter,
-      log: ['warn', 'error'],
+      log: ['warn'], // Seguranca 0A (05/10/2026): 404 esperados (findFirstOrThrow) nao poluem o log; erros reais saem pelo PrismaErroFilter e pelo Nest
     });
   }
 

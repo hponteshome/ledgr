@@ -20,20 +20,10 @@ export class AccountingService {
       ? this.GLOBAL_COMPANY_ID 
       : companyId;
 
-    console.log('--- DEBUG ACCOUNTING ---');
-    console.log('ID Solicitado:', companyId);
-    console.log('ID Alvo (UUID):', targetId);
-
     const results = await this.prisma.chartOfAccounts.findMany({
       where: { companyId: targetId },
       orderBy: { code: 'asc' },
     });
-
-    console.log('Quantidade de registros encontrados:', results.length);
-    if (results.length > 0) {
-      console.log('Primeiro registro:', results[0].code, results[0].name);
-    }
-    console.log('-------------------------');
 
     return results;
   }
