@@ -2,6 +2,7 @@
 // Templates de documentos (30/09/2026): lista, duplicar, editar (versionado), ativar/desativar,
 // padrao por tipo e abrangencia, exclusao logica e Word nos dois sentidos.
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { DocumentsService } from './documents.service';
 import * as Handlebars from 'handlebars';
@@ -18,6 +19,12 @@ export class DocumentTemplatesService {
 
   private scope(companyId: string): any[] {
     return companyId ? [{ companyId: null }, { companyId }] : [{ companyId: null }];
+  }
+
+  // Seguranca 0A (04/10/2026): modelos GLOBAIS (companyId nulo) sao compartilhados por todas as empresas;
+  // so o Master os altera. Modelos da empresa: quem tem vinculo (o getOrFail ja restringe a global + empresa ativa).
+  private exigirPodeEditar(t: { companyId: string | null }, master: boolean) {
+    if (!t.companyId && !master) throw new ForbiddenException('Modelos globais so podem ser alterados pelo Master.');
   }
 
   private async getOrFail(id: string, companyId: string) {
@@ -66,12 +73,13 @@ export class DocumentTemplatesService {
     return { ...t, escopo: t.companyId ? 'EMPRESA' : 'GLOBAL', versions };
   }
 
-  async duplicate(id: string, companyId: string, userId: string, body: { name?: string; description?: string; escopo?: string }) {
+  async duplicate(id: string, companyId: string, userId: string, body: { name?: string; description?: string; escopo?: string }, master = false) {
     const src = await this.getOrFail(id, companyId);
     const name = (body?.name ?? '').trim();
     if (!name) throw new BadRequestException('Informe o nome do novo template.');
     const daEmpresa = body?.escopo === 'EMPRESA';
     if (daEmpresa && !companyId) throw new BadRequestException('Selecione uma empresa para criar um template da empresa.');
+    if (!daEmpresa && !master) throw new ForbiddenException('Somente o Master cria modelos globais (compartilhados por todas as empresas).');
     const novo = await this.prisma.documentTemplate.create({
       data: {
         type: src.type,
@@ -92,8 +100,9 @@ export class DocumentTemplatesService {
     return novo;
   }
 
-  async update(id: string, companyId: string, userId: string, body: { name?: string; description?: string; content?: string; changeNote?: string }) {
+  async update(id: string, companyId: string, userId: string, body: { name?: string; description?: string; content?: string; changeNote?: string }, master = false) {
     const t = await this.getOrFail(id, companyId);
+    this.exigirPodeEditar(t, master);
     const data: any = { updatedById: userId };
     if (body?.name !== undefined) {
       if (!body.name.trim()) throw new BadRequestException('O nome do template nao pode ficar vazio.');
@@ -117,16 +126,18 @@ export class DocumentTemplatesService {
     return upd;
   }
 
-  async setActive(id: string, companyId: string, active: boolean) {
+  async setActive(id: string, companyId: string, active: boolean, master = false) {
     const t = await this.getOrFail(id, companyId);
+    this.exigirPodeEditar(t, master);
     if (!active && t.isDefault) {
       throw new BadRequestException('Este e o template padrao. Defina outro como padrao antes de desativa-lo.');
     }
     return this.prisma.documentTemplate.update({ where: { id }, data: { isActive: !!active } });
   }
 
-  async setDefault(id: string, companyId: string) {
+  async setDefault(id: string, companyId: string, master = false) {
     const t = await this.getOrFail(id, companyId);
+    this.exigirPodeEditar(t, master);
     if (!t.isActive) throw new BadRequestException('Ative o template antes de defini-lo como padrao.');
     await this.prisma.$transaction([
       this.prisma.documentTemplate.updateMany({
@@ -138,8 +149,9 @@ export class DocumentTemplatesService {
     return { ok: true };
   }
 
-  async remove(id: string, companyId: string) {
+  async remove(id: string, companyId: string, master = false) {
     const t = await this.getOrFail(id, companyId);
+    this.exigirPodeEditar(t, master);
     if (t.isDefault) throw new BadRequestException('Nao e possivel excluir o template padrao.');
     const usos = await this.prisma.document.count({ where: { templateId: id } });
     if (usos > 0) {
@@ -174,8 +186,9 @@ export class DocumentTemplatesService {
   }
 
   // Word -> texto do template (NAO grava: volta para o editor, para pre-visualizar e salvar)
-  async importDocx(id: string, companyId: string, file: Express.Multer.File) {
+  async importDocx(id: string, companyId: string, file: Express.Multer.File, master = false) {
     const t = await this.getOrFail(id, companyId);
+    this.exigirPodeEditar(t, master);
     if (!/\.docx$/i.test(file?.originalname ?? '')) throw new BadRequestException('Envie um arquivo Word (.docx).');
     const mammoth = require('mammoth');
     const r = await mammoth.convertToHtml({ buffer: file.buffer });

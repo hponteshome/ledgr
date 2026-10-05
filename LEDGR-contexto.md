@@ -10276,3 +10276,6 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 
 - Documentos e Contratos: protegidos pelo DocumentScopeInterceptor na classe (cobre leitura e escrita; contratos sao registros de documents). Testes: contrato e versoes de outra empresa, listas de documentos e contratos por ?companyId= de outra empresa. document-templates NAO usa o interceptor: escritas de modelos em revisao. contratos/socio/:personId/qualificacao segue a politica pendente do cadastro global de pessoas.
 
+
+- Modelos de documento: getOrFail ja restringia a global + empresa ativa. NOVO: modelos GLOBAIS (compartilhados) so o Master altera, ativa/desativa, torna padrao, exclui, importa Word ou cria (duplicar como global); duplicar para a empresa segue liberado. Teste: ativar modelo global ativo = 403.
+

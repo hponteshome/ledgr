@@ -241,6 +241,11 @@ if ($global:tok) {
     Isolado "lista de documentos de outra empresa (filtro)" "/documents?companyId=$empOutra"
     Isolado "lista de contratos de outra empresa (filtro)" "/contratos?companyId=$empOutra"
   }
+  # Seguranca 0A (04/10/2026): modelo GLOBAL (compartilhado por todas as empresas) so o Master altera.
+  # Pede para ATIVAR um modelo ja ativo: mesmo se a protecao falhar, nada muda de fato.
+  $tplGlobal = ((docker exec ledgr-postgres psql -U ledgr -d ledgr_app -tA -c "SELECT id FROM document_templates WHERE company_id IS NULL AND deleted_at IS NULL AND is_active LIMIT 1") | Out-String).Trim()
+  if ($tplGlobal) { Teste "Modelos: alterar modelo global (so Master)"   PATCH  "/document-templates/${tplGlobal}/active"   403 -corpo '{"active":true}' }
+  else { Write-Host "SEM DADOS - nenhum modelo global ativo" -ForegroundColor Yellow }
   Teste "Projetos: alterar vinculo (so Master)"           POST   "/projects/operacoes/${opId}/creditos/${zero}/vinculo" 403 -corpo '{}'
   Teste "Projetos: creditos de operacao inexistente"   GET    "/projects/operacoes/${zero}/creditos"         404
   Teste "Projetos: operacao inexistente/alheia"        GET    "/projects/operacoes/${zero}/participacoes"    404

@@ -7,6 +7,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
 import { JwtAuthGuard } from '../../auth/guards/jwt.guard';
+import { isMasterAdmin } from '../../multi-company/company.interceptor';
 import { DocumentTemplatesService } from './document-templates.service';
 
 @UseGuards(JwtAuthGuard)
@@ -29,27 +30,27 @@ export class DocumentTemplatesController {
 
   @Post(':id/duplicate')
   duplicate(@Req() req: any, @Param('id') id: string, @Body() body: any) {
-    return this.svc.duplicate(id, this.cid(req), this.uid(req), body);
+    return this.svc.duplicate(id, this.cid(req), this.uid(req), body, isMasterAdmin(req.user));
   }
 
   @Put(':id')
   update(@Req() req: any, @Param('id') id: string, @Body() body: any) {
-    return this.svc.update(id, this.cid(req), this.uid(req), body);
+    return this.svc.update(id, this.cid(req), this.uid(req), body, isMasterAdmin(req.user));
   }
 
   @Patch(':id/active')
   setActive(@Req() req: any, @Param('id') id: string, @Body('active') active: boolean) {
-    return this.svc.setActive(id, this.cid(req), active === true);
+    return this.svc.setActive(id, this.cid(req), active === true, isMasterAdmin(req.user));
   }
 
   @Patch(':id/default')
   setDefault(@Req() req: any, @Param('id') id: string) {
-    return this.svc.setDefault(id, this.cid(req));
+    return this.svc.setDefault(id, this.cid(req), isMasterAdmin(req.user));
   }
 
   @Delete(':id')
   remove(@Req() req: any, @Param('id') id: string) {
-    return this.svc.remove(id, this.cid(req));
+    return this.svc.remove(id, this.cid(req), isMasterAdmin(req.user));
   }
 
   @Get(':id/docx')
@@ -66,6 +67,6 @@ export class DocumentTemplatesController {
   @UseInterceptors(FileInterceptor('file', { storage: require('multer').memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } }))
   importDocx(@Req() req: any, @Param('id') id: string, @UploadedFile() file: Express.Multer.File) {
     if (!file) throw new BadRequestException('Arquivo .docx nao enviado.');
-    return this.svc.importDocx(id, this.cid(req), file);
+    return this.svc.importDocx(id, this.cid(req), file, isMasterAdmin(req.user));
   }
 }
