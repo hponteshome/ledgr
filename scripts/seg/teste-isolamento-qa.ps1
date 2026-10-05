@@ -200,6 +200,31 @@ if ($global:tok) {
   Teste "Feriados: importar (so Master)"                      POST   "/calendar/holidays/import/2099"               403 -corpo '{}'
   Teste "Backup: restauracao de emergencia sem chave"         POST   "/system/backup/restore-emergency"             403 -corpo '{}'
   Teste "ClickSign: webhook sem assinatura"                   POST   "/signatures/clicksign/webhook"                403 -corpo '{}'
+  # Seguranca 0A (04/10/2026): RH - leitura de registros de empresas SEM vinculo com a QA (escolhidos pela regra).
+  # Passa com 403/404 ou 200 vazio (filtro aplicado). Em falha, mostra so codigo e tamanho, nunca o conteudo.
+  function Isolado($nome, $rota) {
+    $st = 0; $cont = ''
+    try { $r = Invoke-WebRequest -UseBasicParsing "$base$rota" -Headers @{ Authorization = "Bearer $global:tok"; 'x-company-id' = $HOT } -TimeoutSec 30; $st = [int]$r.StatusCode; $cont = [string]$r.Content } catch { $st = [int]$_.Exception.Response.StatusCode }
+    $vazio = ($st -eq 200) -and (@('', '[]', 'null', '{}') -contains $cont.Trim())
+    if ($st -in 403, 404 -or $vazio) { Write-Host ("OK     esperado 403/404/vazio | obtido {0} | RH: {1}" -f $st, $nome) -ForegroundColor Green }
+    else { $global:falhas++; Write-Host ("FALHA  esperado 403/404/vazio | obtido {0} ({1} bytes) | RH: {2}" -f $st, $cont.Length, $nome) -ForegroundColor Red }
+  }
+  $foraQa = "company_id NOT IN (SELECT uc.company_id FROM user_companies uc JOIN users u ON u.id = uc.user_id WHERE u.email = 'qa.hotelsys@ledgr.local')"
+  function IdFora($tabela) { ((docker exec ledgr-postgres psql -U ledgr -d ledgr_app -tA -c "SELECT id FROM $tabela WHERE $foraQa LIMIT 1") | Out-String).Trim() }
+  $rhEmp = IdFora 'employees'; $rhDec = IdFora 'decimo_terceiro'; $rhProg = IdFora 'programacoes_ferias'
+  $rhInf = IdFora 'informes_rendimentos'; $rhPlc = IdFora 'pro_labore_calculos'; $rhRec = IdFora 'recessos_coletivos'
+  if ($rhEmp) {
+    Isolado "funcionario de outra empresa" "/hr/employees/$rhEmp"
+    foreach ($sub in 'historico', 'afastamentos', 'ocorrencias', 'banco-horas') { Isolado "funcionario de outra empresa: $sub" "/hr/employees/$rhEmp/$sub" }
+    Isolado "periodos de ferias de outra empresa" "/hr/ferias/periodos/$rhEmp"
+    Isolado "eSocial S-2200 de outra empresa" "/hr/esocial/s2200/$rhEmp"
+    Isolado "eSocial S-2299 de outra empresa" "/hr/esocial/s2299/$rhEmp"
+  } else { Write-Host "SEM DADOS - nenhum funcionario de empresa sem vinculo com a QA" -ForegroundColor Yellow }
+  if ($rhDec) { foreach ($f in 'html', 'pdf') { Isolado "recibo do 13o ($f) de outra empresa" "/hr/decimo-terceiro/$rhDec/recibo/1/$f" } } else { Write-Host "SEM DADOS - nenhum 13o de empresa sem vinculo" -ForegroundColor Yellow }
+  if ($rhProg) { foreach ($d in 'aviso/html', 'aviso/pdf', 'recibo/html', 'recibo/pdf') { Isolado "ferias ($d) de outra empresa" "/hr/ferias/programacoes/$rhProg/$d" } } else { Write-Host "SEM DADOS - nenhuma programacao de ferias de empresa sem vinculo" -ForegroundColor Yellow }
+  if ($rhInf) { Isolado "informe de rendimentos de outra empresa" "/hr/informes/$rhInf"; Isolado "informe de rendimentos (pdf) de outra empresa" "/hr/informes/$rhInf/pdf" } else { Write-Host "SEM DADOS - nenhum informe de empresa sem vinculo" -ForegroundColor Yellow }
+  if ($rhPlc) { Isolado "guias do pro-labore de outra empresa" "/hr/pro-labore/calculos/$rhPlc/guias" } else { Write-Host "SEM DADOS - nenhum calculo de pro-labore de empresa sem vinculo" -ForegroundColor Yellow }
+  if ($rhRec) { Isolado "recesso coletivo de outra empresa" "/hr/recesso/$rhRec/preview" } else { Write-Host "SEM DADOS - nenhum recesso de empresa sem vinculo" -ForegroundColor Yellow }
   Teste "Projetos: alterar vinculo (so Master)"           POST   "/projects/operacoes/${opId}/creditos/${zero}/vinculo" 403 -corpo '{}'
   Teste "Projetos: creditos de operacao inexistente"   GET    "/projects/operacoes/${zero}/creditos"         404
   Teste "Projetos: operacao inexistente/alheia"        GET    "/projects/operacoes/${zero}/participacoes"    404

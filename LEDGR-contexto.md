@@ -10258,3 +10258,12 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - Bug pre-existente corrigido no SidebarResourceGuard/SidebarPermissionsService: sem empresa ativa (rotas com @SkipCompanyCheck, como pessoas), o companyId '' ia para a consulta e o PostgreSQL devolvia erro de UUID -> 500. Agora: empresa invalida/ausente = so permissoes globais do usuario; sem usuario = NONE; cabecalho lido como texto.
 - BACKUP_MASTER_KEY trocada em 04/10/2026 (48 caracteres, nos dois .env); a anterior tinha 29 e so estava no .env da raiz. Guardar no gerenciador de senhas.
 - Pendentes da Fase 0A: acesso por ID nos demais controllers (RH primeiro), politica do cadastro global de pessoas (CPF), autorizacao por perfil na API (SidebarResourceGuard so onde ha @RequireResourceAccess), validacao do state no callback gov.br.
+
+## [SEGURANCA 0A] 04/10/2026 - RH: acesso por ID
+
+- Levantamento: 62 rotas do RH com identificador; 58 repassam a empresa e o servico a usa. Testes reais de leitura (suite, registros de empresas sem vinculo com a QA escolhidos pela regra; passa com 403/404/200 vazio, falha mostra so codigo e tamanho): funcionario e sub-recursos, ferias, 13o, informes, pro-labore, recesso, eSocial, PDFs. Varios sem dados hoje (so empresas vinculadas a QA tem esses registros) - valem automaticamente quando houver.
+- Leitura de pro-labore (guias) e recesso de outra empresa davam 500 (findFirstOrThrow com companyId, erro P2025 sem tratamento; nada vazava). Corrigido globalmente: PrismaErroFilter (common/prisma-erro.filter.ts, registrado no main.ts) - P2025 = 404, P2002 = 409, demais = 500 generico com detalhe so no log. Vale para todos os modulos.
+- BRECHAS DE ESCRITA corrigidas (update so por id, sem conferir a empresa): decimo-terceiro pagarPrimeira e pagarSegunda, pro-labore updateConfig, rais registrarEnvio, ferias atualizarStatus. Agora: findFirstOrThrow({ id, companyId }) antes do update -> 404 se nao for da empresa. Sem teste de escrita cruzada de proposito (alteraria dado real se a protecao falhasse); conferido pela leitura do codigo.
+- Ja corretas: rescisao, recesso (aplicar), funcionario (update, desligar), informe (remove com findOne; upsert pela chave composta com companyId).
+- Proximo: mesmo levantamento (leitura e escrita) em Financeiro, Documentos, Ativos e Fiscal.- Guias do pro-labore: 'throw new Error' (500) trocado por NotFoundException (404). PENDENTE: revisar 'throw new Error(...)' em servicos dos demais modulos (vira 500); nao trocar em massa - avaliar caso a caso junto com o acesso por ID.
+

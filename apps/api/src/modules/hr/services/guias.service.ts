@@ -2,6 +2,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import * as puppeteer from 'puppeteer';
+import { NotFoundException } from '@nestjs/common';
 
 function fmtBRL(v: number) { return v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 function fmtCPF(v: string) { return (v||'').replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4'); }
@@ -298,7 +299,7 @@ export class GuiasService {
       where: { id: calculoId, companyId },
       include: { config: { include: { person: true } }, company: true },
     });
-    if (!calculo) throw new Error('Calculo nao encontrado');
+    if (!calculo) throw new NotFoundException('Calculo nao encontrado.'); // Seguranca 0A (04/10/2026): 404, nao 500
     const company = await this.prisma.company.findUnique({ where: { id: companyId } });
     const dados = {
       cpf: calculo.config.person.cpf, nome: calculo.config.person.fullName,
@@ -337,7 +338,7 @@ export class GuiasService {
       where: { companyId, competencia },
       include: { config: { include: { person: true } }, company: true },
     });
-    if (!calculos.length) throw new Error('Nenhum calculo encontrado.');
+    if (!calculos.length) throw new NotFoundException('Nenhum calculo encontrado.');
     const company = await this.prisma.company.findUnique({ where: { id: companyId } });
     let html = '<!DOCTYPE html><html><head><meta charset=utf-8></head><body>';
     for (const c of calculos) {

@@ -125,6 +125,7 @@ export class DecimoTerceiroService {
   }
 
   async pagarPrimeira(companyId: string, id: string, dataPgto: string) {
+    await this.prisma.decimoTerceiro.findFirstOrThrow({ where: { id, companyId }, select: { id: true } }); // Seguranca 0A (04/10/2026): o registro precisa ser da empresa ativa
     return this.prisma.decimoTerceiro.update({
       where: { id },
       data: { primeiraParcelaPagoEm: new Date(dataPgto), status: 'PRIMEIRA_PAGA' },
@@ -132,6 +133,7 @@ export class DecimoTerceiroService {
   }
 
   async pagarSegunda(companyId: string, id: string, dataPgto: string) {
+    await this.prisma.decimoTerceiro.findFirstOrThrow({ where: { id, companyId }, select: { id: true } }); // Seguranca 0A (04/10/2026): o registro precisa ser da empresa ativa
     return this.prisma.decimoTerceiro.update({
       where: { id },
       data: { segundaParcelaPagoEm: new Date(dataPgto), status: 'QUITADO' },

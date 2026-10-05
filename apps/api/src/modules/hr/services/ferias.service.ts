@@ -233,6 +233,7 @@ export class FeriasService {
   }
 
   async atualizarStatus(companyId: string, id: string, status: string) {
+    await this.prisma.programacaoFerias.findFirstOrThrow({ where: { id, companyId }, select: { id: true } }); // Seguranca 0A (04/10/2026): o registro precisa ser da empresa ativa
     return this.prisma.programacaoFerias.update({
       where: { id },
       data: { status: status as any },

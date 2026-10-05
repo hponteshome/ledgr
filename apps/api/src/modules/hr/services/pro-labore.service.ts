@@ -94,6 +94,7 @@ export class ProLaboreService {
   }
 
   async updateConfig(id: string, companyId: string, dto: any) {
+    await this.prisma.proLaboreConfig.findFirstOrThrow({ where: { id, companyId }, select: { id: true } }); // Seguranca 0A (04/10/2026): o registro precisa ser da empresa ativa
     if (dto.valorBruto && Number(dto.valorBruto) < SALARIO_MINIMO_2026) {
       throw new BadRequestException(
         `Valor abaixo do minimo legal (R$ ${SALARIO_MINIMO_2026.toFixed(2)}).`

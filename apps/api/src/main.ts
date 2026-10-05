@@ -10,6 +10,7 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { ConsoleLogger, ValidationPipe } from '@nestjs/common';
 import { join } from 'path';
 import { AppModule } from './app.module';
+import { PrismaErroFilter } from './common/prisma-erro.filter';
 
 // Logger customizado: silencia o ruido de boot (RouterExplorer/InstanceLoader)
 // mas mantem erros, avisos e mensagens de negocio (console.log normais).
@@ -45,6 +46,7 @@ async function bootstrap() {
   // generico em vez do 400 com mensagem que os DTOs ja foram escritos pra produzir).
   // enableImplicitConversion e necessario pq varios DTOs de filtro (@Query) tem
   // campos boolean/number que chegam como string na querystring.
+  app.useGlobalFilters(new PrismaErroFilter()); // Seguranca 0A (04/10/2026): 'nao encontrado' do Prisma = 404, duplicado = 409, sem detalhe interno
   app.useGlobalPipes(new ValidationPipe({
     transform: true,
     transformOptions: { enableImplicitConversion: true },

@@ -99,6 +99,7 @@ export class RaisService {
   }
 
   async registrarEnvio(companyId: string, id: string, protocolo: string) {
+    await this.prisma.raisDeclaracao.findFirstOrThrow({ where: { id, companyId }, select: { id: true } }); // Seguranca 0A (04/10/2026): o registro precisa ser da empresa ativa
     return this.prisma.raisDeclaracao.update({
       where: { id },
       data:  { status: 'ENVIADA', dataEnvio: new Date(), protocoloRais: protocolo },
