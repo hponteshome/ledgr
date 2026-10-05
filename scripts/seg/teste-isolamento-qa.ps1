@@ -246,6 +246,21 @@ if ($global:tok) {
   $tplGlobal = ((docker exec ledgr-postgres psql -U ledgr -d ledgr_app -tA -c "SELECT id FROM document_templates WHERE company_id IS NULL AND deleted_at IS NULL AND is_active LIMIT 1") | Out-String).Trim()
   if ($tplGlobal) { Teste "Modelos: alterar modelo global (so Master)"   PATCH  "/document-templates/${tplGlobal}/active"   403 -corpo '{"active":true}' }
   else { Write-Host "SEM DADOS - nenhum modelo global ativo" -ForegroundColor Yellow }
+  # Seguranca 0A (04/10/2026): empresa pelo caminho/filtro e modulos contabeis (registros de empresas sem vinculo com a QA)
+  function TabelaCom($padrao) { ((docker exec ledgr-postgres psql -U ledgr -d ledgr_app -tA -c "SELECT table_name FROM information_schema.columns WHERE table_schema = 'public' AND column_name = 'company_id' AND table_name LIKE '$padrao' ORDER BY length(table_name) LIMIT 1") | Out-String).Trim() }
+  if ($empOutra) {
+    Isolado "historico de outra empresa" "/companies/$empOutra/history"
+    Isolado "regimes tributarios de outra empresa" "/companies/$empOutra/tax-regimes"
+    Isolado "socios de outra empresa" "/companies/$empOutra/shareholders"
+    Isolado "comparativo de balancos de outra empresa" "/reports/balance-comparison/$empOutra"
+    Isolado "plano de contas de outra empresa (filtro)" "/accounting/accounts?companyId=$empOutra"
+    Isolado "certificados digitais de outra empresa (filtro)" "/certificates?companyId=$empOutra"
+  }
+  $visFora = IdFora 'accounting_views'
+  if ($visFora) { Isolado "visao contabil de outra empresa" "/sped/visoes/views/$visFora/mappings"; Isolado "visao contabil de outra empresa (agrupada)" "/sped/visoes/views/$visFora/mappings/grouped" } else { Write-Host "SEM DADOS - nenhuma visao contabil de empresa sem vinculo" -ForegroundColor Yellow }
+  $ecdFora = IdFora 'ecd_imports'
+  if ($ecdFora) { Isolado "importacao de ECD de outra empresa" "/sped/ecd/viewer/$ecdFora" } else { Write-Host "SEM DADOS - nenhuma importacao de ECD de empresa sem vinculo" -ForegroundColor Yellow }
+  Teste "Tabelas legais: excluir indicador (so Master)"      DELETE "/tabelas-legais/indicadores/${zero}"         403
   Teste "Projetos: alterar vinculo (so Master)"           POST   "/projects/operacoes/${opId}/creditos/${zero}/vinculo" 403 -corpo '{}'
   Teste "Projetos: creditos de operacao inexistente"   GET    "/projects/operacoes/${zero}/creditos"         404
   Teste "Projetos: operacao inexistente/alheia"        GET    "/projects/operacoes/${zero}/participacoes"    404

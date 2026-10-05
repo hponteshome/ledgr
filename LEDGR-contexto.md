@@ -10279,3 +10279,11 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 
 - Modelos de documento: getOrFail ja restringia a global + empresa ativa. NOVO: modelos GLOBAIS (compartilhados) so o Master altera, ativa/desativa, torna padrao, exclui, importa Word ou cria (duplicar como global); duplicar para a empresa segue liberado. Teste: ativar modelo global ativo = 403.
 
+
+## [SEGURANCA 0A] 04/10/2026 - Contabilidade, SPED, Empresas, Certificados, Chat e auxiliares
+
+- Levantamento v2 (reconhece metodo auxiliar com companyId, interceptor de escopo, servico pela propriedade injetada, e EMPRESA VINDA DO CLIENTE em todas as rotas).
+- Ja corretos: certificados (empresaEfetiva), chat (participacao), socios (servico confere { id, companyId }).
+- BRECHAS corrigidas: regime tributario excluido so pelo id (guard pela fonte regime:regimeId); visoes contabeis do SPED por :id sem empresa (fonte visao:id); visualizador de ECD sem empresa (fonte ecd:importId). EscopoEmpresaGuard tambem em historico/RFB (param:id), regimes (param:id), socios e comparativo (param:companyId).
+- Tabelas legais (globais): escrita (INSS, IRRF, salario minimo, indicadores, lote) so Master; calculo de correcao segue aberto.
+- Testes na suite: historico, regimes, socios, comparativo, plano de contas e certificados de outra empresa; visao contabil e importacao de ECD de outra empresa; excluir indicador = 403.

@@ -7,12 +7,15 @@ import { Controller, Get, Param, Query, Req, UseGuards } from '@nestjs/common';
 import { empresaEfetiva } from '../../../multi-company/company.interceptor';
 import { JwtAuthGuard } from '../../../auth/guards/jwt.guard';
 import { BalanceComparisonService } from '../services/balance-comparison.service';
+import { EscopoEmpresaGuard, EscopoEmpresa } from '../../../multi-company/escopo-empresa.guard';
 
 @UseGuards(JwtAuthGuard)
 @Controller('reports')
 export class BalanceComparisonController {
   constructor(private readonly svc: BalanceComparisonService) {}
 
+  @UseGuards(EscopoEmpresaGuard) // Seguranca 0A (04/10/2026): vinculo com a empresa dona do registro
+  @EscopoEmpresa('param:companyId')
   @Get('balance-comparison/:companyId')
   async getComparison(
     @Param('companyId') companyId: string,
@@ -23,6 +26,8 @@ export class BalanceComparisonController {
     return this.svc.getComparison(empresaEfetiva(req, companyId) as string, startMonth, endMonth); // Seguranca 0A
   }
 
+  @UseGuards(EscopoEmpresaGuard) // Seguranca 0A (04/10/2026): vinculo com a empresa dona do registro
+  @EscopoEmpresa('param:companyId')
   @Get('balance-comparison/:companyId/anual')
   async getComparisonAnual(
     @Param('companyId') companyId: string,

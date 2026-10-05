@@ -4,6 +4,7 @@ import { HttpService } from "@nestjs/axios";
 import { JwtAuthGuard } from "@/auth/guards/jwt.guard";
 import { CompanyHistoryService } from "./company-history.service";
 import { firstValueFrom } from "rxjs";
+import { EscopoEmpresaGuard, EscopoEmpresa } from '../../multi-company/escopo-empresa.guard';
 
 @Controller("companies")
 @UseGuards(JwtAuthGuard)
@@ -14,6 +15,8 @@ export class CompanyHistoryController {
   ) {}
 
   // GET /companies/:id/history
+  @UseGuards(EscopoEmpresaGuard) // Seguranca 0A (04/10/2026): vinculo com a empresa dona do registro
+  @EscopoEmpresa('param:id')
   @Get(":id/history")
   findHistory(@Param("id") id: string) {
     return this.historySvc.findByCompany(id);
@@ -21,6 +24,8 @@ export class CompanyHistoryController {
 
   // POST /companies/:id/rfb-compare
   // Consulta RFB pelo CNPJ da empresa e retorna divergencias
+  @UseGuards(EscopoEmpresaGuard) // Seguranca 0A (04/10/2026): vinculo com a empresa dona do registro
+  @EscopoEmpresa('param:id')
   @Post(":id/rfb-compare")
   async compareWithRfb(
     @Param("id") id: string,
@@ -56,6 +61,8 @@ export class CompanyHistoryController {
   }
 
   // POST /companies/:id/rfb-apply
+  @UseGuards(EscopoEmpresaGuard) // Seguranca 0A (04/10/2026): vinculo com a empresa dona do registro
+  @EscopoEmpresa('param:id')
   @Post(":id/rfb-apply")
   async applyRfb(
     @Param("id") id: string,

@@ -2,6 +2,7 @@
 import { Controller, Get, Post, Put, Delete, Body, Param, Query, Req, UseGuards } from '@nestjs/common';
 import { AccountingViewsService } from './accounting-views.service';
 import { JwtAuthGuard } from '../../../auth/guards/jwt.guard';
+import { EscopoEmpresaGuard, EscopoEmpresa } from '../../../multi-company/escopo-empresa.guard';
 
 @UseGuards(JwtAuthGuard)
 @Controller('sped/visoes')
@@ -39,23 +40,31 @@ export class AccountingViewsController {
     return this.svc.createView(req.companyId, dto);
   }
 
+  @UseGuards(EscopoEmpresaGuard) // Seguranca 0A (04/10/2026): vinculo com a empresa dona do registro
+  @EscopoEmpresa('visao:id')
   @Delete('views/:id')
   deleteView(@Param('id') id: string) {
     return this.svc.deleteView(id);
   }
 
   // ── Mapeamentos ──────────────────────────────────────────────────────────
+  @UseGuards(EscopoEmpresaGuard) // Seguranca 0A (04/10/2026): vinculo com a empresa dona do registro
+  @EscopoEmpresa('visao:id')
   @Get('views/:id/mappings')
   findMappings(@Param('id') viewId: string) {
     return this.svc.findMappings(viewId);
   }
 
+        @UseGuards(EscopoEmpresaGuard) // Seguranca 0A (04/10/2026): vinculo com a empresa dona do registro
+        @EscopoEmpresa('visao:id')
         @Get('views/:id/mappings/grouped')
         findMappingsGrouped(@Param('id') viewId: string) {
           return this.svc.findMappingsGrouped(viewId);
         }
 
 
+  @UseGuards(EscopoEmpresaGuard) // Seguranca 0A (04/10/2026): vinculo com a empresa dona do registro
+  @EscopoEmpresa('visao:id')
   @Put('views/:id/mappings/:accountId')
   upsertMapping(
     @Param('id') viewId: string,
@@ -65,11 +74,15 @@ export class AccountingViewsController {
     return this.svc.upsertMapping(viewId, accountId, body.aglutinationCode);
   }
 
+  @UseGuards(EscopoEmpresaGuard) // Seguranca 0A (04/10/2026): vinculo com a empresa dona do registro
+  @EscopoEmpresa('visao:id')
   @Delete('views/:id/mappings/:accountId')
   deleteMapping(@Param('id') viewId: string, @Param('accountId') accountId: string) {
     return this.svc.deleteMapping(viewId, accountId);
   }
 
+  @UseGuards(EscopoEmpresaGuard) // Seguranca 0A (04/10/2026): vinculo com a empresa dona do registro
+  @EscopoEmpresa('visao:id')
   @Post('views/:id/mappings/bulk')
   bulkUpsertMappings(
     @Param('id') viewId: string,
@@ -78,6 +91,8 @@ export class AccountingViewsController {
     return this.svc.bulkUpsertMappings(viewId, body.mappings);
   }
 
+  @UseGuards(EscopoEmpresaGuard) // Seguranca 0A (04/10/2026): vinculo com a empresa dona do registro
+  @EscopoEmpresa('visao:id')
   @Post('views/:id/auto-match')
   autoMatch(
     @Param('id') viewId: string,
@@ -87,6 +102,8 @@ export class AccountingViewsController {
     return this.svc.autoMatch(viewId, req.companyId, body.leiaute, body.anoBase);
   }
 
+  @UseGuards(EscopoEmpresaGuard) // Seguranca 0A (04/10/2026): vinculo com a empresa dona do registro
+  @EscopoEmpresa('visao:id')
   @Post('views/:id/clone-previous-year')
   clonePreviousYear(@Param('id') viewId: string) {
     return this.svc.cloneFromPreviousYear(viewId);

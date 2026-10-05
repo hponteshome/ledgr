@@ -8,7 +8,7 @@ import { Reflector } from '@nestjs/core';
 import { PrismaService } from '../prisma/prisma.service';
 import { isMasterAdmin } from './company.interceptor';
 
-export type FonteEmpresa = 'param:id' | 'param:companyId' | 'body:companyId' | 'vinculo:linkId' | 'documento:documentId';
+export type FonteEmpresa = 'param:id' | 'param:companyId' | 'body:companyId' | 'vinculo:linkId' | 'documento:documentId' | 'regime:regimeId' | 'visao:id' | 'ecd:importId';
 export const ESCOPO_EMPRESA_KEY = 'escopoEmpresa';
 export const EscopoEmpresa = (fonte: FonteEmpresa) => SetMetadata(ESCOPO_EMPRESA_KEY, fonte);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -30,6 +30,9 @@ export class EscopoEmpresaGuard implements CanActivate {
     if (tipo === 'param' || tipo === 'body') companyId = valor;
     else if (tipo === 'vinculo') companyId = (await this.prisma.personCompany.findUnique({ where: { id: valor }, select: { companyId: true } }))?.companyId ?? null;
     else if (tipo === 'documento') companyId = (await this.prisma.document.findUnique({ where: { id: valor }, select: { companyId: true } }))?.companyId ?? null;
+    else if (tipo === 'regime') companyId = (await this.prisma.companyTaxRegime.findUnique({ where: { id: valor }, select: { companyId: true } }))?.companyId ?? null;
+    else if (tipo === 'visao') companyId = (await this.prisma.accountingView.findUnique({ where: { id: valor }, select: { companyId: true } }))?.companyId ?? null;
+    else if (tipo === 'ecd') companyId = (await this.prisma.ecdImport.findUnique({ where: { id: valor }, select: { companyId: true } }))?.companyId ?? null;
     if (!companyId || !req.user?.id) throw negar();
     const v = await this.prisma.userCompany.findFirst({ where: { userId: req.user.id, companyId }, select: { id: true } });
     if (!v) throw negar();

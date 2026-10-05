@@ -3,6 +3,7 @@ import { Controller, Get, Post, Put, Delete, Param, Body, Query, UseGuards } fro
 import { JwtAuthGuard } from '@/auth/guards/jwt.guard';
 import { SkipCompanyCheck } from '@/multi-company/company.interceptor';
 import { TabelasLegaisService } from './tabelas-legais.service';
+import { MasterOnlyGuard } from '../../auth/guards/master-only.guard';
 
 @UseGuards(JwtAuthGuard)
 @SkipCompanyCheck()
@@ -20,6 +21,7 @@ export class TabelasLegaisController {
     return this.svc.getInss(ano ? parseInt(ano) : undefined);
   }
 
+  @UseGuards(MasterOnlyGuard) // Seguranca 0A (04/10/2026): tabela global - so o Master altera
   @Put('inss/:ano')
   upsertInss(@Param('ano') ano: string, @Body() dto: any) {
     return this.svc.upsertInssLote(parseInt(ano), dto);
@@ -31,6 +33,7 @@ export class TabelasLegaisController {
     return this.svc.getIrrf(ano ? parseInt(ano) : undefined);
   }
 
+  @UseGuards(MasterOnlyGuard) // Seguranca 0A (04/10/2026): tabela global - so o Master altera
   @Put('irrf/:ano')
   upsertIrrf(@Param('ano') ano: string, @Body() dto: any) {
     return this.svc.upsertIrrfLote(parseInt(ano), dto);
@@ -40,9 +43,11 @@ export class TabelasLegaisController {
   @Get('salario-minimo')
   getSalMin() { return this.svc.getSalarioMinimo(); }
 
+  @UseGuards(MasterOnlyGuard) // Seguranca 0A (04/10/2026): tabela global - so o Master altera
   @Post('salario-minimo')
   upsertSalMin(@Body() dto: any) { return this.svc.upsertSalarioMinimo(dto); }
 
+  @UseGuards(MasterOnlyGuard) // Seguranca 0A (04/10/2026): tabela global - so o Master altera
   @Delete('salario-minimo/:id')
   deleteSalMin(@Param('id') id: string) { return this.svc.deleteSalarioMinimo(id); }
 
@@ -52,12 +57,15 @@ export class TabelasLegaisController {
     return this.svc.getIndicadores(ind, ano ? parseInt(ano) : undefined);
   }
 
+  @UseGuards(MasterOnlyGuard) // Seguranca 0A (04/10/2026): tabela global - so o Master altera
   @Post('indicadores')
   upsertIndicador(@Body() dto: any) { return this.svc.upsertIndicador(dto); }
 
+  @UseGuards(MasterOnlyGuard) // Seguranca 0A (04/10/2026): tabela global - so o Master altera
   @Post('indicadores/lote')
   upsertLote(@Body() dto: any) { return this.svc.upsertIndicadoresLote(dto.registros ?? dto); }
 
+  @UseGuards(MasterOnlyGuard) // Seguranca 0A (04/10/2026): tabela global - so o Master altera
   @Delete('indicadores/:id')
   deleteIndicador(@Param('id') id: string) { return this.svc.deleteIndicador(id); }
 
