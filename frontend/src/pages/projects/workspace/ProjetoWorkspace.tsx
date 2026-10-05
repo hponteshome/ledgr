@@ -5,7 +5,7 @@
 import React, { useEffect, useState } from 'react';
 import { Routes, Route, Navigate, NavLink, useNavigate, useParams } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import { FiGrid, FiDollarSign, FiUsers, FiKey, FiAlertCircle, FiRepeat, FiFileText, FiArrowLeft, FiLogOut, FiLayers, FiTrendingDown, FiClipboard, FiClock } from 'react-icons/fi';
+import { FiGrid, FiDollarSign, FiUsers, FiKey, FiAlertCircle, FiRepeat, FiFileText, FiArrowLeft, FiLogOut, FiLayers, FiTrendingDown, FiClipboard, FiClock, FiBriefcase } from 'react-icons/fi';
 import api from '../../../services/api';
 import { useAuth } from '../../../contexts/AuthContext';
 import ConcessoesPage from '../ConcessoesPage';
@@ -18,6 +18,7 @@ import AplicacoesProjeto from './AplicacoesProjeto';
 import IntercompanyProjeto from './IntercompanyProjeto';
 import DemonstrativoProjeto from './DemonstrativoProjeto';
 import HistoricoProjeto from './HistoricoProjeto';
+import KitInvestidorProjeto from './KitInvestidorProjeto';
 import { PROJ, PROJ_ACCENT, Projeto, erroSt } from './projetoTema';
 
 const itemSt = (ativo: boolean): React.CSSProperties => ({
@@ -30,13 +31,14 @@ const botaoRodape: React.CSSProperties = {
   background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.85)', fontSize: 12, cursor: 'pointer',
 };
 
-const MENU: { to: string; label: string; icon: React.ElementType; end?: boolean }[] = [
+const MENU: { to: string; label: string; icon: React.ElementType; end?: boolean; master?: boolean }[] = [
   { to: '', label: 'Painel', icon: FiGrid, end: true },
   { to: 'creditos', label: 'Créditos', icon: FiDollarSign },
   { to: 'aplicacoes', label: 'Aplicações', icon: FiTrendingDown },
   { to: 'intercompany', label: 'Intercompany', icon: FiRepeat },
   { to: 'demonstrativo', label: 'Demonstrativo', icon: FiClipboard },
   { to: 'historico', label: 'Histórico', icon: FiClock },
+  { to: 'kit-investidor', label: 'Kit do Investidor', icon: FiBriefcase, master: true },
   { to: 'participantes', label: 'Participantes', icon: FiUsers },
   { to: 'documentos', label: 'Documentos', icon: FiFileText },
 ];
@@ -78,7 +80,7 @@ export default function ProjetoWorkspace() {
           <div style={{ fontSize: 15, fontWeight: 700, marginTop: 3, lineHeight: 1.25 }}>{projeto?.nome || '...'}</div>
         </div>
         <nav style={{ padding: 10, flex: 1, display: 'flex', flexDirection: 'column', gap: 2, overflowY: 'auto' }}>
-          {MENU.map((m) => (
+          {MENU.filter((m) => !m.master || master).map((m) => (
             <NavLink key={m.label} to={m.to ? `${base}/${m.to}` : base} end={m.end} style={({ isActive }) => itemSt(isActive)}>
               <m.icon size={15} /> {m.label}
             </NavLink>
@@ -132,6 +134,7 @@ export default function ProjetoWorkspace() {
               <Route path="intercompany" element={<IntercompanyProjeto operacao={operacao} master={master} />} />
               <Route path="demonstrativo" element={<DemonstrativoProjeto operacao={operacao} />} />
               <Route path="historico" element={<HistoricoProjeto operacao={operacao} />} />
+              {master && <Route path="kit-investidor" element={<KitInvestidorProjeto projetoId={projeto.id} />} />}
               <Route path="participantes" element={<ParticipantesProjeto operacao={operacao} master={master} />} />
               <Route path="documentos" element={<DocumentosProjeto operacao={operacao} master={master} />} />
               <Route path="pendencias" element={<PendenciasProjeto operacao={operacao} master={master} />} />

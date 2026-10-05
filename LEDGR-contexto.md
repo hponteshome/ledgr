@@ -10323,3 +10323,11 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - Carga: scripts/projetos/carga-premissas-bp.js - so ENTRADAS (BP 2018, IPCA, produto, sensibilidade, faixas, contrato, meta); recalcula e confere tudo contra a planilha (divergencia = nao grava); hash do arquivo evita duplicar.
 - Etapa 2: pagina do Kit (6 secoes, numeros etiquetados Apurado no LEDGR / Premissa do BP vN), progresso da meta da Ancora no Painel, PDF com codigo de conferencia.- A planilha do BP usa XML prefixado (x:) e celulas mescladas repetidas, que o exceljs nao le; o script normaliza o arquivo em memoria (original intacto, hash do original). 21 conferencias OK; com a cota senior de R$ 5 mi: resultado elegivel R$ 373,40 mi, recebimento indicativo da REAL R$ 117,44 mi, MOIC 2,175x.
 
+
+## [PROJETOS] 05/10/2026 - Kit do Investidor, Etapa 2 (pagina e PDF)
+
+- API (so Master): GET projects-relatorios/projetos/:projetoId/kit-investidor (dados) e .../pdf (puppeteer; codigo de conferencia SHA-256 no rodape; AuditLog PROJ_KIT_INVESTIDOR_EMITIDO).
+- Montagem: premissas da versao vigente (entradas) + calculos do LEDGR (reexpressao pelo fator do IPCA, cota senior, waterfall, 5 cenarios) + realizado da Operacao Ancora (creditos vinculados e devolucoes: aportes exatos ate 31/10/2025 e 31/12/2025, saldo liquido, progresso da meta, data de conclusao, aviso "em conciliacao" se o saldo calculado diverge do informado na mesma data) + participantes da operacao REAL. Waterfall com realizado = R$ 0, Faixa I (CDE ainda nao apurado).
+- Cada numero etiquetado: Apurado no LEDGR / Premissa do BP vN / Parametro contratual.
+- Frontend: menu "Kit do Investidor" so para Master (MENU com master?: true); pagina com as 6 secoes e botao do PDF. Painel (VisaoExecutiva) com o card da cota senior (progresso ou data de conclusao).
+- Etapa 3 (futura): acesso do investidor; apuracao do CDE e distribuicoes realizadas.

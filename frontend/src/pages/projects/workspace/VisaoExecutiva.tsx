@@ -13,6 +13,7 @@ interface Exec {
   aplicacoesPorNatureza: { nome: string; tipo: string; quantidade: number; total: string }[];
   documentos: { vigentes: number; porTipo: { nome: string; quantidade: number }[] };
   pendencias: Pend[];
+  meta?: { valor: string; saldo: string; percentual: number; falta: string; concluidaEm: string | null } | null;
 }
 
 export default function VisaoExecutiva({ operacao, versao }: { operacao: Operacao | null; versao: number }) {
@@ -38,6 +39,7 @@ export default function VisaoExecutiva({ operacao, versao }: { operacao: Operaca
         {kpi('Intercompany esperado', fmtBRL(d.totais.intercompanyEsperado), 'o que a recebedora deve à beneficiária')}
         {kpi('Total aplicado', fmtBRL(d.totais.aplicacoes), 'por conta da beneficiária')}
         {kpi('Novos créditos', fmtBRL(d.novosCreditos.total), `${d.novosCreditos.quantidade} após a data-base`)}
+        {d.meta && kpi('Cota sênior', `${(d.meta.percentual * 100).toFixed(1)}% de ${fmtBRL(d.meta.valor)}`, d.meta.concluidaEm ? `meta atingida em ${d.meta.concluidaEm.split('-').reverse().join('/')}` : `faltam ${fmtBRL(d.meta.falta)}`, d.meta.concluidaEm ? '#166534' : '#1A4A3A')}
       </div>
       <div style={{ ...cardSt, padding: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', marginBottom: 10 }}>

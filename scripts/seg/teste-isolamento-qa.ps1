@@ -191,6 +191,8 @@ if ($global:tok) {
   Teste "Relatorios: historico sem acesso"               GET    "/projects-relatorios/operacoes/${zero}/historico"     404
   Teste "Relatorios: painel executivo"                   GET    "/projects-relatorios/operacoes/${opId}/painel-executivo" 200 -msg '"pendencias":'
   Teste "Relatorios: painel executivo sem acesso"        GET    "/projects-relatorios/operacoes/${zero}/painel-executivo" 404
+  Teste "Kit do Investidor (so Master)"                  GET    "/projects-relatorios/projetos/${projId}/kit-investidor" 403
+  Teste "Kit do Investidor em PDF (so Master)"           GET    "/projects-relatorios/projetos/${projId}/kit-investidor/pdf" 403
   # Seguranca 0A (04/10/2026): escopo pela empresa DO REGISTRO (empresa sem vinculo com a QA, escolhida pela regra)
   $empOutra = ((docker exec ledgr-postgres psql -U ledgr -d ledgr_app -tA -c "SELECT c.id FROM companies c WHERE NOT EXISTS (SELECT 1 FROM user_companies uc JOIN users u ON u.id = uc.user_id WHERE u.email = 'qa.hotelsys@ledgr.local' AND uc.company_id = c.id) ORDER BY c.legal_name LIMIT 1") | Out-String).Trim()
   $docOutra = if ($empOutra) { ((docker exec ledgr-postgres psql -U ledgr -d ledgr_app -tA -c "SELECT id FROM documents WHERE company_id = '$empOutra' LIMIT 1") | Out-String).Trim() } else { '' }
