@@ -753,7 +753,7 @@ export class BankImportService {
         const { propertyTag, assetId } = await resolveProperty(String(referenciaRaw));
 
         const transactionDate = parseFlexibleDate(dateRaw);
-        if (!transactionDate) throw new Error('Data invalida: ' + dateRaw);
+        if (!transactionDate) throw new BadRequestException('Data invalida: ' + dateRaw);
 
         // Layout LM: colunas separadas Credito(R$) e Debito(R$)
         let amountNum: number;
@@ -769,9 +769,9 @@ export class BankImportService {
           type = credNum > 0 ? 'CREDIT' : 'DEBIT';
         } else {
           // fallback coluna Valor
-          if (valorRaw === null || valorRaw === undefined) throw new Error('Coluna Valor ausente.');
+          if (valorRaw === null || valorRaw === undefined) throw new BadRequestException('Coluna Valor ausente.');
           const valorNum = typeof valorRaw === 'number' ? valorRaw : parseFloat(String(valorRaw).replace(/[()]/g,'').replace(/,/g,'.'));
-          if (isNaN(valorNum)) throw new Error('Valor invalido na linha.');
+          if (isNaN(valorNum)) throw new BadRequestException('Valor invalido na linha.');
           amountNum = Math.abs(valorNum);
           type = valorNum < 0 ? 'DEBIT' : 'CREDIT';
         }
@@ -783,8 +783,8 @@ export class BankImportService {
         const debitAcc  = await findAccount(debitCode);
         const creditAcc = await findAccount(creditCode);
 
-        if (debitCode  && !debitAcc)  throw new Error('Conta Debito '  + debitCode  + ' nao encontrada.');
-        if (creditCode && !creditAcc) throw new Error('Conta Credito ' + creditCode + ' nao encontrada.');
+        if (debitCode  && !debitAcc)  throw new BadRequestException('Conta Debito '  + debitCode  + ' nao encontrada.');
+        if (creditCode && !creditAcc) throw new BadRequestException('Conta Credito ' + creditCode + ' nao encontrada.');
 
         const isAutoPostable = debitAcc !== null && creditAcc !== null;
         const amount = new Prisma.Decimal(amountNum.toFixed(2));

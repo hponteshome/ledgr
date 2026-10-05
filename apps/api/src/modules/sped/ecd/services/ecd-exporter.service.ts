@@ -1,3 +1,4 @@
+import { NotFoundException } from '@nestjs/common'; // Seguranca 0A (04/10/2026): erros de negocio com o codigo HTTP certo
 // apps/api/src/modules/sped/ecd/services/ecd-exporter.service.ts
 // Baseado no gabarito IOB (ECD_G_2024_00011.TXT) — Leiaute 9
 import { Injectable, Logger } from "@nestjs/common";
@@ -35,7 +36,7 @@ export class EcdExporterService {
       where: { id: companyId },
       select: { taxId: true, legalName: true, state: true, city: true, nire: true, codMun: true, registerOrg: true },
     });
-    if (!company) throw new Error("Empresa nao encontrada.");
+    if (!company) throw new NotFoundException("Empresa nao encontrada.");
 
     const cnpj  = company.taxId.replace(/\D/g, "");
     const dtIni = this.fmtDate(periodStart);

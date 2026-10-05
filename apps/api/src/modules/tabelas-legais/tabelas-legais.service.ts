@@ -1,3 +1,4 @@
+import { BadRequestException } from '@nestjs/common'; // Seguranca 0A (04/10/2026): erros de negocio com o codigo HTTP certo
 // apps/api/src/modules/tabelas-legais/tabelas-legais.service.ts
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -149,7 +150,7 @@ export class TabelasLegaisService {
     const valorOriginal = parseFloat(String(dto.valorOriginal ?? '0').replace(',', '.'));
 
     if (!indicador || !competenciaInicio || !competenciaFim || competenciaInicio > competenciaFim) {
-      throw new Error('Parametros invalidos: indicador, competenciaInicio e competenciaFim sao obrigatorios (competenciaInicio <= competenciaFim).');
+      throw new BadRequestException('Parametros invalidos: indicador, competenciaInicio e competenciaFim sao obrigatorios (competenciaInicio <= competenciaFim).');
     }
 
     const where: any = {

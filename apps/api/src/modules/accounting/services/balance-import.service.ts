@@ -43,7 +43,7 @@ export class BalanceImportService {
         const values = line.split(this.DELIMITER).map(v => v.trim());
 
         if (values.length !== 4) {
-          throw new Error(`Formato inválido. Esperado 4 colunas, recebido ${values.length}`);
+          throw new BadRequestException(`Formato inválido. Esperado 4 colunas, recebido ${values.length}`);
         }
 
         let rawDate, accountCode, valueStr, dc;
@@ -65,7 +65,7 @@ export class BalanceImportService {
         });
 
         if (!account) {
-          throw new Error(`Conta "${accountCode}" não encontrada no Plano de Contas desta empresa.`);
+          throw new BadRequestException(`Conta "${accountCode}" não encontrada no Plano de Contas desta empresa.`);
         }
 
         await this.processUpsert(account.id, companyId, referenceDate, amount, userId, stats);
@@ -124,13 +124,13 @@ export class BalanceImportService {
 
   private parseDate(dateStr: string): Date {
     const parts = dateStr.split('/');
-    if (parts.length !== 3) throw new Error(`Data inválida: ${dateStr}`);
+    if (parts.length !== 3) throw new BadRequestException(`Data inválida: ${dateStr}`);
 
     const [d, m, y] = parts.map(Number);
     // Date.UTC garante 00:00:00Z independente do fuso do servidor
     const date = new Date(Date.UTC(y, m - 1, d));
 
-    if (isNaN(date.getTime())) throw new Error(`Data inexistente: ${dateStr}`);
+    if (isNaN(date.getTime())) throw new BadRequestException(`Data inexistente: ${dateStr}`);
     return date;
   }
 
@@ -138,7 +138,7 @@ export class BalanceImportService {
     const normalized = valueStr.replace(/\./g, '').replace(',', '.');
     const val = parseFloat(normalized);
 
-    if (isNaN(val)) throw new Error(`Valor não numérico: ${valueStr}`);
+    if (isNaN(val)) throw new BadRequestException(`Valor não numérico: ${valueStr}`);
 
     return dc.toUpperCase() === 'C' ? -Math.abs(val) : Math.abs(val);
   }

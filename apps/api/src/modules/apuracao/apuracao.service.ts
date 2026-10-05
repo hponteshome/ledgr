@@ -1,3 +1,4 @@
+import { NotFoundException } from '@nestjs/common'; // Seguranca 0A (04/10/2026): erros de negocio com o codigo HTTP certo
 // apps/api/src/modules/apuracao/apuracao.service.ts
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -359,7 +360,7 @@ export class ApuracaoService {
     const apuracao = await this.prisma.apuracaoImpostos.findFirst({
       where: { companyId, competencia, tipo: tipo as any },
     });
-    if (!apuracao) throw new Error('Apuracao nao encontrada para ' + competencia + ' / ' + tipo);
+    if (!apuracao) throw new NotFoundException('Apuracao nao encontrada para ' + competencia + ' / ' + tipo);
 
     const fmtBRL = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const fmtCNPJ = (v: string) => (v||'').replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');

@@ -96,7 +96,7 @@ export class EsocialEventsService {
       where: { companyId, employeeId, status: { not: 'CANCELADA' }, deletedAt: null },
       orderBy: { createdAt: 'desc' },
     });
-    if (!term) throw new Error('Nenhuma rescisao confirmada encontrada para este funcionario. Confirme o TRCT antes de gerar o S-2299.');
+    if (!term) throw new BadRequestException('Nenhuma rescisao confirmada encontrada para este funcionario. Confirme o TRCT antes de gerar o S-2299.');
 
     const cnpj       = this.digits(company.taxId);
     const id         = this.evtId(cnpj, '00002');

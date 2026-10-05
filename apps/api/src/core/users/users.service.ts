@@ -343,7 +343,7 @@ async findByLogin(login: string) {
 
   async resolveUnlockRequest(requestId: string, approve: boolean, adminId: string) {
     const request = await this.prisma.accessUnlockRequest.findUnique({ where: { id: requestId } });
-    if (!request) throw new Error('Solicitacao nao encontrada.');
+    if (!request) throw new NotFoundException('Solicitacao nao encontrada.');
 
     const updated = await this.prisma.accessUnlockRequest.update({
       where: { id: requestId },

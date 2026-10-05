@@ -10287,3 +10287,9 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - BRECHAS corrigidas: regime tributario excluido so pelo id (guard pela fonte regime:regimeId); visoes contabeis do SPED por :id sem empresa (fonte visao:id); visualizador de ECD sem empresa (fonte ecd:importId). EscopoEmpresaGuard tambem em historico/RFB (param:id), regimes (param:id), socios e comparativo (param:companyId).
 - Tabelas legais (globais): escrita (INSS, IRRF, salario minimo, indicadores, lote) so Master; calculo de correcao segue aberto.
 - Testes na suite: historico, regimes, socios, comparativo, plano de contas e certificados de outra empresa; visao contabil e importacao de ECD de outra empresa; excluir indicador = 403.
+
+## [SEGURANCA 0A] 04/10/2026 - gov.br e excecoes HTTP
+
+- gov.br: fluxo real (signatures -> govbr.service) correto: state = id de sessao, PKCE com verifier cifrado, expiracao e limpeza, state invalido/expirado recusado. Rascunhos com state previsivel SEM risco (documents.initGovBrOAuth: callback nao implementado, agora 501; signature.service.initiateGovBr: o callback real recusa o formato). Remover os rascunhos quando a integracao for concluida.
+- throw new Error -> excecoes HTTP (mesma mensagem): NotFound (funcionario, apuracao, solicitacao, empresa nos exportadores ECD/ECF), BadRequest (importacoes bancaria/saldos/lancamentos, leitura de ECD, guia sem IRRF, rescisao nao confirmada, parametros de indicadores, empresa modelo), NotImplemented (callback gov.br de documents). Mantidos como erro interno: configuracao (2FA, banco, contexto), backup, BrasilAPI, montagem do eSocial, NFS-e.
+- Decisao do Hpontes (04/10/2026): cadastro de pessoas - OPCAO A (escopo pelos vinculos: so pessoas vinculadas a alguma empresa do usuario; Master ve todas). Implementacao a seguir.

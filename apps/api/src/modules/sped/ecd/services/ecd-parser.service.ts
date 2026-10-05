@@ -1,3 +1,4 @@
+import { BadRequestException } from '@nestjs/common'; // Seguranca 0A (04/10/2026): erros de negocio com o codigo HTTP certo
 // apps/api/src/modules/sped/ecd/ecd-parser.service.ts
 //
 // Suporte a leiautes:
@@ -510,13 +511,13 @@ export class EcdParserService {
   /** "ddmmaaaa" → Date (local) */
   parseDate(dateStr: string): Date {
     if (!dateStr || dateStr.length !== 8) {
-      throw new Error(`Data inválida no formato ECD: "${dateStr}"`);
+      throw new BadRequestException(`Data inválida no formato ECD: "${dateStr}"`);
     }
     const d = parseInt(dateStr.substring(0, 2));
     const m = parseInt(dateStr.substring(2, 4));
     const y = parseInt(dateStr.substring(4, 8));
     const date = new Date(y, m - 1, d);
-    if (isNaN(date.getTime())) throw new Error(`Data inexistente: ${dateStr}`);
+    if (isNaN(date.getTime())) throw new BadRequestException(`Data inexistente: ${dateStr}`);
     return date;
   }
 

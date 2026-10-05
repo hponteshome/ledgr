@@ -1,3 +1,4 @@
+import { NotImplementedException } from '@nestjs/common'; // Seguranca 0A (04/10/2026): erros de negocio com o codigo HTTP certo
 // src/core/documents/documents.service.ts
 import {
   Injectable, Logger, NotFoundException, BadRequestException,
@@ -1082,7 +1083,7 @@ async handleGovBrCallback(
   state: string,
   user: any,
 ): Promise<any> {
-  throw new Error('handleGovBrCallback: não implementado - aguardando integração Gov.br');
+  throw new NotImplementedException('handleGovBrCallback: não implementado - aguardando integração Gov.br');
 }
 
 

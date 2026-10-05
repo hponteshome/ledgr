@@ -63,13 +63,13 @@ export class AccountingService {
         const [code, balanceStr] = line.split('|').map(s => s.trim());
         
         if (!code || !balanceStr) {
-          throw new Error('Formato inválido. Use: CÓDIGO|VALOR');
+          throw new BadRequestException('Formato inválido. Use: CÓDIGO|VALOR');
         }
 
         const balance = parseFloat(balanceStr.replace(',', '.'));
         
         if (isNaN(balance)) {
-          throw new Error('Valor inválido');
+          throw new BadRequestException('Valor inválido');
         }
 
         // Buscar a conta pelo código
@@ -81,11 +81,11 @@ export class AccountingService {
         });
 
         if (!account) {
-          throw new Error(`Conta ${code} não encontrada`);
+          throw new BadRequestException(`Conta ${code} não encontrada`);
         }
 
         if (!account.isAnalytic) {
-          throw new Error(`Conta ${code} é sintética. Importe apenas contas analíticas.`);
+          throw new BadRequestException(`Conta ${code} é sintética. Importe apenas contas analíticas.`);
         }
 
         // Criar ou atualizar o saldo

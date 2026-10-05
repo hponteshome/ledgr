@@ -1,3 +1,4 @@
+import { NotFoundException } from '@nestjs/common'; // Seguranca 0A (04/10/2026): erros de negocio com o codigo HTTP certo
 // apps/api/src/modules/sped/ecf/services/ecf-exporter.service.ts
 // Confrontado campo a campo contra 2 fontes reais: LM/ECF_2024_LM.TXT (gabarito
 // generico do repo) e um ECF REAL da propria GRB (2025, ja transmitido/validado,
@@ -85,7 +86,7 @@ export class EcfExporterService {
         phone1: true, email: true, mainActivity: true, legalNature: true,
       },
     });
-    if (!company) throw new Error("Empresa nao encontrada.");
+    if (!company) throw new NotFoundException("Empresa nao encontrada.");
 
     const cnpj  = company.taxId.replace(/\D/g, "");
     const dtIni = this.fmtDate(periodStart);

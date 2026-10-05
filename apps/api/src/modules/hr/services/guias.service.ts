@@ -1,3 +1,4 @@
+import { BadRequestException } from '@nestjs/common'; // Seguranca 0A (04/10/2026): erros de negocio com o codigo HTTP certo
 // apps/api/src/modules/hr/services/guias.service.ts
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
@@ -224,7 +225,7 @@ export class GuiasService {
       baseIrrf: Number(f.baseIrrf), aliqIrrf: Number(f.aliqIrrf), irrf: Number(f.valorIrrf),
     }));
     const totalIrrf = linhas.reduce((s,l)=>s+l.irrf,0);
-    if (totalIrrf <= 0) throw new Error('Nenhum IRRF retido nesta folha.');
+    if (totalIrrf <= 0) throw new BadRequestException('Nenhum IRRF retido nesta folha.');
     const d = { cnpj: company.taxId, empresa: company.legalName, competencia: folha.competencia,
       totalIrrf, numFuncsIrrf: linhas.filter(l=>l.irrf>0).length, vencimento: vencGPS(folha.competencia), linhas };
     return { html: htmlDARFFolha(d) };
@@ -287,7 +288,7 @@ export class GuiasService {
       baseIrrf: Number(f.baseIrrf), aliqIrrf: Number(f.aliqIrrf), irrf: Number(f.valorIrrf),
     }));
     const totalIrrf = linhas.reduce((s,l)=>s+l.irrf,0);
-    if (totalIrrf <= 0) throw new Error('Nenhum IRRF retido nesta folha.');
+    if (totalIrrf <= 0) throw new BadRequestException('Nenhum IRRF retido nesta folha.');
     const d = { cnpj: company.taxId, empresa: company.legalName, competencia: folha.competencia,
       totalIrrf, numFuncsIrrf: linhas.filter(l=>l.irrf>0).length, vencimento: vencGPS(folha.competencia), linhas };
     const pdf = await renderPdf(htmlDARFFolha(d));

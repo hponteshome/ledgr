@@ -212,7 +212,7 @@ export class CompanyService {
 
   async remove(id: string, adminId: string) {
     if (id === GLOBAL_COMPANY_ID) {
-      throw new Error('A empresa Global Template não pode ser removida.');
+      throw new BadRequestException('A empresa Global Template não pode ser removida.');
     }
 
     const company = await this.findById(id);

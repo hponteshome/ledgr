@@ -1,3 +1,4 @@
+import { NotFoundException } from '@nestjs/common'; // Seguranca 0A (04/10/2026): erros de negocio com o codigo HTTP certo
 ﻿// apps/api/src/modules/hr/services/employee.service.ts
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
@@ -150,7 +151,7 @@ export class EmployeeService {
         bancoHoras: { include: { lancamentos: { orderBy: { data: 'desc' }, take: 20 } } },
       },
     });
-    if (!emp) throw new Error('Funcionario nao encontrado.');
+    if (!emp) throw new NotFoundException('Funcionario nao encontrado.');
     return emp;
   }
 
