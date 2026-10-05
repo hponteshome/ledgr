@@ -225,6 +225,17 @@ if ($global:tok) {
   if ($rhInf) { Isolado "informe de rendimentos de outra empresa" "/hr/informes/$rhInf"; Isolado "informe de rendimentos (pdf) de outra empresa" "/hr/informes/$rhInf/pdf" } else { Write-Host "SEM DADOS - nenhum informe de empresa sem vinculo" -ForegroundColor Yellow }
   if ($rhPlc) { Isolado "guias do pro-labore de outra empresa" "/hr/pro-labore/calculos/$rhPlc/guias" } else { Write-Host "SEM DADOS - nenhum calculo de pro-labore de empresa sem vinculo" -ForegroundColor Yellow }
   if ($rhRec) { Isolado "recesso coletivo de outra empresa" "/hr/recesso/$rhRec/preview" } else { Write-Host "SEM DADOS - nenhum recesso de empresa sem vinculo" -ForegroundColor Yellow }
+  # Seguranca 0A (04/10/2026): Documentos e Contratos - leitura de registros de empresas sem vinculo com a QA
+  $docFora = IdFora 'documents'
+  $tplFora = ((docker exec ledgr-postgres psql -U ledgr -d ledgr_app -tA -c "SELECT id FROM document_templates WHERE company_id IS NOT NULL AND $foraQa LIMIT 1") | Out-String).Trim()
+  $tabContr = ((docker exec ledgr-postgres psql -U ledgr -d ledgr_app -tA -c "SELECT table_name FROM information_schema.columns WHERE table_schema = 'public' AND column_name = 'company_id' AND table_name LIKE 'contrato%' ORDER BY length(table_name) LIMIT 1") | Out-String).Trim()
+  $ctrFora = if ($tabContr) { IdFora $tabContr } else { '' }
+  if ($docFora) {
+    Isolado "documento de outra empresa (leitura)" "/documents/$docFora"
+    foreach ($sub in 'versions', 'pdf', 'preview', 'docx', 'signatures') { Isolado "documento de outra empresa: $sub" "/documents/$docFora/$sub" }
+  } else { Write-Host "SEM DADOS - nenhum documento de empresa sem vinculo" -ForegroundColor Yellow }
+  if ($tplFora) { Isolado "modelo de documento de outra empresa" "/document-templates/$tplFora"; Isolado "modelo de documento de outra empresa: docx" "/document-templates/$tplFora/docx" } else { Write-Host "SEM DADOS - nenhum modelo de documento de empresa sem vinculo" -ForegroundColor Yellow }
+  if ($ctrFora) { Isolado "contrato de outra empresa ($tabContr)" "/contratos/$ctrFora"; Isolado "versoes de contrato de outra empresa" "/contratos/$ctrFora/versions" } else { Write-Host "SEM DADOS - nenhum contrato de empresa sem vinculo (tabela: $tabContr)" -ForegroundColor Yellow }
   Teste "Projetos: alterar vinculo (so Master)"           POST   "/projects/operacoes/${opId}/creditos/${zero}/vinculo" 403 -corpo '{}'
   Teste "Projetos: creditos de operacao inexistente"   GET    "/projects/operacoes/${zero}/creditos"         404
   Teste "Projetos: operacao inexistente/alheia"        GET    "/projects/operacoes/${zero}/participacoes"    404
