@@ -274,6 +274,15 @@ if ($global:tok) {
       else { $global:falhas++; Write-Host ("FALHA  esperado sem os dados da pessoa | obtido {0} ({1} bytes) | Pessoas: {2}" -f $st, $cont.Length, $par[0]) -ForegroundColor Red }
     }
   } else { Write-Host "SEM DADOS - nenhuma pessoa vinculada so a empresas sem relacao com a QA" -ForegroundColor Yellow }
+  # Seguranca 0A (04/10/2026): perfil na API (regra: nivel da QA no recurso; NONE = 403; com leitura = 404 no id inexistente)
+  function NivelQa($recurso) {
+    $q = "SELECT COALESCE((SELECT x.access_level::text FROM user_sidebar_permissions x JOIN sidebar_items i ON i.id = x.item_id JOIN users u ON u.id = x.user_id WHERE i.resource = '$recurso' AND u.email = 'qa.hotelsys@ledgr.local' AND x.company_id = '$HOT' LIMIT 1), (SELECT x.access_level::text FROM user_sidebar_permissions x JOIN sidebar_items i ON i.id = x.item_id JOIN users u ON u.id = x.user_id WHERE i.resource = '$recurso' AND u.email = 'qa.hotelsys@ledgr.local' AND x.company_id IS NULL LIMIT 1), (SELECT x.access_level::text FROM profile_sidebar_permissions x JOIN sidebar_items i ON i.id = x.item_id JOIN users u ON u.profile_id = x.profile_id WHERE i.resource = '$recurso' AND u.email = 'qa.hotelsys@ledgr.local' LIMIT 1), 'NONE')"
+    $n = ((docker exec ledgr-postgres psql -U ledgr -d ledgr_app -tA -c $q) | Out-String).Trim(); if ($n) { $n } else { 'NONE' }
+  }
+  foreach ($c in @(@('employees', "/hr/employees/$zero"), @('folha', "/hr/informes/$zero"), @('ferias', "/hr/recesso/$zero/preview"), @('esocial', "/hr/esocial/s2200/$zero"))) {
+    $nivel = NivelQa $c[0]; $esp = if ($nivel -eq 'NONE') { 403 } else { 404 }
+    Teste ("Perfil na API: " + $c[0] + " (QA com nivel " + $nivel + ")") GET $c[1] $esp
+  }
   Teste "Projetos: alterar vinculo (so Master)"           POST   "/projects/operacoes/${opId}/creditos/${zero}/vinculo" 403 -corpo '{}'
   Teste "Projetos: creditos de operacao inexistente"   GET    "/projects/operacoes/${zero}/creditos"         404
   Teste "Projetos: operacao inexistente/alheia"        GET    "/projects/operacoes/${zero}/participacoes"    404

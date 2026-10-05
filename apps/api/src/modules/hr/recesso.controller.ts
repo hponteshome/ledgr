@@ -1,3 +1,5 @@
+import { SidebarResourceGuard } from '../../auth/guards/sidebar-resource.guard';
+import { RecursoMenu } from '../../auth/decorators/recurso-menu.decorator';
 import { Controller, Get, Post, Param, Body, Req, Res, UseGuards, UseInterceptors } from '@nestjs/common';
 import { RecessoService } from './services/recesso.service';
 import { JwtAuthGuard } from '@/auth/guards/jwt.guard';
@@ -5,6 +7,8 @@ import { CompanyInterceptor } from '@/multi-company/company.interceptor';
 import { Response } from 'express';
 
 @Controller('hr/recesso')
+@UseGuards(SidebarResourceGuard) // Seguranca 0A (04/10/2026): perfil na API = permissoes do menu (roda depois do JwtAuthGuard)
+@RecursoMenu('ferias')
 @UseGuards(JwtAuthGuard)
 @UseInterceptors(CompanyInterceptor)
 export class RecessoController {

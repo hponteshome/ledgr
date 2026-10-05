@@ -1,3 +1,5 @@
+import { SidebarResourceGuard } from '../../auth/guards/sidebar-resource.guard';
+import { RecursoMenu } from '../../auth/decorators/recurso-menu.decorator';
 // apps/api/src/modules/hr/hr.controller.ts
 import { Controller, Get, Post, Param, Body, Res, Query, UseGuards, UseInterceptors, Req } from '@nestjs/common';
 import { Response } from 'express';
@@ -7,6 +9,8 @@ import { EsocialS2200Service } from './services/esocial-s2200.service';
 import { EsocialEventsService } from './services/esocial-events.service';
 import { EsocialTransmissionService } from './services/esocial-transmission.service';
 
+@UseGuards(SidebarResourceGuard) // Seguranca 0A (04/10/2026): perfil na API = permissoes do menu (roda depois do JwtAuthGuard)
+@RecursoMenu('esocial')
 @UseGuards(JwtAuthGuard)
 @UseInterceptors(CompanyInterceptor)
 @Controller('hr')

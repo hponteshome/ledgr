@@ -1,3 +1,4 @@
+import { SidebarPermissionsModule } from '../sidebar-permissions/sidebar-permissions.module';
 // apps/api/src/modules/hr/hr.module.ts
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '../../prisma/prisma.module';
@@ -32,7 +33,7 @@ import { RaisService } from './services/rais.service';
 import { DctfWebController } from './dctfweb.controller';
 import { DctfWebService } from './services/dctfweb.service';
 @Module({
-  imports: [PrismaModule, CertificatesModule],
+  imports: [SidebarPermissionsModule, PrismaModule, CertificatesModule],
   controllers: [ProLaboreController, InformeController, EmployeeController, HrController, FolhaController, RescisaoController, FeriasController, RecessoController, DecimoTerceiroController, RaisController, DctfWebController],
   providers: [ProLaboreService, GuiasService, InformeService, InformePdfService, EmployeePdfParserService, EmployeeService, EsocialS2200Service, EsocialEventsService, FolhaService, RescisaoService, TrctPdfService, EsocialTransmissionService, BancoHorasService, FeriasService, RecessoService, DecimoTerceiroService, RaisService, DctfWebService],
   exports: [ProLaboreService, GuiasService, InformeService, EmployeeService, EsocialS2200Service, EsocialEventsService, FolhaService, RescisaoService, TrctPdfService, EsocialTransmissionService, BancoHorasService, FeriasService],

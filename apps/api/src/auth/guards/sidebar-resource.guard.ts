@@ -1,3 +1,4 @@
+import { RECURSO_MENU_KEY } from '../decorators/recurso-menu.decorator';
 // apps/api/src/auth/guards/sidebar-resource.guard.ts
 import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
@@ -11,8 +12,14 @@ export class SidebarResourceGuard implements CanActivate {
   constructor(private reflector: Reflector, private svc: SidebarPermissionsService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const required = this.reflector.get<ResourceAccessRequirement>('resourceAccess', context.getHandler());
-    if (!required) return true;
+    // Seguranca 0A (04/10/2026): declaracao por rota tem precedencia; senao, @RecursoMenu na classe com o nivel pelo verbo HTTP
+    let required = this.reflector.get<ResourceAccessRequirement>('resourceAccess', context.getHandler());
+    if (!required) {
+      const recurso = this.reflector.getAllAndOverride<string>(RECURSO_MENU_KEY, [context.getHandler(), context.getClass()]);
+      if (!recurso) return true;
+      const m = String(context.switchToHttp().getRequest().method || 'GET').toUpperCase();
+      required = { resource: recurso, level: m === 'GET' || m === 'HEAD' ? 'VIEW' : m === 'DELETE' ? 'DELETE' : 'EDIT' } as any;
+    }
 
     const request = context.switchToHttp().getRequest();
     const user = request.user;

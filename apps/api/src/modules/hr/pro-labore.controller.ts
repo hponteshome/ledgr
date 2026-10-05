@@ -1,3 +1,5 @@
+import { SidebarResourceGuard } from '../../auth/guards/sidebar-resource.guard';
+import { RecursoMenu } from '../../auth/decorators/recurso-menu.decorator';
 // apps/api/src/modules/hr/pro-labore.controller.ts
 import { Controller, Get, Post, Put, Body, Param, Query, Request, UseGuards, Res } from '@nestjs/common';
 import { Response } from 'express';
@@ -6,6 +8,8 @@ import { CompanyGuard } from '@/multi-company/multi-company.guard';
 import { ProLaboreService } from './services/pro-labore.service';
 import { GuiasService } from './services/guias.service';
 
+@UseGuards(SidebarResourceGuard) // Seguranca 0A (04/10/2026): perfil na API = permissoes do menu (roda depois do JwtAuthGuard)
+@RecursoMenu('folha')
 @UseGuards(JwtAuthGuard, CompanyGuard)
 @Controller('hr/pro-labore')
 export class ProLaboreController {

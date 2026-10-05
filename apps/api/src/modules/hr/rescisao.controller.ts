@@ -1,3 +1,5 @@
+import { SidebarResourceGuard } from '../../auth/guards/sidebar-resource.guard';
+import { RecursoMenu } from '../../auth/decorators/recurso-menu.decorator';
 // apps/api/src/modules/hr/rescisao.controller.ts
 import { Controller, Get, Post, Put, Body, Param, Request, Res, UseGuards } from '@nestjs/common';
 import { Response } from 'express';
@@ -6,6 +8,8 @@ import { JwtAuthGuard } from '@/auth/guards/jwt.guard';
 import { CompanyGuard } from '@/multi-company/multi-company.guard';
 import { RescisaoService } from './services/rescisao.service';
 
+@UseGuards(SidebarResourceGuard) // Seguranca 0A (04/10/2026): perfil na API = permissoes do menu (roda depois do JwtAuthGuard)
+@RecursoMenu('employees')
 @UseGuards(JwtAuthGuard, CompanyGuard)
 @Controller('hr/employees/:employeeId/rescisao')
 export class RescisaoController {

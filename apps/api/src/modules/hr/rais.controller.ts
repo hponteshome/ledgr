@@ -1,8 +1,12 @@
+import { SidebarResourceGuard } from '../../auth/guards/sidebar-resource.guard';
+import { RecursoMenu } from '../../auth/decorators/recurso-menu.decorator';
 import { Controller, Get, Post, Patch, Param, Body, Req, Query, UseGuards, UseInterceptors } from '@nestjs/common';
 import { RaisService } from './services/rais.service';
 import { JwtAuthGuard } from '@/auth/guards/jwt.guard';
 import { CompanyInterceptor } from '@/multi-company/company.interceptor';
 @Controller('hr/rais')
+@UseGuards(SidebarResourceGuard) // Seguranca 0A (04/10/2026): perfil na API = permissoes do menu (roda depois do JwtAuthGuard)
+@RecursoMenu('esocial')
 @UseGuards(JwtAuthGuard)
 @UseInterceptors(CompanyInterceptor)
 export class RaisController {

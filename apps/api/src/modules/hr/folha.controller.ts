@@ -1,3 +1,5 @@
+import { SidebarResourceGuard } from '../../auth/guards/sidebar-resource.guard';
+import { RecursoMenu } from '../../auth/decorators/recurso-menu.decorator';
 // apps/api/src/modules/hr/folha.controller.ts
 import { Controller, Get, Post, Patch, Param, Body, Req, Res, UseGuards, UseInterceptors } from "@nestjs/common";
 import { Response } from "express";
@@ -6,6 +8,8 @@ import { CompanyInterceptor } from "@/multi-company/company.interceptor";
 import { FolhaService } from "./services/folha.service";
 import { GuiasService } from "./services/guias.service";
 
+@UseGuards(SidebarResourceGuard) // Seguranca 0A (04/10/2026): perfil na API = permissoes do menu (roda depois do JwtAuthGuard)
+@RecursoMenu('folha')
 @UseGuards(JwtAuthGuard)
 @UseInterceptors(CompanyInterceptor)
 @Controller("hr/folha")

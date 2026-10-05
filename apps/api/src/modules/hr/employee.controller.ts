@@ -1,3 +1,5 @@
+import { SidebarResourceGuard } from '../../auth/guards/sidebar-resource.guard';
+import { RecursoMenu } from '../../auth/decorators/recurso-menu.decorator';
 import { BancoHorasService } from './services/banco-horas.service';
 // apps/api/src/modules/hr/employee.controller.ts
 import { Controller, Post, Get, Put, Patch, Delete, UseGuards, UseInterceptors, Req, UploadedFile, Body, Param, BadRequestException } from '@nestjs/common';
@@ -8,6 +10,8 @@ import { CompanyInterceptor } from '@/multi-company/company.interceptor';
 import { EmployeePdfParserService } from './services/employee-pdf-parser.service';
 import { EmployeeService } from './services/employee.service';
 
+@UseGuards(SidebarResourceGuard) // Seguranca 0A (04/10/2026): perfil na API = permissoes do menu (roda depois do JwtAuthGuard)
+@RecursoMenu('employees')
 @UseGuards(JwtAuthGuard)
 @UseInterceptors(CompanyInterceptor)
 @Controller('hr/employees')

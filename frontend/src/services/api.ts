@@ -78,6 +78,16 @@ function encerrarSessaoLocal() {
   }
 }
 
+// Seguranca 0A (04/10/2026): busca de pessoa por CPF fora do alcance (opcao A) - mostra a mensagem e entrega resposta vazia
+api.interceptors.response.use((response) => {
+  const d: any = response?.data;
+  if (d && d.existe === true && d.visivel === false && /\/persons\/(cpf|document)\//.test(String(response.config?.url || ''))) {
+    toast(d.mensagem || 'Ja existe uma pessoa com este CPF, fora do seu acesso.', { icon: '🔒' });
+    return { ...response, data: null };
+  }
+  return response;
+});
+
 api.interceptors.response.use(
   (response) => response,
   async (error) => {

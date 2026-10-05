@@ -1,3 +1,5 @@
+import { SidebarResourceGuard } from '../../auth/guards/sidebar-resource.guard';
+import { RecursoMenu } from '../../auth/decorators/recurso-menu.decorator';
 // apps/api/src/modules/hr/informe.controller.ts
 import { Controller, Get, Post, Put, Delete, Param, Body, Query, Req, UseGuards, Res } from '@nestjs/common';
 import { JwtAuthGuard } from '@/auth/guards/jwt.guard';
@@ -5,6 +7,8 @@ import { InformeService } from './informe.service';
 import { InformePdfService } from './informe-pdf.service';
 import { Response } from 'express';
 
+@UseGuards(SidebarResourceGuard) // Seguranca 0A (04/10/2026): perfil na API = permissoes do menu (roda depois do JwtAuthGuard)
+@RecursoMenu('folha')
 @UseGuards(JwtAuthGuard)
 @Controller('hr/informes')
 export class InformeController {

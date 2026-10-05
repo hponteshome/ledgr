@@ -10296,3 +10296,13 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 
 - Cadastro de pessoas, OPCAO A implementada (04/10/2026): listagem com filtro (vinculadas a empresas do usuario ou ainda sem vinculo; Master ve todas); :id (consulta, qualificacao, alterar, excluir) com EscopoEmpresaGuard fonte pessoa:id (404); busca por CPF fora do alcance devolve so { existe, visivel: false, mensagem } sem dados; criar vinculo confere empresa E pessoa (fonte vinculoNovo). Testes: pessoa so de outras empresas - consulta/qualificacao 404, listagem e busca por CPF sem o id dela. Frontend: a busca por CPF pode receber { existe: true, visivel: false } - conferir a tela de cadastro.
 
+
+## [SEGURANCA 0A] 04/10/2026 - perfil na API (lote 1: mecanismo + RH)
+
+- Retrato: 689 rotas, 121 com recurso declarado; SidebarResourceGuard em 10 controllers. Perfis: Master Admin e Administrador Master (all); Operador (QA), Administrativo e Visualizador configurados, sem usuarios ativos - ligar nao trava ninguem.
+- Mecanismo: @RecursoMenu('recurso') na classe (auth/decorators/recurso-menu.decorator.ts); SidebarResourceGuard deduz o nivel pelo verbo (GET/HEAD VIEW, POST/PUT/PATCH EDIT, DELETE DELETE); @RequireResourceAccess na rota tem precedencia. Guard inserido ACIMA do UseGuards(JwtAuthGuard) da classe (roda depois dele).
+- RH: employees (funcionarios, rescisao), folha (folha, 13o, pro-labore, informes, DCTFWeb), ferias (ferias, recesso), esocial (eSocial, RAIS).
+- Recursos novos (decisao do Hpontes: criar quatro), atribuidos aos grupos do menu: relatorios-contabeis (Relatorios), importacoes-contabeis (Importacao contabil), societario (Societario Operacao), conciliacao-bancaria (Importacao Bancaria). Perfis nao-Master precisam ser configurados para eles em Permissoes de Menu.
+- Frontend: interceptor no api.ts trata { existe, visivel: false } da busca por CPF (mensagem + resposta vazia) nas 8 telas.
+- Testes pela regra: nivel da QA calculado no banco (override da empresa, override global, perfil); NONE = 403, leitura = 404 no id inexistente.
+- Proximos lotes: Financeiro/Fiscal, Contabilidade (+ relatorios e importacoes), SPED, Societario, Certificados/Auditoria.
