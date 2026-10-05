@@ -26,6 +26,7 @@ WITH u AS (UPDATE proj_credito_vinculos SET motivo_cancelamento = motivo_cancela
 SELECT 'qa_provas=' || count(*) FROM proj_credito_provas WHERE cancelado_em IS NULL;
 SELECT 'qa_aplicacoes=' || count(*) FROM proj_aplicacoes WHERE cancelado_em IS NULL;
 SELECT 'qa_saldos=' || count(*) FROM proj_saldos_informados WHERE cancelado_em IS NULL;
+SELECT 'qa_premissas=' || count(*) FROM proj_premissas;
 WITH u AS (UPDATE proj_credito_provas SET motivo_cancelamento = motivo_cancelamento RETURNING 1) SELECT 'qa_update_provas=' || count(*) FROM u;
 SELECT 'qa_concessoes_de_outros=' || count(*) FROM proj_concessoes WHERE user_id <> proj_ctx_user();
 WITH u AS (UPDATE proj_operacoes SET nome = nome RETURNING 1) SELECT 'qa_update_operacoes=' || count(*) FROM u;

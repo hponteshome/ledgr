@@ -5605,6 +5605,8 @@ model ProjContraparte {
   id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   tipoPessoa         String?   @map("tipo_pessoa") @db.VarChar(2)
   documento          String?   @db.VarChar(14)
+  pais               String    @default("BR") @db.Char(2)
+  tipoDocumento      String?   @map("tipo_documento") @db.VarChar(10)
   nome               String    @db.VarChar(200)
   email              String?   @db.VarChar(200)
   telefone           String?   @db.VarChar(20)
@@ -5895,4 +5897,46 @@ model ProjSaldoInformado {
 
   @@index([operacaoId, tipo, dataReferencia])
   @@map("proj_saldos_informados")
+}
+
+
+/// Kit do Investidor - Etapa 1 (05/10/2026): versao de premissas do projeto (BP + parametros contratuais), imutavel; so o Master le (RLS).
+model ProjPremissaVersao {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  projetoId          String    @map("projeto_id") @db.Uuid
+  numero             Int
+  descricao          String
+  dataBase           DateTime  @map("data_base") @db.Date
+  arquivoOrigem      String?   @map("arquivo_origem")
+  arquivoSha256      String?   @map("arquivo_sha256") @db.Char(64)
+  criadoEm           DateTime  @default(now()) @map("criado_em") @db.Timestamp(6)
+  criadoPorId        String?   @map("criado_por_id") @db.Uuid
+  canceladoEm        DateTime? @map("cancelado_em") @db.Timestamp(6)
+  canceladoPorId     String?   @map("cancelado_por_id") @db.Uuid
+  motivoCancelamento String?   @map("motivo_cancelamento")
+
+  premissas ProjPremissa[]
+
+  @@unique([projetoId, numero])
+  @@map("proj_premissa_versoes")
+}
+
+/// Kit do Investidor - Etapa 1 (05/10/2026): premissa (entrada) com fonte; valores derivados sao calculados pelo LEDGR, nao gravados.
+model ProjPremissa {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  versaoId   String    @map("versao_id") @db.Uuid
+  operacaoId String?   @map("operacao_id") @db.Uuid
+  grupo      String    @db.VarChar(40)
+  codigo     String    @db.VarChar(60)
+  nome       String    @db.VarChar(160)
+  valorNum   Decimal?  @map("valor_num") @db.Decimal(24, 10)
+  valorTexto String?   @map("valor_texto")
+  valorData  DateTime? @map("valor_data") @db.Date
+  unidade    String?   @db.VarChar(20)
+  fonte      String
+  ordem      Int       @default(0)
+
+  versao ProjPremissaVersao @relation(fields: [versaoId], references: [id])
+
+  @@map("proj_premissas")
 }
