@@ -41,6 +41,7 @@ export class ProvisaoService {
   }
 
   async updateConfig(id: string, companyId: string, dto: any, createdById?: string) {
+    await this.exigirConfigDaEmpresa(id, companyId); // Seguranca 0A (04/10/2026): a alteracao tinha ficado sem a checagem que o deleteConfig ja tinha
     const { rateios, ...data } = dto;
     const config = await this.prisma.$transaction(async tx => {
       const updated = await tx.provisaoConfig.update({

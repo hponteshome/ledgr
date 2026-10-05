@@ -10267,3 +10267,9 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - Ja corretas: rescisao, recesso (aplicar), funcionario (update, desligar), informe (remove com findOne; upsert pela chave composta com companyId).
 - Proximo: mesmo levantamento (leitura e escrita) em Financeiro, Documentos, Ativos e Fiscal.- Guias do pro-labore: 'throw new Error' (500) trocado por NotFoundException (404). PENDENTE: revisar 'throw new Error(...)' em servicos dos demais modulos (vira 500); nao trocar em massa - avaliar caso a caso junto com o acesso por ID.
 
+
+## [SEGURANCA 0A] 04/10/2026 - Financeiro, Ativos, Documentos (acesso por ID)
+
+- Levantamento em Financeiro, Ativos, Fiscal, Apuracao, Documentos, Contratos e Locacao. Fiscal e Apuracao sem suspeitas. Locacao, Financeiro e Ativos: escritas com this.findOne(companyId, id) antes do update (padrao seguro; o levantamento nao reconhece metodo auxiliar - falso alarme).
+- BRECHA corrigida: provisao.updateConfig alterava so por id (o deleteConfig ja tinha exigirConfigDaEmpresa desde etapa anterior; a alteracao ficou de fora). Agora chama exigirConfigDaEmpresa antes.
+- Documentos e modelos: leitura por ID de outra empresa = 404 (protecao fora do controller); 8 testes na suite (d0836ab). Contratos: tabela nao achada por 'contrato%' - investigar.
