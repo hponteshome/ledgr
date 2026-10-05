@@ -10273,3 +10273,6 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - Levantamento em Financeiro, Ativos, Fiscal, Apuracao, Documentos, Contratos e Locacao. Fiscal e Apuracao sem suspeitas. Locacao, Financeiro e Ativos: escritas com this.findOne(companyId, id) antes do update (padrao seguro; o levantamento nao reconhece metodo auxiliar - falso alarme).
 - BRECHA corrigida: provisao.updateConfig alterava so por id (o deleteConfig ja tinha exigirConfigDaEmpresa desde etapa anterior; a alteracao ficou de fora). Agora chama exigirConfigDaEmpresa antes.
 - Documentos e modelos: leitura por ID de outra empresa = 404 (protecao fora do controller); 8 testes na suite (d0836ab). Contratos: tabela nao achada por 'contrato%' - investigar.
+
+- Documentos e Contratos: protegidos pelo DocumentScopeInterceptor na classe (cobre leitura e escrita; contratos sao registros de documents). Testes: contrato e versoes de outra empresa, listas de documentos e contratos por ?companyId= de outra empresa. document-templates NAO usa o interceptor: escritas de modelos em revisao. contratos/socio/:personId/qualificacao segue a politica pendente do cadastro global de pessoas.
+

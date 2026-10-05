@@ -235,7 +235,12 @@ if ($global:tok) {
     foreach ($sub in 'versions', 'pdf', 'preview', 'docx', 'signatures') { Isolado "documento de outra empresa: $sub" "/documents/$docFora/$sub" }
   } else { Write-Host "SEM DADOS - nenhum documento de empresa sem vinculo" -ForegroundColor Yellow }
   if ($tplFora) { Isolado "modelo de documento de outra empresa" "/document-templates/$tplFora"; Isolado "modelo de documento de outra empresa: docx" "/document-templates/$tplFora/docx" } else { Write-Host "SEM DADOS - nenhum modelo de documento de empresa sem vinculo" -ForegroundColor Yellow }
-  if ($ctrFora) { Isolado "contrato de outra empresa ($tabContr)" "/contratos/$ctrFora"; Isolado "versoes de contrato de outra empresa" "/contratos/$ctrFora/versions" } else { Write-Host "SEM DADOS - nenhum contrato de empresa sem vinculo (tabela: $tabContr)" -ForegroundColor Yellow }
+  # Contratos sao registros da tabela documents (DocumentScopeInterceptor no controller)
+  if ($docFora) { Isolado "contrato (documento) de outra empresa" "/contratos/$docFora"; Isolado "versoes de contrato de outra empresa" "/contratos/$docFora/versions" }
+  if ($empOutra) {
+    Isolado "lista de documentos de outra empresa (filtro)" "/documents?companyId=$empOutra"
+    Isolado "lista de contratos de outra empresa (filtro)" "/contratos?companyId=$empOutra"
+  }
   Teste "Projetos: alterar vinculo (so Master)"           POST   "/projects/operacoes/${opId}/creditos/${zero}/vinculo" 403 -corpo '{}'
   Teste "Projetos: creditos de operacao inexistente"   GET    "/projects/operacoes/${zero}/creditos"         404
   Teste "Projetos: operacao inexistente/alheia"        GET    "/projects/operacoes/${zero}/participacoes"    404
