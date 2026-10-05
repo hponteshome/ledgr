@@ -10,6 +10,7 @@ export const TIPOS_SALDO: Record<string, string> = {
   CONTA_INDIVIDUAL: 'Conta Individual do Adquirente',
   INTERCOMPANY_RECEBEDORA: 'Intercompany - conta da recebedora',
   INTERCOMPANY_BENEFICIARIA: 'Intercompany - conta da beneficiária',
+  PASSIVOS_EMPREENDIMENTO: 'Passivos do empreendimento (HOTELSYS)',
 };
 
 export function normalizarValor(s: string): string {

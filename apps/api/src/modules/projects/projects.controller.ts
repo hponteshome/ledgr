@@ -495,7 +495,7 @@ export class ProjectsController {
   registrarSaldoInformado(@Param('operacaoId') operacaoId: string, @Body() b: any, @Req() req: any) {
     if (!UUID_RE.test(operacaoId)) throw new NotFoundException('Registro nao encontrado.');
     const tipo = String(b?.tipo || '');
-    if (!['CONTA_INDIVIDUAL', 'INTERCOMPANY_RECEBEDORA', 'INTERCOMPANY_BENEFICIARIA'].includes(tipo)) throw new BadRequestException('Tipo de saldo invalido.');
+    if (!['CONTA_INDIVIDUAL', 'INTERCOMPANY_RECEBEDORA', 'INTERCOMPANY_BENEFICIARIA', 'PASSIVOS_EMPREENDIMENTO'].includes(tipo)) throw new BadRequestException('Tipo de saldo invalido.');
     const data = b?.dataReferencia ? new Date(String(b.dataReferencia).slice(0, 10) + 'T00:00:00Z') : null;
     if (!data || isNaN(data.getTime())) throw new BadRequestException('Informe a data de referencia.');
     let bruto = String(b?.valor ?? '').trim().replace(/\s|R\$/g, '');

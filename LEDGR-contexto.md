@@ -10341,3 +10341,12 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - Premissas: v1 encerrada com motivo; v2 = BP/IPCA/produto/sensibilidade/meta reaproveitados da v1 + Series#1 + divida REAL + passivos + cronograma. Naturezas: paga_passivo (Devolucao ao Adquirente e nova Manutencao da Operacao = false).
 - Efeito temporario: pagina do Kit do Investidor (v1) mostra premissa ausente ate a Etapa C (Kit do Cotista).
 
+
+## [PROJETOS] 05/10/2026 - Series#1, Etapa B (estrutura)
+
+- Papeis novos: EMISSORA, OFERTANTE, COTISTA, CREDORA, DEVEDORA, CONCEDENTE. Operacao SERIES1 (tipo EMISSAO_QUOTAS, data-base 01/10/2026): F5 emissora, HOTELSYS e SUNRISE ofertantes, VAL cotista. Operacao REAL reestruturada: "Divida e Participacao REAL" (tipo DIVIDA_PARTICIPACAO); papeis antigos encerrados com motivo; REAL devedora, F5 credora, SUNRISE concedente.
+- proj_quotas (imutavel, sem DELETE, RLS): Quota no 1 = VAL, R$ 5 mi, subscricao 01/08/2024, ingresso 01/10/2026, origem Operacao Ancora. Capital aportado calculado (aportes liquidos da operacao de origem).
+- Saldos informados: novo tipo PASSIVOS_EMPREENDIMENTO (registrado na SERIES1) = estoque dos passivos da HOTELSYS ate a escrituracao estar no LEDGR.
+- GET projects-relatorios/projetos/:projetoId/estrutura (so Master): saldo 1 (estoque informado - aplicacoes com paga_passivo depois dele; sem estoque, conta desde 31/10/2025) -> subordinacao liberada quando zera; saldo 2 (R$ 54.418.451,00 - 10% dos aportes liquidos, data de quitacao e aportes que faltam); parametros da serie (% por quota = 80% x quota / resultado do BP); quotas com integralizacao. Pagina "Series#1 e Divida" (so Master).
+- pg: declaracao conferida no package.json (^8 impede a 9); aviso de consultas paralelas vem do interpretador do Prisma dentro de transacoes (comoUsuario) - revisar quando o Prisma corrigir.
+- Etapa C: Kit do Cotista (substitui o Kit da v1), Demonstrativo semestral da REAL, extrato por quota, saldos no Painel; depois, contas de passivo da HOTELSYS para o saldo 1 pela contabilidade.

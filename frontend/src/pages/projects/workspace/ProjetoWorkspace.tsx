@@ -19,6 +19,7 @@ import IntercompanyProjeto from './IntercompanyProjeto';
 import DemonstrativoProjeto from './DemonstrativoProjeto';
 import HistoricoProjeto from './HistoricoProjeto';
 import KitInvestidorProjeto from './KitInvestidorProjeto';
+import EstruturaSeries1Projeto from './EstruturaSeries1Projeto';
 import { PROJ, PROJ_ACCENT, Projeto, erroSt } from './projetoTema';
 
 const itemSt = (ativo: boolean): React.CSSProperties => ({
@@ -39,6 +40,7 @@ const MENU: { to: string; label: string; icon: React.ElementType; end?: boolean;
   { to: 'demonstrativo', label: 'Demonstrativo', icon: FiClipboard },
   { to: 'historico', label: 'Histórico', icon: FiClock },
   { to: 'kit-investidor', label: 'Kit do Investidor', icon: FiBriefcase, master: true },
+  { to: 'series1', label: 'Series#1 e Dívida', icon: FiLayers, master: true },
   { to: 'participantes', label: 'Participantes', icon: FiUsers },
   { to: 'documentos', label: 'Documentos', icon: FiFileText },
 ];
@@ -135,6 +137,7 @@ export default function ProjetoWorkspace() {
               <Route path="demonstrativo" element={<DemonstrativoProjeto operacao={operacao} />} />
               <Route path="historico" element={<HistoricoProjeto operacao={operacao} />} />
               {master && <Route path="kit-investidor" element={<KitInvestidorProjeto projetoId={projeto.id} />} />}
+              {master && <Route path="series1" element={<EstruturaSeries1Projeto projetoId={projeto.id} />} />}
               <Route path="participantes" element={<ParticipantesProjeto operacao={operacao} master={master} />} />
               <Route path="documentos" element={<DocumentosProjeto operacao={operacao} master={master} />} />
               <Route path="pendencias" element={<PendenciasProjeto operacao={operacao} master={master} />} />

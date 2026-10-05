@@ -5941,3 +5941,24 @@ model ProjPremissa {
 
   @@map("proj_premissas")
 }
+
+/// Series#1 - Etapa B (05/10/2026): registro de quotas da serie (imutavel, so encerra com motivo; sem DELETE; RLS).
+/// Capital aportado e integralizacao sao calculados (quota com operacao de origem = aportes liquidos daquela operacao).
+model ProjQuota {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  operacaoId         String    @map("operacao_id") @db.Uuid
+  numero             Int
+  subscritorId       String    @map("subscritor_id") @db.Uuid
+  valor              Decimal   @db.Decimal(18, 2)
+  dataSubscricao     DateTime  @map("data_subscricao") @db.Date
+  dataIngresso       DateTime  @map("data_ingresso") @db.Date
+  operacaoOrigemId   String?   @map("operacao_origem_id") @db.Uuid
+  observacao         String?
+  criadoEm           DateTime  @default(now()) @map("criado_em") @db.Timestamp(6)
+  criadoPorId        String?   @map("criado_por_id") @db.Uuid
+  canceladoEm        DateTime? @map("cancelado_em") @db.Timestamp(6)
+  canceladoPorId     String?   @map("cancelado_por_id") @db.Uuid
+  motivoCancelamento String?   @map("motivo_cancelamento")
+
+  @@map("proj_quotas")
+}

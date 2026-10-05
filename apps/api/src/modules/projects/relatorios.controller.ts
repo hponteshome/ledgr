@@ -526,6 +526,84 @@ export class RelatoriosController {
       <p style="font-size:8.5px;color:#667085">Fonte das premissas: ${esc(k.versao.arquivo || '-')} (SHA-256 ${esc((k.versao.sha256 || '').slice(0, 16))}…). Documento executivo; em caso de divergência, prevalecem os instrumentos jurídicos assinados.</p></section>
     </body></html>`;
   }
+
+  // -- Series#1 e Divida da REAL (Etapa B, 05/10/2026) - so o Master -----------------------------------------
+  // Saldo 1 (passivos da HOTELSYS): ultimo estoque informado - aplicacoes que pagam passivo depois dele. Libera os cotistas.
+  // Saldo 2 (divida da REAL com a F5): valor fixo - compensacao de 10% dos aportes liquidos (inclusive Ancora). Libera a REAL.
+  @Get('projetos/:projetoId/estrutura')
+  @UseGuards(MasterOnlyGuard)
+  @ProjAcao('autenticado')
+  estrutura(@Param('projetoId') projetoId: string, @Req() req: any) {
+    if (!UUID_RE.test(projetoId)) throw new NotFoundException('Registro nao encontrado.');
+    return this.db.comoUsuario(req.user.id, async (tx) => {
+      const ops = await tx.projOperacao.findMany({ where: { projetoId, canceladoEm: null }, select: { id: true, codigo: true, nome: true } });
+      const op = (c: string) => ops.find((o) => o.codigo === c);
+      const anc = op('ANCORA'); const s1 = op('SERIES1'); const real = op('REAL');
+      if (!s1 || !real) throw new BadRequestException('Estrutura da Series#1 ainda nao carregada.');
+      const versao = await tx.projPremissaVersao.findFirst({ where: { projetoId, canceladoEm: null }, orderBy: { numero: 'desc' }, select: { id: true, numero: true } });
+      if (!versao) throw new BadRequestException('Nenhuma versao de premissas carregada.');
+      const opCod = new Map(ops.map((o) => [o.id, o.codigo]));
+      const prem = await tx.projPremissa.findMany({ where: { versaoId: versao.id } });
+      const P = new Map<string, any>(); prem.forEach((p) => P.set((p.operacaoId ? opCod.get(p.operacaoId) + ':' : '') + p.codigo, p));
+      const n = (k: string) => { const p = P.get(k); if (!p || p.valorNum === null) throw new BadRequestException(`Premissa ausente: ${k}`); return Number(p.valorNum); };
+      const t = (k: string): string | null => P.get(k)?.valorTexto ?? null;
+      const cent = (v: any) => Math.round(Number(v) * 100);
+      const fmt = (c: number) => (c / 100).toFixed(2);
+      // aportes liquidos da Ancora, em ordem de data
+      const ev: { data: string; c: number }[] = [];
+      if (anc) {
+        const vincs = await tx.projCreditoVinculo.findMany({ where: { canceladoEm: null, situacao: 'VINCULADO', credito: { operacaoId: anc.id, canceladoEm: null } }, select: { credito: { select: { dataCredito: true, valor: true } } } });
+        const devs = await tx.projAplicacao.findMany({ where: { operacaoId: anc.id, canceladoEm: null, natureza: { tipo: 'DEVOLUCAO' } }, select: { dataAplicacao: true, valor: true } });
+        vincs.forEach((x) => ev.push({ data: x.credito.dataCredito.toISOString().slice(0, 10), c: cent(x.credito.valor) }));
+        devs.forEach((x) => ev.push({ data: x.dataAplicacao.toISOString().slice(0, 10), c: -cent(x.valor) }));
+        ev.sort((a, b) => a.data.localeCompare(b.data));
+      }
+      const aportesAncora = ev.reduce((s, e) => s + e.c, 0);
+      // divida da REAL (saldo 2)
+      const dividaC = cent(n('REAL:DIVIDA_VALOR')); const pct = n('REAL:CONTRAPARTIDA_PCT_APORTE');
+      let acum = 0; let quitadaEm: string | null = null;
+      for (const e of ev) { acum += e.c; if (!quitadaEm && Math.round(acum * pct) >= dividaC) quitadaEm = e.data; }
+      const compensadoC = Math.round(aportesAncora * pct);
+      const divida = {
+        valor: fmt(dividaC), valorEur: n('REAL:DIVIDA_VALOR_EUR'), data: P.get('REAL:DIVIDA_DATA')?.valorData ? (P.get('REAL:DIVIDA_DATA').valorData as Date).toISOString().slice(0, 10) : null,
+        pctContrapartida: pct, aportesBase: fmt(aportesAncora), compensado: fmt(compensadoC), saldo: fmt(Math.max(0, dividaC - compensadoC)),
+        quitadaEm, aportesNecessarios: fmt(Math.max(0, Math.ceil((dividaC - compensadoC) / pct))),
+      };
+      // passivos da HOTELSYS (saldo 1)
+      const inf = await tx.projSaldoInformado.findFirst({ where: { operacaoId: s1.id, canceladoEm: null, tipo: 'PASSIVOS_EMPREENDIMENTO' }, orderBy: [{ dataReferencia: 'desc' }, { criadoEm: 'desc' }], select: { id: true, dataReferencia: true, valor: true, fonte: true } });
+      const desde = inf ? inf.dataReferencia : (P.get('REAL:DIVIDA_DATA')?.valorData as Date | undefined) ?? null;
+      const apls = await tx.projAplicacao.findMany({
+        where: { canceladoEm: null, operacaoId: { in: ops.map((o) => o.id) }, natureza: { pagaPassivo: true }, ...(desde ? { dataAplicacao: { gt: desde } } : {}) },
+        select: { valor: true, natureza: { select: { nome: true } } },
+      });
+      const porNat = new Map<string, { nome: string; quantidade: number; c: number }>();
+      apls.forEach((a) => { const e = porNat.get(a.natureza.nome) || { nome: a.natureza.nome, quantidade: 0, c: 0 }; e.quantidade += 1; e.c += cent(a.valor); porNat.set(a.natureza.nome, e); });
+      const pagosC = apls.reduce((s, a) => s + cent(a.valor), 0);
+      const passivos = {
+        estoqueInformado: inf ? { data: inf.dataReferencia.toISOString().slice(0, 10), valor: fmt(cent(inf.valor)), fonte: inf.fonte } : null,
+        pagamentosDesde: desde ? desde.toISOString().slice(0, 10) : null, pagamentos: fmt(pagosC),
+        porNatureza: [...porNat.values()].sort((a, b) => b.c - a.c).map((e) => ({ nome: e.nome, quantidade: e.quantidade, total: fmt(e.c) })),
+        saldoEstimado: inf ? fmt(Math.max(0, cent(inf.valor) - pagosC)) : null, quitados: inf ? cent(inf.valor) - pagosC <= 0 : false,
+      };
+      // series e quotas
+      const fator = prem.filter((p) => p.grupo === 'REEXPRESSAO' && p.codigo.startsWith('IPCA_')).reduce((f, p) => f * (1 + Number(p.valorNum)), 1);
+      const resultado = (n('RECEITAS') + n('DESPESAS')) * fator;
+      const valorQuota = n('SERIES1_VALOR_QUOTA');
+      const quotas = await tx.projQuota.findMany({ where: { operacaoId: s1.id, canceladoEm: null }, orderBy: { numero: 'asc' } });
+      const subs = quotas.length ? await tx.projContraparte.findMany({ where: { id: { in: quotas.map((q) => q.subscritorId) } }, select: { id: true, nome: true } }) : [];
+      const nomes = new Map(subs.map((s) => [s.id, s.nome]));
+      return {
+        versaoPremissas: versao.numero, operacoes: { series1: s1.id, real: real.id, ancora: anc?.id ?? null },
+        series: { valorQuota, pctPorQuota: n('SERIES1_PCT_CDE_COTISTAS') * valorQuota / resultado, pctCotistas: n('SERIES1_PCT_CDE_COTISTAS'), pctF5: n('SERIES1_PCT_CDE_F5'),
+          janela: [t('SERIES1_JANELA_INICIO'), t('SERIES1_JANELA_FIM')], primeiraDistribuicao: t('SERIES1_PRIMEIRA_DISTRIBUICAO'), periodicidade: t('SERIES1_PERIODICIDADE') },
+        divida, passivos, subordinacao: { liberada: passivos.quitados },
+        quotas: quotas.map((q) => {
+          const aportadoC = q.operacaoOrigemId && anc && q.operacaoOrigemId === anc.id ? aportesAncora : 0;
+          return { numero: q.numero, subscritor: nomes.get(q.subscritorId) || '-', valor: fmt(cent(q.valor)), capitalAportado: fmt(aportadoC),
+            integralizacao: cent(q.valor) ? Math.min(1, aportadoC / cent(q.valor)) : 0, dataSubscricao: q.dataSubscricao.toISOString().slice(0, 10),
+            dataIngresso: q.dataIngresso.toISOString().slice(0, 10), origem: q.operacaoOrigemId ? opCod.get(q.operacaoOrigemId) ?? null : null, faixaVigente: 1, multiplo: 0 };
+        }),
+      };
+    });
+  }
 }
-
-
