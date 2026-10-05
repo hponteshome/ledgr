@@ -19,7 +19,8 @@ export class SidebarResourceGuard implements CanActivate {
     if (!user) throw new ForbiddenException('Usuário não autenticado.');
 
     const userId = user.id ?? user.sub;
-    const companyId = request.headers['x-company-id'] ?? '';
+    // Seguranca 0A (04/10/2026): cabecalho lido como texto; o servico ignora valor que nao seja UUID (rotas sem empresa ativa)
+    const companyId = String(request.headers['x-company-id'] ?? '');
 
     const level = await this.svc.resolveResourceLevel(userId, companyId, required.resource);
 

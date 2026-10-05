@@ -14,6 +14,7 @@ import { ClicksignService } from './clicksign.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SignatureValidatorService } from './signature-validator.service';
 import { JwtAuthGuard } from '../../auth/guards/jwt.guard';
+import { EscopoEmpresaGuard, EscopoEmpresa } from '../../multi-company/escopo-empresa.guard';
 import { SkipCompanyCheck } from '../../multi-company/company.interceptor';
 import { UseGuards } from '@nestjs/common';
 
@@ -43,6 +44,8 @@ export class SignaturesController {
 
   // ── Signatários ────────────────────────────────────────────────────────────
   @UseGuards(JwtAuthGuard)
+  @UseGuards(EscopoEmpresaGuard) // Seguranca 0A (04/10/2026): vinculo com a empresa DO REGISTRO
+  @EscopoEmpresa('documento:documentId')
   @Get('documents/:documentId/signers')
   async getSigners(@Param('documentId') documentId: string) {
     return this.signatureService.getSigners(documentId);
@@ -104,7 +107,7 @@ export class SignaturesController {
       throw new ForbiddenException('Webhook nao configurado corretamente.');
     }
     const expected = crypto.createHmac('sha256', secret).update(req.rawBody).digest('hex');
-    if (!signature || !crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) {
+    if (!signature || String(signature).length !== expected.length || !crypto.timingSafeEqual(Buffer.from(String(signature)), Buffer.from(expected))) {
       console.warn('[ClickSign Webhook] Assinatura invalida - requisicao rejeitada');
       throw new ForbiddenException('Assinatura invalida.');
     }
@@ -176,6 +179,8 @@ export class SignaturesController {
 
   // ── Status geral ──────────────────────────────────────────────────────────
   @UseGuards(JwtAuthGuard)
+  @UseGuards(EscopoEmpresaGuard) // Seguranca 0A (04/10/2026): vinculo com a empresa DO REGISTRO
+  @EscopoEmpresa('documento:documentId')
   @Get('documents/:documentId/status')
   async getStatus(@Param('documentId') documentId: string) {
     return this.signatureService.getSignatureStatus(documentId);

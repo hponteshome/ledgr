@@ -117,6 +117,10 @@ export class SidebarPermissionsService {
   }
 
   async resolveResourceLevel(userId: string, companyId: string, resource: string): Promise<Level> {
+    // Seguranca 0A (04/10/2026): sem usuario = NONE (falha fechada); empresa invalida/ausente = so permissoes globais
+    // (antes: companyId '' ia para a consulta e o PostgreSQL devolvia erro de UUID -> 500 no guard).
+    if (!userId) return 'NONE';
+    const cid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(companyId || '')) ? String(companyId) : null;
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { profileId: true, profile: { select: { permissions: true, sidebarConfigured: true } } },
@@ -132,10 +136,10 @@ export class SidebarPermissionsService {
     if (!item) return 'NONE';
 
     const overrides = await this.prisma.userSidebarPermission.findMany({
-      where: { userId, itemId: item.id, OR: [{ companyId }, { companyId: null }] },
+      where: { userId, itemId: item.id, OR: cid ? [{ companyId: cid }, { companyId: null }] : [{ companyId: null }] },
     });
     // Prioriza override especifico da empresa ativa sobre o global (companyId nulo)
-    const override = overrides.find(o => o.companyId === companyId) ?? overrides.find(o => o.companyId === null) ?? null;
+    const override = (cid ? overrides.find(o => o.companyId === cid) : undefined) ?? overrides.find(o => o.companyId === null) ?? null;
 
     if (!user.profile?.sidebarConfigured) {
       // Perfil nunca revisado por um admin: sem acesso a recursos

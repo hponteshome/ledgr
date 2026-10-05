@@ -9,6 +9,7 @@ import {
   CreatePersonCompanyDto, UpdatePersonCompanyDto,
 } from './persons.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt.guard';
+import { EscopoEmpresaGuard, EscopoEmpresa } from '../../multi-company/escopo-empresa.guard';
 import { SkipCompanyCheck } from '../../multi-company/company.interceptor';
 import { SidebarResourceGuard } from '../../auth/guards/sidebar-resource.guard';
 import { RequireResourceAccess } from '../../auth/decorators/require-resource-access.decorator';
@@ -69,23 +70,31 @@ export class PersonsController {
   }
 
   @RequireResourceAccess('persons', 'VIEW')
+  @UseGuards(EscopoEmpresaGuard) // Seguranca 0A (04/10/2026): vinculo com a empresa DO REGISTRO
+  @EscopoEmpresa('param:companyId')
   @Get('links/company/:companyId')
   async linksByCompany(@Param('companyId') companyId: string) {
     return await this.service.linksByCompany(companyId);
   }
   @RequireResourceAccess('persons', 'EDIT')
+  @UseGuards(EscopoEmpresaGuard) // Seguranca 0A (04/10/2026): vinculo com a empresa DO REGISTRO
+  @EscopoEmpresa('body:companyId')
   @Post('links')
   async createLink(@Body() dto: CreatePersonCompanyDto) {
     return await this.service.createLink(dto);
   }
 
   @RequireResourceAccess('persons', 'EDIT')
+  @UseGuards(EscopoEmpresaGuard) // Seguranca 0A (04/10/2026): vinculo com a empresa DO REGISTRO
+  @EscopoEmpresa('vinculo:linkId')
   @Patch('links/:linkId')
   async updateLink(@Param('linkId') linkId: string, @Body() dto: UpdatePersonCompanyDto) {
     return await this.service.updateLink(linkId, dto);
   }
 
   @RequireResourceAccess('persons', 'DELETE')
+  @UseGuards(EscopoEmpresaGuard) // Seguranca 0A (04/10/2026): vinculo com a empresa DO REGISTRO
+  @EscopoEmpresa('vinculo:linkId')
   @Delete('links/:linkId')
   @HttpCode(HttpStatus.OK)
   async removeLink(@Param('linkId') linkId: string) {

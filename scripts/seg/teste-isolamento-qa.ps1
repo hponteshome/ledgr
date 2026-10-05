@@ -184,6 +184,22 @@ if ($global:tok) {
   Teste "Relatorios: historico sem acesso"               GET    "/projects-relatorios/operacoes/${zero}/historico"     404
   Teste "Relatorios: painel executivo"                   GET    "/projects-relatorios/operacoes/${opId}/painel-executivo" 200 -msg '"pendencias":'
   Teste "Relatorios: painel executivo sem acesso"        GET    "/projects-relatorios/operacoes/${zero}/painel-executivo" 404
+  # Seguranca 0A (04/10/2026): escopo pela empresa DO REGISTRO (empresa sem vinculo com a QA, escolhida pela regra)
+  $empOutra = ((docker exec ledgr-postgres psql -U ledgr -d ledgr_app -tA -c "SELECT c.id FROM companies c WHERE NOT EXISTS (SELECT 1 FROM user_companies uc JOIN users u ON u.id = uc.user_id WHERE u.email = 'qa.hotelsys@ledgr.local' AND uc.company_id = c.id) ORDER BY c.legal_name LIMIT 1") | Out-String).Trim()
+  $docOutra = if ($empOutra) { ((docker exec ledgr-postgres psql -U ledgr -d ledgr_app -tA -c "SELECT id FROM documents WHERE company_id = '$empOutra' LIMIT 1") | Out-String).Trim() } else { '' }
+  if ($empOutra) {
+    Teste "Escopo: empresa sem vinculo por ID"                GET    "/companies/${empOutra}"                       404
+    Teste "Escopo: competencia de empresa sem vinculo"        GET    "/companies/${empOutra}/active-competencia"    404
+    $sP = try { (Invoke-WebRequest -UseBasicParsing "$base/persons/links/company/$empOutra" -Headers @{ Authorization = "Bearer $global:tok" } -TimeoutSec 10).StatusCode } catch { [int]$_.Exception.Response.StatusCode }
+    if ($sP -in 403, 404) { Write-Host "OK     esperado 403/404 | obtido $sP | Escopo: vinculos de pessoas de empresa sem vinculo" -ForegroundColor Green } else { $global:falhas++; Write-Host "FALHA  esperado 403/404 | obtido $sP | Escopo: vinculos de pessoas de empresa sem vinculo" -ForegroundColor Red }
+  } else { Write-Host "SEM DADOS - nenhuma empresa sem vinculo com a QA" -ForegroundColor Yellow }
+  if ($docOutra) {
+    Teste "Escopo: signatarios de documento de outra empresa" GET    "/signatures/documents/${docOutra}/signers"    404
+    Teste "Escopo: situacao de documento de outra empresa"    GET    "/signatures/documents/${docOutra}/status"     404
+  } else { Write-Host "SEM DADOS - nenhum documento de empresa sem vinculo com a QA" -ForegroundColor Yellow }
+  Teste "Feriados: importar (so Master)"                      POST   "/calendar/holidays/import/2099"               403 -corpo '{}'
+  Teste "Backup: restauracao de emergencia sem chave"         POST   "/system/backup/restore-emergency"             403 -corpo '{}'
+  Teste "ClickSign: webhook sem assinatura"                   POST   "/signatures/clicksign/webhook"                403 -corpo '{}'
   Teste "Projetos: alterar vinculo (so Master)"           POST   "/projects/operacoes/${opId}/creditos/${zero}/vinculo" 403 -corpo '{}'
   Teste "Projetos: creditos de operacao inexistente"   GET    "/projects/operacoes/${zero}/creditos"         404
   Teste "Projetos: operacao inexistente/alheia"        GET    "/projects/operacoes/${zero}/participacoes"    404

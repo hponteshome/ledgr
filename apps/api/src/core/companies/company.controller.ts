@@ -19,6 +19,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
 import { JwtAuthGuard } from '../../auth/guards/jwt.guard';
+import { EscopoEmpresaGuard, EscopoEmpresa } from '../../multi-company/escopo-empresa.guard';
 import { SidebarResourceGuard } from '../../auth/guards/sidebar-resource.guard';
 import { RequireResourceAccess } from '../../auth/decorators/require-resource-access.decorator';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
@@ -74,12 +75,16 @@ export class CompanyController {
    * Usada por Diario Geral, Razao Analitico, Balanco Patrimonial e DRE
    * como padrao inicial de periodo/exercicio.
    */
+  @UseGuards(EscopoEmpresaGuard) // Seguranca 0A (04/10/2026): vinculo com a empresa DO REGISTRO
+  @EscopoEmpresa('param:id')
   @Get(':id/active-competencia')
   async getActiveCompetencia(@Param('id') id: string, @CurrentUser('object') user: any) {
     const activeCompetencia = await this.companyService.getActiveCompetencia(user.id, id);
     return { activeCompetencia };
   }
 
+  @UseGuards(EscopoEmpresaGuard) // Seguranca 0A (04/10/2026): vinculo com a empresa DO REGISTRO
+  @EscopoEmpresa('param:id')
   @Patch(':id/active-competencia')
   async setActiveCompetencia(
     @Param('id') id: string,
@@ -117,6 +122,8 @@ export class CompanyController {
     return company;
   }
 
+  @UseGuards(EscopoEmpresaGuard) // Seguranca 0A (04/10/2026): vinculo com a empresa DO REGISTRO
+  @EscopoEmpresa('param:id')
   @Get(':id')
   async findOne(@Param('id') id: string) {
     const company = await this.companyService.findById(id);
@@ -140,6 +147,8 @@ export class CompanyController {
     return new CompanyDto(result);
   }
 
+  @UseGuards(EscopoEmpresaGuard) // Seguranca 0A (04/10/2026): vinculo com a empresa DO REGISTRO
+  @EscopoEmpresa('param:id')
   @Patch(':id')
   async update(
     @Param('id') id: string,
@@ -156,6 +165,8 @@ export class CompanyController {
   }
 
   @RequireResourceAccess('companies', 'EDIT')
+  @UseGuards(EscopoEmpresaGuard) // Seguranca 0A (04/10/2026): vinculo com a empresa DO REGISTRO
+  @EscopoEmpresa('param:id')
   @Patch(':id/status')
   async changeStatus(
     @Param('id') id: string,
@@ -167,6 +178,8 @@ export class CompanyController {
   }
 
   @RequireResourceAccess('companies', 'DELETE')
+  @UseGuards(EscopoEmpresaGuard) // Seguranca 0A (04/10/2026): vinculo com a empresa DO REGISTRO
+  @EscopoEmpresa('param:id')
   @Delete(':id')
   async remove(@Param('id') id: string, @CurrentUser('object') user: any) {
     return this.companyService.remove(id, user.id);
@@ -174,6 +187,8 @@ export class CompanyController {
 
   // ── Logo (papel timbrado) ────────────────────────────────────────────────
   @RequireResourceAccess('companies', 'EDIT')
+  @UseGuards(EscopoEmpresaGuard) // Seguranca 0A (04/10/2026): vinculo com a empresa DO REGISTRO
+  @EscopoEmpresa('param:id')
   @Post(':id/logo')
   @UseInterceptors(
     FileInterceptor('file', {
