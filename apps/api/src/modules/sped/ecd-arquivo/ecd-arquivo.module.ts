@@ -1,3 +1,4 @@
+import { SidebarPermissionsModule } from '../../sidebar-permissions/sidebar-permissions.module';
 // apps/api/src/modules/sped/ecd-arquivo/ecd-arquivo.module.ts
 // ARQUIVO FIEL DA ECD - CRIADO 21/09/2026 (mesmo padrao do EfdModule/EcfModule)
 import { Module } from '@nestjs/common';
@@ -7,7 +8,7 @@ import { EcdArquivoController } from './ecd-arquivo.controller';
 import { EcdArquivoService } from './ecd-arquivo.service';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [SidebarPermissionsModule, PrismaModule],
   controllers: [EcdArquivoController],
   providers: [PrismaService, EcdArquivoService],
 })

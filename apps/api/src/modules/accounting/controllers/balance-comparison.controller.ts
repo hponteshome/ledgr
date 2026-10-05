@@ -1,3 +1,5 @@
+import { SidebarResourceGuard } from '../../../auth/guards/sidebar-resource.guard';
+import { RecursoMenu } from '../../../auth/decorators/recurso-menu.decorator';
 // /apps/api/src/modules/accounting/controllers/balance-comparison.controller.ts
 // REESCRITO 25/08/2026: usa BalanceComparisonService (reaproveita a logica
 // validada do Balancete) em vez de BalancesService.getBalanceComparison
@@ -9,6 +11,8 @@ import { JwtAuthGuard } from '../../../auth/guards/jwt.guard';
 import { BalanceComparisonService } from '../services/balance-comparison.service';
 import { EscopoEmpresaGuard, EscopoEmpresa } from '../../../multi-company/escopo-empresa.guard';
 
+@UseGuards(SidebarResourceGuard) // Seguranca 0A (04/10/2026): perfil na API = permissoes do menu (roda depois do JwtAuthGuard)
+@RecursoMenu('relatorios-contabeis')
 @UseGuards(JwtAuthGuard)
 @Controller('reports')
 export class BalanceComparisonController {

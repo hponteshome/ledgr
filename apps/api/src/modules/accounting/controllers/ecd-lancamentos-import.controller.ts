@@ -1,3 +1,5 @@
+import { SidebarResourceGuard } from '../../../auth/guards/sidebar-resource.guard';
+import { RecursoMenu } from '../../../auth/decorators/recurso-menu.decorator';
 // apps/api/src/modules/accounting/controllers/ecd-lancamentos-import.controller.ts
 // Upload via navegador (multipart) - mesmo padrao do importador original
 // (ecd.controller.ts). Arquivos ECD SPED sao latin1 (ISO-8859-1). Ano
@@ -8,6 +10,8 @@ import { JwtAuthGuard } from '../../../auth/guards/jwt.guard';
 import { CompanyInterceptor } from '../../../multi-company/company.interceptor';
 import { EcdLancamentosImportService } from '../services/ecd-lancamentos-import.service';
 
+@UseGuards(SidebarResourceGuard) // Seguranca 0A (04/10/2026): perfil na API = permissoes do menu (roda depois do JwtAuthGuard)
+@RecursoMenu('importacoes-contabeis')
 @UseGuards(JwtAuthGuard)
 @UseInterceptors(CompanyInterceptor)
 @Controller('accounting/ecd-lancamentos')

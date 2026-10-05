@@ -1,3 +1,5 @@
+import { SidebarResourceGuard } from '../../../auth/guards/sidebar-resource.guard';
+import { RecursoMenu } from '../../../auth/decorators/recurso-menu.decorator';
 // apps/api/src/modules/accounting/controllers/iob-import.controller.ts
 // REDUZIDO 24/08/2026: metodo import-plano (Matriz LEDGR) foi extraido para
 // MatrizImportController (accounting/matriz/import-plano) - este controller
@@ -12,6 +14,8 @@ import { JwtAuthGuard }        from '../../../auth/guards/jwt.guard';
 import { CompanyInterceptor }  from '../../../multi-company/company.interceptor';
 import { IobLotdImportService } from '../services/iob-lotd-import.service';
 
+@UseGuards(SidebarResourceGuard) // Seguranca 0A (04/10/2026): perfil na API = permissoes do menu (roda depois do JwtAuthGuard)
+@RecursoMenu('importacoes-contabeis')
 @UseGuards(JwtAuthGuard)
 @UseInterceptors(CompanyInterceptor)
 @Controller('accounting/iob')

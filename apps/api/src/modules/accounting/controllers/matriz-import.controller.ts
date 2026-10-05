@@ -1,3 +1,5 @@
+import { SidebarResourceGuard } from '../../../auth/guards/sidebar-resource.guard';
+import { RecursoMenu } from '../../../auth/decorators/recurso-menu.decorator';
 // apps/api/src/modules/accounting/controllers/matriz-import.controller.ts
 // CRIADO 24/08/2026 (separado de IobImportController): importacao do Plano
 // de Contas MATRIZ (formato proprio LEDGR, nao tem mais relacao com IOB).
@@ -8,6 +10,8 @@ import { JwtAuthGuard }        from '../../../auth/guards/jwt.guard';
 import { CompanyInterceptor }  from '../../../multi-company/company.interceptor';
 import { MatrizImportService } from '../services/matriz-import.service';
 
+@UseGuards(SidebarResourceGuard) // Seguranca 0A (04/10/2026): perfil na API = permissoes do menu (roda depois do JwtAuthGuard)
+@RecursoMenu('importacoes-contabeis')
 @UseGuards(JwtAuthGuard)
 @UseInterceptors(CompanyInterceptor)
 @Controller('accounting/matriz')

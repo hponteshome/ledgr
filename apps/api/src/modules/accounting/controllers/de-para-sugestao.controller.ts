@@ -1,9 +1,13 @@
+import { SidebarResourceGuard } from '../../../auth/guards/sidebar-resource.guard';
+import { RecursoMenu } from '../../../auth/decorators/recurso-menu.decorator';
 // apps/api/src/modules/accounting/controllers/de-para-sugestao.controller.ts
 import { Body, Controller, Get, Post, Query, Req, UseGuards, UseInterceptors } from '@nestjs/common';
 import { JwtAuthGuard } from '../../../auth/guards/jwt.guard';
 import { CompanyInterceptor } from '../../../multi-company/company.interceptor';
 import { DeParaSugestaoService } from '../services/de-para-sugestao.service';
 
+@UseGuards(SidebarResourceGuard) // Seguranca 0A (04/10/2026): perfil na API = permissoes do menu (roda depois do JwtAuthGuard)
+@RecursoMenu('importacoes-contabeis')
 @UseGuards(JwtAuthGuard)
 @UseInterceptors(CompanyInterceptor)
 @Controller('accounting/de-para')

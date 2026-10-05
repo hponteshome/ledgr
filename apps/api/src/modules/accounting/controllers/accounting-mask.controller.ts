@@ -1,3 +1,5 @@
+import { SidebarResourceGuard } from '../../../auth/guards/sidebar-resource.guard';
+import { RecursoMenu } from '../../../auth/decorators/recurso-menu.decorator';
 // apps/api/src/modules/accounting/controllers/accounting-mask.controller.ts
 
 import {
@@ -24,6 +26,8 @@ class CreateMaskBodyDto {
 }
 
 @Controller('accounting/mask')
+@UseGuards(SidebarResourceGuard) // Seguranca 0A (04/10/2026): perfil na API = permissoes do menu (roda depois do JwtAuthGuard)
+@RecursoMenu('chart-of-accounts')
 @UseGuards(JwtAuthGuard)
 export class AccountingMaskController {
   constructor(private readonly service: AccountingMaskService) {}

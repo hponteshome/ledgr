@@ -1,3 +1,5 @@
+import { SidebarResourceGuard } from '../../auth/guards/sidebar-resource.guard';
+import { RecursoMenu } from '../../auth/decorators/recurso-menu.decorator';
 // ============================================================
 // LEDGR — src/modules/finance/finance.controller.ts
 // ============================================================
@@ -16,6 +18,8 @@ import { CreateAgendaEventDto } from './dto/create.agenda.dto';
 import { UpdateAgendaEventDto } from './dto/update.agenda.dto';
 import { IntegrationService } from './integration.service';
 
+@UseGuards(SidebarResourceGuard) // Seguranca 0A (04/10/2026): perfil na API = permissoes do menu (roda depois do JwtAuthGuard)
+@RecursoMenu('fiscal-documents')
 @UseGuards(JwtAuthGuard)
 @UseInterceptors(CompanyInterceptor)
 @Controller('finance')

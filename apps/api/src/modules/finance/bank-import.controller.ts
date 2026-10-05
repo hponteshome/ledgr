@@ -1,3 +1,5 @@
+import { SidebarResourceGuard } from '../../auth/guards/sidebar-resource.guard';
+import { RecursoMenu } from '../../auth/decorators/recurso-menu.decorator';
 ﻿// ============================================================
 // LEDGR — apps/api/src/modules/finance/bank-import.controller.ts
 // ============================================================
@@ -12,6 +14,8 @@ import { JwtAuthGuard } from '@/auth/guards/jwt.guard';
 import { CompanyInterceptor } from '@/multi-company/company.interceptor';
 import { BankImportService, ClassifyGroupDto, PostStatementDto } from './bank-import.service';
 
+@UseGuards(SidebarResourceGuard) // Seguranca 0A (04/10/2026): perfil na API = permissoes do menu (roda depois do JwtAuthGuard)
+@RecursoMenu('conciliacao-bancaria')
 @UseGuards(JwtAuthGuard)
 @UseInterceptors(CompanyInterceptor)
 @Controller('bank-import')

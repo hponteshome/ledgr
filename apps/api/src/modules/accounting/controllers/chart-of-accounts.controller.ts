@@ -1,3 +1,5 @@
+import { SidebarResourceGuard } from '../../../auth/guards/sidebar-resource.guard';
+import { RecursoMenu } from '../../../auth/decorators/recurso-menu.decorator';
 // apps/api/src/modules/accounting/controllers/chart-of-accounts.controller.ts
 
 import { 
@@ -34,6 +36,8 @@ import { EscopoPorId } from '../../../multi-company/escopo-por-id.interceptor';
 
 @UseInterceptors(EscopoPorId('chartOfAccounts')) // Seguranca 0A: escopo de empresa nas rotas :id
 @Controller('chart-of-accounts')
+@UseGuards(SidebarResourceGuard) // Seguranca 0A (04/10/2026): perfil na API = permissoes do menu (roda depois do JwtAuthGuard)
+@RecursoMenu('chart-of-accounts')
 @UseGuards(JwtAuthGuard, CompanyGuard)
 export class ChartOfAccountsController {
   constructor(

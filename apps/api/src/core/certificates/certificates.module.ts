@@ -1,3 +1,4 @@
+import { SidebarPermissionsModule } from '../../modules/sidebar-permissions/sidebar-permissions.module';
 // src/core/certificates/certificates.module.ts
 
 import { Module } from '@nestjs/common';
@@ -12,7 +13,7 @@ import { CertificatesService }   from './certificates.service';
 import { CertificatesController } from './certificates.controller';
 
 @Module({
-  imports: [
+  imports: [SidebarPermissionsModule, 
     PrismaModule,
     ScheduleModule.forRoot(),           // necessário para o @Cron do checkExpirations
     MulterModule.register({

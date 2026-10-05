@@ -1,3 +1,5 @@
+import { SidebarResourceGuard } from '../../../auth/guards/sidebar-resource.guard';
+import { RecursoMenu } from '../../../auth/decorators/recurso-menu.decorator';
 // apps/api/src/modules/accounting/controllers/journal-manual-import.controller.ts
 // CRIADO 03/09/2026 (Etapa 3). Mesmo padrao de guards/interceptors do
 // journal-importer.controller.ts existente. Reaproveita bufferToString de la
@@ -11,6 +13,8 @@ import * as multer from 'multer';
 import { JournalManualImportService } from '../services/journal-manual-import.service';
 import { bufferToString } from '../services/journal-importer.service';
 
+@UseGuards(SidebarResourceGuard) // Seguranca 0A (04/10/2026): perfil na API = permissoes do menu (roda depois do JwtAuthGuard)
+@RecursoMenu('importacoes-contabeis')
 @UseGuards(JwtAuthGuard)
 @UseInterceptors(CompanyInterceptor)
 @Controller('accounting/journal')

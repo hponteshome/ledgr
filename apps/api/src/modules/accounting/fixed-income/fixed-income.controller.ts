@@ -1,3 +1,5 @@
+import { SidebarResourceGuard } from '../../../auth/guards/sidebar-resource.guard';
+import { RecursoMenu } from '../../../auth/decorators/recurso-menu.decorator';
 // apps/api/src/modules/accounting/fixed-income/fixed-income.controller.ts
 
 import {
@@ -14,6 +16,8 @@ import {
   RedemptionDto, ProjectionParamsDto,
 } from './dto/fixed-income.dto';
 
+@UseGuards(SidebarResourceGuard) // Seguranca 0A (04/10/2026): perfil na API = permissoes do menu (roda depois do JwtAuthGuard)
+@RecursoMenu('renda-fixa')
 @UseGuards(JwtAuthGuard, CompanyGuard)
 
 @Controller('accounting/fixed-income')

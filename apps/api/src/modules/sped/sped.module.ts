@@ -1,3 +1,4 @@
+import { SidebarPermissionsModule } from '../sidebar-permissions/sidebar-permissions.module';
 // ============================================================
 // LEDGR — apps/api/src/modules/sped/sped.module.ts
 // FIX: Adiciona EcfController e serviços ECF ao módulo
@@ -28,7 +29,7 @@ import { EcdArquivoModule } from './ecd-arquivo/ecd-arquivo.module';
 import { EcfArquivoModule } from './ecf-arquivo/ecf-arquivo.module';
 
 @Module({
-  imports: [
+  imports: [SidebarPermissionsModule, 
     PrismaModule,
     EfdModule,
     EcfModule,

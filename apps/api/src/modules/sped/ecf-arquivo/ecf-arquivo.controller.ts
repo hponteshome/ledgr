@@ -1,3 +1,5 @@
+import { SidebarResourceGuard } from '../../../auth/guards/sidebar-resource.guard';
+import { RecursoMenu } from '../../../auth/decorators/recurso-menu.decorator';
 // apps/api/src/modules/sped/ecf-arquivo/ecf-arquivo.controller.ts
 // ============================================================================
 // ARQUIVO FIEL DA ECF - CRIADO 21/09/2026
@@ -23,6 +25,8 @@ import { Company } from '@multi-company/company.decorator';
 import { EcfArquivoService } from './ecf-arquivo.service';
 
 @Controller('sped/ecf-arquivo')
+@UseGuards(SidebarResourceGuard) // Seguranca 0A (04/10/2026): perfil na API = permissoes do menu (roda depois do JwtAuthGuard)
+@RecursoMenu('ecf')
 @UseGuards(JwtAuthGuard, CompanyGuard)
 export class EcfArquivoController {
   constructor(private readonly service: EcfArquivoService) {}

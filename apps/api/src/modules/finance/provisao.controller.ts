@@ -1,3 +1,5 @@
+import { SidebarResourceGuard } from '../../auth/guards/sidebar-resource.guard';
+import { RecursoMenu } from '../../auth/decorators/recurso-menu.decorator';
 // apps/api/src/modules/finance/provisao.controller.ts
 import { Controller, Get, Post, Put, Delete, Body, Param, Query, Request, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '@/auth/guards/jwt.guard';
@@ -5,6 +7,8 @@ import { CompanyGuard } from '@/multi-company/multi-company.guard';
 import { ProvisaoService } from './provisao.service';
 import { isMasterAdmin } from '../../multi-company/company.interceptor';
 
+@UseGuards(SidebarResourceGuard) // Seguranca 0A (04/10/2026): perfil na API = permissoes do menu (roda depois do JwtAuthGuard)
+@RecursoMenu('provisoes')
 @UseGuards(JwtAuthGuard, CompanyGuard)
 @Controller('finance/provisoes')
 export class ProvisaoController {

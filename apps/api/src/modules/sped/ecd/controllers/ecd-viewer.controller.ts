@@ -1,3 +1,5 @@
+import { SidebarResourceGuard } from '../../../../auth/guards/sidebar-resource.guard';
+import { RecursoMenu } from '../../../../auth/decorators/recurso-menu.decorator';
 import { EscopoEmpresaGuard, EscopoEmpresa } from '../../../../multi-company/escopo-empresa.guard';
 // apps/api/src/modules/sped/ecd/ecd-viewer.controller.ts
 
@@ -6,6 +8,8 @@ import { EcdViewerService } from '../services/ecd-viewer.service';
 import { JwtAuthGuard } from '@/auth/guards/jwt.guard'; // Exemplo de Guard que você já usa
 
 @Controller('sped/ecd/viewer')
+@UseGuards(SidebarResourceGuard) // Seguranca 0A (04/10/2026): perfil na API = permissoes do menu (roda depois do JwtAuthGuard)
+@RecursoMenu('ecd')
 @UseGuards(JwtAuthGuard)
 export class EcdViewerController {
   constructor(private readonly viewerService: EcdViewerService) {}

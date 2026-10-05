@@ -1,3 +1,4 @@
+import { SidebarPermissionsModule } from '../../sidebar-permissions/sidebar-permissions.module';
 // apps/api/src/modules/sped/efd/efd.module.ts
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '@/prisma/prisma.module';
@@ -5,7 +6,7 @@ import { EfdController } from './controllers/efd.controller';
 import { EfdExporterService } from './services/efd-exporter.service';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [SidebarPermissionsModule, PrismaModule],
   controllers: [EfdController],
   providers: [EfdExporterService],
   exports: [EfdExporterService],

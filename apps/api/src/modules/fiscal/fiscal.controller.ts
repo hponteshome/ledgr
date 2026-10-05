@@ -1,3 +1,5 @@
+import { SidebarResourceGuard } from '../../auth/guards/sidebar-resource.guard';
+import { RecursoMenu } from '../../auth/decorators/recurso-menu.decorator';
 // apps/api/src/modules/fiscal/fiscal.controller.ts
 import { Controller, BadRequestException, Post, Get, UseGuards, UseInterceptors,
   UploadedFile, UploadedFiles, Req, Body, Query, Param } from '@nestjs/common';
@@ -14,6 +16,8 @@ import { NfseSpEmissaoService } from './services/nfse-sp-emissao.service';
 import { PrismaService } from '../../prisma/prisma.service';
 
 @Controller('fiscal')
+@UseGuards(SidebarResourceGuard) // Seguranca 0A (04/10/2026): perfil na API = permissoes do menu (roda depois do JwtAuthGuard)
+@RecursoMenu('fiscal-documents')
 @UseGuards(JwtAuthGuard)
 @UseInterceptors(CompanyInterceptor)
 export class FiscalController {

@@ -1,9 +1,13 @@
+import { SidebarResourceGuard } from '../../../auth/guards/sidebar-resource.guard';
+import { RecursoMenu } from '../../../auth/decorators/recurso-menu.decorator';
 // apps/api/src/modules/accounting/controllers/tabela-comparativa.controller.ts
 import { Controller, Get, Query, Req, UseGuards, UseInterceptors } from '@nestjs/common';
 import { JwtAuthGuard } from '../../../auth/guards/jwt.guard';
 import { CompanyInterceptor } from '../../../multi-company/company.interceptor';
 import { TabelaComparativaService } from '../services/tabela-comparativa.service';
 
+@UseGuards(SidebarResourceGuard) // Seguranca 0A (04/10/2026): perfil na API = permissoes do menu (roda depois do JwtAuthGuard)
+@RecursoMenu('relatorios-contabeis')
 @UseGuards(JwtAuthGuard)
 @UseInterceptors(CompanyInterceptor)
 @Controller('accounting/tabela-comparativa')

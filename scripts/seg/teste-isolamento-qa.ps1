@@ -92,7 +92,14 @@ if ($global:tok) {
   Teste "ESCALACAO: remover permissao de usuario"   DELETE "/sidebar-permissions/user/${zero}/${zero}"  403
   Teste "Fechamento: conferir item inexistente/alheio"  PUT    "/finance/fechamento/itens/${zero}/conferir"            404 -corpo '{}'
   Teste "Fechamento: ignorar item inexistente/alheio"   PUT    "/finance/fechamento/itens/${zero}/ignorar"             404 -corpo '{}'
-  Teste "Provisao: excluir config inexistente/alheia"   DELETE "/finance/provisoes/configs/${zero}"                    404
+  # Seguranca 0A (04/10/2026): com o perfil na API, excluir exige nivel DELETE no recurso. Esperado pela regra:
+  # QA com DELETE -> o pedido chega ao servico -> 404 (registro alheio/inexistente); sem DELETE -> 403 no guard.
+  function NivelQa($recurso) {
+    $q = "SELECT COALESCE((SELECT x.access_level::text FROM user_sidebar_permissions x JOIN sidebar_items i ON i.id = x.item_id JOIN users u ON u.id = x.user_id WHERE i.resource = '$recurso' AND u.email = 'qa.hotelsys@ledgr.local' AND x.company_id = '$HOT' LIMIT 1), (SELECT x.access_level::text FROM user_sidebar_permissions x JOIN sidebar_items i ON i.id = x.item_id JOIN users u ON u.id = x.user_id WHERE i.resource = '$recurso' AND u.email = 'qa.hotelsys@ledgr.local' AND x.company_id IS NULL LIMIT 1), (SELECT x.access_level::text FROM profile_sidebar_permissions x JOIN sidebar_items i ON i.id = x.item_id JOIN users u ON u.profile_id = x.profile_id WHERE i.resource = '$recurso' AND u.email = 'qa.hotelsys@ledgr.local' LIMIT 1), 'NONE')"
+    $n = ((docker exec ledgr-postgres psql -U ledgr -d ledgr_app -tA -c $q) | Out-String).Trim(); if ($n) { $n } else { 'NONE' }
+  }
+  function EspDel($recurso) { if ((NivelQa $recurso) -eq 'DELETE') { 404 } else { 403 } }
+  Teste "Provisao: excluir config inexistente/alheia"   DELETE "/finance/provisoes/configs/${zero}"                    $(EspDel 'provisoes')
   Teste "Provisao: conferir NF inexistente/alheia"      PUT    "/finance/provisoes/lancamentos/${zero}/conferir-nf"    404 -corpo '{}'
   Teste "Provisao: rateio em config inexistente/alheia" PUT    "/finance/provisoes/configs/${zero}/rateio/2026-10"     404 -corpo '{"rateios":[]}'
   Teste "Contas a pagar da propria empresa"             GET    "/finance/accounts-payable"                             200
@@ -108,8 +115,8 @@ if ($global:tok) {
   if ($coaGrb) { Teste "Lancamento com conta do plano da GRB" POST "/accounting/journal" 400 -corpo ('{"date":"2026-10-01","description":"QA isolamento","items":[{"accountId":"' + $coaGrb + '","value":1,"type":"DEBIT"}]}') -msg 'nao pertence' }
   if ($eqAlh)  { Teste "MEP de outra investidora (historico)"   GET    "/accounting/equity-method/${eqAlh}/historico" 404 } else { Write-Host "SEM DADOS - MEP de outra investidora" -ForegroundColor DarkGray }
   Teste "Lancamento: alterar inexistente/alheio"       PUT    "/accounting/journal/${zero}"                       404 -corpo '{}'
-  Teste "Plano de contas: excluir inexistente/alheia"  DELETE "/chart-of-accounts/${zero}"                        404
-  Teste "MEP: excluir inexistente/alheio"              DELETE "/accounting/equity-method/${zero}"                 404
+  Teste "Plano de contas: excluir inexistente/alheia"  DELETE "/chart-of-accounts/${zero}"                        $(EspDel 'chart-of-accounts')
+  Teste "MEP: excluir inexistente/alheio"              DELETE "/accounting/equity-method/${zero}"                 $(EspDel 'renda-fixa')
   Teste "Importar saldos (restrito ao Master)"         POST   "/accounting/import-balances"                       403 -corpo '{}'
   Teste "CDI: leitura liberada"                        GET    "/accounting/cdi/latest"                            200
   Teste "CDI GLOBAL: apagar taxa"                      DELETE "/accounting/cdi/2000-01-01"                        403
@@ -283,6 +290,16 @@ if ($global:tok) {
     $nivel = NivelQa $c[0]; $esp = if ($nivel -eq 'NONE') { 403 } else { 404 }
     Teste ("Perfil na API: " + $c[0] + " (QA com nivel " + $nivel + ")") GET $c[1] $esp
   }
+  # Prova do 403: restricao TEMPORARIA "sem acesso" na propria QA (substituicao por empresa tem precedencia) e remocao em seguida
+  function OverrideQa($recurso, $nivel) {
+    docker exec ledgr-postgres psql -U ledgr -d ledgr_app -q -c "DELETE FROM user_sidebar_permissions WHERE user_id = (SELECT id FROM users WHERE email = 'qa.hotelsys@ledgr.local') AND item_id = (SELECT id FROM sidebar_items WHERE resource = '$recurso' LIMIT 1) AND company_id = '$HOT';" | Out-Null
+    if ($nivel) { docker exec ledgr-postgres psql -U ledgr -d ledgr_app -q -c "INSERT INTO user_sidebar_permissions (id, user_id, item_id, company_id, access_level) SELECT gen_random_uuid(), u.id, i.id, '$HOT', '$nivel' FROM users u, sidebar_items i WHERE u.email = 'qa.hotelsys@ledgr.local' AND i.resource = '$recurso' LIMIT 1;" | Out-Null }
+  }
+  OverrideQa 'esocial' 'NONE'; OverrideQa 'certificates' 'NONE'
+  Teste "Perfil na API: sem acesso ao eSocial = 403"            GET    "/hr/esocial/s2200/${zero}"                    403
+  Teste "Perfil na API: sem acesso a certificados = 403"        GET    "/certificates"                                403
+  OverrideQa 'esocial' $null; OverrideQa 'certificates' $null
+  Teste "Perfil na API: certificados de novo com acesso"        GET    "/certificates"                                200
   Teste "Projetos: alterar vinculo (so Master)"           POST   "/projects/operacoes/${opId}/creditos/${zero}/vinculo" 403 -corpo '{}'
   Teste "Projetos: creditos de operacao inexistente"   GET    "/projects/operacoes/${zero}/creditos"         404
   Teste "Projetos: operacao inexistente/alheia"        GET    "/projects/operacoes/${zero}/participacoes"    404

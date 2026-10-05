@@ -1,9 +1,13 @@
+import { SidebarResourceGuard } from '../../../auth/guards/sidebar-resource.guard';
+import { RecursoMenu } from '../../../auth/decorators/recurso-menu.decorator';
 // apps/api/src/modules/corporate/transfers/transfers.controller.ts
 import { Controller, Get, Post, Param, Body, Query, Request, UseGuards, Patch } from '@nestjs/common';
 import { TransfersService } from './transfers.service';
 import { CreateTransferDto } from './dto/create-transfer.dto';
 import { JwtAuthGuard } from '@/auth/guards/jwt.guard';
 
+@UseGuards(SidebarResourceGuard) // Seguranca 0A (04/10/2026): perfil na API = permissoes do menu (roda depois do JwtAuthGuard)
+@RecursoMenu('societario')
 @UseGuards(JwtAuthGuard)
 @Controller('corporate/transfers')
 export class TransfersController {

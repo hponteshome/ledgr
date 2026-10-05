@@ -1,9 +1,13 @@
+import { SidebarResourceGuard } from '../../../auth/guards/sidebar-resource.guard';
+import { RecursoMenu } from '../../../auth/decorators/recurso-menu.decorator';
 // apps/api/src/modules/corporate/shareholders/shareholders.controller.ts
 import { Controller, Get, Post, Patch, Delete, Param, Body, Query, Request, UseGuards } from '@nestjs/common';
 import { ShareholdersService } from './shareholders.service';
 import { CreateShareholderDto } from './dto/create-shareholder.dto';
 import { JwtAuthGuard } from '@/auth/guards/jwt.guard';
 
+@UseGuards(SidebarResourceGuard) // Seguranca 0A (04/10/2026): perfil na API = permissoes do menu (roda depois do JwtAuthGuard)
+@RecursoMenu('societario')
 @UseGuards(JwtAuthGuard)
 @Controller('corporate/shareholders')
 export class ShareholdersController {

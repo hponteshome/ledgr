@@ -1,3 +1,4 @@
+import { SidebarPermissionsModule } from '../../sidebar-permissions/sidebar-permissions.module';
 // apps/api/src/modules/sped/ecf/ecf.module.ts
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '@/prisma/prisma.module';
@@ -9,7 +10,7 @@ import { EcfExporterService } from './services/ecf-exporter.service';
 import { EcfPreValidateService } from './services/ecf-pre-validate.service';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [SidebarPermissionsModule, PrismaModule],
   controllers: [EcfController],
   providers: [EcfParserService, EcfValidatorService, EcfImporterService, EcfExporterService, EcfPreValidateService],
   exports: [EcfParserService, EcfExporterService],

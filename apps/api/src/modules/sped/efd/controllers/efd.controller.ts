@@ -1,3 +1,5 @@
+import { SidebarResourceGuard } from '../../../../auth/guards/sidebar-resource.guard';
+import { RecursoMenu } from '../../../../auth/decorators/recurso-menu.decorator';
 // apps/api/src/modules/sped/efd/controllers/efd.controller.ts
 import JSZip = require('jszip');
 import { Controller, Get, Query, Res, UseGuards } from '@nestjs/common';
@@ -6,6 +8,8 @@ import { CompanyGuard } from '@/multi-company/multi-company.guard';
 import { Company } from '@/multi-company/company.decorator';
 import { EfdExporterService } from '../services/efd-exporter.service';
 
+@UseGuards(SidebarResourceGuard) // Seguranca 0A (04/10/2026): perfil na API = permissoes do menu (roda depois do JwtAuthGuard)
+@RecursoMenu('efd')
 @UseGuards(JwtAuthGuard, CompanyGuard)
 @Controller('sped/efd-contribuicoes')
 export class EfdController {

@@ -1,3 +1,5 @@
+import { SidebarResourceGuard } from '../../../auth/guards/sidebar-resource.guard';
+import { RecursoMenu } from '../../../auth/decorators/recurso-menu.decorator';
 // apps/api/src/modules/corporate/pdf/corporate-pdf.controller.ts
 import { Controller, Get, Query, Request, Res, UseGuards } from '@nestjs/common';
 import { Response } from 'express';
@@ -5,6 +7,8 @@ import { JwtAuthGuard } from '@/auth/guards/jwt.guard';
 import { CorporatePdfService } from './corporate-pdf.service';
 import { PrismaService } from '../../../prisma/prisma.service';
 
+@UseGuards(SidebarResourceGuard) // Seguranca 0A (04/10/2026): perfil na API = permissoes do menu (roda depois do JwtAuthGuard)
+@RecursoMenu('societario')
 @UseGuards(JwtAuthGuard)
 @Controller('corporate/pdf')
 export class CorporatePdfController {

@@ -1,3 +1,4 @@
+import { SidebarPermissionsModule } from '../sidebar-permissions/sidebar-permissions.module';
 // apps/api/src/modules/fiscal/fiscal.module.ts
 import { Module } from '@nestjs/common';
 import { MulterModule } from '@nestjs/platform-express';
@@ -15,7 +16,7 @@ import { NfseSpCsvService } from './services/nfse-sp-csv.service';
 import { NfseSpEmissaoService } from './services/nfse-sp-emissao.service';
 
 @Module({
-  imports: [
+  imports: [SidebarPermissionsModule, 
     FinanceModule,
     PrismaModule,
     CertificatesModule,

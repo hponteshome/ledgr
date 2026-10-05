@@ -1,3 +1,5 @@
+import { SidebarResourceGuard } from '../../auth/guards/sidebar-resource.guard';
+import { RecursoMenu } from '../../auth/decorators/recurso-menu.decorator';
 // src/core/certificates/certificates.controller.ts
 
 import {
@@ -17,6 +19,8 @@ import { isMasterAdmin, empresaEfetiva } from '../../multi-company/company.inter
 // ── Limite de tamanho: 2 MB (certificados típicos < 10 KB) ──────
 const MAX_CERT_SIZE = 2 * 1024 * 1024;
 
+@UseGuards(SidebarResourceGuard) // Seguranca 0A (04/10/2026): perfil na API = permissoes do menu (roda depois do JwtAuthGuard)
+@RecursoMenu('certificates')
 @UseGuards(JwtAuthGuard)
 @Controller('certificates')
 export class CertificatesController {

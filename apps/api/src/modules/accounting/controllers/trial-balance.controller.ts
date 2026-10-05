@@ -1,3 +1,5 @@
+import { SidebarResourceGuard } from '../../../auth/guards/sidebar-resource.guard';
+import { RecursoMenu } from '../../../auth/decorators/recurso-menu.decorator';
 // /apps/api/src/modules/accounting/controllers/trial-balance.controller.ts
 //
 // ARQUIVO COMPLETO — substitui o trial-balance.controller.ts atual.
@@ -12,6 +14,8 @@ import { JwtAuthGuard } from '@/auth/guards/jwt.guard';
 import { TrialBalanceService } from '../services/trial-balance.service';
 
 @Controller('accounting')
+@UseGuards(SidebarResourceGuard) // Seguranca 0A (04/10/2026): perfil na API = permissoes do menu (roda depois do JwtAuthGuard)
+@RecursoMenu('relatorios-contabeis')
 @UseGuards(JwtAuthGuard)
 export class TrialBalanceController {
   constructor(private readonly trialBalanceService: TrialBalanceService) {}

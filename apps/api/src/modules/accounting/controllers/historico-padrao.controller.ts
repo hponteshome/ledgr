@@ -1,9 +1,13 @@
+import { SidebarResourceGuard } from '../../../auth/guards/sidebar-resource.guard';
+import { RecursoMenu } from '../../../auth/decorators/recurso-menu.decorator';
 // apps/api/src/modules/accounting/controllers/historico-padrao.controller.ts
 import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards, UseInterceptors } from '@nestjs/common';
 import { JwtAuthGuard } from '../../../auth/guards/jwt.guard';
 import { CompanyInterceptor } from '../../../multi-company/company.interceptor';
 import { HistoricoPadraoService, CreateHistoricoPadraoDto, UpdateHistoricoPadraoDto } from '../services/historico-padrao.service';
 
+@UseGuards(SidebarResourceGuard) // Seguranca 0A (04/10/2026): perfil na API = permissoes do menu (roda depois do JwtAuthGuard)
+@RecursoMenu('journal')
 @UseGuards(JwtAuthGuard)
 @UseInterceptors(CompanyInterceptor)
 @Controller('accounting/historico-padrao')

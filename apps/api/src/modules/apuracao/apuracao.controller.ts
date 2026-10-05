@@ -1,8 +1,12 @@
+import { SidebarResourceGuard } from '../../auth/guards/sidebar-resource.guard';
+import { RecursoMenu } from '../../auth/decorators/recurso-menu.decorator';
 // apps/api/src/modules/apuracao/apuracao.controller.ts
 import { Controller, Get, Post, Put, Delete, Param, Body, Query, Req, Res, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '@/auth/guards/jwt.guard';
 import { ApuracaoService } from './apuracao.service';
 
+@UseGuards(SidebarResourceGuard) // Seguranca 0A (04/10/2026): perfil na API = permissoes do menu (roda depois do JwtAuthGuard)
+@RecursoMenu('apuracao')
 @UseGuards(JwtAuthGuard)
 @Controller('apuracao')
 export class ApuracaoController {

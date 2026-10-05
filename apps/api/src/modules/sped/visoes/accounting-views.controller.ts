@@ -1,9 +1,13 @@
+import { SidebarResourceGuard } from '../../../auth/guards/sidebar-resource.guard';
+import { RecursoMenu } from '../../../auth/decorators/recurso-menu.decorator';
 // apps/api/src/modules/sped/visoes/accounting-views.controller.ts
 import { Controller, Get, Post, Put, Delete, Body, Param, Query, Req, UseGuards } from '@nestjs/common';
 import { AccountingViewsService } from './accounting-views.service';
 import { JwtAuthGuard } from '../../../auth/guards/jwt.guard';
 import { EscopoEmpresaGuard, EscopoEmpresa } from '../../../multi-company/escopo-empresa.guard';
 
+@UseGuards(SidebarResourceGuard) // Seguranca 0A (04/10/2026): perfil na API = permissoes do menu (roda depois do JwtAuthGuard)
+@RecursoMenu('accounting-views')
 @UseGuards(JwtAuthGuard)
 @Controller('sped/visoes')
 export class AccountingViewsController {

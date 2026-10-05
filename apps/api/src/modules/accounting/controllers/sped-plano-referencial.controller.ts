@@ -1,3 +1,5 @@
+import { SidebarResourceGuard } from '../../../auth/guards/sidebar-resource.guard';
+import { RecursoMenu } from '../../../auth/decorators/recurso-menu.decorator';
 // apps/api/src/modules/accounting/controllers/sped-plano-referencial.controller.ts
 // NOVO (11/09/2026): importacao do plano referencial SPED (registro I051).
 import { Controller, Post, Get, UploadedFiles, UseInterceptors, UseGuards } from '@nestjs/common';
@@ -7,6 +9,8 @@ import { JwtAuthGuard } from '../../../auth/guards/jwt.guard';
 import { SpedPlanoReferencialService } from '../services/sped-plano-referencial.service';
 
 @Controller('accounting/sped-plano-referencial')
+@UseGuards(SidebarResourceGuard) // Seguranca 0A (04/10/2026): perfil na API = permissoes do menu (roda depois do JwtAuthGuard)
+@RecursoMenu('chart-of-accounts')
 @UseGuards(JwtAuthGuard)
 export class SpedPlanoReferencialController {
   constructor(private readonly svc: SpedPlanoReferencialService) {}

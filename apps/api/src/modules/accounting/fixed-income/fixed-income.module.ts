@@ -1,3 +1,4 @@
+import { SidebarPermissionsModule } from '../../sidebar-permissions/sidebar-permissions.module';
 // apps/api/src/modules/accounting/fixed-income/fixed-income.module.ts
 
 import { Module } from '@nestjs/common';
@@ -6,7 +7,7 @@ import { FixedIncomeController } from './fixed-income.controller';
 import { PrismaModule } from '../../../prisma/prisma.module';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [SidebarPermissionsModule, PrismaModule],
   controllers: [FixedIncomeController],
   providers: [FixedIncomeService],
   exports: [FixedIncomeService],

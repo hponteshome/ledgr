@@ -1,3 +1,5 @@
+import { SidebarResourceGuard } from '../../../auth/guards/sidebar-resource.guard';
+import { RecursoMenu } from '../../../auth/decorators/recurso-menu.decorator';
 // apps/api/src/modules/accounting/controllers/accounting-import.controller.ts
 //
 // Endpoints:
@@ -67,6 +69,8 @@ export interface ImportResult {
 // ── Controller ─────────────────────────────────────────────────
 
 @Controller('accounting')
+@UseGuards(SidebarResourceGuard) // Seguranca 0A (04/10/2026): perfil na API = permissoes do menu (roda depois do JwtAuthGuard)
+@RecursoMenu('importacoes-contabeis')
 @UseGuards(JwtAuthGuard, CompanyGuard)
 export class AccountingImportController {
   constructor(private prisma: PrismaService) {}

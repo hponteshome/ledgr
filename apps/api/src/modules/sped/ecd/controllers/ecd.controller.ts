@@ -1,3 +1,5 @@
+import { SidebarResourceGuard } from '../../../../auth/guards/sidebar-resource.guard';
+import { RecursoMenu } from '../../../../auth/decorators/recurso-menu.decorator';
 // apps/api/src/modules/sped/ecd/ecd.controller.ts
 
 import {
@@ -17,6 +19,8 @@ import { EcdPreValidateService } from './../services/ecd-pre-validate.service';
 import { PrismaService } from '@prisma/prisma.service';
 
 @Controller('sped/ecd')
+@UseGuards(SidebarResourceGuard) // Seguranca 0A (04/10/2026): perfil na API = permissoes do menu (roda depois do JwtAuthGuard)
+@RecursoMenu('ecd')
 @UseGuards(JwtAuthGuard, CompanyGuard)
 export class EcdController {
   constructor(

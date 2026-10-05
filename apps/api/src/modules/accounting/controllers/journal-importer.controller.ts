@@ -1,3 +1,5 @@
+import { SidebarResourceGuard } from '../../../auth/guards/sidebar-resource.guard';
+import { RecursoMenu } from '../../../auth/decorators/recurso-menu.decorator';
 import { Controller, Post, UploadedFile, UseInterceptors, UseGuards, Req, BadRequestException } from '@nestjs/common';
 import { JwtAuthGuard }       from '../../../auth/guards/jwt.guard';
 import { CompanyInterceptor } from '../../../multi-company/company.interceptor';
@@ -5,6 +7,8 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import * as multer from 'multer';
 import { JournalImporterService, bufferToString } from '../services/journal-importer.service';
 
+@UseGuards(SidebarResourceGuard) // Seguranca 0A (04/10/2026): perfil na API = permissoes do menu (roda depois do JwtAuthGuard)
+@RecursoMenu('importacoes-contabeis')
 @UseGuards(JwtAuthGuard)
 @UseInterceptors(CompanyInterceptor)
 @Controller('accounting/journal')

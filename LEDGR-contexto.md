@@ -10306,3 +10306,11 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - Frontend: interceptor no api.ts trata { existe, visivel: false } da busca por CPF (mensagem + resposta vazia) nas 8 telas.
 - Testes pela regra: nivel da QA calculado no banco (override da empresa, override global, perfil); NONE = 403, leitura = 404 no id inexistente.
 - Proximos lotes: Financeiro/Fiscal, Contabilidade (+ relatorios e importacoes), SPED, Societario, Certificados/Auditoria.
+
+## [SEGURANCA 0A] 04/10/2026 - perfil na API (lote 2: resto do LEDGR)
+
+- @RecursoMenu em: fiscal-documents (finance: documentos fiscais e agenda; fiscal), provisoes, apuracao, conciliacao-bancaria (importacao bancaria); chart-of-accounts (plano, mascaras, plano referencial); relatorios-contabeis (balancete, saldos, comparativo, tabela comparativa, encerramento, movimentacao ECD); importacoes-contabeis (9 importacoes + de/para); journal (abertura, historico padrao); renda-fixa (renda fixa, equivalencia patrimonial); ecd, ecf, efd, accounting-views (SPED); societario (socios, transferencias, PDFs societarios, socios da empresa); certificates; audit. SidebarPermissionsModule incluido nos modulos donos.
+- Fora de proposito: accounting/accounts (seletor de contas usado por varias telas), fluxo de caixa e obrigacoes (revisar), documentos/contratos/assinaturas/chat/painel (uso geral, protegidos por empresa), rotas so Master.
+- Efeito conhecido: relatorio via POST exige EDIT; se um perfil so-leitura for barrado, excecao com @RequireResourceAccess(recurso, 'VIEW') na rota.
+- Prova do 403 na suite: substituicao temporaria NONE na QA (eSocial, certificados) -> 403; removida em seguida -> 200.- Testes antigos de exclusao (provisao, plano de contas, MEP) passaram a dar 403: o Operador tem EDIT, nao DELETE, e o guard de perfil barra antes do servico. Esperado agora pela regra (EspDel): QA com DELETE -> 404; sem -> 403.
+

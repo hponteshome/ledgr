@@ -1,3 +1,5 @@
+import { SidebarResourceGuard } from '../../../auth/guards/sidebar-resource.guard';
+import { RecursoMenu } from '../../../auth/decorators/recurso-menu.decorator';
 // apps/api/src/modules/sped/ecd-arquivo/ecd-arquivo.controller.ts
 // ============================================================================
 // ARQUIVO FIEL DA ECD - CRIADO 21/09/2026
@@ -23,6 +25,8 @@ import { Company } from '@multi-company/company.decorator';
 import { EcdArquivoService } from './ecd-arquivo.service';
 
 @Controller('sped/ecd-arquivo')
+@UseGuards(SidebarResourceGuard) // Seguranca 0A (04/10/2026): perfil na API = permissoes do menu (roda depois do JwtAuthGuard)
+@RecursoMenu('ecd')
 @UseGuards(JwtAuthGuard, CompanyGuard)
 export class EcdArquivoController {
   constructor(private readonly service: EcdArquivoService) {}

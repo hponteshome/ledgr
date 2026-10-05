@@ -1,3 +1,4 @@
+import { SidebarPermissionsModule } from '../sidebar-permissions/sidebar-permissions.module';
 // ============================================================
 // LEDGR — apps/api/src/modules/finance/bank-import.module.ts
 // FIX: Remove MulterModule — storage definido direto no interceptor
@@ -10,7 +11,7 @@ import { SuggestionService } from './suggestion.service';
 import { PrismaModule } from '@/prisma/prisma.module';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [SidebarPermissionsModule, PrismaModule],
   controllers: [BankImportController],
   providers: [BankImportService, BankParserService, SuggestionService],
   exports: [BankImportService, SuggestionService],

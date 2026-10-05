@@ -1,3 +1,5 @@
+import { SidebarResourceGuard } from '../../../../auth/guards/sidebar-resource.guard';
+import { RecursoMenu } from '../../../../auth/decorators/recurso-menu.decorator';
 // ============================================================
 // LEDGR — apps/api/src/modules/sped/ecf/controllers/ecf.controller.ts
 // FIX:
@@ -23,6 +25,8 @@ import { CurrentUser } from '../../../../shared/decorators/current-user.decorato
 import { PrismaService } from '../../../../prisma/prisma.service';
 
 @Controller('sped/ecf')
+@UseGuards(SidebarResourceGuard) // Seguranca 0A (04/10/2026): perfil na API = permissoes do menu (roda depois do JwtAuthGuard)
+@RecursoMenu('ecf')
 @UseGuards(JwtAuthGuard, CompanyGuard)
 export class EcfController {
   constructor(
