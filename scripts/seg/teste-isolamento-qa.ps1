@@ -261,6 +261,19 @@ if ($global:tok) {
   $ecdFora = IdFora 'ecd_imports'
   if ($ecdFora) { Isolado "importacao de ECD de outra empresa" "/sped/ecd/viewer/$ecdFora" } else { Write-Host "SEM DADOS - nenhuma importacao de ECD de empresa sem vinculo" -ForegroundColor Yellow }
   Teste "Tabelas legais: excluir indicador (so Master)"      DELETE "/tabelas-legais/indicadores/${zero}"         403
+  # Seguranca 0A (04/10/2026) - cadastro de pessoas, opcao A: pessoa vinculada SO a empresas sem relacao com a QA
+  $pesFora = ((docker exec ledgr-postgres psql -U ledgr -d ledgr_app -tA -c "SELECT p.id || '|' || p.cpf FROM persons p WHERE p.deleted_at IS NULL AND EXISTS (SELECT 1 FROM person_companies pc WHERE pc.person_id = p.id) AND NOT EXISTS (SELECT 1 FROM person_companies pc WHERE pc.person_id = p.id AND pc.$foraQa = false) LIMIT 1") | Out-String).Trim()
+  if ($pesFora) {
+    $pesId, $pesCpf = $pesFora -split '\|'
+    Isolado "pessoa de outra empresa" "/persons/$pesId"
+    Isolado "qualificacao de pessoa de outra empresa" "/persons/$pesId/qualificacao"
+    foreach ($par in @(@("busca de pessoas pelo CPF de outra empresa (lista)", "/persons?search=$pesCpf"), @("consulta por CPF de pessoa de outra empresa", "/persons/cpf/$pesCpf"))) {
+      $st = 0; $cont = ''
+      try { $r = Invoke-WebRequest -UseBasicParsing ("$base" + $par[1]) -Headers @{ Authorization = "Bearer $global:tok"; 'x-company-id' = $HOT } -TimeoutSec 30; $st = [int]$r.StatusCode; $cont = [string]$r.Content } catch { $st = [int]$_.Exception.Response.StatusCode }
+      if ($cont -notmatch [regex]::Escape($pesId)) { Write-Host ("OK     esperado sem os dados da pessoa | obtido {0} | Pessoas: {1}" -f $st, $par[0]) -ForegroundColor Green }
+      else { $global:falhas++; Write-Host ("FALHA  esperado sem os dados da pessoa | obtido {0} ({1} bytes) | Pessoas: {2}" -f $st, $cont.Length, $par[0]) -ForegroundColor Red }
+    }
+  } else { Write-Host "SEM DADOS - nenhuma pessoa vinculada so a empresas sem relacao com a QA" -ForegroundColor Yellow }
   Teste "Projetos: alterar vinculo (so Master)"           POST   "/projects/operacoes/${opId}/creditos/${zero}/vinculo" 403 -corpo '{}'
   Teste "Projetos: creditos de operacao inexistente"   GET    "/projects/operacoes/${zero}/creditos"         404
   Teste "Projetos: operacao inexistente/alheia"        GET    "/projects/operacoes/${zero}/participacoes"    404

@@ -35,6 +35,7 @@ export class PersonsService {
     const skip  = (page - 1) * limit;
 
     const where: any = { deletedAt: null };
+    if ((query as any)?.__escopoFiltro) where.AND = [(query as any).__escopoFiltro]; // Seguranca 0A (04/10/2026): opcao A
 
     if (query.isActive !== undefined) {
       where.isActive = query.isActive === 'true';
@@ -319,6 +320,18 @@ async findByCpf(cpf: string) {
 if (endereco) partes.push(`com domicílio na ${endereco}`);
 
     return partes.join(', ');
+  }
+
+  // Seguranca 0A (04/10/2026) - opcao A: pessoas visiveis = vinculadas a alguma empresa do usuario, ou ainda sem vinculo. Master: sem filtro.
+  async filtroPessoas(userId: string | undefined, master: boolean): Promise<any | null> {
+    if (master) return null;
+    const ucs = userId ? await this.prisma.userCompany.findMany({ where: { userId }, select: { companyId: true } }) : [];
+    return { OR: [{ companyLinks: { some: { companyId: { in: ucs.map((x) => x.companyId) } } } }, { companyLinks: { none: {} } }] };
+  }
+
+  async pessoaVisivel(personId: string, userId: string | undefined): Promise<boolean> {
+    const f = await this.filtroPessoas(userId, false);
+    return !!(await this.prisma.person.findFirst({ where: { id: personId, deletedAt: null, AND: [f] }, select: { id: true } }));
   }
 }
 
