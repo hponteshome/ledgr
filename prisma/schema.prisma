@@ -5847,6 +5847,7 @@ model ProjNaturezaAplicacao {
   nome       String   @db.VarChar(120)
   tipo       String   @db.VarChar(15)
   ativo      Boolean  @default(true)
+  pagaPassivo Boolean  @default(true) @map("paga_passivo")
   criadoEm   DateTime @default(now()) @map("criado_em") @db.Timestamp(6)
 
   aplicacoes ProjAplicacao[]

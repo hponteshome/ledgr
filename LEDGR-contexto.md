@@ -10334,3 +10334,10 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 
 - 05/10/2026: log do Prisma so com 'warn' (404 esperados nao aparecem mais como prisma:error); removidos 8 console.log de depuracao do accounting.service.findAllAccounts (imprimiam o id da empresa); transfers.service: percentuais dos socios atualizados em sequencia dentro da transacao (Promise.all na mesma conexao vira erro no pg@9). signature.service.getSignatureStatus: Promise.all fora de transacao, correto.
 
+
+## [PROJETOS] 05/10/2026 - Series#1, Etapa A (premissas v2 e naturezas)
+
+- Book (Book_Oferta_Recife_Series1.docx, sha256 ade161e9b22a52b1) e termo Sunrise x Real Mouchao 31/10/2025 (Participação Resultados Sunrise x Real Mouchão 311025.pdf, sha256 b07c7298b9be31c4). Decisoes: REAL DEVEDORA da F5 (divida confessada EUR 8.748.947,11 fixada em R$ 54.418.451,00), participacao concedida pela SUNRISE = 10% de cada aporte (inclusive Ancora, liquido de devolucoes), compensada com a divida ate a quitacao; cotistas subordinados aos PASSIVOS DA HOTELSYS (saldo 1, estoque pela contabilidade conciliada com as aplicacoes que pagam passivo; NAO a divida da REAL); faixas 100/30/20/10 sao dos COTISTAS sobre o capital de cada um, 80% do CDE aos cotistas e 20% a F5; % por quota = 80% x quota / resultado do BP (201 unidades); cronograma do book; Quota no 1 (Ancora) ingressa na Series#1 em 01/10/2026; piso de remuneracao so com o contrato de administracao hoteleira; Antonio Vieira so intermediario.
+- Premissas: v1 encerrada com motivo; v2 = BP/IPCA/produto/sensibilidade/meta reaproveitados da v1 + Series#1 + divida REAL + passivos + cronograma. Naturezas: paga_passivo (Devolucao ao Adquirente e nova Manutencao da Operacao = false).
+- Efeito temporario: pagina do Kit do Investidor (v1) mostra premissa ausente ate a Etapa C (Kit do Cotista).
+
