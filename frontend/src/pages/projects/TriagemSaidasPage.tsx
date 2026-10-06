@@ -8,6 +8,7 @@ import api from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { ModalProjeto, Secao, ErroModal, Campo, BotaoSec, BotaoPri, inputModal, erroApi } from './workspace/ModalProjeto';
 import DecisaoMovimentoModal from './DecisaoMovimentoModal';
+import { useOrdenacao, ThOrdenavel } from './ordenacao';
 
 const fmtBRL = (v: any) => Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const fmtData = (iso?: string | null) => { if (!iso) return '-'; const [a, m, d] = iso.slice(0, 10).split('-'); return `${d}/${m}/${a}`; };
@@ -17,6 +18,8 @@ const tdSt: React.CSSProperties = { padding: '8px 10px', fontSize: 13, borderBot
 interface Saida { id: string; data: string; valor: string; lancamento: string; favorecidoNome: string | null; favorecidoDocumento: string | null; anotacao: string | null; }
 interface Destino { operacaoId: string; nome: string; contrapartes: { id: string; nome: string; papeis: string }[]; creditos: { id: string; rotulo: string }[]; }
 interface Apoio { naturezas: { codigo: string; nome: string; tipo: string }[]; destinos: Destino[]; }
+// Ordenacao por coluna (06/10/2026): clicar no titulo ordena; clicar de novo inverte; vazios sempre no fim.
+const COLS_SAIDA: Record<string, (s: Saida) => any> = { data: (s) => s.data, valor: (s) => Number(s.valor), lancamento: (s) => s.lancamento, favorecido: (s) => s.favorecidoNome, anotacao: (s) => s.anotacao };
 
 export default function TriagemSaidasPage() {
   const { user } = useAuth() as any;
@@ -46,6 +49,7 @@ export default function TriagemSaidasPage() {
     return saidas.filter((s) => (ano === 'TODOS' || s.data.startsWith(ano)) &&
       (!t || [s.lancamento, s.favorecidoNome, s.anotacao].some((x) => (x || '').toLowerCase().includes(t))));
   }, [saidas, ano, busca]);
+  const { ordenada, ord, alternar } = useOrdenacao(lista, COLS_SAIDA, { col: 'data', dir: 'asc' });
   const total = lista.reduce((s, x) => s + Number(x.valor), 0);
   const semDestino = !!apoio && apoio.destinos.length === 0;
 
@@ -68,10 +72,10 @@ export default function TriagemSaidasPage() {
       </div>
       <div style={{ background: '#fff', border: '0.5px solid #E5E7EB', borderRadius: 10, overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead><tr><th style={thSt}>Data</th><th style={{ ...thSt, textAlign: 'right' }}>Valor</th><th style={thSt}>Lançamento</th><th style={thSt}>Favorecido (extrato)</th><th style={thSt}>Anotação da planilha (apoio)</th>{master && !semDestino && <th style={thSt}></th>}</tr></thead>
+          <thead><tr><ThOrdenavel col="data" rotulo="Data" ord={ord} alternar={alternar} style={thSt} /><ThOrdenavel col="valor" rotulo="Valor" ord={ord} alternar={alternar} style={{ ...thSt, textAlign: 'right' }} /><ThOrdenavel col="lancamento" rotulo="Lançamento" ord={ord} alternar={alternar} style={thSt} /><ThOrdenavel col="favorecido" rotulo="Favorecido (extrato)" ord={ord} alternar={alternar} style={thSt} /><ThOrdenavel col="anotacao" rotulo="Anotação da planilha (apoio)" ord={ord} alternar={alternar} style={thSt} />{master && !semDestino && <th style={thSt}></th>}</tr></thead>
           <tbody>
             {lista.length === 0 && <tr><td colSpan={6} style={{ ...tdSt, textAlign: 'center', color: '#9CA3AF', padding: 24 }}>Nenhuma saída para classificar.</td></tr>}
-            {lista.map((s) => (
+            {ordenada.map((s) => (
               <tr key={s.id}>
                 <td style={{ ...tdSt, whiteSpace: 'nowrap' }}>{fmtData(s.data)}</td>
                 <td style={{ ...tdSt, textAlign: 'right', whiteSpace: 'nowrap', fontWeight: 600 }}>{fmtBRL(s.valor)}</td>
