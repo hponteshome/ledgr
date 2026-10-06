@@ -1,3 +1,4 @@
+import { Post as PostC, Body as BodyC } from '@nestjs/common';
 import { MasterOnlyGuard } from '../../auth/guards/master-only.guard';
 // apps/api/src/modules/projects/relatorios.controller.ts
 // Pacote de auditoria (04/10/2026):
@@ -841,6 +842,196 @@ export class RelatoriosController {
         { numero: 7, titulo: 'Resgates da dívida da RM', familia: 'resgate', quantidade: resgates.length },
       ];
       return { apuradoEm: hoje, eventos, lancamentos: lanc, saldos, resgates, taxaHistorica: TX };
+    });
+  }
+
+  // -- Custodia (Etapa B, 06/10/2026) - so o Master por ora (Etapa C: Financeiro e Josi, com segregacao) -------------
+  // Acesso direto as tabelas da custodia (RLS e gatilhos do banco valem integralmente). Comprovante = referencia textual
+  // por enquanto (anexo do arquivo na Etapa D).
+  private async custodiaBase(tx: any, projetoId: string, codigo: string) {
+    if (!/^[A-Z0-9_]{1,40}$/.test(codigo)) throw new NotFoundException('Custodia nao encontrada.');
+    const c: any[] = await tx.$queryRaw`SELECT c.id, c.codigo, c.nome, c.descricao, c.prazo_dias FROM proj_custodias c JOIN proj_operacoes o ON o.id = c.operacao_id
+      WHERE o.projeto_id = ${projetoId}::uuid AND c.codigo = ${codigo} AND c.cancelado_em IS NULL LIMIT 1`;
+    if (!c.length) throw new NotFoundException('Custodia nao encontrada.');
+    return c[0];
+  }
+
+  private erroCustodia(e: any): never {
+    const m = String(e?.meta?.message || e?.message || '');
+    const t = m.match(/((Aloca|Lancamento|Validacao|Encerramento|Envio)[^"\n]{0,180})/);
+    if (t) throw new BadRequestException(t[1].replace(/\s+$/, ''));
+    throw e;
+  }
+
+  @Get('projetos/:projetoId/custodias')
+  @UseGuards(MasterOnlyGuard)
+  @ProjAcao('autenticado')
+  custodias(@Param('projetoId') projetoId: string, @Req() req: any) {
+    if (!UUID_RE.test(projetoId)) throw new NotFoundException('Registro nao encontrado.');
+    return this.db.comoUsuario(req.user.id, (tx: any) => tx.$queryRaw`SELECT c.codigo, c.nome FROM proj_custodias c JOIN proj_operacoes o ON o.id = c.operacao_id
+      WHERE o.projeto_id = ${projetoId}::uuid AND c.cancelado_em IS NULL ORDER BY c.nome`);
+  }
+
+  @Get('projetos/:projetoId/custodias/:codigo')
+  @UseGuards(MasterOnlyGuard)
+  @ProjAcao('autenticado')
+  custodiaDetalhe(@Param('projetoId') projetoId: string, @Param('codigo') codigo: string, @Req() req: any) {
+    if (!UUID_RE.test(projetoId)) throw new NotFoundException('Registro nao encontrado.');
+    return this.db.comoUsuario(req.user.id, async (tx: any) => {
+      const c = await this.custodiaBase(tx, projetoId, codigo);
+      const lanc: any[] = await tx.$queryRaw`SELECT l.id, l.tipo, l.data, l.valor, l.situacao, l.favorecido, l.descricao, l.motivo, l.motivo_validacao, l.bank_transaction_id,
+          n.nome AS natureza, bt.description AS lancamento_banco, bt.counterparty_name AS contraparte
+        FROM proj_custodia_lancamentos l LEFT JOIN proj_naturezas_aplicacao n ON n.id = l.natureza_id LEFT JOIN bank_transactions bt ON bt.id = l.bank_transaction_id
+        WHERE l.custodia_id = ${c.id}::uuid AND l.cancelado_em IS NULL ORDER BY l.data, l.criado_em`;
+      const aloc: any[] = await tx.$queryRaw`SELECT id, origem_id, destino_id, valor, situacao, motivo, motivo_validacao FROM proj_custodia_alocacoes
+        WHERE custodia_id = ${c.id}::uuid AND cancelado_em IS NULL ORDER BY criado_em`;
+      const naturezas: any[] = await tx.$queryRaw`SELECT codigo, nome FROM proj_naturezas_aplicacao WHERE ativo AND tipo = 'APLICACAO' ORDER BY nome`;
+      const cent = (v: any) => Math.round(Number(v) * 100);
+      const hoje = new Date().toISOString().slice(0, 10);
+      const soma = (campo: string, id: string, sit: string) => aloc.filter((a) => a[campo] === id && a.situacao === sit).reduce((s, a) => s + cent(a.valor), 0);
+      const itens = lanc.map((l) => {
+        const origem = l.tipo === 'ENVIO' || l.tipo === 'RECEBIMENTO_TERCEIRO';
+        const campo = origem ? 'origem_id' : 'destino_id';
+        const vC = cent(l.valor); const val = soma(campo, l.id, 'VALIDADO'); const reg = soma(campo, l.id, 'REGISTRADO');
+        const data = (l.data as Date).toISOString().slice(0, 10);
+        const limite = new Date(new Date(data + 'T00:00:00Z').getTime() + Number(c.prazo_dias) * 86400000).toISOString().slice(0, 10);
+        const pend = l.situacao === 'RECUSADO' ? 0 : Math.max(0, vC - val - reg);
+        return { id: l.id, tipo: l.tipo, data, valor: vC / 100, situacao: l.situacao, favorecido: l.favorecido, descricao: l.descricao, motivo: l.motivo,
+          motivoValidacao: l.motivo_validacao, natureza: l.natureza, lancamentoBanco: l.lancamento_banco, contraparte: l.contraparte, extrato: !!l.bank_transaction_id,
+          alocadoValidado: val / 100, alocadoEmAnalise: reg / 100, pendente: pend / 100, prazo: l.tipo === 'ENVIO' ? limite : null, vencido: l.tipo === 'ENVIO' && pend > 0 && limite < hoje };
+      });
+      const tot = (t: string, sit?: string) => itens.filter((i) => i.tipo === t && i.situacao !== 'RECUSADO' && (!sit || i.situacao === sit)).reduce((s, i) => s + cent(i.valor), 0);
+      const enviado = tot('ENVIO'); const devolvido = tot('DEVOLUCAO'); const pagos = tot('PAGAMENTO_DIRETO', 'VALIDADO'); const recebidos = tot('RECEBIMENTO_TERCEIRO', 'VALIDADO');
+      const rot = new Map(itens.map((i) => [i.id, `${i.tipo === 'ENVIO' ? 'Envio' : i.tipo === 'DEVOLUCAO' ? 'Devolução' : i.tipo === 'PAGAMENTO_DIRETO' ? 'Pagamento direto' : 'Recebimento de terceiro'} ${i.data.split('-').reverse().join('/')} · ${i.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`]));
+      return {
+        custodia: { codigo: c.codigo, nome: c.nome, descricao: c.descricao, prazoDias: Number(c.prazo_dias) },
+        resumo: {
+          enviado: enviado / 100, devolvido: devolvido / 100, pagosDiretos: pagos / 100, pagosDiretosEmAnalise: tot('PAGAMENTO_DIRETO', 'REGISTRADO') / 100,
+          recebidosTerceiros: recebidos / 100, recebidosEmAnalise: tot('RECEBIMENTO_TERCEIRO', 'REGISTRADO') / 100, saldoEmPoder: (enviado + recebidos - devolvido - pagos) / 100,
+          enviosPendentes: itens.filter((i) => i.tipo === 'ENVIO').reduce((s, i) => s + cent(i.pendente), 0) / 100, enviosVencidos: itens.filter((i) => i.vencido).length,
+          devolucoesSemOrigem: itens.filter((i) => i.tipo === 'DEVOLUCAO').reduce((s, i) => s + cent(i.pendente), 0) / 100,
+        },
+        lancamentos: itens,
+        alocacoes: aloc.map((a) => ({ id: a.id, origemId: a.origem_id, destinoId: a.destino_id, origem: rot.get(a.origem_id) || '-', destino: rot.get(a.destino_id) || '-', valor: cent(a.valor) / 100, situacao: a.situacao, motivo: a.motivo, motivoValidacao: a.motivo_validacao })),
+        naturezas,
+      };
+    });
+  }
+
+  @PostC('projetos/:projetoId/custodias/:codigo/lancamentos')
+  @UseGuards(MasterOnlyGuard)
+  @ProjAcao('autenticado')
+  custodiaLancar(@Param('projetoId') projetoId: string, @Param('codigo') codigo: string, @BodyC() b: any, @Req() req: any) {
+    if (!UUID_RE.test(projetoId)) throw new NotFoundException('Registro nao encontrado.');
+    const tipo = String(b?.tipo || '');
+    if (!['PAGAMENTO_DIRETO', 'RECEBIMENTO_TERCEIRO'].includes(tipo)) throw new BadRequestException('Tipo invalido: pagamento direto ou recebimento de terceiro.');
+    const data = String(b?.data || '');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) throw new BadRequestException('Informe a data.');
+    const valor = Math.round(Number(b?.valor) * 100) / 100;
+    if (!(valor > 0)) throw new BadRequestException('Informe um valor positivo.');
+    const motivo = String(b?.motivo || '').trim();
+    if (motivo.length < 10) throw new BadRequestException('Informe o motivo (minimo 10 caracteres).');
+    const favorecido = String(b?.favorecido || '').trim().slice(0, 200) || null;
+    const comprovante = String(b?.comprovante || '').trim().slice(0, 300);
+    if (comprovante.length < 3) throw new BadRequestException('Informe o comprovante (numero do DARF, recibo, processo ou documento).');
+    const descricao = ('Comprovante: ' + comprovante + (b?.descricao ? ' · ' + String(b.descricao).trim().slice(0, 600) : ''));
+    const alocarEm = b?.alocarEm ? String(b.alocarEm) : null;
+    if (alocarEm && !UUID_RE.test(alocarEm)) throw new BadRequestException('Lancamento a alocar invalido.');
+    const valorAlocado = b?.valorAlocado ? Math.round(Number(b.valorAlocado) * 100) / 100 : valor;
+    return this.db.comoUsuario(req.user.id, async (tx: any) => {
+      const c = await this.custodiaBase(tx, projetoId, codigo);
+      let natId: string | null = null;
+      if (tipo === 'PAGAMENTO_DIRETO') {
+        const n: any[] = await tx.$queryRaw`SELECT id FROM proj_naturezas_aplicacao WHERE codigo = ${String(b?.naturezaCodigo || '')} AND ativo AND tipo = 'APLICACAO'`;
+        if (!n.length) throw new BadRequestException('Informe a natureza do pagamento.');
+        natId = n[0].id;
+      }
+      try {
+        const ins: any[] = await tx.$queryRaw`INSERT INTO proj_custodia_lancamentos (custodia_id, tipo, data, valor, natureza_id, favorecido, descricao, motivo, criado_por_id)
+          VALUES (${c.id}::uuid, ${tipo}, ${data}::date, ${valor.toFixed(2)}::numeric, ${natId}::uuid, ${favorecido}, ${descricao}, ${motivo}, ${req.user.id}::uuid) RETURNING id`;
+        const id = ins[0].id as string;
+        await tx.auditLog.create({ data: { actorId: req.user.id, action: 'PROJ_CUSTODIA_LANCAMENTO_REGISTRADO', targetId: id, after: { custodia: c.codigo, tipo, data, valor: valor.toFixed(2), favorecido, comprovante, motivo } } });
+        if (alocarEm) {
+          const [origem, destino] = tipo === 'PAGAMENTO_DIRETO' ? [alocarEm, id] : [id, alocarEm];
+          const al: any[] = await tx.$queryRaw`INSERT INTO proj_custodia_alocacoes (custodia_id, origem_id, destino_id, valor, motivo, criado_por_id)
+            VALUES (${c.id}::uuid, ${origem}::uuid, ${destino}::uuid, ${valorAlocado.toFixed(2)}::numeric, ${motivo}, ${req.user.id}::uuid) RETURNING id`;
+          await tx.auditLog.create({ data: { actorId: req.user.id, action: 'PROJ_CUSTODIA_ALOCACAO_REGISTRADA', targetId: al[0].id, after: { custodia: c.codigo, origem, destino, valor: valorAlocado.toFixed(2), motivo } } });
+        }
+        return { id };
+      } catch (e) { this.erroCustodia(e); }
+    });
+  }
+
+  @PostC('projetos/:projetoId/custodias/:codigo/alocacoes')
+  @UseGuards(MasterOnlyGuard)
+  @ProjAcao('autenticado')
+  custodiaAlocar(@Param('projetoId') projetoId: string, @Param('codigo') codigo: string, @BodyC() b: any, @Req() req: any) {
+    if (!UUID_RE.test(projetoId)) throw new NotFoundException('Registro nao encontrado.');
+    const origem = String(b?.origemId || ''); const destino = String(b?.destinoId || '');
+    if (!UUID_RE.test(origem) || !UUID_RE.test(destino)) throw new BadRequestException('Informe a origem e o destino.');
+    const valor = Math.round(Number(b?.valor) * 100) / 100;
+    if (!(valor > 0)) throw new BadRequestException('Informe um valor positivo.');
+    const motivo = String(b?.motivo || '').trim();
+    if (motivo.length < 10) throw new BadRequestException('Informe o motivo (minimo 10 caracteres).');
+    return this.db.comoUsuario(req.user.id, async (tx: any) => {
+      const c = await this.custodiaBase(tx, projetoId, codigo);
+      try {
+        const al: any[] = await tx.$queryRaw`INSERT INTO proj_custodia_alocacoes (custodia_id, origem_id, destino_id, valor, motivo, criado_por_id)
+          VALUES (${c.id}::uuid, ${origem}::uuid, ${destino}::uuid, ${valor.toFixed(2)}::numeric, ${motivo}, ${req.user.id}::uuid) RETURNING id`;
+        await tx.auditLog.create({ data: { actorId: req.user.id, action: 'PROJ_CUSTODIA_ALOCACAO_REGISTRADA', targetId: al[0].id, after: { custodia: c.codigo, origem, destino, valor: valor.toFixed(2), motivo } } });
+        return { id: al[0].id };
+      } catch (e) { this.erroCustodia(e); }
+    });
+  }
+
+  @PostC('projetos/:projetoId/custodias/:codigo/validar')
+  @UseGuards(MasterOnlyGuard)
+  @ProjAcao('autenticado')
+  custodiaValidar(@Param('projetoId') projetoId: string, @Param('codigo') codigo: string, @BodyC() b: any, @Req() req: any) {
+    if (!UUID_RE.test(projetoId)) throw new NotFoundException('Registro nao encontrado.');
+    const alvo = String(b?.alvo || ''); const id = String(b?.id || ''); const decisao = String(b?.decisao || '');
+    const motivo = String(b?.motivo || '').trim() || null;
+    if (!['lancamento', 'alocacao'].includes(alvo) || !UUID_RE.test(id) || !['VALIDADO', 'RECUSADO'].includes(decisao)) throw new BadRequestException('Pedido de validacao invalido.');
+    if (decisao === 'RECUSADO' && (!motivo || motivo.length < 10)) throw new BadRequestException('Informe o motivo da recusa (minimo 10 caracteres).');
+    return this.db.comoUsuario(req.user.id, async (tx: any) => {
+      const c = await this.custodiaBase(tx, projetoId, codigo);
+      try {
+        const n: number = alvo === 'lancamento'
+          ? await tx.$executeRaw`UPDATE proj_custodia_lancamentos SET situacao = ${decisao}, validado_por_id = ${req.user.id}::uuid, validado_em = now(), motivo_validacao = ${motivo}
+              WHERE id = ${id}::uuid AND custodia_id = ${c.id}::uuid AND cancelado_em IS NULL AND situacao = 'REGISTRADO'`
+          : await tx.$executeRaw`UPDATE proj_custodia_alocacoes SET situacao = ${decisao}, validado_por_id = ${req.user.id}::uuid, validado_em = now(), motivo_validacao = ${motivo}
+              WHERE id = ${id}::uuid AND custodia_id = ${c.id}::uuid AND cancelado_em IS NULL AND situacao = 'REGISTRADO'`;
+        if (!n) throw new BadRequestException('Nada a validar: o registro nao existe, ja foi validado/recusado ou foi encerrado.');
+        await tx.auditLog.create({ data: { actorId: req.user.id, action: decisao === 'VALIDADO' ? 'PROJ_CUSTODIA_VALIDADO' : 'PROJ_CUSTODIA_RECUSADO', targetId: id, after: { custodia: c.codigo, alvo, motivo } } });
+        return { ok: true };
+      } catch (e) { if (e instanceof BadRequestException) throw e; this.erroCustodia(e); }
+    });
+  }
+
+  @PostC('projetos/:projetoId/custodias/:codigo/encerrar')
+  @UseGuards(MasterOnlyGuard)
+  @ProjAcao('autenticado')
+  custodiaEncerrar(@Param('projetoId') projetoId: string, @Param('codigo') codigo: string, @BodyC() b: any, @Req() req: any) {
+    if (!UUID_RE.test(projetoId)) throw new NotFoundException('Registro nao encontrado.');
+    const alvo = String(b?.alvo || ''); const id = String(b?.id || ''); const motivo = String(b?.motivo || '').trim();
+    if (!['lancamento', 'alocacao'].includes(alvo) || !UUID_RE.test(id)) throw new BadRequestException('Pedido invalido.');
+    if (motivo.length < 10) throw new BadRequestException('Informe o motivo (minimo 10 caracteres).');
+    return this.db.comoUsuario(req.user.id, async (tx: any) => {
+      const c = await this.custodiaBase(tx, projetoId, codigo);
+      try {
+        if (alvo === 'lancamento') {
+          await tx.$executeRaw`UPDATE proj_custodia_alocacoes SET cancelado_em = now(), cancelado_por_id = ${req.user.id}::uuid, motivo_cancelamento = ${'Lancamento encerrado: ' + motivo}
+            WHERE custodia_id = ${c.id}::uuid AND cancelado_em IS NULL AND (origem_id = ${id}::uuid OR destino_id = ${id}::uuid)`;
+        }
+        const n: number = alvo === 'lancamento'
+          ? await tx.$executeRaw`UPDATE proj_custodia_lancamentos SET cancelado_em = now(), cancelado_por_id = ${req.user.id}::uuid, motivo_cancelamento = ${motivo}
+              WHERE id = ${id}::uuid AND custodia_id = ${c.id}::uuid AND cancelado_em IS NULL AND bank_transaction_id IS NULL`
+          : await tx.$executeRaw`UPDATE proj_custodia_alocacoes SET cancelado_em = now(), cancelado_por_id = ${req.user.id}::uuid, motivo_cancelamento = ${motivo}
+              WHERE id = ${id}::uuid AND custodia_id = ${c.id}::uuid AND cancelado_em IS NULL`;
+        if (!n) throw new BadRequestException('Nada a encerrar (envios e devolucoes do extrato so saem da custodia pela triagem).');
+        await tx.auditLog.create({ data: { actorId: req.user.id, action: 'PROJ_CUSTODIA_ENCERRADO', targetId: id, after: { custodia: c.codigo, alvo, motivo } } });
+        return { ok: true };
+      } catch (e) { if (e instanceof BadRequestException) throw e; this.erroCustodia(e); }
     });
   }
 }

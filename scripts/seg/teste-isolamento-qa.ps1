@@ -137,8 +137,8 @@ if ($global:tok) {
   Teste "Projetos: detalhe do projeto concedido"       GET    "/projects/${projId}"                          200
   Teste "Projetos: participacoes da Operacao Ancora"   GET    "/projects/operacoes/${opId}/participacoes"    200 -msg '"codigo":"ADQUIRENTE"'
   Teste "Projetos: creditos da Operacao Ancora"        GET    "/projects/operacoes/${opId}/creditos"         200 -msg '"numeroOrdem":1,'
-  Teste "Projetos: resumo - 58 creditos conferidos"     GET    "/projects/operacoes/${opId}/resumo"           200 -msg '"conferido":true'
-  Teste "Projetos: resumo - total historico exato"      GET    "/projects/operacoes/${opId}/resumo"           200 -msg '"totalAteDataBase":"3495791.15"'
+  Teste "Projetos: resumo - saldo contratual conciliado" GET    "/projects/operacoes/${opId}/resumo"           200 -msg '"saldoContratual":"3295265.82"'
+  Teste "Projetos: resumo - creditos com prova bancaria" GET    "/projects/operacoes/${opId}/resumo"           200 -msg '"semProvaBancaria":0'
   Teste "Projetos: VAL aparece como Conta Individual"   GET    "/projects/operacoes/${opId}/resumo"           200 -msg '"nome":"VAL INVESTIMENTOS S/A"'
   Teste "Projetos: resumo traz os pendentes de vinculo"    GET    "/projects/operacoes/${opId}/resumo"           200 -msg '"semVinculoTotal":'
   $rs = $null; try { $rs = Invoke-RestMethod -Uri "$base/projects/operacoes/${opId}/resumo" -Headers @{ Authorization = "Bearer $global:tok" } } catch {}
@@ -197,6 +197,7 @@ if ($global:tok) {
   Teste "Extrato por quota (so Master)"                  GET    "/projects-relatorios/projetos/${projId}/extrato-quota?numero=1" 403
   Teste "Demonstrativo da REAL (so Master)"              GET    "/projects-relatorios/projetos/${projId}/demonstrativo-real" 403
   Teste "Fluxo contabil (so Master)"                     GET    "/projects-relatorios/projetos/${projId}/fluxo-contabil" 403
+  Teste "Custodia (so Master)"                           GET    "/projects-relatorios/projetos/${projId}/custodias" 403
   # Seguranca 0A (04/10/2026): escopo pela empresa DO REGISTRO (empresa sem vinculo com a QA, escolhida pela regra)
   $empOutra = ((docker exec ledgr-postgres psql -U ledgr -d ledgr_app -tA -c "SELECT c.id FROM companies c WHERE NOT EXISTS (SELECT 1 FROM user_companies uc JOIN users u ON u.id = uc.user_id WHERE u.email = 'qa.hotelsys@ledgr.local' AND uc.company_id = c.id) ORDER BY c.legal_name LIMIT 1") | Out-String).Trim()
   $docOutra = if ($empOutra) { ((docker exec ledgr-postgres psql -U ledgr -d ledgr_app -tA -c "SELECT id FROM documents WHERE company_id = '$empOutra' LIMIT 1") | Out-String).Trim() } else { '' }
