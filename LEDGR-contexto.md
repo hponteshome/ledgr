@@ -10378,3 +10378,11 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - Eventos: 1 confissao (F5, RM), 2 termo (SUNRISE, sem lancamento na assinatura), 3 aportes (SUNSYS: D Bancos / C Valores recebidos por conta e ordem), 4 pagamentos (SUNSYS: D Mutuo HOTELSYS / C Bancos; HOTELSYS: baixa de passivos e despesas da operacao, C Mutuo SUNSYS), 5 encontro de contas (SUNSYS) e adiantamento (HOTELSYS), 6 ingresso da Quota no 1 (HOTELSYS -> F5), 7 resgates (SUNRISE, F5, RM; a validar).
 - GET projects-relatorios/projetos/:id/fluxo-contabil (so Master), pagina "Fluxo contabil": regua de eventos, quadros por empresa, saldos resultantes. Contas descritivas; nada gravado no Contabil.
 - Parte 2: tabela de cambio (EUR/BRL por data e fonte), escolha BCE/PTAX no fechamento, variacao cambial por resgate, roteiro para o contador (Excel/PDF por empresa e periodo).
+
+## [PROJETOS] 06/10/2026 - Conciliacao da Conta Individual com a planilha ajustada
+
+- Planilha ajustada do Financeiro (Extrato_Itau_Sunsys_ajustada_20261006.xlsx): coluna 'Projeto Ancora?' = sim em 47 entradas, R$ 3.295.265,82 ate 31/12/2025.
+- Diferenca de R$ 200.515,33: 11 creditos desvinculados da Conta Individual (no 1 e 2 vendas de unidade nao provenientes de A. Vieira, R$ 150.000; no 20 entrada de terceiro, R$ 200; no 31, 32, 33, 39, 43, 44, 45, 46 devolucoes do circuito da Josi, R$ 50.991,74) e 1 entrada encaminhada e vinculada (no 59, 27/02/2025, R$ 676,41). Conta Individual em 31/12/2025 = R$ 3.295.265,82. Regra do banco: DESVINCULADO exige adquirente_id nulo.
+- Correcao das entradas: decisoes de 14:24 (Josi/Aldenir) restauradas; lote das 16:28-16:29 (13 rendimentos) desfeito para nova decisao.
+- Pendente (organizacao): levar as 8 devolucoes da Josi ao circuito 'Josi - protecao de bloqueios' (encerrar os creditos para as entradas voltarem a triagem); registrar o saldo informado de R$ 3.295.265,82 em 31/12/2025.
+
