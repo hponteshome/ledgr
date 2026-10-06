@@ -10350,3 +10350,10 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - GET projects-relatorios/projetos/:projetoId/estrutura (so Master): saldo 1 (estoque informado - aplicacoes com paga_passivo depois dele; sem estoque, conta desde 31/10/2025) -> subordinacao liberada quando zera; saldo 2 (R$ 54.418.451,00 - 10% dos aportes liquidos, data de quitacao e aportes que faltam); parametros da serie (% por quota = 80% x quota / resultado do BP); quotas com integralizacao. Pagina "Series#1 e Divida" (so Master).
 - pg: declaracao conferida no package.json (^8 impede a 9); aviso de consultas paralelas vem do interpretador do Prisma dentro de transacoes (comoUsuario) - revisar quando o Prisma corrigir.
 - Etapa C: Kit do Cotista (substitui o Kit da v1), Demonstrativo semestral da REAL, extrato por quota, saldos no Painel; depois, contas de passivo da HOTELSYS para o saldo 1 pela contabilidade.
+
+## [PROJETOS] 06/10/2026 - Series#1, Etapa C1 (Kit do Cotista)
+
+- Kit do Cotista substitui o Kit do Investidor (premissas v1): GET projects-relatorios/projetos/:projetoId/kit-cotista e .../pdf (so Master; AuditLog PROJ_KIT_COTISTA_EMITIDO). Pagina KitCotistaProjeto; menu "Kit do Cotista".
+- Secoes: oferta (quota, % por quota pela regra = 1,0606%, citando 1,0582% do book; renda 12m 7,52%; distribuicoes), empreendimento (BP v2, 201 unidades), modelo de renda (80/20 e faixas sobre o capital com R$ por quota e multiplo esperado; piso pendente), subordinacao (saldo de passivos apurado no LEDGR; contrapartida de 10% a Real Mouchao), projecao 2027-2035 e choques, cronograma do book e captacao realizada (quotas, aportado, distribuido = 0, Faixa I).
+- Material para potenciais cotistas: sem nomes de subscritores. Etiquetas: Apurado no LEDGR / Premissa vN / Parametro contratual.
+- Pagina Series#1 e Divida: valor em euros em linha propria.

@@ -56,7 +56,8 @@ export default function EstruturaSeries1Projeto({ projetoId }: { projetoId: stri
         <div style={{ ...cardSt, padding: 16 }}>
           <div style={secTitle}>Dívida da REAL com a F5 (libera a REAL)</div>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}><tbody>
-            {linha(`Dívida confessada em ${fmtData(dv.data)}`, `${fmtBRL(dv.valor)} (€ ${Number(dv.valorEur).toLocaleString('pt-BR', { minimumFractionDigits: 2 })})`)}
+            {linha(`Dívida confessada em ${fmtData(dv.data)}`, fmtBRL(dv.valor))}
+            {linha('Montante de referência em euros', `€ ${Number(dv.valorEur).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`)}
             {linha(`(−) Compensação: ${pc(dv.pctContrapartida, 0)} dos aportes líquidos (${fmtBRL(dv.aportesBase)})`, fmtBRL(dv.compensado))}
             {linha('(=) Saldo da dívida', fmtBRL(dv.saldo), true)}
             {linha(dv.quitadaEm ? 'Quitada em' : 'Aportes que ainda faltam para a quitação', dv.quitadaEm ? fmtData(dv.quitadaEm) : fmtBRL(dv.aportesNecessarios))}

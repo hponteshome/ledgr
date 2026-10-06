@@ -347,126 +347,113 @@ export class RelatoriosController {
     });
   }
 
-  // -- Kit do Investidor (Etapa 2, 05/10/2026) - so o Master ---------------------------------------------
-  // Premissas da versao vigente (entradas) + calculos do LEDGR (reexpressao, cota senior, waterfall, cenarios)
-  // + realizado da Operacao Ancora (creditos vinculados e devolucoes). Codigo de conferencia = SHA-256 do conteudo.
-  private montarKit(userId: string, projetoId: string) {
+  // -- Kit do Cotista (Series#1, Etapa C1, 06/10/2026) - so o Master ------------------------------------------
+  // Premissas da versao vigente (BP + book) + realizado do LEDGR (quotas, captacao, passivos). Sem nomes de subscritores
+  // (material para potenciais cotistas). Codigo de conferencia = SHA-256 do conteudo; emissao do PDF vai para o historico.
+  private montarKitCotista(userId: string, projetoId: string) {
     return this.db.comoUsuario(userId, async (tx) => {
-      const proj = await tx.projProjeto.findFirst({ where: { id: projetoId, canceladoEm: null }, select: { codigo: true, nome: true } });
+      const proj = await tx.projProjeto.findFirst({ where: { id: projetoId, canceladoEm: null }, select: { nome: true } });
       if (!proj) throw new NotFoundException('Projeto nao encontrado.');
       const versao = await tx.projPremissaVersao.findFirst({ where: { projetoId, canceladoEm: null }, orderBy: { numero: 'desc' }, select: { id: true, numero: true, dataBase: true, arquivoOrigem: true, arquivoSha256: true } });
       if (!versao) throw new BadRequestException('Nenhuma versao de premissas carregada para o projeto.');
-      const ops = await tx.projOperacao.findMany({ where: { projetoId, canceladoEm: null }, select: { id: true, codigo: true, nome: true } });
+      const ops = await tx.projOperacao.findMany({ where: { projetoId, canceladoEm: null }, select: { id: true, codigo: true } });
       const opCod = new Map(ops.map((o) => [o.id, o.codigo]));
       const prem = await tx.projPremissa.findMany({ where: { versaoId: versao.id }, orderBy: { ordem: 'asc' } });
       const P = new Map<string, any>();
       prem.forEach((p) => P.set((p.operacaoId ? opCod.get(p.operacaoId) + ':' : '') + p.codigo, p));
-      const n = (k: string) => { const p = P.get(k); if (!p || p.valorNum === null) throw new BadRequestException(`Premissa ausente: ${k}`); return Number(p.valorNum); };
+      const n = (k: string) => { const p = P.get(k); if (!p || p.valorNum === null) throw new BadRequestException(`Premissa ausente: ${k} (o kit precisa da versao 2 das premissas)`); return Number(p.valorNum); };
       const t = (k: string): string | null => P.get(k)?.valorTexto ?? null;
-      const dt = (k: string): string | null => (P.get(k)?.valorData ? (P.get(k).valorData as Date).toISOString().slice(0, 10) : null);
+      const cent = (v: any) => Math.round(Number(v) * 100);
       const fator = prem.filter((p) => p.grupo === 'REEXPRESSAO' && p.codigo.startsWith('IPCA_')).reduce((f, p) => f * (1 + Number(p.valorNum)), 1);
       const rx = (k: string) => n(k) * fator;
-      const receitas = rx('RECEITAS'); const despesas = rx('DESPESAS'); const resultado = receitas + despesas; const exposicao = rx('EXPOSICAO_MAXIMA');
-      const precoCota = rx('VALOR_MEDIO_COTA'); const cotas = n('COTAS');
-      const bp = {
-        vgv: rx('VGV'), receitas, despesas, resultado, vpl: rx('VPL_6'), exposicaoMaxima: exposicao, margem: resultado / receitas, roe: resultado / Math.abs(exposicao),
-        tirMensal: n('TIR_MENSAL'), tirAnual: Math.pow(1 + n('TIR_MENSAL'), 12) - 1, precoCota, valorParcela: rx('VALOR_MEDIO_PARCELA'), valorM2: rx('VALOR_MEDIO_AREA_PRIVATIVA'),
-        cotas, uh: n('UH'), velocidade: n('VELOCIDADE_VENDA'), parcelas: n('PARCELAS'), taxaVpl: n('TAXA_VPL'), fatorIpca: fator, dataBase: t('DATA_BASE_REEXPRESSAO'),
-      };
-      const cenarios = [['ESTRESSE', 'Estresse'], ['CONSERVADOR', 'Conservador'], ['BASE', 'Base'], ['UPSIDE', 'Upside'], ['UPSIDE_MAIS', 'Upside +']].map(([c, nome]) => {
-        const rr = receitas * (1 + n(`SENS_${c}_RECEITA`)); const dd = despesas * (1 + n(`SENS_${c}_DESPESA`));
-        return { nome, varReceita: n(`SENS_${c}_RECEITA`), varDespesa: n(`SENS_${c}_DESPESA`), receitas: rr, despesas: dd, resultado: rr + dd, margem: (rr + dd) / rr };
+      const receitas = rx('RECEITAS'); const despesas = rx('DESPESAS'); const resultado = receitas + despesas;
+      const bp = { vgv: rx('VGV'), receitas, despesas, resultado, vpl: rx('VPL_6'), exposicaoMaxima: rx('EXPOSICAO_MAXIMA'), margem: resultado / receitas,
+        tirMensal: n('TIR_MENSAL'), tirAnual: Math.pow(1 + n('TIR_MENSAL'), 12) - 1, uh: n('UH'), cotas: n('COTAS'), velocidade: n('VELOCIDADE_VENDA'), taxaVpl: n('TAXA_VPL'), fatorIpca: fator, dataBase: t('DATA_BASE_REEXPRESSAO') };
+      const valorQuota = n('SERIES1_VALOR_QUOTA'); const pctCot = n('SERIES1_PCT_CDE_COTISTAS');
+      let deM = 0;
+      const faixas = [1, 2, 3, 4].map((i) => {
+        const ate = i < 4 ? n(`SERIES1_FAIXA_${i}_ATE_MOIC`) : null;
+        const f = { faixa: i, pct: n(`SERIES1_FAIXA_${i}_PCT`), deMoic: deM, ateMoic: ate, deValor: deM * valorQuota, ateValor: ate === null ? null : ate * valorQuota, multiploEsperado: n(`SERIES1_FAIXA_${i}_MULTIPLO_ESPERADO`) };
+        deM = ate ?? deM; return f;
       });
-      const anc = ops.find((o) => o.codigo === 'ANCORA');
-      const meta = n('ANCORA:META_COTA_SENIOR');
-      let ancora: any = null;
+      let ac = 0;
+      const renda = [2027, 2028, 2029, 2030, 2031, 2032, 2033, 2034, 2035].filter((a) => P.has(`SERIES1_RENDA_${a}`)).map((a) => { const v = n(`SERIES1_RENDA_${a}`); ac += v; return { ano: a, renda: v, acumulado: ac, pctAcumulado: ac / valorQuota }; });
+      const choques = [90, 75, 60].filter((c) => P.has(`SERIES1_CHOQUE_${c}`)).map((c) => ({ fluxo: c / 100, renda: n(`SERIES1_CHOQUE_${c}`), rendimento: n(`SERIES1_CHOQUE_${c}`) / valorQuota }));
+      const renda12m = n('SERIES1_RENDA_12M');
+      const series = { valorQuota, pctCotistas: pctCot, pctF5: n('SERIES1_PCT_CDE_F5'), pctPorQuota: pctCot * valorQuota / resultado, pctQuotaBook: P.has('SERIES1_PCT_QUOTA_BOOK') ? n('SERIES1_PCT_QUOTA_BOOK') : null,
+        regra: t('SERIES1_REGRA_PCT_QUOTA'), renda12m, rendimento12m: renda12m / valorQuota, janela: [t('SERIES1_JANELA_INICIO'), t('SERIES1_JANELA_FIM')],
+        primeiraDistribuicao: t('SERIES1_PRIMEIRA_DISTRIBUICAO'), periodicidade: t('SERIES1_PERIODICIDADE'), inicioParticipacao: t('SERIES1_INICIO_PARTICIPACAO'), piso: t('SERIES1_PISO_REMUNERACAO') };
+      const cronograma = ['FASE_1', 'FASE_2', 'FASE_3', 'FASE_4'].filter((c) => P.has(c)).map((c) => ({ nome: P.get(c).nome as string, texto: t(c) }));
+      const contrapartidaPct = n('REAL:CONTRAPARTIDA_PCT_APORTE');
+      // realizado
+      const anc = ops.find((o) => o.codigo === 'ANCORA'); const s1 = ops.find((o) => o.codigo === 'SERIES1');
+      let aportesAncoraC = 0;
       if (anc) {
-        const vincs = await tx.projCreditoVinculo.findMany({ where: { canceladoEm: null, situacao: 'VINCULADO', credito: { operacaoId: anc.id, canceladoEm: null } }, select: { credito: { select: { dataCredito: true, valor: true } } } });
-        const devs = await tx.projAplicacao.findMany({ where: { operacaoId: anc.id, canceladoEm: null, natureza: { tipo: 'DEVOLUCAO' } }, select: { dataAplicacao: true, valor: true } });
-        const ev = [...vincs.map((x) => ({ data: x.credito.dataCredito.toISOString().slice(0, 10), c: Math.round(Number(x.credito.valor) * 100) })),
-          ...devs.map((x) => ({ data: x.dataAplicacao.toISOString().slice(0, 10), c: -Math.round(Number(x.valor) * 100) }))].sort((a, b) => a.data.localeCompare(b.data));
-        const metaC = Math.round(meta * 100);
-        let s = 0; let concluida: string | null = null;
-        for (const e of ev) { s += e.c; if (!concluida && s >= metaC) concluida = e.data; }
-        const aportesAte = (iso: string) => ev.filter((e) => e.data <= iso && e.c > 0).reduce((x, e) => x + e.c, 0) / 100;
-        const inf = await tx.projSaldoInformado.findFirst({ where: { operacaoId: anc.id, canceladoEm: null, tipo: 'CONTA_INDIVIDUAL' }, orderBy: [{ dataReferencia: 'desc' }, { criadoEm: 'desc' }], select: { dataReferencia: true, valor: true } });
-        let difConc: number | null = null;
-        if (inf) { const lim = inf.dataReferencia.toISOString().slice(0, 10); difConc = (ev.filter((e) => e.data <= lim).reduce((x, e) => x + e.c, 0) - Math.round(Number(inf.valor) * 100)) / 100; }
-        ancora = {
-          inicio: t('ANCORA:INICIO_OPERACAO'), primeiroAporte: ev.find((e) => e.c > 0)?.data ?? null, meta, saldo: s / 100, percentual: metaC ? s / metaC : 0,
-          falta: Math.max(0, (metaC - s) / 100), concluidaEm: concluida, aportesAte31out2025: aportesAte('2025-10-31'), aportesAte31dez2025: aportesAte('2025-12-31'),
-          emConciliacao: difConc !== null && Math.abs(difConc) >= 0.01, diferencaConciliacao: difConc,
-        };
+        const vincs = await tx.projCreditoVinculo.findMany({ where: { canceladoEm: null, situacao: 'VINCULADO', credito: { operacaoId: anc.id, canceladoEm: null } }, select: { credito: { select: { valor: true } } } });
+        const devs = await tx.projAplicacao.findMany({ where: { operacaoId: anc.id, canceladoEm: null, natureza: { tipo: 'DEVOLUCAO' } }, select: { valor: true } });
+        aportesAncoraC = vincs.reduce((s, v) => s + cent(v.credito.valor), 0) - devs.reduce((s, d) => s + cent(d.valor), 0);
       }
-      const cotasEq = meta / precoCota; const elegivel = resultado * (1 - cotasEq / cotas);
-      const cotaSenior = { valor: meta, cotasEquivalentes: cotasEq, percentualCotas: cotasEq / cotas, vgvRemanescente: bp.vgv - meta, resultadoElegivel: elegivel };
-      const passivo = n('REAL:PASSIVO_REFERENCIA');
-      const faixasP = [1, 2, 3, 4].map((i) => ({ faixa: i, pct: n(`REAL:FAIXA_${i}_PCT`), ateMoic: i < 4 ? n(`REAL:FAIXA_${i}_ATE_MOIC`) : null }));
-      let resto = elegivel; let acum = 0; let ant = 0; const faixas: any[] = [];
-      for (const f of faixasP) {
-        const alvo = f.ateMoic === null ? Infinity : (f.ateMoic - ant) * passivo;
-        const consumo = alvo === Infinity ? resto : Math.min(resto, alvo / f.pct);
-        const rec = consumo * f.pct; acum += rec; resto -= consumo;
-        faixas.push({ ...f, deMoic: ant, deValor: ant * passivo, ateValor: f.ateMoic === null ? null : f.ateMoic * passivo, recebimento: rec, consumo, acumulado: acum, moic: acum / passivo });
-        ant = f.ateMoic ?? ant;
-      }
-      const waterfall = { passivo, faixas, recebimentoTotal: acum, moic: acum / passivo, ganho: acum - passivo, residualProjeto: elegivel - acum, participacaoEfetiva: acum / elegivel,
-        realizado: { distribuido: 0, faixaVigente: 1, moic: 0 } };
-      const contrato = { passivo, dataAssuncao: dt('REAL:DATA_ASSUNCAO_PASSIVO'), inicioEstruturacao: t('REAL:INICIO_ESTRUTURACAO'), inicioParticipacao: t('REAL:INICIO_PARTICIPACAO') };
-      const opReal = ops.find((o) => o.codigo === 'REAL');
-      const parts = opReal ? await tx.projParticipacao.findMany({ where: { operacaoId: opReal.id, canceladoEm: null }, select: { companyId: true, papel: { select: { nome: true } }, contraparte: { select: { nome: true, pais: true } } } }) : [];
-      const cids = parts.map((p) => p.companyId).filter((x): x is string => !!x);
-      const emps = new Map((cids.length ? await tx.company.findMany({ where: { id: { in: cids } }, select: { id: true, legalName: true } }) : []).map((c) => [c.id, c.legalName]));
-      const participantes = parts.map((p) => ({ papel: p.papel.nome, nome: (p.companyId && emps.get(p.companyId)) || p.contraparte?.nome || '-', pais: p.contraparte?.pais ?? 'BR' }));
+      const quotas = s1 ? await tx.projQuota.findMany({ where: { operacaoId: s1.id, canceladoEm: null }, orderBy: { numero: 'asc' } }) : [];
+      const qd = quotas.map((q) => { const ap = q.operacaoOrigemId && anc && q.operacaoOrigemId === anc.id ? aportesAncoraC : 0; return { numero: q.numero, valor: Number(q.valor), aportado: ap / 100, integralizacao: cent(q.valor) ? Math.min(1, ap / cent(q.valor)) : 0 }; });
+      const inf = s1 ? await tx.projSaldoInformado.findFirst({ where: { operacaoId: s1.id, canceladoEm: null, tipo: 'PASSIVOS_EMPREENDIMENTO' }, orderBy: [{ dataReferencia: 'desc' }, { criadoEm: 'desc' }], select: { dataReferencia: true, valor: true } }) : null;
+      const desde = inf ? inf.dataReferencia : ((P.get('REAL:DIVIDA_DATA')?.valorData as Date | undefined) ?? null);
+      const apls = await tx.projAplicacao.findMany({ where: { canceladoEm: null, operacaoId: { in: ops.map((o) => o.id) }, natureza: { pagaPassivo: true }, ...(desde ? { dataAplicacao: { gt: desde } } : {}) }, select: { valor: true } });
+      const pagosC = apls.reduce((s, a) => s + cent(a.valor), 0);
+      const passivos = { estoqueData: inf ? inf.dataReferencia.toISOString().slice(0, 10) : null, estoque: inf ? Number(inf.valor) : null, pagamentosDesde: desde ? desde.toISOString().slice(0, 10) : null,
+        pagamentos: pagosC / 100, saldo: inf ? Math.max(0, cent(inf.valor) - pagosC) / 100 : null, liberada: inf ? cent(inf.valor) - pagosC <= 0 : false };
+      const realizado = { quotas: qd.length, captado: qd.reduce((s, q) => s + q.aportado, 0), quotasDetalhe: qd, passivos, distribuido: 0, faixaVigente: 1 };
       const dados = { projeto: proj.nome, versao: { numero: versao.numero, dataBase: versao.dataBase.toISOString().slice(0, 10), arquivo: versao.arquivoOrigem, sha256: versao.arquivoSha256 },
-        bp, cenarios, ancora, cotaSenior, waterfall, contrato, participantes };
+        bp, series, faixas, renda, choques, cronograma, contrapartidaPct, realizado };
       const hash = crypto.createHash('sha256').update(JSON.stringify(dados)).digest('hex');
       return { ...dados, hash, emitidoEm: new Date().toISOString() };
     });
   }
 
-  @Get('projetos/:projetoId/kit-investidor')
+  @Get('projetos/:projetoId/kit-cotista')
   @UseGuards(MasterOnlyGuard)
   @ProjAcao('autenticado') // decisao do MasterOnlyGuard do metodo (403 consistente)
-  kitInvestidor(@Param('projetoId') projetoId: string, @Req() req: any) {
+  kitCotista(@Param('projetoId') projetoId: string, @Req() req: any) {
     if (!UUID_RE.test(projetoId)) throw new NotFoundException('Registro nao encontrado.');
-    return this.montarKit(req.user.id, projetoId);
+    return this.montarKitCotista(req.user.id, projetoId);
   }
 
-  @Get('projetos/:projetoId/kit-investidor/pdf')
+  @Get('projetos/:projetoId/kit-cotista/pdf')
   @UseGuards(MasterOnlyGuard)
   @ProjAcao('autenticado')
-  async kitInvestidorPdf(@Param('projetoId') projetoId: string, @Req() req: any, @Res() res: Response) {
+  async kitCotistaPdf(@Param('projetoId') projetoId: string, @Req() req: any, @Res() res: Response) {
     if (!UUID_RE.test(projetoId)) throw new NotFoundException('Registro nao encontrado.');
-    const k: any = await this.montarKit(req.user.id, projetoId);
-    await this.db.comoUsuario(req.user.id, (tx) => tx.auditLog.create({ data: { actorId: req.user.id, action: 'PROJ_KIT_INVESTIDOR_EMITIDO', targetId: projetoId, after: { projetoId, versaoPremissas: k.versao.numero, hash: k.hash } } }));
+    const k: any = await this.montarKitCotista(req.user.id, projetoId);
+    await this.db.comoUsuario(req.user.id, (tx) => tx.auditLog.create({ data: { actorId: req.user.id, action: 'PROJ_KIT_COTISTA_EMITIDO', targetId: projetoId, after: { projetoId, versaoPremissas: k.versao.numero, hash: k.hash } } }));
     const puppeteer = require('puppeteer');
     const browser = await puppeteer.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox'] });
     try {
       const page = await browser.newPage();
-      await page.setContent(this.htmlKit(k), { waitUntil: 'load' });
+      await page.setContent(this.htmlKitCotista(k), { waitUntil: 'load' });
       const pdf = Buffer.from(await page.pdf({
         format: 'A4', printBackground: true, margin: { top: '12mm', bottom: '16mm', left: '12mm', right: '12mm' }, displayHeaderFooter: true, headerTemplate: '<span></span>',
-        footerTemplate: `<div style="font-size:7px;width:100%;padding:0 12mm;color:#667085;display:flex;justify-content:space-between;font-family:Arial"><span>Kit do Investidor · premissas v${k.versao.numero} · código de conferência (SHA-256): ${k.hash}</span><span><span class="pageNumber"></span>/<span class="totalPages"></span></span></div>`,
+        footerTemplate: `<div style="font-size:7px;width:100%;padding:0 12mm;color:#667085;display:flex;justify-content:space-between;font-family:Arial"><span>Kit do Cotista · Series#1 · premissas v${k.versao.numero} · código de conferência (SHA-256): ${k.hash}</span><span><span class="pageNumber"></span>/<span class="totalPages"></span></span></div>`,
       }));
       res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename="kit-investidor-${new Date().toISOString().slice(0, 10)}.pdf"`);
+      res.setHeader('Content-Disposition', `attachment; filename="kit-cotista-series1-${new Date().toISOString().slice(0, 10)}.pdf"`);
       res.setHeader('Cache-Control', 'private, no-store');
       res.end(pdf);
     } finally { await browser.close(); }
   }
 
-  private htmlKit(k: any): string {
+  private htmlKitCotista(k: any): string {
     const mi = (v: number) => 'R$ ' + (v / 1e6).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' mi';
     const pc = (v: number, d = 2) => (v * 100).toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d }) + '%';
-    const nf = (v: number, d = 0) => v.toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d });
-    const tag = (o: string) => `<span class="tag ${o === 'LEDGR' ? 'lg' : o === 'BP' ? 'bp' : 'ct'}">${o === 'LEDGR' ? 'Apurado no LEDGR' : o === 'BP' ? 'Premissa do BP v' + k.versao.numero : 'Parâmetro contratual'}</span>`;
-    const card = (rot: string, val: string, o: string) => `<div class="card"><span>${esc(rot)}</span><strong>${val}</strong>${tag(o)}</div>`;
-    const a = k.ancora || {};
-    const conc = a.emConciliacao ? ` <span class="warnc">em conciliação (diferença de ${brl(a.diferencaConciliacao)})</span>` : '';
-    const faixas = k.waterfall.faixas.map((f: any) => `<tr><td><b>${['I', 'II', 'III', 'IV'][f.faixa - 1]}</b></td><td>${f.ateValor === null ? 'Acima de ' + mi(f.deValor) + ' (&gt;' + nf(f.deMoic, 2) + 'x)' : (f.deValor ? mi(f.deValor) + ' → ' : 'Até ') + mi(f.ateValor) + ' (' + nf(f.ateMoic, 2) + 'x)'}</td><td class="num"><b>${pc(f.pct, 0)}</b></td><td class="num">${pc(1 - f.pct, 0)}</td><td class="num">${mi(f.recebimento)}</td><td class="num">${nf(f.moic, 2)}x</td></tr>`).join('');
-    const cen = k.cenarios.map((c: any) => `<tr><td>${esc(c.nome)}</td><td class="num">${pc(c.varReceita, 0)}</td><td class="num">${pc(c.varDespesa, 0)}</td><td class="num">${mi(c.resultado)}</td><td class="num">${pc(c.margem, 1)}</td></tr>`).join('');
-    const parts = k.participantes.map((p: any) => `<tr><td><b>${esc(p.nome)}</b>${p.pais && p.pais !== 'BR' ? ' (' + esc(p.pais) + ')' : ''}</td><td>${esc(p.papel)}</td></tr>`).join('');
+    const nf = (v: number, d = 0) => Number(v).toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d });
+    const tag = (o: string) => `<span class="tag ${o === 'LEDGR' ? 'lg' : o === 'P' ? 'bp' : 'ct'}">${o === 'LEDGR' ? 'Apurado no LEDGR' : o === 'P' ? 'Premissa v' + k.versao.numero : 'Parâmetro contratual'}</span>`;
+    const card = (rot: string, val: string, o: string, sub = '') => `<div class="card"><span>${esc(rot)}</span><strong>${val}</strong>${sub ? `<em>${sub}</em>` : ''}${tag(o)}</div>`;
+    const s = k.series; const r = k.realizado; const pv = r.passivos; const ROM = ['I', 'II', 'III', 'IV'];
+    const faixas = k.faixas.map((f: any) => `<tr><td><b>${ROM[f.faixa - 1]}</b></td><td>${f.ateMoic === null ? 'acima de ' + nf(f.deMoic, 2) + 'x (' + brl(f.deValor) + ')' : (f.deMoic ? nf(f.deMoic, 2) + 'x a ' : 'até ') + nf(f.ateMoic, 2) + 'x (' + (f.deMoic ? brl(f.deValor) + ' a ' : 'até ') + brl(f.ateValor) + ')'}</td><td class="num"><b>${pc(f.pct, 0)}</b></td><td class="num">${nf(f.multiploEsperado, 2)}x</td></tr>`).join('');
+    const renda = k.renda.map((x: any) => `<tr><td>${x.ano}</td><td class="num">${brl(x.renda)}</td><td class="num">${brl(x.acumulado)}</td><td class="num">${pc(x.pctAcumulado)}</td></tr>`).join('');
+    const choques = k.choques.map((c: any) => `<tr><td>Choque de ${pc(c.fluxo, 0)} do fluxo</td><td class="num">${brl(c.renda)}</td><td class="num">${pc(c.rendimento)}</td></tr>`).join('');
+    const crono = k.cronograma.map((c: any) => `<div class="ev"><b>${esc(c.nome)}</b> ${tag('P')}<small>${esc(c.texto || '')}</small></div>`).join('');
+    const passivosTxt = pv.estoque === null
+      ? `Estoque de passivos ainda não informado; pagamentos de passivo desde ${pv.pagamentosDesde ? pv.pagamentosDesde.split('-').reverse().join('/') : '-'}: ${brl(pv.pagamentos)}.`
+      : `Estoque informado em ${pv.estoqueData.split('-').reverse().join('/')}: ${brl(pv.estoque)}; pagamentos desde então: ${brl(pv.pagamentos)}; saldo estimado: <b>${brl(pv.saldo)}</b>.`;
     return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
       body{font-family:Arial,Helvetica,sans-serif;color:#152033;font-size:10.5px;margin:0}
       .page{page-break-after:always;padding:6px 4px}.page:last-child{page-break-after:auto}
@@ -475,55 +462,46 @@ export class RelatoriosController {
       h1{font-size:34px;margin:10px 0 14px}h2{font-size:20px;color:#0f2747;margin:2px 0 10px}h3{font-size:13px;color:#0f2747;margin:12px 0 6px}
       .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:14px 0}.two{display:grid;grid-template-columns:1fr 1fr;gap:18px}
       .card{border:1px solid #d8dee8;border-radius:6px;padding:10px}.card span{font-size:8px;color:#667085;text-transform:uppercase;letter-spacing:.06em}
-      .card strong{display:block;font-size:17px;color:#0f2747;margin:4px 0}
+      .card strong{display:block;font-size:17px;color:#0f2747;margin:4px 0}.card em{display:block;font-style:normal;font-size:9px;color:#667085;margin-bottom:3px}
       table{width:100%;border-collapse:collapse;margin:8px 0}th{background:#0f2747;color:#fff;text-align:left;padding:6px;font-size:9px}
       td{border-bottom:1px solid #d8dee8;padding:6px;vertical-align:top}.num{text-align:right;white-space:nowrap}
       .note{background:#f7f9fc;border-left:3px solid #1f5f99;padding:9px 12px;margin:10px 0;color:#344054}.warn{background:#fff8e8;border-left-color:#9a6a14}
       .tag{display:inline-block;font-size:7.5px;font-weight:700;border-radius:999px;padding:1px 6px;margin-top:2px}
       .tag.lg{background:#e8f5ee;color:#1a4a3a}.tag.bp{background:#eaf2fb;color:#1f5f99}.tag.ct{background:#fff3df;color:#9a6a14}
-      .warnc{color:#9a6a14;font-weight:700}.ev{padding:0 0 10px 16px;border-left:2px solid #cad4e2;margin-left:4px}.ev b{color:#0f2747}.ev small{display:block;color:#667085}
-      .bar{height:8px;background:#e5e7eb;border-radius:999px;overflow:hidden;margin:6px 0}.bar i{display:block;height:100%;background:#236a57}
+      .ev{padding:0 0 10px 16px;border-left:2px solid #cad4e2;margin-left:4px}.ev b{color:#0f2747}.ev small{display:block;color:#667085}
+      ul{padding-left:18px}li{margin:4px 0}
     </style></head><body>
-    <section class="page cover"><div class="eyebrow">${esc(k.projeto)} · material executivo</div><h1>Kit do Investidor</h1>
-      <p style="font-size:15px;max-width:620px">Visão executiva do projeto, evolução da Operação Âncora e estrutura econômica do Investidor Estratégico.</p>
-      <p style="margin-top:40px">Premissas do BP versão ${k.versao.numero}, reexpressas a ${esc(k.bp.dataBase || '')} · Emitido em ${new Date(k.emitidoEm).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}</p>
-      <p style="opacity:.75;font-size:9.5px;max-width:620px">Material informativo e confidencial. As projeções não constituem garantia de retorno e devem ser lidas em conjunto com os instrumentos contratuais, que prevalecem em caso de divergência.</p></section>
-    <section class="page"><div class="eyebrow">01 · OnePage do Projeto</div><h2>Escala econômica e assimetria de capital</h2>
-      <div class="grid">${card('VGV reexpresso', mi(k.bp.vgv), 'BP')}${card('Receitas projetadas', mi(k.bp.receitas), 'BP')}${card('Resultado projetado', mi(k.bp.resultado), 'BP')}${card('Exposição máxima', mi(Math.abs(k.bp.exposicaoMaxima)), 'BP')}</div>
-      <div class="two"><div><h3>Configuração econômica ${tag('BP')}</h3><table>
-        <tr><td>Total de U.H.</td><td class="num"><b>${nf(k.bp.uh)}</b></td></tr><tr><td>Cotas econômicas do BP</td><td class="num"><b>${nf(k.bp.cotas)}</b></td></tr>
-        <tr><td>Preço-base médio por cota</td><td class="num"><b>${brl(k.bp.precoCota)}</b></td></tr><tr><td>Prazo de venda</td><td class="num"><b>${nf(k.bp.velocidade)} meses</b></td></tr>
-        <tr><td>Margem resultado / receita</td><td class="num"><b>${pc(k.bp.margem)}</b></td></tr></table></div>
-        <div><h3>Indicadores de referência</h3><table>
-        <tr><td>TIR do BP ${tag('BP')}</td><td class="num"><b>${pc(k.bp.tirMensal)} a.m. / ${pc(k.bp.tirAnual)} a.a.</b></td></tr>
-        <tr><td>Resultado / exposição máxima ${tag('BP')}</td><td class="num"><b>${nf(k.bp.roe, 2)}x</b></td></tr>
-        <tr><td>VPL comparável a ${pc(k.bp.taxaVpl, 0)} a.a. ${tag('BP')}</td><td class="num"><b>${mi(k.bp.vpl)}</b></td></tr>
-        <tr><td>Passivo de referência assumido ${tag('CT')}</td><td class="num"><b>${mi(k.contrato.passivo)}</b></td></tr>
-        <tr><td>Início da participação ${tag('CT')}</td><td class="num"><b>${esc(k.contrato.inicioParticipacao || '-')}</b></td></tr></table></div></div>
-      <div class="note">O VPL a ${pc(k.bp.taxaVpl, 0)} a.a. é referência comparável ao estudo original (2018), reexpresso pelo IPCA acumulado (fator ${nf(k.bp.fatorIpca, 4)}); não é um valuation de mercado atual.</div></section>
-    <section class="page"><div class="eyebrow">02 · Cronograma e andamento</div><h2>Da Operação Âncora à participação econômica</h2>
-      <div class="ev"><b>${esc(a.inicio || 'ago/2024')} · Início da Operação Âncora</b> ${tag('LEDGR')}<small>Primeiro aporte do Cliente Âncora em ${a.primeiroAporte ? a.primeiroAporte.split('-').reverse().join('/') : '-'}, comprovado no extrato da recebedora.</small></div>
-      <div class="ev"><b>Até 31/10/2025 · ${brl(a.aportesAte31out2025 || 0)} aportados</b> ${tag('LEDGR')}<small>Soma exata dos créditos vinculados à Conta Individual, com prova bancária.</small></div>
-      <div class="ev"><b>${k.contrato.dataAssuncao ? k.contrato.dataAssuncao.split('-').reverse().join('/') : '31/10/2025'} · Assunção do passivo de referência de ${mi(k.contrato.passivo)}</b> ${tag('CT')}<small>Marco da exposição econômica do Investidor Estratégico; sem recebimento de cotas.</small></div>
-      <div class="ev"><b>Até 31/12/2025 · ${brl(a.aportesAte31dez2025 || 0)} aportados</b> ${tag('LEDGR')}${conc}</div>
-      <div class="ev"><b>Cota sênior · ${pc(a.percentual || 0, 1)} de ${brl(k.cotaSenior.valor)}</b> ${tag('LEDGR')}<div class="bar"><i style="width:${Math.min(100, (a.percentual || 0) * 100).toFixed(1)}%"></i></div>
-        <small>${a.concluidaEm ? 'Meta atingida em ' + a.concluidaEm.split('-').reverse().join('/') + '.' : 'Saldo líquido de ' + brl(a.saldo || 0) + '; faltam ' + brl(a.falta || 0) + ' para a conclusão da Operação Âncora.'}</small></div>
-      <div class="ev"><b>${esc(k.contrato.inicioEstruturacao || '-')} · Início da Estruturação</b> ${tag('CT')}<small>Preparação comercial, financeira e operacional; sem apuração de participação.</small></div>
-      <div class="ev"><b>Início da participação: ${esc(k.contrato.inicioParticipacao || '-')}</b> ${tag('CT')}<small>A data formalizada delimita a base elegível da waterfall.</small></div>
-      <div class="note warn"><b>Segregação:</b> a Operação Âncora (cota sênior de ${brl(k.cotaSenior.valor)}) permanece segregada da base econômica do Investidor Estratégico; ela é excluída pro-rata do resultado elegível (${nf(k.cotaSenior.cotasEquivalentes, 2)} cotas equivalentes, ${pc(k.cotaSenior.percentualCotas)} do estoque).</div></section>
-    <section class="page"><div class="eyebrow">03 e 04 · Tese e estrutura</div><h2>Participação econômica vinculada ao caixa distribuível</h2>
-      <div class="grid">${card('Escala (VGV)', mi(k.bp.vgv), 'BP')}${card('Capital (passivo)', mi(k.contrato.passivo), 'CT')}${card('Margem projetada', pc(k.bp.margem, 1), 'BP')}${card('Resultado elegível', mi(k.cotaSenior.resultadoElegivel), 'BP')}</div>
-      <h3>Participantes da operação ${tag('LEDGR')}</h3><table><tr><th>Participante</th><th>Papel</th></tr>${parts}<tr><td><b>Cliente Âncora</b></td><td>Operação Âncora (cota sênior), segregada da base econômica</td></tr></table>
-      <div class="note"><b>Importante:</b> o Investidor Estratégico não recebe cotas, unidades, frações ideais, posse ou poderes de gestão; sua posição é econômica e contratual. A gestão estratégica, comercial, operacional e imobiliária permanece com a desenvolvedora.</div></section>
-    <section class="page"><div class="eyebrow">05 · Waterfall econômico</div><h2>Participação progressiva sobre o Caixa Distribuível Elegível</h2>
-      <table><tr><th>Faixa</th><th>Retorno acumulado do investidor</th><th class="num">Investidor</th><th class="num">Desenvolvedora</th><th class="num">Recebimento indicativo</th><th class="num">MOIC acumulado</th></tr>${faixas}</table>
-      <div class="two"><div class="card"><span>Caso-base indicativo</span><strong>${mi(k.waterfall.recebimentoTotal)} · ${nf(k.waterfall.moic, 2)}x</strong>${tag('BP')}<p>Sobre o resultado elegível de ${mi(k.cotaSenior.resultadoElegivel)}; participação efetiva de ${pc(k.waterfall.participacaoEfetiva, 1)}.</p></div>
-        <div class="card"><span>Realizado</span><strong>${brl(k.waterfall.realizado.distribuido)} · Faixa ${['I', 'II', 'III', 'IV'][k.waterfall.realizado.faixaVigente - 1]}</strong>${tag('LEDGR')}<p>A apuração do CDE começa com a participação; até lá não há distribuição.</p></div></div>
-      <div class="note"><b>CDE:</b> receitas efetivamente recebidas menos tributos, comissões, custos, despesas, investimentos, obrigações, passivos, perdas e reservas necessárias ao projeto. VGV ou vendas contratadas, isoladamente, não equivalem a caixa distribuível.</div></section>
-    <section class="page"><div class="eyebrow">06 · Premissas e acompanhamento</div><h2>Sensibilidade e disciplina do modelo</h2>
-      <h3>Sensibilidade indicativa do resultado ${tag('BP')}</h3><table><tr><th>Cenário</th><th class="num">Receita</th><th class="num">Despesas</th><th class="num">Resultado</th><th class="num">Margem</th></tr>${cen}</table>
-      <div class="note warn">As projeções vêm do BP original de 2018, reexpresso pelo IPCA; não representam garantia de rentabilidade ou de prazo. O BP precisa ser atualizado com o fluxo mensal realizado a partir do início da participação, para TIR, MOIC e payback efetivos do investidor.</div>
-      <p style="font-size:8.5px;color:#667085">Fonte das premissas: ${esc(k.versao.arquivo || '-')} (SHA-256 ${esc((k.versao.sha256 || '').slice(0, 16))}…). Documento executivo; em caso de divergência, prevalecem os instrumentos jurídicos assinados.</p></section>
+    <section class="page cover"><div class="eyebrow">${esc(k.projeto)} · Quota Series#1</div><h1>Kit do Cotista</h1>
+      <p style="font-size:15px;max-width:620px">Participação econômica nos resultados do Hotel Recife, por meio de quotas sênior emitidas e geridas pela F5, Sociedade de Propósito Específico de comercialização.</p>
+      <p style="margin-top:40px">Premissas versão ${k.versao.numero} · Emitido em ${new Date(k.emitidoEm).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}</p>
+      <p style="opacity:.75;font-size:9.5px;max-width:620px">Este material não constitui oferta, convite ou solicitação de investimento. Taxas, rendimentos e múltiplos são projeções sujeitas a confirmação e não constituem garantia de captação, receita, rendimento ou resultado.</p></section>
+    <section class="page"><div class="eyebrow">01 · A oferta</div><h2>Quota sênior de ${brl(s.valorQuota)}</h2>
+      <div class="grid">${card('Valor da quota', brl(s.valorQuota), 'CT')}${card('Participação por quota', pc(s.pctPorQuota, 4), 'P', 'do Caixa Distribuível Elegível')}${card('Renda projetada (12 meses)', brl(s.renda12m), 'P', pc(s.rendimento12m) + ' ao ano')}${card('Distribuições', esc(s.periodicidade || '-'), 'CT', 'a partir de ' + esc(s.primeiraDistribuicao || '-'))}</div>
+      <table><tr><td>Tipo de valor</td><td>Quota de participação econômica: sem direito societário, sem voto, sem gestão e sem propriedade ${tag('CT')}</td></tr>
+        <tr><td>Janela de subscrição</td><td>${esc(s.janela[0] || '-')} a ${esc(s.janela[1] || '-')} ${tag('CT')}</td></tr>
+        <tr><td>Início da participação</td><td>${esc(s.inicioParticipacao || '-')} ${tag('CT')}</td></tr>
+        <tr><td>Regra da participação por quota</td><td>${esc(s.regra || '-')}${s.pctQuotaBook ? ' (o book de referência cita ' + pc(s.pctQuotaBook, 4) + ')' : ''} ${tag('P')}</td></tr></table></section>
+    <section class="page"><div class="eyebrow">02 · O empreendimento</div><h2>Base econômica do BP, reexpressa a ${esc(k.bp.dataBase || '')}</h2>
+      <div class="grid">${card('VGV', mi(k.bp.vgv), 'P')}${card('Receitas', mi(k.bp.receitas), 'P')}${card('Resultado', mi(k.bp.resultado), 'P')}${card('Unidades', nf(k.bp.uh), 'P')}</div>
+      <table><tr><td>Margem resultado / receita</td><td class="num"><b>${pc(k.bp.margem)}</b></td></tr><tr><td>TIR do BP</td><td class="num"><b>${pc(k.bp.tirMensal)} a.m. / ${pc(k.bp.tirAnual)} a.a.</b></td></tr>
+        <tr><td>VPL comparável a ${pc(k.bp.taxaVpl, 0)} a.a.</td><td class="num"><b>${mi(k.bp.vpl)}</b></td></tr><tr><td>Prazo de venda do BP</td><td class="num"><b>${nf(k.bp.velocidade)} meses</b></td></tr></table>
+      <div class="note">Valores do estudo original de 2018, reexpressos pelo IPCA acumulado (fator ${nf(k.bp.fatorIpca, 4)}). Referência comparável, não valuation de mercado.</div></section>
+    <section class="page"><div class="eyebrow">03 · O modelo de renda</div><h2>Faixas progressivas sobre o capital aportado</h2>
+      <p>Do Caixa Distribuível Elegível, <b>${pc(s.pctCotistas, 0)}</b> são destinados aos cotistas e <b>${pc(s.pctF5, 0)}</b> à F5 ${tag('CT')}. A parte de cada cotista segue as faixas abaixo, sobre o capital que ele aportou (valores para uma quota):</p>
+      <table><tr><th>Faixa</th><th>Retorno acumulado do cotista</th><th class="num">Parte do cotista</th><th class="num">Múltiplo esperado</th></tr>${faixas}</table>
+      <div class="note">Piso da remuneração: ${esc(s.piso || '-')}. ${tag('CT')}</div></section>
+    <section class="page"><div class="eyebrow">04 · Subordinação</div><h2>O cotista recebe depois da quitação dos passivos</h2>
+      <p>A ordem de pagamento é: operação do hotel, quitação dos passivos do empreendimento e, somente então, as distribuições aos cotistas. ${tag('CT')}</p>
+      <div class="note ${pv.liberada ? '' : 'warn'}"><b>Situação atual:</b> ${pv.liberada ? 'passivos quitados; distribuições liberadas.' : 'distribuições bloqueadas até a quitação dos passivos.'} ${passivosTxt} ${tag('LEDGR')}</div>
+      <p>${pc(k.contrapartidaPct, 0)} de cada aporte de investidor destinam-se à contrapartida de lucros da Real Mouchão. ${tag('CT')}</p></section>
+    <section class="page"><div class="eyebrow">05 · Projeção de renda por quota</div><h2>Renda anual projetada ${tag('P')}</h2>
+      <table><tr><th>Ano</th><th class="num">Renda no ano</th><th class="num">Acumulado</th><th class="num">% da quota</th></tr>${renda}</table>
+      <h3>Sensibilidade a choques de fluxo ${tag('P')}</h3><table><tr><th>Cenário</th><th class="num">Renda (12 meses)</th><th class="num">Rendimento</th></tr>${choques}</table>
+      <div class="note warn">Não constitui garantia de rendimento. A renda depende da performance efetiva da operação, do fechamento dos contratos em discussão e da quitação dos passivos.</div></section>
+    <section class="page"><div class="eyebrow">06 · Cronograma e captação</div><h2>Andamento</h2>${crono}
+      <div class="grid">${card('Quotas registradas', nf(r.quotas), 'LEDGR')}${card('Capital aportado', brl(r.captado), 'LEDGR')}${card('Distribuído', brl(r.distribuido), 'LEDGR', 'Faixa ' + ROM[r.faixaVigente - 1])}</div>
+      <table><tr><th>Quota</th><th class="num">Valor</th><th class="num">Aportado</th><th class="num">Integralização</th></tr>${r.quotasDetalhe.map((q: any) => `<tr><td>nº ${q.numero}</td><td class="num">${brl(q.valor)}</td><td class="num">${brl(q.aportado)}</td><td class="num">${pc(q.integralizacao, 1)}</td></tr>`).join('')}</table>
+      <p style="font-size:8.5px;color:#667085">Fontes das premissas: ${esc(k.versao.arquivo || '-')} (SHA-256 ${esc((k.versao.sha256 || '').slice(0, 16))}…). Material confidencial; em caso de divergência, prevalecem os instrumentos assinados.</p></section>
     </body></html>`;
   }
 
