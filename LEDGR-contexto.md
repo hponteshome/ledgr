@@ -10386,3 +10386,6 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - Correcao das entradas: decisoes de 14:24 (Josi/Aldenir) restauradas; lote das 16:28-16:29 (13 rendimentos) desfeito para nova decisao.
 - Pendente (organizacao): levar as 8 devolucoes da Josi ao circuito 'Josi - protecao de bloqueios' (encerrar os creditos para as entradas voltarem a triagem); registrar o saldo informado de R$ 3.295.265,82 em 31/12/2025.
 
+
+- 06/10/2026 - Estorno bancario: decisao ESTORNO_BANCARIO em proj_extrato_decisoes com par_bank_transaction_id (gatilho: mesma empresa, tipo oposto, mesmo valor, ate 7 dias). 5 pares convertidos (PIX devolvido Aldenir R$ 7.990; desbloqueios judiciais R$ 12, R$ 4.073,35, R$ 240,03; estorno de tarifa R$ 139); circuito 'Estornos bancarios' extinto. Ficam fora da triagem, dos circuitos e dos saldos. CORRECAO da nota anterior: a restauracao das decisoes da Josi/Aldenir de 14:24 NAO foi executada (as 3 entradas ficaram sem decisao) e o lote dos rendimentos das 16:28-16:29 NAO foi desfeito (seguem NAO_PERTENCE).
+
