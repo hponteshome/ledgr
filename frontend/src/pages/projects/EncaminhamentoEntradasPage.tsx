@@ -7,6 +7,7 @@ import api from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { ModalProjeto, Secao, ErroModal, Campo, BotaoSec, BotaoPri, inputModal, erroApi } from './workspace/ModalProjeto';
 import DecisaoMovimentoModal from './DecisaoMovimentoModal';
+import { useOrdenacao, ThOrdenavel } from './ordenacao';
 
 const fmtBRL = (v: any) => Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const fmtData = (iso?: string | null) => { if (!iso) return '-'; const [a, m, d] = iso.slice(0, 10).split('-'); return `${d}/${m}/${a}`; };
@@ -16,6 +17,8 @@ const filtroSt: React.CSSProperties = { padding: '7px 10px', border: '0.5px soli
 
 interface Entrada { id: string; data: string; valor: string; lancamento: string; pagadorNome: string | null; pagadorDocumento: string | null; remetenteConhecido: boolean; anotacao: string | null; }
 interface Destino { operacaoId: string; nome: string; }
+// Ordenacao por coluna (06/10/2026): clicar no titulo ordena; clicar de novo inverte; vazios sempre no fim.
+const COLS_ENTRADA: Record<string, (e: Entrada) => any> = { data: (e) => e.data, valor: (e) => Number(e.valor), lancamento: (e) => e.lancamento, pagador: (e) => e.pagadorNome, anotacao: (e) => e.anotacao };
 
 export default function EncaminhamentoEntradasPage() {
   const { user } = useAuth() as any;
@@ -42,6 +45,7 @@ export default function EncaminhamentoEntradasPage() {
     return (dados?.entradas || []).filter((e) => (ano === 'TODOS' || e.data.startsWith(ano)) && (!soConhecidos || e.remetenteConhecido) &&
       (!t || [e.lancamento, e.pagadorNome, e.anotacao].some((x) => (x || '').toLowerCase().includes(t))));
   }, [dados, ano, soConhecidos, busca]);
+  const { ordenada, ord, alternar } = useOrdenacao(lista, COLS_ENTRADA, { col: 'data', dir: 'asc' });
   const total = lista.reduce((s, e) => s + Number(e.valor), 0);
   const semDestino = !!dados && dados.destinos.length === 0;
 
@@ -65,10 +69,10 @@ export default function EncaminhamentoEntradasPage() {
       </div>
       <div style={{ background: '#fff', border: '0.5px solid #E5E7EB', borderRadius: 10, overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead><tr><th style={thSt}>Data</th><th style={{ ...thSt, textAlign: 'right' }}>Valor</th><th style={thSt}>Lançamento</th><th style={thSt}>Pagador (extrato)</th><th style={thSt}>Anotação da planilha (apoio)</th>{master && !semDestino && <th style={thSt}></th>}</tr></thead>
+          <thead><tr><ThOrdenavel col="data" rotulo="Data" ord={ord} alternar={alternar} style={thSt} /><ThOrdenavel col="valor" rotulo="Valor" ord={ord} alternar={alternar} style={{ ...thSt, textAlign: 'right' }} /><ThOrdenavel col="lancamento" rotulo="Lançamento" ord={ord} alternar={alternar} style={thSt} /><ThOrdenavel col="pagador" rotulo="Pagador (extrato)" ord={ord} alternar={alternar} style={thSt} /><ThOrdenavel col="anotacao" rotulo="Anotação da planilha (apoio)" ord={ord} alternar={alternar} style={thSt} />{master && !semDestino && <th style={thSt}></th>}</tr></thead>
           <tbody>
             {lista.length === 0 && <tr><td colSpan={6} style={{ ...tdSt, textAlign: 'center', color: '#9CA3AF', padding: 24 }}>Nenhuma entrada para triagem.</td></tr>}
-            {lista.map((e) => (
+            {ordenada.map((e) => (
               <tr key={e.id}>
                 <td style={{ ...tdSt, whiteSpace: 'nowrap' }}>{fmtData(e.data)}</td>
                 <td style={{ ...tdSt, textAlign: 'right', whiteSpace: 'nowrap', fontWeight: 600 }}>{fmtBRL(e.valor)}</td>
