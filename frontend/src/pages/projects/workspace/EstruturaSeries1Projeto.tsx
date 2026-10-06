@@ -91,7 +91,45 @@ export default function EstruturaSeries1Projeto({ projetoId }: { projetoId: stri
           </tbody>
         </table>
       </div>
+      <DocumentosSemestrais projetoId={projetoId} quotas={d.quotas} />
       {registrando && <SaldoInformadoModal operacaoId={d.operacoes.series1} tipoInicial="PASSIVOS_EMPREENDIMENTO" onClose={() => setRegistrando(false)} onFeito={() => { setRegistrando(false); carregar(); }} />}
+    </div>
+  );
+}
+
+// Series#1 - Etapa C2 (06/10/2026): extrato por quota e demonstrativo da REAL, por semestre civil (01/01-30/06 e 01/07-31/12)
+function DocumentosSemestrais({ projetoId, quotas }: { projetoId: string; quotas: any[] }) {
+  const hoje = new Date();
+  const atual = `${hoje.getFullYear()}-${hoje.getMonth() < 6 ? 1 : 2}`;
+  const semestres: string[] = [];
+  for (let a = 2024; a <= hoje.getFullYear(); a++) for (const s of [1, 2]) { const c = `${a}-${s}`; if (!(a === 2024 && s === 1) && c <= atual) semestres.push(c); }
+  semestres.reverse();
+  const [sem, setSem] = useState(atual);
+  const [quota, setQuota] = useState<number>(quotas[0]?.numero ?? 1);
+  const [baixando, setBaixando] = useState('');
+  const rot = (c: string) => `${c.slice(5)}º semestre de ${c.slice(0, 4)}${c === atual ? ' (parcial)' : ''}`;
+  const baixar = async (tipo: 'extrato' | 'real') => {
+    setBaixando(tipo);
+    try {
+      const url = tipo === 'extrato' ? `/projects-relatorios/projetos/${projetoId}/extrato-quota/pdf?numero=${quota}&semestre=${sem}` : `/projects-relatorios/projetos/${projetoId}/demonstrativo-real/pdf?semestre=${sem}`;
+      const r = await api.get(url, { responseType: 'blob' });
+      const u = URL.createObjectURL(r.data); const a = document.createElement('a'); a.href = u;
+      a.download = tipo === 'extrato' ? `extrato-quota-${quota}-${sem}.pdf` : `demonstrativo-real-${sem}.pdf`;
+      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(u);
+    } catch { window.alert('Falha ao gerar o PDF.'); } finally { setBaixando(''); }
+  };
+  const sel: React.CSSProperties = { padding: '6px 8px', border: '0.5px solid #E5E7EB', borderRadius: 7, fontSize: 13, background: '#fff' };
+  const btn: React.CSSProperties = { padding: '7px 12px', background: '#0F2747', color: '#fff', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer' };
+  return (
+    <div style={{ ...cardSt, padding: 16 }}>
+      <div style={secTitle}>Documentos semestrais</div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
+        <select value={sem} onChange={(e) => setSem(e.target.value)} style={sel}>{semestres.map((c) => <option key={c} value={c}>{rot(c)}</option>)}</select>
+        <select value={quota} onChange={(e) => setQuota(Number(e.target.value))} style={sel}>{quotas.map((q: any) => <option key={q.numero} value={q.numero}>Quota nº {q.numero}</option>)}</select>
+        <button onClick={() => baixar('extrato')} disabled={!!baixando || !quotas.length} style={{ ...btn, opacity: baixando ? 0.6 : 1 }}>{baixando === 'extrato' ? 'Gerando...' : 'Extrato da quota (PDF)'}</button>
+        <button onClick={() => baixar('real')} disabled={!!baixando} style={{ ...btn, background: '#134E4A', opacity: baixando ? 0.6 : 1 }}>{baixando === 'real' ? 'Gerando...' : 'Demonstrativo da REAL (PDF)'}</button>
+      </div>
+      <div style={{ fontSize: 11, color: '#6B7280', marginTop: 8 }}>Cada emissão fica registrada no Histórico, com o código de conferência do documento.</div>
     </div>
   );
 }

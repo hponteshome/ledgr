@@ -336,8 +336,13 @@ export class RelatoriosController {
         for (const e of ev) { s += e.c; if (!concl && s >= metaC) concl = new Date(e.t).toISOString().slice(0, 10); }
         meta = { valor: fmt(metaC), saldo: fmt(s), percentual: metaC ? s / metaC : 0, falta: fmt(Math.max(0, metaC - s)), concluidaEm: concl };
       }
+      // Series#1 - Etapa C2 (06/10/2026): saldos de passivos e da divida da REAL (so o Master le premissas; demais recebem null)
+      const sb = opAtual ? await this.saldosSeries(tx, opAtual.projetoId, new Date().toISOString().slice(0, 10)) : null;
+      const saldos = sb ? { passivos: { semEstoque: sb.passivos.estoqueC === null, saldo: sb.passivos.saldoC === null ? null : fmt(sb.passivos.saldoC), pagamentos: fmt(sb.passivos.pagamentosC), liberada: sb.passivos.liberada },
+        divida: { valor: fmt(sb.dividaC), compensado: fmt(sb.compensadoC), saldo: fmt(sb.saldoDividaC) } } : null;
       return {
         meta,
+        saldos,
         totais: { vinculados: fmt(totVinc), aplicacoes: fmt(totApl), devolucoes: fmt(totDev), saldoContratual: fmt(totVinc - totDev), intercompanyEsperado: fmt(totVinc - totApl - totDev) },
         novosCreditos: { quantidade: novos.length, total: fmt(novos.reduce((s, c) => s + cent(c.valor), 0)) },
         aplicacoesPorNatureza: [...nat.values()].sort((a, b) => b.centavos - a.centavos).map(({ centavos, ...n }) => ({ ...n, total: fmt(centavos) })),
@@ -583,5 +588,180 @@ export class RelatoriosController {
         }),
       };
     });
+  }
+
+  // -- Series#1, Etapa C2 (06/10/2026): saldos ate uma data, extrato por quota e demonstrativo da REAL (semestres civis) --
+  private semestre(s?: string) {
+    const hoje = new Date().toISOString().slice(0, 10);
+    let ano: number; let sem: number;
+    if (s) { if (!/^\d{4}-[12]$/.test(s)) throw new BadRequestException('Semestre invalido (use AAAA-1 ou AAAA-2).'); ano = Number(s.slice(0, 4)); sem = Number(s[5]); }
+    else { ano = Number(hoje.slice(0, 4)); sem = Number(hoje.slice(5, 7)) <= 6 ? 1 : 2; }
+    const ini = `${ano}-${sem === 1 ? '01-01' : '07-01'}`; const fim = `${ano}-${sem === 1 ? '06-30' : '12-31'}`;
+    if (ini > hoje) throw new BadRequestException('Semestre ainda nao iniciado.');
+    return { codigo: `${ano}-${sem}`, rotulo: `${sem}º semestre de ${ano}`, ini, fim, parcial: fim >= hoje, ate: fim < hoje ? fim : hoje };
+  }
+
+  // Saldos da Series#1 ate a data (inclusive): aportes liquidos (Ancora), compensacao da divida da REAL e passivos do empreendimento.
+  // Retorna null quando a estrutura ou as premissas nao estao visiveis (RLS: so o Master le premissas).
+  private async saldosSeries(tx: any, projetoId: string, ate: string) {
+    const ops: { id: string; codigo: string }[] = await tx.projOperacao.findMany({ where: { projetoId, canceladoEm: null }, select: { id: true, codigo: true } });
+    const anc = ops.find((o) => o.codigo === 'ANCORA'); const s1 = ops.find((o) => o.codigo === 'SERIES1'); const real = ops.find((o) => o.codigo === 'REAL');
+    if (!s1 || !real) return null;
+    const versao = await tx.projPremissaVersao.findFirst({ where: { projetoId, canceladoEm: null }, orderBy: { numero: 'desc' }, select: { id: true } });
+    if (!versao) return null;
+    const prem: any[] = await tx.projPremissa.findMany({ where: { versaoId: versao.id, operacaoId: real.id, codigo: { in: ['DIVIDA_VALOR', 'CONTRAPARTIDA_PCT_APORTE', 'DIVIDA_DATA', 'DIVIDA_VALOR_EUR'] } } });
+    const g = (c: string) => prem.find((p) => p.codigo === c);
+    if (!g('DIVIDA_VALOR') || !g('CONTRAPARTIDA_PCT_APORTE')) return null;
+    const cent = (v: any) => Math.round(Number(v) * 100);
+    const ateD = new Date(ate + 'T00:00:00Z');
+    const eventos: { data: string; c: number }[] = [];
+    if (anc) {
+      const vincs: any[] = await tx.projCreditoVinculo.findMany({ where: { canceladoEm: null, situacao: 'VINCULADO', credito: { operacaoId: anc.id, canceladoEm: null, dataCredito: { lte: ateD } } }, select: { credito: { select: { dataCredito: true, valor: true } } } });
+      const devs: any[] = await tx.projAplicacao.findMany({ where: { operacaoId: anc.id, canceladoEm: null, natureza: { tipo: 'DEVOLUCAO' }, dataAplicacao: { lte: ateD } }, select: { dataAplicacao: true, valor: true } });
+      vincs.forEach((x) => eventos.push({ data: (x.credito.dataCredito as Date).toISOString().slice(0, 10), c: cent(x.credito.valor) }));
+      devs.forEach((x) => eventos.push({ data: (x.dataAplicacao as Date).toISOString().slice(0, 10), c: -cent(x.valor) }));
+      eventos.sort((a, b) => a.data.localeCompare(b.data) || b.c - a.c);
+    }
+    const pct = Number(g('CONTRAPARTIDA_PCT_APORTE').valorNum); const dividaC = cent(g('DIVIDA_VALOR').valorNum);
+    const aportesLiqC = eventos.reduce((s, e) => s + e.c, 0);
+    const compensadoC = Math.max(0, Math.round(aportesLiqC * pct));
+    const inf = await tx.projSaldoInformado.findFirst({ where: { operacaoId: s1.id, canceladoEm: null, tipo: 'PASSIVOS_EMPREENDIMENTO', dataReferencia: { lte: ateD } }, orderBy: [{ dataReferencia: 'desc' }, { criadoEm: 'desc' }], select: { dataReferencia: true, valor: true, fonte: true } });
+    const desde: Date | null = inf ? inf.dataReferencia : (g('DIVIDA_DATA')?.valorData ?? null);
+    const apls: any[] = await tx.projAplicacao.findMany({ where: { canceladoEm: null, operacaoId: { in: ops.map((o) => o.id) }, natureza: { pagaPassivo: true }, dataAplicacao: { lte: ateD, ...(desde ? { gt: desde } : {}) } }, select: { valor: true } });
+    const pagamentosC = apls.reduce((s, a) => s + cent(a.valor), 0);
+    const estoqueC = inf ? cent(inf.valor) : null;
+    return {
+      ops: { anc, s1, real }, eventos, pct, dividaC, dividaEur: g('DIVIDA_VALOR_EUR') ? Number(g('DIVIDA_VALOR_EUR').valorNum) : null,
+      dividaData: g('DIVIDA_DATA')?.valorData ? (g('DIVIDA_DATA').valorData as Date).toISOString().slice(0, 10) : null,
+      aportesLiqC, compensadoC, saldoDividaC: Math.max(0, dividaC - compensadoC),
+      passivos: { estoqueC, estoqueData: inf ? (inf.dataReferencia as Date).toISOString().slice(0, 10) : null, estoqueFonte: inf?.fonte ?? null, desde: desde ? desde.toISOString().slice(0, 10) : null,
+        pagamentosC, saldoC: estoqueC === null ? null : Math.max(0, estoqueC - pagamentosC), liberada: estoqueC !== null && estoqueC - pagamentosC <= 0 },
+    };
+  }
+
+  private montarExtratoQuota(userId: string, projetoId: string, numero: number, semestre?: string) {
+    return this.db.comoUsuario(userId, async (tx) => {
+      const S = this.semestre(semestre);
+      const base = await this.saldosSeries(tx, projetoId, S.ate);
+      if (!base) throw new BadRequestException('Estrutura da Series#1 nao carregada.');
+      const q = await tx.projQuota.findFirst({ where: { operacaoId: base.ops.s1!.id, numero, canceladoEm: null } });
+      if (!q) throw new NotFoundException('Quota nao encontrada.');
+      const sub = await tx.projContraparte.findFirst({ where: { id: q.subscritorId }, select: { nome: true } });
+      const daAncora = !!(q.operacaoOrigemId && base.ops.anc && q.operacaoOrigemId === base.ops.anc.id);
+      const ev = daAncora ? base.eventos : [];
+      const antes = ev.filter((e) => e.data < S.ini); const per = ev.filter((e) => e.data >= S.ini);
+      const iniC = antes.reduce((s, e) => s + e.c, 0); const fimC = iniC + per.reduce((s, e) => s + e.c, 0);
+      const apC = per.filter((e) => e.c > 0).reduce((s, e) => s + e.c, 0); const dvC = -per.filter((e) => e.c < 0).reduce((s, e) => s + e.c, 0);
+      const valorC = Math.round(Number(q.valor) * 100);
+      const dados = {
+        semestre: S, quota: { numero: q.numero, valor: Number(q.valor), subscritor: sub?.nome ?? '-', dataSubscricao: q.dataSubscricao.toISOString().slice(0, 10), dataIngresso: q.dataIngresso.toISOString().slice(0, 10), origem: daAncora ? 'Operação Âncora' : null },
+        saldoInicial: iniC / 100, aportes: apC / 100, devolucoes: dvC / 100, saldoFinal: fimC / 100, integralizacao: valorC ? Math.min(1, fimC / valorC) : 0,
+        movimentos: per.map((e) => ({ data: e.data, tipo: e.c > 0 ? 'Aporte' : 'Devolução', valor: Math.abs(e.c) / 100 })),
+        contrapartidaPeriodo: Math.round((apC - dvC) * base.pct) / 100, pctContrapartida: base.pct, faixaVigente: 1, distribuicoesPeriodo: 0, distribuicoesAcumuladas: 0,
+      };
+      const hash = crypto.createHash('sha256').update(JSON.stringify(dados)).digest('hex');
+      return { ...dados, hash, emitidoEm: new Date().toISOString() };
+    });
+  }
+
+  private montarDemonstrativoReal(userId: string, projetoId: string, semestre?: string) {
+    return this.db.comoUsuario(userId, async (tx) => {
+      const S = this.semestre(semestre);
+      const base = await this.saldosSeries(tx, projetoId, S.ate);
+      if (!base) throw new BadRequestException('Estrutura da Series#1 nao carregada.');
+      const antes = base.eventos.filter((e) => e.data < S.ini); const per = base.eventos.filter((e) => e.data >= S.ini);
+      const compIniC = Math.max(0, Math.round(antes.reduce((s, e) => s + e.c, 0) * base.pct));
+      const comps = per.map((e) => ({ data: e.data, tipo: e.c > 0 ? 'Aporte' : 'Devolução', base: e.c / 100, compensacao: Math.round(e.c * base.pct) / 100 }));
+      const compFimC = base.compensadoC;
+      const dados = {
+        semestre: S, divida: { valor: base.dividaC / 100, valorEur: base.dividaEur, dataConfissao: base.dividaData, pctContrapartida: base.pct },
+        compensacaoAteInicio: compIniC / 100, compensacoes: comps, compensacaoPeriodo: (compFimC - compIniC) / 100, compensacaoAcumulada: compFimC / 100,
+        saldoInicial: Math.max(0, base.dividaC - compIniC) / 100, saldoFinal: base.saldoDividaC / 100, quitada: base.saldoDividaC === 0,
+        aportesQueFaltam: Math.max(0, Math.ceil(base.saldoDividaC / base.pct)) / 100,
+        passivos: { estoque: base.passivos.estoqueC === null ? null : base.passivos.estoqueC / 100, estoqueData: base.passivos.estoqueData, desde: base.passivos.desde,
+          pagamentos: base.passivos.pagamentosC / 100, saldo: base.passivos.saldoC === null ? null : base.passivos.saldoC / 100, liberada: base.passivos.liberada },
+      };
+      const hash = crypto.createHash('sha256').update(JSON.stringify(dados)).digest('hex');
+      return { ...dados, hash, emitidoEm: new Date().toISOString() };
+    });
+  }
+
+  private async pdfSimples(res: Response, nome: string, titulo: string, corpo: string, k: any) {
+    const puppeteer = require('puppeteer');
+    const browser = await puppeteer.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+    try {
+      const page = await browser.newPage();
+      await page.setContent(`<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+        body{font-family:Arial,Helvetica,sans-serif;color:#152033;font-size:10.5px;margin:0}
+        h1{font-size:18px;color:#0f2747;margin:0 0 4px}.sub{color:#667085;margin-bottom:12px}
+        h3{font-size:12px;color:#0f2747;margin:14px 0 6px}
+        table{width:100%;border-collapse:collapse;margin:6px 0}th{background:#0f2747;color:#fff;text-align:left;padding:6px;font-size:9px}
+        td{border-bottom:1px solid #d8dee8;padding:6px}.num{text-align:right;white-space:nowrap}.tot td{font-weight:700;border-top:1.5px solid #0f2747}
+        .note{background:#f7f9fc;border-left:3px solid #1f5f99;padding:8px 12px;margin:10px 0;color:#344054}.warn{background:#fff8e8;border-left-color:#9a6a14}
+      </style></head><body><h1>${esc(titulo)}</h1><div class="sub">${esc(k.semestre.rotulo)} (${k.semestre.ini.split('-').reverse().join('/')} a ${k.semestre.fim.split('-').reverse().join('/')})${k.semestre.parcial ? ' · PARCIAL, apurado até ' + k.semestre.ate.split('-').reverse().join('/') : ''} · emitido em ${new Date(k.emitidoEm).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}</div>${corpo}</body></html>`, { waitUntil: 'load' });
+      const pdf = Buffer.from(await page.pdf({
+        format: 'A4', printBackground: true, margin: { top: '14mm', bottom: '16mm', left: '14mm', right: '14mm' }, displayHeaderFooter: true, headerTemplate: '<span></span>',
+        footerTemplate: `<div style="font-size:7px;width:100%;padding:0 14mm;color:#667085;display:flex;justify-content:space-between;font-family:Arial"><span>${esc(titulo)} · código de conferência (SHA-256): ${k.hash}</span><span><span class="pageNumber"></span>/<span class="totalPages"></span></span></div>`,
+      }));
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${nome}"`);
+      res.setHeader('Cache-Control', 'private, no-store');
+      res.end(pdf);
+    } finally { await browser.close(); }
+  }
+
+  @Get('projetos/:projetoId/extrato-quota')
+  @UseGuards(MasterOnlyGuard)
+  @ProjAcao('autenticado')
+  extratoQuota(@Param('projetoId') projetoId: string, @Query('numero') numero: string, @Query('semestre') semestre: string, @Req() req: any) {
+    if (!UUID_RE.test(projetoId)) throw new NotFoundException('Registro nao encontrado.');
+    return this.montarExtratoQuota(req.user.id, projetoId, Number(numero) || 1, semestre || undefined);
+  }
+
+  @Get('projetos/:projetoId/extrato-quota/pdf')
+  @UseGuards(MasterOnlyGuard)
+  @ProjAcao('autenticado')
+  async extratoQuotaPdf(@Param('projetoId') projetoId: string, @Query('numero') numero: string, @Query('semestre') semestre: string, @Req() req: any, @Res() res: Response) {
+    if (!UUID_RE.test(projetoId)) throw new NotFoundException('Registro nao encontrado.');
+    const k: any = await this.montarExtratoQuota(req.user.id, projetoId, Number(numero) || 1, semestre || undefined);
+    await this.db.comoUsuario(req.user.id, (tx) => tx.auditLog.create({ data: { actorId: req.user.id, action: 'PROJ_EXTRATO_QUOTA_EMITIDO', targetId: projetoId, after: { projetoId, quota: k.quota.numero, semestre: k.semestre.codigo, parcial: k.semestre.parcial, hash: k.hash } } }));
+    const q = k.quota;
+    const mov = k.movimentos.length ? k.movimentos.map((m: any) => `<tr><td>${m.data.split('-').reverse().join('/')}</td><td>${m.tipo}</td><td class="num">${m.tipo === 'Devolução' ? '-' : ''}${brl(m.valor)}</td></tr>`).join('') : '<tr><td colspan="3" style="color:#667085">Sem movimentos no período.</td></tr>';
+    const corpo = `<table><tr><td>Quota</td><td><b>nº ${q.numero}</b> · ${brl(q.valor)}</td></tr><tr><td>Subscritor</td><td><b>${esc(q.subscritor)}</b></td></tr>
+      <tr><td>Subscrição / ingresso na Series#1</td><td>${q.dataSubscricao.split('-').reverse().join('/')} / ${q.dataIngresso.split('-').reverse().join('/')}${q.origem ? ' · origem: ' + esc(q.origem) : ''}</td></tr></table>
+      <h3>Capital aportado</h3><table><tr><td>Saldo no início do período</td><td class="num">${brl(k.saldoInicial)}</td></tr><tr><td>(+) Aportes no período</td><td class="num">${brl(k.aportes)}</td></tr>
+      <tr><td>(−) Devoluções no período</td><td class="num">${brl(k.devolucoes)}</td></tr><tr class="tot"><td>(=) Saldo no fim do período</td><td class="num">${brl(k.saldoFinal)}</td></tr>
+      <tr><td>Integralização da quota</td><td class="num"><b>${(k.integralizacao * 100).toFixed(1).replace('.', ',')}%</b></td></tr></table>
+      <h3>Movimentos do período</h3><table><tr><th>Data</th><th>Tipo</th><th class="num">Valor</th></tr>${mov}</table>
+      <h3>Distribuições</h3><table><tr><td>Faixa vigente</td><td class="num">${['I', 'II', 'III', 'IV'][k.faixaVigente - 1]}</td></tr><tr><td>Distribuições no período</td><td class="num">${brl(k.distribuicoesPeriodo)}</td></tr><tr><td>Distribuições acumuladas</td><td class="num">${brl(k.distribuicoesAcumuladas)}</td></tr></table>
+      <div class="note">Dos aportes líquidos do período, ${(k.pctContrapartida * 100).toFixed(0)}% (${brl(k.contrapartidaPeriodo)}) destinam-se à contrapartida de lucros da Real Mouchão. As distribuições aos cotistas começam após a quitação dos passivos do empreendimento.</div>`;
+    return this.pdfSimples(res, `extrato-quota-${q.numero}-${k.semestre.codigo}.pdf`, `Extrato da Quota nº ${q.numero} · Series#1`, corpo, k);
+  }
+
+  @Get('projetos/:projetoId/demonstrativo-real')
+  @UseGuards(MasterOnlyGuard)
+  @ProjAcao('autenticado')
+  demonstrativoReal(@Param('projetoId') projetoId: string, @Query('semestre') semestre: string, @Req() req: any) {
+    if (!UUID_RE.test(projetoId)) throw new NotFoundException('Registro nao encontrado.');
+    return this.montarDemonstrativoReal(req.user.id, projetoId, semestre || undefined);
+  }
+
+  @Get('projetos/:projetoId/demonstrativo-real/pdf')
+  @UseGuards(MasterOnlyGuard)
+  @ProjAcao('autenticado')
+  async demonstrativoRealPdf(@Param('projetoId') projetoId: string, @Query('semestre') semestre: string, @Req() req: any, @Res() res: Response) {
+    if (!UUID_RE.test(projetoId)) throw new NotFoundException('Registro nao encontrado.');
+    const k: any = await this.montarDemonstrativoReal(req.user.id, projetoId, semestre || undefined);
+    await this.db.comoUsuario(req.user.id, (tx) => tx.auditLog.create({ data: { actorId: req.user.id, action: 'PROJ_DEMONSTRATIVO_REAL_EMITIDO', targetId: projetoId, after: { projetoId, semestre: k.semestre.codigo, parcial: k.semestre.parcial, hash: k.hash } } }));
+    const d = k.divida; const pv = k.passivos;
+    const comps = k.compensacoes.length ? k.compensacoes.map((c: any) => `<tr><td>${c.data.split('-').reverse().join('/')}</td><td>${c.tipo}</td><td class="num">${brl(c.base)}</td><td class="num">${brl(c.compensacao)}</td></tr>`).join('') : '<tr><td colspan="4" style="color:#667085">Sem aportes ou devoluções no período.</td></tr>';
+    const corpo = `<div class="note">Demonstrativo da participação econômica da Real Mouchão Lombo do Tejo, Sociedade Agropecuária, S.A. (cláusula 7.A.1 do termo de 31/10/2025). A participação de ${(d.pctContrapartida * 100).toFixed(0)}% de cada aporte é compensada com a dívida confessada em favor da F5 até a quitação; depois, passa a ser exigível.</div>
+      <h3>Dívida confessada em favor da F5</h3><table><tr><td>Valor fixado${d.dataConfissao ? ' (' + d.dataConfissao.split('-').reverse().join('/') + ')' : ''}</td><td class="num">${brl(d.valor)}${d.valorEur ? ' (€ ' + Number(d.valorEur).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) + ')' : ''}</td></tr>
+      <tr><td>(−) Compensação acumulada até o início do período</td><td class="num">${brl(k.compensacaoAteInicio)}</td></tr><tr><td>(=) Saldo no início do período</td><td class="num">${brl(k.saldoInicial)}</td></tr>
+      <tr><td>(−) Compensação no período</td><td class="num">${brl(k.compensacaoPeriodo)}</td></tr><tr class="tot"><td>(=) Saldo no fim do período</td><td class="num">${brl(k.saldoFinal)}</td></tr>
+      <tr><td>${k.quitada ? 'Dívida quitada' : 'Aportes que ainda faltam para a quitação'}</td><td class="num">${k.quitada ? '-' : brl(k.aportesQueFaltam)}</td></tr></table>
+      <h3>Compensações do período</h3><table><tr><th>Data</th><th>Movimento</th><th class="num">Base</th><th class="num">Compensação</th></tr>${comps}</table>
+      <h3>Passivos do empreendimento</h3><div class="note ${pv.liberada ? '' : 'warn'}">${pv.estoque === null ? 'Estoque de passivos ainda não informado; pagamentos de passivo desde ' + (pv.desde ? pv.desde.split('-').reverse().join('/') : '-') + ': ' + brl(pv.pagamentos) + '.' : 'Estoque informado em ' + pv.estoqueData.split('-').reverse().join('/') + ': ' + brl(pv.estoque) + '; pagamentos desde então: ' + brl(pv.pagamentos) + '; saldo estimado: ' + brl(pv.saldo) + '.'} ${pv.liberada ? 'Passivos quitados.' : 'As distribuições aos cotistas permanecem bloqueadas até a quitação.'}</div>`;
+    return this.pdfSimples(res, `demonstrativo-real-${k.semestre.codigo}.pdf`, 'Demonstrativo da Participação Econômica · Real Mouchão', corpo, k);
   }
 }

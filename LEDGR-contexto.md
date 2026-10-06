@@ -10357,3 +10357,11 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - Secoes: oferta (quota, % por quota pela regra = 1,0606%, citando 1,0582% do book; renda 12m 7,52%; distribuicoes), empreendimento (BP v2, 201 unidades), modelo de renda (80/20 e faixas sobre o capital com R$ por quota e multiplo esperado; piso pendente), subordinacao (saldo de passivos apurado no LEDGR; contrapartida de 10% a Real Mouchao), projecao 2027-2035 e choques, cronograma do book e captacao realizada (quotas, aportado, distribuido = 0, Faixa I).
 - Material para potenciais cotistas: sem nomes de subscritores. Etiquetas: Apurado no LEDGR / Premissa vN / Parametro contratual.
 - Pagina Series#1 e Divida: valor em euros em linha propria.
+
+## [PROJETOS] 06/10/2026 - Series#1, Etapa C2 (extrato por quota, demonstrativo da REAL, painel)
+
+- Semestres civis (decisao do Hpontes): 01/01-30/06 e 01/07-31/12; semestre em curso = PARCIAL (apurado ate hoje).
+- saldosSeries(tx, projetoId, ate): calculo unico ate uma data - aportes liquidos da Ancora (vinculados - devolucoes), compensacao de 10% (divida da REAL), passivos (ultimo estoque informado ate a data - aplicacoes com paga_passivo depois dele). Usado pelo painel, pelo extrato e pelo demonstrativo; null quando premissas nao visiveis (so Master).
+- GET projects-relatorios/projetos/:id/extrato-quota?numero=&semestre=AAAA-S (+ /pdf): saldo inicial, aportes e devolucoes do periodo, saldo final, integralizacao, faixa vigente, distribuicoes (0), contrapartida do periodo; com nome do subscritor (documento do cotista). AuditLog PROJ_EXTRATO_QUOTA_EMITIDO.
+- GET .../demonstrativo-real?semestre= (+ /pdf): divida, compensacao ate o inicio, compensacoes do periodo, saldos, aportes que faltam, passivos (clausula 7.A.1). AuditLog PROJ_DEMONSTRATIVO_REAL_EMITIDO.
+- Pagina Series#1 e Divida: bloco "Documentos semestrais" (semestre, quota, PDFs). Painel (VisaoExecutiva): cards Passivos do empreendimento e Divida da REAL (so Master).

@@ -14,6 +14,7 @@ interface Exec {
   documentos: { vigentes: number; porTipo: { nome: string; quantidade: number }[] };
   pendencias: Pend[];
   meta?: { valor: string; saldo: string; percentual: number; falta: string; concluidaEm: string | null } | null;
+  saldos?: { passivos: { semEstoque: boolean; saldo: string | null; pagamentos: string; liberada: boolean }; divida: { valor: string; compensado: string; saldo: string } } | null;
 }
 
 export default function VisaoExecutiva({ operacao, versao }: { operacao: Operacao | null; versao: number }) {
@@ -40,6 +41,8 @@ export default function VisaoExecutiva({ operacao, versao }: { operacao: Operaca
         {kpi('Total aplicado', fmtBRL(d.totais.aplicacoes), 'por conta da beneficiária')}
         {kpi('Novos créditos', fmtBRL(d.novosCreditos.total), `${d.novosCreditos.quantidade} após a data-base`)}
         {d.meta && kpi('Cota sênior', `${(d.meta.percentual * 100).toFixed(1)}% de ${fmtBRL(d.meta.valor)}`, d.meta.concluidaEm ? `meta atingida em ${d.meta.concluidaEm.split('-').reverse().join('/')}` : `faltam ${fmtBRL(d.meta.falta)}`, d.meta.concluidaEm ? '#166534' : '#1A4A3A')}
+        {d.saldos && kpi('Passivos do empreendimento', d.saldos.passivos.semEstoque ? 'sem estoque' : fmtBRL(d.saldos.passivos.saldo), d.saldos.passivos.liberada ? 'quitados: cotistas liberados' : `pagos desde a base: ${fmtBRL(d.saldos.passivos.pagamentos)}`, d.saldos.passivos.liberada ? '#166534' : '#B45309')}
+        {d.saldos && kpi('Dívida da REAL', fmtBRL(d.saldos.divida.saldo), `compensado ${fmtBRL(d.saldos.divida.compensado)} de ${fmtBRL(d.saldos.divida.valor)}`)}
       </div>
       <div style={{ ...cardSt, padding: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', marginBottom: 10 }}>
