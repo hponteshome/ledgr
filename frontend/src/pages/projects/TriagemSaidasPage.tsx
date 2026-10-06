@@ -9,6 +9,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { ModalProjeto, Secao, ErroModal, Campo, BotaoSec, BotaoPri, inputModal, erroApi } from './workspace/ModalProjeto';
 import DecisaoMovimentoModal from './DecisaoMovimentoModal';
 import { useOrdenacao, ThOrdenavel } from './ordenacao';
+import { useSelecao, BarraSelecao, LoteDecisaoModal, executarEmLote } from './lote';
 
 const fmtBRL = (v: any) => Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const fmtData = (iso?: string | null) => { if (!iso) return '-'; const [a, m, d] = iso.slice(0, 10).split('-'); return `${d}/${m}/${a}`; };
@@ -50,6 +51,12 @@ export default function TriagemSaidasPage() {
       (!t || [s.lancamento, s.favorecidoNome, s.anotacao].some((x) => (x || '').toLowerCase().includes(t))));
   }, [saidas, ano, busca]);
   const { ordenada, ord, alternar } = useOrdenacao(lista, COLS_SAIDA, { col: 'data', dir: 'asc' });
+  // Selecao para decisao em lote (06/10/2026): cada linha segue pela mesma rota da decisao individual.
+  const sel = useSelecao();
+  const [loteAplicar, setLoteAplicar] = useState(false);
+  const [loteDecidir, setLoteDecidir] = useState(false);
+  const selecionadas = saidas.filter((s) => sel.tem(s.id));
+  const fecharLote = () => { setLoteAplicar(false); setLoteDecidir(false); sel.limpar(); carregar(); };
   const total = lista.reduce((s, x) => s + Number(x.valor), 0);
   const semDestino = !!apoio && apoio.destinos.length === 0;
 
@@ -70,13 +77,19 @@ export default function TriagemSaidasPage() {
         <div style={{ flex: 1 }} />
         <div style={{ fontSize: 13, color: '#374151' }}>{lista.length} saída(s) · <b>{fmtBRL(total)}</b></div>
       </div>
+      {master && !semDestino && selecionadas.length > 0 && (
+        <BarraSelecao quantidade={selecionadas.length} total={selecionadas.reduce((s, x) => s + Number(x.valor), 0)} onLimpar={sel.limpar}>
+          <button onClick={() => setLoteAplicar(true)} disabled={!apoio} style={{ padding: '6px 12px', fontSize: 12, border: 'none', borderRadius: 7, background: '#1A4A3A', color: '#fff', cursor: 'pointer' }}>Aplicação em lote</button>
+          <button onClick={() => setLoteDecidir(true)} style={{ padding: '6px 12px', fontSize: 12, border: '0.5px solid #E5E7EB', borderRadius: 7, background: '#fff', color: '#374151', cursor: 'pointer' }}>Outra decisão em lote</button>
+        </BarraSelecao>
+      )}
       <div style={{ background: '#fff', border: '0.5px solid #E5E7EB', borderRadius: 10, overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead><tr><ThOrdenavel col="data" rotulo="Data" ord={ord} alternar={alternar} style={thSt} /><ThOrdenavel col="valor" rotulo="Valor" ord={ord} alternar={alternar} style={{ ...thSt, textAlign: 'right' }} /><ThOrdenavel col="lancamento" rotulo="Lançamento" ord={ord} alternar={alternar} style={thSt} /><ThOrdenavel col="favorecido" rotulo="Favorecido (extrato)" ord={ord} alternar={alternar} style={thSt} /><ThOrdenavel col="anotacao" rotulo="Anotação da planilha (apoio)" ord={ord} alternar={alternar} style={thSt} />{master && !semDestino && <th style={thSt}></th>}</tr></thead>
+          <thead><tr>{master && !semDestino && <th style={{ ...thSt, width: 28 }}><input type="checkbox" checked={sel.todos(ordenada)} onChange={() => sel.alternarTodos(ordenada)} title="Marcar ou desmarcar todas as linhas visíveis" /></th>}<ThOrdenavel col="data" rotulo="Data" ord={ord} alternar={alternar} style={thSt} /><ThOrdenavel col="valor" rotulo="Valor" ord={ord} alternar={alternar} style={{ ...thSt, textAlign: 'right' }} /><ThOrdenavel col="lancamento" rotulo="Lançamento" ord={ord} alternar={alternar} style={thSt} /><ThOrdenavel col="favorecido" rotulo="Favorecido (extrato)" ord={ord} alternar={alternar} style={thSt} /><ThOrdenavel col="anotacao" rotulo="Anotação da planilha (apoio)" ord={ord} alternar={alternar} style={thSt} />{master && !semDestino && <th style={thSt}></th>}</tr></thead>
           <tbody>
             {lista.length === 0 && <tr><td colSpan={6} style={{ ...tdSt, textAlign: 'center', color: '#9CA3AF', padding: 24 }}>Nenhuma saída para classificar.</td></tr>}
             {ordenada.map((s) => (
-              <tr key={s.id}>
+              <tr key={s.id} style={sel.tem(s.id) ? { background: '#F0FDFA' } : undefined}>{master && !semDestino && <td style={{ ...tdSt, width: 28 }}><input type="checkbox" checked={sel.tem(s.id)} onChange={() => sel.alternar(s.id)} /></td>}
                 <td style={{ ...tdSt, whiteSpace: 'nowrap' }}>{fmtData(s.data)}</td>
                 <td style={{ ...tdSt, textAlign: 'right', whiteSpace: 'nowrap', fontWeight: 600 }}>{fmtBRL(s.valor)}</td>
                 <td style={{ ...tdSt, fontSize: 12 }}>{s.lancamento}</td>
@@ -96,13 +109,15 @@ export default function TriagemSaidasPage() {
           </tbody>
         </table>
       </div>
-      {aplicando && apoio && <AplicarModal saida={aplicando} apoio={apoio} onClose={() => setAplicando(null)} onFeito={() => { setAplicando(null); carregar(); }} />}
+      {aplicando && apoio && <AplicarModal saidas={[aplicando]} apoio={apoio} onClose={() => setAplicando(null)} onFeito={() => { setAplicando(null); carregar(); }} />}
+      {loteAplicar && apoio && selecionadas.length > 0 && <AplicarModal saidas={selecionadas} apoio={apoio} onClose={fecharLote} onFeito={fecharLote} />}
+      {loteDecidir && selecionadas.length > 0 && <LoteDecisaoModal rotaBase="/projects-financeiro/saidas" itens={selecionadas} rotulos={rotulos} onClose={fecharLote} onFeito={fecharLote} />}
       {decidindo && <DecisaoMovimentoModal rota={`/projects-financeiro/saidas/${decidindo.id}/decidir`} mov={decidindo} rotulos={rotulos} onClose={() => setDecidindo(null)} onFeito={() => { setDecidindo(null); carregar(); }} />}
     </div>
   );
 }
 
-function AplicarModal({ saida, apoio, onClose, onFeito }: { saida: Saida; apoio: Apoio; onClose: () => void; onFeito: () => void }) {
+function AplicarModal({ saidas, apoio, onClose, onFeito }: { saidas: Saida[]; apoio: Apoio; onClose: () => void; onFeito: () => void }) {
   const [operacaoId, setOperacaoId] = useState(apoio.destinos[0]?.operacaoId || '');
   const [natureza, setNatureza] = useState('');
   const [beneficiarioId, setBeneficiarioId] = useState('');
@@ -111,6 +126,7 @@ function AplicarModal({ saida, apoio, onClose, onFeito }: { saida: Saida; apoio:
   const [motivo, setMotivo] = useState('');
   const [erro, setErro] = useState('');
   const [enviando, setEnviando] = useState(false);
+  const [progresso, setProgresso] = useState(0);
   const destino = apoio.destinos.find((d) => d.operacaoId === operacaoId);
   const devolucao = apoio.naturezas.find((n) => n.codigo === natureza)?.tipo === 'DEVOLUCAO';
   const valido = !!operacaoId && !!natureza && motivo.trim().length >= 10 && (!devolucao || !!beneficiarioId);
@@ -118,16 +134,17 @@ function AplicarModal({ saida, apoio, onClose, onFeito }: { saida: Saida; apoio:
     if (!valido) return;
     setErro(''); setEnviando(true);
     try {
-      await api.post(`/projects-financeiro/saidas/${saida.id}/aplicar`, { operacaoId, naturezaCodigo: natureza, beneficiarioId: beneficiarioId || undefined, creditoId: creditoId || undefined, descricao: descricao.trim(), motivo: motivo.trim() });
-      toast.success('Aplicação registrada.');
+      const r = await executarEmLote(saidas, (s) => api.post(`/projects-financeiro/saidas/${s.id}/aplicar`, { operacaoId, naturezaCodigo: natureza, beneficiarioId: beneficiarioId || undefined, creditoId: saidas.length === 1 ? creditoId || undefined : undefined, descricao: descricao.trim(), motivo: motivo.trim() }), setProgresso);
+      if (r.falhas.length) { if (r.ok) toast.success(`${r.ok} aplicação(ões) registrada(s).`); setErro(`${r.falhas.length} não registrada(s): ` + r.falhas.map((f) => `${fmtData(f.item.data)} ${fmtBRL(f.item.valor)} (${f.msg})`).join(' | ')); return; }
+      toast.success(saidas.length > 1 ? `${r.ok} aplicações registradas.` : 'Aplicação registrada.');
       onFeito();
     } catch (e: any) { setErro(erroApi(e, 'Falha ao registrar.')); } finally { setEnviando(false); }
   };
   return (
-    <ModalProjeto titulo="Registrar aplicação de recursos" subtitulo={`${fmtData(saida.data)} · ${fmtBRL(saida.valor)} · ${saida.lancamento}`} onClose={onClose}
-      rodape={<><BotaoSec onClick={onClose}>Cancelar</BotaoSec><BotaoPri onClick={enviar} ativo={valido && !enviando}>{enviando ? 'Aguarde...' : 'Registrar'}</BotaoPri></>}>
+    <ModalProjeto titulo="Registrar aplicação de recursos" subtitulo={saidas.length === 1 ? `${fmtData(saidas[0].data)} · ${fmtBRL(saidas[0].valor)} · ${saidas[0].lancamento}` : `${saidas.length} saídas selecionadas · ${fmtBRL(saidas.reduce((s, x) => s + Number(x.valor), 0))}`} onClose={onClose}
+      rodape={<><BotaoSec onClick={onClose}>Cancelar</BotaoSec><BotaoPri onClick={enviar} ativo={valido && !enviando}>{enviando ? (progresso && saidas.length > 1 ? `${progresso} de ${saidas.length}...` : 'Aguarde...') : (saidas.length > 1 ? `Registrar ${saidas.length}` : 'Registrar')}</BotaoPri></>}>
       <ErroModal msg={erro} />
-      {saida.anotacao && <Secao titulo="ANOTAÇÃO DA PLANILHA (SÓ APOIO)"><div style={{ fontSize: 12, color: '#374151', fontStyle: 'italic' }}>{saida.anotacao}</div></Secao>}
+      {saidas.length === 1 && saidas[0].anotacao && <Secao titulo="ANOTAÇÃO DA PLANILHA (SÓ APOIO)"><div style={{ fontSize: 12, color: '#374151', fontStyle: 'italic' }}>{saidas[0].anotacao}</div></Secao>}
       <Secao titulo="CLASSIFICAÇÃO">
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <Campo rotulo="Operação *">
@@ -153,12 +170,14 @@ function AplicarModal({ saida, apoio, onClose, onFeito }: { saida: Saida; apoio:
                 {destino.contrapartes.map((c) => <option key={c.id} value={c.id}>{c.nome} ({c.papeis})</option>)}
               </select>
             </Campo>
-            <Campo rotulo="Crédito devolvido (se for de um crédito específico)">
-              <select style={inputModal} value={creditoId} onChange={(e) => setCreditoId(e.target.value)}>
-                <option value="">Não vincular a um crédito</option>
-                {destino.creditos.map((c) => <option key={c.id} value={c.id}>{c.rotulo}</option>)}
-              </select>
-            </Campo>
+            {saidas.length === 1 && (
+              <Campo rotulo="Crédito devolvido (se for de um crédito específico)">
+                <select style={inputModal} value={creditoId} onChange={(e) => setCreditoId(e.target.value)}>
+                  <option value="">Não vincular a um crédito</option>
+                  {destino.creditos.map((c) => <option key={c.id} value={c.id}>{c.rotulo}</option>)}
+                </select>
+              </Campo>
+            )}
           </div>
           <div style={{ fontSize: 11, color: '#6B7280', marginTop: 8 }}>Se o intermediário (por exemplo, Antonio Vieira) ainda não participa da operação, cadastre-o antes em Participantes, com o papel Intermediário do Adquirente.</div>
         </Secao>

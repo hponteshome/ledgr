@@ -8,6 +8,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { ModalProjeto, Secao, ErroModal, Campo, BotaoSec, BotaoPri, inputModal, erroApi } from './workspace/ModalProjeto';
 import DecisaoMovimentoModal from './DecisaoMovimentoModal';
 import { useOrdenacao, ThOrdenavel } from './ordenacao';
+import { useSelecao, BarraSelecao, LoteDecisaoModal, executarEmLote } from './lote';
 
 const fmtBRL = (v: any) => Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const fmtData = (iso?: string | null) => { if (!iso) return '-'; const [a, m, d] = iso.slice(0, 10).split('-'); return `${d}/${m}/${a}`; };
@@ -46,6 +47,12 @@ export default function EncaminhamentoEntradasPage() {
       (!t || [e.lancamento, e.pagadorNome, e.anotacao].some((x) => (x || '').toLowerCase().includes(t))));
   }, [dados, ano, soConhecidos, busca]);
   const { ordenada, ord, alternar } = useOrdenacao(lista, COLS_ENTRADA, { col: 'data', dir: 'asc' });
+  // Selecao para decisao em lote (06/10/2026): cada linha segue pela mesma rota da decisao individual.
+  const sel = useSelecao();
+  const [loteEncaminhar, setLoteEncaminhar] = useState(false);
+  const [loteDecidir, setLoteDecidir] = useState(false);
+  const selecionadas = (dados?.entradas || []).filter((e) => sel.tem(e.id));
+  const fecharLote = () => { setLoteEncaminhar(false); setLoteDecidir(false); sel.limpar(); carregar(); };
   const total = lista.reduce((s, e) => s + Number(e.valor), 0);
   const semDestino = !!dados && dados.destinos.length === 0;
 
@@ -67,13 +74,19 @@ export default function EncaminhamentoEntradasPage() {
         <div style={{ flex: 1 }} />
         <div style={{ fontSize: 13, color: '#374151' }}>{lista.length} entrada(s) · <b>{fmtBRL(total)}</b></div>
       </div>
+      {master && !semDestino && selecionadas.length > 0 && (
+        <BarraSelecao quantidade={selecionadas.length} total={selecionadas.reduce((s, x) => s + Number(x.valor), 0)} onLimpar={sel.limpar}>
+          <button onClick={() => setLoteEncaminhar(true)} style={{ padding: '6px 12px', fontSize: 12, border: 'none', borderRadius: 7, background: '#1A4A3A', color: '#fff', cursor: 'pointer' }}>Encaminhar em lote</button>
+          <button onClick={() => setLoteDecidir(true)} style={{ padding: '6px 12px', fontSize: 12, border: '0.5px solid #E5E7EB', borderRadius: 7, background: '#fff', color: '#374151', cursor: 'pointer' }}>Outra decisão em lote</button>
+        </BarraSelecao>
+      )}
       <div style={{ background: '#fff', border: '0.5px solid #E5E7EB', borderRadius: 10, overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead><tr><ThOrdenavel col="data" rotulo="Data" ord={ord} alternar={alternar} style={thSt} /><ThOrdenavel col="valor" rotulo="Valor" ord={ord} alternar={alternar} style={{ ...thSt, textAlign: 'right' }} /><ThOrdenavel col="lancamento" rotulo="Lançamento" ord={ord} alternar={alternar} style={thSt} /><ThOrdenavel col="pagador" rotulo="Pagador (extrato)" ord={ord} alternar={alternar} style={thSt} /><ThOrdenavel col="anotacao" rotulo="Anotação da planilha (apoio)" ord={ord} alternar={alternar} style={thSt} />{master && !semDestino && <th style={thSt}></th>}</tr></thead>
+          <thead><tr>{master && !semDestino && <th style={{ ...thSt, width: 28 }}><input type="checkbox" checked={sel.todos(ordenada)} onChange={() => sel.alternarTodos(ordenada)} title="Marcar ou desmarcar todas as linhas visíveis" /></th>}<ThOrdenavel col="data" rotulo="Data" ord={ord} alternar={alternar} style={thSt} /><ThOrdenavel col="valor" rotulo="Valor" ord={ord} alternar={alternar} style={{ ...thSt, textAlign: 'right' }} /><ThOrdenavel col="lancamento" rotulo="Lançamento" ord={ord} alternar={alternar} style={thSt} /><ThOrdenavel col="pagador" rotulo="Pagador (extrato)" ord={ord} alternar={alternar} style={thSt} /><ThOrdenavel col="anotacao" rotulo="Anotação da planilha (apoio)" ord={ord} alternar={alternar} style={thSt} />{master && !semDestino && <th style={thSt}></th>}</tr></thead>
           <tbody>
             {lista.length === 0 && <tr><td colSpan={6} style={{ ...tdSt, textAlign: 'center', color: '#9CA3AF', padding: 24 }}>Nenhuma entrada para triagem.</td></tr>}
             {ordenada.map((e) => (
-              <tr key={e.id}>
+              <tr key={e.id} style={sel.tem(e.id) ? { background: '#F0FDFA' } : undefined}>{master && !semDestino && <td style={{ ...tdSt, width: 28 }}><input type="checkbox" checked={sel.tem(e.id)} onChange={() => sel.alternar(e.id)} /></td>}
                 <td style={{ ...tdSt, whiteSpace: 'nowrap' }}>{fmtData(e.data)}</td>
                 <td style={{ ...tdSt, textAlign: 'right', whiteSpace: 'nowrap', fontWeight: 600 }}>{fmtBRL(e.valor)}</td>
                 <td style={{ ...tdSt, fontSize: 12 }}>{e.lancamento}</td>
@@ -94,7 +107,9 @@ export default function EncaminhamentoEntradasPage() {
           </tbody>
         </table>
       </div>
-      {encaminhando && dados && <EncaminharModal entrada={encaminhando} destinos={dados.destinos} onClose={() => setEncaminhando(null)} onFeito={() => { setEncaminhando(null); carregar(); }} />}
+      {encaminhando && dados && <EncaminharModal entradas={[encaminhando]} destinos={dados.destinos} onClose={() => setEncaminhando(null)} onFeito={() => { setEncaminhando(null); carregar(); }} />}
+      {loteEncaminhar && dados && selecionadas.length > 0 && <EncaminharModal entradas={selecionadas} destinos={dados.destinos} onClose={fecharLote} onFeito={fecharLote} />}
+      {loteDecidir && selecionadas.length > 0 && <LoteDecisaoModal rotaBase="/projects-financeiro/entradas" itens={selecionadas} rotulos={rotulos} onClose={fecharLote} onFeito={fecharLote} />}
       {decidindo && (
         <DecisaoMovimentoModal rota={`/projects-financeiro/entradas/${decidindo.id}/decidir`} mov={decidindo} rotulos={rotulos}
           onClose={() => setDecidindo(null)} onFeito={() => { setDecidindo(null); carregar(); }} />
@@ -103,26 +118,28 @@ export default function EncaminhamentoEntradasPage() {
   );
 }
 
-function EncaminharModal({ entrada, destinos, onClose, onFeito }: { entrada: Entrada; destinos: Destino[]; onClose: () => void; onFeito: () => void }) {
+function EncaminharModal({ entradas, destinos, onClose, onFeito }: { entradas: Entrada[]; destinos: Destino[]; onClose: () => void; onFeito: () => void }) {
   const [operacaoId, setOperacaoId] = useState(destinos[0]?.operacaoId || '');
   const [motivo, setMotivo] = useState('');
   const [erro, setErro] = useState('');
   const [enviando, setEnviando] = useState(false);
+  const [progresso, setProgresso] = useState(0);
   const valido = !!operacaoId && motivo.trim().length >= 10;
   const enviar = async () => {
     if (!valido) return;
     setErro(''); setEnviando(true);
     try {
-      await api.post(`/projects-financeiro/entradas/${entrada.id}/encaminhar`, { operacaoId, motivo: motivo.trim() });
-      toast.success('Entrada encaminhada ao projeto.');
+      const r = await executarEmLote(entradas, (x) => api.post(`/projects-financeiro/entradas/${x.id}/encaminhar`, { operacaoId, motivo: motivo.trim() }), setProgresso);
+      if (r.falhas.length) { if (r.ok) toast.success(`${r.ok} entrada(s) encaminhada(s).`); setErro(`${r.falhas.length} não encaminhada(s): ` + r.falhas.map((f) => `${fmtData(f.item.data)} ${fmtBRL(f.item.valor)} (${f.msg})`).join(' | ')); return; }
+      toast.success(entradas.length > 1 ? `${r.ok} entradas encaminhadas ao projeto.` : 'Entrada encaminhada ao projeto.');
       onFeito();
     } catch (e: any) { setErro(erroApi(e, 'Falha ao encaminhar.')); } finally { setEnviando(false); }
   };
   return (
-    <ModalProjeto titulo="Encaminhar ao projeto" subtitulo={`${fmtData(entrada.data)} · ${fmtBRL(entrada.valor)} · ${entrada.pagadorNome || 'pagador não identificado no extrato'}`} onClose={onClose}
-      rodape={<><BotaoSec onClick={onClose}>Cancelar</BotaoSec><BotaoPri onClick={enviar} ativo={valido && !enviando}>{enviando ? 'Aguarde...' : 'Encaminhar'}</BotaoPri></>}>
+    <ModalProjeto titulo="Encaminhar ao projeto" subtitulo={entradas.length === 1 ? `${fmtData(entradas[0].data)} · ${fmtBRL(entradas[0].valor)} · ${entradas[0].pagadorNome || 'pagador não identificado no extrato'}` : `${entradas.length} entradas selecionadas · ${fmtBRL(entradas.reduce((s, x) => s + Number(x.valor), 0))}`} onClose={onClose}
+      rodape={<><BotaoSec onClick={onClose}>Cancelar</BotaoSec><BotaoPri onClick={enviar} ativo={valido && !enviando}>{enviando ? (progresso && entradas.length > 1 ? `${progresso} de ${entradas.length}...` : 'Aguarde...') : (entradas.length > 1 ? `Encaminhar ${entradas.length}` : 'Encaminhar')}</BotaoPri></>}>
       <ErroModal msg={erro} />
-      {entrada.anotacao && <Secao titulo="ANOTAÇÃO DA PLANILHA (SÓ APOIO)"><div style={{ fontSize: 12, color: '#374151', fontStyle: 'italic' }}>{entrada.anotacao}</div></Secao>}
+      {entradas.length === 1 && entradas[0].anotacao && <Secao titulo="ANOTAÇÃO DA PLANILHA (SÓ APOIO)"><div style={{ fontSize: 12, color: '#374151', fontStyle: 'italic' }}>{entradas[0].anotacao}</div></Secao>}
       <Secao><div style={{ fontSize: 12, color: '#374151' }}>O projeto recebe esta entrada como crédito, já comprovado por ela. A decisão sobre a Conta Individual do Adquirente fica com o projeto.</div></Secao>
       <Secao titulo="OPERAÇÃO DE DESTINO *">
         <Campo rotulo="Operação"><select style={inputModal} value={operacaoId} onChange={(e) => setOperacaoId(e.target.value)}>{destinos.map((d) => <option key={d.operacaoId} value={d.operacaoId}>{d.nome}</option>)}</select></Campo>
