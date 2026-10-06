@@ -10365,3 +10365,9 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - GET projects-relatorios/projetos/:id/extrato-quota?numero=&semestre=AAAA-S (+ /pdf): saldo inicial, aportes e devolucoes do periodo, saldo final, integralizacao, faixa vigente, distribuicoes (0), contrapartida do periodo; com nome do subscritor (documento do cotista). AuditLog PROJ_EXTRATO_QUOTA_EMITIDO.
 - GET .../demonstrativo-real?semestre= (+ /pdf): divida, compensacao ate o inicio, compensacoes do periodo, saldos, aportes que faltam, passivos (clausula 7.A.1). AuditLog PROJ_DEMONSTRATIVO_REAL_EMITIDO.
 - Pagina Series#1 e Divida: bloco "Documentos semestrais" (semestre, quota, PDFs). Painel (VisaoExecutiva): cards Passivos do empreendimento e Divida da REAL (so Master).
+
+## [PROJETOS] 06/10/2026 - Triagem em lote das saidas da SUNSYS
+
+- Classificacao pelas categorias da planilha (texto antes da "|" nas anotacoes do extrato). Decisoes do Hpontes: impostos, trabalhistas, reembolsos e honorarios do periodo anterior pagam passivo; manutencao, folha e contabilidade CORRENTES = Manutencao da Operacao (nao paga passivo; opcao 1); estornos = transferencia interna no circuito "Estornos bancarios".
+- Lote "triagem-lote-20261006" (scripts/projetos/triagem-lote-sunsys.sql): 427 aplicacoes (A impostos R$ 1.677.946,30; B trabalhistas R$ 1.308.152,99; C reembolsos R$ 140.800,00; D honorarios R$ 327.404,66; E manutencao R$ 227.122,75; F folha e contabilidade correntes R$ 580.652,41) + 5 decisoes (G estornos R$ 12.454,38); transacao unica; motivo cita a categoria; um registro em audit_logs por movimento com depois.lote.
+- Ficam para a tela (grupo H, 29 saidas, R$ 1.238.399,56): Devolucao AV, Josi, PROTEGER A CONTA, imposto pela conta da mae, imposto Solsys pipa ocean view, michelly / Michelly Charlene Moraes, ???, Rosielli.
