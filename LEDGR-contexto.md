@@ -10389,3 +10389,10 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 
 - 06/10/2026 - Estorno bancario: decisao ESTORNO_BANCARIO em proj_extrato_decisoes com par_bank_transaction_id (gatilho: mesma empresa, tipo oposto, mesmo valor, ate 7 dias). 5 pares convertidos (PIX devolvido Aldenir R$ 7.990; desbloqueios judiciais R$ 12, R$ 4.073,35, R$ 240,03; estorno de tarifa R$ 139); circuito 'Estornos bancarios' extinto. Ficam fora da triagem, dos circuitos e dos saldos. CORRECAO da nota anterior: a restauracao das decisoes da Josi/Aldenir de 14:24 NAO foi executada (as 3 entradas ficaram sem decisao) e o lote dos rendimentos das 16:28-16:29 NAO foi desfeito (seguem NAO_PERTENCE).
 
+
+## [PROJETOS] 06/10/2026 - Custodia Josi, Etapa A
+
+- Modelo: contas de Josivani e Aldenir = custodia (protecao contra bloqueio). Lancamentos ENVIO e DEVOLUCAO (extrato, ja validados), PAGAMENTO_DIRETO e RECEBIMENTO_TERCEIRO (manuais, com comprovante, REGISTRADO -> VALIDADO/RECUSADO pelo Master); alocacoes origem (envio/recebimento) -> destino (devolucao/pagamento direto), soma limitada no banco. Prazo: 30 dias. Registro: Financeiro, Josi ou Master; validacao: Master (Josi nao valida a propria custodia - segregacao). Josi sera usuaria frequente (perfil operacional + segregacao, Etapa C).
+- Tabelas proj_custodias, proj_custodia_lancamentos, proj_custodia_alocacoes (imutaveis, sem DELETE, RLS so Master por ora); decisao CUSTODIA em proj_extrato_decisoes. Creditos historicos ligam-se ao extrato pela tabela de provas (nao por coluna do credito).
+- Lote: 11 envios R$ 555.334,00 e 34 devolucoes R$ 1.139.611,04 (26 do extrato + 8 creditos desvinculados, encerrados); devolvido a mais R$ 584.277,04 (a justificar). Convertidas decisoes e a aplicacao IMPOSTOS de R$ 203.594 (a justificar como pagamento direto). Pendentes pela tela: pagamentos a conta da Josi classificados como aplicacao (2 acordos trabalhistas R$ 123.750 e 3 menores).
+
