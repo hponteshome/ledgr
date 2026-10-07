@@ -17,47 +17,71 @@ export default function AplicacoesProjeto({ operacao, master }: { operacao: Oper
   const [lista, setLista] = useState<Aplicacao[]>([]);
   const [erro, setErro] = useState('');
   const [encerrando, setEncerrando] = useState<Aplicacao | null>(null);
+  const [de, setDe] = useState('');
+  const [ate, setAte] = useState('');
+  const [natSel, setNatSel] = useState('');
   const carregar = useCallback(() => {
     if (!operacao) return;
     api.get(`/projects/operacoes/${operacao.id}/aplicacoes`).then((r) => setLista(r.data || [])).catch((e) => setErro(erroApi(e, 'Falha ao carregar as aplicações.')));
   }, [operacao]);
   useEffect(() => { carregar(); }, [carregar]);
+  // Periodo (07/10/2026): totais e lista ate uma data (ex.: 31/12/2025); clique na natureza filtra a lista.
+  const noPeriodo = useMemo(() => lista.filter((a) => { const d = String(a.dataAplicacao).slice(0, 10); return (!de || d >= de) && (!ate || d <= ate); }), [lista, de, ate]);
   const porNatureza = useMemo(() => {
-    const m = new Map<string, { nome: string; tipo: string; total: number; n: number }>();
-    lista.forEach((a) => { const e = m.get(a.natureza.codigo) || { nome: a.natureza.nome, tipo: a.natureza.tipo, total: 0, n: 0 }; e.total += Number(a.valor); e.n += 1; m.set(a.natureza.codigo, e); });
+    const m = new Map<string, { codigo: string; nome: string; tipo: string; total: number; n: number }>();
+    noPeriodo.forEach((a) => { const e = m.get(a.natureza.codigo) || { codigo: a.natureza.codigo, nome: a.natureza.nome, tipo: a.natureza.tipo, total: 0, n: 0 }; e.total += Number(a.valor); e.n += 1; m.set(a.natureza.codigo, e); });
     return [...m.values()].sort((a, b) => b.total - a.total);
-  }, [lista]);
-  const total = lista.reduce((s, a) => s + Number(a.valor), 0);
+  }, [noPeriodo]);
+  const total = noPeriodo.reduce((s, a) => s + Number(a.valor), 0);
+  const visiveis = natSel ? noPeriodo.filter((a) => a.natureza.codigo === natSel) : noPeriodo;
+  const totalVis = visiveis.reduce((s, a) => s + Number(a.valor), 0);
+  const br = (d: string) => d.split('-').reverse().join('/');
+  const periodo = de && ate ? `de ${br(de)} a ${br(ate)}` : ate ? `até ${br(ate)}` : de ? `desde ${br(de)}` : 'geral';
+  const anoAtual = String(new Date().getFullYear());
   if (!operacao) return <div style={{ color: '#6B7280' }}>Nenhuma operação disponível para o seu acesso.</div>;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div>
         <div style={tituloSt}>Aplicações de recursos</div>
-        <div style={subtituloSt}>{operacao.nome} · saídas classificadas pelo Financeiro no LEDGR, comprovadas no extrato · total {fmtBRL(total)}</div>
+        <div style={subtituloSt}>{operacao.nome} · saídas classificadas pelo Financeiro no LEDGR, comprovadas no extrato · total {periodo}: {fmtBRL(total)}</div>
       </div>
       {erro && <div style={erroSt}>⚠ {erro}</div>}
-      {porNatureza.length > 0 && (
-        <div style={{ ...cardSt, padding: 16 }}>
-          <div style={secTitle}>Por natureza</div>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <tbody>
-              {porNatureza.map((n) => (
-                <tr key={n.nome}>
-                  <td style={tdSt}>{n.nome}{n.tipo === 'DEVOLUCAO' && <span style={{ marginLeft: 8, fontSize: 11, color: '#92400E', background: '#FEF3C7', borderRadius: 999, padding: '1px 7px' }}>reduz a Conta Individual</span>}</td>
-                  <td style={{ ...tdSt, textAlign: 'right' }}>{n.n}</td>
-                  <td style={{ ...tdSt, textAlign: 'right', fontWeight: 600 }}>{fmtBRL(n.total)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <div style={{ ...cardSt, padding: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+          <div style={{ ...secTitle, marginBottom: 0 }}>Por natureza · {periodo}</div>
+          <div style={{ flex: 1 }} />
+          <span style={{ fontSize: 12, color: '#6B7280' }}>De</span>
+          <input type="date" value={de} onChange={(e) => setDe(e.target.value)} style={{ ...inputModal, width: 150, padding: '5px 8px' }} />
+          <span style={{ fontSize: 12, color: '#6B7280' }}>Até</span>
+          <input type="date" value={ate} onChange={(e) => setAte(e.target.value)} style={{ ...inputModal, width: 150, padding: '5px 8px' }} />
+          {([['Até 31/12/2025', '', '2025-12-31'], ['Ano atual', anoAtual + '-01-01', ''], ['Tudo', '', '']] as [string, string, string][]).map(([rot, d, a]) => (
+            <button key={rot} onClick={() => { setDe(d); setAte(a); }} style={{ padding: '4px 10px', fontSize: 12, borderRadius: 7, cursor: 'pointer', border: '0.5px solid #E5E7EB', background: de === d && ate === a ? '#134E4A' : '#fff', color: de === d && ate === a ? '#fff' : '#134E4A' }}>{rot}</button>
+          ))}
         </div>
-      )}
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <tbody>
+            {porNatureza.length === 0 && <tr><td colSpan={3} style={{ ...tdSt, textAlign: 'center', color: '#9CA3AF' }}>Nenhuma aplicação no período.</td></tr>}
+            {porNatureza.map((n) => (
+              <tr key={n.codigo} onClick={() => setNatSel(natSel === n.codigo ? '' : n.codigo)} title="Clique para filtrar a lista por esta natureza" style={{ cursor: 'pointer', background: natSel === n.codigo ? '#E6F4F1' : undefined }}>
+                <td style={{ ...tdSt, fontWeight: natSel === n.codigo ? 700 : 400 }}>{natSel === n.codigo ? '▶ ' : ''}{n.nome}</td>
+                <td style={{ ...tdSt, textAlign: 'right' }}>{n.n}</td>
+                <td style={{ ...tdSt, textAlign: 'right', fontWeight: 600 }}>{fmtBRL(n.total)}</td>
+              </tr>
+            ))}
+            <tr style={{ borderTop: '1.5px solid #134E4A' }}>
+              <td style={{ ...tdSt, fontWeight: 700 }}>Total {periodo}</td>
+              <td style={{ ...tdSt, textAlign: 'right', fontWeight: 700 }}>{noPeriodo.length}</td>
+              <td style={{ ...tdSt, textAlign: 'right', fontWeight: 700 }}>{fmtBRL(total)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
       <div style={{ ...cardSt, overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead><tr><th style={thSt}>Data</th><th style={thSt}>Natureza</th><th style={{ ...thSt, textAlign: 'right' }}>Valor</th><th style={thSt}>Descrição e motivo</th><th style={thSt}>Devolvido a / crédito</th><th style={thSt}>Lançamento do extrato</th>{master && <th style={thSt}></th>}</tr></thead>
           <tbody>
             {lista.length === 0 && <tr><td colSpan={7} style={{ ...tdSt, textAlign: 'center', color: '#9CA3AF', padding: 24 }}>Nenhuma aplicação classificada ainda. A classificação é feita no LEDGR, em Projetos → Classificar saídas.</td></tr>}
-            {lista.map((a) => (
+            {visiveis.map((a) => (
               <tr key={a.id}>
                 <td style={{ ...tdSt, whiteSpace: 'nowrap' }}>{fmtData(a.dataAplicacao)}</td>
                 <td style={tdSt}>{a.natureza.nome}</td>
@@ -69,6 +93,7 @@ export default function AplicacoesProjeto({ operacao, master }: { operacao: Oper
               </tr>
             ))}
           </tbody>
+<tfoot><tr><td colSpan={2} style={{ ...tdSt, fontWeight: 700 }}>{visiveis.length} aplicação(ões){natSel ? ' · ' + (porNatureza.find((n) => n.codigo === natSel)?.nome || '') : ''} · {periodo}</td><td style={{ ...tdSt, textAlign: 'right', fontWeight: 700 }}>{fmtBRL(totalVis)}</td><td colSpan={master ? 4 : 3} style={tdSt}></td></tr></tfoot>
         </table>
       </div>
       {encerrando && <EncerrarModal operacaoId={operacao.id} ap={encerrando} onClose={() => setEncerrando(null)} onFeito={() => { setEncerrando(null); carregar(); }} />}
