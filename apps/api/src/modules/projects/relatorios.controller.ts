@@ -1034,4 +1034,108 @@ export class RelatoriosController {
       } catch (e) { if (e instanceof BadRequestException) throw e; this.erroCustodia(e); }
     });
   }
+
+  // -- Fontes e usos pelo PEPS (07/10/2026) - so o Master --------------------------------------------------------------
+  // Simula a conta da recebedora financeira (SUNSYS) inteira, ate a data "ate": cada entrada entra numa fila com a sua
+  // origem e cada saida consome as entradas mais antigas (PEPS). Estornos bancarios ficam fora; entradas do dia antes
+  // das saidas do dia; saida sem saldo na fila = origem nao identificada. Usos reportados dentro de [de, ate]. Nada e gravado.
+  @Get('projetos/:projetoId/fontes-usos')
+  @UseGuards(MasterOnlyGuard)
+  @ProjAcao('autenticado')
+  fontesUsos(@Param('projetoId') projetoId: string, @Query('de') deQ: string, @Query('ate') ateQ: string, @Req() req: any) {
+    if (!UUID_RE.test(projetoId)) throw new NotFoundException('Registro nao encontrado.');
+    const dRe = /^\d{4}-\d{2}-\d{2}$/;
+    const de = deQ && dRe.test(deQ) ? deQ : null;
+    const ate = ateQ && dRe.test(ateQ) ? ateQ : new Date().toISOString().slice(0, 10);
+    return this.db.comoUsuario(req.user.id, async (tx: any) => {
+      const base: any[] = await tx.$queryRaw`SELECT o.id AS op, pp.company_id AS emp FROM proj_operacoes o
+        JOIN proj_participacoes pp ON pp.operacao_id = o.id AND pp.cancelado_em IS NULL
+        JOIN proj_papeis pa ON pa.id = pp.papel_id AND pa.codigo = 'RECEBEDORA_FINANCEIRA'
+        WHERE o.projeto_id = ${projetoId}::uuid AND o.codigo = 'ANCORA' LIMIT 1`;
+      if (!base.length) throw new NotFoundException('Operacao Ancora ou recebedora financeira nao encontrada.');
+      const op = base[0].op as string; const emp = base[0].emp as string;
+      const txs: any[] = await tx.$queryRaw`SELECT id, type::text AS tipo, transaction_date::date AS data, amount, balance, description, counterparty_name
+        FROM bank_transactions WHERE company_id = ${emp}::uuid AND transaction_date::date <= ${ate}::date
+        ORDER BY transaction_date, CASE WHEN type::text = 'CREDIT' THEN 0 ELSE 1 END, created_at, id`;
+      if (!txs.length) throw new BadRequestException('Nenhum lancamento do extrato visivel ate a data informada.');
+      const estRows: any[] = await tx.$queryRaw`SELECT bank_transaction_id AS id FROM proj_extrato_decisoes WHERE decisao = 'ESTORNO_BANCARIO' AND cancelado_em IS NULL`;
+      const credRows: any[] = await tx.$queryRaw`SELECT p.bank_transaction_id AS id, c.numero_ordem AS numero, v.situacao FROM proj_credito_provas p
+        JOIN proj_creditos c ON c.id = p.credito_id AND c.cancelado_em IS NULL AND c.operacao_id = ${op}::uuid
+        LEFT JOIN proj_credito_vinculos v ON v.credito_id = c.id AND v.cancelado_em IS NULL WHERE p.cancelado_em IS NULL`;
+      const custRows: any[] = await tx.$queryRaw`SELECT l.bank_transaction_id AS id, l.tipo FROM proj_custodia_lancamentos l
+        JOIN proj_custodias cu ON cu.id = l.custodia_id AND cu.operacao_id = ${op}::uuid WHERE l.cancelado_em IS NULL AND l.bank_transaction_id IS NOT NULL`;
+      const aplRows: any[] = await tx.$queryRaw`SELECT a.bank_transaction_id AS id, n.nome AS natureza, a.descricao FROM proj_aplicacoes a
+        JOIN proj_naturezas_aplicacao n ON n.id = a.natureza_id WHERE a.operacao_id = ${op}::uuid AND a.cancelado_em IS NULL`;
+      const est = new Set(estRows.map((r) => r.id));
+      const cred = new Map(credRows.map((r) => [r.id, r]));
+      const cust = new Map(custRows.map((r) => [r.id, r.tipo]));
+      const apl = new Map(aplRows.map((r) => [r.id, r]));
+      const NOMES: Record<string, string> = {
+        SALDO_ANTERIOR: 'Saldo anterior ao extrato', APORTE_ANCORA: 'Aportes do Cliente Âncora', DEVOLUCAO_CUSTODIA: 'Devoluções da custódia',
+        CREDITO_DESVINCULADO: 'Créditos desvinculados', OUTRA_ENTRADA: 'Outras entradas da conta', NAO_IDENTIFICADA: 'Origem não identificada' };
+      const ORDEM = ['SALDO_ANTERIOR', 'APORTE_ANCORA', 'DEVOLUCAO_CUSTODIA', 'CREDITO_DESVINCULADO', 'OUTRA_ENTRADA', 'NAO_IDENTIFICADA'];
+      const ENVIO = 'Envios à custódia'; const OUTRA = 'Outras saídas da conta';
+      const cent = (v: any) => Math.round(Number(v) * 100);
+      const iso = (d: any) => (d instanceof Date ? d.toISOString() : String(d)).slice(0, 10);
+      type Lote = { origem: string; key: string; resta: number };
+      const fila: Lote[] = [];
+      const f0 = txs[0];
+      const sIni = f0.balance == null ? 0 : cent(f0.balance) - (f0.tipo === 'CREDIT' ? cent(f0.amount) : -cent(f0.amount));
+      if (sIni > 0) fila.push({ origem: 'SALDO_ANTERIOR', key: 'SALDO', resta: sIni });
+      const entrou: Record<string, number> = { SALDO_ANTERIOR: Math.max(0, sIni) };
+      const matriz = new Map<string, Map<string, number>>();
+      const somaM = (o: string, c: string, v: number) => { const m = matriz.get(o) || new Map<string, number>(); m.set(c, (m.get(c) || 0) + v); matriz.set(o, m); };
+      const aportes = new Map<string, { numero: number; data: string; valor: number; destinos: Map<string, number> }>();
+      const aplicacoes: any[] = [];
+      for (const t of txs) {
+        if (est.has(t.id)) continue;
+        const v = cent(t.amount); const d = iso(t.data);
+        if (t.tipo === 'CREDIT') {
+          const c: any = cred.get(t.id);
+          const origem = c ? (c.situacao === 'VINCULADO' ? 'APORTE_ANCORA' : 'CREDITO_DESVINCULADO') : cust.get(t.id) === 'DEVOLUCAO' ? 'DEVOLUCAO_CUSTODIA' : 'OUTRA_ENTRADA';
+          fila.push({ origem, key: t.id, resta: v });
+          entrou[origem] = (entrou[origem] || 0) + v;
+          if (origem === 'APORTE_ANCORA') aportes.set(t.id, { numero: Number(c.numero), data: d, valor: v, destinos: new Map() });
+          continue;
+        }
+        const a: any = apl.get(t.id);
+        const col = a ? a.natureza : cust.get(t.id) === 'ENVIO' ? ENVIO : OUTRA;
+        const comp = new Map<string, number>(); let falta = v;
+        while (falta > 0 && fila.length) {
+          const l = fila[0]; const u = Math.min(l.resta, falta); l.resta -= u; falta -= u;
+          comp.set(l.origem, (comp.get(l.origem) || 0) + u);
+          const ap = aportes.get(l.key); if (ap) ap.destinos.set(col, (ap.destinos.get(col) || 0) + u);
+          if (l.resta === 0) fila.shift();
+        }
+        if (falta > 0) comp.set('NAO_IDENTIFICADA', falta);
+        if (de && d < de) continue;
+        comp.forEach((u, o) => somaM(o, col, u));
+        if (a) aplicacoes.push({ id: t.id, data: d, valor: v / 100, natureza: a.natureza, descricao: a.descricao, lancamento: t.description || t.counterparty_name || '',
+          composicao: [...comp.entries()].map(([o, u]) => ({ origem: o, valor: u / 100 })), ancora: (comp.get('APORTE_ANCORA') || 0) / 100 });
+      }
+      const naturezas = [...new Set(aplicacoes.map((x) => x.natureza))].sort();
+      const colunas = [...naturezas, ENVIO, OUTRA].filter((c) => [...matriz.values()].some((m) => m.has(c)) || naturezas.includes(c));
+      const resta: Record<string, number> = {}; fila.forEach((l) => { resta[l.origem] = (resta[l.origem] || 0) + l.resta; });
+      const origensUsadas = ORDEM.filter((o) => matriz.has(o) || entrou[o] || resta[o]);
+      const totCol: Record<string, number> = {};
+      const linhas = origensUsadas.map((o) => {
+        const m = matriz.get(o) || new Map<string, number>(); const valores: Record<string, number> = {}; let tot = 0;
+        colunas.forEach((c) => { const x = m.get(c) || 0; valores[c] = x / 100; tot += x; totCol[c] = (totCol[c] || 0) + x; });
+        const emApl = naturezas.reduce((s, c) => s + (m.get(c) || 0), 0);
+        return { origem: o, nome: NOMES[o], valores, total: tot / 100, entrou: (entrou[o] || 0) / 100, usadoAplicacoes: emApl / 100, usadoOutros: (tot - emApl) / 100, saldoNaConta: (resta[o] || 0) / 100 };
+      });
+      return {
+        parametros: { de, ate, metodo: 'PEPS (primeiro a entrar, primeiro a sair) sobre a conta inteira da recebedora financeira; estornos bancarios excluidos; entradas do dia antes das saidas do dia; usos dentro do periodo.' },
+        nomes: NOMES, colunas, matriz: linhas,
+        totaisColunas: Object.fromEntries(colunas.map((c) => [c, (totCol[c] || 0) / 100])),
+        totalGeral: Object.values(totCol).reduce((s, x) => s + x, 0) / 100,
+        aportes: [...aportes.values()].sort((x, y) => x.numero - y.numero).map((ap) => {
+          const usado = [...ap.destinos.values()].reduce((s, x) => s + x, 0);
+          return { numero: ap.numero, data: ap.data, valor: ap.valor / 100, restante: (ap.valor - usado) / 100,
+            destinos: [...ap.destinos.entries()].sort((x, y) => y[1] - x[1]).map(([c, x]) => ({ destino: c, valor: x / 100 })) };
+        }),
+        aplicacoes,
+      };
+    });
+  }
 }
