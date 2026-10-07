@@ -1054,7 +1054,9 @@ export class RelatoriosController {
         WHERE o.projeto_id = ${projetoId}::uuid AND o.codigo = 'ANCORA' LIMIT 1`;
       if (!base.length) throw new NotFoundException('Operacao Ancora ou recebedora financeira nao encontrada.');
       const op = base[0].op as string; const emp = base[0].emp as string;
-      const txs: any[] = await tx.$queryRaw`SELECT id, type::text AS tipo, transaction_date::date AS data, amount, balance, description, counterparty_name
+      const txs: any[] = await tx.$queryRaw`SELECT id, type::text AS tipo, transaction_date::date AS data, amount, balance, description, counterparty_name,
+          (SELECT trim(split_part(an.texto, '|', 1)) FROM proj_anotacoes_extrato an WHERE an.bank_transaction_id = bank_transactions.id LIMIT 1) AS categoria,
+          (SELECT dd.decisao || COALESCE(' / ' || dd.circuito, '') FROM proj_extrato_decisoes dd WHERE dd.bank_transaction_id = bank_transactions.id AND dd.cancelado_em IS NULL LIMIT 1) AS decisao
         FROM bank_transactions WHERE company_id = ${emp}::uuid AND transaction_date::date <= ${ate}::date
         ORDER BY transaction_date, CASE WHEN type::text = 'CREDIT' THEN 0 ELSE 1 END, created_at, id`;
       if (!txs.length) throw new BadRequestException('Nenhum lancamento do extrato visivel ate a data informada.');
@@ -1077,39 +1079,41 @@ export class RelatoriosController {
       const ENVIO = 'Envios à custódia'; const OUTRA = 'Outras saídas da conta';
       const cent = (v: any) => Math.round(Number(v) * 100);
       const iso = (d: any) => (d instanceof Date ? d.toISOString() : String(d)).slice(0, 10);
-      type Lote = { origem: string; key: string; resta: number };
+      type Lote = { origem: string; key: string; resta: number; info: any };
       const fila: Lote[] = [];
       const f0 = txs[0];
       const sIni = f0.balance == null ? 0 : cent(f0.balance) - (f0.tipo === 'CREDIT' ? cent(f0.amount) : -cent(f0.amount));
-      if (sIni > 0) fila.push({ origem: 'SALDO_ANTERIOR', key: 'SALDO', resta: sIni });
+      if (sIni > 0) fila.push({ origem: 'SALDO_ANTERIOR', key: 'SALDO', resta: sIni, info: { data: iso(f0.data), lancamento: 'Saldo anterior ao primeiro lançamento do extrato', categoria: null, decisao: null, valor: sIni / 100, numero: null } });
       const entrou: Record<string, number> = { SALDO_ANTERIOR: Math.max(0, sIni) };
       const matriz = new Map<string, Map<string, number>>();
       const somaM = (o: string, c: string, v: number) => { const m = matriz.get(o) || new Map<string, number>(); m.set(c, (m.get(c) || 0) + v); matriz.set(o, m); };
       const aportes = new Map<string, { numero: number; data: string; valor: number; destinos: Map<string, number> }>();
       const aplicacoes: any[] = [];
+      const movimentos: any[] = [];
       for (const t of txs) {
         if (est.has(t.id)) continue;
         const v = cent(t.amount); const d = iso(t.data);
         if (t.tipo === 'CREDIT') {
           const c: any = cred.get(t.id);
           const origem = c ? (c.situacao === 'VINCULADO' ? 'APORTE_ANCORA' : 'CREDITO_DESVINCULADO') : cust.get(t.id) === 'DEVOLUCAO' ? 'DEVOLUCAO_CUSTODIA' : 'OUTRA_ENTRADA';
-          fila.push({ origem, key: t.id, resta: v });
+          fila.push({ origem, key: t.id, resta: v, info: { data: d, lancamento: t.counterparty_name || t.description || '', categoria: t.categoria || null, decisao: t.decisao || null, valor: v / 100, numero: c ? Number(c.numero) : null } });
           entrou[origem] = (entrou[origem] || 0) + v;
           if (origem === 'APORTE_ANCORA') aportes.set(t.id, { numero: Number(c.numero), data: d, valor: v, destinos: new Map() });
           continue;
         }
         const a: any = apl.get(t.id);
         const col = a ? a.natureza : cust.get(t.id) === 'ENVIO' ? ENVIO : OUTRA;
-        const comp = new Map<string, number>(); let falta = v;
+        const comp = new Map<string, number>(); const parc: any[] = []; let falta = v;
         while (falta > 0 && fila.length) {
           const l = fila[0]; const u = Math.min(l.resta, falta); l.resta -= u; falta -= u;
-          comp.set(l.origem, (comp.get(l.origem) || 0) + u);
+          comp.set(l.origem, (comp.get(l.origem) || 0) + u); parc.push({ origem: l.origem, valor: u / 100, entrada: l.info });
           const ap = aportes.get(l.key); if (ap) ap.destinos.set(col, (ap.destinos.get(col) || 0) + u);
           if (l.resta === 0) fila.shift();
         }
-        if (falta > 0) comp.set('NAO_IDENTIFICADA', falta);
+        if (falta > 0) { comp.set('NAO_IDENTIFICADA', falta); parc.push({ origem: 'NAO_IDENTIFICADA', valor: falta / 100, entrada: null }); }
         if (de && d < de) continue;
         comp.forEach((u, o) => somaM(o, col, u));
+        movimentos.push({ id: t.id, data: d, valor: v / 100, uso: col, lancamento: t.description || t.counterparty_name || '', categoria: t.categoria || null, decisao: t.decisao || null, parcelas: parc });
         if (a) aplicacoes.push({ id: t.id, data: d, valor: v / 100, natureza: a.natureza, descricao: a.descricao, lancamento: t.description || t.counterparty_name || '',
           composicao: [...comp.entries()].map(([o, u]) => ({ origem: o, valor: u / 100 })), ancora: (comp.get('APORTE_ANCORA') || 0) / 100 });
       }
@@ -1135,6 +1139,7 @@ export class RelatoriosController {
             destinos: [...ap.destinos.entries()].sort((x, y) => y[1] - x[1]).map(([c, x]) => ({ destino: c, valor: x / 100 })) };
         }),
         aplicacoes,
+        movimentos,
       };
     });
   }

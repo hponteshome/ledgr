@@ -19,8 +19,9 @@ export default function FontesUsosProjeto({ projetoId }: { projetoId: string }) 
   const [d, setD] = useState<any>(null);
   const [erro, setErro] = useState('');
   const [carregando, setCarregando] = useState(false);
+  const [cel, setCel] = useState<{ origem: string; col: string } | null>(null);
   useEffect(() => {
-    setCarregando(true); setErro('');
+    setCarregando(true); setErro(''); setCel(null);
     const q = new URLSearchParams(); if (de) q.set('de', de); if (ate) q.set('ate', ate);
     api.get(`/projects-relatorios/projetos/${projetoId}/fontes-usos?${q.toString()}`)
       .then((r) => setD(r.data)).catch((e) => setErro(erroApi(e, 'Falha ao calcular as fontes e usos.'))).finally(() => setCarregando(false));
@@ -28,6 +29,12 @@ export default function FontesUsosProjeto({ projetoId }: { projetoId: string }) 
   const br = (x: string) => x.split('-').reverse().join('/');
   const periodo = de && ate ? `de ${br(de)} a ${br(ate)}` : ate ? `até ${br(ate)}` : de ? `desde ${br(de)}` : 'até hoje';
   const anoAtual = String(new Date().getFullYear());
+  // Detalhamento (07/10/2026): cada celula do quadro abre os lancamentos que a compoem; '*' = todas as origens ou todos os usos.
+  const cl = (origem: string, col: string, v: number, base: React.CSSProperties) => {
+    const sel = cel && cel.origem === origem && cel.col === col;
+    return <td key={col} title={v ? 'Clique para ver os lançamentos' : undefined} onClick={v ? () => setCel(sel ? null : { origem, col }) : undefined}
+      style={{ ...base, cursor: v ? 'pointer' : 'default', textDecoration: v ? 'underline dotted' : 'none', background: sel ? '#FEF3C7' : undefined }}>{v ? fmtBRL(v) : '-'}</td>;
+  };
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div>
@@ -54,13 +61,14 @@ export default function FontesUsosProjeto({ projetoId }: { projetoId: string }) 
             <thead><tr><th style={thSt}>Origem \ uso</th>{d.colunas.map((c: string) => <th key={c} style={dir}>{c}</th>)}<th style={dir}>Total</th></tr></thead>
             <tbody>{d.matriz.map((l: any) => (
               <tr key={l.origem}><td style={{ ...tdSt, fontWeight: 600, color: COR[l.origem] }}>{l.nome}</td>
-                {d.colunas.map((c: string) => <td key={c} style={num}>{l.valores[c] ? fmtBRL(l.valores[c]) : '-'}</td>)}
-                <td style={{ ...num, fontWeight: 700 }}>{fmtBRL(l.total)}</td></tr>))}</tbody>
+                {d.colunas.map((c: string) => cl(l.origem, c, l.valores[c] || 0, num))}
+                {cl(l.origem, '*', l.total, { ...num, fontWeight: 700 })}</tr>))}</tbody>
             <tfoot><tr style={{ borderTop: '1.5px solid #134E4A' }}><td style={{ ...tdSt, fontWeight: 700 }}>Total</td>
-              {d.colunas.map((c: string) => <td key={c} style={{ ...num, fontWeight: 700 }}>{fmtBRL(d.totaisColunas[c] || 0)}</td>)}
+              {d.colunas.map((c: string) => cl('*', c, d.totaisColunas[c] || 0, { ...num, fontWeight: 700 }))}
               <td style={{ ...num, fontWeight: 700 }}>{fmtBRL(d.totalGeral)}</td></tr></tfoot>
           </table>
         </div>
+        {cel && <Detalhe d={d} cel={cel} onClose={() => setCel(null)} />}
         <div style={{ ...cardSt, overflowX: 'auto' }}>
           <div style={{ ...secTitle, padding: '12px 14px 0' }}>Origens</div>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -102,6 +110,39 @@ function TabelaAplicacoes({ itens, periodo }: { itens: any[]; periodo: string })
             <td style={num}>{fmtBRL(x.ancora)}</td><td style={tdSt}>{x.composicao.map((c: any) => chip(c.origem, c.valor))}</td><td style={{ ...tdSt, fontSize: 12 }}>{x.lancamento}</td></tr>))}</tbody>
         <tfoot><tr style={{ borderTop: '1.5px solid #134E4A' }}><td colSpan={2} style={{ ...tdSt, fontWeight: 700 }}>{itens.length} aplicação(ões)</td>
           <td style={{ ...num, fontWeight: 700 }}>{fmtBRL(total)}</td><td style={{ ...num, fontWeight: 700 }}>{fmtBRL(anc)}</td><td colSpan={2} style={tdSt}></td></tr></tfoot>
+      </table>
+    </div>
+  );
+}
+
+function Detalhe({ d, cel, onClose }: { d: any; cel: { origem: string; col: string }; onClose: () => void }) {
+  const itens = (d.movimentos as any[]).filter((m) => cel.col === '*' || m.uso === cel.col)
+    .map((m) => ({ ...m, parte: (m.parcelas as any[]).filter((p) => cel.origem === '*' || p.origem === cel.origem) }))
+    .filter((m) => m.parte.length);
+  const soma = itens.reduce((s, m) => s + m.parte.reduce((x: number, p: any) => x + p.valor, 0), 0);
+  const titulo = `${cel.origem === '*' ? 'Todas as origens' : d.nomes[cel.origem]} → ${cel.col === '*' ? 'todos os usos' : cel.col}`;
+  return (
+    <div style={{ ...cardSt, overflowX: 'auto', border: '1px solid #FCD34D' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px 0' }}>
+        <div style={{ ...secTitle, marginBottom: 0, flex: 1 }}>Detalhamento · {titulo} · {itens.length} saída(s) · {fmtBRL(soma)}</div>
+        <button onClick={onClose} style={{ padding: '4px 10px', fontSize: 12, border: '0.5px solid #E5E7EB', borderRadius: 7, background: '#fff', color: '#134E4A', cursor: 'pointer' }}>Fechar</button>
+      </div>
+      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <thead><tr><th style={thSt}>Data</th><th style={thSt}>Saída (extrato, categoria e decisão)</th><th style={thSt}>Uso</th><th style={dir}>Valor da saída</th><th style={dir}>Desta origem</th><th style={thSt}>Pago com</th></tr></thead>
+        <tbody>{itens.map((m) => (
+          <tr key={m.id} style={{ verticalAlign: 'top' }}>
+            <td style={tdSt}>{fmtData(m.data)}</td>
+            <td style={{ ...tdSt, fontSize: 12 }}>{m.lancamento}{(m.categoria || m.decisao) && <div style={{ color: '#6B7280', fontSize: 11 }}>{[m.categoria && `planilha: ${m.categoria}`, m.decisao && `decisão: ${m.decisao}`].filter(Boolean).join(' · ')}</div>}</td>
+            <td style={{ ...tdSt, fontSize: 12 }}>{m.uso}</td>
+            <td style={num}>{fmtBRL(m.valor)}</td>
+            <td style={{ ...num, fontWeight: 600 }}>{fmtBRL(m.parte.reduce((x: number, p: any) => x + p.valor, 0))}</td>
+            <td style={{ ...tdSt, fontSize: 11 }}>{m.parte.map((p: any, i: number) => (
+              <div key={i} style={{ marginBottom: 2 }}>
+                <span style={{ color: COR[p.origem], fontWeight: 600 }}>{CURTO[p.origem]}</span>{' '}
+                {p.entrada ? <>· {fmtData(p.entrada.data)} · {p.entrada.numero ? `crédito nº ${p.entrada.numero} · ` : ''}{p.entrada.lancamento}{p.entrada.categoria ? ` (${p.entrada.categoria})` : ''}</> : '· sem entrada identificada na conta'}
+                {' · '}<b>{fmtBRL(p.valor)}</b>
+              </div>))}</td>
+          </tr>))}</tbody>
       </table>
     </div>
   );
