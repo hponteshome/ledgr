@@ -771,19 +771,25 @@ export class RelatoriosController {
   @Get('projetos/:projetoId/fluxo-contabil')
   @UseGuards(MasterOnlyGuard)
   @ProjAcao('autenticado')
-  fluxoContabil(@Param('projetoId') projetoId: string, @Req() req: any) {
+  fluxoContabil(@Param('projetoId') projetoId: string, @Query('ate') ateQ: string, @Req() req: any) {
     if (!UUID_RE.test(projetoId)) throw new NotFoundException('Registro nao encontrado.');
     return this.db.comoUsuario(req.user.id, async (tx) => {
-      const hoje = new Date().toISOString().slice(0, 10);
+      // Data-base (08/10/2026): ?ate=AAAA-MM-DD; sem data, o ultimo extrato carregado da recebedora financeira (SUNSYS).
+      const ue: any[] = await tx.$queryRaw`SELECT max(bt.transaction_date)::date AS d FROM bank_transactions bt
+        JOIN proj_participacoes pp ON pp.company_id = bt.company_id AND pp.cancelado_em IS NULL
+        JOIN proj_papeis pa ON pa.id = pp.papel_id AND pa.codigo = 'RECEBEDORA_FINANCEIRA'
+        JOIN proj_operacoes o ON o.id = pp.operacao_id WHERE o.projeto_id = ${projetoId}::uuid`;
+      const ultimoExtrato: string | null = ue[0]?.d ? new Date(ue[0].d).toISOString().slice(0, 10) : null;
+      const hoje = ateQ && /^\d{4}-\d{2}-\d{2}$/.test(ateQ) ? ateQ : (ultimoExtrato || new Date().toISOString().slice(0, 10));
       const base = await this.saldosSeries(tx, projetoId, hoje);
       if (!base) throw new BadRequestException('Estrutura da Series#1 nao carregada.');
       const ops = [base.ops.anc, base.ops.s1, base.ops.real].filter((o): o is { id: string; codigo: string } => !!o);
       const cent = (v: any) => Math.round(Number(v) * 100);
-      const apls = await tx.projAplicacao.findMany({ where: { canceladoEm: null, operacaoId: { in: ops.map((o) => o.id) }, natureza: { tipo: 'APLICACAO' } }, select: { id: true, valor: true, natureza: { select: { pagaPassivo: true, codigo: true } } } });
+      const apls = await tx.projAplicacao.findMany({ where: { canceladoEm: null, operacaoId: { in: ops.map((o) => o.id) }, natureza: { tipo: 'APLICACAO' }, dataAplicacao: { lte: new Date(hoje + 'T00:00:00Z') } }, select: { id: true, valor: true, natureza: { select: { pagaPassivo: true, codigo: true } } } });
       const passivosC = apls.filter((a) => a.natureza.pagaPassivo).reduce((s, a) => s + cent(a.valor), 0);
       const despesasC = apls.filter((a) => !a.natureza.pagaPassivo).reduce((s, a) => s + cent(a.valor), 0);
       // E0 (08/10/2026): baixa comprovada (DARF vinculado) x pagamentos a comprovar (passivos sem comprovante + ordem do intermediario).
-      const compRows: any[] = await tx.$queryRaw`SELECT v.aplicacao_id, sum(v.valor) AS valor FROM proj_comprovante_vinculos v JOIN proj_comprovantes_fiscais c ON c.id = v.comprovante_id AND c.cancelado_em IS NULL WHERE v.cancelado_em IS NULL GROUP BY 1`;
+      const compRows: any[] = await tx.$queryRaw`SELECT v.aplicacao_id, sum(v.valor) AS valor FROM proj_comprovante_vinculos v JOIN proj_comprovantes_fiscais c ON c.id = v.comprovante_id AND c.cancelado_em IS NULL AND c.data_arrecadacao <= ${hoje}::date WHERE v.cancelado_em IS NULL GROUP BY 1`;
       const compMap = new Map<string, number>(compRows.map((r: any) => [r.aplicacao_id as string, cent(r.valor)]));
       const passComprovC = apls.filter((a: any) => a.natureza.pagaPassivo).reduce((s: number, a: any) => s + Math.min(cent(a.valor), compMap.get(a.id) || 0), 0);
       const ordemC = apls.filter((a: any) => a.natureza.codigo === 'PAGAMENTO_ORDEM_INTERMEDIARIO').reduce((s: number, a: any) => s + cent(a.valor), 0);
@@ -850,7 +856,7 @@ export class RelatoriosController {
         { numero: 5, titulo: 'Encontro de contas', familia: 'intercompany' }, { numero: 6, titulo: 'Ingresso da Quota nº 1', familia: 'intercompany', data: ingresso, previsto: !ingressoOcorreu },
         { numero: 7, titulo: 'Resgates da dívida da RM', familia: 'resgate', quantidade: resgates.length },
       ];
-      return { apuradoEm: hoje, eventos, lancamentos: lanc, saldos, resgates, taxaHistorica: TX };
+      return { ultimoExtrato, apuradoEm: hoje, eventos, lancamentos: lanc, saldos, resgates, taxaHistorica: TX };
     });
   }
 
@@ -1283,12 +1289,13 @@ export class RelatoriosController {
   @Get('projetos/:projetoId/resgate-rm/previa')
   @UseGuards(MasterOnlyGuard)
   @ProjAcao('autenticado')
-  async resgateRmPrevia(@Param('projetoId') projetoId: string, @Req() req: any) {
+  async resgateRmPrevia(@Param('projetoId') projetoId: string, @Query('ate') ateQ: string, @Req() req: any) {
     if (!UUID_RE.test(projetoId)) throw new NotFoundException('Registro nao encontrado.');
     const CONFISSAO = '2025-10-31'; const DIVIDA = 5441845100;
-    const fu: any = await this.fontesUsos(projetoId, '', '', req);
+    const ateOk = ateQ && /^\d{4}-\d{2}-\d{2}$/.test(ateQ) ? ateQ : '';
+    const fu: any = await this.fontesUsos(projetoId, '', ateOk, req);
     const cent = (v: any) => Math.round(Number(v || 0) * 100);
-    const hoje = new Date().toISOString().slice(0, 10);
+    const hoje = ateOk || new Date().toISOString().slice(0, 10);
     let aportes = 0;
     for (const l of fu.matriz || []) if (l.origem === 'APORTE_ANCORA') aportes = cent(l.entrou);
     const meses = new Map<string, { competencia: string; base: number; qtd: number; nat: Map<string, number> }>();

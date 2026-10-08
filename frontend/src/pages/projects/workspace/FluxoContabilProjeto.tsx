@@ -14,9 +14,10 @@ export default function FluxoContabilProjeto({ projetoId }: { projetoId: string 
   const [erro, setErro] = useState('');
   const [ativo, setAtivo] = useState<number | null>(null);
   const [resgate, setResgate] = useState(false);
+  const [dataBase, setDataBase] = useState('');
   useEffect(() => {
-    api.get(`/projects-relatorios/projetos/${projetoId}/fluxo-contabil`).then((r) => setD(r.data)).catch((e) => setErro(e?.response?.data?.message || 'Falha ao montar o fluxo.'));
-  }, [projetoId]);
+    api.get(`/projects-relatorios/projetos/${projetoId}/fluxo-contabil${dataBase ? `?ate=${dataBase}` : ''}`).then((r) => setD(r.data)).catch((e) => setErro(e?.response?.data?.message || 'Falha ao montar o fluxo.'));
+  }, [projetoId, dataBase]);
   if (erro) return <div style={erroSt}>⚠ {erro}</div>;
   if (!d) return <div style={{ color: '#6B7280' }}>Montando o fluxo...</div>;
   const famDe = (n: number) => d.eventos.find((e: any) => e.numero === n)?.familia || 'origem';
@@ -25,8 +26,18 @@ export default function FluxoContabilProjeto({ projetoId }: { projetoId: string 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}><div style={{ ...tituloSt, flex: 1 }}>Fluxo contábil</div><button onClick={() => setResgate(true)} style={{ padding: '6px 12px', fontSize: 12, border: 'none', borderRadius: 7, background: '#1A4A3A', color: '#fff', cursor: 'pointer' }}>Resgates na F5 (prévia)</button>{resgate && <ResgateRmModal projetoId={projetoId} onClose={() => setResgate(false)} />}</div>
-        <div style={subtituloSt}>Lançamentos propostos por empresa, com os valores da trilha em {fmtData(d.apuradoEm)} · roteiro para o contador · visível só para o Master</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}><div style={{ ...tituloSt, flex: 1 }}>Fluxo contábil</div><button onClick={() => setResgate(true)} style={{ padding: '6px 12px', fontSize: 12, border: 'none', borderRadius: 7, background: '#1A4A3A', color: '#fff', cursor: 'pointer' }}>Resgates na F5 (prévia)</button>{resgate && <ResgateRmModal projetoId={projetoId} ate={d?.apuradoEm} onClose={() => setResgate(false)} />}</div>
+        <div style={subtituloSt}>Lançamentos propostos por empresa, com os valores da trilha até a data-base {fmtData(d.apuradoEm)} · roteiro para o contador · visível só para o Master</div>
+      <div style={{ ...cardSt, padding: 10, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <b style={{ fontSize: 13, color: '#134E4A' }}>Data-base: {fmtData(d.apuradoEm)}</b>
+        {d.ultimoExtrato && <span style={{ fontSize: 12, color: '#6B7280' }}>· último extrato carregado: {fmtData(d.ultimoExtrato)}</span>}
+        <div style={{ flex: 1 }} />
+        <input type="date" value={dataBase || d.apuradoEm} onChange={(e) => setDataBase(e.target.value)} style={{ padding: '5px 8px', fontSize: 12, border: '0.5px solid #D1D5DB', borderRadius: 7 }} />
+        {(() => { const h = new Date(); const fimAnt = new Date(Date.UTC(h.getFullYear(), h.getMonth(), 0)).toISOString().slice(0, 10);
+          return ([['Último extrato', ''], ['Fim do mês anterior', fimAnt], ['31/12/2025', '2025-12-31']] as [string, string][]).map(([rot, v]) => (
+            <button key={rot} onClick={() => setDataBase(v)} style={{ padding: '4px 10px', fontSize: 12, borderRadius: 7, cursor: 'pointer', border: '0.5px solid #E5E7EB', background: dataBase === v ? '#134E4A' : '#fff', color: dataBase === v ? '#fff' : '#134E4A' }}>{rot}</button>)); })()}
+      </div>
+      {d.ultimoExtrato && d.apuradoEm > d.ultimoExtrato && <div style={{ fontSize: 12, background: '#FFFBEB', border: '1px solid #FCD34D', color: '#78350F', borderRadius: 8, padding: '8px 12px' }}>⚠ Extratos carregados só até {fmtData(d.ultimoExtrato)}: os saldos depois dessa data estão incompletos.</div>}
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
         {d.eventos.map((e: any) => (

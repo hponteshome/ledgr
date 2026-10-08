@@ -10417,3 +10417,6 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 
 - 08/10/2026 - Suite RLS: anotacoes testadas nos dois lados (qa_anotacoes = 0 no contexto do QA; master_anotacoes = total real no contexto do Master). O teste antigo rodava depois da troca para o Master e por isso contava 592.
 
+
+- 08/10/2026 - Fluxo contabil com data-base: GET fluxo-contabil?ate=AAAA-MM-DD (padrao: ultimo extrato carregado da recebedora financeira, e nao a data de hoje); aplicacoes e DARFs limitados a data-base; resposta traz ultimoExtrato; tela com seletor (ultimo extrato, fim do mes anterior, 31/12/2025) e aviso quando a data-base passa do ultimo extrato; previa do resgate (resgate-rm/previa?ate=) na mesma data-base.
+

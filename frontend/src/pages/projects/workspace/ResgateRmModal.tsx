@@ -9,18 +9,18 @@ import { ModalProjeto, BotaoSec, erroApi } from './ModalProjeto';
 const num: React.CSSProperties = { ...tdSt, textAlign: 'right', whiteSpace: 'nowrap' };
 const dir: React.CSSProperties = { ...thSt, textAlign: 'right' };
 
-export default function ResgateRmModal({ projetoId, onClose }: { projetoId: string; onClose: () => void }) {
+export default function ResgateRmModal({ projetoId, ate, onClose }: { projetoId: string; ate?: string; onClose: () => void }) {
   const [d, setD] = useState<any>(null);
   const [erro, setErro] = useState('');
   const [aberto, setAberto] = useState('');
   useEffect(() => {
-    api.get(`/projects-relatorios/projetos/${projetoId}/resgate-rm/previa`).then((r) => setD(r.data)).catch((e) => setErro(erroApi(e, 'Falha ao calcular a prévia.')));
-  }, [projetoId]);
+    api.get(`/projects-relatorios/projetos/${projetoId}/resgate-rm/previa${ate ? `?ate=${ate}` : ''}`).then((r) => setD(r.data)).catch((e) => setErro(erroApi(e, 'Falha ao calcular a prévia.')));
+  }, [projetoId, ate]);
   const card = (rot: string, val: string, sub?: string, cor?: string) => (
     <div style={{ border: '0.5px solid #E5E7EB', borderRadius: 10, padding: '8px 12px' }}><div style={{ fontSize: 11, color: '#6B7280', textTransform: 'uppercase', letterSpacing: 0.4, fontWeight: 600 }}>{rot}</div>
       <div style={{ fontSize: 16, fontWeight: 700, color: cor || '#0F2747' }}>{val}</div>{sub && <div style={{ fontSize: 11, color: '#6B7280' }}>{sub}</div>}</div>);
   return (
-    <ModalProjeto titulo="Resgate da dívida da RM na F5 - prévia" subtitulo="10% da parte de cada pagamento feita com dinheiro do Cliente Âncora (PEPS) · um lançamento por mês" largura={1000} onClose={onClose}
+    <ModalProjeto titulo="Resgate da dívida da RM na F5 - prévia" subtitulo={`10% da parte de cada pagamento feita com dinheiro do Cliente Âncora (PEPS) · um lançamento por mês · data-base ${ate ? fmtData(ate) : 'hoje'}`} largura={1000} onClose={onClose}
       rodape={<><span style={{ flex: 1, fontSize: 12, color: '#6B7280' }}>Prévia: nada é gravado na contabilidade nesta etapa.</span><BotaoSec onClick={onClose}>Fechar</BotaoSec></>}>
       {erro && <div style={erroSt}>⚠ {erro}</div>}
       {!d && !erro && <div style={{ color: '#6B7280' }}>Calculando...</div>}
