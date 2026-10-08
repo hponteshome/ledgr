@@ -779,9 +779,16 @@ export class RelatoriosController {
       if (!base) throw new BadRequestException('Estrutura da Series#1 nao carregada.');
       const ops = [base.ops.anc, base.ops.s1, base.ops.real].filter((o): o is { id: string; codigo: string } => !!o);
       const cent = (v: any) => Math.round(Number(v) * 100);
-      const apls = await tx.projAplicacao.findMany({ where: { canceladoEm: null, operacaoId: { in: ops.map((o) => o.id) }, natureza: { tipo: 'APLICACAO' } }, select: { valor: true, natureza: { select: { pagaPassivo: true } } } });
+      const apls = await tx.projAplicacao.findMany({ where: { canceladoEm: null, operacaoId: { in: ops.map((o) => o.id) }, natureza: { tipo: 'APLICACAO' } }, select: { id: true, valor: true, natureza: { select: { pagaPassivo: true, codigo: true } } } });
       const passivosC = apls.filter((a) => a.natureza.pagaPassivo).reduce((s, a) => s + cent(a.valor), 0);
       const despesasC = apls.filter((a) => !a.natureza.pagaPassivo).reduce((s, a) => s + cent(a.valor), 0);
+      // E0 (08/10/2026): baixa comprovada (DARF vinculado) x pagamentos a comprovar (passivos sem comprovante + ordem do intermediario).
+      const compRows: any[] = await tx.$queryRaw`SELECT v.aplicacao_id, sum(v.valor) AS valor FROM proj_comprovante_vinculos v JOIN proj_comprovantes_fiscais c ON c.id = v.comprovante_id AND c.cancelado_em IS NULL WHERE v.cancelado_em IS NULL GROUP BY 1`;
+      const compMap = new Map<string, number>(compRows.map((r: any) => [r.aplicacao_id as string, cent(r.valor)]));
+      const passComprovC = apls.filter((a: any) => a.natureza.pagaPassivo).reduce((s: number, a: any) => s + Math.min(cent(a.valor), compMap.get(a.id) || 0), 0);
+      const ordemC = apls.filter((a: any) => a.natureza.codigo === 'PAGAMENTO_ORDEM_INTERMEDIARIO').reduce((s: number, a: any) => s + cent(a.valor), 0);
+      const aComprovarC = passivosC - passComprovC + ordemC;
+      const despesasOpC = despesasC - ordemC;
       const pagosC = passivosC + despesasC;
       const entradasC = base.eventos.filter((e) => e.c > 0).reduce((s, e) => s + e.c, 0);
       const devolC = -base.eventos.filter((e) => e.c < 0).reduce((s, e) => s + e.c, 0);
@@ -807,9 +814,11 @@ export class RelatoriosController {
         ...(devolC ? [L(3, 'SUNSYS', 'Devoluções ao Adquirente', 'Valores recebidos por conta e ordem - HOTELSYS / Operação Âncora (passivo)', 'Bancos (ativo)', v(devolC), 'Devolução de valores ao Adquirente Âncora.')] : []),
         L(4, 'SUNSYS', 'Pagamentos por conta da HOTELSYS', 'Mútuo / conta corrente intercompany - HOTELSYS (ativo)', 'Bancos (ativo)', v(pagosC),
           'Pagamento de obrigações tributárias, trabalhistas e operacionais por conta e ordem da HOTELSYS.'),
-        L(4, 'HOTELSYS', 'Baixa de passivos', 'Passivos tributários, trabalhistas e demais obrigações (passivo)', 'Mútuo / conta corrente intercompany - SUNSYS (passivo)', v(passivosC),
-          'Quitação de obrigações próprias realizada pela SUNSYS (naturezas que pagam passivo).'),
-        L(4, 'HOTELSYS', 'Despesas da operação', 'Despesas de manutenção da operação (resultado)', 'Mútuo / conta corrente intercompany - SUNSYS (passivo)', v(despesasC),
+        L(4, 'HOTELSYS', 'Baixa de passivos comprovada', 'Passivos tributários, trabalhistas e demais obrigações (passivo)', 'Mútuo / conta corrente intercompany - SUNSYS (passivo)', v(passComprovC),
+          'Quitação de obrigações próprias realizada pela SUNSYS, com comprovante fiscal vinculado (DARF).'),
+        L(4, 'HOTELSYS', 'Pagamentos a comprovar', 'Pagamentos a comprovar - obrigações da HOTELSYS em reestruturação (ativo transitório)', 'Mútuo / conta corrente intercompany - SUNSYS (passivo)', v(aComprovarC),
+          'Passivos pagos sem comprovante vinculado e pagamentos por ordem do Intermediário; baixados contra o passivo quando o comprovante for apresentado.'),
+        L(4, 'HOTELSYS', 'Despesas da operação', 'Despesas de manutenção da operação (resultado)', 'Mútuo / conta corrente intercompany - SUNSYS (passivo)', v(despesasOpC),
           'Despesas correntes (folha, contabilidade e manutenção) pagas pela SUNSYS por conta da HOTELSYS.'),
         L(5, 'SUNSYS', 'Encontro de contas', 'Valores recebidos por conta e ordem - HOTELSYS / Operação Âncora (passivo)', 'Mútuo / conta corrente intercompany - HOTELSYS (ativo)', v(encontroC),
           'Encontro de contas intercompany entre os valores recebidos por conta e ordem e os pagamentos realizados.'),
@@ -833,7 +842,7 @@ export class RelatoriosController {
         SUNRISE: [S('Participação da RM no resultado (acumulada)', base.compensadoC)],
         RM: [S('Direito de participação econômica', base.dividaC - base.compensadoC), S('Dívida confessada - F5', base.dividaC - base.compensadoC)],
         SUNSYS: [S('Bancos (efeito da operação)', liqC - pagosC), S('Valores recebidos por conta e ordem - HOTELSYS', liqC - encontroC), S('Mútuo - HOTELSYS (a receber)', pagosC - encontroC)],
-        HOTELSYS: [S('Passivos baixados', passivosC), S('Despesas da operação', despesasC), S('Mútuo - SUNSYS (a pagar)', pagosC - liqC), S('Adiantamento - Operação Âncora', liqC - quotaEfetiva), S('Mútuo - F5 (a pagar)', quotaEfetiva)],
+        HOTELSYS: [S('Passivos baixados (comprovados)', passComprovC), S('Pagamentos a comprovar', aComprovarC), S('Despesas da operação', despesasOpC), S('Mútuo - SUNSYS (a pagar)', pagosC - liqC), S('Adiantamento - Operação Âncora', liqC - quotaEfetiva), S('Mútuo - F5 (a pagar)', quotaEfetiva)],
       };
       const eventos = [
         { numero: 1, titulo: 'Confissão de dívida', familia: 'origem', data: base.dividaData }, { numero: 2, titulo: 'Termo de participação', familia: 'origem', data: base.dividaData },
@@ -1142,5 +1151,168 @@ export class RelatoriosController {
         movimentos,
       };
     });
+  }
+
+  // -- Comprovantes fiscais (08/10/2026) - so o Master ------------------------------------------------------------------
+  // DARFs do relatorio de pagamentos da RFB (carga com sha256 do PDF) vinculados as aplicacoes que os pagaram. Regras no
+  // banco: vinculo nao excede o DARF nem a aplicacao; nada e apagado, so encerrado com motivo.
+  private erroComprovante(e: any): never {
+    const m = String(e?.meta?.message || e?.message || '');
+    const t = m.match(/(Comprovante[^"\n]{0,180})/);
+    if (t) throw new BadRequestException(t[1].replace(/\s+$/, ''));
+    throw e;
+  }
+
+  private async opAncora(tx: any, projetoId: string): Promise<string> {
+    const op: any[] = await tx.$queryRaw`SELECT id FROM proj_operacoes WHERE projeto_id = ${projetoId}::uuid AND codigo = 'ANCORA' LIMIT 1`;
+    if (!op.length) throw new NotFoundException('Operacao Ancora nao encontrada.');
+    return op[0].id as string;
+  }
+
+  @Get('operacoes/:operacaoId/comprovacao-fiscal')
+  @UseGuards(MasterOnlyGuard)
+  @ProjAcao('autenticado')
+  comprovacaoFiscal(@Param('operacaoId') operacaoId: string, @Req() req: any) {
+    if (!UUID_RE.test(operacaoId)) throw new NotFoundException('Registro nao encontrado.');
+    return this.db.comoUsuario(req.user.id, async (tx: any) => {
+      const r: any[] = await tx.$queryRaw`SELECT v.aplicacao_id, sum(v.valor) AS valor, string_agg(c.numero_documento, ', ' ORDER BY c.data_arrecadacao) AS darfs
+        FROM proj_comprovante_vinculos v JOIN proj_comprovantes_fiscais c ON c.id = v.comprovante_id AND c.cancelado_em IS NULL
+        JOIN proj_aplicacoes a ON a.id = v.aplicacao_id AND a.operacao_id = ${operacaoId}::uuid
+        WHERE v.cancelado_em IS NULL GROUP BY v.aplicacao_id`;
+      return r.map((x) => ({ aplicacaoId: x.aplicacao_id, valor: Number(x.valor), darfs: String(x.darfs || '').split(', ').filter(Boolean) }));
+    });
+  }
+
+  @Get('projetos/:projetoId/comprovantes-fiscais')
+  @UseGuards(MasterOnlyGuard)
+  @ProjAcao('autenticado')
+  comprovantesFiscais(@Param('projetoId') projetoId: string, @Req() req: any) {
+    if (!UUID_RE.test(projetoId)) throw new NotFoundException('Registro nao encontrado.');
+    return this.db.comoUsuario(req.user.id, async (tx: any) => {
+      const opId = await this.opAncora(tx, projetoId);
+      const comps: any[] = await tx.$queryRaw`SELECT id, tipo, contribuinte_cnpj, contribuinte_nome, data_arrecadacao, receita, numero_documento, periodo_apuracao,
+          principal, multa, juros, total, arquivo_nome FROM proj_comprovantes_fiscais WHERE operacao_id = ${opId}::uuid AND cancelado_em IS NULL
+          ORDER BY data_arrecadacao, numero_documento`;
+      const vincs: any[] = await tx.$queryRaw`SELECT v.id, v.comprovante_id, v.aplicacao_id, v.valor, v.motivo, a.data_aplicacao, n.nome AS natureza, bt.description AS lancamento
+        FROM proj_comprovante_vinculos v JOIN proj_aplicacoes a ON a.id = v.aplicacao_id JOIN proj_naturezas_aplicacao n ON n.id = a.natureza_id
+        LEFT JOIN bank_transactions bt ON bt.id = a.bank_transaction_id WHERE v.cancelado_em IS NULL AND a.operacao_id = ${opId}::uuid`;
+      const imps: any[] = await tx.$queryRaw`SELECT a.id, a.data_aplicacao, a.valor, a.descricao, bt.description AS lancamento, n.nome AS natureza
+        FROM proj_aplicacoes a JOIN proj_naturezas_aplicacao n ON n.id = a.natureza_id LEFT JOIN bank_transactions bt ON bt.id = a.bank_transaction_id
+        WHERE a.operacao_id = ${opId}::uuid AND a.cancelado_em IS NULL AND (n.codigo ILIKE 'IMPOST%' OR n.nome ILIKE 'Impost%') ORDER BY a.data_aplicacao`;
+      const cent = (v: any) => Math.round(Number(v || 0) * 100);
+      const iso = (d: any) => (d ? new Date(d).toISOString().slice(0, 10) : null);
+      const porComp = new Map<string, any[]>(); const porApl = new Map<string, number>();
+      vincs.forEach((v) => {
+        porComp.set(v.comprovante_id, [...(porComp.get(v.comprovante_id) || []), v]);
+        porApl.set(v.aplicacao_id, (porApl.get(v.aplicacao_id) || 0) + cent(v.valor));
+      });
+      const comprovantes = comps.map((c) => {
+        const vs = porComp.get(c.id) || []; const vinc = vs.reduce((s, v) => s + cent(v.valor), 0);
+        return { id: c.id, tipo: c.tipo, cnpj: c.contribuinte_cnpj, contribuinte: c.contribuinte_nome, data: iso(c.data_arrecadacao), receita: c.receita,
+          numero: c.numero_documento, periodo: iso(c.periodo_apuracao), principal: Number(c.principal), multa: Number(c.multa), juros: Number(c.juros),
+          total: Number(c.total), arquivo: c.arquivo_nome, vinculado: vinc / 100, saldo: (cent(c.total) - vinc) / 100,
+          vinculos: vs.map((v) => ({ id: v.id, aplicacaoId: v.aplicacao_id, valor: Number(v.valor), data: iso(v.data_aplicacao), natureza: v.natureza, lancamento: v.lancamento, motivo: v.motivo })) };
+      });
+      const impostos = imps.map((a) => {
+        const comp = porApl.get(a.id) || 0;
+        return { id: a.id, data: iso(a.data_aplicacao), valor: Number(a.valor), descricao: a.descricao, lancamento: a.lancamento, natureza: a.natureza,
+          comprovado: comp / 100, falta: (cent(a.valor) - comp) / 100 };
+      });
+      const s = (arr: any[], f: (x: any) => number) => arr.reduce((t, x) => t + cent(f(x)), 0) / 100;
+      return {
+        comprovantes, impostos,
+        resumo: {
+          qtdComprovantes: comprovantes.length, totalComprovantes: s(comprovantes, (c) => c.total), totalVinculado: s(comprovantes, (c) => c.vinculado),
+          semAplicacao: s(comprovantes, (c) => c.saldo), qtdSemAplicacao: comprovantes.filter((c) => c.saldo > 0).length,
+          qtdImpostos: impostos.length, totalImpostos: s(impostos, (a) => a.valor), impostosComprovados: s(impostos, (a) => a.comprovado),
+          impostosSemComprovante: s(impostos, (a) => a.falta), qtdImpostosSemComprovante: impostos.filter((a) => a.falta > 0).length,
+        },
+      };
+    });
+  }
+
+  @PostC('projetos/:projetoId/comprovantes-fiscais/vincular')
+  @UseGuards(MasterOnlyGuard)
+  @ProjAcao('autenticado')
+  comprovanteVincular(@Param('projetoId') projetoId: string, @BodyC() b: any, @Req() req: any) {
+    if (!UUID_RE.test(projetoId)) throw new NotFoundException('Registro nao encontrado.');
+    const cid = String(b?.comprovanteId || ''); const aid = String(b?.aplicacaoId || '');
+    if (!UUID_RE.test(cid) || !UUID_RE.test(aid)) throw new BadRequestException('Informe o comprovante e a aplicacao.');
+    const valor = Math.round(Number(b?.valor) * 100) / 100;
+    if (!(valor > 0)) throw new BadRequestException('Informe um valor positivo.');
+    const motivo = String(b?.motivo || '').trim();
+    if (motivo.length < 10) throw new BadRequestException('Informe o motivo (minimo 10 caracteres).');
+    return this.db.comoUsuario(req.user.id, async (tx: any) => {
+      const opId = await this.opAncora(tx, projetoId);
+      const ok: any[] = await tx.$queryRaw`SELECT id FROM proj_comprovantes_fiscais WHERE id = ${cid}::uuid AND operacao_id = ${opId}::uuid AND cancelado_em IS NULL`;
+      if (!ok.length) throw new NotFoundException('Comprovante nao encontrado.');
+      try {
+        const ins: any[] = await tx.$queryRaw`INSERT INTO proj_comprovante_vinculos (comprovante_id, aplicacao_id, valor, motivo, criado_por_id)
+          VALUES (${cid}::uuid, ${aid}::uuid, ${valor.toFixed(2)}::numeric, ${motivo}, ${req.user.id}::uuid) RETURNING id`;
+        await tx.auditLog.create({ data: { actorId: req.user.id, action: 'PROJ_COMPROVANTE_VINCULADO', targetId: ins[0].id, after: { comprovante: cid, aplicacao: aid, valor: valor.toFixed(2), motivo } } });
+        return { id: ins[0].id };
+      } catch (e) { this.erroComprovante(e); }
+    });
+  }
+
+  @PostC('projetos/:projetoId/comprovantes-fiscais/desvincular')
+  @UseGuards(MasterOnlyGuard)
+  @ProjAcao('autenticado')
+  comprovanteDesvincular(@Param('projetoId') projetoId: string, @BodyC() b: any, @Req() req: any) {
+    if (!UUID_RE.test(projetoId)) throw new NotFoundException('Registro nao encontrado.');
+    const vid = String(b?.vinculoId || ''); const motivo = String(b?.motivo || '').trim();
+    if (!UUID_RE.test(vid)) throw new BadRequestException('Vinculo invalido.');
+    if (motivo.length < 10) throw new BadRequestException('Informe o motivo (minimo 10 caracteres).');
+    return this.db.comoUsuario(req.user.id, async (tx: any) => {
+      const opId = await this.opAncora(tx, projetoId);
+      try {
+        const n: number = await tx.$executeRaw`UPDATE proj_comprovante_vinculos v SET cancelado_em = now(), cancelado_por_id = ${req.user.id}::uuid, motivo_cancelamento = ${motivo}
+          FROM proj_comprovantes_fiscais c WHERE v.id = ${vid}::uuid AND v.cancelado_em IS NULL AND c.id = v.comprovante_id AND c.operacao_id = ${opId}::uuid`;
+        if (!n) throw new BadRequestException('Vinculo nao encontrado ou ja encerrado.');
+        await tx.auditLog.create({ data: { actorId: req.user.id, action: 'PROJ_COMPROVANTE_DESVINCULADO', targetId: vid, after: { motivo } } });
+        return { ok: true };
+      } catch (e) { if (e instanceof BadRequestException) throw e; this.erroComprovante(e); }
+    });
+  }
+
+  // -- Resgate da divida da RM na F5 - E1, previa mensal SEM gravar (08/10/2026) - so o Master -----------------------
+  // Base (decisao Hpontes, opcao iii): 10% da parte de cada aplicacao (passivos + manutencao + ordem do intermediario;
+  // devolucoes fora) paga com dinheiro do Cliente Ancora, pelo mesmo PEPS de Fontes e usos. Pagamentos ate a confissao
+  // (31/10/2025) somam no lancamento de 31/10/2025; depois, um lancamento por mes, no ultimo dia. Contas da F5 (as do
+  // lancamento da confissao): D 22103010001 Quitacao dos passivos da HOTELSYS / C 12101010006 Real Mouchao.
+  @Get('projetos/:projetoId/resgate-rm/previa')
+  @UseGuards(MasterOnlyGuard)
+  @ProjAcao('autenticado')
+  async resgateRmPrevia(@Param('projetoId') projetoId: string, @Req() req: any) {
+    if (!UUID_RE.test(projetoId)) throw new NotFoundException('Registro nao encontrado.');
+    const CONFISSAO = '2025-10-31'; const DIVIDA = 5441845100;
+    const fu: any = await this.fontesUsos(projetoId, '', '', req);
+    const cent = (v: any) => Math.round(Number(v || 0) * 100);
+    const hoje = new Date().toISOString().slice(0, 10);
+    let aportes = 0;
+    for (const l of fu.matriz || []) if (l.origem === 'APORTE_ANCORA') aportes = cent(l.entrou);
+    const meses = new Map<string, { competencia: string; base: number; qtd: number; nat: Map<string, number> }>();
+    for (const a of fu.aplicacoes || []) {
+      if (/devolu/i.test(String(a.natureza))) continue;
+      const anc = cent(a.ancora); if (!anc) continue;
+      const comp = a.data <= CONFISSAO ? CONFISSAO.slice(0, 7) : String(a.data).slice(0, 7);
+      const m = meses.get(comp) || { competencia: comp, base: 0, qtd: 0, nat: new Map<string, number>() };
+      m.base += anc; m.qtd += 1; m.nat.set(a.natureza, (m.nat.get(a.natureza) || 0) + anc); meses.set(comp, m);
+    }
+    let acum = 0;
+    const lista = [...meses.values()].sort((x, y) => x.competencia.localeCompare(y.competencia)).map((m) => {
+      const [y, mo] = m.competencia.split('-').map(Number);
+      const inicial = m.competencia === CONFISSAO.slice(0, 7);
+      const data = inicial ? CONFISSAO : new Date(Date.UTC(y, mo, 0)).toISOString().slice(0, 10);
+      const resgate = Math.round(m.base / 10); acum += resgate;
+      return { competencia: m.competencia, data, rotulo: inicial ? 'Acumulado até 31/10/2025 (desde ago/2024)' : `${String(mo).padStart(2, '0')}/${y}`,
+        emCurso: data > hoje, qtd: m.qtd, base: m.base / 100, resgate: resgate / 100, acumulado: acum / 100, saldoDivida: (DIVIDA - acum) / 100,
+        porNatureza: [...m.nat.entries()].sort((p, q) => q[1] - p[1]).map(([natureza, v]) => ({ natureza, base: v / 100, resgate: Math.round(v / 10) / 100 })) };
+    });
+    return {
+      empresa: 'F5 PARTICIPAÇÕES S/A', dataConfissao: CONFISSAO, divida: DIVIDA / 100, aportes: aportes / 100, limite: Math.round(aportes / 10) / 100, totalResgate: acum / 100,
+      contas: { debito: { codigo: '22103010001', nome: 'Quitação dos passivos da HOTELSYS' }, credito: { codigo: '12101010006', nome: 'Real Mouchão' } },
+      meses: lista,
+    };
   }
 }

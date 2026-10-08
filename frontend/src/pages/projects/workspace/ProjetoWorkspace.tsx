@@ -5,7 +5,7 @@
 import React, { useEffect, useState } from 'react';
 import { Routes, Route, Navigate, NavLink, useNavigate, useParams } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import { FiGrid, FiDollarSign, FiUsers, FiKey, FiAlertCircle, FiRepeat, FiFileText, FiArrowLeft, FiLogOut, FiLayers, FiTrendingDown, FiClipboard, FiClock, FiBriefcase, FiGitMerge, FiShield, FiShuffle } from 'react-icons/fi';
+import { FiGrid, FiDollarSign, FiUsers, FiKey, FiAlertCircle, FiRepeat, FiFileText, FiArrowLeft, FiLogOut, FiLayers, FiTrendingDown, FiClipboard, FiClock, FiBriefcase, FiGitMerge, FiShield, FiShuffle, FiCheckSquare } from 'react-icons/fi';
 import api from '../../../services/api';
 import { useAuth } from '../../../contexts/AuthContext';
 import ConcessoesPage from '../ConcessoesPage';
@@ -23,6 +23,7 @@ import EstruturaSeries1Projeto from './EstruturaSeries1Projeto';
 import FluxoContabilProjeto from './FluxoContabilProjeto';
 import CustodiaProjeto from './CustodiaProjeto';
 import FontesUsosProjeto from './FontesUsosProjeto';
+import ComprovantesFiscaisProjeto from './ComprovantesFiscaisProjeto';
 import { PROJ, PROJ_ACCENT, Projeto, erroSt } from './projetoTema';
 
 const itemSt = (ativo: boolean): React.CSSProperties => ({
@@ -47,6 +48,7 @@ const MENU: { to: string; label: string; icon: React.ElementType; end?: boolean;
   { to: 'fluxo-contabil', label: 'Fluxo contábil', icon: FiGitMerge, master: true },
   { to: 'custodia', label: 'Custódia', icon: FiShield, master: true },
   { to: 'fontes-usos', label: 'Fontes e usos', icon: FiShuffle, master: true },
+  { to: 'comprovantes-fiscais', label: 'Comprovantes fiscais', icon: FiCheckSquare, master: true },
   { to: 'participantes', label: 'Participantes', icon: FiUsers },
   { to: 'documentos', label: 'Documentos', icon: FiFileText },
 ];
@@ -147,6 +149,7 @@ export default function ProjetoWorkspace() {
               {master && <Route path="fluxo-contabil" element={<FluxoContabilProjeto projetoId={projeto.id} />} />}
               {master && <Route path="custodia" element={<CustodiaProjeto projetoId={projeto.id} />} />}
               {master && <Route path="fontes-usos" element={<FontesUsosProjeto projetoId={projeto.id} />} />}
+              {master && <Route path="comprovantes-fiscais" element={<ComprovantesFiscaisProjeto projetoId={projeto.id} />} />}
               <Route path="participantes" element={<ParticipantesProjeto operacao={operacao} master={master} />} />
               <Route path="documentos" element={<DocumentosProjeto operacao={operacao} master={master} />} />
               <Route path="pendencias" element={<PendenciasProjeto operacao={operacao} master={master} />} />

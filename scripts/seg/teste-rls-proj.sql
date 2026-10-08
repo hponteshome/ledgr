@@ -11,6 +11,7 @@ SELECT 'total_aplicacoes=' || count(*) FROM proj_aplicacoes a JOIN proj_operacoe
 SELECT 'total_projetos=' || count(*) FROM proj_projetos;
 SELECT 'total_operacoes=' || count(*) FROM proj_operacoes;
 SELECT 'total_saldos=' || count(*) FROM proj_saldos_informados s JOIN proj_operacoes o ON o.id = s.operacao_id WHERE o.codigo = 'ANCORA' AND s.cancelado_em IS NULL;
+SELECT 'total_anotacoes=' || count(*) FROM proj_anotacoes_extrato;
 SET LOCAL ROLE ledgr_api;
 SELECT 'sem_contexto=' || count(*) FROM proj_projetos;
 SELECT 'sem_contexto_creditos=' || count(*) FROM proj_creditos;
@@ -31,9 +32,12 @@ SELECT 'qa_quotas=' || count(*) FROM proj_quotas;
 WITH u AS (UPDATE proj_credito_provas SET motivo_cancelamento = motivo_cancelamento RETURNING 1) SELECT 'qa_update_provas=' || count(*) FROM u;
 SELECT 'qa_concessoes_de_outros=' || count(*) FROM proj_concessoes WHERE user_id <> proj_ctx_user();
 WITH u AS (UPDATE proj_operacoes SET nome = nome RETURNING 1) SELECT 'qa_update_operacoes=' || count(*) FROM u;
+-- 08/10/2026: anotacoes da planilha - leitura so Master (a API le com RLS); o QA ve ZERO linhas.
+SELECT 'qa_anotacoes=' || count(*) FROM proj_anotacoes_extrato;
 SELECT 'ctx_master=' || (set_config('app.user_id', (SELECT id::text FROM users WHERE email = 'hpontes@ledgr.com'), true) IS NOT NULL)::text;
 SELECT 'master_projetos=' || count(*) FROM proj_projetos;
 SELECT 'master_operacoes=' || count(*) FROM proj_operacoes;
+SELECT 'master_anotacoes=' || count(*) FROM proj_anotacoes_extrato;
 CREATE TEMP TABLE t_imut (r text) ON COMMIT DROP;
 DO $$ BEGIN BEGIN UPDATE proj_credito_vinculos SET motivo = motivo || ' alterado' WHERE id = (SELECT id FROM proj_credito_vinculos LIMIT 1); INSERT INTO t_imut VALUES ('nao'); EXCEPTION WHEN others THEN INSERT INTO t_imut VALUES ('sim'); END; END $$;
 SELECT 'vinculo_imutavel=' || r FROM t_imut;
@@ -43,7 +47,4 @@ SELECT 'vinculo_delete=' || r FROM t_del;
 CREATE TEMP TABLE t_delp (r text) ON COMMIT DROP;
 DO $$ BEGIN BEGIN DELETE FROM proj_credito_provas WHERE id = (SELECT id FROM proj_credito_provas LIMIT 1); INSERT INTO t_delp VALUES ('permitido'); EXCEPTION WHEN others THEN INSERT INTO t_delp VALUES ('negado'); END; END $$;
 SELECT 'prova_delete=' || r FROM t_delp;
-CREATE TEMP TABLE t_anot (r text) ON COMMIT DROP;
-DO $$ BEGIN BEGIN PERFORM 1 FROM proj_anotacoes_extrato LIMIT 1; INSERT INTO t_anot VALUES ('permitido'); EXCEPTION WHEN others THEN INSERT INTO t_anot VALUES ('negado'); END; END $$;
-SELECT 'anotacoes_acesso_direto=' || r FROM t_anot;
 ROLLBACK;

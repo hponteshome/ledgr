@@ -10405,3 +10405,15 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 
 - 08/10/2026 - Decisao Hpontes: A. Vieira e INTERMEDIARIO (indica onde os recursos sao aplicados, as vezes transitando por contas dele). As 6 'Devolucoes AV' de out/2024 (R$ 316.753,71, creditos de Manuela, Rafael Mesquita e Celso Ramalho reenviados a MAK, HF Tour, JR Soares/Antonio Hindi etc.) passam de NAO_PERTENCE a aplicacao 'Pagamento por ordem do Intermediario' (PAGAMENTO_ORDEM_INTERMEDIARIO, tipo APLICACAO, nao paga passivo, NAO reduz a Conta Individual). Conta Individual mantida em R$ 3.295.265,82. Custas de arbitragem a J.A.A.H. (jul/2025, R$ 66.000) seguem como honorarios. J.A.A.H. Empreendimentos parece ligada a A. Vieira (entrada de 10/06/2026 a confirmar).
 
+
+## [PROJETOS] 08/10/2026 - Fluxo contabil E0/E1 e comprovantes fiscais
+
+- Comprovantes fiscais: tabelas proj_comprovantes_fiscais/proj_comprovante_vinculos (RLS so Master), carga de 12 DARFs da RFB (R$ 808.989,90; 8 vinculados, R$ 799.061,28); conta da mae e C6 Bank = custodia Josi (2 envios, R$ 415.718,71); pagina Comprovantes fiscais e selo/filtro de DARF nas Aplicacoes.
+- Decisoes: pagamentos por ordem de A. Vieira = obrigacoes/despesas da HOTELSYS (reestruturacao); custodia so no Painel; evento 7 adequado. F5: confissao relancada em 31/10/2025 por R$ 54.418.451,00 (D 12101010006 Real Mouchao / C 22103010001 Quitacao dos passivos da HOTELSYS); encerramento 2025 revertido (refazer apos os resgates de nov e dez/2025).
+- E0: Fluxo/HOTELSYS separa 'Baixa de passivos comprovada' (DARF vinculado) de 'Pagamentos a comprovar' (passivos sem comprovante + ordem do intermediario); despesas = so manutencao.
+- E1: GET projects-relatorios/projetos/:id/resgate-rm/previa (so Master): base = 10% da parte de cada aplicacao (passivo, manutencao, ordem do intermediario; devolucoes fora) paga com dinheiro do Ancora pelo PEPS; acumulado ate 31/10/2025 num lancamento na data da confissao, depois mensal no ultimo dia; D 22103010001 / C 12101010006. Modal 'Resgates na F5 (previa)' no Fluxo. E2: gravacao via JournalEntryService (sourceModule OTHER, referencia PROJ-RESGATE-RM-AAAA-MM), tabela de controle, estorno via reverse(), ajustes por diferenca; teste em copia do banco.
+- Suite: QA ve zero anotacoes (leitura so Master).
+
+
+- 08/10/2026 - Suite RLS: anotacoes testadas nos dois lados (qa_anotacoes = 0 no contexto do QA; master_anotacoes = total real no contexto do Master). O teste antigo rodava depois da troca para o Master e por isso contava 592.
+

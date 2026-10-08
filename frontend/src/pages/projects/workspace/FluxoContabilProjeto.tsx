@@ -4,6 +4,7 @@
 import React, { useEffect, useState } from 'react';
 import api from '../../../services/api';
 import { cardSt, erroSt, tituloSt, subtituloSt, fmtBRL, fmtData } from './projetoTema';
+import ResgateRmModal from './ResgateRmModal';
 
 const FAM: Record<string, [string, string]> = { origem: ['#EEEDFE', '#3C3489'], ancora: ['#E1F5EE', '#085041'], intercompany: ['#FAECE7', '#712B13'], resgate: ['#FAEEDA', '#633806'] };
 const EMPRESAS: [string, string][] = [['F5', 'emissora · credora da RM'], ['SUNRISE', 'concedente da participação'], ['RM', 'Real Mouchão · fora do LEDGR (informativo)'], ['SUNSYS', 'recebedora'], ['HOTELSYS', 'beneficiária · devedora']];
@@ -12,6 +13,7 @@ export default function FluxoContabilProjeto({ projetoId }: { projetoId: string 
   const [d, setD] = useState<any>(null);
   const [erro, setErro] = useState('');
   const [ativo, setAtivo] = useState<number | null>(null);
+  const [resgate, setResgate] = useState(false);
   useEffect(() => {
     api.get(`/projects-relatorios/projetos/${projetoId}/fluxo-contabil`).then((r) => setD(r.data)).catch((e) => setErro(e?.response?.data?.message || 'Falha ao montar o fluxo.'));
   }, [projetoId]);
@@ -23,7 +25,7 @@ export default function FluxoContabilProjeto({ projetoId }: { projetoId: string 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div>
-        <div style={tituloSt}>Fluxo contábil</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}><div style={{ ...tituloSt, flex: 1 }}>Fluxo contábil</div><button onClick={() => setResgate(true)} style={{ padding: '6px 12px', fontSize: 12, border: 'none', borderRadius: 7, background: '#1A4A3A', color: '#fff', cursor: 'pointer' }}>Resgates na F5 (prévia)</button>{resgate && <ResgateRmModal projetoId={projetoId} onClose={() => setResgate(false)} />}</div>
         <div style={subtituloSt}>Lançamentos propostos por empresa, com os valores da trilha em {fmtData(d.apuradoEm)} · roteiro para o contador · visível só para o Master</div>
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
