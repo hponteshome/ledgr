@@ -30,7 +30,7 @@ interface ImportRecord {
         accounts: number;
         balances: number;
         journalEntries: number;
-        totalAccountsInDb: number;
+        totalAccountsInDb: number; consistency?: { consistent: number; divergent: number; missing: number; details: any[] };
     } | null;
     importedAt: string;
 }
@@ -39,7 +39,7 @@ interface ExistingData {
     accounts: number;
     balances: number;
     journalEntries: number;
-    totalAccountsInDb: number;
+    totalAccountsInDb: number; consistency?: { consistent: number; divergent: number; missing: number; details: any[] };
     periodStart: string;
     periodEnd: string;
 }
@@ -78,7 +78,7 @@ interface ImportResult {
         accountsSkipped: number;
         balances: number;
         journalEntries: number;
-        totalAccountsInDb: number;
+        totalAccountsInDb: number; consistency?: { consistent: number; divergent: number; missing: number; details: any[] };
     };
     errors?: Array<{ block: string; message: string }>;
     warnings?: string[];
