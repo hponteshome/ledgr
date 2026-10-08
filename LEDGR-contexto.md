@@ -10429,3 +10429,11 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - Tela SimuladorRmProjeto.tsx (menu Simulador RM, so Master): calculo na tela; 2025 agrega ago-dez/2024; naturezas de passivo escolhidas por chips (padrao: Impostos, Acordos trabalhistas, Reembolsos e bloqueios); desconto = pago x d/(1-d); comparacao de ate 3 cenarios. Nada vai para contabilidade, Fluxo ou Painel.
 - Suite QA: 403 para simulador-rm/base e /cenarios.
 - Pendente fora desta sessao: 9 erros de tsc em frontend/src/pages/sped/EcdPage.tsx (stats.consistency), existentes desde o commit 969332e de 27/08/2026.
+## 2026-10-08 - Simulador do spread RM (commit 3317a4e)
+- Contexto: nao existe contrato dos 10% dos aportes; aditivo RM x SUNRISE em negociacao (minuta no claude.ai, F5 como interveniente anuente). Proposta: retorno preferencial antes do CDE ate recuperar a divida (25%), residual depois (5% a 8%), parte do desconto da reestruturacao (50%) e antecipacao de 10% dos aportes (PEPS), abativel do preferencial.
+- Achado: na proposta inicial a RM recupera em 2031 com spread nominal positivo, mas spread em VP negativo a 12% a.a.; o que chega cedo (desconto, antecipacao, preferencial) pesa mais que o residual.
+- Tabela proj_simulacoes_rm (migracao 20261008_proj_simulacoes_rm.sql): imutavel, encerramento com motivo, RLS so Master, FK proj_projetos.
+- Rotas (relatorios.controller, fim da classe): GET simulador-rm/base (PEPS por ano; valor pago = soma de a.composicao), GET/POST simulador-rm/cenarios, POST cenarios/:id/encerrar. Auditoria PROJ_SIMULACAO_RM_SALVA e _ENCERRADA.
+- Tela SimuladorRmProjeto.tsx (menu Simulador RM, so Master): calculo na tela; 2025 agrega ago-dez/2024; naturezas de passivo escolhidas por chips (padrao: Impostos, Acordos trabalhistas, Reembolsos e bloqueios); desconto = pago x d/(1-d); comparacao de ate 3 cenarios. Nada vai para contabilidade, Fluxo ou Painel.
+- Suite QA: 403 para simulador-rm/base e /cenarios.
+- Pendente fora desta sessao: 9 erros de tsc em frontend/src/pages/sped/EcdPage.tsx (stats.consistency), existentes desde o commit 969332e de 27/08/2026.
