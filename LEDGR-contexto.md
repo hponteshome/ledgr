@@ -10437,3 +10437,4 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - Tela SimuladorRmProjeto.tsx (menu Simulador RM, so Master): calculo na tela; 2025 agrega ago-dez/2024; naturezas de passivo escolhidas por chips (padrao: Impostos, Acordos trabalhistas, Reembolsos e bloqueios); desconto = pago x d/(1-d); comparacao de ate 3 cenarios. Nada vai para contabilidade, Fluxo ou Painel.
 - Suite QA: 403 para simulador-rm/base e /cenarios.
 - Pendente fora desta sessao: 9 erros de tsc em frontend/src/pages/sped/EcdPage.tsx (stats.consistency), existentes desde o commit 969332e de 27/08/2026.
+- 2026-10-08: resolvido o pendente do EcdPage (commit c15cf43): consistency? opcional nos 3 tipos de stats; tsc do frontend volta a exit 0.
