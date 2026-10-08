@@ -53,7 +53,7 @@ export default function FluxoContabilProjeto({ projetoId }: { projetoId: string 
               </div>
             ))}
             <div style={{ borderTop: '0.5px solid #E5E7EB', marginTop: 10, paddingTop: 8 }}>
-              <div style={{ fontSize: 11, color: '#6B7280', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 4 }}>Saldos resultantes</div>
+              <div style={{ fontSize: 11, color: '#6B7280', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 4 }}>Saldos resultantes em {fmtData(d.apuradoEm)}</div>
               {(d.saldos[emp] || []).map((s: any) => (
                 <div key={s.conta} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '2px 0' }}>
                   <span>{s.conta}</span><span style={{ fontWeight: 600, color: s.saldo < 0 ? '#B45309' : '#111827' }}>{fmtBRL(s.saldo)}</span>
