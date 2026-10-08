@@ -1322,4 +1322,88 @@ export class RelatoriosController {
       meses: lista,
     };
   }
+
+  // Simulador do spread RM (08/10/2026): dados-base reais (PEPS por ano) e cenarios salvos. Nao altera nada do restante do dominio.
+  @Get('projetos/:projetoId/simulador-rm/base')
+  @UseGuards(MasterOnlyGuard)
+  @ProjAcao('autenticado')
+  async simuladorRmBase(@Param('projetoId') projetoId: string, @Query('ate') ateQ: string, @Req() req: any) {
+    if (!UUID_RE.test(projetoId)) throw new NotFoundException('Registro nao encontrado.');
+    const ateOk = ateQ && /^\d{4}-\d{2}-\d{2}$/.test(ateQ) ? ateQ : '';
+    const fu: any = await this.fontesUsos(projetoId, '', ateOk, req);
+    const cent = (v: any) => Math.round(Number(v || 0) * 100);
+    let aportes = 0;
+    for (const l of fu.matriz || []) if (l.origem === 'APORTE_ANCORA') aportes = cent(l.entrou);
+    const anos = new Map<number, { ano: number; ancora: number; pago: number; nat: Map<string, { ancora: number; pago: number }> }>();
+    for (const a of fu.aplicacoes || []) {
+      if (/devolu/i.test(String(a.natureza))) continue;
+      const ano = Number(String(a.data).slice(0, 4)); if (!ano) continue;
+      const anc = cent(a.ancora); const pago = Array.isArray(a.composicao) ? cent(a.composicao.reduce((s: number, c: any) => s + Number(c.valor || 0), 0)) : cent(a.valor ?? a.total);
+      const r = anos.get(ano) || { ano, ancora: 0, pago: 0, nat: new Map<string, { ancora: number; pago: number }>() };
+      r.ancora += anc; r.pago += pago;
+      const n = r.nat.get(a.natureza) || { ancora: 0, pago: 0 }; n.ancora += anc; n.pago += pago; r.nat.set(a.natureza, n);
+      anos.set(ano, r);
+    }
+    const lista = [...anos.values()].sort((x, y) => x.ano - y.ano).map((r) => ({ ano: r.ano, ancora: r.ancora / 100, pago: r.pago / 100,
+      porNatureza: [...r.nat.entries()].sort((p, q) => q[1].pago - p[1].pago).map(([natureza, v]) => ({ natureza, ancora: v.ancora / 100, pago: v.pago / 100 })) }));
+    return { dataConfissao: '2025-10-31', divida: 54418451, ate: ateOk || new Date().toISOString().slice(0, 10), aportesAncora: aportes / 100, anos: lista };
+  }
+
+  @Get('projetos/:projetoId/simulador-rm/cenarios')
+  @UseGuards(MasterOnlyGuard)
+  @ProjAcao('autenticado')
+  async simuladorRmCenarios(@Param('projetoId') projetoId: string, @Req() req: any) {
+    if (!UUID_RE.test(projetoId)) throw new NotFoundException('Registro nao encontrado.');
+    return this.db.comoUsuario(req.user.id, (tx: any) => tx.$queryRaw`SELECT id, nome, parametros, anual, resumo, criado_em AS "criadoEm"
+      FROM proj_simulacoes_rm WHERE projeto_id = ${projetoId}::uuid AND encerrado_em IS NULL ORDER BY criado_em DESC`);
+  }
+
+  @PostC('projetos/:projetoId/simulador-rm/cenarios')
+  @UseGuards(MasterOnlyGuard)
+  @ProjAcao('autenticado')
+  async simuladorRmSalvar(@Param('projetoId') projetoId: string, @BodyC() body: any, @Req() req: any) {
+    if (!UUID_RE.test(projetoId)) throw new NotFoundException('Registro nao encontrado.');
+    const nome = String(body?.nome || '').trim();
+    if (nome.length < 3 || nome.length > 120) throw new BadRequestException('Informe um nome de 3 a 120 caracteres.');
+    const obj = (v: any) => (v && typeof v === 'object' && !Array.isArray(v) ? v : null);
+    const parametros = obj(body?.parametros), resumo = obj(body?.resumo), anual = Array.isArray(body?.anual) ? body.anual : null;
+    if (!parametros || !resumo || !anual || !anual.length) throw new BadRequestException('Cenario incompleto.');
+    if (JSON.stringify(body).length > 200000) throw new BadRequestException('Cenario grande demais.');
+    try {
+      return await this.db.comoUsuario(req.user.id, async (tx: any) => {
+        const r: any[] = await tx.$queryRaw`INSERT INTO proj_simulacoes_rm (projeto_id, nome, parametros, anual, resumo, criado_por_id)
+          VALUES (${projetoId}::uuid, ${nome}, ${JSON.stringify(parametros)}::jsonb, ${JSON.stringify(anual)}::jsonb, ${JSON.stringify(resumo)}::jsonb, ${req.user.id}::uuid) RETURNING id`;
+        await tx.auditLog.create({ data: { actorId: req.user.id, action: 'PROJ_SIMULACAO_RM_SALVA', targetId: r[0].id, after: { projetoId, nome, parametros, resumo } } });
+        return { id: r[0].id };
+      });
+    } catch (e: any) { throw new BadRequestException(this.erroSimulacao(e)); }
+  }
+
+  @PostC('projetos/:projetoId/simulador-rm/cenarios/:id/encerrar')
+  @UseGuards(MasterOnlyGuard)
+  @ProjAcao('autenticado')
+  async simuladorRmEncerrar(@Param('projetoId') projetoId: string, @Param('id') id: string, @BodyC() body: any, @Req() req: any) {
+    if (!UUID_RE.test(projetoId) || !UUID_RE.test(id)) throw new NotFoundException('Registro nao encontrado.');
+    const motivo = String(body?.motivo || '').trim();
+    if (motivo.length < 10) throw new BadRequestException('Informe o motivo (minimo de 10 caracteres).');
+    let r: any[] = [];
+    try {
+      r = await this.db.comoUsuario(req.user.id, async (tx: any) => {
+        const x: any[] = await tx.$queryRaw`UPDATE proj_simulacoes_rm SET encerrado_em = CURRENT_TIMESTAMP, encerrado_por_id = ${req.user.id}::uuid, motivo_encerramento = ${motivo}
+          WHERE id = ${id}::uuid AND projeto_id = ${projetoId}::uuid AND encerrado_em IS NULL RETURNING id, nome`;
+        if (x.length) await tx.auditLog.create({ data: { actorId: req.user.id, action: 'PROJ_SIMULACAO_RM_ENCERRADA', targetId: id, after: { projetoId, nome: x[0].nome, motivo } } });
+        return x;
+      });
+    } catch (e: any) { throw new BadRequestException(this.erroSimulacao(e)); }
+    if (!r.length) throw new NotFoundException('Cenario nao encontrado ou ja encerrado.');
+    return { ok: true };
+  }
+
+  private erroSimulacao(e: any): string {
+    const m = String(e?.meta?.message || e?.message || '');
+    const k = m.match(/Simulacao: [^\n"]+/);
+    if (k) return k[0];
+    if (/foreign key/i.test(m)) return 'Projeto invalido.';
+    return 'Falha ao gravar o cenario.';
+  }
 }
