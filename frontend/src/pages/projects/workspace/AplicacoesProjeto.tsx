@@ -13,6 +13,14 @@ interface Aplicacao {
   beneficiario: string | null; creditoNumero: number | null; natureza: { codigo: string; nome: string; tipo: string };
 }
 
+const ROT_DARF: [string, string][] = [['TODOS', 'Todos'], ['OK', 'DARF ✓'], ['PARCIAL', 'Parcial'], ['SEM', 'Sem DARF']];
+const COR_DARF: Record<string, string> = { TODOS: '#134E4A', OK: '#166534', PARCIAL: '#B45309', SEM: '#A32D2D' };
+function ChipsDarf({ valor, set, contagem }: { valor: string; set: (v: string) => void; contagem: Record<string, number> }) {
+  return <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>{ROT_DARF.map(([k, r]) => (
+    <button key={k} onClick={() => set(k)} style={{ padding: '3px 10px', fontSize: 12, borderRadius: 999, cursor: 'pointer', border: `1px solid ${COR_DARF[k]}`,
+      background: valor === k ? COR_DARF[k] : '#fff', color: valor === k ? '#fff' : COR_DARF[k], fontWeight: 600 }}>{r} ({contagem[k] || 0})</button>))}</div>;
+}
+
 export default function AplicacoesProjeto({ operacao, master }: { operacao: Operacao | null; master: boolean }) {
   const [lista, setLista] = useState<Aplicacao[]>([]);
   const [erro, setErro] = useState('');
@@ -25,6 +33,15 @@ export default function AplicacoesProjeto({ operacao, master }: { operacao: Oper
     api.get(`/projects/operacoes/${operacao.id}/aplicacoes`).then((r) => setLista(r.data || [])).catch((e) => setErro(erroApi(e, 'Falha ao carregar as aplicações.')));
   }, [operacao]);
   useEffect(() => { carregar(); }, [carregar]);
+  // Comprovacao fiscal (08/10/2026): DARFs vinculados a cada aplicacao; so o Master ve o selo.
+  const [comprov, setComprov] = useState<Record<string, { valor: number; darfs: string[] }>>({});
+  const [fDarf, setFDarf] = useState('TODOS');
+  useEffect(() => {
+    if (!master || !operacao) return;
+    api.get(`/projects-relatorios/operacoes/${operacao.id}/comprovacao-fiscal`)
+      .then((r) => setComprov(Object.fromEntries((r.data || []).map((x: any) => [x.aplicacaoId, x]))))
+      .catch(() => setComprov({}));
+  }, [master, operacao]);
   // Periodo (07/10/2026): totais e lista ate uma data (ex.: 31/12/2025); clique na natureza filtra a lista.
   const noPeriodo = useMemo(() => lista.filter((a) => { const d = String(a.dataAplicacao).slice(0, 10); return (!de || d >= de) && (!ate || d <= ate); }), [lista, de, ate]);
   const porNatureza = useMemo(() => {
@@ -33,7 +50,11 @@ export default function AplicacoesProjeto({ operacao, master }: { operacao: Oper
     return [...m.values()].sort((a, b) => b.total - a.total);
   }, [noPeriodo]);
   const total = noPeriodo.reduce((s, a) => s + Number(a.valor), 0);
-  const visiveis = natSel ? noPeriodo.filter((a) => a.natureza.codigo === natSel) : noPeriodo;
+  // Filtro pelos selos de DARF (08/10/2026): so impostos; as demais naturezas ficam como 'NA'.
+  const statusDarf = (a: Aplicacao) => { if (!/impost/i.test(a.natureza.nome)) return 'NA'; const c = comprov[a.id]; return c && c.valor >= Number(a.valor) - 0.005 ? 'OK' : c ? 'PARCIAL' : 'SEM'; };
+  const baseNat = natSel ? noPeriodo.filter((a) => a.natureza.codigo === natSel) : noPeriodo;
+  const contDarf: Record<string, number> = { TODOS: baseNat.length }; baseNat.forEach((a) => { const s = statusDarf(a); contDarf[s] = (contDarf[s] || 0) + 1; });
+  const visiveis = fDarf === 'TODOS' ? baseNat : baseNat.filter((a) => statusDarf(a) === fDarf);
   const totalVis = visiveis.reduce((s, a) => s + Number(a.valor), 0);
   const br = (d: string) => d.split('-').reverse().join('/');
   const periodo = de && ate ? `de ${br(de)} a ${br(ate)}` : ate ? `até ${br(ate)}` : de ? `desde ${br(de)}` : 'geral';
@@ -78,13 +99,13 @@ export default function AplicacoesProjeto({ operacao, master }: { operacao: Oper
       </div>
       <div style={{ ...cardSt, overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead><tr><th style={thSt}>Data</th><th style={thSt}>Natureza</th><th style={{ ...thSt, textAlign: 'right' }}>Valor</th><th style={thSt}>Descrição e motivo</th><th style={thSt}>Devolvido a / crédito</th><th style={thSt}>Lançamento do extrato</th>{master && <th style={thSt}></th>}</tr></thead>
+          {master && <caption style={{ textAlign: 'left', padding: '10px 10px 6px', captionSide: 'top' }}><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><span style={{ fontSize: 11, fontWeight: 700, color: '#6B7280', letterSpacing: 0.4 }}>COMPROVAÇÃO FISCAL</span><ChipsDarf valor={fDarf} set={setFDarf} contagem={contDarf} /></div></caption>}<thead><tr><th style={thSt}>Data</th><th style={thSt}>Natureza</th><th style={{ ...thSt, textAlign: 'right' }}>Valor</th><th style={thSt}>Descrição e motivo</th><th style={thSt}>Devolvido a / crédito</th><th style={thSt}>Lançamento do extrato</th>{master && <th style={thSt}></th>}</tr></thead>
           <tbody>
             {lista.length === 0 && <tr><td colSpan={7} style={{ ...tdSt, textAlign: 'center', color: '#9CA3AF', padding: 24 }}>Nenhuma aplicação classificada ainda. A classificação é feita no LEDGR, em Projetos → Classificar saídas.</td></tr>}
             {visiveis.map((a) => (
               <tr key={a.id}>
                 <td style={{ ...tdSt, whiteSpace: 'nowrap' }}>{fmtData(a.dataAplicacao)}</td>
-                <td style={tdSt}>{a.natureza.nome}</td>
+                <td style={tdSt}>{a.natureza.nome}{master && /impost/i.test(a.natureza.nome) && (() => { const c = comprov[a.id]; const ok = c && c.valor >= Number(a.valor) - 0.005; const [txt, bg, fg] = ok ? ['DARF ✓', '#DCFCE7', '#166534'] : c ? ['DARF parcial', '#FEF3C7', '#78350F'] : ['sem DARF', '#FCEBEB', '#A32D2D']; return <span title={c ? 'DARF: ' + c.darfs.join(', ') : 'Nenhum DARF vinculado (Comprovantes fiscais)'} style={{ marginLeft: 6, fontSize: 10, fontWeight: 600, borderRadius: 999, padding: '1px 7px', background: bg, color: fg, whiteSpace: 'nowrap' }}>{txt}</span>; })()}</td>
                 <td style={{ ...tdSt, textAlign: 'right', fontWeight: 600, whiteSpace: 'nowrap' }}>{fmtBRL(a.valor)}</td>
                 <td style={tdSt}>{a.descricao && <div>{a.descricao}</div>}<div style={{ fontSize: 11, color: '#6B7280' }}>{a.motivo}</div></td>
                 <td style={tdSt}>{a.beneficiario || '-'}{a.creditoNumero ? ` · crédito nº ${a.creditoNumero}` : ''}</td>
