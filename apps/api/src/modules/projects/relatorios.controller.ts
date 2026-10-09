@@ -1406,4 +1406,161 @@ export class RelatoriosController {
     if (/foreign key/i.test(m)) return 'Projeto invalido.';
     return 'Falha ao gravar o cenario.';
   }
+
+  // Anexo V (09/10/2026): itens da confissao de 31/10/2025 (cl. 2.A.2), classificacao das aplicacoes e desembolsos no layout
+  // do Nei (colunas A-G, origem pelo PEPS). Anexo I: reconciliacao dos 58 aportes com os creditos do LEDGR. Calculo a cada consulta.
+  private anexoVSugestao(codigo: string, texto: string): { ordem: number | null; fora: boolean } {
+    if (['MANUTENCAO_OPERACAO', 'PAGAMENTO_ORDEM_INTERMEDIARIO', 'DEVOLUCAO_ADQUIRENTE'].includes(codigo)) return { ordem: null, fora: true };
+    if (codigo === 'IMPOSTOS') return { ordem: 5, fora: false };
+    if (codigo === 'TRABALHISTA' || codigo === 'SALARIOS') return { ordem: 4, fora: false };
+    if (codigo === 'HONORARIOS' && /arbitragem/i.test(texto || '')) return { ordem: null, fora: true };
+    return { ordem: null, fora: false };
+  }
+
+  private erroAnexoV(e: any): string {
+    const m = String(e?.meta?.message || e?.message || '');
+    const k = m.match(/Anexo V: [^\n"]+/);
+    if (k) return k[0];
+    if (/duplicate key|unique/i.test(m)) return 'Anexo V: a aplicacao ja esta classificada; encerre o vinculo antes de reclassificar.';
+    if (/destino_ck/i.test(m)) return 'Anexo V: informe um item do Anexo V ou marque como fora do Anexo V.';
+    return 'Falha ao gravar a classificacao.';
+  }
+
+  @Get('projetos/:projetoId/anexo-v')
+  @UseGuards(MasterOnlyGuard)
+  @ProjAcao('autenticado')
+  async anexoV(@Param('projetoId') projetoId: string, @Query('ate') ateQ: string, @Req() req: any) {
+    if (!UUID_RE.test(projetoId)) throw new NotFoundException('Registro nao encontrado.');
+    const ateOk = ateQ && /^\d{4}-\d{2}-\d{2}$/.test(ateQ) ? ateQ : '';
+    const fu: any = await this.fontesUsos(projetoId, '', ateOk, req);
+    const porTx = new Map<string, any>();
+    for (const a of fu.aplicacoes || []) porTx.set(String(a.id), a);
+    const txIds = [...porTx.keys()];
+    const CONTRATO = '2025-10-31';
+    const cent = (v: any) => Math.round(Number(v || 0) * 100);
+    return this.db.comoUsuario(req.user.id, async (tx: any) => {
+      const apl: any[] = txIds.length ? await tx.$queryRaw`SELECT a.id, a.bank_transaction_id AS "txId", a.operacao_id AS "operacaoId", a.data_aplicacao::text AS data,
+          a.valor::float AS valor, a.descricao, n.codigo, n.nome AS natureza, v.id AS "vinculoId", v.item_id AS "itemId", v.fora_anexo AS fora,
+          v.consta_reconciliacao AS consta, v.motivo AS "vinculoMotivo",
+          (SELECT string_agg(c.numero_documento, ', ') FROM proj_comprovante_vinculos cv JOIN proj_comprovantes_fiscais c ON c.id = cv.comprovante_id
+            WHERE cv.aplicacao_id = a.id AND cv.cancelado_em IS NULL AND c.cancelado_em IS NULL) AS darfs
+        FROM proj_aplicacoes a JOIN proj_naturezas_aplicacao n ON n.id = a.natureza_id
+        LEFT JOIN proj_aplicacao_anexo_v v ON v.aplicacao_id = a.id AND v.cancelado_em IS NULL
+        WHERE a.cancelado_em IS NULL AND a.bank_transaction_id = ANY(${txIds}::uuid[]) ORDER BY a.data_aplicacao, a.criado_em` : [];
+      const opIds = [...new Set(apl.map((a) => String(a.operacaoId)))];
+      const itens: any[] = opIds.length ? await tx.$queryRaw`SELECT id, operacao_id AS "operacaoId", ordem, credor, valor_face::float AS "valorFace"
+        FROM proj_anexo_v_itens WHERE operacao_id = ANY(${opIds}::uuid[]) ORDER BY ordem` : [];
+      const porOrdem = new Map<string, any>(); const porId = new Map<string, any>();
+      for (const i of itens) { porOrdem.set(`${i.operacaoId}:${i.ordem}`, i); porId.set(String(i.id), i); }
+      const pago = new Map<string, { f5: number; outros: number; antes: number; antesSim: number }>();
+      const linhas: any[] = [];
+      const aplicacoes = apl.map((a) => {
+        const f = porTx.get(String(a.txId));
+        let itemId: string | null = a.itemId ? String(a.itemId) : null;
+        let fora = !!a.fora;
+        let situacao = a.vinculoId ? 'CONFIRMADO' : 'PENDENTE';
+        if (!a.vinculoId) {
+          const s = this.anexoVSugestao(String(a.codigo), `${a.descricao || ''} ${f?.lancamento || ''}`);
+          fora = s.fora;
+          itemId = s.ordem ? (porOrdem.get(`${a.operacaoId}:${s.ordem}`)?.id ? String(porOrdem.get(`${a.operacaoId}:${s.ordem}`).id) : null) : null;
+          if (s.fora || itemId) situacao = 'SUGERIDO';
+        }
+        const item = itemId ? porId.get(itemId) : null;
+        const total = cent(a.valor); const ancora = Math.min(total, cent(f?.ancora)); const outros = total - ancora;
+        if (item && !fora && situacao !== 'PENDENTE') {
+          const consta = a.data <= CONTRATO ? (a.consta || 'Não') : '';
+          const base = { aplicacaoId: a.id, data: a.data, credor: f?.lancamento || a.descricao || '', item: `Anexo V - ${item.credor}`, consta,
+            comprovante: a.darfs ? `DARF ${a.darfs}` : `Extrato LEDGR ${String(a.data).split('-').reverse().join('/')}`, situacao };
+          if (ancora) linhas.push({ ...base, valor: ancora / 100, origem: 'VAL (via título F5)' });
+          if (outros) linhas.push({ ...base, valor: outros / 100, origem: 'Receita própria da Sunrise' });
+          const p = pago.get(String(item.id)) || { f5: 0, outros: 0, antes: 0, antesSim: 0 };
+          if (a.data <= CONTRATO) { p.antes += total; if (consta === 'Sim') p.antesSim += total; } else { p.f5 += ancora; p.outros += outros; }
+          pago.set(String(item.id), p);
+        }
+        return { id: a.id, data: a.data, valor: a.valor, natureza: a.natureza, codigo: a.codigo, descricao: a.descricao, lancamento: f?.lancamento || '',
+          ancora: ancora / 100, darfs: a.darfs, vinculoId: a.vinculoId, vinculoMotivo: a.vinculoMotivo, itemId, fora, consta: a.consta, situacao };
+      });
+      return {
+        contrato: CONTRATO, ate: ateOk || null, aplicacoes, linhas,
+        itens: itens.map((i) => { const p = pago.get(String(i.id)) || { f5: 0, outros: 0, antes: 0, antesSim: 0 };
+          return { id: i.id, ordem: i.ordem, credor: i.credor, valorFace: i.valorFace, pagoF5: p.f5 / 100, pagoOutros: p.outros / 100, pagoAntes: p.antes / 100, pagoAntesReconciliado: p.antesSim / 100, saldo: (cent(i.valorFace) - p.f5 - p.outros - p.antesSim) / 100 }; }),
+      };
+    });
+  }
+
+  @PostC('projetos/:projetoId/anexo-v/vincular')
+  @UseGuards(MasterOnlyGuard)
+  @ProjAcao('autenticado')
+  async anexoVVincular(@Param('projetoId') projetoId: string, @BodyC() body: any, @Req() req: any) {
+    if (!UUID_RE.test(projetoId)) throw new NotFoundException('Registro nao encontrado.');
+    const motivo = String(body?.motivo || '').trim();
+    if (motivo.length < 10) throw new BadRequestException('Informe o motivo (minimo de 10 caracteres).');
+    const lista: any[] = Array.isArray(body?.itens) ? body.itens : [];
+    if (!lista.length || lista.length > 500) throw new BadRequestException('Informe de 1 a 500 aplicacoes.');
+    for (const x of lista) {
+      if (!UUID_RE.test(String(x?.aplicacaoId || ''))) throw new BadRequestException('Aplicacao invalida.');
+      if (x.itemId != null && !UUID_RE.test(String(x.itemId))) throw new BadRequestException('Item do Anexo V invalido.');
+      if (x.consta != null && !['Sim', 'Não'].includes(x.consta)) throw new BadRequestException('Consta da reconciliacao: use Sim ou Não.');
+    }
+    try {
+      return await this.db.comoUsuario(req.user.id, async (tx: any) => {
+        for (const x of lista) {
+          const itemId = x.fora ? null : (x.itemId || null);
+          await tx.$queryRaw`INSERT INTO proj_aplicacao_anexo_v (aplicacao_id, item_id, fora_anexo, consta_reconciliacao, motivo, criado_por_id)
+            VALUES (${x.aplicacaoId}::uuid, ${itemId}::uuid, ${!!x.fora}, ${x.consta ?? null}::varchar, ${motivo}, ${req.user.id}::uuid) RETURNING id`;
+        }
+        await tx.auditLog.create({ data: { actorId: req.user.id, action: 'PROJ_ANEXO_V_CLASSIFICADO', targetId: projetoId, after: { projetoId, qtd: lista.length, motivo, itens: lista } } });
+        return { ok: true, qtd: lista.length };
+      });
+    } catch (e: any) { throw new BadRequestException(this.erroAnexoV(e)); }
+  }
+
+  @PostC('projetos/:projetoId/anexo-v/desvincular')
+  @UseGuards(MasterOnlyGuard)
+  @ProjAcao('autenticado')
+  async anexoVDesvincular(@Param('projetoId') projetoId: string, @BodyC() body: any, @Req() req: any) {
+    const vinculoId = String(body?.vinculoId || '');
+    if (!UUID_RE.test(projetoId) || !UUID_RE.test(vinculoId)) throw new NotFoundException('Registro nao encontrado.');
+    const motivo = String(body?.motivo || '').trim();
+    if (motivo.length < 10) throw new BadRequestException('Informe o motivo (minimo de 10 caracteres).');
+    let r: any[] = [];
+    try {
+      r = await this.db.comoUsuario(req.user.id, async (tx: any) => {
+        const x: any[] = await tx.$queryRaw`UPDATE proj_aplicacao_anexo_v SET cancelado_em = CURRENT_TIMESTAMP, cancelado_por_id = ${req.user.id}::uuid, motivo_cancelamento = ${motivo}
+          WHERE id = ${vinculoId}::uuid AND cancelado_em IS NULL RETURNING id, aplicacao_id AS "aplicacaoId"`;
+        if (x.length) await tx.auditLog.create({ data: { actorId: req.user.id, action: 'PROJ_ANEXO_V_DESVINCULADO', targetId: vinculoId, after: { projetoId, aplicacaoId: x[0].aplicacaoId, motivo } } });
+        return x;
+      });
+    } catch (e: any) { throw new BadRequestException(this.erroAnexoV(e)); }
+    if (!r.length) throw new NotFoundException('Vinculo nao encontrado ou ja encerrado.');
+    return { ok: true };
+  }
+
+  @Get('projetos/:projetoId/anexo-i')
+  @UseGuards(MasterOnlyGuard)
+  @ProjAcao('autenticado')
+  async anexoI(@Param('projetoId') projetoId: string, @Req() req: any) {
+    if (!UUID_RE.test(projetoId)) throw new NotFoundException('Registro nao encontrado.');
+    return this.db.comoUsuario(req.user.id, async (tx: any) => {
+      const rows: any[] = await tx.$queryRaw`WITH ops AS (SELECT DISTINCT operacao_id FROM proj_anexo_i_lancamentos),
+        c AS (SELECT DISTINCT ON (numero_ordem) id, numero_ordem, data_credito, valor, cancelado_em, motivo_cancelamento, remetente_nome_extrato
+              FROM proj_creditos WHERE operacao_id IN (SELECT operacao_id FROM ops) AND numero_ordem IS NOT NULL
+              ORDER BY numero_ordem, (cancelado_em IS NOT NULL), criado_em DESC)
+        SELECT COALESCE(ai.numero, c.numero_ordem) AS numero, ai.data::text AS data, ai.remetente, ai.forma, ai.valor::float AS valor,
+          c.id AS "creditoId", c.data_credito::text AS "dataLedgr", c.valor::float AS "valorLedgr", (c.cancelado_em IS NOT NULL) AS encerrado,
+          c.motivo_cancelamento AS "motivoEncerramento", c.remetente_nome_extrato AS "remetenteLedgr"
+        FROM proj_anexo_i_lancamentos ai FULL JOIN c ON c.numero_ordem = ai.numero ORDER BY 1`;
+      const lista = rows.map((r) => ({ ...r, numero: Number(r.numero),
+        situacao: !r.creditoId ? 'SO_ANEXO_I' : r.valor == null ? (r.encerrado ? 'ENCERRADO_SO_LEDGR' : 'SO_LEDGR') : r.encerrado ? 'ENCERRADO_NO_LEDGR'
+          : (Math.abs(Number(r.valor) - Number(r.valorLedgr)) < 0.005 && r.data === r.dataLedgr ? 'OK' : 'DIVERGE') }));
+      const resumo: Record<string, { qtd: number; anexoI: number; ledgr: number }> = {};
+      for (const r of lista) {
+        const s = resumo[r.situacao] || { qtd: 0, anexoI: 0, ledgr: 0 };
+        s.qtd += 1; s.anexoI += Math.round(Number(r.valor || 0) * 100); s.ledgr += r.encerrado ? 0 : Math.round(Number(r.valorLedgr || 0) * 100);
+        resumo[r.situacao] = s;
+      }
+      for (const k of Object.keys(resumo)) { resumo[k].anexoI /= 100; resumo[k].ledgr /= 100; }
+      return { lista, resumo };
+    });
+  }
 }

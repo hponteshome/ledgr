@@ -10445,3 +10445,9 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - Calculo pelo saldo da divida: encargos e variacao cambial aumentam o saldo; antecipacao, desconto e preferencial abatem; recuperacao quando o saldo zera; spread = recebido - divida original.
 - Cenarios antigos: corr vira atualizacao monetaria e abrem como Detalhado. Sem mudanca de backend.
 - Minuta simplificada do aditivo (8 clausulas + quadro ilustrativo) no claude.ai.
+## 2026-10-09 - Anexo V e desembolsos (modelo F5 financiadora do Nei)
+- Modelo do Nei adotado pela administracao do projeto: F5 financia o Anexo V por conta da RM (insolvente desde 22/07/2026); credito da F5 de EUR 8.748.947,11 nao baixa com pagamentos (desembolsado x a desembolsar); spread de 20% para a massa; programa de amortizacao da Sunrise + dacao do saldo a F5. Minutas do aditivo RM x SUNRISE e a E2 (resgate na F5) ficam superadas.
+- Tabelas: proj_anexo_v_itens (18 credores da cl. 2.A.2, R$ 54.418.451; coluna credor_no_contrato guarda o texto original; 3 renomeados a pedido), proj_aplicacao_anexo_v (classificacao imutavel, encerra com motivo), proj_anexo_i_lancamentos (58 aportes). RLS so Master.
+- Rotas anexo-v (consulta, vincular em lote, desvincular) e anexo-i; origem pelo PEPS (Ancora = VAL via titulo F5; demais = receita propria da Sunrise). Tela Anexo V e desembolsos: itens (antes/depois de 31/10/2025), classificacao com sugestoes por natureza, desembolsos no layout do Nei com Excel, reconciliacao do Anexo I.
+- Decisao: aportes da VAL desde ago/2024 sao a aquisicao da VAL (direito dela contra a F5 por todos). Pagamentos anteriores a 31/10/2025 = "Nao": credito da F5 sobre a Sunrise, fora da confissao (premissa da linha 44 do Nei deve mudar).
+- Reconciliacao Anexo I: 50 batem; 8 (31-33, 39, 43-46; R$ 50.991,74) sao devolucoes da custodia da Josi e devem sair do Anexo I; n. 59 (R$ 676,41) so no LEDGR; n. 24 (R$ 10,00) pendente de encerramento.
