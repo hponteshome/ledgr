@@ -10438,3 +10438,10 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - Suite QA: 403 para simulador-rm/base e /cenarios.
 - Pendente fora desta sessao: 9 erros de tsc em frontend/src/pages/sped/EcdPage.tsx (stats.consistency), existentes desde o commit 969332e de 27/08/2026.
 - 2026-10-08: resolvido o pendente do EcdPage (commit c15cf43): consistency? opcional nos 3 tipos de stats; tsc do frontend volta a exit 0.
+
+## 2026-10-09 - Simulador RM: modos Simplificado e Detalhado
+- Simplificado espelha a planilha Simulador_Spread_RM.xlsx: divida fixa em reais, sem encargos, prejuizo conta como zero, sem graficos; padroes 25/5, antecipacao 10%, desconto medio 20%, parte do desconto 20%, resultado R$ 376,2 mi (R$ 41,8 mi/ano 2027-2035).
+- Detalhado: moeda da divida configuravel (R$ fixa ou euro com cambio inicial 6,22 e variacao cambial % a.a.), atualizacao monetaria e juros % a.a. sobre o saldo desde 2026, compensacao de prejuizo opcional, graficos e naturezas de passivo.
+- Calculo pelo saldo da divida: encargos e variacao cambial aumentam o saldo; antecipacao, desconto e preferencial abatem; recuperacao quando o saldo zera; spread = recebido - divida original.
+- Cenarios antigos: corr vira atualizacao monetaria e abrem como Detalhado. Sem mudanca de backend.
+- Minuta simplificada do aditivo (8 clausulas + quadro ilustrativo) no claude.ai.
