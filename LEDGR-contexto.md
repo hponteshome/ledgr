@@ -10451,3 +10451,12 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - Rotas anexo-v (consulta, vincular em lote, desvincular) e anexo-i; origem pelo PEPS (Ancora = VAL via titulo F5; demais = receita propria da Sunrise). Tela Anexo V e desembolsos: itens (antes/depois de 31/10/2025), classificacao com sugestoes por natureza, desembolsos no layout do Nei com Excel, reconciliacao do Anexo I.
 - Decisao: aportes da VAL desde ago/2024 sao a aquisicao da VAL (direito dela contra a F5 por todos). Pagamentos anteriores a 31/10/2025 = "Nao": credito da F5 sobre a Sunrise, fora da confissao (premissa da linha 44 do Nei deve mudar).
 - Reconciliacao Anexo I: 50 batem; 8 (31-33, 39, 43-46; R$ 50.991,74) sao devolucoes da custodia da Josi e devem sair do Anexo I; n. 59 (R$ 676,41) so no LEDGR; n. 24 (R$ 10,00) pendente de encerramento.
+## 2026-10-10 - Instrumentos do plano (Etapas 1 e 2)
+- Migracao 20261010_proj_instrumentos: proj_instrumentos, _versoes (SHA-256), _partes, _dependencias, _registros,
+  _valores (congelados na aprovacao) e _eventos (trilha encadeada por hash; UPDATE/DELETE bloqueados por trigger).
+- Ciclo validado no banco: RASCUNHO > EM_REVISAO > APROVADO (exige versao FINAL) > EM_ASSINATURA (exige dependencias)
+  > ASSINADO (exige PDF ASSINADA) > REGISTRADO (exige registro) > VIGENTE; retorno/encerramento exigem motivo.
+- Perfil REVISOR (acao 'revisar', ProjAcaoTipo): le, comenta e envia versoes REVISAO so com o instrumento EM_REVISAO (RLS).
+- 11 instrumentos carregados (I01-I11, planilha do Nei), 19 partes e 9 dependencias. Arquivos em storage/projetos/instrumentos/<id>/<sha>.
+- Tela InstrumentosProjeto.tsx (menu "Instrumentos do plano", so Master por ora). Teste real: I11 levado a VIGENTE em 10/10/2026.
+- Pendente: Etapa 2b (Revisor no workspace so com esta tela), Etapa 3 (ClickSign e validacao do PDF assinado), Etapa 4 (valores do LEDGR e dossie).
