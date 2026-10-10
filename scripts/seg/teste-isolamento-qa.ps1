@@ -209,6 +209,7 @@ if ($global:tok) {
   Teste "Instrumentos - lista (sem perfil revisor)"    GET "/projects-instrumentos/projetos/${projId}/instrumentos" 403
   Teste "Instrumentos - detalhe (sem perfil revisor)"  GET "/projects-instrumentos/projetos/${projId}/instrumentos/${instrId}" 403
   Teste "Instrumentos - acesso (sem perfil revisor)"   GET "/projects-instrumentos/projetos/${projId}/acesso" 403
+  Teste "Instrumentos - enviar a ClickSign (so Master)" POST "/projects-instrumentos/projetos/${projId}/instrumentos/${instrId}/assinatura/clicksign" 403
   # Seguranca 0A (04/10/2026): escopo pela empresa DO REGISTRO (empresa sem vinculo com a QA, escolhida pela regra)
   $empOutra = ((docker exec ledgr-postgres psql -U ledgr -d ledgr_app -tA -c "SELECT c.id FROM companies c WHERE NOT EXISTS (SELECT 1 FROM user_companies uc JOIN users u ON u.id = uc.user_id WHERE u.email = 'qa.hotelsys@ledgr.local' AND uc.company_id = c.id) ORDER BY c.legal_name LIMIT 1") | Out-String).Trim()
   $docOutra = if ($empOutra) { ((docker exec ledgr-postgres psql -U ledgr -d ledgr_app -tA -c "SELECT id FROM documents WHERE company_id = '$empOutra' LIMIT 1") | Out-String).Trim() } else { '' }

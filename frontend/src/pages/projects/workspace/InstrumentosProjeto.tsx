@@ -25,11 +25,20 @@ const LEI: Record<string, string> = { BR: 'Lei brasileira', PT: 'Lei portuguesa'
 const PAPEL: Record<string, string> = { PARTE: 'Parte', FIADOR: 'Fiador', INTERVENIENTE: 'Interveniente', CIENCIA: 'Ciência', TESTEMUNHA: 'Testemunha' };
 const FORMA: Record<string, string> = { CLICKSIGN: 'ClickSign', ICP_BRASIL: 'ICP-Brasil', QUALIFICADA_EU: 'Qualificada (UE/PT)', MANUSCRITA: 'Manuscrita', A_DEFINIR: 'A definir' };
 const ORIGEM: Record<string, string> = { ANEXO_I: 'Anexo I', ANEXO_V: 'Anexo V', CONFISSAO: 'Confissão', PLANILHA_NEI: 'Planilha do Nei', SIMULADOR: 'Simulador', MANUAL: 'Manual' };
+const TIPO_CERT: Record<string, string> = { ICP_BRASIL: 'ICP-Brasil', GOVBR: 'gov.br', QUALIFICADA_EU: 'Qualificada (UE/PT)', OTHER: 'Outro emissor' };
+const CONFIANCA: Record<string, { rot: string; cor: string; fundo: string }> = {
+  VALID: { rot: 'Emissor reconhecido', cor: '#166534', fundo: '#DCFCE7' },
+  EXPIRED: { rot: 'Certificado vencido', cor: '#A32D2D', fundo: '#FCEBEB' },
+  UNTRUSTED: { rot: 'Emissor não reconhecido', cor: '#92400E', fundo: '#FEF3C7' },
+  UNKNOWN: { rot: 'Indeterminada', cor: '#374151', fundo: '#F3F4F6' },
+};
 const EVENTO: Record<string, string> = {
   CRIADO: 'Criado', EDITADO: 'Editado', SITUACAO: 'Situação', VERSAO: 'Versão enviada', VERSAO_ENCERRADO: 'Versão encerrada',
   PARTE: 'Parte incluída', PARTE_ENCERRADO: 'Parte encerrada', DEPENDENCIA: 'Dependência incluída', DEPENDENCIA_ENCERRADO: 'Dependência encerrada',
   REGISTRO: 'Registro informado', REGISTRO_ENCERRADO: 'Registro encerrado', VALOR: 'Valor vinculado', VALOR_ENCERRADO: 'Valor encerrado',
   VALOR_CONGELADO: 'Valor congelado na aprovação', COMENTARIO: 'Comentário',
+  ENVIO_ASSINATURA: 'Enviado para assinatura', ENVIO_CONCLUIDO: 'Assinatura concluída', ENVIO_CANCELADO: 'Envio cancelado',
+  ASSINATURA_PARTE: 'Parte assinou', VALIDACAO: 'Validação de assinaturas',
 };
 
 const painel: React.CSSProperties = { background: '#fff', border: '0.5px solid #E5E7EB', borderRadius: 10, padding: 14 };
@@ -42,11 +51,12 @@ const inputSt: React.CSSProperties = { width: '100%', padding: '7px 9px', border
 const pequeno: React.CSSProperties = { fontSize: 11, color: '#6B7280' };
 
 type Acao = { para: string; rot: string; precisa?: 'versao' | 'substituto'; tom?: 'pri' | 'perigo'; dica?: string };
-type Aba = 'versoes' | 'partes' | 'registro' | 'valores' | 'dependencias' | 'trilha';
+type Aba = 'versoes' | 'partes' | 'assinatura' | 'registro' | 'valores' | 'dependencias' | 'trilha';
 type ModalSt =
   | { tipo: 'transitar'; acao: Acao }
   | { tipo: 'versao' } | { tipo: 'parte' } | { tipo: 'registro' } | { tipo: 'valor' } | { tipo: 'dependencia' }
-  | { tipo: 'encerrar'; colecao: string; item: any; rotulo: string };
+  | { tipo: 'encerrar'; colecao: string; item: any; rotulo: string }
+  | { tipo: 'clicksign' } | { tipo: 'cancelarEnvio' };
 
 function acoesDe(i: any): Acao[] {
   const a: Acao[] = [];
@@ -118,6 +128,9 @@ function resumoEvento(e: any): string {
     case 'VALOR': case 'VALOR_ENCERRADO': case 'VALOR_CONGELADO': return `${d.rotulo || ''}: ${d.valor != null ? fmtVal(String(d.valor), d.moeda) : ''}`;
     case 'DEPENDENCIA': case 'DEPENDENCIA_ENCERRADO': return `exige ${SIT[d.exige_situacao]?.rot || d.exige_situacao || ''}`;
     case 'COMENTARIO': return d.texto || '';
+    case 'ENVIO_ASSINATURA': case 'ENVIO_CONCLUIDO': case 'ENVIO_CANCELADO': return `${d.canal || ''} · documento ${d.chave || ''}`;
+    case 'ASSINATURA_PARTE': return `${d.nome || ''} (${d.email || ''}) · ${d.situacao || ''}`;
+    case 'VALIDACAO': return `${d.valido ? 'Assinaturas reconhecidas' : 'Não confirmada'} · ${d.assinaturas} assinatura(s)${Array.isArray(d.signatarios) && d.signatarios.length ? ': ' + d.signatarios.join(', ') : ''}`;
     case 'EDITADO': return 'Dados descritivos alterados';
     default: return '';
   }
@@ -172,6 +185,7 @@ export default function InstrumentosProjeto({ projetoId }: { projetoId: string }
   const [ocupado, setOcupado] = useState(false);
   const [erroM, setErroM] = useState('');
   const [comentario, setComentario] = useState('');
+  const [sinc, setSinc] = useState(false);
 
   const carregarLista = () => api.get(base).then((r) => { setLista(r.data); setErro(''); }).catch((e) => setErro(msgErro(e)));
   const carregarDet = (id: string) => api.get(`${base}/${id}`).then((r) => setDet(r.data)).catch((e) => setErro(msgErro(e)));
@@ -193,6 +207,12 @@ export default function InstrumentosProjeto({ projetoId }: { projetoId: string }
     if (m.tipo === 'registro') ini.orgao = inst?.orgaoRegistro || '';
     if (m.tipo === 'valor') { ini.moeda = 'BRL'; ini.origem = 'MANUAL'; }
     if (m.tipo === 'dependencia') ini.exige = 'ASSINADO';
+    if (m.tipo === 'clicksign') {
+      ini.prazo = '30';
+      (det?.partes || []).filter((p: any) => !p.canceladoEm).forEach((p: any) => {
+        ini['sel_' + p.id] = p.formaAssinatura === 'CLICKSIGN' ? '1' : ''; ini['email_' + p.id] = p.email || '';
+      });
+    }
     setF(ini); setArq(null); setErroM(''); setModal(m);
   };
 
@@ -243,6 +263,18 @@ export default function InstrumentosProjeto({ projetoId }: { projetoId: string }
         if (!f.depId) throw new Error('Escolha o instrumento.');
         setOcupado(true);
         await api.post(`${url}/dependencias`, { dependeDeId: f.depId, exigeSituacao: f.exige, justificativa: f.justificativa || null });
+      } else if (modal.tipo === 'clicksign') {
+        const ativas = det.partes.filter((p: any) => !p.canceladoEm);
+        const sig = ativas.filter((p: any) => f['sel_' + p.id] === '1').map((p: any) => ({ parteId: p.id, email: (f['email_' + p.id] || '').trim() }));
+        if (!sig.length) throw new Error('Escolha ao menos uma parte.');
+        if (sig.some((s: any) => !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s.email))) throw new Error('Informe um e-mail válido para cada parte escolhida.');
+        setOcupado(true);
+        await api.post(`${url}/assinatura/clicksign`, { signatarios: sig, prazoDias: Number(f.prazo || 30) });
+      } else if (modal.tipo === 'cancelarEnvio') {
+        if ((f.motivo || '').trim().length < 10) throw new Error('Informe o motivo (mínimo de 10 caracteres).');
+        setOcupado(true);
+        const r = await api.post(`${url}/assinatura/cancelar`, { motivo: f.motivo });
+        if (r.data?.aviso) toast(r.data.aviso);
       } else if (modal.tipo === 'encerrar') {
         if ((f.motivo || '').trim().length < 10) throw new Error('Informe o motivo (mínimo de 10 caracteres).');
         setOcupado(true);
@@ -254,6 +286,25 @@ export default function InstrumentosProjeto({ projetoId }: { projetoId: string }
     } catch (e: any) { setErroM(msgErro(e)); } finally { setOcupado(false); }
   };
 
+  const atualizarClickSign = async () => {
+    if (!inst) return;
+    setSinc(true);
+    try {
+      const r = await api.post(`${base}/${inst.id}/assinatura/atualizar`, {});
+      const d = r.data;
+      if (d.aviso) toast(d.aviso);
+      else toast.success(d.concluido ? 'Todos assinaram: PDF assinado guardado e validado.' : `ClickSign: ${d.status || '-'} · novas assinaturas: ${d.novasAssinaturas}.`);
+      carregarDet(inst.id);
+    } catch (e) { toast.error(msgErro(e)); } finally { setSinc(false); }
+  };
+  const validarVersao = async (v: any) => {
+    if (!inst) return;
+    try {
+      const r = await api.post(`${base}/${inst.id}/versoes/${v.id}/validar`, {});
+      toast.success(r.data?.valido ? 'Assinaturas com emissor reconhecido.' : 'Assinaturas não confirmadas. Veja a aba Assinatura.');
+      carregarDet(inst.id);
+    } catch (e) { toast.error(msgErro(e)); }
+  };
   const comentar = async () => {
     if (!inst || comentario.trim().length < 3) return;
     try {
@@ -374,6 +425,7 @@ export default function InstrumentosProjeto({ projetoId }: { projetoId: string }
       <div style={{ display: 'flex', gap: 2, borderBottom: '1px solid #E5E7EB', overflowX: 'auto' }}>
         {abaBtn('versoes', 'Versões', versoesAtivas.length)}
         {abaBtn('partes', 'Partes', det.partes.filter((p: any) => !p.canceladoEm).length)}
+        {abaBtn('assinatura', 'Assinatura', (det.validacoes || []).length)}
         {abaBtn('registro', 'Registro', det.registros.filter((r: any) => !r.canceladoEm).length)}
         {abaBtn('valores', 'Valores', det.valores.filter((v: any) => !v.canceladoEm).length)}
         {abaBtn('dependencias', 'Dependências', det.dependencias.length)}
@@ -407,7 +459,7 @@ export default function InstrumentosProjeto({ projetoId }: { projetoId: string }
                       </td>
                       <td style={{ ...tdSt, whiteSpace: 'nowrap' }}>
                         <button style={linkBtn} onClick={() => baixar(`${base}/${inst.id}/versoes/${v.id}/arquivo`, v.arquivoNome).catch((e) => toast.error(msgErro(e)))}>Baixar</button>
-                        {' '}{encerrarBtn('versoes', v, `versão v${v.numero}`)}
+                        {' '}{master && v.tipo === 'ASSINADA' && !v.canceladoEm && <button style={linkBtn} onClick={() => validarVersao(v)}>Validar</button>}{' '}{encerrarBtn('versoes', v, `versão v${v.numero}`)}
                       </td>
                     </tr>
                   ))}
@@ -444,6 +496,100 @@ export default function InstrumentosProjeto({ projetoId }: { projetoId: string }
           </div>
         </div>
       )}
+
+      {aba === 'assinatura' && (() => {
+        const envios: any[] = det.envios || [];
+        const ativo = envios.find((e: any) => e.situacao === 'ENVIADO');
+        const aprovada = det.versoes.find((v: any) => v.id === inst.versaoAprovadaId);
+        const aprovadaPdf = !!aprovada && /\.pdf$/i.test(aprovada.arquivoNome || '');
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={painel}>
+              <div style={pequeno}>
+                Partes no Brasil assinam pela ClickSign. Partes em Portugal (assinatura qualificada ou à mão) assinam fora: o PDF assinado
+                entra na aba Versões como Assinada e a validação roda sozinha. Depois, use "Marcar como assinado".
+              </div>
+              {!inst.requerAssinatura && <div style={{ ...pequeno, marginTop: 8 }}>Este instrumento não exige assinatura.</div>}
+              {master && inst.situacao === 'EM_ASSINATURA' && !ativo && (
+                <div style={{ marginTop: 10, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <button style={{ ...botaoPri, opacity: aprovadaPdf ? 1 : 0.5 }} disabled={!aprovadaPdf} onClick={() => abrir({ tipo: 'clicksign' })}>Enviar à ClickSign</button>
+                  {!aprovadaPdf && <span style={{ fontSize: 12, color: '#92400E' }}>A versão aprovada não é PDF. A ClickSign só aceita PDF.</span>}
+                </div>
+              )}
+            </div>
+            {ativo && (
+              <div style={painel}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 14 }}>Envio em andamento · ClickSign</div>
+                    <div style={pequeno}>Documento {ativo.chave} · versão v{ativo.versaoNumero} · prazo {fmtDH(ativo.prazo)}</div>
+                    <div style={pequeno}>Situação na ClickSign: {ativo.statusExterno || 'não consultada'} · última consulta {fmtDH(ativo.ultimaConsulta)}</div>
+                  </div>
+                  {master && (
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button style={botaoPri} disabled={sinc} onClick={atualizarClickSign}>{sinc ? 'Consultando...' : 'Atualizar da ClickSign'}</button>
+                      <button style={botaoPerigo} onClick={() => abrir({ tipo: 'cancelarEnvio' })}>Cancelar envio</button>
+                    </div>
+                  )}
+                </div>
+                <div style={{ overflowX: 'auto', marginTop: 10 }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 520 }}>
+                    <thead><tr><th style={thSt}>Parte</th><th style={thSt}>E-mail</th><th style={thSt}>Situação</th><th style={thSt}>Assinou em</th></tr></thead>
+                    <tbody>
+                      {ativo.assinaturas.map((a: any) => (
+                        <tr key={a.id}>
+                          <td style={tdSt}>{a.nome}</td><td style={tdSt}>{a.email}</td>
+                          <td style={tdSt}><Tag cor={a.situacao === 'ASSINADO' ? '#166534' : '#92400E'} fundo={a.situacao === 'ASSINADO' ? '#DCFCE7' : '#FEF3C7'}>{a.situacao === 'ASSINADO' ? 'Assinou' : a.situacao === 'RECUSADO' ? 'Recusou' : 'Pendente'}</Tag></td>
+                          <td style={tdSt}>{fmtDH(a.assinadoEm)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+            {envios.filter((e: any) => e.situacao !== 'ENVIADO').length > 0 && (
+              <div style={painel}>
+                <Label>Envios anteriores</Label>
+                {envios.filter((e: any) => e.situacao !== 'ENVIADO').map((e: any) => (
+                  <div key={e.id} style={{ borderTop: '1px solid #F3F4F6', padding: '6px 0', fontSize: 12 }}>
+                    <b>{e.situacao === 'CONCLUIDO' ? 'Concluído' : 'Cancelado'}</b> · ClickSign {e.chave} · versão v{e.versaoNumero} · enviado em {fmtDH(e.criadoEm)}
+                    {e.concluidoEm && <> · concluído em {fmtDH(e.concluidoEm)}</>}
+                    {e.motivoCancelamento && <div style={{ color: '#A32D2D' }}>Motivo: {e.motivoCancelamento}</div>}
+                    <div style={pequeno}>{e.assinaturas.map((a: any) => `${a.nome} (${a.situacao === 'ASSINADO' ? 'assinou' : 'pendente'})`).join(' · ')}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div style={painel}>
+              <Label>Validações de PDF assinado</Label>
+              {(det.validacoes || []).length === 0 ? <div style={pequeno}>Nenhuma validação ainda.</div> : det.validacoes.map((x: any) => (
+                <div key={x.id} style={{ borderTop: '1px solid #F3F4F6', padding: '8px 0' }}>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <span style={{ fontWeight: 600, fontSize: 13 }}>v{x.versaoNumero}</span>
+                    <Tag cor={x.valido ? '#166534' : '#A32D2D'} fundo={x.valido ? '#DCFCE7' : '#FCEBEB'}>{x.valido ? 'Emissor reconhecido' : 'Não confirmada'}</Tag>
+                    <span style={pequeno}>{x.qtd} assinatura(s) · {fmtDH(x.criadoEm)} · PDF {String(x.sha256).slice(0, 12)}</span>
+                  </div>
+                  {(x.resultado?.assinaturas || []).map((s: any, k: number) => {
+                    const cf = CONFIANCA[s.confianca] || CONFIANCA.UNKNOWN;
+                    return (
+                      <div key={k} style={{ fontSize: 12, marginTop: 4, display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                        <span style={{ fontWeight: 600 }}>{s.nome || 'Sem nome'}</span>
+                        {s.documento && <span style={mono}>{s.documento}</span>}
+                        <Tag>{TIPO_CERT[s.tipo] || s.tipo}</Tag>
+                        <Tag cor={cf.cor} fundo={cf.fundo}>{cf.rot}</Tag>
+                        <span style={pequeno}>{s.emissor} · válido até {fmtD(s.validoAte)}</span>
+                      </div>
+                    );
+                  })}
+                  {(x.resultado?.erros || []).length > 0 && <div style={{ fontSize: 11, color: '#A32D2D', marginTop: 4 }}>{x.resultado.erros.join(' · ')}</div>}
+                  {x.resultado?.metodo && <div style={{ ...pequeno, marginTop: 4, fontStyle: 'italic' }}>{x.resultado.metodo}</div>}
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
 
       {aba === 'registro' && (
         <div style={painel}>
@@ -647,6 +793,30 @@ export default function InstrumentosProjeto({ projetoId }: { projetoId: string }
             {['APROVADO', 'ASSINADO', 'REGISTRADO', 'VIGENTE'].map((s) => <option key={s} value={s}>{SIT[s].rot}</option>)}
           </select>
           <Label>Justificativa</Label><input value={f.justificativa || ''} onChange={campo('justificativa')} style={inputSt} />
+        </Modal>
+      )}
+
+      {modal && modal.tipo === 'clicksign' && (
+        <Modal titulo="Enviar à ClickSign" subtitulo={`${inst.codigo} · ${inst.titulo}`} onFechar={() => setModal(null)} onConfirmar={confirmar} rotulo="Enviar" ocupado={ocupado} erro={erroM}>
+          <div style={{ fontSize: 12, color: '#374151' }}>O PDF aprovado vai para a ClickSign e cada parte escolhida recebe o pedido por e-mail. Partes que assinam fora (Portugal ou à mão) ficam desmarcadas.</div>
+          <Label>Partes que assinam pela ClickSign</Label>
+          {det.partes.filter((p: any) => !p.canceladoEm).map((p: any) => (
+            <div key={p.id} style={{ display: 'flex', gap: 8, alignItems: 'center', margin: '6px 0', flexWrap: 'wrap' }}>
+              <input type="checkbox" checked={f['sel_' + p.id] === '1'} onChange={(e) => { const v = e.target.checked ? '1' : ''; setF((x) => ({ ...x, ['sel_' + p.id]: v })); }} />
+              <div style={{ minWidth: 180, flex: 1, fontSize: 13 }}>{p.nome}<div style={pequeno}>{PAPEL[p.papel] || p.papel} · {FORMA[p.formaAssinatura] || p.formaAssinatura}</div></div>
+              <input value={f['email_' + p.id] || ''} onChange={campo('email_' + p.id)} placeholder="e-mail do signatário" style={{ ...inputSt, maxWidth: 240 }} disabled={f['sel_' + p.id] !== '1'} />
+            </div>
+          ))}
+          <Label>Prazo (dias)</Label>
+          <input value={f.prazo || ''} onChange={campo('prazo')} style={{ ...inputSt, maxWidth: 100 }} />
+        </Modal>
+      )}
+
+      {modal && modal.tipo === 'cancelarEnvio' && (
+        <Modal titulo="Cancelar envio" subtitulo={`${inst.codigo} · ClickSign`} onFechar={() => setModal(null)} onConfirmar={confirmar} rotulo="Cancelar envio" ocupado={ocupado} erro={erroM} perigo>
+          <div style={{ fontSize: 12, color: '#374151' }}>O documento é cancelado na ClickSign e o envio fica registrado como cancelado na trilha.</div>
+          <Label>Motivo (obrigatório)</Label>
+          <textarea value={f.motivo || ''} onChange={campo('motivo')} rows={3} style={{ ...inputSt, resize: 'vertical' }} />
         </Modal>
       )}
 

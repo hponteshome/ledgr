@@ -20,7 +20,7 @@ export interface SignatureInfo {
   validFrom: Date;
   validTo: Date;
   signedAt: Date | null;
-  certificateType: 'ICP_BRASIL' | 'GOVBR' | 'OTHER';
+  certificateType: 'ICP_BRASIL' | 'GOVBR' | 'QUALIFICADA_EU' | 'OTHER';
   trustLevel: 'VALID' | 'EXPIRED' | 'UNTRUSTED' | 'UNKNOWN';
   algorithm: string;
 }
@@ -245,6 +245,9 @@ export class SignatureValidatorService {
 
   private detectCertType(issuer: string): SignatureInfo['certificateType'] {
     const l = issuer.toLowerCase();
+    // 10/10/2026: emissoras qualificadas de Portugal (Cartao de Cidadao, Chave Movel Digital, Multicert, DigitalSign)
+    if ((l.includes('cart') && l.includes('cidad')) || l.includes('chave m') || l.includes('multicert')
+        || (l.includes('digitalsign') && l.includes('qualif')) || l.includes('qualificada')) return 'QUALIFICADA_EU';
     if (l.includes('gov.br') || l.includes('acesso.gov')) return 'GOVBR';
     const icpACs = ['serpro','certisign','valid','safeweb','soluti','ac ','icp','serasa','caixa','receita','oab','jus','iti','instituto nacional','rfb','casa da moeda','digitalsign'];
     if (icpACs.some(a => l.includes(a))) return 'ICP_BRASIL';

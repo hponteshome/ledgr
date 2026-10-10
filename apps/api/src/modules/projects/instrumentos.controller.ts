@@ -20,6 +20,8 @@ import { SkipCompanyCheck, isMasterAdmin } from '../../multi-company/company.int
 import { ProjEscopoGuard, ProjAcao } from './proj-escopo.guard';
 import { UUID_RE } from './concessoes.service';
 import { ProjDbService } from './proj-db.service';
+import { ClicksignService } from '../signatures/clicksign.service';
+import { SignatureValidatorService } from '../signatures/signature-validator.service';
 
 const SITUACOES = ['RASCUNHO', 'EM_REVISAO', 'APROVADO', 'EM_ASSINATURA', 'ASSINADO', 'REGISTRADO', 'VIGENTE', 'SUBSTITUIDO', 'ENCERRADO'];
 const TIPOS_VERSAO = ['MINUTA', 'REVISAO', 'FINAL', 'ASSINADA'];
@@ -51,7 +53,11 @@ const extensao = (nome: string) => (String(nome || '').split('.').pop() || '').t
 @UseGuards(JwtAuthGuard, ProjEscopoGuard)
 @SkipCompanyCheck()
 export class InstrumentosController {
-  constructor(private readonly db: ProjDbService) {}
+  constructor(
+    private readonly db: ProjDbService,
+    private readonly clicksign: ClicksignService,
+    private readonly validador: SignatureValidatorService,
+  ) {}
 
   private ids(...xs: string[]) {
     for (const x of xs) if (!UUID_RE.test(String(x || ''))) throw new NotFoundException('Registro nao encontrado.');
@@ -84,6 +90,46 @@ export class InstrumentosController {
       fs.renameSync(tmp, destino);
     }
     return { sha, chave };
+  }
+
+  private lerArquivo(chave: string, sha: string): Buffer {
+    const caminho = path.join(this.dirArquivos(), ...chave.split('/'));
+    if (!fs.existsSync(caminho)) throw new NotFoundException('Arquivo nao encontrado no armazenamento.');
+    const buf = fs.readFileSync(caminho);
+    if (crypto.createHash('sha256').update(buf).digest('hex') !== String(sha).trim()) {
+      throw new ConflictException('Integridade violada: o arquivo armazenado difere do registrado.');
+    }
+    return buf;
+  }
+
+  // Validacao heuristica do validador do LEDGR: identifica signatarios e emissoras pelo nome;
+  // nao verifica a cadeia de confianca nem a integridade criptografica (registrado no proprio resultado).
+  private async validarESalvar(tx: any, instrumentoId: string, versaoId: string, buf: Buffer, sha: string) {
+    let r: any;
+    try { r = await this.validador.validateSignedPdf(buf); }
+    catch (e: any) { r = { valid: false, signatures: [], errors: [String(e?.message || e)] }; }
+    const resumo = {
+      valido: !!r.valid,
+      assinaturas: (r.signatures || []).map((s: any) => ({
+        nome: s.signerName, documento: s.signerCpf || null, emissor: s.issuer, tipo: s.certificateType,
+        confianca: s.trustLevel, validoDe: s.validFrom, validoAte: s.validTo,
+      })),
+      erros: r.errors || [],
+      metodo: 'Heuristico: identifica o emissor pelo nome; nao verifica a cadeia de confianca nem a integridade criptografica. Confirmar no validador oficial (ITI/AMA).',
+    };
+    await tx.$queryRaw`
+      INSERT INTO proj_instrumento_validacoes (instrumento_id, versao_id, valido, qtd_assinaturas, sha256, resultado)
+      VALUES (${instrumentoId}::uuid, ${versaoId}::uuid, ${resumo.valido}, ${resumo.assinaturas.length}::int, ${sha}::text, ${JSON.stringify(resumo)}::jsonb)
+      RETURNING id`;
+    return resumo;
+  }
+
+  private async envioAtivo(tx: any, instrumentoId: string) {
+    const r: any[] = await tx.$queryRaw`
+      SELECT e.id, e.chave_externa AS chave, e.versao_id AS "versaoId", i.codigo
+      FROM proj_instrumento_envios e JOIN proj_instrumentos i ON i.id = e.instrumento_id
+      WHERE e.instrumento_id = ${instrumentoId}::uuid AND e.situacao = 'ENVIADO'`;
+    return r[0] || null;
   }
 
   private entregar(res: Response, chave: string, sha: string, nome: string, mime: string | null) {
@@ -187,12 +233,27 @@ export class InstrumentosController {
                e.criado_em AS "criadoEm", u.email AS "por", e.hash, e.hash_anterior AS "hashAnterior"
         FROM proj_instrumento_eventos e LEFT JOIN users u ON u.id = e.criado_por_id
         WHERE e.instrumento_id = ${instrumentoId}::uuid ORDER BY e.seq`;
+      const envios = await tx.$queryRaw`
+        SELECT e.id, e.canal, e.chave_externa AS chave, e.situacao, e.prazo, e.criado_em AS "criadoEm", e.concluido_em AS "concluidoEm",
+               e.ultima_consulta_em AS "ultimaConsulta", e.ultima_resposta->>'status' AS "statusExterno",
+               e.cancelado_em AS "canceladoEm", e.motivo_cancelamento AS "motivoCancelamento", v.numero AS "versaoNumero",
+               COALESCE((SELECT jsonb_agg(jsonb_build_object('id', a.id, 'nome', p.nome, 'email', a.email, 'situacao', a.situacao,
+                          'assinadoEm', a.assinado_em) ORDER BY a.ordem)
+                         FROM proj_instrumento_assinaturas a JOIN proj_instrumento_partes p ON p.id = a.parte_id
+                         WHERE a.envio_id = e.id), '[]'::jsonb) AS assinaturas
+        FROM proj_instrumento_envios e JOIN proj_instrumento_versoes v ON v.id = e.versao_id
+        WHERE e.instrumento_id = ${instrumentoId}::uuid ORDER BY e.criado_em DESC`;
+      const validacoes = await tx.$queryRaw`
+        SELECT x.id, x.versao_id AS "versaoId", v.numero AS "versaoNumero", x.valido, x.qtd_assinaturas AS qtd, x.sha256,
+               x.resultado, x.criado_em AS "criadoEm"
+        FROM proj_instrumento_validacoes x JOIN proj_instrumento_versoes v ON v.id = x.versao_id
+        WHERE x.instrumento_id = ${instrumentoId}::uuid ORDER BY x.criado_em DESC`;
       const ver: any[] = await tx.$queryRaw`
         SELECT count(*)::int AS total, count(*) FILTER (WHERE NOT ev_ok)::int AS falhas
         FROM proj_instrumento_verificar(${instrumentoId}::uuid)`;
       return {
         podeOperar: isMasterAdmin(req.user),
-        instrumento: inst[0], versoes, partes, dependencias, dependentes, registros, valores, eventos,
+        instrumento: inst[0], versoes, partes, dependencias, dependentes, registros, valores, eventos, envios, validacoes,
         trilha: { eventos: ver[0]?.total ?? 0, integra: (ver[0]?.falhas ?? 1) === 0 },
       };
     });
@@ -275,7 +336,8 @@ export class InstrumentosController {
         RETURNING id, numero`;
       await tx.auditLog.create({ data: { actorId: req.user.id, action: 'PROJ_INSTRUMENTO_VERSAO_ENVIADA', targetId: v[0].id,
         after: { projetoId, instrumentoId, numero: v[0].numero, tipo, arquivo: nome, sha256: g.sha, tamanho: file.size } } });
-      return { ok: true, id: v[0].id, numero: v[0].numero, sha256: g.sha };
+      const validacao = tipo === 'ASSINADA' ? await this.validarESalvar(tx, instrumentoId, v[0].id, file.buffer, g.sha) : null;
+      return { ok: true, id: v[0].id, numero: v[0].numero, sha256: g.sha, validacao };
     });
   }
 
@@ -428,6 +490,196 @@ export class InstrumentosController {
         RETURNING id`;
       if (!r.length) throw new NotFoundException('Instrumento de dependencia nao encontrado neste projeto.');
       return { ok: true, id: r[0].id };
+    });
+  }
+
+  // ---------------------------------------------------------------- Etapa 3: assinatura
+  @Post('projetos/:projetoId/instrumentos/:instrumentoId/assinatura/clicksign')
+  @UseGuards(MasterOnlyGuard)
+  @ProjAcao('autenticado')
+  async enviarClicksign(@Param('projetoId') projetoId: string, @Param('instrumentoId') instrumentoId: string, @Body() body: any, @Req() req: any) {
+    this.ids(projetoId, instrumentoId);
+    const prazoDias = Math.min(90, Math.max(1, Number(body?.prazoDias) || 30));
+    const lista: any[] = Array.isArray(body?.signatarios) ? body.signatarios : [];
+    if (!lista.length || lista.length > 20) throw new BadRequestException('Escolha de 1 a 20 partes para assinar pela ClickSign.');
+    const emails: Record<string, string> = {};
+    for (const s of lista) {
+      const pid = String(s?.parteId || ''); const em = String(s?.email || '').trim().toLowerCase();
+      if (!UUID_RE.test(pid)) throw new BadRequestException('Parte invalida.');
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) throw new BadRequestException('E-mail invalido: ' + em);
+      emails[pid] = em;
+    }
+    const ids = Object.keys(emails);
+    const prep: any = await this.executar(req, async (tx: any) => {
+      const i: any[] = await tx.$queryRaw`
+        SELECT i.id, i.codigo, i.titulo, i.situacao, v.id AS "versaoId", v.arquivo_nome AS nome, v.sha256, v.chave_armazenamento AS chave
+        FROM proj_instrumentos i LEFT JOIN proj_instrumento_versoes v ON v.id = i.versao_aprovada_id
+        WHERE i.id = ${instrumentoId}::uuid AND i.projeto_id = ${projetoId}::uuid`;
+      if (!i.length) throw new NotFoundException('Registro nao encontrado.');
+      if (i[0].situacao !== 'EM_ASSINATURA') throw new BadRequestException('O instrumento precisa estar Em assinatura.');
+      if (!i[0].versaoId) throw new BadRequestException('Instrumento sem versao aprovada.');
+      if (extensao(i[0].nome) !== 'pdf') throw new BadRequestException('A ClickSign so aceita PDF. Cancele a assinatura, reabra a revisao, envie o PDF como Final e aprove.');
+      if (await this.envioAtivo(tx, instrumentoId)) throw new BadRequestException('Ja existe um envio ativo. Atualize ou cancele antes de enviar outro.');
+      const partes: any[] = await tx.$queryRaw`
+        SELECT id, nome, documento, ordem FROM proj_instrumento_partes
+        WHERE instrumento_id = ${instrumentoId}::uuid AND cancelado_em IS NULL AND id = ANY(${ids}::uuid[]) ORDER BY ordem`;
+      if (partes.length !== ids.length) throw new BadRequestException('Parte invalida ou encerrada.');
+      return { inst: i[0], partes };
+    });
+    const buf = this.lerArquivo(prep.inst.chave, prep.inst.sha256);
+    const prazo = new Date(Date.now() + prazoDias * 86400000);
+    const arquivo = (`${prep.inst.codigo} - ${prep.inst.titulo}`).replace(/[\\/:*?"<>|]/g, '-').slice(0, 120) + '.pdf';
+    let docKey = '';
+    const listas: any[] = [];
+    try {
+      docKey = await this.clicksign.uploadDocument(buf, arquivo, prazo);
+      for (const p of prep.partes) {
+        const d = String(p.documento || '').replace(/\D/g, '');
+        const cpf = d.length === 11 ? `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}` : undefined;
+        const signerKey = await this.clicksign.addSigner({ name: p.nome, email: emails[p.id], cpf, auth: 'email' });
+        const listKey = await this.clicksign.addSignerToDocument(docKey, signerKey, 1);
+        listas.push({ parteId: p.id, email: emails[p.id], ordem: p.ordem, signerKey, listKey });
+      }
+    } catch (e: any) {
+      if (docKey) await this.clicksign.cancelDocument(docKey).catch(() => undefined);
+      throw new BadRequestException('A ClickSign recusou o envio: ' + String(e?.message || e).slice(0, 200));
+    }
+    try {
+      return await this.executar(req, async (tx: any) => {
+        const e: any[] = await tx.$queryRaw`
+          INSERT INTO proj_instrumento_envios (instrumento_id, versao_id, canal, chave_externa, prazo, criado_por_id)
+          VALUES (${instrumentoId}::uuid, ${prep.inst.versaoId}::uuid, 'CLICKSIGN', ${docKey}::varchar, ${prazo}::timestamp, ${req.user.id}::uuid)
+          RETURNING id`;
+        for (const l of listas) {
+          await tx.$queryRaw`
+            INSERT INTO proj_instrumento_assinaturas (envio_id, parte_id, email, ordem, chave_signatario, chave_lista)
+            VALUES (${e[0].id}::uuid, ${l.parteId}::uuid, ${l.email}::varchar, ${l.ordem}::int, ${l.signerKey}::varchar, ${l.listKey}::varchar)
+            RETURNING id`;
+        }
+        await tx.auditLog.create({ data: { actorId: req.user.id, action: 'PROJ_INSTRUMENTO_ENVIADO_CLICKSIGN', targetId: e[0].id,
+          after: { projetoId, instrumentoId, documento: docKey, signatarios: listas.map((l) => l.email), prazo } } });
+        return { ok: true, envioId: e[0].id, documento: docKey, signatarios: listas.length };
+      });
+    } catch (err) {
+      await this.clicksign.cancelDocument(docKey).catch(() => undefined);
+      throw err;
+    }
+  }
+
+  @Post('projetos/:projetoId/instrumentos/:instrumentoId/assinatura/atualizar')
+  @UseGuards(MasterOnlyGuard)
+  @ProjAcao('autenticado')
+  async atualizarClicksign(@Param('projetoId') projetoId: string, @Param('instrumentoId') instrumentoId: string, @Req() req: any) {
+    this.ids(projetoId, instrumentoId);
+    const env: any = await this.executar(req, async (tx: any) => {
+      await this.instrumento(tx, projetoId, instrumentoId);
+      const e = await this.envioAtivo(tx, instrumentoId);
+      if (!e) throw new NotFoundException('Nenhum envio ativo para este instrumento.');
+      return e;
+    });
+    let st: any;
+    try { st = await this.clicksign.getDocumentStatus(env.chave); }
+    catch (e: any) { throw new BadRequestException('Falha ao consultar a ClickSign: ' + String(e?.message || e).slice(0, 200)); }
+    const doc = st?.document || {};
+    const assinados = new Map<string, string>();
+    for (const s of doc.signers || []) {
+      const em = String(s?.email || '').toLowerCase();
+      const at = s?.signature?.signed_at || s?.signed_at || (s?.status === 'signed' ? (s?.updated_at || new Date().toISOString()) : null);
+      if (em && at) assinados.set(em, String(at));
+    }
+    for (const ev of doc.events || []) {
+      if (ev?.name !== 'sign') continue;
+      const em = String(ev?.data?.signer?.email || ev?.signer?.email || '').toLowerCase();
+      if (em && !assinados.has(em)) assinados.set(em, String(ev?.occurred_at || ev?.at || new Date().toISOString()));
+    }
+    const fechado = doc.status === 'closed';
+    let pdf: Buffer | null = null;
+    if (fechado) { try { pdf = await this.clicksign.downloadSignedPdf(env.chave); } catch { pdf = null; } }
+    const resposta = {
+      status: doc.status ?? null, deadline_at: doc.deadline_at ?? null, finished_at: doc.finished_at ?? null,
+      signers: (doc.signers || []).map((s: any) => ({ email: s?.email, name: s?.name, signed: assinados.has(String(s?.email || '').toLowerCase()) })),
+    };
+    return this.executar(req, async (tx: any) => {
+      const pend: any[] = await tx.$queryRaw`
+        SELECT a.id, lower(a.email) AS email FROM proj_instrumento_assinaturas a WHERE a.envio_id = ${env.id}::uuid AND a.situacao = 'PENDENTE'`;
+      let novas = 0;
+      for (const a of pend) {
+        const at = assinados.get(a.email);
+        if (!at) continue;
+        const d = new Date(at);
+        await tx.$queryRaw`
+          UPDATE proj_instrumento_assinaturas SET situacao = 'ASSINADO', assinado_em = ${isNaN(d.getTime()) ? new Date() : d}::timestamp,
+            evidencia = ${JSON.stringify({ fonte: 'ClickSign', documento: env.chave, assinadoEm: at })}::jsonb
+          WHERE id = ${a.id}::uuid RETURNING id`;
+        novas++;
+      }
+      await tx.$queryRaw`
+        UPDATE proj_instrumento_envios SET ultima_consulta_em = CURRENT_TIMESTAMP, ultima_resposta = ${JSON.stringify(resposta)}::jsonb
+        WHERE id = ${env.id}::uuid RETURNING id`;
+      let versao: any = null;
+      let validacao: any = null;
+      if (fechado && pdf && pdf.length) {
+        const g = this.guardar(instrumentoId, pdf);
+        const nome = `${env.codigo} - assinado ClickSign.pdf`;
+        const coment = `PDF assinado baixado da ClickSign (documento ${env.chave})`;
+        const v: any[] = await tx.$queryRaw`
+          INSERT INTO proj_instrumento_versoes (instrumento_id, numero, tipo, versao_base_id, arquivo_nome, mime, tamanho, sha256, chave_armazenamento, comentario, criado_por_id)
+          VALUES (${instrumentoId}::uuid, 1, 'ASSINADA', ${env.versaoId}::uuid, ${nome}::varchar, 'application/pdf', ${pdf.length}::int,
+                  ${g.sha}::text, ${g.chave}::varchar, ${coment}::text, ${req.user.id}::uuid)
+          RETURNING id, numero`;
+        versao = v[0];
+        validacao = await this.validarESalvar(tx, instrumentoId, v[0].id, pdf, g.sha);
+        await tx.$queryRaw`
+          UPDATE proj_instrumento_envios SET situacao = 'CONCLUIDO', concluido_em = CURRENT_TIMESTAMP, versao_assinada_id = ${v[0].id}::uuid
+          WHERE id = ${env.id}::uuid RETURNING id`;
+      }
+      return { ok: true, status: doc.status ?? null, novasAssinaturas: novas, concluido: !!versao, versao, validacao,
+               aviso: fechado && !versao ? 'A ClickSign fechou o documento, mas o PDF assinado ainda nao esta disponivel. Tente de novo em instantes.' : null };
+    });
+  }
+
+  @Post('projetos/:projetoId/instrumentos/:instrumentoId/assinatura/cancelar')
+  @UseGuards(MasterOnlyGuard)
+  @ProjAcao('autenticado')
+  async cancelarClicksign(@Param('projetoId') projetoId: string, @Param('instrumentoId') instrumentoId: string, @Body() body: any, @Req() req: any) {
+    this.ids(projetoId, instrumentoId);
+    const motivo = txt(body?.motivo, 2000) || '';
+    if (motivo.length < 10) throw new BadRequestException('Informe o motivo (minimo de 10 caracteres).');
+    const env: any = await this.executar(req, async (tx: any) => {
+      await this.instrumento(tx, projetoId, instrumentoId);
+      const e = await this.envioAtivo(tx, instrumentoId);
+      if (!e) throw new NotFoundException('Nenhum envio ativo para este instrumento.');
+      return e;
+    });
+    let aviso: string | null = null;
+    try { await this.clicksign.cancelDocument(env.chave); }
+    catch { aviso = 'A ClickSign nao confirmou o cancelamento: cancele tambem pelo painel da ClickSign.'; }
+    return this.executar(req, async (tx: any) => {
+      await tx.$queryRaw`
+        UPDATE proj_instrumento_envios SET situacao = 'CANCELADO', cancelado_em = CURRENT_TIMESTAMP, cancelado_por_id = ${req.user.id}::uuid,
+          motivo_cancelamento = ${motivo}::text
+        WHERE id = ${env.id}::uuid AND situacao = 'ENVIADO' RETURNING id`;
+      await tx.auditLog.create({ data: { actorId: req.user.id, action: 'PROJ_INSTRUMENTO_ENVIO_CANCELADO', targetId: env.id,
+        after: { projetoId, instrumentoId, documento: env.chave, motivo, aviso } } });
+      return { ok: true, aviso };
+    });
+  }
+
+  @Post('projetos/:projetoId/instrumentos/:instrumentoId/versoes/:versaoId/validar')
+  @UseGuards(MasterOnlyGuard)
+  @ProjAcao('autenticado')
+  async validarVersao(@Param('projetoId') projetoId: string, @Param('instrumentoId') instrumentoId: string,
+                      @Param('versaoId') versaoId: string, @Req() req: any) {
+    this.ids(projetoId, instrumentoId, versaoId);
+    return this.executar(req, async (tx: any) => {
+      const r: any[] = await tx.$queryRaw`
+        SELECT v.id, v.tipo, v.arquivo_nome AS nome, v.sha256, v.chave_armazenamento AS chave
+        FROM proj_instrumento_versoes v JOIN proj_instrumentos i ON i.id = v.instrumento_id
+        WHERE v.id = ${versaoId}::uuid AND i.id = ${instrumentoId}::uuid AND i.projeto_id = ${projetoId}::uuid`;
+      if (!r.length) throw new NotFoundException('Registro nao encontrado.');
+      if (extensao(r[0].nome) !== 'pdf') throw new BadRequestException('So PDFs podem ser validados.');
+      const buf = this.lerArquivo(r[0].chave, r[0].sha256);
+      return this.validarESalvar(tx, instrumentoId, r[0].id, buf, String(r[0].sha256).trim());
     });
   }
 

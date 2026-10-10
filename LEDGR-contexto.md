@@ -10462,3 +10462,9 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - Pendente: Etapa 2b (Revisor no workspace so com esta tela), Etapa 3 (ClickSign e validacao do PDF assinado), Etapa 4 (valores do LEDGR e dossie).
 - 2026-10-10 Etapa 2b: rota /projects-instrumentos/projetos/:id/acesso (acao revisar); workspace com revisor e soRevisor
   (Revisor puro ve so "Instrumentos do plano"; quem tem ver + revisar ve o item no menu normal). QA: 3 testes de instrumentos, todos 403.
+- 2026-10-10 Etapa 3: migracao 20261010_proj_instrumentos_assinaturas (envios, assinaturas por parte, validacoes; eventos
+  ENVIO_ASSINATURA/CONCLUIDO/CANCELADO, ASSINATURA_PARTE, VALIDACAO; instrumento nao sai de EM_ASSINATURA com envio aberto).
+  ClickSign: enviar (PDF aprovado, e-mail informado no envio), "Atualizar da ClickSign" sob demanda (webhook nao alcanca localhost),
+  cancelar (cancelDocument novo no ClicksignService). ProjectsModule importa SignaturesModule.
+  Validador: reconhece emissoras qualificadas de Portugal (QUALIFICADA_EU); validacao e heuristica (nao verifica cadeia nem
+  integridade criptografica) e isso fica gravado em cada resultado. QA: envio a ClickSign so Master (403).

@@ -213,6 +213,11 @@ export class ClicksignService {
     }
   }
 
+  // ── 6b. Cancelar documento (Instrumentos do plano, 10/10/2026) ───────────
+  async cancelDocument(documentKey: string): Promise<void> {
+    await this.csRequest('PATCH', `/documents/${documentKey}/cancel`);
+  }
+
   // ── 7. Baixar PDF assinado ────────────────────────────────────────────────
   async downloadSignedPdf(documentKey: string): Promise<Buffer> {
     const url = `${CS_BASE()}/api/v1/documents/${documentKey}/download?access_token=${CS_TOKEN()}`;
