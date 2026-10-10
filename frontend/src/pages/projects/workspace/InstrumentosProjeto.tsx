@@ -186,6 +186,8 @@ export default function InstrumentosProjeto({ projetoId }: { projetoId: string }
   const [erroM, setErroM] = useState('');
   const [comentario, setComentario] = useState('');
   const [sinc, setSinc] = useState(false);
+  const [fontes, setFontes] = useState<any[]>([]);
+  const [gerando, setGerando] = useState(false);
 
   const carregarLista = () => api.get(base).then((r) => { setLista(r.data); setErro(''); }).catch((e) => setErro(msgErro(e)));
   const carregarDet = (id: string) => api.get(`${base}/${id}`).then((r) => setDet(r.data)).catch((e) => setErro(msgErro(e)));
@@ -205,7 +207,10 @@ export default function InstrumentosProjeto({ projetoId }: { projetoId: string }
     if (m.tipo === 'versao' && inst) ini.tipo = tiposPermitidos(inst.situacao, master)[0] || '';
     if (m.tipo === 'parte') { ini.papel = 'PARTE'; ini.forma = 'A_DEFINIR'; ini.jurisdicao = 'BR'; }
     if (m.tipo === 'registro') ini.orgao = inst?.orgaoRegistro || '';
-    if (m.tipo === 'valor') { ini.moeda = 'BRL'; ini.origem = 'MANUAL'; }
+    if (m.tipo === 'valor') {
+      ini.moeda = 'BRL'; ini.origem = 'MANUAL'; ini.fonte = '';
+      api.get(`/projects-instrumentos/projetos/${projetoId}/instrumentos-fontes`).then((r) => setFontes(r.data || [])).catch(() => setFontes([]));
+    }
     if (m.tipo === 'dependencia') ini.exige = 'ASSINADO';
     if (m.tipo === 'clicksign') {
       ini.prazo = '30';
@@ -252,6 +257,9 @@ export default function InstrumentosProjeto({ projetoId }: { projetoId: string }
         if (arq) fd.append('file', arq);
         setOcupado(true);
         await enviarArquivo(`${url}/registros`, fd);
+      } else if (modal.tipo === 'valor' && f.fonte) {
+        setOcupado(true);
+        await api.post(`${url}/valores`, { fonte: f.fonte, rotulo: f.rotulo || null, marcador: f.marcador || null });
       } else if (modal.tipo === 'valor') {
         const bruto = String(f.valor || '').trim();
         const v = Number(bruto.replace(/\./g, '').replace(',', '.'));
@@ -287,6 +295,17 @@ export default function InstrumentosProjeto({ projetoId }: { projetoId: string }
     } catch (e: any) { setErroM(msgErro(e)); } finally { setOcupado(false); }
   };
 
+  const gerarDossie = async () => {
+    setGerando(true);
+    try {
+      const r = await api.get(`/projects-instrumentos/projetos/${projetoId}/dossie`, { responseType: 'blob' });
+      const sha = (r.headers as any)?.['x-manifesto-sha256'];
+      const href = URL.createObjectURL(r.data);
+      const a = document.createElement('a'); a.href = href; a.download = `dossie-instrumentos-${new Date().toISOString().slice(0, 10)}.zip`;
+      document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(href), 1500);
+      toast.success(sha ? `Dossiê gerado. SHA-256 do manifesto: ${String(sha).slice(0, 16)}...` : 'Dossiê gerado e registrado na auditoria.');
+    } catch (e) { toast.error(msgErro(e)); } finally { setGerando(false); }
+  };
   const atualizarClickSign = async () => {
     if (!inst) return;
     setSinc(true);
@@ -333,7 +352,10 @@ export default function InstrumentosProjeto({ projetoId }: { projetoId: string }
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: 20, color: '#111827' }}>Instrumentos do plano</h2>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <h2 style={{ margin: 0, fontSize: 20, color: '#111827' }}>Instrumentos do plano</h2>
+            {lista.podeOperar && <button style={botaoSec} disabled={gerando} onClick={gerarDossie}>{gerando ? 'Gerando...' : 'Gerar dossiê de auditoria'}</button>}
+          </div>
           <div style={{ fontSize: 13, color: '#6B7280', marginTop: 4 }}>
             Contratos, termos e aditivos do plano F5 - Real Mouchão - Sunrise. Cada mudança fica numa trilha encadeada por hash, que ninguém altera.
           </div>
@@ -642,7 +664,7 @@ export default function InstrumentosProjeto({ projetoId }: { projetoId: string }
                     <td style={tdSt}>{v.rotulo}{v.canceladoEm && <div style={{ fontSize: 11, color: '#A32D2D' }}>Encerrado: {v.motivoCancelamento}</div>}</td>
                     <td style={mono}>{v.marcador || '-'}</td>
                     <td style={{ ...tdSt, textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{fmtVal(v.valor, v.moeda)}</td>
-                    <td style={tdSt}>{ORIGEM[v.origem] || v.origem}{v.origemRef?.descricao && <div style={pequeno}>{v.origemRef.descricao}</div>}<div style={pequeno}>apurado em {fmtDH(v.apuradoEm)}</div></td>
+                    <td style={tdSt}>{ORIGEM[v.origem] || v.origem}{v.origemRef?.descricao && <div style={pequeno}>{v.origemRef.descricao}</div>}{v.origemRef?.criterio && <div style={pequeno}>{v.origemRef.criterio} · {v.origemRef.qtd} registro(s)</div>}<div style={pequeno}>apurado em {fmtDH(v.apuradoEm)}</div></td>
                     <td style={tdSt}>{v.congeladoEm ? fmtDH(v.congeladoEm) : '-'}</td>
                     <td style={tdSt}>{!v.congeladoEm && encerrarBtn('valores', v, v.rotulo)}</td>
                   </tr>
@@ -782,8 +804,25 @@ export default function InstrumentosProjeto({ projetoId }: { projetoId: string }
 
       {modal && modal.tipo === 'valor' && (
         <Modal titulo="Vincular valor" subtitulo={`${inst.codigo} · ${inst.titulo}`} onFechar={() => setModal(null)} onConfirmar={confirmar} rotulo="Vincular" ocupado={ocupado} erro={erroM}>
+          <Label>Fonte do valor</Label>
+          <select value={f.fonte || ''} onChange={(e) => { const v = e.target.value; const fo = fontes.find((x: any) => x.codigo === v); setF((x) => ({ ...x, fonte: v, rotulo: fo ? fo.rotulo : (x.rotulo || '') })); }} style={inputSt}>
+            <option value="">Manual (digitar o valor)</option>
+            {fontes.map((fo: any) => <option key={fo.codigo} value={fo.codigo}>{fo.rotulo}</option>)}
+          </select>
+          {f.fonte && (() => {
+            const fo = fontes.find((x: any) => x.codigo === f.fonte);
+            return fo ? (
+              <div style={{ marginTop: 8, background: '#F0FDF4', borderRadius: 6, padding: '8px 10px', fontSize: 12 }}>
+                <div style={{ fontWeight: 700, fontSize: 15 }}>{fmtVal(String(fo.valor), 'BRL')}</div>
+                <div>{fo.criterio} · {fo.qtd} registro(s)</div>
+                {fo.aviso && <div style={{ color: '#92400E' }}>Atenção: {fo.aviso}</div>}
+                <div style={pequeno}>Prévia. O valor é recalculado no servidor ao gravar, com a lista dos registros que o compõem.</div>
+              </div>
+            ) : null;
+          })()}
           <Label>Rótulo</Label><input value={f.rotulo || ''} onChange={campo('rotulo')} placeholder="Ex.: Aportes reconhecidos à VAL" style={inputSt} />
           <Label>Marcador na minuta</Label><input value={f.marcador || ''} onChange={campo('marcador')} placeholder="Ex.: R$ [3.445.475,82]" style={inputSt} />
+          {!f.fonte && (<>
           <div style={{ display: 'flex', gap: 8 }}>
             <div style={{ flex: 2 }}><Label>Valor</Label><input value={f.valor || ''} onChange={campo('valor')} placeholder="3.445.475,82" style={inputSt} /></div>
             <div style={{ flex: 1 }}><Label>Moeda</Label>
@@ -793,6 +832,7 @@ export default function InstrumentosProjeto({ projetoId }: { projetoId: string }
           <Label>Origem</Label>
           <select value={f.origem || 'MANUAL'} onChange={campo('origem')} style={inputSt}>{Object.keys(ORIGEM).map((k) => <option key={k} value={k}>{ORIGEM[k]}</option>)}</select>
           <Label>Referência da origem</Label><input value={f.ref || ''} onChange={campo('ref')} placeholder="Ex.: Anexo I, 51 lançamentos vigentes em 10/10/2026" style={inputSt} />
+          </>)}
         </Modal>
       )}
 

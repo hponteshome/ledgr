@@ -10472,3 +10472,9 @@ independente da profundidade). Contraste ajustado a pedido do usuario
   nao serve), validado e levado a VIGENTE. Ajustes: notificacao (POST /notifications) obrigatoria na v1; signatario = pessoa
   (nome e sobrenome); um envio por versao aprovada; selo ICP da ClickSign marcado como "selo da plataforma" (nao identifica quem
   assinou; o numero do certificado nao e CPF). Banco em UTC: datas dentro de JSON saem com AT TIME ZONE 'UTC'.
+- 2026-10-10 Etapa 4: fontes de valor do LEDGR (Anexo I creditos vigentes; Anexo V face, ate 31/10/2025 com Consta=Nao,
+  apos 31/10/2025 via F5 e total), recalculadas no servidor ao gravar, com criterio, quantidade e IDs em origem_ref; reaproveita
+  RelatoriosController.anexoV via ModuleRef (numeros batem com a tela Anexo V). Dossie de auditoria (ZIP, jszip): pasta por
+  instrumento com aprovada/assinadas/comprovantes e trilha.txt, manifesto.json/.txt/.sha256 e LEIA-ME com a formula do hash da
+  trilha; geracao no AuditLog (PROJ_DOSSIE_GERADO) com hash do manifesto e do ZIP. Validado: I02 = R$ 3.445.475,82; dossie com
+  11 instrumentos, trilhas integras. QA: fontes e dossie so Master.

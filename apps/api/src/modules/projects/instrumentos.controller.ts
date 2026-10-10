@@ -20,6 +20,8 @@ import { SkipCompanyCheck, isMasterAdmin } from '../../multi-company/company.int
 import { ProjEscopoGuard, ProjAcao } from './proj-escopo.guard';
 import { UUID_RE } from './concessoes.service';
 import { ProjDbService } from './proj-db.service';
+import { ModuleRef } from '@nestjs/core';
+import { RelatoriosController } from './relatorios.controller';
 import { ClicksignService } from '../signatures/clicksign.service';
 import { SignatureValidatorService } from '../signatures/signature-validator.service';
 
@@ -57,6 +59,7 @@ export class InstrumentosController {
     private readonly db: ProjDbService,
     private readonly clicksign: ClicksignService,
     private readonly validador: SignatureValidatorService,
+    private readonly moduleRef: ModuleRef,
   ) {}
 
   private ids(...xs: string[]) {
@@ -139,6 +142,100 @@ export class InstrumentosController {
     return { enviados, falhas };
   }
 
+  // ---------------------------------------------------------------- Etapa 4a: fontes de valor do LEDGR
+  // Reaproveita o calculo da tela Anexo V (PEPS, data de corte, reconciliacao): os numeros dos instrumentos batem com os relatorios.
+  private async calcularFontes(projetoId: string, req: any): Promise<any[]> {
+    const rel = this.moduleRef.get(RelatoriosController, { strict: false });
+    const av: any = await rel.anexoV(projetoId, '', req);
+    const base: any = await this.executar(req, async (tx: any) => {
+      const cred: any[] = await tx.$queryRaw`
+        SELECT c.id, c.numero_ordem AS n, c.valor::text AS valor, c.data_credito::text AS data
+        FROM proj_creditos c JOIN proj_operacoes o ON o.id = c.operacao_id
+        WHERE o.projeto_id = ${projetoId}::uuid AND o.codigo = 'ANCORA' AND o.cancelado_em IS NULL AND c.cancelado_em IS NULL
+        ORDER BY c.data_credito, c.numero_ordem`;
+      const itens: any[] = await tx.$queryRaw`
+        SELECT i.id, i.ordem, i.valor_face::text AS valor FROM proj_anexo_v_itens i JOIN proj_operacoes o ON o.id = i.operacao_id
+        WHERE o.projeto_id = ${projetoId}::uuid ORDER BY i.ordem`;
+      return { cred, itens };
+    });
+    const cent = (v: any) => Math.round(Number(v || 0) * 100);
+    const reais = (c: number) => Math.round(c) / 100;
+    const contrato = String(av.contrato || '2025-10-31');
+    const apl: any[] = av.aplicacoes || [];
+    const conf = apl.filter((a: any) => a.situacao === 'CONFIRMADO' && !a.fora && a.itemId);
+    const antesNao = conf.filter((a: any) => String(a.data) <= contrato && (a.consta || 'Não') === 'Não');
+    const pos = conf.filter((a: any) => String(a.data) > contrato);
+    const posF5 = pos.filter((a: any) => cent(a.ancora) > 0);
+    const naoConf = apl.filter((a: any) => a.situacao !== 'CONFIRMADO').length;
+    const aviso = naoConf ? `${naoConf} aplicacao(oes) ainda sugerida(s) ou pendente(s) no Anexo V ficaram de fora` : null;
+    return [
+      { codigo: 'ANEXO_I_CREDITOS', origem: 'ANEXO_I', rotulo: 'Créditos vigentes da Operação Âncora (aportes reconhecidos à VAL)',
+        criterio: 'Soma dos creditos nao cancelados da operacao ANCORA', qtd: base.cred.length, aviso: null,
+        valor: reais(base.cred.reduce((s: number, x: any) => s + cent(x.valor), 0)),
+        ref: { creditos: base.cred.map((x: any) => x.id), numeros: base.cred.map((x: any) => x.n), ultimaData: base.cred.length ? base.cred[base.cred.length - 1].data : null } },
+      { codigo: 'ANEXO_V_FACE', origem: 'ANEXO_V', rotulo: 'Valor de face do Anexo V (confissão de 31/10/2025)',
+        criterio: 'Soma do valor de face dos itens do Anexo V', qtd: base.itens.length, aviso: null,
+        valor: reais(base.itens.reduce((s: number, x: any) => s + cent(x.valor), 0)), ref: { itens: base.itens.map((x: any) => x.id) } },
+      { codigo: 'ANEXO_V_ANTES_NAO', origem: 'ANEXO_V', rotulo: 'Pagamentos até 31/10/2025 fora da reconciliação (crédito da F5 sobre a Sunrise)',
+        criterio: 'Aplicacoes confirmadas no Anexo V ate 31/10/2025 com Consta da reconciliacao = Nao', qtd: antesNao.length, aviso,
+        valor: reais(antesNao.reduce((s: number, a: any) => s + cent(a.valor), 0)), ref: { aplicacoes: antesNao.map((a: any) => a.id), corte: contrato } },
+      { codigo: 'ANEXO_V_POS_F5', origem: 'ANEXO_V', rotulo: 'Pagamentos do Anexo V após 31/10/2025 com recursos da VAL via F5 (parte desembolsada)',
+        criterio: 'Parcela de origem VAL (PEPS) das aplicacoes confirmadas no Anexo V apos 31/10/2025', qtd: posF5.length, aviso,
+        valor: reais(posF5.reduce((s: number, a: any) => s + cent(a.ancora), 0)), ref: { aplicacoes: posF5.map((a: any) => a.id), corte: contrato } },
+      { codigo: 'ANEXO_V_POS_TOTAL', origem: 'ANEXO_V', rotulo: 'Pagamentos do Anexo V após 31/10/2025 (todas as origens)',
+        criterio: 'Total das aplicacoes confirmadas no Anexo V apos 31/10/2025', qtd: pos.length, aviso,
+        valor: reais(pos.reduce((s: number, a: any) => s + cent(a.valor), 0)), ref: { aplicacoes: pos.map((a: any) => a.id), corte: contrato } },
+    ];
+  }
+
+  // ---------------------------------------------------------------- Etapa 4b: dados completos de um instrumento (dossie)
+  private async coletar(tx: any, instrumentoId: string) {
+    const inst: any[] = await tx.$queryRaw`
+      SELECT i.id, i.codigo, i.ordem, i.titulo, i.item_planilha AS "itemPlanilha", i.tipo, i.lei, i.requer_assinatura AS "requerAssinatura",
+             i.requer_registro AS "requerRegistro", i.orgao_registro_previsto AS "orgaoRegistro", i.situacao, i.situacao_em AS "situacaoEm",
+             i.versao_aprovada_id AS "versaoAprovadaId", i.substituido_por_id AS "substituidoPorId", proj_instr_pendencias(i.id) AS pendencias
+      FROM proj_instrumentos i WHERE i.id = ${instrumentoId}::uuid`;
+    const versoes = await tx.$queryRaw`
+      SELECT v.id, v.numero, v.tipo, v.arquivo_nome AS "arquivoNome", v.tamanho, trim(v.sha256) AS sha256, v.chave_armazenamento AS chave,
+             v.comentario, v.criado_em AS "criadoEm", u.email AS "criadoPor", v.cancelado_em AS "canceladoEm", v.motivo_cancelamento AS "motivoCancelamento"
+      FROM proj_instrumento_versoes v LEFT JOIN users u ON u.id = v.criado_por_id WHERE v.instrumento_id = ${instrumentoId}::uuid ORDER BY v.numero`;
+    const partes = await tx.$queryRaw`
+      SELECT nome, papel, documento, jurisdicao, forma_assinatura AS "formaAssinatura", cancelado_em AS "canceladoEm"
+      FROM proj_instrumento_partes WHERE instrumento_id = ${instrumentoId}::uuid ORDER BY ordem`;
+    const dependencias = await tx.$queryRaw`
+      SELECT d2.codigo, d.exige_situacao AS "exigeSituacao", d2.situacao, d.justificativa
+      FROM proj_instrumento_dependencias d JOIN proj_instrumentos d2 ON d2.id = d.depende_de_id
+      WHERE d.instrumento_id = ${instrumentoId}::uuid AND d.cancelado_em IS NULL ORDER BY d2.ordem`;
+    const registros = await tx.$queryRaw`
+      SELECT r.id, r.orgao, r.protocolo, r.data_registro::text AS "dataRegistro", r.arquivo_nome AS "arquivoNome", trim(r.sha256) AS sha256,
+             r.chave_armazenamento AS chave, r.observacao, r.cancelado_em AS "canceladoEm"
+      FROM proj_instrumento_registros r WHERE r.instrumento_id = ${instrumentoId}::uuid ORDER BY r.criado_em`;
+    const valores = await tx.$queryRaw`
+      SELECT rotulo, marcador, valor::text AS valor, moeda, origem, origem_ref AS "origemRef", apurado_em AS "apuradoEm",
+             congelado_em AS "congeladoEm", congelado_versao_id AS "congeladoVersaoId", cancelado_em AS "canceladoEm"
+      FROM proj_instrumento_valores WHERE instrumento_id = ${instrumentoId}::uuid ORDER BY criado_em`;
+    const envios = await tx.$queryRaw`
+      SELECT e.canal, e.chave_externa AS chave, e.situacao, e.criado_em AS "criadoEm", e.concluido_em AS "concluidoEm", e.motivo_cancelamento AS "motivoCancelamento",
+             COALESCE((SELECT jsonb_agg(jsonb_build_object('parte', p.nome, 'signatario', a.evidencia->>'signatario', 'email', a.email,
+                        'situacao', a.situacao, 'assinadoEm', (a.assinado_em AT TIME ZONE 'UTC')) ORDER BY a.ordem)
+                       FROM proj_instrumento_assinaturas a JOIN proj_instrumento_partes p ON p.id = a.parte_id WHERE a.envio_id = e.id), '[]'::jsonb) AS assinaturas
+      FROM proj_instrumento_envios e WHERE e.instrumento_id = ${instrumentoId}::uuid ORDER BY e.criado_em`;
+    const validacoes = await tx.$queryRaw`
+      SELECT v.numero AS "versaoNumero", x.valido, x.qtd_assinaturas AS qtd, trim(x.sha256) AS sha256, x.resultado, x.criado_em AS "criadoEm"
+      FROM proj_instrumento_validacoes x JOIN proj_instrumento_versoes v ON v.id = x.versao_id
+      WHERE x.instrumento_id = ${instrumentoId}::uuid ORDER BY x.criado_em`;
+    const eventos = await tx.$queryRaw`
+      SELECT e.seq, e.tipo, e.de_situacao AS de, e.para_situacao AS para, e.ref_id AS "refId", e.detalhe, e.detalhe::text AS "detalheTexto",
+             e.motivo, to_char(e.criado_em, 'YYYY-MM-DD"T"HH24:MI:SS.US') AS "criadoEmTxt", e.criado_por_id AS "criadoPorId", u.email AS por,
+             e.hash_anterior AS "hashAnterior", e.hash
+      FROM proj_instrumento_eventos e LEFT JOIN users u ON u.id = e.criado_por_id
+      WHERE e.instrumento_id = ${instrumentoId}::uuid ORDER BY e.seq`;
+    const ver: any[] = await tx.$queryRaw`
+      SELECT count(*)::int AS total, count(*) FILTER (WHERE NOT ev_ok)::int AS falhas FROM proj_instrumento_verificar(${instrumentoId}::uuid)`;
+    return { instrumento: inst[0], versoes, partes, dependencias, registros, valores, envios, validacoes, eventos,
+             trilha: { eventos: ver[0]?.total ?? 0, integra: (ver[0]?.falhas ?? 1) === 0 } };
+  }
+
   private async envioAtivo(tx: any, instrumentoId: string) {
     const r: any[] = await tx.$queryRaw`
       SELECT e.id, e.chave_externa AS chave, e.versao_id AS "versaoId", i.codigo
@@ -157,6 +254,109 @@ export class InstrumentosController {
     res.setHeader('Content-Type', mime || 'application/octet-stream');
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(nome)}`);
     res.setHeader('X-Documento-Sha256', String(sha).trim());
+    res.send(buf);
+  }
+
+  @Get('projetos/:projetoId/instrumentos-fontes')
+  @UseGuards(MasterOnlyGuard)
+  @ProjAcao('autenticado')
+  async fontesValores(@Param('projetoId') projetoId: string, @Req() req: any) {
+    this.ids(projetoId);
+    const fontes = await this.calcularFontes(projetoId, req);
+    return fontes.map(({ ref, ...x }: any) => x);
+  }
+
+  @Get('projetos/:projetoId/dossie')
+  @UseGuards(MasterOnlyGuard)
+  @ProjAcao('autenticado')
+  async dossie(@Param('projetoId') projetoId: string, @Req() req: any, @Res() res: Response) {
+    this.ids(projetoId);
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const JSZip = require('jszip');
+    const zip = new JSZip();
+    const geradoEm = new Date().toISOString();
+    const dados: any = await this.executar(req, async (tx: any) => {
+      const p: any[] = await tx.$queryRaw`SELECT id, codigo, nome FROM proj_projetos WHERE id = ${projetoId}::uuid`;
+      if (!p.length) throw new NotFoundException('Registro nao encontrado.');
+      const ids: any[] = await tx.$queryRaw`SELECT id FROM proj_instrumentos WHERE projeto_id = ${projetoId}::uuid ORDER BY ordem, codigo`;
+      const lista: any[] = [];
+      for (const r of ids) lista.push(await this.coletar(tx, String(r.id)));
+      const u: any[] = await tx.$queryRaw`SELECT email FROM users WHERE id = ${req.user.id}::uuid`;
+      return { projeto: p[0], instrumentos: lista, por: u[0]?.email || req.user.id };
+    });
+    const todos: any[] = [];
+    const limpa = (s: any) => String(s || '').replace(/[\\/:*?"<>|]/g, '-').replace(/\s+/g, ' ').trim().slice(0, 80);
+    const incluir = (caminho: string, chave: string | null, sha: string | null, papel: string) => {
+      const item: any = { caminho, papel, sha256: sha ? String(sha).trim() : null, situacao: 'OK' };
+      if (!chave || !sha) item.situacao = 'SEM_ARQUIVO';
+      else {
+        try { const buf = this.lerArquivo(chave, sha); zip.file(caminho, buf); item.tamanho = buf.length; }
+        catch (e: any) { item.situacao = /Integridade/.test(String(e?.message)) ? 'INTEGRIDADE_VIOLADA' : 'ARQUIVO_AUSENTE'; }
+      }
+      todos.push(item);
+      return item;
+    };
+    const insts = dados.instrumentos.map((d: any) => {
+      const pasta = `${d.instrumento.codigo} - ${limpa(d.instrumento.titulo)}`;
+      const arquivos: any[] = [];
+      const aprov = d.versoes.find((v: any) => v.id === d.instrumento.versaoAprovadaId);
+      if (aprov) arquivos.push(incluir(`${pasta}/aprovada v${aprov.numero} - ${limpa(aprov.arquivoNome)}`, aprov.chave, aprov.sha256, 'VERSAO_APROVADA'));
+      for (const v of d.versoes.filter((x: any) => x.tipo === 'ASSINADA' && !x.canceladoEm)) {
+        arquivos.push(incluir(`${pasta}/assinada v${v.numero} - ${limpa(v.arquivoNome)}`, v.chave, v.sha256, 'VERSAO_ASSINADA'));
+      }
+      for (const r of d.registros.filter((x: any) => !x.canceladoEm && x.chave)) {
+        arquivos.push(incluir(`${pasta}/registro - ${limpa(r.orgao)} - ${limpa(r.arquivoNome)}`, r.chave, r.sha256, 'COMPROVANTE_REGISTRO'));
+      }
+      const trilha = d.eventos.map((e: any) => `#${e.seq} ${e.criadoEmTxt} UTC ${e.tipo}${e.de || e.para ? ` ${e.de || '-'} -> ${e.para || '-'}` : ''}`
+        + `${e.motivo ? ` | motivo: ${e.motivo}` : ''} | por ${e.por || e.criadoPorId || '-'} | hash ${e.hash}`).join('\r\n');
+      zip.file(`${pasta}/trilha.txt`, trilha + '\r\n');
+      return { ...d, versoes: d.versoes.map(({ chave, ...v }: any) => v), registros: d.registros.map(({ chave, ...r }: any) => r), arquivos };
+    });
+    const manifesto = {
+      tipo: 'LEDGR - Dossie de auditoria dos instrumentos do plano', geradoEm, geradoPor: dados.por, projeto: dados.projeto,
+      formulaHashTrilha: "hash = sha256(UTF-8 de concat_ws('|', instrumento_id, seq, tipo, de_situacao ou '', para_situacao ou '', ref_id ou '', detalheTexto ou '', motivo ou '', criadoEmTxt, criado_por_id ou '', hash_anterior)); o primeiro evento usa 64 zeros como hash_anterior",
+      instrumentos: insts,
+    };
+    const json = JSON.stringify(manifesto, null, 2);
+    const shaMan = crypto.createHash('sha256').update(json, 'utf8').digest('hex');
+    const L: string[] = ['DOSSIE DE AUDITORIA - INSTRUMENTOS DO PLANO', `Projeto: ${dados.projeto.codigo} - ${dados.projeto.nome}`,
+      `Gerado em: ${geradoEm} (UTC) por ${dados.por}`, `SHA-256 do manifesto.json: ${shaMan}`, ''];
+    for (const d of insts) {
+      L.push(`${d.instrumento.codigo} - ${d.instrumento.titulo}`);
+      L.push(`  Situacao: ${d.instrumento.situacao} | Trilha: ${d.trilha.integra ? 'integra' : 'VIOLADA'} (${d.trilha.eventos} eventos)`);
+      for (const v of d.valores.filter((x: any) => !x.canceladoEm)) L.push(`  Valor: ${v.rotulo} = ${v.moeda} ${v.valor}${v.congeladoEm ? ' (congelado na aprovacao)' : ''}`);
+      for (const e of d.envios) L.push(`  Assinatura ${e.canal} ${e.chave}: ${e.situacao}`);
+      for (const a of d.arquivos) L.push(`  Arquivo [${a.situacao}] ${a.caminho}  sha256=${a.sha256 || '-'}`);
+      L.push('');
+    }
+    const leiame = [
+      'COMO CONFERIR ESTE DOSSIE',
+      '',
+      '1. Integridade do manifesto: o SHA-256 de manifesto.json deve ser igual ao de manifesto.sha256 e ao registrado no LEDGR.',
+      '   Windows: Get-FileHash manifesto.json -Algorithm SHA256   (ou: certutil -hashfile manifesto.json SHA256)',
+      '2. Integridade dos arquivos: o SHA-256 de cada arquivo deve ser igual ao informado em manifesto.txt / manifesto.json.',
+      '3. Trilha de cada instrumento: cada evento traz hash e hash_anterior. Recalcule com a formula em formulaHashTrilha',
+      '   (manifesto.json) usando os campos do proprio evento; o hash_anterior de cada evento e o hash do evento anterior.',
+      '   Qualquer alteracao em um evento muda o hash dele e quebra a corrente a partir dali.',
+      '4. Validacoes de assinatura: o validador do LEDGR identifica signatarios e emissoras pelo certificado, mas nao verifica',
+      '   a cadeia de confianca nem a integridade criptografica. Confirme os PDFs assinados no validador oficial',
+      '   (ITI - validar.iti.gov.br no Brasil; AMA em Portugal). Em PDFs da ClickSign, o certificado ICP e o selo da plataforma;',
+      '   quem assinou consta do log anexado ao PDF.',
+      '',
+    ].join('\r\n');
+    zip.file('manifesto.json', json);
+    zip.file('manifesto.sha256', `${shaMan}  manifesto.json\n`);
+    zip.file('manifesto.txt', L.join('\r\n'));
+    zip.file('LEIA-ME.txt', leiame);
+    const buf: Buffer = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
+    const shaZip = crypto.createHash('sha256').update(buf).digest('hex');
+    await this.executar(req, async (tx: any) => tx.auditLog.create({ data: { actorId: req.user.id, action: 'PROJ_DOSSIE_GERADO', targetId: projetoId,
+      after: { manifestoSha256: shaMan, zipSha256: shaZip, instrumentos: insts.length, arquivos: todos.length,
+               problemas: todos.filter((a) => a.situacao === 'ARQUIVO_AUSENTE' || a.situacao === 'INTEGRIDADE_VIOLADA').length } } }));
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="dossie-instrumentos-${geradoEm.slice(0, 10)}.zip"`);
+    res.setHeader('X-Manifesto-Sha256', shaMan);
+    res.setHeader('Access-Control-Expose-Headers', 'X-Manifesto-Sha256, Content-Disposition');
     res.send(buf);
   }
 
@@ -460,6 +660,22 @@ export class InstrumentosController {
   @ProjAcao('autenticado')
   async incluirValor(@Param('projetoId') projetoId: string, @Param('instrumentoId') instrumentoId: string, @Body() body: any, @Req() req: any) {
     this.ids(projetoId, instrumentoId);
+    if (body?.fonte) {
+      const fontes = await this.calcularFontes(projetoId, req);
+      const fo = fontes.find((x: any) => x.codigo === String(body.fonte));
+      if (!fo) throw new BadRequestException('Fonte de valor desconhecida.');
+      const rot = txt(body?.rotulo, 160) || String(fo.rotulo).slice(0, 160);
+      const marc = txt(body?.marcador, 80);
+      const refF = JSON.stringify({ fonte: fo.codigo, criterio: fo.criterio, qtd: fo.qtd, aviso: fo.aviso, calculadoEm: new Date().toISOString(), ...fo.ref });
+      return this.executar(req, async (tx: any) => {
+        await this.instrumento(tx, projetoId, instrumentoId);
+        const r: any[] = await tx.$queryRaw`
+          INSERT INTO proj_instrumento_valores (instrumento_id, rotulo, marcador, valor, moeda, origem, origem_ref, criado_por_id)
+          VALUES (${instrumentoId}::uuid, ${rot}::varchar, ${marc}::varchar, ${fo.valor}::numeric, 'BRL', ${fo.origem}::varchar, ${refF}::jsonb, ${req.user.id}::uuid)
+          RETURNING id`;
+        return { ok: true, id: r[0].id, valor: fo.valor };
+      });
+    }
     const rotulo = txt(body?.rotulo, 160);
     if (!rotulo || rotulo.length < 3) throw new BadRequestException('Informe o rotulo do valor.');
     const valor = Number(body?.valor);
