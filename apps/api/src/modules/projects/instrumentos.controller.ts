@@ -253,7 +253,7 @@ export class InstrumentosController {
                e.ultima_consulta_em AS "ultimaConsulta", e.ultima_resposta->>'status' AS "statusExterno",
                e.cancelado_em AS "canceladoEm", e.motivo_cancelamento AS "motivoCancelamento", v.numero AS "versaoNumero",
                COALESCE((SELECT jsonb_agg(jsonb_build_object('id', a.id, 'nome', p.nome, 'email', a.email, 'signatario', a.evidencia->>'signatario', 'situacao', a.situacao,
-                          'assinadoEm', a.assinado_em) ORDER BY a.ordem)
+                          'assinadoEm', (a.assinado_em AT TIME ZONE 'UTC')) ORDER BY a.ordem)
                          FROM proj_instrumento_assinaturas a JOIN proj_instrumento_partes p ON p.id = a.parte_id
                          WHERE a.envio_id = e.id), '[]'::jsonb) AS assinaturas
         FROM proj_instrumento_envios e JOIN proj_instrumento_versoes v ON v.id = e.versao_id
@@ -539,6 +539,8 @@ export class InstrumentosController {
       if (!i[0].versaoId) throw new BadRequestException('Instrumento sem versao aprovada.');
       if (extensao(i[0].nome) !== 'pdf') throw new BadRequestException('A ClickSign so aceita PDF. Cancele a assinatura, reabra a revisao, envie o PDF como Final e aprove.');
       if (await this.envioAtivo(tx, instrumentoId)) throw new BadRequestException('Ja existe um envio ativo. Atualize ou cancele antes de enviar outro.');
+      const conc: any[] = await tx.$queryRaw`SELECT 1 FROM proj_instrumento_envios WHERE instrumento_id = ${instrumentoId}::uuid AND versao_id = ${i[0].versaoId}::uuid AND situacao = 'CONCLUIDO'`;
+      if (conc.length) throw new BadRequestException('Esta versao ja foi assinada pela ClickSign: use Marcar como assinado.');
       const partes: any[] = await tx.$queryRaw`
         SELECT id, nome, documento, ordem FROM proj_instrumento_partes
         WHERE instrumento_id = ${instrumentoId}::uuid AND cancelado_em IS NULL AND id = ANY(${ids}::uuid[]) ORDER BY ordem`;
@@ -615,10 +617,18 @@ export class InstrumentosController {
     }
     const fechado = doc.status === 'closed';
     let pdf: Buffer | null = null;
-    if (fechado) { try { pdf = await this.clicksign.downloadSignedPdf(env.chave); } catch { pdf = null; } }
+    if (fechado) {
+      // API v1: o PDF assinado vem em document.downloads.signed_file_url (link temporario); o /download fica como reserva
+      const url = doc?.downloads?.signed_file_url;
+      if (url) { try { const rr = await fetch(url); if (rr.ok) pdf = Buffer.from(await rr.arrayBuffer()); } catch { pdf = null; } }
+      if (!pdf) { try { pdf = await this.clicksign.downloadSignedPdf(env.chave); } catch { pdf = null; } }
+      if (pdf && pdf.subarray(0, 5).toString('latin1') !== '%PDF-') pdf = null;
+    }
     const resposta = {
       status: doc.status ?? null, deadline_at: doc.deadline_at ?? null, finished_at: doc.finished_at ?? null,
-      signers: (doc.signers || []).map((s: any) => ({ email: s?.email, name: s?.name, signed: assinados.has(String(s?.email || '').toLowerCase()) })),
+      temPdfAssinado: !!doc?.downloads?.signed_file_url,
+      signers: (doc.signers || []).map((s: any) => ({ email: s?.email, name: s?.name, signed: assinados.has(String(s?.email || '').toLowerCase()),
+        signed_at: s?.signature?.signed_at ?? s?.signed_at ?? null })),
     };
     return this.executar(req, async (tx: any) => {
       const pend: any[] = await tx.$queryRaw`

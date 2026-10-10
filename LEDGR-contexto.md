@@ -10468,3 +10468,7 @@ independente da profundidade). Contraste ajustado a pedido do usuario
   cancelar (cancelDocument novo no ClicksignService). ProjectsModule importa SignaturesModule.
   Validador: reconhece emissoras qualificadas de Portugal (QUALIFICADA_EU); validacao e heuristica (nao verifica cadeia nem
   integridade criptografica) e isso fica gravado em cada resultado. QA: envio a ClickSign so Master (403).
+- 2026-10-10 Etapa 3 validada com o I01 (sandbox): enviado, assinado, PDF baixado via downloads.signed_file_url (o /download da v1
+  nao serve), validado e levado a VIGENTE. Ajustes: notificacao (POST /notifications) obrigatoria na v1; signatario = pessoa
+  (nome e sobrenome); um envio por versao aprovada; selo ICP da ClickSign marcado como "selo da plataforma" (nao identifica quem
+  assinou; o numero do certificado nao e CPF). Banco em UTC: datas dentro de JSON saem com AT TIME ZONE 'UTC'.

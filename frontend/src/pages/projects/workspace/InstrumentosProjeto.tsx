@@ -520,7 +520,10 @@ export default function InstrumentosProjeto({ projetoId }: { projetoId: string }
                 entra na aba Versões como Assinada e a validação roda sozinha. Depois, use "Marcar como assinado".
               </div>
               {!inst.requerAssinatura && <div style={{ ...pequeno, marginTop: 8 }}>Este instrumento não exige assinatura.</div>}
-              {master && inst.situacao === 'EM_ASSINATURA' && !ativo && (
+              {master && inst.situacao === 'EM_ASSINATURA' && !ativo && envios.some((e: any) => e.situacao === 'CONCLUIDO' && e.versaoNumero === aprovada?.numero) && (
+                <div style={{ marginTop: 10, fontSize: 12, color: '#166534' }}>Assinatura concluída pela ClickSign: use "Marcar como assinado" no topo.</div>
+              )}
+              {master && inst.situacao === 'EM_ASSINATURA' && !ativo && !envios.some((e: any) => e.situacao === 'CONCLUIDO' && e.versaoNumero === aprovada?.numero) && (
                 <div style={{ marginTop: 10, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
                   <button style={{ ...botaoPri, opacity: aprovadaPdf ? 1 : 0.5 }} disabled={!aprovadaPdf} onClick={() => abrir({ tipo: 'clicksign' })}>Enviar à ClickSign</button>
                   {!aprovadaPdf && <span style={{ fontSize: 12, color: '#92400E' }}>A versão aprovada não é PDF. A ClickSign só aceita PDF.</span>}
@@ -586,7 +589,8 @@ export default function InstrumentosProjeto({ projetoId }: { projetoId: string }
                     return (
                       <div key={k} style={{ fontSize: 12, marginTop: 4, display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
                         <span style={{ fontWeight: 600 }}>{s.nome || 'Sem nome'}</span>
-                        {s.documento && <span style={mono}>{s.documento}</span>}
+                        {/clicksign/i.test(s.nome || '') && <Tag cor="#1E40AF" fundo="#DBEAFE" title="Certificado da plataforma; quem assinou está no log anexado ao PDF">Selo da plataforma (não identifica o signatário)</Tag>}
+                        {s.documento && !/clicksign/i.test(s.nome || '') && <span style={mono}>{s.documento}</span>}
                         <Tag>{TIPO_CERT[s.tipo] || s.tipo}</Tag>
                         <Tag cor={cf.cor} fundo={cf.fundo}>{cf.rot}</Tag>
                         <span style={pequeno}>{s.emissor} · válido até {fmtD(s.validoAte)}</span>
