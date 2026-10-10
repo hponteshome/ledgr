@@ -10,7 +10,7 @@ import { Reflector } from '@nestjs/core';
 import { isMasterAdmin } from '../../multi-company/company.interceptor';
 import { ConcessoesService } from './concessoes.service';
 
-export type ProjAcaoTipo = 'autenticado' | 'ver' | 'criar' | 'editar' | 'conciliar' | 'aprovar' | 'exportar' | 'administrar';
+export type ProjAcaoTipo = 'autenticado' | 'ver' | 'criar' | 'editar' | 'conciliar' | 'aprovar' | 'exportar' | 'administrar' | 'revisar';
 export const PROJ_ACAO_KEY = 'projAcao';
 export const ProjAcao = (acao: ProjAcaoTipo) => SetMetadata(PROJ_ACAO_KEY, acao);
 
