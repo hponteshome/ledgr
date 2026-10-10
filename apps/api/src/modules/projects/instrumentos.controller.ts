@@ -43,7 +43,7 @@ function erroInstr(e: any): string {
   const bruto = String(e?.meta?.message || e?.message || 'Falha ao gravar.');
   if (/row-level security/i.test(bruto)) return 'Seu perfil nao permite esta acao.';
   if (/proj_instr_dep_ativa_uq/.test(bruto)) return 'Esta dependencia ja existe.';
-  const m = bruto.match(/ERROR:\s*([^\n`]+)/);
+  const m = bruto.match(/Message: `(?:ERROR:\s*)?([^`]+)`/) || bruto.match(/ERROR:\s*([^\n`]+)/);
   return (m ? m[1] : bruto).slice(0, 300);
 }
 const txt = (v: any, max: number): string | null => { const s = String(v ?? '').trim(); return s ? s.slice(0, max) : null; };
@@ -122,6 +122,21 @@ export class InstrumentosController {
       VALUES (${instrumentoId}::uuid, ${versaoId}::uuid, ${resumo.valido}, ${resumo.assinaturas.length}::int, ${sha}::text, ${JSON.stringify(resumo)}::jsonb)
       RETURNING id`;
     return resumo;
+  }
+
+  // Pede a ClickSign que envie (ou reenvie) o e-mail a cada signatario que ainda nao assinou.
+  private async notificarPendentes(docKey: string, mensagem: string): Promise<{ enviados: string[]; falhas: string[] }> {
+    const enviados: string[] = [];
+    const falhas: string[] = [];
+    let st: any;
+    try { st = await this.clicksign.getDocumentStatus(docKey); }
+    catch (e: any) { return { enviados, falhas: ['consulta: ' + String(e?.message || e).slice(0, 150)] }; }
+    for (const s of st?.document?.signers || []) {
+      if (s?.signature || !s?.request_signature_key) continue;
+      try { await this.clicksign.notifySigner(s.request_signature_key, mensagem); enviados.push(String(s.email)); }
+      catch (e: any) { falhas.push(String(s.email) + ': ' + String(e?.message || e).slice(0, 150)); }
+    }
+    return { enviados, falhas };
   }
 
   private async envioAtivo(tx: any, instrumentoId: string) {
@@ -237,7 +252,7 @@ export class InstrumentosController {
         SELECT e.id, e.canal, e.chave_externa AS chave, e.situacao, e.prazo, e.criado_em AS "criadoEm", e.concluido_em AS "concluidoEm",
                e.ultima_consulta_em AS "ultimaConsulta", e.ultima_resposta->>'status' AS "statusExterno",
                e.cancelado_em AS "canceladoEm", e.motivo_cancelamento AS "motivoCancelamento", v.numero AS "versaoNumero",
-               COALESCE((SELECT jsonb_agg(jsonb_build_object('id', a.id, 'nome', p.nome, 'email', a.email, 'situacao', a.situacao,
+               COALESCE((SELECT jsonb_agg(jsonb_build_object('id', a.id, 'nome', p.nome, 'email', a.email, 'signatario', a.evidencia->>'signatario', 'situacao', a.situacao,
                           'assinadoEm', a.assinado_em) ORDER BY a.ordem)
                          FROM proj_instrumento_assinaturas a JOIN proj_instrumento_partes p ON p.id = a.parte_id
                          WHERE a.envio_id = e.id), '[]'::jsonb) AS assinaturas
@@ -503,11 +518,15 @@ export class InstrumentosController {
     const lista: any[] = Array.isArray(body?.signatarios) ? body.signatarios : [];
     if (!lista.length || lista.length > 20) throw new BadRequestException('Escolha de 1 a 20 partes para assinar pela ClickSign.');
     const emails: Record<string, string> = {};
+    const nomes: Record<string, string> = {};
     for (const s of lista) {
       const pid = String(s?.parteId || ''); const em = String(s?.email || '').trim().toLowerCase();
       if (!UUID_RE.test(pid)) throw new BadRequestException('Parte invalida.');
       if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) throw new BadRequestException('E-mail invalido: ' + em);
       emails[pid] = em;
+      const nm = String(s?.nome || '').trim().replace(/\s+/g, ' ');
+      if (nm.split(' ').filter(Boolean).length < 2) throw new BadRequestException('Informe o nome completo (nome e sobrenome) de quem assina: ' + (nm || em));
+      nomes[pid] = nm.slice(0, 200);
     }
     const ids = Object.keys(emails);
     const prep: any = await this.executar(req, async (tx: any) => {
@@ -536,9 +555,9 @@ export class InstrumentosController {
       for (const p of prep.partes) {
         const d = String(p.documento || '').replace(/\D/g, '');
         const cpf = d.length === 11 ? `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}` : undefined;
-        const signerKey = await this.clicksign.addSigner({ name: p.nome, email: emails[p.id], cpf, auth: 'email' });
+        const signerKey = await this.clicksign.addSigner({ name: nomes[p.id], email: emails[p.id], cpf, auth: 'email' });
         const listKey = await this.clicksign.addSignerToDocument(docKey, signerKey, 1);
-        listas.push({ parteId: p.id, email: emails[p.id], ordem: p.ordem, signerKey, listKey });
+        listas.push({ parteId: p.id, nome: nomes[p.id], email: emails[p.id], ordem: p.ordem, signerKey, listKey });
       }
     } catch (e: any) {
       if (docKey) await this.clicksign.cancelDocument(docKey).catch(() => undefined);
@@ -552,13 +571,15 @@ export class InstrumentosController {
           RETURNING id`;
         for (const l of listas) {
           await tx.$queryRaw`
-            INSERT INTO proj_instrumento_assinaturas (envio_id, parte_id, email, ordem, chave_signatario, chave_lista)
-            VALUES (${e[0].id}::uuid, ${l.parteId}::uuid, ${l.email}::varchar, ${l.ordem}::int, ${l.signerKey}::varchar, ${l.listKey}::varchar)
+            INSERT INTO proj_instrumento_assinaturas (envio_id, parte_id, email, ordem, chave_signatario, chave_lista, evidencia)
+            VALUES (${e[0].id}::uuid, ${l.parteId}::uuid, ${l.email}::varchar, ${l.ordem}::int, ${l.signerKey}::varchar, ${l.listKey}::varchar,
+                    ${JSON.stringify({ signatario: l.nome })}::jsonb)
             RETURNING id`;
         }
         await tx.auditLog.create({ data: { actorId: req.user.id, action: 'PROJ_INSTRUMENTO_ENVIADO_CLICKSIGN', targetId: e[0].id,
-          after: { projetoId, instrumentoId, documento: docKey, signatarios: listas.map((l) => l.email), prazo } } });
-        return { ok: true, envioId: e[0].id, documento: docKey, signatarios: listas.length };
+          after: { projetoId, instrumentoId, documento: docKey, signatarios: listas.map((l) => ({ nome: l.nome, email: l.email })), prazo } } });
+        const notif = await this.notificarPendentes(docKey, (`Por favor, assine: ${prep.inst.codigo} - ${prep.inst.titulo}`).slice(0, 200));
+        return { ok: true, envioId: e[0].id, documento: docKey, signatarios: listas.length, notificados: notif.enviados, falhas: notif.falhas };
       });
     } catch (err) {
       await this.clicksign.cancelDocument(docKey).catch(() => undefined);
@@ -609,7 +630,7 @@ export class InstrumentosController {
         const d = new Date(at);
         await tx.$queryRaw`
           UPDATE proj_instrumento_assinaturas SET situacao = 'ASSINADO', assinado_em = ${isNaN(d.getTime()) ? new Date() : d}::timestamp,
-            evidencia = ${JSON.stringify({ fonte: 'ClickSign', documento: env.chave, assinadoEm: at })}::jsonb
+            evidencia = COALESCE(evidencia, '{}'::jsonb) || ${JSON.stringify({ fonte: 'ClickSign', documento: env.chave, assinadoEm: at })}::jsonb
           WHERE id = ${a.id}::uuid RETURNING id`;
         novas++;
       }
@@ -636,6 +657,23 @@ export class InstrumentosController {
       return { ok: true, status: doc.status ?? null, novasAssinaturas: novas, concluido: !!versao, versao, validacao,
                aviso: fechado && !versao ? 'A ClickSign fechou o documento, mas o PDF assinado ainda nao esta disponivel. Tente de novo em instantes.' : null };
     });
+  }
+
+  @Post('projetos/:projetoId/instrumentos/:instrumentoId/assinatura/reenviar')
+  @UseGuards(MasterOnlyGuard)
+  @ProjAcao('autenticado')
+  async reenviarClicksign(@Param('projetoId') projetoId: string, @Param('instrumentoId') instrumentoId: string, @Req() req: any) {
+    this.ids(projetoId, instrumentoId);
+    const env: any = await this.executar(req, async (tx: any) => {
+      await this.instrumento(tx, projetoId, instrumentoId);
+      const e = await this.envioAtivo(tx, instrumentoId);
+      if (!e) throw new NotFoundException('Nenhum envio ativo para este instrumento.');
+      return e;
+    });
+    const r = await this.notificarPendentes(env.chave, `Lembrete: assine o documento ${env.codigo}.`);
+    await this.executar(req, async (tx: any) => tx.auditLog.create({ data: { actorId: req.user.id, action: 'PROJ_INSTRUMENTO_ENVIO_LEMBRETE',
+      targetId: env.id, after: { projetoId, instrumentoId, documento: env.chave, enviados: r.enviados, falhas: r.falhas } } }));
+    return { ok: true, ...r };
   }
 
   @Post('projetos/:projetoId/instrumentos/:instrumentoId/assinatura/cancelar')

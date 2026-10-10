@@ -23,7 +23,7 @@ export class ClicksignService {
     if (!res.ok) {
       const err = await res.text();
       console.error(`[ClickSign] ${method} ${endpoint} → ${res.status}: ${err}`);
-      throw new BadRequestException(`ClickSign API error: ${res.status}`);
+      throw new BadRequestException(`ClickSign API error: ${res.status} ${String(err || '').slice(0, 300)}`);
     }
     if (res.status === 204) return null;
     return res.json();
@@ -216,6 +216,11 @@ export class ClicksignService {
   // ── 6b. Cancelar documento (Instrumentos do plano, 10/10/2026) ───────────
   async cancelDocument(documentKey: string): Promise<void> {
     await this.csRequest('PATCH', `/documents/${documentKey}/cancel`);
+  }
+
+  // ── 6c. Notificar signatario: na API v1 incluir na lista nao dispara o e-mail (10/10/2026) ──
+  async notifySigner(requestSignatureKey: string, message?: string): Promise<void> {
+    await this.csRequest('POST', '/notifications', { request_signature_key: requestSignatureKey, message: message ?? 'Por favor, assine o documento.' });
   }
 
   // ── 7. Baixar PDF assinado ────────────────────────────────────────────────

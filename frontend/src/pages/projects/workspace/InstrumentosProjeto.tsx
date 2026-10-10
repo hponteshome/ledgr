@@ -71,7 +71,7 @@ function acoesDe(i: any): Acao[] {
       else a.push({ para: 'VIGENTE', rot: 'Tornar vigente', tom: 'pri', dica: 'Exige as dependências atendidas.' });
       a.push({ para: 'EM_REVISAO', rot: 'Reabrir revisão' }); break;
     case 'EM_ASSINATURA':
-      a.push({ para: 'ASSINADO', rot: 'Marcar como assinado', tom: 'pri', dica: 'Exige a versão Assinada (PDF) enviada na aba Versões.' });
+      a.push({ para: 'ASSINADO', rot: 'Marcar como assinado', tom: 'pri', dica: 'Exige a versão Assinada (PDF): use a aba Assinatura (ClickSign) ou envie o PDF assinado na aba Versões.' });
       a.push({ para: 'APROVADO', rot: 'Cancelar assinatura' }); break;
     case 'ASSINADO':
       a.push(i.requerRegistro
@@ -87,7 +87,7 @@ const obrigaMotivo = (de: string, para: string) => (RANK[para] ?? -1) < (RANK[de
 function tiposPermitidos(sit: string, master: boolean): string[] {
   if (!master) return sit === 'EM_REVISAO' ? ['REVISAO'] : [];
   if (sit === 'RASCUNHO') return ['MINUTA', 'REVISAO'];
-  if (sit === 'EM_REVISAO') return ['REVISAO', 'FINAL', 'MINUTA'];
+  if (sit === 'EM_REVISAO') return ['FINAL', 'REVISAO', 'MINUTA'];
   if (sit === 'EM_ASSINATURA') return ['ASSINADA'];
   return [];
 }
@@ -210,7 +210,7 @@ export default function InstrumentosProjeto({ projetoId }: { projetoId: string }
     if (m.tipo === 'clicksign') {
       ini.prazo = '30';
       (det?.partes || []).filter((p: any) => !p.canceladoEm).forEach((p: any) => {
-        ini['sel_' + p.id] = p.formaAssinatura === 'CLICKSIGN' ? '1' : ''; ini['email_' + p.id] = p.email || '';
+        ini['sel_' + p.id] = p.formaAssinatura === 'CLICKSIGN' ? '1' : ''; ini['email_' + p.id] = p.email || ''; ini['nome_' + p.id] = '';
       });
     }
     setF(ini); setArq(null); setErroM(''); setModal(m);
@@ -265,9 +265,10 @@ export default function InstrumentosProjeto({ projetoId }: { projetoId: string }
         await api.post(`${url}/dependencias`, { dependeDeId: f.depId, exigeSituacao: f.exige, justificativa: f.justificativa || null });
       } else if (modal.tipo === 'clicksign') {
         const ativas = det.partes.filter((p: any) => !p.canceladoEm);
-        const sig = ativas.filter((p: any) => f['sel_' + p.id] === '1').map((p: any) => ({ parteId: p.id, email: (f['email_' + p.id] || '').trim() }));
+        const sig = ativas.filter((p: any) => f['sel_' + p.id] === '1').map((p: any) => ({ parteId: p.id, email: (f['email_' + p.id] || '').trim(), nome: (f['nome_' + p.id] || '').trim() }));
         if (!sig.length) throw new Error('Escolha ao menos uma parte.');
         if (sig.some((s: any) => !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s.email))) throw new Error('Informe um e-mail válido para cada parte escolhida.');
+        if (sig.some((s: any) => s.nome.split(/\s+/).filter(Boolean).length < 2)) throw new Error('Informe o nome completo (nome e sobrenome) de quem assina por cada parte.');
         setOcupado(true);
         await api.post(`${url}/assinatura/clicksign`, { signatarios: sig, prazoDias: Number(f.prazo || 30) });
       } else if (modal.tipo === 'cancelarEnvio') {
@@ -295,6 +296,15 @@ export default function InstrumentosProjeto({ projetoId }: { projetoId: string }
       if (d.aviso) toast(d.aviso);
       else toast.success(d.concluido ? 'Todos assinaram: PDF assinado guardado e validado.' : `ClickSign: ${d.status || '-'} · novas assinaturas: ${d.novasAssinaturas}.`);
       carregarDet(inst.id);
+    } catch (e) { toast.error(msgErro(e)); } finally { setSinc(false); }
+  };
+  const reenviar = async () => {
+    if (!inst) return;
+    setSinc(true);
+    try {
+      const d = (await api.post(`${base}/${inst.id}/assinatura/reenviar`, {})).data;
+      if (d.enviados?.length) toast.success('E-mail reenviado para ' + d.enviados.join(', '));
+      else toast(d.falhas?.length ? 'Falha: ' + d.falhas.join('; ') : 'Nenhum signatário pendente.');
     } catch (e) { toast.error(msgErro(e)); } finally { setSinc(false); }
   };
   const validarVersao = async (v: any) => {
@@ -528,6 +538,7 @@ export default function InstrumentosProjeto({ projetoId }: { projetoId: string }
                   {master && (
                     <div style={{ display: 'flex', gap: 8 }}>
                       <button style={botaoPri} disabled={sinc} onClick={atualizarClickSign}>{sinc ? 'Consultando...' : 'Atualizar da ClickSign'}</button>
+                      <button style={botaoSec} disabled={sinc} onClick={reenviar}>Reenviar e-mail</button>
                       <button style={botaoPerigo} onClick={() => abrir({ tipo: 'cancelarEnvio' })}>Cancelar envio</button>
                     </div>
                   )}
@@ -538,7 +549,7 @@ export default function InstrumentosProjeto({ projetoId }: { projetoId: string }
                     <tbody>
                       {ativo.assinaturas.map((a: any) => (
                         <tr key={a.id}>
-                          <td style={tdSt}>{a.nome}</td><td style={tdSt}>{a.email}</td>
+                          <td style={tdSt}>{a.nome}{a.signatario && <div style={pequeno}>por {a.signatario}</div>}</td><td style={tdSt}>{a.email}</td>
                           <td style={tdSt}><Tag cor={a.situacao === 'ASSINADO' ? '#166534' : '#92400E'} fundo={a.situacao === 'ASSINADO' ? '#DCFCE7' : '#FEF3C7'}>{a.situacao === 'ASSINADO' ? 'Assinou' : a.situacao === 'RECUSADO' ? 'Recusou' : 'Pendente'}</Tag></td>
                           <td style={tdSt}>{fmtDH(a.assinadoEm)}</td>
                         </tr>
@@ -798,13 +809,16 @@ export default function InstrumentosProjeto({ projetoId }: { projetoId: string }
 
       {modal && modal.tipo === 'clicksign' && (
         <Modal titulo="Enviar à ClickSign" subtitulo={`${inst.codigo} · ${inst.titulo}`} onFechar={() => setModal(null)} onConfirmar={confirmar} rotulo="Enviar" ocupado={ocupado} erro={erroM}>
-          <div style={{ fontSize: 12, color: '#374151' }}>O PDF aprovado vai para a ClickSign e cada parte escolhida recebe o pedido por e-mail. Partes que assinam fora (Portugal ou à mão) ficam desmarcadas.</div>
+          <div style={{ fontSize: 12, color: '#374151' }}>O PDF aprovado vai para a ClickSign e cada parte escolhida recebe o pedido por e-mail. Partes que assinam fora (Portugal ou à mão) ficam desmarcadas. Para cada parte, informe a pessoa que assina por ela (representante): nome completo e e-mail.</div>
           <Label>Partes que assinam pela ClickSign</Label>
           {det.partes.filter((p: any) => !p.canceladoEm).map((p: any) => (
             <div key={p.id} style={{ display: 'flex', gap: 8, alignItems: 'center', margin: '6px 0', flexWrap: 'wrap' }}>
               <input type="checkbox" checked={f['sel_' + p.id] === '1'} onChange={(e) => { const v = e.target.checked ? '1' : ''; setF((x) => ({ ...x, ['sel_' + p.id]: v })); }} />
               <div style={{ minWidth: 180, flex: 1, fontSize: 13 }}>{p.nome}<div style={pequeno}>{PAPEL[p.papel] || p.papel} · {FORMA[p.formaAssinatura] || p.formaAssinatura}</div></div>
-              <input value={f['email_' + p.id] || ''} onChange={campo('email_' + p.id)} placeholder="e-mail do signatário" style={{ ...inputSt, maxWidth: 240 }} disabled={f['sel_' + p.id] !== '1'} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, width: 260 }}>
+                <input value={f['nome_' + p.id] || ''} onChange={campo('nome_' + p.id)} placeholder="nome completo de quem assina" style={inputSt} disabled={f['sel_' + p.id] !== '1'} />
+                <input value={f['email_' + p.id] || ''} onChange={campo('email_' + p.id)} placeholder="e-mail de quem assina" style={inputSt} disabled={f['sel_' + p.id] !== '1'} />
+              </div>
             </div>
           ))}
           <Label>Prazo (dias)</Label>
