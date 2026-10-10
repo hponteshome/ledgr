@@ -72,13 +72,23 @@ export default function ProjetoWorkspace() {
   const [erro, setErro] = useState('');
   const master = user?.profile?.permissions?.all === true;
 
+  const [revisor, setRevisor] = useState(false); // Etapa 2b: tem a acao 'revisar' neste projeto
+  const [soRevisor, setSoRevisor] = useState(false); // so 'revisar' (sem 'ver'): ve apenas os instrumentos
   useEffect(() => {
     if (!user) return;
     setErro('');
+    const cab: Promise<any> = master ? Promise.resolve(null)
+      : api.get(`/projects-instrumentos/projetos/${projetoId}/acesso`).then((r) => r.data).catch(() => null);
     api.get(`/projects/${projetoId}`)
-      .then((r) => { setProjeto(r.data); setOpId(r.data?.operacoes?.[0]?.id || ''); })
-      .catch((e) => setErro(e?.response?.status === 404 ? 'Projeto não encontrado ou sem acesso.' : e?.response?.data?.message || 'Falha ao carregar o projeto.'));
-  }, [projetoId, user, versao]);
+      .then(async (r) => { setProjeto(r.data); setOpId(r.data?.operacoes?.[0]?.id || ''); setSoRevisor(false); setRevisor(!!(await cab)); })
+      .catch(async (e) => {
+        const c = await cab;
+        if (c && e?.response?.status === 403) {
+          setProjeto({ ...c.projeto, operacoes: [] } as any); setOpId(''); setRevisor(true); setSoRevisor(true); return;
+        }
+        setErro(e?.response?.status === 404 ? 'Projeto não encontrado ou sem acesso.' : e?.response?.data?.message || 'Falha ao carregar o projeto.');
+      });
+  }, [projetoId, user, versao]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) return <div style={{ padding: 40, color: '#6B7280' }}>Carregando...</div>;
   if (!user) return <Navigate to="/" replace />;
@@ -96,14 +106,16 @@ export default function ProjetoWorkspace() {
           <div style={{ fontSize: 15, fontWeight: 700, marginTop: 3, lineHeight: 1.25 }}>{projeto?.nome || '...'}</div>
         </div>
         <nav style={{ padding: 10, flex: 1, display: 'flex', flexDirection: 'column', gap: 2, overflowY: 'auto' }}>
-          {MENU.filter((m) => !m.master || master).map((m) => (
+          {MENU.filter((m) => (soRevisor ? m.to === 'instrumentos' : (!m.master || master || (m.to === 'instrumentos' && revisor)))).map((m) => (
             <NavLink key={m.label} to={m.to ? `${base}/${m.to}` : base} end={m.end} style={({ isActive }) => itemSt(isActive)}>
               <m.icon size={15} /> {m.label}
             </NavLink>
           ))}
+          {!soRevisor && (
           <NavLink to={`${base}/pendencias`} style={({ isActive }) => itemSt(isActive)}>
             <FiAlertCircle size={15} /> Pendências
           </NavLink>
+          )}
           {master && (
             <NavLink to={`${base}/concessoes`} style={({ isActive }) => itemSt(isActive)}>
               <FiKey size={15} /> Concessões de acesso
@@ -144,7 +156,7 @@ export default function ProjetoWorkspace() {
             <div style={{ color: '#6B7280' }}>Carregando...</div>
           ) : (
             <Routes>
-              <Route index element={<PainelProjeto projeto={projeto} operacao={operacao} master={master} onAlterado={() => setVersao((v) => v + 1)} />} />
+              {soRevisor ? <Route index element={<Navigate to={`${base}/instrumentos`} replace />} /> : <Route index element={<PainelProjeto projeto={projeto} operacao={operacao} master={master} onAlterado={() => setVersao((v) => v + 1)} />} />}
               <Route path="creditos" element={<CreditosProjeto operacao={operacao} master={master} />} />
               <Route path="aplicacoes" element={<AplicacoesProjeto operacao={operacao} master={master} />} />
               <Route path="intercompany" element={<IntercompanyProjeto operacao={operacao} master={master} />} />
@@ -158,7 +170,7 @@ export default function ProjetoWorkspace() {
               {master && <Route path="comprovantes-fiscais" element={<ComprovantesFiscaisProjeto projetoId={projeto.id} />} />}
               {master && <Route path="simulador-rm" element={<SimuladorRmProjeto projetoId={projeto.id} />} />}
               {master && <Route path="anexo-v" element={<AnexoVProjeto projetoId={projeto.id} />} />}
-              {master && <Route path="instrumentos" element={<InstrumentosProjeto projetoId={projeto.id} />} />}
+              {(master || revisor) && <Route path="instrumentos" element={<InstrumentosProjeto projetoId={projeto.id} />} />}
               <Route path="participantes" element={<ParticipantesProjeto operacao={operacao} master={master} />} />
               <Route path="documentos" element={<DocumentosProjeto operacao={operacao} master={master} />} />
               <Route path="pendencias" element={<PendenciasProjeto operacao={operacao} master={master} />} />

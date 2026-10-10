@@ -99,6 +99,18 @@ export class InstrumentosController {
     res.send(buf);
   }
 
+  // Etapa 2b: cabecalho minimo do projeto para quem tem a acao 'revisar' (o Revisor nao tem 'ver').
+  @Get('projetos/:projetoId/acesso')
+  @ProjAcao('revisar')
+  async acesso(@Param('projetoId') projetoId: string, @Req() req: any) {
+    this.ids(projetoId);
+    return this.executar(req, async (tx: any) => {
+      const p: any[] = await tx.$queryRaw`SELECT id, codigo, nome FROM proj_projetos WHERE id = ${projetoId}::uuid AND cancelado_em IS NULL`;
+      if (!p.length) throw new NotFoundException('Registro nao encontrado.');
+      return { projeto: p[0], revisor: true, podeOperar: isMasterAdmin(req.user) };
+    });
+  }
+
   @Get('projetos/:projetoId/instrumentos')
   @ProjAcao('revisar')
   async listar(@Param('projetoId') projetoId: string, @Req() req: any) {

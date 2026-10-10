@@ -10460,3 +10460,5 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - 11 instrumentos carregados (I01-I11, planilha do Nei), 19 partes e 9 dependencias. Arquivos em storage/projetos/instrumentos/<id>/<sha>.
 - Tela InstrumentosProjeto.tsx (menu "Instrumentos do plano", so Master por ora). Teste real: I11 levado a VIGENTE em 10/10/2026.
 - Pendente: Etapa 2b (Revisor no workspace so com esta tela), Etapa 3 (ClickSign e validacao do PDF assinado), Etapa 4 (valores do LEDGR e dossie).
+- 2026-10-10 Etapa 2b: rota /projects-instrumentos/projetos/:id/acesso (acao revisar); workspace com revisor e soRevisor
+  (Revisor puro ve so "Instrumentos do plano"; quem tem ver + revisar ve o item no menu normal). QA: 3 testes de instrumentos, todos 403.
