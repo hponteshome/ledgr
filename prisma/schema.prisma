@@ -923,6 +923,7 @@ enum SignatureMethod {
   CERT_A1
   CERT_A3
   FISICO
+  CLICKSIGN /// Assinatura eletronica pela ClickSign (API 3.0) - 11/10/2026
 }
 
 enum SignatureStatus {

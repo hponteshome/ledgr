@@ -3,8 +3,12 @@ import * as crypto from 'crypto';
 import {
   Controller, Post, Get, Delete, Param, Body,
   UseInterceptors, Req, Query, Redirect, RawBodyRequest,
-  ForbiddenException,
+  ForbiddenException, NotFoundException, StreamableFile,
 } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
+import * as fs from 'fs';
+import * as path from 'path';
+import { DocumentsService } from '../../core/documents/documents.service';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UploadedFile } from '@nestjs/common';
 import { SignatureService } from './signature.service';
@@ -27,7 +31,26 @@ export class SignaturesController {
     private clicksignService: ClicksignService,
     private validatorService: SignatureValidatorService,
     private prisma: PrismaService,
+    private moduleRef: ModuleRef,
   ) {}
+
+  // PDF que vai para a ClickSign (11/10/2026): o PDF importado do documento ou, se nao houver,
+  // o mesmo PDF da exportacao (GET /documents/:id/pdf). Antes ia o TEXTO do documento, nao um PDF.
+  private async pdfDoDocumento(doc: any): Promise<{ pdf: Buffer; nome: string }> {
+    const base = ClicksignService.nomeSeguro(doc.title || doc.id);
+    const rel = String(doc.fileUrl || '');
+    if (/\.pdf$/i.test(rel) && rel.startsWith('/uploads/')) {
+      const raiz = path.resolve(process.cwd(), 'uploads');
+      const alvo = path.resolve(raiz, rel.slice('/uploads/'.length));
+      if (alvo.startsWith(raiz + path.sep) && fs.existsSync(alvo)) {
+        const buf = fs.readFileSync(alvo);
+        if (ClicksignService.ehPdf(buf)) return { pdf: buf, nome: `${base}.pdf` };
+      }
+    }
+    const docs = this.moduleRef.get(DocumentsService, { strict: false });
+    const gerado = Buffer.from(await docs.generatePdf(doc.id));
+    return { pdf: gerado, nome: `${base}.pdf` };
+  }
 
   // ── Certificados ───────────────────────────────────────────────────────────
   @UseGuards(JwtAuthGuard)
@@ -83,8 +106,7 @@ export class SignaturesController {
     if (!doc) throw new Error('Documento não encontrado');
 
     // Gerar PDF simples com conteúdo do documento
-    const pdfBuffer = Buffer.from(doc.content ?? doc.title ?? documentId);
-    const filename = `${doc.title?.replace(/[^a-zA-Z0-9]/g, '_') ?? documentId}.pdf`;
+    const { pdf: pdfBuffer, nome: filename } = await this.pdfDoDocumento(doc);
 
     return this.clicksignService.createSignatureRequest({
       documentId,
@@ -93,6 +115,7 @@ export class SignaturesController {
       filename,
       signers: body.signers,
       deadline: body.deadline ? new Date(body.deadline) : undefined,
+      userId: req.user?.id,
     });
   }
 
@@ -100,12 +123,14 @@ export class SignaturesController {
   @Post('clicksign/webhook')
   @SkipCompanyCheck()
   async clicksignWebhook(@Req() req: any, @Body() body: any) {
-    const signature = req.headers['x-clicksign-signature'];
+    // API 3.0: cabecalho Content-Hmac: sha256=<hex>. O cabecalho antigo segue aceito.
+    const signature = String(req.headers['content-hmac'] || req.headers['x-clicksign-signature'] || '').replace(/^sha256=/i, '').trim().toLowerCase();
     const secret = process.env.CLICKSIGN_WEBHOOK_SECRET;
     if (!secret) {
       console.error('[ClickSign Webhook] CLICKSIGN_WEBHOOK_SECRET nao configurado - rejeitando por seguranca');
       throw new ForbiddenException('Webhook nao configurado corretamente.');
     }
+    if (!req.rawBody) throw new ForbiddenException('Webhook sem corpo bruto.');
     const expected = crypto.createHmac('sha256', secret).update(req.rawBody).digest('hex');
     if (!signature || String(signature).length !== expected.length || !crypto.timingSafeEqual(Buffer.from(String(signature)), Buffer.from(expected))) {
       console.warn('[ClickSign Webhook] Assinatura invalida - requisicao rejeitada');
@@ -125,8 +150,9 @@ export class SignaturesController {
     const doc = await this.prisma.document.findFirst({
       where: { id: documentId, companyId: req.companyId },
     });
-    if (!doc?.digitalSignature) throw new Error('Documento não enviado para ClickSign');
-    return this.clicksignService.downloadSignedPdf(doc.digitalSignature);
+    if (!doc) throw new NotFoundException('Documento nao encontrado');
+    const { pdf, nome } = await this.clicksignService.baixarPdfAssinado(documentId);
+    return new StreamableFile(pdf, { type: 'application/pdf', disposition: `attachment; filename="${nome}"` });
   }
 
   // ── ClickSign — status ────────────────────────────────────────────────────
@@ -140,7 +166,7 @@ export class SignaturesController {
       where: { id: documentId, companyId: req.companyId },
     });
     if (!doc?.digitalSignature) return { status: 'not_sent' };
-    return this.clicksignService.getDocumentStatus(doc.digitalSignature);
+    return this.clicksignService.sincronizar(documentId, req.user?.id);
   }
 
   // ── Gov.br ────────────────────────────────────────────────────────────────

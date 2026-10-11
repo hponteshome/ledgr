@@ -5,12 +5,9 @@ import { useNavigate } from 'react-router-dom';
 import api from '../../../services/api';
 import { SmartDateInput } from '../../../components/SmartDateInput';
 
+// ClickSign API 3.0 (11/10/2026): so e-mail esta ligado. SMS, WhatsApp, Pix e ICP voltam depois de testados no sandbox.
 const AUTH_METHODS = [
   { value: 'email', label: 'E-mail (link de assinatura)' },
-  { value: 'sms', label: 'SMS (código no celular)' },
-  { value: 'whatsapp', label: 'WhatsApp' },
-  { value: 'pix', label: 'Pix (validação CPF)' },
-  { value: 'icp', label: 'Certificado ICP-Brasil (A1/A3)' },
 ];
 
 export const SignatureRequest: React.FC = () => {
@@ -52,6 +49,7 @@ export const SignatureRequest: React.FC = () => {
   const handleSubmit = async () => {
     if (!selectedDocId) { alert('Selecione um documento'); return; }
     if (signers.some(s => !s.name || !s.email)) { alert('Nome e e-mail são obrigatórios para todos os signatários'); return; }
+    if (signers.some(s => s.name.trim().split(/\s+/).length < 2)) { alert('Informe nome e sobrenome de cada signatário (exigência da ClickSign).'); return; }
     setSubmitting(true);
     try {
       // 1. Adicionar signatários ao documento
@@ -179,7 +177,7 @@ export const SignatureRequest: React.FC = () => {
             ))}
           </div>
           <p className="text-[12px] text-gray-400 mt-3">
-            Os signatários receberão um e-mail do ClickSign com o link para assinar na ordem definida.
+            Todos os signatários recebem ao mesmo tempo o e-mail da ClickSign com o link para assinar (sem ordem entre eles).
           </p>
         </div>
 

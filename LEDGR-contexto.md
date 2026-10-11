@@ -10491,3 +10491,22 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - Teste ponta a ponta no sandbox com I09 (envelope c4f0c954): assinado, PDF ASSINADA v2, validacao OK, Vigente.
 - v1 (ClicksignService) continua so no modulo Arquivo. Pendente: migrar Arquivo para v3 e remover v1 e a chave.
 - Producao: trocar CLICKSIGN_BASE_URL para https://app.clicksign.com e o token de producao.
+
+## 2026-10-11 - ClickSign 3.0 em todo o LEDGR; API 1.9 removida
+- Arquivo (Assinaturas Digitais) migrado: clicksign.service.ts reescrito sobre o ClicksignV3Service.
+  Document.digitalSignature = "cs3:<envelopeId>:<documentoId>".
+- Corrigido defeito antigo: o envio mandava o TEXTO do documento como PDF. Agora vai o PDF importado (fileUrl)
+  ou o mesmo PDF da exportacao (DocumentsService.generatePdf via ModuleRef).
+- Validacoes no envio: PDF valido, nome e sobrenome, e-mail unico por signatario, sem envio ativo duplicado.
+- GET /signatures/documents/:id/clicksign/status agora SINCRONIZA: grava assinaturas novas (metodo CLICKSIGN,
+  formato CLICKSIGN_V3) e, ao fechar, guarda o PDF assinado em /uploads (pdfUrl) com SHA-256 na auditoria.
+- Download do PDF assinado: copia local primeiro; link temporario da ClickSign como reserva (StreamableFile).
+- Webhook: aceita Content-Hmac (sha256=) e o cabecalho antigo; o corpo so localiza o documento, a situacao e relida pela API.
+- Enum SignatureMethod ganhou CLICKSIGN (antes gravava CERT_A1, incorreto). Migracao 20261011_signature_method_clicksign.sql.
+- Instrumentos: removidos ramo 1.9, notificarPendentes, reserva /download e a chave CLICKSIGN_INSTRUMENTOS_API.
+- Telas: botoes "Atualizar da ClickSign" e "PDF assinado" na lista; nova solicitacao so com e-mail e nome completo.
+- Menu: item "Solicitacoes de Assinatura" (/app/documents/signatures) no grupo Assinaturas & Certificados
+  (20261011_sidebar_solicitacoes_assinatura.sql, permissoes copiadas do grupo).
+- Limitacoes atuais: assinatura em paralelo (sem ordem); autenticacao so por e-mail (SMS/WhatsApp/Pix/ICP a testar no sandbox).
+- Pendentes: teste ponta a ponta do Arquivo com documento real; webhook so em producao (URL publica + CLICKSIGN_WEBHOOK_SECRET);
+  layout do modal de Validacao de Assinatura; reabrir documento do Arquivo nao cancela o envelope na ClickSign.

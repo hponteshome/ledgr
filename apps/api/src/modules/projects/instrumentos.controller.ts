@@ -22,7 +22,6 @@ import { UUID_RE } from './concessoes.service';
 import { ProjDbService } from './proj-db.service';
 import { ModuleRef } from '@nestjs/core';
 import { RelatoriosController } from './relatorios.controller';
-import { ClicksignService } from '../signatures/clicksign.service';
 import { ClicksignV3Service } from '../signatures/clicksign-v3.service';
 import { SignatureValidatorService } from '../signatures/signature-validator.service';
 
@@ -40,8 +39,6 @@ const COLECOES: Record<string, string> = {
   versoes: 'proj_instrumento_versoes', partes: 'proj_instrumento_partes', registros: 'proj_instrumento_registros',
   valores: 'proj_instrumento_valores', dependencias: 'proj_instrumento_dependencias',
 };
-// Instrumentos usam a ClickSign API 3.0 por padrao; CLICKSIGN_INSTRUMENTOS_API=v1 volta para a 1.9 (legada).
-const USA_V3 = () => (process.env.CLICKSIGN_INSTRUMENTOS_API || 'v3').toLowerCase() !== 'v1';
 const UPLOAD = FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 
 function erroInstr(e: any): string {
@@ -60,7 +57,6 @@ const extensao = (nome: string) => (String(nome || '').split('.').pop() || '').t
 export class InstrumentosController {
   constructor(
     private readonly db: ProjDbService,
-    private readonly clicksign: ClicksignService,
     private readonly clicksign3: ClicksignV3Service,
     private readonly validador: SignatureValidatorService,
     private readonly moduleRef: ModuleRef,
@@ -131,20 +127,6 @@ export class InstrumentosController {
     return resumo;
   }
 
-  // Pede a ClickSign que envie (ou reenvie) o e-mail a cada signatario que ainda nao assinou.
-  private async notificarPendentes(docKey: string, mensagem: string): Promise<{ enviados: string[]; falhas: string[] }> {
-    const enviados: string[] = [];
-    const falhas: string[] = [];
-    let st: any;
-    try { st = await this.clicksign.getDocumentStatus(docKey); }
-    catch (e: any) { return { enviados, falhas: ['consulta: ' + String(e?.message || e).slice(0, 150)] }; }
-    for (const s of st?.document?.signers || []) {
-      if (s?.signature || !s?.request_signature_key) continue;
-      try { await this.clicksign.notifySigner(s.request_signature_key, mensagem); enviados.push(String(s.email)); }
-      catch (e: any) { falhas.push(String(s.email) + ': ' + String(e?.message || e).slice(0, 150)); }
-    }
-    return { enviados, falhas };
-  }
 
   // ---------------------------------------------------------------- Etapa 4a: fontes de valor do LEDGR
   // Reaproveita o calculo da tela Anexo V (PEPS, data de corte, reconciliacao): os numeros dos instrumentos batem com os relatorios.
@@ -772,15 +754,12 @@ export class InstrumentosController {
     const arquivo = (`${prep.inst.codigo} - ${prep.inst.titulo}`).replace(/[\\/:*?"<>|]/g, '-').slice(0, 120) + '.pdf';
     let docKey = '';
     let docExterno: string | null = null;
-    const v3 = USA_V3();
-    const canal = v3 ? 'CLICKSIGN_V3' : 'CLICKSIGN';
+    const canal = 'CLICKSIGN_V3'; // API 1.9 removida em 11/10/2026
     const listas: any[] = [];
     const desfazer = async () => {
-      if (!docKey) return;
-      if (v3) { if (docExterno) await this.clicksign3.cancelar(docKey, docExterno).catch(() => undefined); }
-      else await this.clicksign.cancelDocument(docKey).catch(() => undefined);
+      if (docKey && docExterno) await this.clicksign3.cancelar(docKey, docExterno).catch(() => undefined);
     };
-    if (v3) {
+    {
       try {
         const r3 = await this.clicksign3.criarEnvio({
           nome: (`${prep.inst.codigo} - ${prep.inst.titulo}`).slice(0, 200), arquivo, pdf: buf, prazo,
@@ -793,19 +772,6 @@ export class InstrumentosController {
       } catch (e: any) {
         throw new BadRequestException('A ClickSign recusou o envio: ' + String(e?.message || e).slice(0, 300));
       }
-    } else
-    try {
-      docKey = await this.clicksign.uploadDocument(buf, arquivo, prazo);
-      for (const p of prep.partes) {
-        const d = String(p.documento || '').replace(/\D/g, '');
-        const cpf = d.length === 11 ? `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}` : undefined;
-        const signerKey = await this.clicksign.addSigner({ name: nomes[p.id], email: emails[p.id], cpf, auth: 'email' });
-        const listKey = await this.clicksign.addSignerToDocument(docKey, signerKey, 1);
-        listas.push({ parteId: p.id, nome: nomes[p.id], email: emails[p.id], ordem: p.ordem, signerKey, listKey });
-      }
-    } catch (e: any) {
-      if (docKey) await this.clicksign.cancelDocument(docKey).catch(() => undefined);
-      throw new BadRequestException('A ClickSign recusou o envio: ' + String(e?.message || e).slice(0, 200));
     }
     try {
       return await this.executar(req, async (tx: any) => {
@@ -822,7 +788,7 @@ export class InstrumentosController {
         }
         await tx.auditLog.create({ data: { actorId: req.user.id, action: 'PROJ_INSTRUMENTO_ENVIADO_CLICKSIGN', targetId: e[0].id,
           after: { projetoId, instrumentoId, documento: docKey, signatarios: listas.map((l) => ({ nome: l.nome, email: l.email })), prazo } } });
-        const notif = v3 ? { enviados: listas.map((l: any) => l.email), falhas: [] as string[] } : await this.notificarPendentes(docKey, (`Por favor, assine: ${prep.inst.codigo} - ${prep.inst.titulo}`).slice(0, 200));
+        const notif = { enviados: listas.map((l: any) => l.email), falhas: [] as string[] };
         return { ok: true, envioId: e[0].id, documento: docKey, signatarios: listas.length, notificados: notif.enviados, falhas: notif.falhas };
       });
     } catch (err) {
@@ -843,7 +809,7 @@ export class InstrumentosController {
       return e;
     });
     let st: any;
-    try { st = env.canal === 'CLICKSIGN_V3' ? await this.clicksign3.consultarComoV1(env.chave, env.documentoExterno) : await this.clicksign.getDocumentStatus(env.chave); }
+    try { st = await this.clicksign3.consultarComoV1(env.chave, env.documentoExterno); }
     catch (e: any) { throw new BadRequestException('Falha ao consultar a ClickSign: ' + String(e?.message || e).slice(0, 200)); }
     const doc = st?.document || {};
     const assinados = new Map<string, string>();
@@ -860,10 +826,9 @@ export class InstrumentosController {
     const fechado = doc.status === 'closed';
     let pdf: Buffer | null = null;
     if (fechado) {
-      // API v1: o PDF assinado vem em document.downloads.signed_file_url (link temporario); o /download fica como reserva
+      // API 3.0: o PDF assinado vem em downloads.signed_file_url (links.files.signed, link temporario de 5 min)
       const url = doc?.downloads?.signed_file_url;
       if (url) { try { const rr = await fetch(url); if (rr.ok) pdf = Buffer.from(await rr.arrayBuffer()); } catch { pdf = null; } }
-      if (!pdf) { try { pdf = await this.clicksign.downloadSignedPdf(env.chave); } catch { pdf = null; } }
       if (pdf && pdf.subarray(0, 5).toString('latin1') !== '%PDF-') pdf = null;
     }
     const resposta = {
@@ -922,9 +887,7 @@ export class InstrumentosController {
       if (!e) throw new NotFoundException('Nenhum envio ativo para este instrumento.');
       return e;
     });
-    const r = env.canal === 'CLICKSIGN_V3'
-      ? await this.clicksign3.notificarTodos(env.chave, `Lembrete: assine o documento ${env.codigo}.`).catch((e: any) => ({ enviados: [] as string[], falhas: [String(e?.message || e).slice(0, 150)] }))
-      : await this.notificarPendentes(env.chave, `Lembrete: assine o documento ${env.codigo}.`);
+    const r = await this.clicksign3.notificarTodos(env.chave, `Lembrete: assine o documento ${env.codigo}.`).catch((e: any) => ({ enviados: [] as string[], falhas: [String(e?.message || e).slice(0, 150)] }));
     await this.executar(req, async (tx: any) => tx.auditLog.create({ data: { actorId: req.user.id, action: 'PROJ_INSTRUMENTO_ENVIO_LEMBRETE',
       targetId: env.id, after: { projetoId, instrumentoId, documento: env.chave, enviados: r.enviados, falhas: r.falhas } } }));
     return { ok: true, ...r };
@@ -944,7 +907,7 @@ export class InstrumentosController {
       return e;
     });
     let aviso: string | null = null;
-    try { if (env.canal === 'CLICKSIGN_V3') await this.clicksign3.cancelar(env.chave, env.documentoExterno); else await this.clicksign.cancelDocument(env.chave); }
+    try { await this.clicksign3.cancelar(env.chave, env.documentoExterno); }
     catch { aviso = 'A ClickSign nao confirmou o cancelamento: cancele tambem pelo painel da ClickSign.'; }
     return this.executar(req, async (tx: any) => {
       await tx.$queryRaw`

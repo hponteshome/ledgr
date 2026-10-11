@@ -1,6 +1,6 @@
 // src/pages/documents/signatures/SignatureList.tsx
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { FiFileText, FiClock, FiCheckCircle, FiDownload, FiUpload, FiShield, FiAward, FiPlus, FiKey } from 'react-icons/fi';
+import { FiFileText, FiClock, FiCheckCircle, FiDownload, FiUpload, FiShield, FiAward, FiPlus, FiKey, FiRefreshCw } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
 import api from '../../../services/api';
 import { SignatureValidateModal } from './SignatureValidateModal';
@@ -20,6 +20,9 @@ export const SignatureList: React.FC = () => {
   const [uploading, setUploading] = useState(false);
   const [validateModal, setValidateModal] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  // ClickSign API 3.0 (11/10/2026): consulta manual - em desenvolvimento o webhook nao chega ao localhost
+  const [sincronizando, setSincronizando] = useState<string | null>(null);
+  const [aviso, setAviso] = useState<{ tipo: 'ok' | 'erro'; texto: string } | null>(null);
 
   const loadDocuments = useCallback(async () => {
     try {
@@ -50,6 +53,36 @@ export const SignatureList: React.FC = () => {
       a.href = url; a.download = `${title}.pdf`; a.click();
       URL.revokeObjectURL(url);
     } catch { alert('Erro ao baixar PDF'); }
+  };
+
+  const ehClickSign = (d: any) => String(d?.digitalSignature || '').startsWith('cs3:');
+
+  const atualizarClickSign = async (docId: string) => {
+    setSincronizando(docId); setAviso(null);
+    try {
+      const r = (await api.get(`/signatures/documents/${docId}/clicksign/status`)).data || {};
+      const n = (r.novasAssinaturas || []).length;
+      const texto = r.status === 'not_sent' ? 'Este documento nao foi enviado a ClickSign.'
+        : r.concluido ? 'Todos assinaram. O PDF assinado foi guardado no LEDGR.'
+        : n ? `${n} assinatura(s) nova(s) registrada(s).`
+        : r.status === 'canceled' ? 'O envio foi cancelado na ClickSign.'
+        : 'Sem novidades na ClickSign.';
+      setAviso({ tipo: r.status === 'not_sent' || r.status === 'canceled' ? 'erro' : 'ok', texto });
+      await loadDocuments();
+    } catch (e: any) {
+      setAviso({ tipo: 'erro', texto: e?.response?.data?.message ?? 'Falha ao consultar a ClickSign.' });
+    }
+    setSincronizando(null);
+  };
+
+  const baixarAssinado = async (docId: string, title: string) => {
+    try {
+      const res = await api.get(`/signatures/documents/${docId}/clicksign/download`, { responseType: 'blob' });
+      const url = URL.createObjectURL(res.data);
+      const a = document.createElement('a');
+      a.href = url; a.download = `${title} - assinado.pdf`; a.click();
+      URL.revokeObjectURL(url);
+    } catch { setAviso({ tipo: 'erro', texto: 'PDF assinado ainda nao disponivel.' }); }
   };
 
   const handleUploadSigned = async (file: File) => {
@@ -119,6 +152,13 @@ export const SignatureList: React.FC = () => {
         ))}
       </div>
 
+      {aviso && (
+        <div className={`flex justify-between items-center px-4 py-2.5 rounded-lg text-[13px] border ${aviso.tipo === 'ok' ? 'bg-green-50 border-green-200 text-green-800' : 'bg-[#FCEBEB] border-red-200 text-red-800'}`}>
+          <span>{aviso.texto}</span>
+          <button onClick={() => setAviso(null)} className="ml-4 text-[16px] leading-none opacity-60 hover:opacity-100">&times;</button>
+        </div>
+      )}
+
       {/* Lista de documentos */}
       <div className="border border-gray-200 rounded-[10px] overflow-hidden">
         <div className="divide-y divide-gray-100">
@@ -160,7 +200,7 @@ export const SignatureList: React.FC = () => {
                             : <FiClock size={13} className="text-yellow-500" />}
                           <span className="text-[13px] text-gray-700">{s.name}</span>
                           {s.role && <span className="text-[11px] text-gray-400">({s.role})</span>}
-                          {s.status !== 'ASSINADO' && (
+                          {s.status !== 'ASSINADO' && doc.status === 'AGUARDANDO_ASSINATURA' && (
                             <div className="flex gap-1 ml-2">
                               <span className="flex items-center gap-1 text-[11px] px-2 py-0.5 bg-orange-50 text-orange-700 border border-orange-200 rounded font-medium">
                                 ⏳ Aguardando via ClickSign
@@ -176,10 +216,27 @@ export const SignatureList: React.FC = () => {
                   )}
                   <p className="text-[11px] text-gray-400 mt-2">Criado em: {fmtDate(doc.createdAt)}</p>
                 </div>
-                <button onClick={() => handleDownloadPdf(doc.id, doc.title)}
-                  className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg ml-4" title="Baixar PDF">
-                  <FiDownload size={16} />
-                </button>
+                <div className="flex items-center gap-1 ml-4">
+                  {doc.status === 'AGUARDANDO_ASSINATURA' && (
+                    <button onClick={() => atualizarClickSign(doc.id)} disabled={sincronizando === doc.id}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-100 disabled:opacity-50"
+                      title="Consultar a ClickSign e registrar as assinaturas">
+                      <FiRefreshCw size={14} className={sincronizando === doc.id ? 'animate-spin' : ''} />
+                      {sincronizando === doc.id ? 'Consultando...' : 'Atualizar da ClickSign'}
+                    </button>
+                  )}
+                  {doc.status === 'ASSINADO' && (doc.digitalSignature === undefined || ehClickSign(doc)) && (
+                    <button onClick={() => baixarAssinado(doc.id, doc.title)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] border border-green-200 text-green-700 rounded-lg hover:bg-green-50"
+                      title="PDF com as assinaturas da ClickSign">
+                      <FiDownload size={14} /> PDF assinado
+                    </button>
+                  )}
+                  <button onClick={() => handleDownloadPdf(doc.id, doc.title)}
+                    className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg" title="Baixar PDF">
+                    <FiDownload size={16} />
+                  </button>
+                </div>
               </div>
             </div>
           ))}
