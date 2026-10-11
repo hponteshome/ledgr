@@ -23,6 +23,7 @@ import { ProjDbService } from './proj-db.service';
 import { ModuleRef } from '@nestjs/core';
 import { RelatoriosController } from './relatorios.controller';
 import { ClicksignService } from '../signatures/clicksign.service';
+import { ClicksignV3Service } from '../signatures/clicksign-v3.service';
 import { SignatureValidatorService } from '../signatures/signature-validator.service';
 
 const SITUACOES = ['RASCUNHO', 'EM_REVISAO', 'APROVADO', 'EM_ASSINATURA', 'ASSINADO', 'REGISTRADO', 'VIGENTE', 'SUBSTITUIDO', 'ENCERRADO'];
@@ -39,6 +40,8 @@ const COLECOES: Record<string, string> = {
   versoes: 'proj_instrumento_versoes', partes: 'proj_instrumento_partes', registros: 'proj_instrumento_registros',
   valores: 'proj_instrumento_valores', dependencias: 'proj_instrumento_dependencias',
 };
+// Instrumentos usam a ClickSign API 3.0 por padrao; CLICKSIGN_INSTRUMENTOS_API=v1 volta para a 1.9 (legada).
+const USA_V3 = () => (process.env.CLICKSIGN_INSTRUMENTOS_API || 'v3').toLowerCase() !== 'v1';
 const UPLOAD = FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 
 function erroInstr(e: any): string {
@@ -58,6 +61,7 @@ export class InstrumentosController {
   constructor(
     private readonly db: ProjDbService,
     private readonly clicksign: ClicksignService,
+    private readonly clicksign3: ClicksignV3Service,
     private readonly validador: SignatureValidatorService,
     private readonly moduleRef: ModuleRef,
   ) {}
@@ -238,7 +242,7 @@ export class InstrumentosController {
 
   private async envioAtivo(tx: any, instrumentoId: string) {
     const r: any[] = await tx.$queryRaw`
-      SELECT e.id, e.chave_externa AS chave, e.versao_id AS "versaoId", i.codigo
+      SELECT e.id, e.chave_externa AS chave, e.versao_id AS "versaoId", i.codigo, e.canal, e.documento_externo AS "documentoExterno"
       FROM proj_instrumento_envios e JOIN proj_instrumentos i ON i.id = e.instrumento_id
       WHERE e.instrumento_id = ${instrumentoId}::uuid AND e.situacao = 'ENVIADO'`;
     return r[0] || null;
@@ -767,7 +771,29 @@ export class InstrumentosController {
     const prazo = new Date(Date.now() + prazoDias * 86400000);
     const arquivo = (`${prep.inst.codigo} - ${prep.inst.titulo}`).replace(/[\\/:*?"<>|]/g, '-').slice(0, 120) + '.pdf';
     let docKey = '';
+    let docExterno: string | null = null;
+    const v3 = USA_V3();
+    const canal = v3 ? 'CLICKSIGN_V3' : 'CLICKSIGN';
     const listas: any[] = [];
+    const desfazer = async () => {
+      if (!docKey) return;
+      if (v3) { if (docExterno) await this.clicksign3.cancelar(docKey, docExterno).catch(() => undefined); }
+      else await this.clicksign.cancelDocument(docKey).catch(() => undefined);
+    };
+    if (v3) {
+      try {
+        const r3 = await this.clicksign3.criarEnvio({
+          nome: (`${prep.inst.codigo} - ${prep.inst.titulo}`).slice(0, 200), arquivo, pdf: buf, prazo,
+          mensagem: (`Por favor, assine: ${prep.inst.codigo} - ${prep.inst.titulo}`).slice(0, 200),
+          signatarios: prep.partes.map((p: any) => ({ chave: p.id, nome: nomes[p.id], email: emails[p.id] })),
+        });
+        docKey = r3.envelopeId;
+        docExterno = r3.documentoId;
+        for (const p of prep.partes) listas.push({ parteId: p.id, nome: nomes[p.id], email: emails[p.id], ordem: p.ordem, signerKey: r3.signatarios[p.id], listKey: null });
+      } catch (e: any) {
+        throw new BadRequestException('A ClickSign recusou o envio: ' + String(e?.message || e).slice(0, 300));
+      }
+    } else
     try {
       docKey = await this.clicksign.uploadDocument(buf, arquivo, prazo);
       for (const p of prep.partes) {
@@ -784,8 +810,8 @@ export class InstrumentosController {
     try {
       return await this.executar(req, async (tx: any) => {
         const e: any[] = await tx.$queryRaw`
-          INSERT INTO proj_instrumento_envios (instrumento_id, versao_id, canal, chave_externa, prazo, criado_por_id)
-          VALUES (${instrumentoId}::uuid, ${prep.inst.versaoId}::uuid, 'CLICKSIGN', ${docKey}::varchar, ${prazo}::timestamp, ${req.user.id}::uuid)
+          INSERT INTO proj_instrumento_envios (instrumento_id, versao_id, canal, chave_externa, documento_externo, prazo, criado_por_id)
+          VALUES (${instrumentoId}::uuid, ${prep.inst.versaoId}::uuid, ${canal}::varchar, ${docKey}::varchar, ${docExterno}::varchar, ${prazo}::timestamp, ${req.user.id}::uuid)
           RETURNING id`;
         for (const l of listas) {
           await tx.$queryRaw`
@@ -796,11 +822,11 @@ export class InstrumentosController {
         }
         await tx.auditLog.create({ data: { actorId: req.user.id, action: 'PROJ_INSTRUMENTO_ENVIADO_CLICKSIGN', targetId: e[0].id,
           after: { projetoId, instrumentoId, documento: docKey, signatarios: listas.map((l) => ({ nome: l.nome, email: l.email })), prazo } } });
-        const notif = await this.notificarPendentes(docKey, (`Por favor, assine: ${prep.inst.codigo} - ${prep.inst.titulo}`).slice(0, 200));
+        const notif = v3 ? { enviados: listas.map((l: any) => l.email), falhas: [] as string[] } : await this.notificarPendentes(docKey, (`Por favor, assine: ${prep.inst.codigo} - ${prep.inst.titulo}`).slice(0, 200));
         return { ok: true, envioId: e[0].id, documento: docKey, signatarios: listas.length, notificados: notif.enviados, falhas: notif.falhas };
       });
     } catch (err) {
-      await this.clicksign.cancelDocument(docKey).catch(() => undefined);
+      await desfazer();
       throw err;
     }
   }
@@ -817,7 +843,7 @@ export class InstrumentosController {
       return e;
     });
     let st: any;
-    try { st = await this.clicksign.getDocumentStatus(env.chave); }
+    try { st = env.canal === 'CLICKSIGN_V3' ? await this.clicksign3.consultarComoV1(env.chave, env.documentoExterno) : await this.clicksign.getDocumentStatus(env.chave); }
     catch (e: any) { throw new BadRequestException('Falha ao consultar a ClickSign: ' + String(e?.message || e).slice(0, 200)); }
     const doc = st?.document || {};
     const assinados = new Map<string, string>();
@@ -896,7 +922,9 @@ export class InstrumentosController {
       if (!e) throw new NotFoundException('Nenhum envio ativo para este instrumento.');
       return e;
     });
-    const r = await this.notificarPendentes(env.chave, `Lembrete: assine o documento ${env.codigo}.`);
+    const r = env.canal === 'CLICKSIGN_V3'
+      ? await this.clicksign3.notificarTodos(env.chave, `Lembrete: assine o documento ${env.codigo}.`).catch((e: any) => ({ enviados: [] as string[], falhas: [String(e?.message || e).slice(0, 150)] }))
+      : await this.notificarPendentes(env.chave, `Lembrete: assine o documento ${env.codigo}.`);
     await this.executar(req, async (tx: any) => tx.auditLog.create({ data: { actorId: req.user.id, action: 'PROJ_INSTRUMENTO_ENVIO_LEMBRETE',
       targetId: env.id, after: { projetoId, instrumentoId, documento: env.chave, enviados: r.enviados, falhas: r.falhas } } }));
     return { ok: true, ...r };
@@ -916,7 +944,7 @@ export class InstrumentosController {
       return e;
     });
     let aviso: string | null = null;
-    try { await this.clicksign.cancelDocument(env.chave); }
+    try { if (env.canal === 'CLICKSIGN_V3') await this.clicksign3.cancelar(env.chave, env.documentoExterno); else await this.clicksign.cancelDocument(env.chave); }
     catch { aviso = 'A ClickSign nao confirmou o cancelamento: cancele tambem pelo painel da ClickSign.'; }
     return this.executar(req, async (tx: any) => {
       await tx.$queryRaw`

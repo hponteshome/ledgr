@@ -10478,3 +10478,16 @@ independente da profundidade). Contraste ajustado a pedido do usuario
   instrumento com aprovada/assinadas/comprovantes e trilha.txt, manifesto.json/.txt/.sha256 e LEIA-ME com a formula do hash da
   trilha; geracao no AuditLog (PROJ_DOSSIE_GERADO) com hash do manifesto e do ZIP. Validado: I02 = R$ 3.445.475,82; dossie com
   11 instrumentos, trilhas integras. QA: fontes e dossie so Master.
+
+## 2026-10-11 - Instrumentos migrados para ClickSign API 3.0 (envelopes)
+
+- Novo servico apps/api/src/modules/signatures/clicksign-v3.service.ts (header Authorization sem Bearer, application/vnd.api+json).
+- Fluxo: envelope -> documento (base64) -> signatarios -> requisitos (agree/sign + provide_evidence/email) -> status running -> notificacao.
+- consultarComoV1 devolve o mesmo formato da v1, entao atualizar/validar/baixar PDF assinado nao mudou no controller.
+- Cancelamento: PATCH do documento com status canceled (o envelope acompanha).
+- Limite da API: page[size] maximo 50 (100 retorna 400).
+- Canal CLICKSIGN_V3 e coluna documento_externo (migracao 20261011_proj_instrumentos_clicksign_v3.sql).
+- Chave CLICKSIGN_INSTRUMENTOS_API: padrao v3; "v1" volta ao fluxo antigo.
+- Teste ponta a ponta no sandbox com I09 (envelope c4f0c954): assinado, PDF ASSINADA v2, validacao OK, Vigente.
+- v1 (ClicksignService) continua so no modulo Arquivo. Pendente: migrar Arquivo para v3 e remover v1 e a chave.
+- Producao: trocar CLICKSIGN_BASE_URL para https://app.clicksign.com e o token de producao.
