@@ -10510,3 +10510,4 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - Limitacoes atuais: assinatura em paralelo (sem ordem); autenticacao so por e-mail (SMS/WhatsApp/Pix/ICP a testar no sandbox).
 - Pendentes: teste ponta a ponta do Arquivo com documento real; webhook so em producao (URL publica + CLICKSIGN_WEBHOOK_SECRET);
   layout do modal de Validacao de Assinatura; reabrir documento do Arquivo nao cancela o envelope na ClickSign.
+- 2026-10-11 Teste ponta a ponta do Arquivo OK (contrato LM, sandbox) e revertido (backup D:\Backups\ledgr-teste-arquivo-20261010-215907). Corrigido nome .pdf.pdf quando o titulo ja termina em .pdf.

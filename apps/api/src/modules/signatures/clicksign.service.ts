@@ -32,7 +32,7 @@ export class ClicksignService {
 
   static nomeSeguro(t?: string | null): string {
     const n = String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-zA-Z0-9 ._-]/g, '_').replace(/\s+/g, ' ').trim().slice(0, 80);
+      .replace(/[^a-zA-Z0-9 ._-]/g, '_').replace(/\s+/g, ' ').trim().replace(/\.pdf$/i, '').trim().slice(0, 80);
     return n || 'documento';
   }
 
