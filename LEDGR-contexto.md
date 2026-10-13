@@ -10511,3 +10511,8 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - Pendentes: teste ponta a ponta do Arquivo com documento real; webhook so em producao (URL publica + CLICKSIGN_WEBHOOK_SECRET);
   layout do modal de Validacao de Assinatura; reabrir documento do Arquivo nao cancela o envelope na ClickSign.
 - 2026-10-11 Teste ponta a ponta do Arquivo OK (contrato LM, sandbox) e revertido (backup D:\Backups\ledgr-teste-arquivo-20261010-215907). Corrigido nome .pdf.pdf quando o titulo ja termina em .pdf.
+
+## 2026-10-13 - Limpeza do CLAUDE.md e revisao do plano do Nei
+- CLAUDE.md: removida a copia duplicada da Regra 12 (CSV com '|'), conferida identica a primeira antes da remocao; a segunda Regra 11 (21/08/2026, reconversao CRLF) passa a se chamar Regra 11-B. Citacoes antigas continuam validas: Regra 11 de 28/07 = nao pedir confirmacao em passo de protocolo; Regra 11-B = reconversao CRLF. Backup em D:\Temp\CLAUDE.md.bak-20261013.
+- Revisao da planilha do Nei (versao 09/10/2026): todas as partidas fecham e os calculos conferem (juros 8%, spread 20%, retorno VAL 7,52%, amortizacao, dacao). Pendencias: base da VAL na planilha (R$ 3.495.791,15) difere da conciliada no LEDGR (R$ 3.445.475,82; n. 24 de R$ 10,00 pendente); planilha trata Sunrise/Hotelsys/Sunsys como uma empresa so (desdobrar por empresa no LEDGR); texto da linha 44 das Premissas desatualizado frente a decisao de 09/10; RM7/RM10 em R$ no Anexo A (RM escritura em EUR); dacao extingue tambem a parte a desembolsar; S10 credita PL no Diario; juros da F5 contra devedora insolvente sem perda esperada nem efeito fiscal; cambio fixo 6,22 (usar PTAX). Encerramento 2025 da F5 a refazer.
+- Contexto e CLAUDE.md atualizados no projeto claude.ai (CLAUDE.md em claude/CLAUDE.md).
