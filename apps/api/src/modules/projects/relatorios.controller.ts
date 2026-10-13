@@ -15,6 +15,7 @@ import { SkipCompanyCheck } from '../../multi-company/company.interceptor';
 import { ProjEscopoGuard, ProjAcao } from './proj-escopo.guard';
 import { UUID_RE } from './concessoes.service';
 import { ProjDbService } from './proj-db.service';
+import { JournalEntryService } from '../accounting/services/journal-entry.service';
 
 const ROTULOS: Record<string, string> = {
   PROJ_PROJETO_EDITADO: 'Projeto editado',
@@ -48,7 +49,7 @@ function mascarar(doc?: string | null): string | null {
 @UseGuards(JwtAuthGuard, ProjEscopoGuard)
 @SkipCompanyCheck()
 export class RelatoriosController {
-  constructor(private readonly db: ProjDbService) {}
+  constructor(private readonly db: ProjDbService, private readonly lancSvc: JournalEntryService) {}
 
   private limite(ate?: string): Date {
     if (!ate) { const h = new Date(); return new Date(Date.UTC(h.getFullYear(), h.getMonth(), h.getDate())); }
@@ -1046,6 +1047,104 @@ export class RelatoriosController {
       await tx.$executeRaw`UPDATE proj_fluxo_contas SET account_id = ${c[0].id}::uuid, atualizado_em = now(), atualizado_por_id = ${req.user.id}::uuid WHERE id = ${f[0].id}::uuid`;
       return this.contasFluxo(tx, projetoId);
     });
+  }
+
+  // -- Gerar lancamentos do Fluxo (13/10/2026) - so o Master. Etapa G1: SUNRISE-E1 (obrigacao de participacao, 31/10/2025) e
+  // F5-E5 de 2025 (juros mes a mes). Juros de 2026 (perda esperada) e variacao cambial (taxa inicial e regime fiscal) aparecem
+  // desabilitados ate a decisao do contador. Grava pelo JournalEntryService (origem OTHER, referencia PROJ-FLUXO-<chave>);
+  // controle em proj_fluxo_lancamentos (uma chave ativa por vez); estorno pelo reverse() do Contabil, com motivo.
+  private async candidatosFluxo(projetoId: string, req: any) {
+    const fx: any = await this.fluxoContabil(projetoId, '', req);
+    return this.db.comoUsuario(req.user.id, async (tx) => {
+      const mapa = await this.contasFluxo(tx, projetoId);
+      const pp = new Map<string, any>(mapa.map((m: any) => [m.papel, m]));
+      const ctrl: any[] = await tx.$queryRaw`SELECT id::text AS id, chave, journal_entry_id::text AS "journalEntryId", valor, data::text AS data, criado_em AS "criadoEm",
+        estornado_em AS "estornadoEm", estorno_journal_entry_id::text AS "estornoJournalEntryId", motivo_estorno AS "motivoEstorno"
+        FROM proj_fluxo_lancamentos WHERE projeto_id = ${projetoId}::uuid ORDER BY criado_em`;
+      const ativo = new Map<string, any>(ctrl.filter((c) => !c.estornadoEm).map((c) => [c.chave as string, c]));
+      const conta = (p: string) => { const m = pp.get(p); return m ? { papel: p, companyId: m.companyId, accountId: m.accountId, code: m.code, name: m.name } : { papel: p }; };
+      const fd = (s: string) => String(s).slice(0, 10).split('-').reverse().join('/');
+      const C: any[] = [];
+      const e1 = (fx.lancamentos || []).find((l: any) => l.evento === 1 && l.empresa === 'SUNRISE');
+      if (e1) C.push({ chave: 'SUNRISE-E1', empresa: 'SUNRISE', data: e1.data, valor: e1.valor, habilitado: true, motivo: '',
+        descricao: 'Obrigação de participação econômica com a Real Mouchão - Termo e confissão de dívida de 31/10/2025 (Operação Âncora)',
+        debito: conta('SUNRISE_RECEBER_F5'), credito: conta('SUNRISE_OBRIG_RM') });
+      for (const m of fx.financeiro?.meses || []) {
+        const dt = String(m.data);
+        if (m.jurosBrl > 0) {
+          const ok = dt < '2026-01-01';
+          C.push({ chave: `F5-E5-${dt}`, empresa: 'F5', data: dt, valor: m.jurosBrl, habilitado: ok,
+            motivo: ok ? '' : 'Aguarda o parecer sobre perda esperada (insolvência da RM em 22/07/2026).',
+            descricao: `Juros de 8% a.a. sobre o crédito contra a Real Mouchão - ${m.dias} dias até ${fd(dt)} - € ${Number(m.jurosEur).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} à PTAX de venda ${String(m.taxa).replace('.', ',')}`,
+            debito: conta('F5_JUROS_RECEBER'), credito: conta('F5_REC_JUROS') });
+        }
+        if (m.variacao) {
+          const pos = m.variacao > 0;
+          C.push({ chave: `F5-E8-${dt}`, empresa: 'F5', data: dt, valor: Math.abs(m.variacao), habilitado: false,
+            motivo: 'Aguarda o contador: taxa do registro inicial e regime fiscal da variação cambial.',
+            descricao: `Variação cambial do crédito e dos juros em euros contra a Real Mouchão - PTAX de venda ${String(m.taxa).replace('.', ',')} em ${fd(dt)}`,
+            debito: conta(pos ? 'F5_CREDITO_RM' : 'F5_VC_PASSIVA'), credito: conta(pos ? 'F5_VC_ATIVA' : 'F5_CREDITO_RM') });
+        }
+      }
+      for (const c of C) {
+        c.gerado = ativo.get(c.chave) || null;
+        c.semConta = !c.debito.code || !c.credito.code;
+        if (c.semConta) { c.habilitado = false; c.motivo = 'Conta do mapa não definida.'; }
+      }
+      return { candidatos: C, controle: ctrl };
+    });
+  }
+
+  @Get('projetos/:projetoId/fluxo-lancamentos')
+  @UseGuards(MasterOnlyGuard)
+  @ProjAcao('autenticado')
+  fluxoLancamentos(@Param('projetoId') projetoId: string, @Req() req: any) {
+    if (!UUID_RE.test(projetoId)) throw new NotFoundException('Registro nao encontrado.');
+    return this.candidatosFluxo(projetoId, req);
+  }
+
+  @PostC('projetos/:projetoId/fluxo-lancamentos/gerar')
+  @UseGuards(MasterOnlyGuard)
+  @ProjAcao('autenticado')
+  async fluxoGerar(@Param('projetoId') projetoId: string, @BodyC() body: any, @Req() req: any) {
+    if (!UUID_RE.test(projetoId)) throw new NotFoundException('Registro nao encontrado.');
+    const chaves: string[] = Array.isArray(body?.chaves) ? body.chaves.map((x: any) => String(x)) : [];
+    if (!chaves.length || chaves.length > 50) throw new BadRequestException('Selecione de 1 a 50 lancamentos.');
+    const { candidatos } = await this.candidatosFluxo(projetoId, req);
+    const sel = chaves.map((k) => candidatos.find((c: any) => c.chave === k));
+    const inval = chaves.filter((k, i) => !sel[i] || !sel[i].habilitado || sel[i].gerado);
+    if (inval.length) throw new BadRequestException(`Nao podem ser gerados: ${inval.join(', ')}`);
+    const feitos: { chave: string; journalEntryId: string }[] = [];
+    for (const c of sel as any[]) {
+      const je: any = await this.lancSvc.create(c.debito.companyId, req.user.id, {
+        date: c.data, description: c.descricao, reference: `PROJ-FLUXO-${c.chave}`, sourceModule: 'OTHER',
+        items: [
+          { accountId: c.debito.accountId, accountCode: c.debito.code, value: Number(c.valor), type: 'DEBIT' },
+          { accountId: c.credito.accountId, accountCode: c.credito.code, value: Number(c.valor), type: 'CREDIT' },
+        ],
+      });
+      await this.db.comoUsuario(req.user.id, (tx) => tx.$executeRaw`INSERT INTO proj_fluxo_lancamentos (projeto_id, company_id, chave, journal_entry_id, valor, data, descricao, criado_por_id)
+        VALUES (${projetoId}::uuid, ${c.debito.companyId}::uuid, ${c.chave}, ${je.id}::uuid, ${Number(c.valor)}, ${c.data}::date, ${c.descricao}, ${req.user.id}::uuid)`);
+      feitos.push({ chave: c.chave, journalEntryId: je.id });
+    }
+    return { gerados: feitos };
+  }
+
+  @PostC('projetos/:projetoId/fluxo-lancamentos/:controleId/estornar')
+  @UseGuards(MasterOnlyGuard)
+  @ProjAcao('autenticado')
+  async fluxoEstornar(@Param('projetoId') projetoId: string, @Param('controleId') controleId: string, @BodyC() body: any, @Req() req: any) {
+    if (!UUID_RE.test(projetoId) || !UUID_RE.test(controleId)) throw new NotFoundException('Registro nao encontrado.');
+    const motivo = String(body?.motivo || '').trim();
+    if (motivo.length < 10) throw new BadRequestException('Informe o motivo do estorno (minimo de 10 caracteres).');
+    const r: any[] = await this.db.comoUsuario(req.user.id, (tx) => tx.$queryRaw`SELECT company_id::text AS cid, journal_entry_id::text AS je, estornado_em AS est
+      FROM proj_fluxo_lancamentos WHERE id = ${controleId}::uuid AND projeto_id = ${projetoId}::uuid`);
+    if (!r.length) throw new NotFoundException('Registro nao encontrado.');
+    if (r[0].est) throw new BadRequestException('Lancamento ja estornado.');
+    const est: any = await this.lancSvc.reverse(r[0].je, r[0].cid, req.user.id);
+    await this.db.comoUsuario(req.user.id, (tx) => tx.$executeRaw`UPDATE proj_fluxo_lancamentos SET estornado_em = now(), estorno_journal_entry_id = ${est.id}::uuid,
+      estornado_por_id = ${req.user.id}::uuid, motivo_estorno = ${motivo} WHERE id = ${controleId}::uuid`);
+    return { estornoJournalEntryId: est.id };
   }
 
   // -- Cambio (13/10/2026) - so o Master: PTAX do euro (Banco Central, boletim de fechamento, taxa de venda), gravada em

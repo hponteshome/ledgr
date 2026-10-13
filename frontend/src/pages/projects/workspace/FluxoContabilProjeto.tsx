@@ -6,6 +6,7 @@ import api from '../../../services/api';
 import { cardSt, erroSt, tituloSt, subtituloSt, fmtBRL, fmtData } from './projetoTema';
 import CambioPtaxCard from './CambioPtaxCard';
 import ContasFluxoCard from './ContasFluxoCard';
+import GerarLancamentosCard from './GerarLancamentosCard';
 
 const FAM: Record<string, [string, string]> = { origem: ['#EEEDFE', '#3C3489'], ancora: ['#E1F5EE', '#085041'], intercompany: ['#FAECE7', '#712B13'], resgate: ['#FAEEDA', '#633806'] };
 const EMPRESAS: [string, string][] = [['F5', 'emissora · credora da RM'], ['SUNRISE', 'concedente da participação'], ['RM', 'Real Mouchão · fora do LEDGR (informativo)'], ['SUNSYS', 'recebedora'], ['HOTELSYS', 'beneficiária · devedora']];
@@ -76,6 +77,7 @@ export default function FluxoContabilProjeto({ projetoId }: { projetoId: string 
           </div>
         ))}
       </div>
+        <GerarLancamentosCard projetoId={projetoId} rev={rev} onAlterado={() => setRev((x) => x + 1)} />
         <ContasFluxoCard projetoId={projetoId} onAlterado={() => setRev((x) => x + 1)} />
         <CambioPtaxCard projetoId={projetoId} />
       <div style={{ fontSize: 11, color: '#6B7280' }}>Contas descritivas, a mapear para o plano de contas de cada empresa após a validação do contador. Os lançamentos da Real Mouchão são informativos (escrituração em Portugal, em euros, taxa histórica {String(d.taxaHistorica).replace('.', ',')}); a variação cambial do crédito em euros (PTAX mensal na F5; BCE no informativo da RM) entra na etapa 2, com juros, spread e retorno da VAL.</div>

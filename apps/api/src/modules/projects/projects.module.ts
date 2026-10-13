@@ -3,6 +3,7 @@
 // Dependencia unidirecional: este modulo usa o nucleo; o nucleo nao importa este modulo.
 import { Module } from '@nestjs/common';
 import { SignaturesModule } from '../signatures/signatures.module';
+import { AccountingModule } from '../accounting/accounting.module';
 import { ProjectsController } from './projects.controller';
 import { ProjetosFinanceiroController } from './projetos-financeiro.controller';
 import { CadastrosController } from './cadastros.controller';
@@ -13,7 +14,7 @@ import { ProjEscopoGuard } from './proj-escopo.guard';
 import { ProjDbService } from './proj-db.service';
 
 @Module({
-  imports: [SignaturesModule],
+  imports: [SignaturesModule, AccountingModule],
   controllers: [ProjectsController, ProjetosFinanceiroController, CadastrosController, RelatoriosController, InstrumentosController],
   providers: [ConcessoesService, ProjEscopoGuard, ProjDbService],
   exports: [ConcessoesService],
