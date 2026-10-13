@@ -902,6 +902,91 @@ export class RelatoriosController {
     });
   }
 
+  // -- Cambio (13/10/2026) - so o Master: PTAX do euro (Banco Central, boletim de fechamento, taxa de venda), gravada em
+  // cambio_cotacoes (imutavel) com data e hora da consulta e SHA-256 da resposta. Fim de semana ou feriado: ultimo fechamento
+  // ate a data (CPC 02). Vale a primeira cotacao gravada de cada data. Datas: a da confissao, cada fim de mes ate hoje e a da
+  // declaracao de insolvencia da RM (22/07/2026, planilha do Nei).
+  private datasCambio(inicio: string, ate: string): string[] {
+    const out = new Set<string>([inicio]);
+    let [y, m] = inicio.split('-').map(Number);
+    for (let k = 0; k < 240; k++) {
+      const fim = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+      if (fim > ate) break;
+      if (fim >= inicio) out.add(fim);
+      m += 1; if (m > 12) { m = 1; y += 1; }
+    }
+    if ('2026-07-22' <= ate && '2026-07-22' >= inicio) out.add('2026-07-22');
+    return [...out].filter((d) => d <= ate).sort();
+  }
+
+  private async cotacoesEur(tx: any) {
+    const rows: any[] = await tx.$queryRaw`SELECT DISTINCT ON (data_referencia) id::text AS id, data_referencia::text AS "dataReferencia",
+      data_cotacao::text AS "dataCotacao", data_hora_boletim::text AS "dataHoraBoletim", tipo_boletim AS "tipoBoletim", taxa_compra AS "taxaCompra",
+      taxa_venda AS "taxaVenda", fonte, consultado_em AS "consultadoEm", resposta_sha256 AS sha256
+      FROM cambio_cotacoes WHERE moeda = 'EUR' AND fonte = 'BCB_PTAX' ORDER BY data_referencia, consultado_em`;
+    return rows.map((r) => ({ ...r, taxaCompra: Number(r.taxaCompra), taxaVenda: Number(r.taxaVenda) }));
+  }
+
+  private buscarPtaxEur(dataRef: string): Promise<{ url: string; body: string; sha256: string; f: any }> {
+    const https = require('https'); const { createHash } = require('crypto');
+    const [y, m, d] = dataRef.split('-').map(Number);
+    const mdY = (x: Date) => `${String(x.getUTCMonth() + 1).padStart(2, '0')}-${String(x.getUTCDate()).padStart(2, '0')}-${x.getUTCFullYear()}`;
+    const url = 'https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/CotacaoMoedaPeriodo(moeda=@moeda,dataInicial=@dataInicial,dataFinalCotacao=@dataFinalCotacao)'
+      + `?@moeda='EUR'&@dataInicial='${mdY(new Date(Date.UTC(y, m - 1, d - 10)))}'&@dataFinalCotacao='${mdY(new Date(Date.UTC(y, m - 1, d)))}'&$format=json`;
+    return new Promise((resolve, reject) => {
+      const rq = https.get(url, { timeout: 20000, headers: { Accept: 'application/json' } }, (res: any) => {
+        let body = ''; res.setEncoding('utf8'); res.on('data', (c: string) => { body += c; });
+        res.on('end', () => {
+          if ((res.statusCode || 0) >= 400) return reject(new Error(`Banco Central respondeu HTTP ${res.statusCode}`));
+          let j: any; try { j = JSON.parse(body); } catch { return reject(new Error('Resposta do Banco Central nao e JSON')); }
+          const f = (j?.value || []).filter((x: any) => x.tipoBoletim === 'Fechamento' && String(x.dataHoraCotacao).slice(0, 10) <= dataRef)
+            .sort((p: any, q: any) => String(p.dataHoraCotacao).localeCompare(String(q.dataHoraCotacao))).pop();
+          if (!f) return reject(new Error('Sem boletim de fechamento nos 10 dias ate a data'));
+          resolve({ url, body, sha256: createHash('sha256').update(body, 'utf8').digest('hex'), f });
+        });
+      });
+      rq.on('timeout', () => rq.destroy(new Error('Banco Central: tempo esgotado')));
+      rq.on('error', (e: any) => reject(e));
+    });
+  }
+
+  @Get('projetos/:projetoId/cambio')
+  @UseGuards(MasterOnlyGuard)
+  @ProjAcao('autenticado')
+  cambio(@Param('projetoId') projetoId: string, @Req() req: any) {
+    if (!UUID_RE.test(projetoId)) throw new NotFoundException('Registro nao encontrado.');
+    return this.db.comoUsuario(req.user.id, async (tx) => {
+      const hoje = new Date().toISOString().slice(0, 10);
+      const base = await this.saldosSeries(tx, projetoId, hoje);
+      const datas = this.datasCambio(base?.dividaData || '2025-10-31', hoje);
+      const cotacoes = await this.cotacoesEur(tx);
+      const tem = new Set(cotacoes.map((c: any) => c.dataReferencia));
+      return { moeda: 'EUR', fonte: 'BCB_PTAX', datasNecessarias: datas, faltando: datas.filter((d) => !tem.has(d)), cotacoes };
+    });
+  }
+
+  @Post('projetos/:projetoId/cambio/atualizar')
+  @UseGuards(MasterOnlyGuard)
+  @ProjAcao('autenticado')
+  async cambioAtualizar(@Param('projetoId') projetoId: string, @Req() req: any) {
+    if (!UUID_RE.test(projetoId)) throw new NotFoundException('Registro nao encontrado.');
+    const atual: any = await this.cambio(projetoId, req);
+    const gravadas: string[] = []; const falhas: { data: string; erro: string }[] = []; const buscas: { data: string; r: any }[] = [];
+    // Consulta ao Banco Central fora da transacao; so a gravacao fica dentro dela.
+    for (const d of atual.faltando as string[]) {
+      try { buscas.push({ data: d, r: await this.buscarPtaxEur(d) }); } catch (e: any) { falhas.push({ data: d, erro: String(e?.message || e) }); }
+    }
+    if (buscas.length) await this.db.comoUsuario(req.user.id, async (tx) => {
+      for (const b of buscas) {
+        await tx.$executeRaw`INSERT INTO cambio_cotacoes (moeda, data_referencia, data_cotacao, data_hora_boletim, tipo_boletim, taxa_compra, taxa_venda, fonte, url, resposta_sha256, resposta, consultado_por_id)
+          VALUES ('EUR', ${b.data}::date, ${String(b.r.f.dataHoraCotacao).slice(0, 10)}::date, ${String(b.r.f.dataHoraCotacao)}::timestamp, ${String(b.r.f.tipoBoletim)},
+          ${Number(b.r.f.cotacaoCompra)}, ${Number(b.r.f.cotacaoVenda)}, 'BCB_PTAX', ${b.r.url}, ${b.r.sha256}, ${b.r.body}::jsonb, ${req.user.id}::uuid)`;
+        gravadas.push(b.data);
+      }
+    });
+    return { gravadas, falhas };
+  }
+
   // -- Custodia (Etapa B, 06/10/2026) - so o Master por ora (Etapa C: Financeiro e Josi, com segregacao) -------------
   // Acesso direto as tabelas da custodia (RLS e gatilhos do banco valem integralmente). Comprovante = referencia textual
   // por enquanto (anexo do arquivo na Etapa D).
