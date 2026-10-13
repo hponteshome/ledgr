@@ -4,7 +4,6 @@
 import React, { useEffect, useState } from 'react';
 import api from '../../../services/api';
 import { cardSt, erroSt, tituloSt, subtituloSt, fmtBRL, fmtData } from './projetoTema';
-import ResgateRmModal from './ResgateRmModal';
 
 const FAM: Record<string, [string, string]> = { origem: ['#EEEDFE', '#3C3489'], ancora: ['#E1F5EE', '#085041'], intercompany: ['#FAECE7', '#712B13'], resgate: ['#FAEEDA', '#633806'] };
 const EMPRESAS: [string, string][] = [['F5', 'emissora · credora da RM'], ['SUNRISE', 'concedente da participação'], ['RM', 'Real Mouchão · fora do LEDGR (informativo)'], ['SUNSYS', 'recebedora'], ['HOTELSYS', 'beneficiária · devedora']];
@@ -13,7 +12,6 @@ export default function FluxoContabilProjeto({ projetoId }: { projetoId: string 
   const [d, setD] = useState<any>(null);
   const [erro, setErro] = useState('');
   const [ativo, setAtivo] = useState<number | null>(null);
-  const [resgate, setResgate] = useState(false);
   const [dataBase, setDataBase] = useState('');
   useEffect(() => {
     api.get(`/projects-relatorios/projetos/${projetoId}/fluxo-contabil${dataBase ? `?ate=${dataBase}` : ''}`).then((r) => setD(r.data)).catch((e) => setErro(e?.response?.data?.message || 'Falha ao montar o fluxo.'));
@@ -26,7 +24,7 @@ export default function FluxoContabilProjeto({ projetoId }: { projetoId: string 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}><div style={{ ...tituloSt, flex: 1 }}>Fluxo contábil</div><button onClick={() => setResgate(true)} style={{ padding: '6px 12px', fontSize: 12, border: 'none', borderRadius: 7, background: '#1A4A3A', color: '#fff', cursor: 'pointer' }}>Resgates na F5 (prévia)</button>{resgate && <ResgateRmModal projetoId={projetoId} ate={d?.apuradoEm} onClose={() => setResgate(false)} />}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}><div style={{ ...tituloSt, flex: 1 }}>Fluxo contábil</div></div>
         <div style={subtituloSt}>Lançamentos propostos por empresa, com os valores da trilha até a data-base {fmtData(d.apuradoEm)} · roteiro para o contador · visível só para o Master</div>
       <div style={{ ...cardSt, padding: 10, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <b style={{ fontSize: 13, color: '#134E4A' }}>Data-base: {fmtData(d.apuradoEm)}</b>
@@ -38,6 +36,7 @@ export default function FluxoContabilProjeto({ projetoId }: { projetoId: string 
             <button key={rot} onClick={() => setDataBase(v)} style={{ padding: '4px 10px', fontSize: 12, borderRadius: 7, cursor: 'pointer', border: '0.5px solid #E5E7EB', background: dataBase === v ? '#134E4A' : '#fff', color: dataBase === v ? '#fff' : '#134E4A' }}>{rot}</button>)); })()}
       </div>
       {d.ultimoExtrato && d.apuradoEm > d.ultimoExtrato && <div style={{ fontSize: 12, background: '#FFFBEB', border: '1px solid #FCD34D', color: '#78350F', borderRadius: 8, padding: '8px 12px' }}>⚠ Extratos carregados só até {fmtData(d.ultimoExtrato)}: os saldos depois dessa data estão incompletos.</div>}
+        {(d.alertas || []).map((a: string, i: number) => <div key={i} style={{ fontSize: 12, background: '#FFFBEB', border: '1px solid #FCD34D', color: '#78350F', borderRadius: 8, padding: '8px 12px', marginTop: 8 }}>⚠ {a}</div>)}
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
         {d.eventos.map((e: any) => (
@@ -74,7 +73,7 @@ export default function FluxoContabilProjeto({ projetoId }: { projetoId: string 
           </div>
         ))}
       </div>
-      <div style={{ fontSize: 11, color: '#6B7280' }}>Contas descritivas, a mapear para o plano de contas de cada empresa após a validação do contador. Os lançamentos da Real Mouchão são informativos (escrituração em Portugal, em euros, taxa histórica {String(d.taxaHistorica).replace('.', ',')}); a variação cambial de cada resgate será apurada no fechamento, com a taxa do BCE ou a PTAX.</div>
+      <div style={{ fontSize: 11, color: '#6B7280' }}>Contas descritivas, a mapear para o plano de contas de cada empresa após a validação do contador. Os lançamentos da Real Mouchão são informativos (escrituração em Portugal, em euros, taxa histórica {String(d.taxaHistorica).replace('.', ',')}); a variação cambial do crédito em euros (PTAX mensal na F5; BCE no informativo da RM) entra na etapa 2, com juros, spread e retorno da VAL.</div>
     </div>
   );
 }
