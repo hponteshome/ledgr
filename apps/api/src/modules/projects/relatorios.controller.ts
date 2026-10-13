@@ -769,7 +769,8 @@ export class RelatoriosController {
   // -- Fluxo contabil (06/10/2026; reescrito no modelo do Nei em 13/10/2026) - so o Master. Etapa 1: E1 confissao e Termo,
   // E2 aportes, E3 pagamentos (3a ate a confissao; 3b depois, fora do Anexo V ou sem classificacao; 3c item do Anexo V pago com
   // dinheiro do Ancora pelo PEPS; 3d item do Anexo V pago com outra origem) e E4 titulo F5-VAL (31/12/2026 provisoria, ou a
-  // premissa TITULO_F5_VAL_DATA). Contas descritivas, a mapear apos a validacao do contador. Sem gravacao no Contabil.
+  // premissa TITULO_F5_VAL_DATA). Etapa 2: E5 juros, E6 spread, E7 retorno da VAL e E8 variacao cambial pela PTAX gravada em
+  // cambio_cotacoes. Contas descritivas, a mapear apos a validacao do contador. Sem gravacao no Contabil.
   @Get('projetos/:projetoId/fluxo-contabil')
   @UseGuards(MasterOnlyGuard)
   @ProjAcao('autenticado')
@@ -837,10 +838,48 @@ export class RelatoriosController {
       const tituloData = tp?.valorData ? (tp.valorData as Date).toISOString().slice(0, 10) : '2026-12-31';
       const tituloProvisorio = !tp?.valorData;
       const tituloOcorreu = tituloData <= hoje;
+      // Etapa 2 (13/10/2026). E5: juros de 8% a.a. (simples, base 365, cl. 3.2) sobre o principal em euros, da confissao ate a
+      // insolvencia (22/07/2026; a F5 renuncia aos juros posteriores - premissa 38 = 0), convertidos pela PTAX de cada fim de mes.
+      // E8: o credito foi registrado ao cambio contratual (6,22); a cada fim de mes o saldo em euros (principal + juros) e
+      // atualizado pela PTAX de venda gravada em cambio_cotacoes (CPC 02). E6: spread de 20% dos aportes; E7: retorno da VAL de
+      // 7,52% a.a. (simples, base 365, aporte a aporte), ambos na data do titulo (premissa 51 = 0).
+      const INSOLV = '2026-07-22'; const JUROS = 0.08; const SPREAD = 0.2; const RET_VAL = 0.0752;
+      const cot = await this.cotacoesEur(tx);
+      const ptax = new Map<string, number>(cot.map((c: any) => [c.dataReferencia as string, Number(c.taxaVenda)]));
+      const datasC = this.datasCambio(CONF, hoje).filter((x) => x > CONF);
+      const principalEurC = Math.round(Number(base.dividaEur ?? v(base.dividaC) / TX) * 100);
+      const dias = (p: string, q: string) => Math.round((Date.parse(q + 'T00:00:00Z') - Date.parse(p + 'T00:00:00Z')) / 86400000);
+      let jurosEurC = 0; let saldoBrlC = base.dividaC; let taxaAnt = TX; let ant = CONF;
+      const porAno: Record<string, { jurosEur: number; jurosBrl: number; variacao: number }> = {};
+      const meses: any[] = []; const semCot: string[] = [];
+      for (const dt of datasC) {
+        const ano = dt.slice(0, 4); const pa = porAno[ano] || (porAno[ano] = { jurosEur: 0, jurosBrl: 0, variacao: 0 });
+        const dJ = ant < INSOLV ? Math.max(0, dias(ant, dt < INSOLV ? dt : INSOLV)) : 0;
+        const jEur = Math.round(principalEurC * JUROS * dJ / 365);
+        const tc = ptax.get(dt); if (!tc) semCot.push(dt);
+        const taxa = tc || taxaAnt;
+        const jBrl = Math.round(jEur * taxa);
+        jurosEurC += jEur; saldoBrlC += jBrl;
+        const novoBrl = Math.round((principalEurC + jurosEurC) * taxa);
+        const varC = novoBrl - saldoBrlC; saldoBrlC = novoBrl;
+        pa.jurosEur += jEur; pa.jurosBrl += jBrl; pa.variacao += varC;
+        meses.push({ data: dt, taxa, dias: dJ, jurosEur: v(jEur), jurosBrl: v(jBrl), variacao: v(varC), saldoBrl: v(saldoBrlC), semCotacao: !tc });
+        taxaAnt = taxa; ant = dt;
+      }
+      const principalBrlC = datasC.length ? Math.round(principalEurC * taxaAnt) : base.dividaC;
+      const jurosSaldoC = saldoBrlC - principalBrlC;
+      const anos = Object.keys(porAno).sort();
+      const jurosTotC = anos.reduce((s, y) => s + porAno[y].jurosBrl, 0);
+      const varTotC = anos.reduce((s, y) => s + porAno[y].variacao, 0);
+      let retC = 0;
+      for (const e of base.eventos) if (e.data <= tituloData) retC += Math.round(e.c * RET_VAL * Math.max(0, dias(e.data, tituloData)) / 365);
+      const spreadC = Math.round(liqC * SPREAD);
+      const eurF = (c: number) => (c / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       const alertas: string[] = [];
       if (semClasQtd) alertas.push(`${semClasQtd} pagamento(s) depois de ${fmtD(CONF)} (R$ ${brl(semClasC)}) sem classificação no Anexo V: tratados como fora do Anexo V (caso 3b) até a classificação na tela Anexo V e desembolsos.`);
       if (!fu) alertas.push('Origem do dinheiro (PEPS) indisponível: itens do Anexo V tratados como pagos com outra origem (caso 3d).');
       if (tituloProvisorio) alertas.push(`Data do título F5-VAL provisória (${fmtD(tituloData)}), conforme a planilha do Nei.`);
+      if (semCot.length) alertas.push(`Sem cotação PTAX em ${semCot.map(fmtD).join(', ')}: usada a taxa anterior. Clique em Atualizar cotações.`);
       const L = (evento: number, empresa: string, titulo: string, debito: string, credito: string, valor: number, historico: string, extra: any = {}) => ({ evento, empresa, titulo, debito, credito, valor, historico, ...extra });
       const lanc = [
         L(1, 'F5', 'Confissão de dívida da RM', 'Real Mouchão - crédito confessado (12101010006, ativo)', 'Obrigação de pagamento do Anexo V por conta da RM (22103010001, passivo)', v(base.dividaC),
@@ -879,14 +918,34 @@ export class RelatoriosController {
         L(4, 'SUNSYS', 'Título F5-VAL', 'Adiantamentos recebidos - Operação Âncora (passivo transitório)', 'Conta corrente - F5 (passivo)', v(liqC - c3),
           'Os aportes passam a recursos da F5, que os deve à VAL pelo título de investimento.', { data: tituloData, previsto: !tituloOcorreu }),
         L(4, 'F5', 'Título F5-VAL', 'Conta corrente - SUNSYS (ativo)', 'Títulos de investimento a pagar - VAL (passivo)', v(liqC),
-          `Base: Conta Individual conciliada.${tituloProvisorio ? ' Data provisória (planilha do Nei: título em 2026).' : ''} Spread de 20% e retorno de 7,52% a.a. na etapa 2.`, { data: tituloData, previsto: !tituloOcorreu }),
+          `Base: Conta Individual conciliada.${tituloProvisorio ? ' Data provisória (planilha do Nei: título em 2026).' : ''}`, { data: tituloData, previsto: !tituloOcorreu }),
       ];
+      for (const y of anos) {
+        if (porAno[y].jurosBrl) {
+          lanc.push(L(5, 'F5', `Juros de 8% a.a. - ${y}`, 'Juros a receber - Real Mouchão (ativo)', 'Receita financeira - juros (resultado)', v(porAno[y].jurosBrl),
+            `€ ${eurF(porAno[y].jurosEur)} convertidos mês a mês pela PTAX de venda; juros só até ${fmtD(INSOLV)} (insolvência; renúncia aos juros posteriores).${y >= INSOLV.slice(0, 4) ? ' Sujeito à perda esperada (parecer técnico).' : ''}`, { validar: y >= INSOLV.slice(0, 4) }));
+          lanc.push(L(5, 'RM', `Juros suportados - ${y}`, '6918 Outros juros suportados', '2722 Juros a pagar - F5', v(porAno[y].jurosBrl), `€ ${eurF(porAno[y].jurosEur)} (equivalente em reais pela PTAX).`, { informativo: true }));
+        }
+      }
+      lanc.push(L(6, 'F5', 'Spread de 20% à massa da RM', 'Despesa financeira - spread à massa (resultado)', 'Contas a pagar - Massa insolvente da RM (passivo)', v(spreadC),
+        '20% dos aportes da VAL, até pagar os créditos sobre a insolvência; sem compensação com o crédito da F5 (art. 99.º CIRE).', { data: tituloData, previsto: !tituloOcorreu }));
+      lanc.push(L(6, 'RM', 'Spread a receber da F5', '278 Outros devedores - F5: spread', '7888 Outros rendimentos - spread sobre captações', v(spreadC), 'Em euros ao câmbio do dia do título.', { data: tituloData, previsto: !tituloOcorreu, informativo: true }));
+      lanc.push(L(7, 'F5', 'Retorno do título da VAL (7,52% a.a.)', 'Despesa financeira - remuneração de títulos (resultado)', 'Títulos de investimento a pagar - VAL (passivo)', v(retC),
+        `Acumulado aporte a aporte até ${fmtD(tituloData)}; premissa 51 = 0: todo o retorno na data do título.`, { data: tituloData, previsto: !tituloOcorreu }));
+      for (const y of anos) {
+        const vy = porAno[y].variacao; if (!vy) continue;
+        lanc.push(L(8, 'F5', `Variação cambial - ${y}`, vy > 0 ? 'Créditos e juros a receber - Real Mouchão (ativo)' : 'Despesa financeira - variação cambial (resultado)',
+          vy > 0 ? 'Receita financeira - variação cambial (resultado)' : 'Créditos e juros a receber - Real Mouchão (ativo)', v(Math.abs(vy)),
+          `Atualização mensal do crédito e dos juros em euros pela PTAX de venda (CPC 02).${y === anos[0] ? ' Inclui a diferença entre o câmbio contratual (6,22) e a PTAX: taxa do registro inicial e regime fiscal a definir com o contador.' : ''}`, { validar: true }));
+      }
       const S = (conta: string, c: number) => ({ conta, saldo: c / 100 });
       const c3t = tituloOcorreu ? c3 : 0;
       const saldos: Record<string, any[]> = {
-        F5: [S('Real Mouchão - crédito confessado', base.dividaC - d3), S('Obrigação de pagamento do Anexo V por conta da RM', base.dividaC - d3 - c3t), S('Conta corrente - SUNSYS', tituloOcorreu ? liqC - c3 : 0), S('Títulos a pagar - VAL (principal)', tituloOcorreu ? liqC : 0)],
+        F5: [S('Real Mouchão - crédito confessado (pela PTAX)', principalBrlC - d3), S('Juros a receber - Real Mouchão', jurosSaldoC), S('Obrigação de pagamento do Anexo V por conta da RM', base.dividaC - d3 - c3t),
+          S('Conta corrente - SUNSYS', tituloOcorreu ? liqC - c3 : 0), S('Títulos a pagar - VAL (principal + retorno)', tituloOcorreu ? liqC + retC : 0), S('Contas a pagar - massa da RM (spread)', tituloOcorreu ? spreadC : 0),
+          S('Resultado: juros', jurosTotC), S('Resultado: variação cambial', varTotC), S('Resultado: spread e retorno da VAL', tituloOcorreu ? -(spreadC + retC) : 0)],
         SUNRISE: [S('A receber da F5 - Anexo V por conta da RM', base.dividaC - d3 - c3t), S('Obrigação de participação - Real Mouchão', base.dividaC - d3), S('Conta corrente - HOTELSYS (a receber)', c3t)],
-        RM: [S('Direito de participação económica', base.dividaC - d3), S('F5 - a desembolsar (2781.2)', base.dividaC - d3 - c3t), S('F5 - desembolsado (2781.1)', c3t)],
+        RM: [S('Direito de participação económica', base.dividaC - d3), S('F5 - a desembolsar (2781.2)', base.dividaC - d3 - c3t), S('F5 - desembolsado (2781.1)', c3t), S('Juros a pagar - F5 (equivalente em R$)', jurosTotC)],
         SUNSYS: [S('Bancos (efeito da operação)', liqC - pagosC), S('Adiantamentos - Operação Âncora', tituloOcorreu ? 0 : liqC - c3), S('Conta corrente - F5 (a pagar)', tituloOcorreu ? liqC - c3 : 0), S('Mútuo - HOTELSYS (a receber)', mutuoC)],
         HOTELSYS: [S('Passivos baixados (comprovados)', passComprovC), S('Pagamentos a comprovar', aComprovarC), S('Despesas da operação', despesasOpC), S('Passivos do Anexo V baixados', c3 + d3), S('Mútuo - SUNSYS (a pagar)', mutuoC), S('Conta corrente - SUNRISE (a pagar)', c3)],
       };
@@ -895,10 +954,16 @@ export class RelatoriosController {
         { numero: 2, titulo: 'Aportes do Cliente Âncora', familia: 'ancora' },
         { numero: 3, titulo: 'Pagamentos da SUNSYS (3a a 3d)', familia: 'ancora', quantidade: apls.length },
         { numero: 4, titulo: 'Título F5-VAL', familia: 'intercompany', data: tituloData, previsto: !tituloOcorreu },
+        { numero: 5, titulo: 'Juros de 8% a.a.', familia: 'resgate', data: INSOLV },
+        { numero: 6, titulo: 'Spread de 20%', familia: 'intercompany', data: tituloData, previsto: !tituloOcorreu },
+        { numero: 7, titulo: 'Retorno da VAL', familia: 'intercompany', data: tituloData, previsto: !tituloOcorreu },
+        { numero: 8, titulo: 'Variação cambial (PTAX)', familia: 'resgate', quantidade: meses.length },
       ];
       return { ultimoExtrato, apuradoEm: hoje, eventos, lancamentos: lanc, saldos, resgates: [], taxaHistorica: TX, alertas,
         titulo: { data: tituloData, provisorio: tituloProvisorio, ocorreu: tituloOcorreu },
-        casos: { ateConfissao: v(antesC), depoisForaAnexoV: v(depoisForaC), semClassificacao: { qtd: semClasQtd, valor: v(semClasC) }, anexoVAncora: v(c3), anexoVOutraOrigem: v(d3) } };
+        casos: { ateConfissao: v(antesC), depoisForaAnexoV: v(depoisForaC), semClassificacao: { qtd: semClasQtd, valor: v(semClasC) }, anexoVAncora: v(c3), anexoVOutraOrigem: v(d3) },
+        financeiro: { porAno: Object.fromEntries(anos.map((y) => [y, { jurosEur: v(porAno[y].jurosEur), jurosBrl: v(porAno[y].jurosBrl), variacao: v(porAno[y].variacao) }])), meses,
+          spread: v(spreadC), retornoVal: v(retC), creditoPtax: v(principalBrlC), jurosAReceber: v(jurosSaldoC) } };
     });
   }
 

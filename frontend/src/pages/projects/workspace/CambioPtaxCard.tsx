@@ -18,6 +18,7 @@ export default function CambioPtaxCard({ projetoId }: { projetoId: string }) {
       .catch((e) => setErro(e?.response?.data?.message || 'Falha ao consultar o Banco Central.'))
       .finally(() => setBusy(false));
   };
+  const TD: React.CSSProperties = { padding: '3px 10px', whiteSpace: 'nowrap' };
   const n4 = (x: any) => Number(x).toLocaleString('pt-BR', { minimumFractionDigits: 4, maximumFractionDigits: 6 });
   return (
     <div style={{ ...cardSt, padding: 14 }}>
@@ -30,11 +31,11 @@ export default function CambioPtaxCard({ projetoId }: { projetoId: string }) {
       {d && d.faltando && d.faltando.length > 0 && <div style={{ fontSize: 12, color: '#78350F', marginBottom: 6 }}>Sem cotação: {d.faltando.map((x: string) => fmtData(x)).join(', ')}</div>}
       {d && (
         <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
-          <thead><tr style={{ color: '#6B7280', textAlign: 'left' }}><th>Data de referência</th><th>Boletim</th><th style={{ textAlign: 'right' }}>Venda</th><th style={{ textAlign: 'right' }}>Compra</th><th>Consultado em</th><th>SHA-256 da resposta</th></tr></thead>
+          <thead><tr style={{ color: '#6B7280', textAlign: 'left' }}><th style={TD}>Data de referência</th><th style={TD}>Boletim</th><th style={{ ...TD, textAlign: 'right' }}>Venda</th><th style={{ ...TD, textAlign: 'right' }}>Compra</th><th style={TD}>Consultado em</th><th style={TD}>SHA-256 da resposta</th></tr></thead>
           <tbody>{(d.cotacoes || []).map((c: any) => (
             <tr key={c.id} style={{ borderTop: '0.5px solid #E5E7EB' }}>
-              <td>{fmtData(c.dataReferencia)}</td><td>{c.dataHoraBoletim}</td><td style={{ textAlign: 'right' }}>{n4(c.taxaVenda)}</td><td style={{ textAlign: 'right' }}>{n4(c.taxaCompra)}</td>
-              <td>{new Date(c.consultadoEm).toLocaleString('pt-BR')}</td><td style={{ fontFamily: 'monospace', fontSize: 11 }}>{String(c.sha256).slice(0, 16)}...</td>
+              <td style={TD}>{fmtData(c.dataReferencia)}</td><td style={TD}>{c.dataHoraBoletim}</td><td style={{ ...TD, textAlign: 'right' }}>{n4(c.taxaVenda)}</td><td style={{ ...TD, textAlign: 'right' }}>{n4(c.taxaCompra)}</td>
+              <td style={TD}>{new Date(c.consultadoEm).toLocaleString('pt-BR')}</td><td style={{ ...TD, fontFamily: 'monospace', fontSize: 11 }}>{String(c.sha256).slice(0, 16)}...</td>
             </tr>))}</tbody>
         </table>
       )}
