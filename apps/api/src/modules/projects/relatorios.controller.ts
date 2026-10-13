@@ -959,11 +959,92 @@ export class RelatoriosController {
         { numero: 7, titulo: 'Retorno da VAL', familia: 'intercompany', data: tituloData, previsto: !tituloOcorreu },
         { numero: 8, titulo: 'Variação cambial (PTAX)', familia: 'resgate', quantidade: meses.length },
       ];
+      // Contas do Fluxo (13/10/2026): troca o nome descritivo pela conta do plano de cada empresa, quando mapeada.
+      const mapaContas = await this.contasFluxo(tx, projetoId);
+      const porPapel = new Map<string, any>(mapaContas.map((m: any) => [m.papel, m]));
+      const PAPEL: Record<string, string> = {
+        'F5|Real Mouchão - crédito confessado (12101010006, ativo)': 'F5_CREDITO_RM',
+        'F5|Obrigação de pagamento do Anexo V por conta da RM (22103010001, passivo)': 'F5_OBRIG_ANEXO_V',
+        'F5|Conta corrente - SUNSYS (ativo)': 'F5_CC_SUNSYS',
+        'F5|Títulos de investimento a pagar - VAL (passivo)': 'F5_TITULO_VAL',
+        'F5|Juros a receber - Real Mouchão (ativo)': 'F5_JUROS_RECEBER',
+        'F5|Receita financeira - juros (resultado)': 'F5_REC_JUROS',
+        'F5|Despesa financeira - spread à massa (resultado)': 'F5_DESP_SPREAD',
+        'F5|Contas a pagar - Massa insolvente da RM (passivo)': 'F5_MASSA_PAGAR',
+        'F5|Despesa financeira - remuneração de títulos (resultado)': 'F5_DESP_RET_VAL',
+        'F5|Receita financeira - variação cambial (resultado)': 'F5_VC_ATIVA',
+        'F5|Despesa financeira - variação cambial (resultado)': 'F5_VC_PASSIVA',
+        'SUNRISE|A receber da F5 - Anexo V por conta da RM (ativo)': 'SUNRISE_RECEBER_F5',
+        'SUNRISE|Obrigação de participação econômica - Real Mouchão (passivo)': 'SUNRISE_OBRIG_RM',
+        'SUNRISE|Conta corrente intercompany - HOTELSYS (ativo)': 'SUNRISE_CC_HOTELSYS',
+        'SUNSYS|Bancos (ativo)': 'SUNSYS_BANCOS',
+        'SUNSYS|Adiantamentos recebidos - Operação Âncora (passivo transitório)': 'SUNSYS_ADIANT',
+        'SUNSYS|Mútuo / conta corrente intercompany - HOTELSYS (ativo)': 'SUNSYS_MUTUO_HOTELSYS',
+        'SUNSYS|Conta corrente - F5 (passivo)': 'SUNSYS_CC_F5',
+        'HOTELSYS|Passivos tributários, trabalhistas e demais obrigações (passivo)': 'HOTELSYS_PASSIVO_REAL',
+        'HOTELSYS|Passivos do Anexo V - credores (passivo)': 'HOTELSYS_PASSIVO_REAL',
+        'HOTELSYS|Mútuo / conta corrente intercompany - SUNSYS (passivo)': 'HOTELSYS_MUTUO_SUNSYS',
+        'HOTELSYS|Pagamentos a comprovar - obrigações da HOTELSYS em reestruturação (ativo transitório)': 'HOTELSYS_A_RECLASSIFICAR',
+        'HOTELSYS|Despesas de manutenção da operação (resultado)': 'HOTELSYS_DESP_MANUT',
+        'HOTELSYS|Conta corrente intercompany - SUNRISE (passivo)': 'HOTELSYS_CC_SUNRISE',
+      };
+      const contaTxt = (emp: string, txt: string) => {
+        if (emp === 'F5' && txt === 'Créditos e juros a receber - Real Mouchão (ativo)') {
+          const p1 = porPapel.get('F5_CREDITO_RM'); const p2 = porPapel.get('F5_JUROS_RECEBER');
+          return p1?.code && p2?.code ? `${p1.code} ${p1.name} e ${p2.code} ${p2.name}` : txt;
+        }
+        const p = PAPEL[emp + '|' + txt]; if (!p) return txt;
+        const m = porPapel.get(p);
+        if (m?.code) return `${m.code} ${m.name}`;
+        return m?.rotina ? `${txt} (conta de rotina)` : `${txt} - sem conta no mapa`;
+      };
+      for (const l of lanc as any[]) { l.debitoDescritivo = l.debito; l.creditoDescritivo = l.credito; l.debito = contaTxt(l.empresa, l.debito); l.credito = contaTxt(l.empresa, l.credito); }
+      const semConta = mapaContas.filter((m: any) => !m.code && !m.rotina).length;
+      if (semConta) alertas.push(`${semConta} papel(is) do Fluxo sem conta no mapa: defina no quadro Contas do projeto.`);
       return { ultimoExtrato, apuradoEm: hoje, eventos, lancamentos: lanc, saldos, resgates: [], taxaHistorica: TX, alertas,
         titulo: { data: tituloData, provisorio: tituloProvisorio, ocorreu: tituloOcorreu },
         casos: { ateConfissao: v(antesC), depoisForaAnexoV: v(depoisForaC), semClassificacao: { qtd: semClasQtd, valor: v(semClasC) }, anexoVAncora: v(c3), anexoVOutraOrigem: v(d3) },
         financeiro: { porAno: Object.fromEntries(anos.map((y) => [y, { jurosEur: v(porAno[y].jurosEur), jurosBrl: v(porAno[y].jurosBrl), variacao: v(porAno[y].variacao) }])), meses,
           spread: v(spreadC), retornoVal: v(retC), creditoPtax: v(principalBrlC), jurosAReceber: v(jurosSaldoC) } };
+    });
+  }
+
+  // -- Contas do Fluxo (13/10/2026) - so o Master: mapa papel -> conta do plano de cada empresa (proj_fluxo_contas; toda troca
+  // fica em proj_fluxo_contas_hist). Usado nos cards do Fluxo e na geracao dos lancamentos.
+  private async contasFluxo(tx: any, projetoId: string) {
+    const rows: any[] = await tx.$queryRaw`SELECT f.id::text AS id, f.papel, f.descricao, f.ordem, f.rotina, f.company_id::text AS "companyId",
+      split_part(c.legal_name, ' ', 1) AS empresa, a.id::text AS "accountId", a.code, a.name,
+      (SELECT count(*)::int FROM journal_entry_items i JOIN journal_entries je ON je.id = i.journal_entry_id AND je.deleted_at IS NULL WHERE i.account_id = a.id) AS itens,
+      f.atualizado_em AS "atualizadoEm"
+      FROM proj_fluxo_contas f JOIN companies c ON c.id = f.company_id LEFT JOIN chart_of_accounts a ON a.id = f.account_id
+      WHERE f.projeto_id = ${projetoId}::uuid ORDER BY f.ordem, f.papel`;
+    return rows;
+  }
+
+  @Get('projetos/:projetoId/fluxo-contas')
+  @UseGuards(MasterOnlyGuard)
+  @ProjAcao('autenticado')
+  fluxoContas(@Param('projetoId') projetoId: string, @Req() req: any) {
+    if (!UUID_RE.test(projetoId)) throw new NotFoundException('Registro nao encontrado.');
+    return this.db.comoUsuario(req.user.id, (tx) => this.contasFluxo(tx, projetoId));
+  }
+
+  @PostC('projetos/:projetoId/fluxo-contas/:papel')
+  @UseGuards(MasterOnlyGuard)
+  @ProjAcao('autenticado')
+  fluxoContaDefinir(@Param('projetoId') projetoId: string, @Param('papel') papel: string, @BodyC() body: any, @Req() req: any) {
+    if (!UUID_RE.test(projetoId) || !/^[A-Z0-9_]{3,40}$/.test(String(papel))) throw new NotFoundException('Registro nao encontrado.');
+    const codigo = String(body?.codigo || '').trim();
+    if (!/^[0-9.]{1,30}$/.test(codigo)) throw new BadRequestException('Informe o codigo da conta.');
+    return this.db.comoUsuario(req.user.id, async (tx) => {
+      const f: any[] = await tx.$queryRaw`SELECT id::text AS id, company_id::text AS cid FROM proj_fluxo_contas WHERE projeto_id = ${projetoId}::uuid AND papel = ${papel}`;
+      if (!f.length) throw new NotFoundException('Papel nao encontrado.');
+      const c: any[] = await tx.$queryRaw`SELECT a.id::text AS id, coalesce((to_jsonb(a)->>'is_analytic')::boolean, true) AS analitica FROM chart_of_accounts a
+        WHERE a.company_id = ${f[0].cid}::uuid AND a.code = ${codigo} AND (to_jsonb(a)->>'deleted_at') IS NULL LIMIT 1`;
+      if (!c.length) throw new BadRequestException('Conta nao encontrada no plano desta empresa.');
+      if (!c[0].analitica) throw new BadRequestException('A conta precisa ser analitica.');
+      await tx.$executeRaw`UPDATE proj_fluxo_contas SET account_id = ${c[0].id}::uuid, atualizado_em = now(), atualizado_por_id = ${req.user.id}::uuid WHERE id = ${f[0].id}::uuid`;
+      return this.contasFluxo(tx, projetoId);
     });
   }
 
