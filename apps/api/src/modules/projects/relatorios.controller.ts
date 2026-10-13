@@ -766,13 +766,21 @@ export class RelatoriosController {
     return this.pdfSimples(res, `demonstrativo-real-${k.semestre.codigo}.pdf`, 'Demonstrativo da Participação Econômica · Real Mouchão', corpo, k);
   }
 
-  // -- Fluxo contabil (06/10/2026) - so o Master: eventos numerados e lancamentos propostos por empresa, valores pela trilha --
-  // Contas descritivas (o mapeamento para o plano de cada empresa vem depois, validado pelo contador). Sem gravacao no Contabil.
+  // -- Fluxo contabil (06/10/2026; reescrito no modelo do Nei em 13/10/2026) - so o Master. Etapa 1: E1 confissao e Termo,
+  // E2 aportes, E3 pagamentos (3a ate a confissao; 3b depois, fora do Anexo V ou sem classificacao; 3c item do Anexo V pago com
+  // dinheiro do Ancora pelo PEPS; 3d item do Anexo V pago com outra origem) e E4 titulo F5-VAL (31/12/2026 provisoria, ou a
+  // premissa TITULO_F5_VAL_DATA). Contas descritivas, a mapear apos a validacao do contador. Sem gravacao no Contabil.
   @Get('projetos/:projetoId/fluxo-contabil')
   @UseGuards(MasterOnlyGuard)
   @ProjAcao('autenticado')
-  fluxoContabil(@Param('projetoId') projetoId: string, @Query('ate') ateQ: string, @Req() req: any) {
+  async fluxoContabil(@Param('projetoId') projetoId: string, @Query('ate') ateQ: string, @Req() req: any) {
     if (!UUID_RE.test(projetoId)) throw new NotFoundException('Registro nao encontrado.');
+    const ateOk = ateQ && /^\d{4}-\d{2}-\d{2}$/.test(ateQ) ? ateQ : '';
+    // Origem do dinheiro de cada aplicacao (PEPS), por movimento bancario; chamada fora da transacao, como no resgate-rm/previa.
+    let fu: any = null;
+    try { fu = await this.fontesUsos(projetoId, '', ateOk, req); } catch { fu = null; }
+    const ancoraPorMov = new Map<string, number>();
+    for (const a of fu?.aplicacoes || []) ancoraPorMov.set(String(a.id), Math.round(Number(a.ancora || 0) * 100));
     return this.db.comoUsuario(req.user.id, async (tx) => {
       // Data-base (08/10/2026): ?ate=AAAA-MM-DD; sem data, o ultimo extrato carregado da recebedora financeira (SUNSYS).
       const ue: any[] = await tx.$queryRaw`SELECT max(bt.transaction_date)::date AS d FROM bank_transactions bt
@@ -780,83 +788,117 @@ export class RelatoriosController {
         JOIN proj_papeis pa ON pa.id = pp.papel_id AND pa.codigo = 'RECEBEDORA_FINANCEIRA'
         JOIN proj_operacoes o ON o.id = pp.operacao_id WHERE o.projeto_id = ${projetoId}::uuid`;
       const ultimoExtrato: string | null = ue[0]?.d ? new Date(ue[0].d).toISOString().slice(0, 10) : null;
-      const hoje = ateQ && /^\d{4}-\d{2}-\d{2}$/.test(ateQ) ? ateQ : (ultimoExtrato || new Date().toISOString().slice(0, 10));
+      const hoje = ateOk || (ultimoExtrato || new Date().toISOString().slice(0, 10));
       const base = await this.saldosSeries(tx, projetoId, hoje);
       if (!base) throw new BadRequestException('Estrutura da Series#1 nao carregada.');
       const ops = [base.ops.anc, base.ops.s1, base.ops.real].filter((o): o is { id: string; codigo: string } => !!o);
-      const cent = (v: any) => Math.round(Number(v) * 100);
-      const apls = await tx.projAplicacao.findMany({ where: { canceladoEm: null, operacaoId: { in: ops.map((o) => o.id) }, natureza: { tipo: 'APLICACAO' }, dataAplicacao: { lte: new Date(hoje + 'T00:00:00Z') } }, select: { id: true, valor: true, natureza: { select: { pagaPassivo: true, codigo: true } } } });
-      const passivosC = apls.filter((a) => a.natureza.pagaPassivo).reduce((s, a) => s + cent(a.valor), 0);
-      const despesasC = apls.filter((a) => !a.natureza.pagaPassivo).reduce((s, a) => s + cent(a.valor), 0);
+      const cent = (x: any) => Math.round(Number(x) * 100);
+      const v = (c: number) => c / 100;
+      const TX = 6.22;
+      const brl = (c: number) => v(c).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const eur = (c: number) => (c / 100 / TX).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const fmtD = (d: string) => d.split('-').reverse().join('/');
+      const CONF = base.dividaData || '2025-10-31';
+      const apls = await tx.projAplicacao.findMany({ where: { canceladoEm: null, operacaoId: { in: ops.map((o) => o.id) }, natureza: { tipo: 'APLICACAO' }, dataAplicacao: { lte: new Date(hoje + 'T00:00:00Z') } }, select: { id: true, valor: true, dataAplicacao: true, natureza: { select: { pagaPassivo: true, codigo: true } } } });
+      const movRows: any[] = await tx.$queryRaw`SELECT id::text AS id, bank_transaction_id::text AS mov FROM proj_aplicacoes WHERE cancelado_em IS NULL`;
+      const movMap = new Map<string, string>(movRows.map((r: any) => [r.id as string, String(r.mov || '')]));
+      const clsRows: any[] = await tx.$queryRaw`SELECT aplicacao_id::text AS id, lower(fora_anexo::text) AS fora FROM proj_aplicacao_anexo_v WHERE cancelado_em IS NULL`;
+      const clsMap = new Map<string, boolean>(clsRows.map((r: any) => [r.id as string, ['true', 't', 's', 'sim', '1'].includes(String(r.fora))]));
+      // E3: 3a ate a confissao e 3b depois (fora do Anexo V ou sem classificacao) vao ao mutuo SUNSYS x HOTELSYS; itens do Anexo V
+      // depois da confissao dividem-se pelo PEPS em 3c (dinheiro do Ancora = desembolso da F5) e 3d (outra origem = reduz o credito).
+      const mutuo: any[] = [];
+      let antesC = 0; let depoisForaC = 0; let semClasQtd = 0; let semClasC = 0; let c3 = 0; let d3 = 0; let c3Qtd = 0; let d3Qtd = 0;
+      for (const a of apls) {
+        const vC = cent(a.valor); const dt = (a.dataAplicacao as Date).toISOString().slice(0, 10);
+        if (dt <= CONF) { mutuo.push(a); antesC += vC; continue; }
+        if (!clsMap.has(a.id)) { mutuo.push(a); depoisForaC += vC; semClasQtd += 1; semClasC += vC; continue; }
+        if (clsMap.get(a.id)) { mutuo.push(a); depoisForaC += vC; continue; }
+        const anc = Math.min(vC, ancoraPorMov.get(movMap.get(a.id) || '') || 0);
+        c3 += anc; d3 += vC - anc; if (anc > 0) c3Qtd += 1; if (vC - anc > 0) d3Qtd += 1;
+      }
+      const passivosC = mutuo.filter((a) => a.natureza.pagaPassivo).reduce((s, a) => s + cent(a.valor), 0);
+      const despesasC = mutuo.filter((a) => !a.natureza.pagaPassivo).reduce((s, a) => s + cent(a.valor), 0);
       // E0 (08/10/2026): baixa comprovada (DARF vinculado) x pagamentos a comprovar (passivos sem comprovante + ordem do intermediario).
       const compRows: any[] = await tx.$queryRaw`SELECT v.aplicacao_id, sum(v.valor) AS valor FROM proj_comprovante_vinculos v JOIN proj_comprovantes_fiscais c ON c.id = v.comprovante_id AND c.cancelado_em IS NULL AND c.data_arrecadacao <= ${hoje}::date WHERE v.cancelado_em IS NULL GROUP BY 1`;
       const compMap = new Map<string, number>(compRows.map((r: any) => [r.aplicacao_id as string, cent(r.valor)]));
-      const passComprovC = apls.filter((a: any) => a.natureza.pagaPassivo).reduce((s: number, a: any) => s + Math.min(cent(a.valor), compMap.get(a.id) || 0), 0);
-      const ordemC = apls.filter((a: any) => a.natureza.codigo === 'PAGAMENTO_ORDEM_INTERMEDIARIO').reduce((s: number, a: any) => s + cent(a.valor), 0);
+      const passComprovC = mutuo.filter((a: any) => a.natureza.pagaPassivo).reduce((s: number, a: any) => s + Math.min(cent(a.valor), compMap.get(a.id) || 0), 0);
+      const ordemC = mutuo.filter((a: any) => a.natureza.codigo === 'PAGAMENTO_ORDEM_INTERMEDIARIO').reduce((s: number, a: any) => s + cent(a.valor), 0);
       const aComprovarC = passivosC - passComprovC + ordemC;
       const despesasOpC = despesasC - ordemC;
-      const pagosC = passivosC + despesasC;
+      const mutuoC = passivosC + despesasC + d3;
+      const pagosC = passivosC + despesasC + c3 + d3;
       const entradasC = base.eventos.filter((e) => e.c > 0).reduce((s, e) => s + e.c, 0);
       const devolC = -base.eventos.filter((e) => e.c < 0).reduce((s, e) => s + e.c, 0);
       const liqC = entradasC - devolC;
-      const encontroC = Math.min(liqC, pagosC);
+      // E4: data do titulo F5-VAL = premissa TITULO_F5_VAL_DATA; sem ela, 31/12/2026 provisoria (planilha do Nei: titulo em 2026,
+      // retorno da VAL ate 31/12/2026, confirmacao da VAL em 31/12/2026).
       const versao = await tx.projPremissaVersao.findFirst({ where: { projetoId, canceladoEm: null }, orderBy: { numero: 'desc' }, select: { id: true } });
-      const ing = versao ? await tx.projPremissa.findFirst({ where: { versaoId: versao.id, codigo: 'SERIES1_QUOTA1_INGRESSO' }, select: { valorData: true } }) : null;
-      const ingresso = ing?.valorData ? (ing.valorData as Date).toISOString().slice(0, 10) : null;
-      const quotaC = ingresso ? base.eventos.filter((e) => e.data <= ingresso).reduce((s, e) => s + e.c, 0) : 0;
-      const ingressoOcorreu = !!ingresso && ingresso <= hoje;
-      const resgates = base.eventos.map((e) => ({ data: e.data, base: e.c / 100, valor: Math.round(e.c * base.pct) / 100 }));
-      const TX = 6.22;
-      const v = (c: number) => c / 100;
+      const tp = versao ? await tx.projPremissa.findFirst({ where: { versaoId: versao.id, codigo: 'TITULO_F5_VAL_DATA' }, select: { valorData: true } }) : null;
+      const tituloData = tp?.valorData ? (tp.valorData as Date).toISOString().slice(0, 10) : '2026-12-31';
+      const tituloProvisorio = !tp?.valorData;
+      const tituloOcorreu = tituloData <= hoje;
+      const alertas: string[] = [];
+      if (semClasQtd) alertas.push(`${semClasQtd} pagamento(s) depois de ${fmtD(CONF)} (R$ ${brl(semClasC)}) sem classificação no Anexo V: tratados como fora do Anexo V (caso 3b) até a classificação na tela Anexo V e desembolsos.`);
+      if (!fu) alertas.push('Origem do dinheiro (PEPS) indisponível: itens do Anexo V tratados como pagos com outra origem (caso 3d).');
+      if (tituloProvisorio) alertas.push(`Data do título F5-VAL provisória (${fmtD(tituloData)}), conforme a planilha do Nei.`);
       const L = (evento: number, empresa: string, titulo: string, debito: string, credito: string, valor: number, historico: string, extra: any = {}) => ({ evento, empresa, titulo, debito, credito, valor, historico, ...extra });
       const lanc = [
-        L(1, 'F5', 'Confissão de dívida da RM', 'Recebível - Real Mouchão (ativo)', 'Obrigação de aplicação na quitação dos passivos da HOTELSYS (passivo)', v(base.dividaC),
-          'Dívida confessada pela Real Mouchão em favor da F5, beneficiária direta, para quitação dos passivos da HOTELSYS (confissão de 31/10/2025).', { data: base.dividaData }),
-        L(1, 'RM', 'Dívida confessada', 'Direito de participação econômica - Recife Ocean (ativo)', 'Dívida confessada - F5 (passivo)', v(base.dividaC),
-          `Assunção dos passivos da HOTELSYS em troca da participação nos resultados. Em euros: € ${(base.dividaEur ?? v(base.dividaC) / TX).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} (taxa histórica ${TX.toLocaleString('pt-BR')}).`, { data: base.dividaData, informativo: true }),
-        L(2, 'SUNRISE', 'Termo de participação', '-', '-', 0, 'Sem lançamento na assinatura: a participação da RM é reconhecida a cada resgate (evento 7).', { data: base.dividaData, semLancamento: true }),
-        L(3, 'SUNSYS', 'Aportes do Cliente Âncora', 'Bancos (ativo)', 'Valores recebidos por conta e ordem - HOTELSYS / Operação Âncora (passivo)', v(entradasC),
-          'Valores recebidos do Adquirente Âncora, antecipação para futura aquisição de unidades/direitos no Recife Ocean Residences, por conta e ordem da HOTELSYS.'),
-        ...(devolC ? [L(3, 'SUNSYS', 'Devoluções ao Adquirente', 'Valores recebidos por conta e ordem - HOTELSYS / Operação Âncora (passivo)', 'Bancos (ativo)', v(devolC), 'Devolução de valores ao Adquirente Âncora.')] : []),
-        L(4, 'SUNSYS', 'Pagamentos por conta da HOTELSYS', 'Mútuo / conta corrente intercompany - HOTELSYS (ativo)', 'Bancos (ativo)', v(pagosC),
-          'Pagamento de obrigações tributárias, trabalhistas e operacionais por conta e ordem da HOTELSYS.'),
-        L(4, 'HOTELSYS', 'Baixa de passivos comprovada', 'Passivos tributários, trabalhistas e demais obrigações (passivo)', 'Mútuo / conta corrente intercompany - SUNSYS (passivo)', v(passComprovC),
+        L(1, 'F5', 'Confissão de dívida da RM', 'Real Mouchão - crédito confessado (12101010006, ativo)', 'Obrigação de pagamento do Anexo V por conta da RM (22103010001, passivo)', v(base.dividaC),
+          'Já lançado em 31/10/2025. O crédito contra a RM não baixa com os pagamentos do Anexo V: só passa de "a desembolsar" para "desembolsado".', { data: base.dividaData }),
+        L(1, 'SUNRISE', 'Obrigação de participação da RM', 'A receber da F5 - Anexo V por conta da RM (ativo)', 'Obrigação de participação econômica - Real Mouchão (passivo)', v(base.dividaC),
+          'Termo de 31/10/2025: obrigação reconhecida no balanço pelo valor de referência. Baixa pelo programa de amortização (a partir de 2027) e pela dação do saldo à F5.', { data: base.dividaData }),
+        L(1, 'RM', 'Dívida confessada', 'Direito de participação económica - Sunrise (4149)', 'F5 - a desembolsar (2781.2)', v(base.dividaC),
+          `Em euros: € ${(base.dividaEur ?? v(base.dividaC) / TX).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} (câmbio contratual ${TX.toLocaleString('pt-BR')}).`, { data: base.dividaData, informativo: true }),
+        L(2, 'SUNSYS', 'Aportes do Cliente Âncora', 'Bancos (ativo)', 'Adiantamentos recebidos - Operação Âncora (passivo transitório)', v(entradasC),
+          'Aportes da VAL na conta da SUNSYS, por conta da F5, até o título F5-VAL (Conta Individual conciliada).'),
+        ...(devolC ? [L(2, 'SUNSYS', 'Devoluções ao Adquirente', 'Adiantamentos recebidos - Operação Âncora (passivo transitório)', 'Bancos (ativo)', v(devolC), 'Devolução de valores ao Adquirente Âncora.')] : []),
+        L(3, 'SUNSYS', 'Pagamentos por conta da HOTELSYS (mútuo)', 'Mútuo / conta corrente intercompany - HOTELSYS (ativo)', 'Bancos (ativo)', v(mutuoC),
+          `3a até ${fmtD(CONF)}: R$ ${brl(antesC)} (crédito da F5 sobre o grupo, fora da confissão); 3b depois, fora do Anexo V: R$ ${brl(depoisForaC)}${semClasQtd ? ` (${semClasQtd} sem classificação)` : ''}; 3d Anexo V pago com outra origem: R$ ${brl(d3)}.`),
+        L(3, 'HOTELSYS', 'Baixa de passivos comprovada', 'Passivos tributários, trabalhistas e demais obrigações (passivo)', 'Mútuo / conta corrente intercompany - SUNSYS (passivo)', v(passComprovC),
           'Quitação de obrigações próprias realizada pela SUNSYS, com comprovante fiscal vinculado (DARF).'),
-        L(4, 'HOTELSYS', 'Pagamentos a comprovar', 'Pagamentos a comprovar - obrigações da HOTELSYS em reestruturação (ativo transitório)', 'Mútuo / conta corrente intercompany - SUNSYS (passivo)', v(aComprovarC),
+        L(3, 'HOTELSYS', 'Pagamentos a comprovar', 'Pagamentos a comprovar - obrigações da HOTELSYS em reestruturação (ativo transitório)', 'Mútuo / conta corrente intercompany - SUNSYS (passivo)', v(aComprovarC),
           'Passivos pagos sem comprovante vinculado e pagamentos por ordem do Intermediário; baixados contra o passivo quando o comprovante for apresentado.'),
-        L(4, 'HOTELSYS', 'Despesas da operação', 'Despesas de manutenção da operação (resultado)', 'Mútuo / conta corrente intercompany - SUNSYS (passivo)', v(despesasOpC),
+        L(3, 'HOTELSYS', 'Despesas da operação', 'Despesas de manutenção da operação (resultado)', 'Mútuo / conta corrente intercompany - SUNSYS (passivo)', v(despesasOpC),
           'Despesas correntes (folha, contabilidade e manutenção) pagas pela SUNSYS por conta da HOTELSYS.'),
-        L(5, 'SUNSYS', 'Encontro de contas', 'Valores recebidos por conta e ordem - HOTELSYS / Operação Âncora (passivo)', 'Mútuo / conta corrente intercompany - HOTELSYS (ativo)', v(encontroC),
-          'Encontro de contas intercompany entre os valores recebidos por conta e ordem e os pagamentos realizados.'),
-        L(5, 'HOTELSYS', 'Adiantamento do Cliente Âncora', 'Mútuo / conta corrente intercompany - SUNSYS (passivo)', 'Adiantamento de clientes - Operação Âncora (passivo)', v(liqC),
-          'Reconhecimento do adiantamento recebido do Adquirente Âncora (cláusulas 2ª e 3ª do Termo).'),
-        L(6, 'HOTELSYS', 'Quota nº 1 transferida à F5', 'Adiantamento de clientes - Operação Âncora (passivo)', 'Mútuo / conta corrente intercompany - F5 (passivo)', v(quotaC),
-          'Ingresso da Quota nº 1 na Series#1: a obrigação com o Cliente Âncora passa à F5, emissora.', { data: ingresso, previsto: !ingressoOcorreu }),
-        L(6, 'F5', 'Quota nº 1 da Series#1', 'Mútuo / conta corrente intercompany - HOTELSYS (ativo)', 'Obrigação com cotista - Quota nº 1 (passivo)', v(quotaC),
-          'Assunção da obrigação com o Cliente Âncora como cotista da Quota nº 1.', { data: ingresso, previsto: !ingressoOcorreu }),
-        L(7, 'SUNRISE', 'Participação da RM (resgates)', 'Participação da RM no resultado do projeto (resultado)', 'Obrigação com a RM, liquidada por compensação junto à F5 (passivo)', v(base.compensadoC),
-          `${(base.pct * 100).toFixed(0)}% de cada aporte líquido, compensados com a dívida da RM.`, { validar: true }),
-        L(7, 'F5', 'Resgate da dívida da RM', 'Obrigação de aplicação na quitação dos passivos da HOTELSYS (passivo)', 'Recebível - Real Mouchão (ativo)', v(base.compensadoC),
-          'Compensação da participação da RM com a dívida confessada.', { validar: true }),
-        L(7, 'RM', 'Resgate da dívida', 'Dívida confessada - F5 (passivo)', 'Direito de participação econômica (ativo) ± variação cambial', v(base.compensadoC),
-          `Em euros à taxa histórica: € ${(v(base.compensadoC) / TX).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}. Variação cambial: a apurar no fechamento (BCE ou PTAX).`, { informativo: true, validar: true }),
+        ...(c3 ? [
+          L(3, 'SUNSYS', 'Anexo V pago com dinheiro do Âncora (3c)', 'Adiantamentos recebidos - Operação Âncora (passivo transitório)', 'Bancos (ativo)', v(c3),
+            `${c3Qtd} pagamento(s) de itens do Anexo V depois de ${fmtD(CONF)}, com dinheiro da VAL (PEPS): desembolso da F5 por conta da RM.`),
+          L(3, 'HOTELSYS', 'Passivos do Anexo V pagos pela F5 (3c)', 'Passivos do Anexo V - credores (passivo)', 'Conta corrente intercompany - SUNRISE (passivo)', v(c3), 'Baixa do passivo do Anexo V pago pela F5 por conta da RM.'),
+          L(3, 'SUNRISE', 'Desembolso do Anexo V (3c)', 'Conta corrente intercompany - HOTELSYS (ativo)', 'A receber da F5 - Anexo V por conta da RM (ativo)', v(c3),
+            'Passivo da HOTELSYS do Anexo V pago pela F5 por conta da RM; reconhecido na data do título.', { data: tituloData, previsto: !tituloOcorreu }),
+          L(3, 'F5', 'Desembolso do Anexo V (3c)', 'Obrigação de pagamento do Anexo V por conta da RM (22103010001, passivo)', 'Conta corrente - SUNSYS (ativo)', v(c3),
+            'Pagamento do Anexo V por conta da RM com recursos da VAL; o crédito contra a RM se mantém. Reconhecido na data do título.', { data: tituloData, previsto: !tituloOcorreu }),
+          L(3, 'RM', 'Desembolso da F5 (3c)', 'F5 - a desembolsar (2781.2)', 'F5 - desembolsado (2781.1)', v(c3), `Reclassificação, sem efeito no total: € ${eur(c3)}.`, { informativo: true }),
+        ] : []),
+        ...(d3 ? [
+          L(3, 'HOTELSYS', 'Passivos do Anexo V pagos com outra origem (3d)', 'Passivos do Anexo V - credores (passivo)', 'Mútuo / conta corrente intercompany - SUNSYS (passivo)', v(d3), `${d3Qtd} pagamento(s) de itens do Anexo V sem dinheiro da F5.`),
+          L(3, 'SUNRISE', 'Redução da obrigação com a RM (3d)', 'Obrigação de participação econômica - Real Mouchão (passivo)', 'A receber da F5 - Anexo V por conta da RM (ativo)', v(d3), 'Regra contra a dupla cobrança: passivo do Anexo V pago sem passar pela F5.'),
+          L(3, 'F5', 'Redução do crédito contra a RM (3d)', 'Obrigação de pagamento do Anexo V por conta da RM (22103010001, passivo)', 'Real Mouchão - crédito confessado (12101010006, ativo)', v(d3), 'Única situação que reduz o crédito da F5: passivo do Anexo V pago com dinheiro que não passou pela F5.'),
+          L(3, 'RM', 'Redução da dívida (3d)', 'F5 - a desembolsar (2781.2)', 'Direito de participação económica - Sunrise (4149)', v(d3), `€ ${eur(d3)} à taxa histórica; variação cambial no fechamento.`, { informativo: true }),
+        ] : []),
+        L(4, 'SUNSYS', 'Título F5-VAL', 'Adiantamentos recebidos - Operação Âncora (passivo transitório)', 'Conta corrente - F5 (passivo)', v(liqC - c3),
+          'Os aportes passam a recursos da F5, que os deve à VAL pelo título de investimento.', { data: tituloData, previsto: !tituloOcorreu }),
+        L(4, 'F5', 'Título F5-VAL', 'Conta corrente - SUNSYS (ativo)', 'Títulos de investimento a pagar - VAL (passivo)', v(liqC),
+          `Base: Conta Individual conciliada.${tituloProvisorio ? ' Data provisória (planilha do Nei: título em 2026).' : ''} Spread de 20% e retorno de 7,52% a.a. na etapa 2.`, { data: tituloData, previsto: !tituloOcorreu }),
       ];
       const S = (conta: string, c: number) => ({ conta, saldo: c / 100 });
-      const quotaEfetiva = ingressoOcorreu ? quotaC : 0;
+      const c3t = tituloOcorreu ? c3 : 0;
       const saldos: Record<string, any[]> = {
-        F5: [S('Recebível - Real Mouchão', base.dividaC - base.compensadoC), S('Obrigação de aplicação nos passivos da HOTELSYS', base.dividaC - base.compensadoC), S('Mútuo - HOTELSYS', quotaEfetiva), S('Obrigação com cotista - Quota nº 1', quotaEfetiva)],
-        SUNRISE: [S('Participação da RM no resultado (acumulada)', base.compensadoC)],
-        RM: [S('Direito de participação econômica', base.dividaC - base.compensadoC), S('Dívida confessada - F5', base.dividaC - base.compensadoC)],
-        SUNSYS: [S('Bancos (efeito da operação)', liqC - pagosC), S('Valores recebidos por conta e ordem - HOTELSYS', liqC - encontroC), S('Mútuo - HOTELSYS (a receber)', pagosC - encontroC)],
-        HOTELSYS: [S('Passivos baixados (comprovados)', passComprovC), S('Pagamentos a comprovar', aComprovarC), S('Despesas da operação', despesasOpC), S('Mútuo - SUNSYS (a pagar)', pagosC - liqC), S('Adiantamento - Operação Âncora', liqC - quotaEfetiva), S('Mútuo - F5 (a pagar)', quotaEfetiva)],
+        F5: [S('Real Mouchão - crédito confessado', base.dividaC - d3), S('Obrigação de pagamento do Anexo V por conta da RM', base.dividaC - d3 - c3t), S('Conta corrente - SUNSYS', tituloOcorreu ? liqC - c3 : 0), S('Títulos a pagar - VAL (principal)', tituloOcorreu ? liqC : 0)],
+        SUNRISE: [S('A receber da F5 - Anexo V por conta da RM', base.dividaC - d3 - c3t), S('Obrigação de participação - Real Mouchão', base.dividaC - d3), S('Conta corrente - HOTELSYS (a receber)', c3t)],
+        RM: [S('Direito de participação económica', base.dividaC - d3), S('F5 - a desembolsar (2781.2)', base.dividaC - d3 - c3t), S('F5 - desembolsado (2781.1)', c3t)],
+        SUNSYS: [S('Bancos (efeito da operação)', liqC - pagosC), S('Adiantamentos - Operação Âncora', tituloOcorreu ? 0 : liqC - c3), S('Conta corrente - F5 (a pagar)', tituloOcorreu ? liqC - c3 : 0), S('Mútuo - HOTELSYS (a receber)', mutuoC)],
+        HOTELSYS: [S('Passivos baixados (comprovados)', passComprovC), S('Pagamentos a comprovar', aComprovarC), S('Despesas da operação', despesasOpC), S('Passivos do Anexo V baixados', c3 + d3), S('Mútuo - SUNSYS (a pagar)', mutuoC), S('Conta corrente - SUNRISE (a pagar)', c3)],
       };
       const eventos = [
-        { numero: 1, titulo: 'Confissão de dívida', familia: 'origem', data: base.dividaData }, { numero: 2, titulo: 'Termo de participação', familia: 'origem', data: base.dividaData },
-        { numero: 3, titulo: 'Aportes do Cliente Âncora', familia: 'ancora' }, { numero: 4, titulo: 'Pagamentos por conta da HOTELSYS', familia: 'ancora' },
-        { numero: 5, titulo: 'Encontro de contas', familia: 'intercompany' }, { numero: 6, titulo: 'Ingresso da Quota nº 1', familia: 'intercompany', data: ingresso, previsto: !ingressoOcorreu },
-        { numero: 7, titulo: 'Resgates da dívida da RM', familia: 'resgate', quantidade: resgates.length },
+        { numero: 1, titulo: 'Confissão de dívida e Termo', familia: 'origem', data: base.dividaData },
+        { numero: 2, titulo: 'Aportes do Cliente Âncora', familia: 'ancora' },
+        { numero: 3, titulo: 'Pagamentos da SUNSYS (3a a 3d)', familia: 'ancora', quantidade: apls.length },
+        { numero: 4, titulo: 'Título F5-VAL', familia: 'intercompany', data: tituloData, previsto: !tituloOcorreu },
       ];
-      return { ultimoExtrato, apuradoEm: hoje, eventos, lancamentos: lanc, saldos, resgates, taxaHistorica: TX };
+      return { ultimoExtrato, apuradoEm: hoje, eventos, lancamentos: lanc, saldos, resgates: [], taxaHistorica: TX, alertas,
+        titulo: { data: tituloData, provisorio: tituloProvisorio, ocorreu: tituloOcorreu },
+        casos: { ateConfissao: v(antesC), depoisForaAnexoV: v(depoisForaC), semClassificacao: { qtd: semClasQtd, valor: v(semClasC) }, anexoVAncora: v(c3), anexoVOutraOrigem: v(d3) } };
     });
   }
 
