@@ -636,3 +636,11 @@ ele distingue "Changes not staged" (rastreado, diff funciona normalmente) de
 de qualquer diff fazer sentido). Ver tambem o novo lembrete na secao 8
 (`git status` no inicio de cada sessao) - previne o arquivo ficar dias sem
 commit ao ponto de essa confusao acontecer de novo.
+
+
+## Licao - Regra 16 (13/10/2026): todo bloco PowerShell vai dentro de & { ... }
+
+Colado no console, cada linha de um bloco roda sozinha: o `return` de uma checagem (erro de tipo, API fora, suite com falha)
+NAO interrompe as linhas seguintes. Em 13/10/2026 isso deixou passar migracao e commit depois de um erro de tipo
+(rota de cambio com @Post nao importado). Regra pratica: todo bloco entregue comeca com `& {` e termina com `}`, para rodar
+como uma unidade; assim o `return` de fato para tudo. Vale tambem para os blocos so de leitura.

@@ -965,7 +965,7 @@ export class RelatoriosController {
     });
   }
 
-  @Post('projetos/:projetoId/cambio/atualizar')
+  @PostC('projetos/:projetoId/cambio/atualizar')
   @UseGuards(MasterOnlyGuard)
   @ProjAcao('autenticado')
   async cambioAtualizar(@Param('projetoId') projetoId: string, @Req() req: any) {
