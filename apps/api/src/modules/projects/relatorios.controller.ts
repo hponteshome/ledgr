@@ -783,6 +783,13 @@ export class RelatoriosController {
     try { fu = await this.fontesUsos(projetoId, '', ateOk, req); } catch { fu = null; }
     const ancoraPorMov = new Map<string, number>();
     for (const a of fu?.aplicacoes || []) ancoraPorMov.set(String(a.id), Math.round(Number(a.ancora || 0) * 100));
+    // 3d so com origem confirmada fora da VAL (13/10/2026): creditos desvinculados e saldo anterior. Origem a confirmar (outras
+    // entradas, devolucoes sem envio, recebimentos de terceiros, nao identificada) fica como 3c presumido, com alerta.
+    const NAO_VAL = new Set(['CREDITO_DESVINCULADO', 'SALDO_ANTERIOR']);
+    const naoValPorMov = new Map<string, number>();
+    for (const a of fu?.aplicacoes || []) naoValPorMov.set(String(a.id), (a.composicao || []).filter((x: any) => NAO_VAL.has(x.origem)).reduce((s: number, x: any) => s + Math.round(Number(x.valor) * 100), 0));
+    const custodiaSaldo = Math.round(Number(fu?.custodia?.saldo || 0) * 100);
+    const devSemEnvioC = Math.round(Number((fu?.matriz || []).find((x: any) => x.origem === 'DEVOLUCAO_CUSTODIA')?.entrou || 0) * 100);
     return this.db.comoUsuario(req.user.id, async (tx) => {
       // Data-base (08/10/2026): ?ate=AAAA-MM-DD; sem data, o ultimo extrato carregado da recebedora financeira (SUNSYS).
       const ue: any[] = await tx.$queryRaw`SELECT max(bt.transaction_date)::date AS d FROM bank_transactions bt
@@ -801,22 +808,33 @@ export class RelatoriosController {
       const eur = (c: number) => (c / 100 / TX).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       const fmtD = (d: string) => d.split('-').reverse().join('/');
       const CONF = base.dividaData || '2025-10-31';
-      const apls = await tx.projAplicacao.findMany({ where: { canceladoEm: null, operacaoId: { in: ops.map((o) => o.id) }, natureza: { tipo: 'APLICACAO' }, dataAplicacao: { lte: new Date(hoje + 'T00:00:00Z') } }, select: { id: true, valor: true, dataAplicacao: true, natureza: { select: { pagaPassivo: true, codigo: true } } } });
+      const aplsBanco = await tx.projAplicacao.findMany({ where: { canceladoEm: null, operacaoId: { in: ops.map((o) => o.id) }, natureza: { tipo: 'APLICACAO' }, dataAplicacao: { lte: new Date(hoje + 'T00:00:00Z') } }, select: { id: true, valor: true, dataAplicacao: true, natureza: { select: { pagaPassivo: true, codigo: true } } } });
       const movRows: any[] = await tx.$queryRaw`SELECT id::text AS id, bank_transaction_id::text AS mov FROM proj_aplicacoes WHERE cancelado_em IS NULL`;
       const movMap = new Map<string, string>(movRows.map((r: any) => [r.id as string, String(r.mov || '')]));
-      const clsRows: any[] = await tx.$queryRaw`SELECT aplicacao_id::text AS id, lower(fora_anexo::text) AS fora FROM proj_aplicacao_anexo_v WHERE cancelado_em IS NULL`;
+      // Pagamentos diretos validados da custodia (13/10/2026): entram no E3 como aplicacoes feitas pela custodia.
+      const pdRows: any[] = await tx.$queryRaw`SELECT l.id::text AS id, l.valor, l.data::date AS data, n.paga_passivo AS "pagaPassivo", n.codigo
+        FROM proj_custodia_lancamentos l JOIN proj_custodias cu ON cu.id = l.custodia_id JOIN proj_naturezas_aplicacao n ON n.id = l.natureza_id
+        WHERE l.cancelado_em IS NULL AND l.tipo = 'PAGAMENTO_DIRETO' AND l.situacao = 'VALIDADO' AND n.tipo = 'APLICACAO'
+          AND cu.operacao_id = ANY(${ops.map((o) => o.id)}::uuid[]) AND l.data <= ${hoje}::date`;
+      for (const r of pdRows) movMap.set(String(r.id), String(r.id));
+      const apls: any[] = [...aplsBanco, ...pdRows.map((r: any) => ({ id: String(r.id), valor: r.valor, dataAplicacao: new Date(r.data), natureza: { pagaPassivo: !!r.pagaPassivo, codigo: String(r.codigo) }, custodia: true }))];
+      const clsRows: any[] = await tx.$queryRaw`SELECT coalesce(aplicacao_id, custodia_lancamento_id)::text AS id, lower(fora_anexo::text) AS fora FROM proj_aplicacao_anexo_v WHERE cancelado_em IS NULL`;
       const clsMap = new Map<string, boolean>(clsRows.map((r: any) => [r.id as string, ['true', 't', 's', 'sim', '1'].includes(String(r.fora))]));
       // E3: 3a ate a confissao e 3b depois (fora do Anexo V ou sem classificacao) vao ao mutuo SUNSYS x HOTELSYS; itens do Anexo V
       // depois da confissao dividem-se pelo PEPS em 3c (dinheiro do Ancora = desembolso da F5) e 3d (outra origem = reduz o credito).
       const mutuo: any[] = [];
-      let antesC = 0; let depoisForaC = 0; let semClasQtd = 0; let semClasC = 0; let c3 = 0; let d3 = 0; let c3Qtd = 0; let d3Qtd = 0;
+      let antesC = 0; let depoisForaC = 0; let semClasQtd = 0; let semClasC = 0; let c3 = 0; let d3 = 0; let c3Qtd = 0; let d3Qtd = 0; let aConfC = 0; let aConfQtd = 0;
       for (const a of apls) {
         const vC = cent(a.valor); const dt = (a.dataAplicacao as Date).toISOString().slice(0, 10);
         if (dt <= CONF) { mutuo.push(a); antesC += vC; continue; }
         if (!clsMap.has(a.id)) { mutuo.push(a); depoisForaC += vC; semClasQtd += 1; semClasC += vC; continue; }
         if (clsMap.get(a.id)) { mutuo.push(a); depoisForaC += vC; continue; }
-        const anc = Math.min(vC, ancoraPorMov.get(movMap.get(a.id) || '') || 0);
-        c3 += anc; d3 += vC - anc; if (anc > 0) c3Qtd += 1; if (vC - anc > 0) d3Qtd += 1;
+        const mk = movMap.get(a.id) || '';
+        const anc = Math.min(vC, ancoraPorMov.get(mk) || 0);
+        const nv = fu ? Math.min(vC - anc, naoValPorMov.get(mk) || 0) : vC - anc;
+        const conf = vC - anc - nv;
+        c3 += anc + conf; d3 += nv; if (anc + conf > 0) c3Qtd += 1; if (nv > 0) d3Qtd += 1;
+        if (conf > 0) { aConfC += conf; aConfQtd += 1; }
       }
       const passivosC = mutuo.filter((a) => a.natureza.pagaPassivo).reduce((s, a) => s + cent(a.valor), 0);
       const despesasC = mutuo.filter((a) => !a.natureza.pagaPassivo).reduce((s, a) => s + cent(a.valor), 0);
@@ -879,6 +897,9 @@ export class RelatoriosController {
       const alertas: string[] = [];
       if (semClasQtd) alertas.push(`${semClasQtd} pagamento(s) depois de ${fmtD(CONF)} (R$ ${brl(semClasC)}) sem classificação no Anexo V: tratados como fora do Anexo V (caso 3b) até a classificação na tela Anexo V e desembolsos.`);
       if (!fu) alertas.push('Origem do dinheiro (PEPS) indisponível: itens do Anexo V tratados como pagos com outra origem (caso 3d).');
+      if (aConfQtd) alertas.push(`${aConfQtd} pagamento(s) de itens do Anexo V (R$ ${brl(aConfC)}) com origem a confirmar (entradas sem cadastro, devoluções sem envio ou recebimentos de terceiros): tratados como pagos pela F5 (caso 3c) até a confirmação da origem.`);
+      if (custodiaSaldo >= 1) alertas.push(`Saldo na custódia pelo PEPS: R$ ${brl(custodiaSaldo)} (enviado à custódia e ainda não devolvido nem pago diretamente).`);
+      if (devSemEnvioC >= 1) alertas.push(`Devoluções da custódia sem envio correspondente: R$ ${brl(devSemEnvioC)} (registrar na Custódia o envio ou o recebimento de terceiro que as originou).`);
       if (tituloProvisorio) alertas.push(`Data do título F5-VAL provisória (${fmtD(tituloData)}), conforme a planilha do Nei.`);
       if (semCot.length) alertas.push(`Sem cotação PTAX em ${semCot.map(fmtD).join(', ')}: usada a taxa anterior. Clique em Atualizar cotações.`);
       const L = (evento: number, empresa: string, titulo: string, debito: string, credito: string, valor: number, historico: string, extra: any = {}) => ({ evento, empresa, titulo, debito, credito, valor, historico, ...extra });
@@ -902,7 +923,7 @@ export class RelatoriosController {
           'Despesas correntes (folha, contabilidade e manutenção) pagas pela SUNSYS por conta da HOTELSYS.'),
         ...(c3 ? [
           L(3, 'SUNSYS', 'Anexo V pago com dinheiro do Âncora (3c)', 'Adiantamentos recebidos - Operação Âncora (passivo transitório)', 'Bancos (ativo)', v(c3),
-            `${c3Qtd} pagamento(s) de itens do Anexo V depois de ${fmtD(CONF)}, com dinheiro da VAL (PEPS): desembolso da F5 por conta da RM.`),
+            `${c3Qtd} pagamento(s) de itens do Anexo V depois de ${fmtD(CONF)}, com dinheiro da VAL (PEPS): desembolso da F5 por conta da RM.${aConfC ? ` Inclui R$ ${brl(aConfC)} com origem a confirmar.` : ''}`),
           L(3, 'HOTELSYS', 'Passivos do Anexo V pagos pela F5 (3c)', 'Passivos do Anexo V - credores (passivo)', 'Conta corrente intercompany - SUNRISE (passivo)', v(c3), 'Baixa do passivo do Anexo V pago pela F5 por conta da RM.'),
           L(3, 'SUNRISE', 'Desembolso do Anexo V (3c)', 'Conta corrente intercompany - HOTELSYS (ativo)', 'A receber da F5 - Anexo V por conta da RM (ativo)', v(c3),
             'Passivo da HOTELSYS do Anexo V pago pela F5 por conta da RM; reconhecido na data do título.', { data: tituloData, previsto: !tituloOcorreu }),
@@ -1004,7 +1025,7 @@ export class RelatoriosController {
       if (semConta) alertas.push(`${semConta} papel(is) do Fluxo sem conta no mapa: defina no quadro Contas do projeto.`);
       return { ultimoExtrato, apuradoEm: hoje, eventos, lancamentos: lanc, saldos, resgates: [], taxaHistorica: TX, alertas,
         titulo: { data: tituloData, provisorio: tituloProvisorio, ocorreu: tituloOcorreu },
-        casos: { ateConfissao: v(antesC), depoisForaAnexoV: v(depoisForaC), semClassificacao: { qtd: semClasQtd, valor: v(semClasC) }, anexoVAncora: v(c3), anexoVOutraOrigem: v(d3) },
+        casos: { ateConfissao: v(antesC), depoisForaAnexoV: v(depoisForaC), semClassificacao: { qtd: semClasQtd, valor: v(semClasC) }, anexoVAncora: v(c3), anexoVOutraOrigem: v(d3), anexoVOrigemAConfirmar: v(aConfC), custodiaSaldo: v(custodiaSaldo), devolucoesSemEnvio: v(devSemEnvioC) },
         financeiro: { porAno: Object.fromEntries(anos.map((y) => [y, { jurosEur: v(porAno[y].jurosEur), jurosBrl: v(porAno[y].jurosBrl), variacao: v(porAno[y].variacao) }])), meses,
           spread: v(spreadC), retornoVal: v(retC), creditoPtax: v(principalBrlC), jurosAReceber: v(jurosSaldoC) } };
     });
@@ -1451,18 +1472,28 @@ export class RelatoriosController {
       const credRows: any[] = await tx.$queryRaw`SELECT p.bank_transaction_id AS id, c.numero_ordem AS numero, v.situacao FROM proj_credito_provas p
         JOIN proj_creditos c ON c.id = p.credito_id AND c.cancelado_em IS NULL AND c.operacao_id = ${op}::uuid
         LEFT JOIN proj_credito_vinculos v ON v.credito_id = c.id AND v.cancelado_em IS NULL WHERE p.cancelado_em IS NULL`;
-      const custRows: any[] = await tx.$queryRaw`SELECT l.bank_transaction_id AS id, l.tipo FROM proj_custodia_lancamentos l
+      const custRows: any[] = await tx.$queryRaw`SELECT l.bank_transaction_id AS id, l.tipo, l.custodia_id::text AS cust FROM proj_custodia_lancamentos l
         JOIN proj_custodias cu ON cu.id = l.custodia_id AND cu.operacao_id = ${op}::uuid WHERE l.cancelado_em IS NULL AND l.bank_transaction_id IS NOT NULL`;
+      // Custodia transparente (13/10/2026): pagamentos diretos e recebimentos de terceiros validados entram na linha do tempo;
+      // o envio leva para a custodia a origem do dinheiro e a devolucao ou o pagamento direto a trazem de volta (PEPS por custodia).
+      const manRows: any[] = await tx.$queryRaw`SELECT l.id::text AS id, l.tipo, l.custodia_id::text AS cust, l.data::date AS data, l.valor, l.favorecido, l.descricao,
+          n.nome AS natureza FROM proj_custodia_lancamentos l
+        JOIN proj_custodias cu ON cu.id = l.custodia_id AND cu.operacao_id = ${op}::uuid
+        LEFT JOIN proj_naturezas_aplicacao n ON n.id = l.natureza_id
+        WHERE l.cancelado_em IS NULL AND l.bank_transaction_id IS NULL AND l.situacao = 'VALIDADO'
+          AND l.tipo IN ('PAGAMENTO_DIRETO', 'RECEBIMENTO_TERCEIRO') AND l.data <= ${ate}::date
+        ORDER BY l.data, l.criado_em`;
       const aplRows: any[] = await tx.$queryRaw`SELECT a.bank_transaction_id AS id, n.nome AS natureza, a.descricao FROM proj_aplicacoes a
         JOIN proj_naturezas_aplicacao n ON n.id = a.natureza_id WHERE a.operacao_id = ${op}::uuid AND a.cancelado_em IS NULL`;
       const est = new Set(estRows.map((r) => r.id));
       const cred = new Map(credRows.map((r) => [r.id, r]));
       const cust = new Map(custRows.map((r) => [r.id, r.tipo]));
+      const custDe = new Map(custRows.map((r) => [r.id, String(r.cust)]));
       const apl = new Map(aplRows.map((r) => [r.id, r]));
       const NOMES: Record<string, string> = {
-        SALDO_ANTERIOR: 'Saldo anterior ao extrato', APORTE_ANCORA: 'Aportes do Cliente Âncora', DEVOLUCAO_CUSTODIA: 'Devoluções da custódia',
+        SALDO_ANTERIOR: 'Saldo anterior ao extrato', APORTE_ANCORA: 'Aportes do Cliente Âncora', DEVOLUCAO_CUSTODIA: 'Devoluções da custódia sem envio correspondente', RECEBIMENTO_TERCEIRO: 'Recebimentos de terceiros na custódia',
         CREDITO_DESVINCULADO: 'Créditos desvinculados', OUTRA_ENTRADA: 'Outras entradas da conta', NAO_IDENTIFICADA: 'Origem não identificada' };
-      const ORDEM = ['SALDO_ANTERIOR', 'APORTE_ANCORA', 'DEVOLUCAO_CUSTODIA', 'CREDITO_DESVINCULADO', 'OUTRA_ENTRADA', 'NAO_IDENTIFICADA'];
+      const ORDEM = ['SALDO_ANTERIOR', 'APORTE_ANCORA', 'DEVOLUCAO_CUSTODIA', 'RECEBIMENTO_TERCEIRO', 'CREDITO_DESVINCULADO', 'OUTRA_ENTRADA', 'NAO_IDENTIFICADA'];
       const ENVIO = 'Envios à custódia'; const OUTRA = 'Outras saídas da conta';
       const cent = (v: any) => Math.round(Number(v) * 100);
       const iso = (d: any) => (d instanceof Date ? d.toISOString() : String(d)).slice(0, 10);
@@ -1477,46 +1508,103 @@ export class RelatoriosController {
       const aportes = new Map<string, { numero: number; data: string; valor: number; destinos: Map<string, number> }>();
       const aplicacoes: any[] = [];
       const movimentos: any[] = [];
+      // Custodia transparente (13/10/2026): lotes em poder de cada custodia, com a origem preservada.
+      const pool = new Map<string, Lote[]>();
+      const poolDe = (k: string) => { let p = pool.get(k); if (!p) { p = []; pool.set(k, p); } return p; };
+      const tirar = (lotes: Lote[], valor: number) => {
+        const out: Lote[] = []; let falta = valor;
+        while (falta > 0 && lotes.length) {
+          const l = lotes[0]; const u = Math.min(l.resta, falta); l.resta -= u; falta -= u;
+          out.push({ origem: l.origem, key: l.key, resta: u, info: l.info });
+          if (l.resta === 0) lotes.shift();
+        }
+        return { out, falta };
+      };
+      const usar = (lotes: Lote[], valor: number, col: string | null) => {
+        const comp = new Map<string, number>(); const parc: any[] = [];
+        const r = tirar(lotes, valor);
+        for (const x of r.out) {
+          comp.set(x.origem, (comp.get(x.origem) || 0) + x.resta); parc.push({ origem: x.origem, valor: x.resta / 100, entrada: x.info });
+          const ap = col ? aportes.get(x.key) : null; if (ap && col) ap.destinos.set(col, (ap.destinos.get(col) || 0) + x.resta);
+        }
+        if (r.falta > 0) { comp.set('NAO_IDENTIFICADA', (comp.get('NAO_IDENTIFICADA') || 0) + r.falta); parc.push({ origem: 'NAO_IDENTIFICADA', valor: r.falta / 100, entrada: null }); }
+        return { comp, parc, out: r.out, falta: r.falta };
+      };
+      let mi = 0;
+      const manuais = (lim: string, inclusive: boolean) => {
+        while (mi < manRows.length) {
+          const m = manRows[mi]; const dm = iso(m.data);
+          if (inclusive ? dm > lim : dm >= lim) break;
+          mi += 1;
+          const vm = cent(m.valor); const k = String(m.cust);
+          if (m.tipo === 'RECEBIMENTO_TERCEIRO') {
+            poolDe(k).push({ origem: 'RECEBIMENTO_TERCEIRO', key: m.id, resta: vm, info: { data: dm, lancamento: m.favorecido || m.descricao || '', categoria: null, decisao: 'Recebimento de terceiro na custodia', valor: vm / 100, numero: null } });
+            entrou.RECEBIMENTO_TERCEIRO = (entrou.RECEBIMENTO_TERCEIRO || 0) + vm;
+            continue;
+          }
+          const colm = m.natureza || OUTRA;
+          const um = usar(poolDe(k), vm, colm);
+          if (de && dm < de) continue;
+          um.comp.forEach((x, o) => somaM(o, colm, x));
+          movimentos.push({ id: m.id, data: dm, valor: vm / 100, uso: colm, lancamento: m.favorecido || m.descricao || '', categoria: null, decisao: 'Pagamento direto da custodia', parcelas: um.parc, custodia: true });
+          aplicacoes.push({ id: m.id, data: dm, valor: vm / 100, natureza: colm, descricao: m.descricao, lancamento: m.favorecido || m.descricao || '', custodia: true,
+            composicao: [...um.comp.entries()].map(([o, x]) => ({ origem: o, valor: x / 100 })), ancora: (um.comp.get('APORTE_ANCORA') || 0) / 100 });
+        }
+      };
       for (const t of txs) {
         if (est.has(t.id)) continue;
         const v = cent(t.amount); const d = iso(t.data);
+        manuais(d, false);
         if (t.tipo === 'CREDIT') {
           const c: any = cred.get(t.id);
-          const origem = c ? (c.situacao === 'VINCULADO' ? 'APORTE_ANCORA' : 'CREDITO_DESVINCULADO') : cust.get(t.id) === 'DEVOLUCAO' ? 'DEVOLUCAO_CUSTODIA' : 'OUTRA_ENTRADA';
+          if (!c && cust.get(t.id) === 'DEVOLUCAO') {
+            // Devolucao: volta para a fila com a origem do envio; o que faltar fica como devolucao sem envio correspondente.
+            const r = tirar(poolDe(String(custDe.get(t.id))), v);
+            for (const x of r.out) fila.push({ origem: x.origem, key: x.key, resta: x.resta, info: { ...(x.info || {}), viaCustodia: d } });
+            if (r.falta > 0) {
+              fila.push({ origem: 'DEVOLUCAO_CUSTODIA', key: t.id, resta: r.falta, info: { data: d, lancamento: t.counterparty_name || t.description || '', categoria: t.categoria || null, decisao: t.decisao || null, valor: r.falta / 100, numero: null } });
+              entrou.DEVOLUCAO_CUSTODIA = (entrou.DEVOLUCAO_CUSTODIA || 0) + r.falta;
+            }
+            continue;
+          }
+          const origem = c ? (c.situacao === 'VINCULADO' ? 'APORTE_ANCORA' : 'CREDITO_DESVINCULADO') : 'OUTRA_ENTRADA';
           fila.push({ origem, key: t.id, resta: v, info: { data: d, lancamento: t.counterparty_name || t.description || '', categoria: t.categoria || null, decisao: t.decisao || null, valor: v / 100, numero: c ? Number(c.numero) : null } });
           entrou[origem] = (entrou[origem] || 0) + v;
           if (origem === 'APORTE_ANCORA') aportes.set(t.id, { numero: Number(c.numero), data: d, valor: v, destinos: new Map() });
           continue;
         }
         const a: any = apl.get(t.id);
-        const col = a ? a.natureza : cust.get(t.id) === 'ENVIO' ? ENVIO : OUTRA;
-        const comp = new Map<string, number>(); const parc: any[] = []; let falta = v;
-        while (falta > 0 && fila.length) {
-          const l = fila[0]; const u = Math.min(l.resta, falta); l.resta -= u; falta -= u;
-          comp.set(l.origem, (comp.get(l.origem) || 0) + u); parc.push({ origem: l.origem, valor: u / 100, entrada: l.info });
-          const ap = aportes.get(l.key); if (ap) ap.destinos.set(col, (ap.destinos.get(col) || 0) + u);
-          if (l.resta === 0) fila.shift();
+        const envio = !a && cust.get(t.id) === 'ENVIO';
+        const col = a ? a.natureza : envio ? ENVIO : OUTRA;
+        const u = usar(fila, v, envio ? null : col);
+        if (envio) {
+          // Envio: os lotes vao para a custodia com a origem preservada; o uso e o pagamento direto feito por ela.
+          const p = poolDe(String(custDe.get(t.id)));
+          for (const x of u.out) p.push(x);
+          if (u.falta > 0) p.push({ origem: 'NAO_IDENTIFICADA', key: t.id, resta: u.falta, info: null });
         }
-        if (falta > 0) { comp.set('NAO_IDENTIFICADA', falta); parc.push({ origem: 'NAO_IDENTIFICADA', valor: falta / 100, entrada: null }); }
         if (de && d < de) continue;
-        comp.forEach((u, o) => somaM(o, col, u));
-        movimentos.push({ id: t.id, data: d, valor: v / 100, uso: col, lancamento: t.description || t.counterparty_name || '', categoria: t.categoria || null, decisao: t.decisao || null, parcelas: parc });
+        if (!envio) u.comp.forEach((x, o) => somaM(o, col, x));
+        movimentos.push({ id: t.id, data: d, valor: v / 100, uso: col, lancamento: t.description || t.counterparty_name || '', categoria: t.categoria || null, decisao: t.decisao || null, parcelas: u.parc });
         if (a) aplicacoes.push({ id: t.id, data: d, valor: v / 100, natureza: a.natureza, descricao: a.descricao, lancamento: t.description || t.counterparty_name || '',
-          composicao: [...comp.entries()].map(([o, u]) => ({ origem: o, valor: u / 100 })), ancora: (comp.get('APORTE_ANCORA') || 0) / 100 });
+          composicao: [...u.comp.entries()].map(([o, x]) => ({ origem: o, valor: x / 100 })), ancora: (u.comp.get('APORTE_ANCORA') || 0) / 100 });
       }
+      manuais(ate, true);
+      const naCustodia: Record<string, number> = {};
+      pool.forEach((lotes) => lotes.forEach((l) => { naCustodia[l.origem] = (naCustodia[l.origem] || 0) + l.resta; }));
       const naturezas = [...new Set(aplicacoes.map((x) => x.natureza))].sort();
       const colunas = [...naturezas, ENVIO, OUTRA].filter((c) => [...matriz.values()].some((m) => m.has(c)) || naturezas.includes(c));
       const resta: Record<string, number> = {}; fila.forEach((l) => { resta[l.origem] = (resta[l.origem] || 0) + l.resta; });
-      const origensUsadas = ORDEM.filter((o) => matriz.has(o) || entrou[o] || resta[o]);
+      const origensUsadas = ORDEM.filter((o) => matriz.has(o) || entrou[o] || resta[o] || naCustodia[o]);
       const totCol: Record<string, number> = {};
       const linhas = origensUsadas.map((o) => {
         const m = matriz.get(o) || new Map<string, number>(); const valores: Record<string, number> = {}; let tot = 0;
         colunas.forEach((c) => { const x = m.get(c) || 0; valores[c] = x / 100; tot += x; totCol[c] = (totCol[c] || 0) + x; });
         const emApl = naturezas.reduce((s, c) => s + (m.get(c) || 0), 0);
-        return { origem: o, nome: NOMES[o], valores, total: tot / 100, entrou: (entrou[o] || 0) / 100, usadoAplicacoes: emApl / 100, usadoOutros: (tot - emApl) / 100, saldoNaConta: (resta[o] || 0) / 100 };
+        return { origem: o, nome: NOMES[o], valores, total: tot / 100, entrou: (entrou[o] || 0) / 100, usadoAplicacoes: emApl / 100, usadoOutros: (tot - emApl) / 100, saldoNaConta: (resta[o] || 0) / 100, naCustodia: (naCustodia[o] || 0) / 100 };
       });
       return {
-        parametros: { de, ate, metodo: 'PEPS (primeiro a entrar, primeiro a sair) sobre a conta inteira da recebedora financeira; estornos bancarios excluidos; entradas do dia antes das saidas do dia; usos dentro do periodo.' },
+        parametros: { de, ate, metodo: 'PEPS (primeiro a entrar, primeiro a sair) sobre a conta inteira da recebedora financeira; estornos bancarios excluidos; entradas do dia antes das saidas do dia; usos dentro do periodo. Custodia transparente: o envio leva a origem do dinheiro para a custodia; a devolucao e o pagamento direto a trazem de volta.' },
         nomes: NOMES, colunas, matriz: linhas,
         totaisColunas: Object.fromEntries(colunas.map((c) => [c, (totCol[c] || 0) / 100])),
         totalGeral: Object.values(totCol).reduce((s, x) => s + x, 0) / 100,
@@ -1527,6 +1615,7 @@ export class RelatoriosController {
         }),
         aplicacoes,
         movimentos,
+        custodia: { saldo: Object.values(naCustodia).reduce((s, x) => s + x, 0) / 100, porOrigem: Object.fromEntries(Object.entries(naCustodia).map(([o, x]) => [o, x / 100])) },
       };
     });
   }
@@ -1819,6 +1908,14 @@ export class RelatoriosController {
         FROM proj_aplicacoes a JOIN proj_naturezas_aplicacao n ON n.id = a.natureza_id
         LEFT JOIN proj_aplicacao_anexo_v v ON v.aplicacao_id = a.id AND v.cancelado_em IS NULL
         WHERE a.cancelado_em IS NULL AND a.bank_transaction_id = ANY(${txIds}::uuid[]) ORDER BY a.data_aplicacao, a.criado_em` : [];
+      // Pagamentos diretos validados da custodia (13/10/2026): classificaveis no Anexo V como as aplicacoes.
+      const pd: any[] = txIds.length ? await tx.$queryRaw`SELECT l.id, l.id AS "txId", cu.operacao_id AS "operacaoId", l.data::text AS data, l.valor::float AS valor,
+          concat_ws(' - ', l.favorecido, l.descricao) AS descricao, n.codigo, n.nome AS natureza, v.id AS "vinculoId", v.item_id AS "itemId", v.fora_anexo AS fora,
+          v.consta_reconciliacao AS consta, v.motivo AS "vinculoMotivo", NULL::text AS darfs, true AS custodia
+        FROM proj_custodia_lancamentos l JOIN proj_custodias cu ON cu.id = l.custodia_id JOIN proj_naturezas_aplicacao n ON n.id = l.natureza_id
+        LEFT JOIN proj_aplicacao_anexo_v v ON v.custodia_lancamento_id = l.id AND v.cancelado_em IS NULL
+        WHERE l.cancelado_em IS NULL AND l.tipo = 'PAGAMENTO_DIRETO' AND l.situacao = 'VALIDADO' AND l.id = ANY(${txIds}::uuid[])` : [];
+      if (pd.length) { apl.push(...pd); apl.sort((x, y) => String(x.data).localeCompare(String(y.data))); }
       const opIds = [...new Set(apl.map((a) => String(a.operacaoId)))];
       const itens: any[] = opIds.length ? await tx.$queryRaw`SELECT id, operacao_id AS "operacaoId", ordem, credor, valor_face::float AS "valorFace"
         FROM proj_anexo_v_itens WHERE operacao_id = ANY(${opIds}::uuid[]) ORDER BY ordem` : [];
@@ -1842,7 +1939,7 @@ export class RelatoriosController {
         if (item && !fora && situacao !== 'PENDENTE') {
           const consta = a.data <= CONTRATO ? (a.consta || 'Não') : '';
           const base = { aplicacaoId: a.id, data: a.data, credor: f?.lancamento || a.descricao || '', item: `Anexo V - ${item.credor}`, consta,
-            comprovante: a.darfs ? `DARF ${a.darfs}` : `Extrato LEDGR ${String(a.data).split('-').reverse().join('/')}`, situacao };
+            comprovante: a.custodia ? `Pagamento direto da custódia ${String(a.data).split('-').reverse().join('/')}` : a.darfs ? `DARF ${a.darfs}` : `Extrato LEDGR ${String(a.data).split('-').reverse().join('/')}`, situacao };
           if (ancora) linhas.push({ ...base, valor: ancora / 100, origem: 'VAL (via título F5)' });
           if (outros) linhas.push({ ...base, valor: outros / 100, origem: 'Receita própria da Sunrise' });
           const p = pago.get(String(item.id)) || { f5: 0, outros: 0, antes: 0, antesSim: 0 };
@@ -1850,7 +1947,7 @@ export class RelatoriosController {
           pago.set(String(item.id), p);
         }
         return { id: a.id, data: a.data, valor: a.valor, natureza: a.natureza, codigo: a.codigo, descricao: a.descricao, lancamento: f?.lancamento || '',
-          ancora: ancora / 100, darfs: a.darfs, vinculoId: a.vinculoId, vinculoMotivo: a.vinculoMotivo, itemId, fora, consta: a.consta, situacao };
+          ancora: ancora / 100, darfs: a.darfs, vinculoId: a.vinculoId, vinculoMotivo: a.vinculoMotivo, itemId, fora, consta: a.consta, situacao, custodia: !!a.custodia };
       });
       return {
         contrato: CONTRATO, ate: ateOk || null, aplicacoes, linhas,
@@ -1878,7 +1975,9 @@ export class RelatoriosController {
       return await this.db.comoUsuario(req.user.id, async (tx: any) => {
         for (const x of lista) {
           const itemId = x.fora ? null : (x.itemId || null);
-          await tx.$queryRaw`INSERT INTO proj_aplicacao_anexo_v (aplicacao_id, item_id, fora_anexo, consta_reconciliacao, motivo, criado_por_id)
+          if (x.custodia) await tx.$queryRaw`INSERT INTO proj_aplicacao_anexo_v (custodia_lancamento_id, item_id, fora_anexo, consta_reconciliacao, motivo, criado_por_id)
+            VALUES (${x.aplicacaoId}::uuid, ${itemId}::uuid, ${!!x.fora}, ${x.consta ?? null}::varchar, ${motivo}, ${req.user.id}::uuid) RETURNING id`;
+          else await tx.$queryRaw`INSERT INTO proj_aplicacao_anexo_v (aplicacao_id, item_id, fora_anexo, consta_reconciliacao, motivo, criado_por_id)
             VALUES (${x.aplicacaoId}::uuid, ${itemId}::uuid, ${!!x.fora}, ${x.consta ?? null}::varchar, ${motivo}, ${req.user.id}::uuid) RETURNING id`;
         }
         await tx.auditLog.create({ data: { actorId: req.user.id, action: 'PROJ_ANEXO_V_CLASSIFICADO', targetId: projetoId, after: { projetoId, qtd: lista.length, motivo, itens: lista } } });

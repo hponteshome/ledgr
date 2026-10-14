@@ -68,7 +68,7 @@ export default function AnexoVProjeto({ projetoId }: { projetoId: string }) {
   };
   const montar = (lista: any[], usarSugestao: boolean) => lista.map((a) => {
     const destino = usarSugestao ? (a.fora ? FORA : a.itemId || '') : destinoAtual(a);
-    return { aplicacaoId: a.id, itemId: destino && destino !== FORA ? destino : null, fora: destino === FORA, consta: a.data <= CONTRATO ? constaAtual(a) : null };
+    return { aplicacaoId: a.id, itemId: destino && destino !== FORA ? destino : null, fora: destino === FORA, consta: a.data <= CONTRATO ? constaAtual(a) : null, custodia: !!a.custodia };
   }).filter((x) => x.fora || x.itemId);
   const alteradas = aplicacoes.filter((a) => escolhas[a.id] && a.situacao !== 'CONFIRMADO');
   const sugeridasVisiveis = visiveis.filter((a) => a.situacao === 'SUGERIDO');
@@ -165,7 +165,7 @@ export default function AnexoVProjeto({ projetoId }: { projetoId: string }) {
               <tbody>{visiveis.map((a) => { const antes = a.data <= CONTRATO; const conf = a.situacao === 'CONFIRMADO'; return (
                 <tr key={a.id} style={{ background: escolhas[a.id] ? '#FFFBEB' : undefined }}>
                   <td style={tdSt}>{fmtData(a.data)}</td><td style={{ ...tdSt, fontSize: 12 }}>{a.natureza}</td>
-                  <td style={{ ...tdSt, maxWidth: 340 }}><div style={{ fontSize: 12 }}>{a.lancamento}</div>{a.descricao && <div style={{ fontSize: 11, color: '#6B7280' }}>{a.descricao}</div>}{a.darfs && <div style={{ fontSize: 11, color: '#166534' }}>DARF {a.darfs}</div>}</td>
+                  <td style={{ ...tdSt, maxWidth: 340 }}><div style={{ fontSize: 12 }}>{a.lancamento}</div>{a.descricao && <div style={{ fontSize: 11, color: '#6B7280' }}>{a.descricao}</div>}{a.custodia && <div style={{ fontSize: 11, color: '#1E40AF' }}>Pagamento direto da custódia</div>}{a.darfs && <div style={{ fontSize: 11, color: '#166534' }}>DARF {a.darfs}</div>}</td>
                   <td style={num}>{fmtBRL(a.valor)}</td><td style={num}>{fmtBRL(a.ancora)}</td><td style={tdSt}><Chip s={a.situacao} /></td>
                   <td style={tdSt}>{conf
                     ? <span style={{ fontSize: 12 }} title={a.vinculoMotivo || ''}>{a.fora ? 'Fora do Anexo V' : (itens.find((i) => i.id === a.itemId)?.credor || '')}</span>
