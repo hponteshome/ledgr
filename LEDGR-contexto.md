@@ -10580,3 +10580,10 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - fluxoContabil: pagamentos diretos validados entram no E3; classificacao do Anexo V por aplicacao ou por lancamento da custodia; 3d so com origem confirmada fora da VAL (CREDITO_DESVINCULADO, SALDO_ANTERIOR); origem a confirmar = 3c presumido com alerta; alertas de saldo na custodia e de devolucoes sem envio.
 - Anexo V: lista e classifica pagamentos diretos validados (vincular com custodia: true); tela marca 'Pagamento direto da custodia'.
 - Pendente (Bloco B): dividir um debito em varias aplicacoes (05/05 e 05/06/2026). Correcoes de 2024-2025 pela tela apos o extrato da PGFN (Solsys).
+
+## 2026-10-14 - Decisao Custodia na triagem do LEDGR
+- projetos-financeiro: GET custodias (custodias das operacoes em que a empresa ativa e recebedora); decidir aceita CUSTODIA (+ codigo da custodia): grava o lancamento ENVIO (saida) ou DEVOLUCAO (entrada) na custodia, VALIDADO, com valor e data do extrato (o gatilho confere), e a decisao CUSTODIA por operacao, numa so transacao. Desfazer (decisoes/:id/encerrar) encerra tambem o lancamento da custodia e as alocacoes dele, com o mesmo motivo.
+- DecisaoMovimentoModal: terceira opcao 'Custodia' (envio na saida, devolucao na entrada), com a escolha da custodia; aparece so se a empresa ativa tiver custodia.
+- Uso: correcoes de 2024-2025 (13/12/2024, 06/01/2025, 10/01/2025 etc.): encerrar a aplicacao no projeto, decidir como Custodia em Classificar saidas e registrar o pagamento direto na tela Custodia do projeto.
+- Saida de comandos longos: anexar o arquivo (texto exato, sem corte do console); saidas curtas: colar do console.
+- Licao: ancora de edicao deve incluir a linha inteira distintiva (o laco 'for (const operacaoId of ids)' existe em dois metodos).

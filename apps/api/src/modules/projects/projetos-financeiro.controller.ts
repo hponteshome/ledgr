@@ -245,6 +245,17 @@ export class ProjetosFinanceiroController {
     });
   }
 
+  // Custodias das operacoes em que a empresa ativa e recebedora (14/10/2026): opcoes da decisao Custodia na triagem.
+  @Get('custodias')
+  @UseGuards(MasterOnlyGuard)
+  async custodiasTriagem(@Req() req: any) {
+    const companyId = this.empresa(req);
+    return this.db.comoUsuario(req.user.id, async (tx) => tx.$queryRaw`SELECT DISTINCT c.codigo, c.nome FROM proj_custodias c
+      JOIN proj_participacoes pp ON pp.operacao_id = c.operacao_id AND pp.cancelado_em IS NULL AND pp.company_id = ${companyId}::uuid
+      JOIN proj_papeis pa ON pa.id = pp.papel_id AND pa.codigo = 'RECEBEDORA_FINANCEIRA'
+      WHERE c.cancelado_em IS NULL ORDER BY c.codigo`);
+  }
+
   // -- Decisoes sobre movimentos que nao vao ao projeto (Fase 1.11 A2, 04/10/2026) --------------------------
   // NAO_PERTENCE ou TRANSFERENCIA_INTERNA (neutra, com rotulo de circuito), nas saidas e nas entradas.
   @Post('saidas/:transacaoId/decidir')
@@ -265,7 +276,9 @@ export class ProjetosFinanceiroController {
     const motivo = String(b?.motivo || '').trim();
     const circuito = b?.circuito ? String(b.circuito).trim().slice(0, 80) : '';
     if (!UUID_RE.test(transacaoId)) throw new BadRequestException('Movimento invalido.');
-    if (!['NAO_PERTENCE', 'TRANSFERENCIA_INTERNA'].includes(decisao)) throw new BadRequestException('Decisao invalida.');
+    if (!['NAO_PERTENCE', 'TRANSFERENCIA_INTERNA', 'CUSTODIA'].includes(decisao)) throw new BadRequestException('Decisao invalida.');
+    const custodia = String(b?.custodia || '').trim().toUpperCase();
+    if (decisao === 'CUSTODIA' && !/^[A-Z0-9_]{1,40}$/.test(custodia)) throw new BadRequestException('Escolha a custodia.');
     if (decisao === 'TRANSFERENCIA_INTERNA' && circuito.length < 3) throw new BadRequestException('Informe o circuito da transferencia interna (ex.: Josi - protecao de bloqueios).');
     if (motivo.length < 10) throw new BadRequestException('Informe o motivo (minimo 10 caracteres). Ele fica na trilha de auditoria.');
     if ((await this.destinadas(companyId)).has(transacaoId)) throw new BadRequestException('Este movimento ja foi destinado.');
@@ -275,11 +288,21 @@ export class ProjetosFinanceiroController {
       const ops = await tx.projParticipacao.findMany({ where: { companyId, canceladoEm: null, papel: { codigo: 'RECEBEDORA_FINANCEIRA' } }, select: { operacaoId: true } });
       const ids = [...new Set(ops.map((o) => o.operacaoId))];
       if (!ids.length) throw new BadRequestException('A empresa ativa nao e recebedora de nenhuma operacao de projeto.');
+      // Custodia (14/10/2026): saida = ENVIO e entrada = DEVOLUCAO na custodia escolhida, com o valor e a data do extrato
+      // (o gatilho da custodia confere); nasce VALIDADO como os lancamentos do extrato de 06/10. A decisao CUSTODIA vem junto.
+      if (decisao === 'CUSTODIA') {
+        const cu: any[] = await tx.$queryRaw`SELECT id::text AS id FROM proj_custodias WHERE codigo = ${custodia} AND cancelado_em IS NULL AND operacao_id = ANY(${ids}::uuid[]) LIMIT 1`;
+        if (!cu.length) throw new BadRequestException('Custodia nao encontrada nas operacoes desta empresa.');
+        const tipoCust = tipo === 'DEBIT' ? 'ENVIO' : 'DEVOLUCAO';
+        await tx.$executeRaw`INSERT INTO proj_custodia_lancamentos (custodia_id, tipo, bank_transaction_id, data, valor, motivo, situacao, validado_por_id, validado_em, motivo_validacao, criado_por_id)
+          SELECT ${cu[0].id}::uuid, ${tipoCust}, bt.id, bt.transaction_date::date, bt.amount, ${motivo}, 'VALIDADO', ${req.user.id}::uuid, now(), ${'Movimento do extrato (prova bancaria), decidido na triagem'}, ${req.user.id}::uuid
+          FROM bank_transactions bt WHERE bt.id = ${t.id}::uuid`;
+      }
       for (const operacaoId of ids) {
         await tx.projExtratoDecisao.create({ data: { operacaoId, bankTransactionId: t.id, decisao, circuito: decisao === 'TRANSFERENCIA_INTERNA' ? circuito : null, motivo, criadoPorId: req.user.id } });
       }
       await tx.auditLog.create({
-        data: { actorId: req.user.id, action: 'PROJ_EXTRATO_MOVIMENTO_DECIDIDO', targetId: t.id, after: { companyId, tipo, decisao, circuito: circuito || null, operacoes: ids, valor: t.amount.toFixed(2), motivo } },
+        data: { actorId: req.user.id, action: 'PROJ_EXTRATO_MOVIMENTO_DECIDIDO', targetId: t.id, after: { companyId, tipo, decisao, circuito: circuito || null, custodia: decisao === 'CUSTODIA' ? custodia : null, operacoes: ids, valor: t.amount.toFixed(2), motivo } },
       });
       return { ok: true };
     });
@@ -338,6 +361,14 @@ export class ProjetosFinanceiroController {
       if (!decs.length) throw new NotFoundException('Nao ha decisao vigente para este movimento.');
       for (const d of decs) {
         await tx.projExtratoDecisao.update({ where: { id: d.id }, data: { canceladoEm: new Date(), canceladoPorId: req.user.id, motivoCancelamento: motivo } });
+        if (d.decisao === 'CUSTODIA') {
+          // Custodia (14/10/2026): o lancamento do extrato na custodia e as alocacoes dele saem junto, com o mesmo motivo.
+          await tx.$executeRaw`UPDATE proj_custodia_alocacoes SET cancelado_em = now(), cancelado_por_id = ${req.user.id}::uuid, motivo_cancelamento = ${'Movimento devolvido a triagem: ' + motivo}
+            WHERE cancelado_em IS NULL AND (origem_id IN (SELECT id FROM proj_custodia_lancamentos WHERE bank_transaction_id = ${t.id}::uuid AND cancelado_em IS NULL)
+              OR destino_id IN (SELECT id FROM proj_custodia_lancamentos WHERE bank_transaction_id = ${t.id}::uuid AND cancelado_em IS NULL))`;
+          await tx.$executeRaw`UPDATE proj_custodia_lancamentos SET cancelado_em = now(), cancelado_por_id = ${req.user.id}::uuid, motivo_cancelamento = ${motivo}
+            WHERE bank_transaction_id = ${t.id}::uuid AND cancelado_em IS NULL`;
+        }
       }
       await tx.auditLog.create({ data: { actorId: req.user.id, action: 'PROJ_EXTRATO_DECISAO_ENCERRADA', targetId: t.id, after: { companyId, decisao: decs[0].decisao, circuito: decs[0].circuito, motivo } } });
       return { ok: true, encerradas: decs.length };
