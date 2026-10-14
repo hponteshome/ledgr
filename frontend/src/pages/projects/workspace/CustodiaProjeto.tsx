@@ -61,10 +61,10 @@ export default function CustodiaProjeto({ projetoId, projetoNome }: { projetoId:
     const ws = wb.addWorksheet('Pendências');
     ws.addRow([`${d.custodia.nome} - pendências em ${fmtData(new Date().toISOString())}`]);
     ws.addRow([]);
-    ws.addRow(['Tipo', 'Data', 'Valor do movimento (R$)', 'A explicar (R$)', 'Lançamento do extrato', 'O que foi feito com o valor', 'Data, favorecido ou origem', 'Comprovante']);
+    ws.addRow(['Tipo', 'Data', 'Valor do movimento (R$)', 'A explicar (R$)', 'Lançamento do extrato', 'Anotação da planilha (custodiante)', 'O que foi feito com o valor', 'Data, favorecido ou origem', 'Comprovante']);
     const linha = (tipo: string, x: any) => {
       const [y, m, dd] = String(x.data).split('-').map(Number);
-      ws.addRow([tipo, new Date(Date.UTC(y, m - 1, dd)), Number(x.valor), Number(x.pendente), [x.lancamentoBanco, x.contraparte].filter(Boolean).join(' · '), '', '', '']);
+      ws.addRow([tipo, new Date(Date.UTC(y, m - 1, dd)), Number(x.valor), Number(x.pendente), [x.lancamentoBanco, x.contraparte].filter(Boolean).join(' · '), x.anotacao || '', '', '', '']);
     };
     pendEnv.forEach((x) => linha('Envio a justificar', x));
     pendDev.forEach((x) => linha('Devolução sem origem', x));
@@ -77,7 +77,7 @@ export default function CustodiaProjeto({ projetoId, projetoNome }: { projetoId:
     ws.getColumn(2).numFmt = 'dd/mm/yyyy';
     ws.getColumn(3).numFmt = '#,##0.00';
     ws.getColumn(4).numFmt = '#,##0.00';
-    [26, 12, 18, 16, 45, 40, 32, 28].forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+    [26, 12, 18, 16, 45, 50, 40, 32, 28].forEach((w, i) => { ws.getColumn(i + 1).width = w; });
     const buf = await wb.xlsx.writeBuffer();
     const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const u = URL.createObjectURL(blob); const el = document.createElement('a');
@@ -148,7 +148,7 @@ function TabelaEnvios({ itens, onJustificar }: { itens: any[]; onJustificar: (x:
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead><tr>{th('data', 'Data')}{th('valor', 'Valor', dir)}{th('justificado', 'Justificado', dir)}{th('analise', 'Em análise', dir)}{th('pendente', 'A justificar', dir)}{th('prazo', 'Prazo')}<th style={thSt}></th></tr></thead>
         <tbody>{ordenada.map((x) => (
-          <tr key={x.id}><td style={tdSt}>{fmtData(x.data)}</td><td style={{ ...tdSt, textAlign: 'right', fontWeight: 600 }}>{fmtBRL(x.valor)}</td>
+          <tr key={x.id}><td style={tdSt}>{fmtData(x.data)}{x.anotacao && <div style={{ fontSize: 11, color: '#6B7280', marginTop: 2, minWidth: 260, whiteSpace: 'normal' }}>{x.anotacao}</div>}</td><td style={{ ...tdSt, textAlign: 'right', fontWeight: 600 }}>{fmtBRL(x.valor)}</td>
             <td style={{ ...tdSt, textAlign: 'right' }}>{fmtBRL(x.alocadoValidado)}</td><td style={{ ...tdSt, textAlign: 'right' }}>{fmtBRL(x.alocadoEmAnalise)}</td>
             <td style={{ ...tdSt, textAlign: 'right', fontWeight: 600 }}>{fmtBRL(x.pendente)}</td>
             <td style={tdSt}>{x.pendente <= 0 ? selo('Justificado', '#DCFCE7', '#166534') : x.vencido ? selo(`Vencido em ${fmtData(x.prazo)}`, '#FCEBEB', '#A32D2D') : selo(`Até ${fmtData(x.prazo)}`, '#FEF3C7', '#78350F')}</td>
@@ -167,7 +167,7 @@ function TabelaDevolucoes({ itens, onOrigem }: { itens: any[]; onOrigem: (x: any
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead><tr>{th('data', 'Data')}{th('valor', 'Valor', dir)}{th('pagador', 'Pagador (extrato)')}{th('origem', 'Origem explicada', dir)}{th('sem', 'Sem origem', dir)}<th style={thSt}></th></tr></thead>
         <tbody>{ordenada.map((x) => (
-          <tr key={x.id}><td style={tdSt}>{fmtData(x.data)}</td><td style={{ ...tdSt, textAlign: 'right', fontWeight: 600 }}>{fmtBRL(x.valor)}</td><td style={{ ...tdSt, fontSize: 12 }}>{x.contraparte || x.lancamentoBanco}</td>
+          <tr key={x.id}><td style={tdSt}>{fmtData(x.data)}</td><td style={{ ...tdSt, textAlign: 'right', fontWeight: 600 }}>{fmtBRL(x.valor)}</td><td style={{ ...tdSt, fontSize: 12 }}>{x.contraparte || x.lancamentoBanco}{x.anotacao && <div style={{ fontSize: 11, color: '#6B7280', marginTop: 2 }}>{x.anotacao}</div>}</td>
             <td style={{ ...tdSt, textAlign: 'right' }}>{fmtBRL(x.alocadoValidado + x.alocadoEmAnalise)}</td><td style={{ ...tdSt, textAlign: 'right', fontWeight: 600, color: x.pendente > 0 ? '#B45309' : '#166534' }}>{fmtBRL(x.pendente)}</td>
             <td style={{ ...tdSt, textAlign: 'right' }}>{x.pendente > 0 && <button style={btn} onClick={() => onOrigem(x)}>Explicar origem</button>}</td></tr>))}</tbody>
       </table>

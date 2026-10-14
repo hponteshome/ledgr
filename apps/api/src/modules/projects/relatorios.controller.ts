@@ -1288,7 +1288,8 @@ export class RelatoriosController {
     return this.db.comoUsuario(req.user.id, async (tx: any) => {
       const c = await this.custodiaBase(tx, projetoId, codigo);
       const lanc: any[] = await tx.$queryRaw`SELECT l.id, l.tipo, l.data, l.valor, l.situacao, l.favorecido, l.descricao, l.motivo, l.motivo_validacao, l.bank_transaction_id,
-          n.nome AS natureza, bt.description AS lancamento_banco, bt.counterparty_name AS contraparte
+          n.nome AS natureza, bt.description AS lancamento_banco, bt.counterparty_name AS contraparte,
+          (SELECT an.texto FROM proj_anotacoes_extrato an WHERE an.bank_transaction_id = l.bank_transaction_id LIMIT 1) AS anotacao
         FROM proj_custodia_lancamentos l LEFT JOIN proj_naturezas_aplicacao n ON n.id = l.natureza_id LEFT JOIN bank_transactions bt ON bt.id = l.bank_transaction_id
         WHERE l.custodia_id = ${c.id}::uuid AND l.cancelado_em IS NULL ORDER BY l.data, l.criado_em`;
       const aloc: any[] = await tx.$queryRaw`SELECT id, origem_id, destino_id, valor, situacao, motivo, motivo_validacao FROM proj_custodia_alocacoes
@@ -1305,7 +1306,7 @@ export class RelatoriosController {
         const limite = new Date(new Date(data + 'T00:00:00Z').getTime() + Number(c.prazo_dias) * 86400000).toISOString().slice(0, 10);
         const pend = l.situacao === 'RECUSADO' ? 0 : Math.max(0, vC - val - reg);
         return { id: l.id, tipo: l.tipo, data, valor: vC / 100, situacao: l.situacao, favorecido: l.favorecido, descricao: l.descricao, motivo: l.motivo,
-          motivoValidacao: l.motivo_validacao, natureza: l.natureza, lancamentoBanco: l.lancamento_banco, contraparte: l.contraparte, extrato: !!l.bank_transaction_id,
+          motivoValidacao: l.motivo_validacao, natureza: l.natureza, lancamentoBanco: l.lancamento_banco, contraparte: l.contraparte, anotacao: l.anotacao || null, extrato: !!l.bank_transaction_id,
           alocadoValidado: val / 100, alocadoEmAnalise: reg / 100, pendente: pend / 100, prazo: l.tipo === 'ENVIO' ? limite : null, vencido: l.tipo === 'ENVIO' && pend > 0 && limite < hoje };
       });
       const tot = (t: string, sit?: string) => itens.filter((i) => i.tipo === t && i.situacao !== 'RECUSADO' && (!sit || i.situacao === sit)).reduce((s, i) => s + cent(i.valor), 0);

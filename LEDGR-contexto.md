@@ -10597,3 +10597,7 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 
 ## 2026-10-14 - Pendencias da custodia (filtro e planilha)
 - CustodiaProjeto: barra com 'So pendencias' (envios a justificar e devolucoes sem origem; esconde os registros manuais; vale tambem para a impressao, titulo '- pendencias') e 'Exportar pendencias (Excel)': uma linha por pendencia (tipo, data, valor, a explicar, lancamento do extrato) + colunas em branco para a resposta da custodiante (o que foi feito, data/favorecido/origem, comprovante) e totais.
+
+## 2026-10-14 - Anotacao da planilha na custodia
+- relatorios.controller custodiaDetalhe: cada lancamento traz a anotacao (proj_anotacoes_extrato.texto) do movimento do extrato.
+- CustodiaProjeto: anotacao sob a data (envios) e sob o pagador (devolucoes), tambem na impressao; coluna 'Anotacao da planilha (custodiante)' na planilha de pendencias.
