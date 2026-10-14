@@ -46,6 +46,8 @@ export default function AnexoVProjeto({ projetoId, projetoNome }: { projetoId: s
   const [modal, setModal] = useState<null | { tipo: 'gravar' | 'sugestoes' | 'encerrar'; lista?: any[]; vinculo?: any }>(null);
   const [motivo, setMotivo] = useState('');
   const [erroModal, setErroModal] = useState('');
+  // Reconciliacao do Anexo I (14/10/2026): clique no card filtra a lista pela situacao; clique de novo mostra todos.
+  const [filtroAi, setFiltroAi] = useState('');
 
   const carregar = () => {
     setErro('');
@@ -117,7 +119,7 @@ export default function AnexoVProjeto({ projetoId, projetoNome }: { projetoId: s
   const NOME_ABA: Record<Aba, string> = { itens: 'Itens do Anexo V', classificar: 'Classificação das aplicações', desembolsos: 'Desembolsos', anexoi: 'Reconciliação do Anexo I' };
   usePrintHandler(d ? () => imprimirProjeto({ projetoNome, titulo: 'Anexo V e desembolsos - ' + NOME_ABA[aba],
     subtitulo: 'Passivo de R$ 54.418.451,00 na confissão de ' + fmtData(CONTRATO) + ' (cl. 2.A.2)', raiz: raiz.current, larguraTotal: true }) : null,
-    'Imprimir Anexo V', [d, ai, aba, filtro, semManut, soConfirmadas, escolhas, projetoNome]);
+    'Imprimir Anexo V', [d, ai, aba, filtro, semManut, soConfirmadas, escolhas, projetoNome, filtroAi]);
 
   return (
     <div ref={raiz} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -213,7 +215,8 @@ export default function AnexoVProjeto({ projetoId, projetoNome }: { projetoId: s
         <div style={painel}>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
             {Object.entries(ai.resumo || {}).map(([k, v]: [string, any]) => (
-              <div key={k} style={{ border: '0.5px solid #E5E7EB', borderRadius: 10, padding: '8px 12px', minWidth: 170 }}>
+              <div key={k} onClick={() => setFiltroAi(filtroAi === k ? '' : k)} title={filtroAi === k ? 'Clique para ver todos' : 'Clique para filtrar a lista'}
+                  style={{ border: filtroAi === k ? '1.5px solid #134E4A' : '0.5px solid #E5E7EB', background: filtroAi === k ? '#F0FDFA' : undefined, borderRadius: 10, padding: '8px 12px', minWidth: 170, cursor: 'pointer' }}>
                 <Chip s={k} /><div style={{ fontSize: 15, fontWeight: 700, marginTop: 4 }}>{v.qtd} lançamento(s)</div>
                 <div style={{ fontSize: 11, color: '#6B7280' }}>Anexo I {fmtBRL(v.anexoI)} · LEDGR {fmtBRL(v.ledgr)}</div>
               </div>))}
@@ -221,7 +224,7 @@ export default function AnexoVProjeto({ projetoId, projetoNome }: { projetoId: s
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1000 }}>
               <thead><tr><th style={thSt}>N.º</th><th style={thSt}>Data (Anexo I)</th><th style={thSt}>Remetente</th><th style={dir}>Valor (Anexo I)</th><th style={thSt}>Data (LEDGR)</th><th style={dir}>Valor (LEDGR)</th><th style={thSt}>Situação</th><th style={thSt}>Motivo do encerramento</th></tr></thead>
-              <tbody>{(ai.lista || []).map((r: any) => (
+              <tbody>{(ai.lista || []).filter((r: any) => !filtroAi || r.situacao === filtroAi).map((r: any) => (
                 <tr key={r.numero} style={{ background: r.situacao === 'OK' ? undefined : '#FFFBEB' }}>
                   <td style={tdSt}>{r.numero}</td><td style={tdSt}>{r.data ? fmtData(r.data) : '-'}</td><td style={{ ...tdSt, fontSize: 12 }}>{r.remetente || r.remetenteLedgr || '-'}</td>
                   <td style={num}>{r.valor != null ? fmtBRL(r.valor) : '-'}</td><td style={tdSt}>{r.dataLedgr ? fmtData(r.dataLedgr) : '-'}</td><td style={num}>{r.valorLedgr != null ? fmtBRL(r.valorLedgr) : '-'}</td>

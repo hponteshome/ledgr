@@ -10601,3 +10601,7 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 ## 2026-10-14 - Anotacao da planilha na custodia
 - relatorios.controller custodiaDetalhe: cada lancamento traz a anotacao (proj_anotacoes_extrato.texto) do movimento do extrato.
 - CustodiaProjeto: anotacao sob a data (envios) e sob o pagador (devolucoes), tambem na impressao; coluna 'Anotacao da planilha (custodiante)' na planilha de pendencias.
+
+## 2026-10-14 - Filtro nos cards da Reconciliacao do Anexo I
+- AnexoVProjeto, aba Reconciliacao do Anexo I: clique no card (Bate, Encerrado no LEDGR, So no LEDGR...) filtra a lista pela situacao; clique de novo mostra todos; a impressao segue o filtro.
+- Remuneracao da Josivani: extra folha, PJ sem NF (transferencias SISPAG TRANSF CC ITAU, ex.: 05/11/2025 R$ 13.000,00).
