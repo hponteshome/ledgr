@@ -24,6 +24,8 @@ export default function CustodiaProjeto({ projetoId, projetoNome }: { projetoId:
   const [justificar, setJustificar] = useState<any>(null);
   const [origem, setOrigem] = useState<any>(null);
   const [acao, setAcao] = useState<{ tipo: 'recusar' | 'encerrar'; alvo: 'lancamento' | 'alocacao'; id: string; rotulo: string } | null>(null);
+  // So pendencias (14/10/2026): filtra envios a justificar e devolucoes sem origem (tela, impressao e Excel).
+  const [soPend, setSoPend] = useState(false);
   const base = `/projects-relatorios/projetos/${projetoId}/custodias`;
   useEffect(() => {
     api.get(base).then((r) => { setLista(r.data || []); if (r.data?.length) setCodigo(r.data[0].codigo); }).catch((e) => setErro(erroApi(e, 'Falha ao carregar as custódias.')));
@@ -40,17 +42,48 @@ export default function CustodiaProjeto({ projetoId, projetoNome }: { projetoId:
   const raiz = useRef<HTMLDivElement>(null);
   usePrintHandler(d ? () => {
     const r = d.resumo;
-    imprimirProjeto({ projetoNome, titulo: d.custodia.nome, subtitulo: 'Prestação de contas da custódia' + (d.custodia.descricao ? ' · ' + d.custodia.descricao : ''), raiz: raiz.current,
+    imprimirProjeto({ projetoNome, titulo: d.custodia.nome + (soPend ? ' - pendências' : ''), subtitulo: 'Prestação de contas da custódia' + (d.custodia.descricao ? ' · ' + d.custodia.descricao : ''), raiz: raiz.current,
       antesHtml: tabelaResumo([['Enviado', fmtBRL(r.enviado)], ['Devolvido', fmtBRL(r.devolvido)], ['Pagamentos diretos validados', fmtBRL(r.pagosDiretos)],
         ['Recebimentos de terceiros validados', fmtBRL(r.recebidosTerceiros)], ['Saldo em poder', fmtBRL(r.saldoEmPoder)],
         ['Envios a justificar', fmtBRL(r.enviosPendentes)], ['Devoluções sem origem', fmtBRL(r.devolucoesSemOrigem)]]) });
-  } : null, 'Imprimir Custódia', [d, projetoNome]);
+  } : null, 'Imprimir Custódia', [d, projetoNome, soPend]);
   if (erro) return <div style={erroSt}>⚠ {erro}</div>;
   if (!lista.length) return <div style={{ color: '#6B7280' }}>Nenhuma custódia cadastrada neste projeto.</div>;
   if (!d) return <div style={{ color: '#6B7280' }}>Carregando...</div>;
   const r = d.resumo; const L: any[] = d.lancamentos;
   const envios = L.filter((x) => x.tipo === 'ENVIO'); const devol = L.filter((x) => x.tipo === 'DEVOLUCAO');
   const manuais = L.filter((x) => x.tipo === 'PAGAMENTO_DIRETO' || x.tipo === 'RECEBIMENTO_TERCEIRO');
+  const pendEnv = envios.filter((x) => x.pendente > 0); const pendDev = devol.filter((x) => x.pendente > 0);
+  // Planilha de pendencias (14/10/2026): uma linha por envio a justificar e por devolucao sem origem, com colunas para a resposta.
+  const exportarPendencias = async () => {
+    const ExcelJS = await import('exceljs');
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Pendências');
+    ws.addRow([`${d.custodia.nome} - pendências em ${fmtData(new Date().toISOString())}`]);
+    ws.addRow([]);
+    ws.addRow(['Tipo', 'Data', 'Valor do movimento (R$)', 'A explicar (R$)', 'Lançamento do extrato', 'O que foi feito com o valor', 'Data, favorecido ou origem', 'Comprovante']);
+    const linha = (tipo: string, x: any) => {
+      const [y, m, dd] = String(x.data).split('-').map(Number);
+      ws.addRow([tipo, new Date(Date.UTC(y, m - 1, dd)), Number(x.valor), Number(x.pendente), [x.lancamentoBanco, x.contraparte].filter(Boolean).join(' · '), '', '', '']);
+    };
+    pendEnv.forEach((x) => linha('Envio a justificar', x));
+    pendDev.forEach((x) => linha('Devolução sem origem', x));
+    ws.addRow([]);
+    ws.addRow(['Total envios a justificar', null, null, Number(r.enviosPendentes)]);
+    ws.addRow(['Total devoluções sem origem', null, null, Number(r.devolucoesSemOrigem)]);
+    ws.addRow(['Saldo a explicar', null, null, Number(r.enviosPendentes) - Number(r.devolucoesSemOrigem)]);
+    ws.getRow(1).font = { bold: true, size: 12 };
+    ws.getRow(3).font = { bold: true };
+    ws.getColumn(2).numFmt = 'dd/mm/yyyy';
+    ws.getColumn(3).numFmt = '#,##0.00';
+    ws.getColumn(4).numFmt = '#,##0.00';
+    [26, 12, 18, 16, 45, 40, 32, 28].forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+    const buf = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const u = URL.createObjectURL(blob); const el = document.createElement('a');
+    el.href = u; el.download = `pendencias-custodia-${String(d.custodia.codigo).toLowerCase()}-${new Date().toISOString().slice(0, 10)}.xlsx`;
+    document.body.appendChild(el); el.click(); el.remove(); URL.revokeObjectURL(u);
+  };
   const fila = [...manuais.filter((x) => x.situacao === 'REGISTRADO').map((x) => ({ alvo: 'lancamento' as const, id: x.id, rotulo: `${x.tipo === 'PAGAMENTO_DIRETO' ? 'Pagamento direto' : 'Recebimento de terceiro'} ${fmtData(x.data)} · ${fmtBRL(x.valor)} · ${x.favorecido || '-'}`, det: x.descricao, motivo: x.motivo })),
     ...d.alocacoes.filter((a: any) => a.situacao === 'REGISTRADO').map((a: any) => ({ alvo: 'alocacao' as const, id: a.id, rotulo: `Alocação ${fmtBRL(a.valor)}: ${a.origem} → ${a.destino}`, det: '', motivo: a.motivo }))];
   const card = (rot: string, val: string, sub?: string, cor?: string) => (
@@ -82,9 +115,15 @@ export default function CustodiaProjeto({ projetoId, projetoNome }: { projetoId:
           ))}
         </div>
       )}
-      <TabelaEnvios itens={envios} onJustificar={setJustificar} />
-      <TabelaDevolucoes itens={devol} onOrigem={setOrigem} />
-      <TabelaManuais itens={manuais} onEncerrar={(x: any) => setAcao({ tipo: 'encerrar', alvo: 'lancamento', id: x.id, rotulo: `${fmtData(x.data)} · ${fmtBRL(x.valor)}` })} />
+      <div data-noprint="1" style={{ ...cardSt, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        <label style={{ fontSize: 13, display: 'flex', gap: 6, alignItems: 'center', cursor: 'pointer' }}><input type="checkbox" checked={soPend} onChange={(e) => setSoPend(e.target.checked)} />Só pendências</label>
+        <span style={{ fontSize: 12, color: '#6B7280' }}>{pendEnv.length} envio(s) a justificar · {fmtBRL(r.enviosPendentes)} · {pendDev.length} devolução(ões) sem origem · {fmtBRL(r.devolucoesSemOrigem)}</span>
+        <div style={{ flex: 1 }} />
+        <button style={{ ...btnPri, opacity: pendEnv.length || pendDev.length ? 1 : 0.5 }} disabled={!pendEnv.length && !pendDev.length} onClick={exportarPendencias}>Exportar pendências (Excel)</button>
+      </div>
+      <TabelaEnvios itens={soPend ? pendEnv : envios} onJustificar={setJustificar} />
+      <TabelaDevolucoes itens={soPend ? pendDev : devol} onOrigem={setOrigem} />
+      {!soPend && <TabelaManuais itens={manuais} onEncerrar={(x: any) => setAcao({ tipo: 'encerrar', alvo: 'lancamento', id: x.id, rotulo: `${fmtData(x.data)} · ${fmtBRL(x.valor)}` })} />}
       {justificar && <JustificarModal base={`${base}/${codigo}`} envio={justificar} d={d} onClose={() => setJustificar(null)} onFeito={() => { setJustificar(null); carregar(); }} />}
       {origem && <OrigemModal base={`${base}/${codigo}`} devolucao={origem} d={d} onClose={() => setOrigem(null)} onFeito={() => { setOrigem(null); carregar(); }} />}
       {acao && <MotivoModal titulo={acao.tipo === 'recusar' ? 'Recusar' : 'Encerrar'} rotulo={acao.rotulo} onClose={() => setAcao(null)}

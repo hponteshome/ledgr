@@ -10594,3 +10594,6 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - imprimirRelatorio.ts: a linha do CNPJ so aparece quando houver CNPJ (o projeto nao tem); as demais telas nao mudam.
 - ProjetoWorkspace passa projetoNome as quatro telas.
 - Custodia Josi fechada em 14/10/2026: envios casados com pagamentos diretos e devolucoes; repasses mensais (aportes VAL via Josi, A Vieira ou JAAH) como recebimentos de terceiros (R$ 179.000,00). Saldo a explicar R$ 80.355,67 (doc de prestacao de contas enviado a Josi). Decisao: reconhecer esses repasses como aporte VAL indireto (opcao b) - nao constam da Conta Individual; implementacao pendente.
+
+## 2026-10-14 - Pendencias da custodia (filtro e planilha)
+- CustodiaProjeto: barra com 'So pendencias' (envios a justificar e devolucoes sem origem; esconde os registros manuais; vale tambem para a impressao, titulo '- pendencias') e 'Exportar pendencias (Excel)': uma linha por pendencia (tipo, data, valor, a explicar, lancamento do extrato) + colunas em branco para a resposta da custodiante (o que foi feito, data/favorecido/origem, comprovante) e totais.
