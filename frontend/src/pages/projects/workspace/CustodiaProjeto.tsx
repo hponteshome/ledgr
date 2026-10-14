@@ -2,19 +2,21 @@
 // Custodia (Etapa B, 06/10/2026), so o Master por ora: prestacao de contas dos recursos enviados as contas de terceiros
 // (Josi). Envios e devolucoes vem do extrato; pagamentos diretos e recebimentos de terceiros sao registrados com comprovante
 // e validados; alocacoes ligam cada envio a sua justificativa e cada devolucao a sua origem.
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import api from '../../../services/api';
 import { cardSt, thSt, tdSt, erroSt, secTitle, tituloSt, subtituloSt, fmtBRL, fmtData } from './projetoTema';
 import { ModalProjeto, Secao, ErroModal, Campo, BotaoSec, BotaoPri, inputModal, erroApi } from './ModalProjeto';
 import { useOrdenacao, ThOrdenavel } from '../ordenacao';
+import { usePrintHandler } from '../../../contexts/PrintContext';
+import { imprimirProjeto, tabelaResumo } from './imprimirProjeto';
 
 const SIT: Record<string, [string, string, string]> = { REGISTRADO: ['Em análise', '#FEF3C7', '#78350F'], VALIDADO: ['Validado', '#DCFCE7', '#166534'], RECUSADO: ['Recusado', '#FCEBEB', '#A32D2D'] };
 const selo = (txt: string, bg: string, fg: string) => <span style={{ fontSize: 11, fontWeight: 600, borderRadius: 999, padding: '1px 8px', background: bg, color: fg, whiteSpace: 'nowrap' }}>{txt}</span>;
 const btn: React.CSSProperties = { padding: '4px 10px', fontSize: 12, border: '0.5px solid #E5E7EB', borderRadius: 7, background: '#fff', color: '#134E4A', cursor: 'pointer' };
 const btnPri: React.CSSProperties = { ...btn, border: 'none', background: '#1A4A3A', color: '#fff' };
 
-export default function CustodiaProjeto({ projetoId }: { projetoId: string }) {
+export default function CustodiaProjeto({ projetoId, projetoNome }: { projetoId: string; projetoNome?: string }) {
   const [lista, setLista] = useState<{ codigo: string; nome: string }[]>([]);
   const [codigo, setCodigo] = useState('');
   const [d, setD] = useState<any>(null);
@@ -34,6 +36,15 @@ export default function CustodiaProjeto({ projetoId }: { projetoId: string }) {
   const validar = async (alvo: 'lancamento' | 'alocacao', id: string) => {
     try { await api.post(`${base}/${codigo}/validar`, { alvo, id, decisao: 'VALIDADO' }); toast.success('Validado.'); carregar(); } catch (e: any) { toast.error(erroApi(e, 'Falha ao validar.')); }
   };
+  // Impressao (14/10/2026): botao flutuante global - resumo e tabelas da custodia, sem botoes e sem a fila de validacao.
+  const raiz = useRef<HTMLDivElement>(null);
+  usePrintHandler(d ? () => {
+    const r = d.resumo;
+    imprimirProjeto({ projetoNome, titulo: d.custodia.nome, subtitulo: 'Prestação de contas da custódia' + (d.custodia.descricao ? ' · ' + d.custodia.descricao : ''), raiz: raiz.current,
+      antesHtml: tabelaResumo([['Enviado', fmtBRL(r.enviado)], ['Devolvido', fmtBRL(r.devolvido)], ['Pagamentos diretos validados', fmtBRL(r.pagosDiretos)],
+        ['Recebimentos de terceiros validados', fmtBRL(r.recebidosTerceiros)], ['Saldo em poder', fmtBRL(r.saldoEmPoder)],
+        ['Envios a justificar', fmtBRL(r.enviosPendentes)], ['Devoluções sem origem', fmtBRL(r.devolucoesSemOrigem)]]) });
+  } : null, 'Imprimir Custódia', [d, projetoNome]);
   if (erro) return <div style={erroSt}>⚠ {erro}</div>;
   if (!lista.length) return <div style={{ color: '#6B7280' }}>Nenhuma custódia cadastrada neste projeto.</div>;
   if (!d) return <div style={{ color: '#6B7280' }}>Carregando...</div>;
@@ -46,12 +57,12 @@ export default function CustodiaProjeto({ projetoId }: { projetoId: string }) {
     <div style={{ ...cardSt, padding: '10px 14px' }}><div style={{ fontSize: 11, color: '#6B7280', textTransform: 'uppercase', letterSpacing: 0.4, fontWeight: 600 }}>{rot}</div>
       <div style={{ fontSize: 18, fontWeight: 700, color: cor || '#0F2747', margin: '2px 0' }}>{val}</div>{sub && <div style={{ fontSize: 11, color: '#6B7280' }}>{sub}</div>}</div>);
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12 }}>
+    <div ref={raiz} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div data-noprint="1" style={{ display: 'flex', alignItems: 'flex-end', gap: 12 }}>
         <div style={{ flex: 1 }}><div style={tituloSt}>{d.custodia.nome}</div><div style={subtituloSt}>{d.custodia.descricao} · prazo de prestação de contas: {d.custodia.prazoDias} dias</div></div>
         {lista.length > 1 && <select value={codigo} onChange={(e) => setCodigo(e.target.value)} style={{ ...inputModal, width: 260 }}>{lista.map((c) => <option key={c.codigo} value={c.codigo}>{c.nome}</option>)}</select>}
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 10 }}>
+      <div data-noprint="1" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 10 }}>
         {card('Enviado', fmtBRL(r.enviado))}{card('Devolvido', fmtBRL(r.devolvido))}
         {card('Pagamentos diretos', fmtBRL(r.pagosDiretos), r.pagosDiretosEmAnalise ? `+ ${fmtBRL(r.pagosDiretosEmAnalise)} em análise` : 'validados')}
         {card('Recebimentos de terceiros', fmtBRL(r.recebidosTerceiros), r.recebidosEmAnalise ? `+ ${fmtBRL(r.recebidosEmAnalise)} em análise` : 'validados')}
@@ -60,7 +71,7 @@ export default function CustodiaProjeto({ projetoId }: { projetoId: string }) {
         {card('Devoluções sem origem', fmtBRL(r.devolucoesSemOrigem), 'a explicar', r.devolucoesSemOrigem ? '#B45309' : undefined)}
       </div>
       {fila.length > 0 && (
-        <div style={{ ...cardSt, padding: 14, border: '1px solid #FCD34D' }}>
+        <div data-noprint="1" style={{ ...cardSt, padding: 14, border: '1px solid #FCD34D' }}>
           <div style={secTitle}>Validação pendente ({fila.length})</div>
           {fila.map((f) => (
             <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderBottom: '0.5px solid #F3F4F6' }}>

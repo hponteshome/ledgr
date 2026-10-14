@@ -158,18 +158,18 @@ export default function ProjetoWorkspace() {
             <Routes>
               {soRevisor ? <Route index element={<Navigate to={`${base}/instrumentos`} replace />} /> : <Route index element={<PainelProjeto projeto={projeto} operacao={operacao} master={master} onAlterado={() => setVersao((v) => v + 1)} />} />}
               <Route path="creditos" element={<CreditosProjeto operacao={operacao} master={master} />} />
-              <Route path="aplicacoes" element={<AplicacoesProjeto operacao={operacao} master={master} />} />
+              <Route path="aplicacoes" element={<AplicacoesProjeto operacao={operacao} master={master} projetoNome={projeto.nome} />} />
               <Route path="intercompany" element={<IntercompanyProjeto operacao={operacao} master={master} />} />
               <Route path="demonstrativo" element={<DemonstrativoProjeto operacao={operacao} />} />
               <Route path="historico" element={<HistoricoProjeto operacao={operacao} />} />
               {master && <Route path="kit-cotista" element={<KitCotistaProjeto projetoId={projeto.id} />} />}
               {master && <Route path="series1" element={<EstruturaSeries1Projeto projetoId={projeto.id} />} />}
               {master && <Route path="fluxo-contabil" element={<FluxoContabilProjeto projetoId={projeto.id} />} />}
-              {master && <Route path="custodia" element={<CustodiaProjeto projetoId={projeto.id} />} />}
-              {master && <Route path="fontes-usos" element={<FontesUsosProjeto projetoId={projeto.id} />} />}
+              {master && <Route path="custodia" element={<CustodiaProjeto projetoId={projeto.id} projetoNome={projeto.nome} />} />}
+              {master && <Route path="fontes-usos" element={<FontesUsosProjeto projetoId={projeto.id} projetoNome={projeto.nome} />} />}
               {master && <Route path="comprovantes-fiscais" element={<ComprovantesFiscaisProjeto projetoId={projeto.id} />} />}
               {master && <Route path="simulador-rm" element={<SimuladorRmProjeto projetoId={projeto.id} />} />}
-              {master && <Route path="anexo-v" element={<AnexoVProjeto projetoId={projeto.id} />} />}
+              {master && <Route path="anexo-v" element={<AnexoVProjeto projetoId={projeto.id} projetoNome={projeto.nome} />} />}
               {(master || revisor) && <Route path="instrumentos" element={<InstrumentosProjeto projetoId={projeto.id} />} />}
               <Route path="participantes" element={<ParticipantesProjeto operacao={operacao} master={master} />} />
               <Route path="documentos" element={<DocumentosProjeto operacao={operacao} master={master} />} />

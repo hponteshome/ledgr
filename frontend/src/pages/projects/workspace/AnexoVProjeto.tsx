@@ -1,10 +1,12 @@
 // frontend/src/pages/projects/workspace/AnexoVProjeto.tsx
 // Anexo V e desembolsos (09/10/2026): itens da confissao de 31/10/2025 (cl. 2.A.2), classificacao das aplicacoes, relatorio de
 // desembolsos no layout do Nei (colunas A-G) com exportacao para Excel e reconciliacao do Anexo I. Calculo a cada consulta; so Master.
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import api from '../../../services/api';
 import { thSt, tdSt, erroSt, fmtBRL, fmtData, PROJ } from './projetoTema';
 import { ModalProjeto, BotaoSec, erroApi } from './ModalProjeto';
+import { usePrintHandler } from '../../../contexts/PrintContext';
+import { imprimirProjeto } from './imprimirProjeto';
 
 const CONTRATO = '2025-10-31';
 const FORA = 'FORA';
@@ -31,7 +33,7 @@ function Chip({ s }: { s: string }) {
 type Escolha = { destino: string; consta: string };
 type Aba = 'itens' | 'classificar' | 'desembolsos' | 'anexoi';
 
-export default function AnexoVProjeto({ projetoId }: { projetoId: string }) {
+export default function AnexoVProjeto({ projetoId, projetoNome }: { projetoId: string; projetoNome?: string }) {
   const [d, setD] = useState<any>(null);
   const [ai, setAi] = useState<any>(null);
   const [erro, setErro] = useState('');
@@ -110,12 +112,18 @@ export default function AnexoVProjeto({ projetoId }: { projetoId: string }) {
       borderBottom: aba === k ? `2px solid ${PROJ}` : '2px solid transparent', background: 'transparent', color: aba === k ? PROJ : '#6B7280' }}>{rot}</button>);
   const totFace = soma(itens, 'valorFace'), totF5 = soma(itens, 'pagoF5'), totOut = soma(itens, 'pagoOutros'), totSaldo = soma(itens, 'saldo');
   const totAntes = soma(itens, 'pagoAntes'), totAntesSim = soma(itens, 'pagoAntesReconciliado');
+  // Impressao (14/10/2026): botao flutuante global - a aba aberta, como esta na tela (filtros aplicados), sem botoes e campos.
+  const raiz = useRef<HTMLDivElement>(null);
+  const NOME_ABA: Record<Aba, string> = { itens: 'Itens do Anexo V', classificar: 'Classificação das aplicações', desembolsos: 'Desembolsos', anexoi: 'Reconciliação do Anexo I' };
+  usePrintHandler(d ? () => imprimirProjeto({ projetoNome, titulo: 'Anexo V e desembolsos - ' + NOME_ABA[aba],
+    subtitulo: 'Passivo de R$ 54.418.451,00 na confissão de ' + fmtData(CONTRATO) + ' (cl. 2.A.2)', raiz: raiz.current, larguraTotal: true }) : null,
+    'Imprimir Anexo V', [d, ai, aba, filtro, semManut, soConfirmadas, escolhas, projetoNome]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+    <div ref={raiz} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div>
-        <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, color: '#0F2747' }}>Anexo V e desembolsos</h1>
-        <div style={{ fontSize: 13, color: '#6B7280', marginTop: 4 }}>
+        <h1 data-noprint="1" style={{ fontSize: 22, fontWeight: 700, margin: 0, color: '#0F2747' }}>Anexo V e desembolsos</h1>
+        <div data-noprint="1" style={{ fontSize: 13, color: '#6B7280', marginTop: 4 }}>
           Passivo brasileiro de R$ 54.418.451,00 na confissão de {fmtData(CONTRATO)} (cl. 2.A.2) · pagamentos classificados por credor, com a origem do dinheiro pelo PEPS · tudo em reconciliação: recalculado a cada consulta
         </div>
       </div>
@@ -153,7 +161,7 @@ export default function AnexoVProjeto({ projetoId }: { projetoId: string }) {
               <option value="PENDENTE">A classificar ({contagem.PENDENTE || 0})</option><option value="SUGERIDO">Sugeridas ({contagem.SUGERIDO || 0})</option>
               <option value="CONFIRMADO">Confirmadas ({contagem.CONFIRMADO || 0})</option><option value="TODAS">Todas</option>
             </select>
-            <label style={{ fontSize: 12, display: 'flex', gap: 6, alignItems: 'center' }}><input type="checkbox" checked={semManut} onChange={(e) => setSemManut(e.target.checked)} />Esconder Manutenção da Operação</label>
+            <label data-noprint="1" style={{ fontSize: 12, display: 'flex', gap: 6, alignItems: 'center' }}><input type="checkbox" checked={semManut} onChange={(e) => setSemManut(e.target.checked)} />Esconder Manutenção da Operação</label>
             <span style={{ flex: 1 }} />
             <BotaoSec onClick={() => { const lista = montar(sugeridasVisiveis, true); if (lista.length) { setMotivo(''); setErroModal(''); setModal({ tipo: 'sugestoes', lista }); } }}>Confirmar sugestões visíveis ({sugeridasVisiveis.length})</BotaoSec>
             <button type="button" style={{ ...botaoPri, opacity: alteradas.length ? 1 : 0.5 }} disabled={!alteradas.length}
@@ -184,7 +192,7 @@ export default function AnexoVProjeto({ projetoId }: { projetoId: string }) {
       {d && aba === 'desembolsos' && (
         <div style={painel}>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
-            <label style={{ fontSize: 12, display: 'flex', gap: 6, alignItems: 'center' }}><input type="checkbox" checked={soConfirmadas} onChange={(e) => setSoConfirmadas(e.target.checked)} />Só classificações confirmadas</label>
+            <label data-noprint="1" style={{ fontSize: 12, display: 'flex', gap: 6, alignItems: 'center' }}><input type="checkbox" checked={soConfirmadas} onChange={(e) => setSoConfirmadas(e.target.checked)} />Só classificações confirmadas</label>
             <span style={{ fontSize: 12, color: '#6B7280' }}>{linhas.length} linha(s) · {fmtBRL(soma(linhas, 'valor'))} · VAL {fmtBRL(soma(linhas.filter((l) => l.origem.startsWith('VAL')), 'valor'))}</span>
             <span style={{ flex: 1 }} />
             <button type="button" style={{ ...botaoPri, opacity: linhas.length ? 1 : 0.5 }} disabled={!linhas.length} onClick={exportar}>Exportar para Excel (layout do Nei)</button>

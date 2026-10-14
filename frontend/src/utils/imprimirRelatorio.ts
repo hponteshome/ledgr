@@ -55,7 +55,7 @@ export function imprimirRelatorio(opts: ImprimirRelatorioOptions): void {
     <div class="cabecalho">
       <div class="empresa">
         <div class="nome">${opts.empresaNome}</div>
-        <div class="cnpj">CNPJ: ${cnpj}</div>
+        ${cnpj ? `<div class="cnpj">CNPJ: ${cnpj}</div>` : ''}
       </div>
       <div class="meta">
         <div>Data: ${hoje}</div>

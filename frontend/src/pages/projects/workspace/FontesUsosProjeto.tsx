@@ -1,11 +1,13 @@
 // frontend/src/pages/projects/workspace/FontesUsosProjeto.tsx
 // Fontes e usos pelo PEPS (07/10/2026), so o Master: de onde veio o dinheiro de cada aplicacao, simulando a conta inteira
 // da recebedora financeira (primeiro a entrar, primeiro a sair). O calculo e refeito pela API a cada consulta.
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import api from '../../../services/api';
 import { cardSt, thSt, tdSt, erroSt, secTitle, tituloSt, subtituloSt, fmtBRL, fmtData } from './projetoTema';
 import { inputModal, erroApi } from './ModalProjeto';
 import { useOrdenacao, ThOrdenavel } from '../ordenacao';
+import { usePrintHandler } from '../../../contexts/PrintContext';
+import { imprimirProjeto } from './imprimirProjeto';
 
 const COR: Record<string, string> = { SALDO_ANTERIOR: '#6B7280', APORTE_ANCORA: '#134E4A', DEVOLUCAO_CUSTODIA: '#B45309', CREDITO_DESVINCULADO: '#7C3AED', OUTRA_ENTRADA: '#2563EB', NAO_IDENTIFICADA: '#A32D2D' };
 const CURTO: Record<string, string> = { SALDO_ANTERIOR: 'Saldo anterior', APORTE_ANCORA: 'Âncora', DEVOLUCAO_CUSTODIA: 'Custódia', CREDITO_DESVINCULADO: 'Desvinculados', OUTRA_ENTRADA: 'Outras entradas', NAO_IDENTIFICADA: 'Não identificada' };
@@ -13,7 +15,7 @@ const chip = (o: string, v: number) => <span key={o} style={{ fontSize: 11, bord
 const dir: React.CSSProperties = { ...thSt, textAlign: 'right' };
 const num: React.CSSProperties = { ...tdSt, textAlign: 'right', whiteSpace: 'nowrap' };
 
-export default function FontesUsosProjeto({ projetoId }: { projetoId: string }) {
+export default function FontesUsosProjeto({ projetoId, projetoNome }: { projetoId: string; projetoNome?: string }) {
   const [de, setDe] = useState('');
   const [ate, setAte] = useState('');
   const [d, setD] = useState<any>(null);
@@ -30,18 +32,23 @@ export default function FontesUsosProjeto({ projetoId }: { projetoId: string }) 
   const periodo = de && ate ? `de ${br(de)} a ${br(ate)}` : ate ? `até ${br(ate)}` : de ? `desde ${br(de)}` : 'até hoje';
   const anoAtual = String(new Date().getFullYear());
   // Detalhamento (07/10/2026): cada celula do quadro abre os lancamentos que a compoem; '*' = todas as origens ou todos os usos.
+  // Impressao (14/10/2026): botao flutuante global - quadro, origens, aportes e aplicacoes do periodo (e o detalhamento aberto).
+  const raiz = useRef<HTMLDivElement>(null);
+  usePrintHandler(d ? () => imprimirProjeto({ projetoNome, titulo: 'Fontes e usos dos recursos',
+    subtitulo: 'Método PEPS sobre a conta inteira da recebedora financeira · estornos bancários excluídos', periodo, raiz: raiz.current, larguraTotal: true }) : null,
+    'Imprimir Fontes e usos', [d, periodo, cel, projetoNome]);
   const cl = (origem: string, col: string, v: number, base: React.CSSProperties) => {
     const sel = cel && cel.origem === origem && cel.col === col;
     return <td key={col} title={v ? 'Clique para ver os lançamentos' : undefined} onClick={v ? () => setCel(sel ? null : { origem, col }) : undefined}
       style={{ ...base, cursor: v ? 'pointer' : 'default', textDecoration: v ? 'underline dotted' : 'none', background: sel ? '#FEF3C7' : undefined }}>{v ? fmtBRL(v) : '-'}</td>;
   };
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div ref={raiz} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div>
-        <div style={tituloSt}>Fontes e usos dos recursos</div>
-        <div style={subtituloSt}>De onde veio o dinheiro de cada aplicação · método PEPS (primeiro a entrar, primeiro a sair) sobre a conta inteira da recebedora financeira · estornos bancários excluídos</div>
+        <div data-noprint="1" style={tituloSt}>Fontes e usos dos recursos</div>
+        <div data-noprint="1" style={subtituloSt}>De onde veio o dinheiro de cada aplicação · método PEPS (primeiro a entrar, primeiro a sair) sobre a conta inteira da recebedora financeira · estornos bancários excluídos</div>
       </div>
-      <div style={{ ...cardSt, padding: 12, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+      <div data-noprint="1" style={{ ...cardSt, padding: 12, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <b style={{ fontSize: 13, color: '#134E4A' }}>Período: {periodo}</b>
         <div style={{ flex: 1 }} />
         <span style={{ fontSize: 12, color: '#6B7280' }}>De</span>

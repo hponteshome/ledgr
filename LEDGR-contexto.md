@@ -10587,3 +10587,10 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - Uso: correcoes de 2024-2025 (13/12/2024, 06/01/2025, 10/01/2025 etc.): encerrar a aplicacao no projeto, decidir como Custodia em Classificar saidas e registrar o pagamento direto na tela Custodia do projeto.
 - Saida de comandos longos: anexar o arquivo (texto exato, sem corte do console); saidas curtas: colar do console.
 - Licao: ancora de edicao deve incluir a linha inteira distintiva (o laco 'for (const operacaoId of ids)' existe em dois metodos).
+
+## 2026-10-14 - Impressao nas telas do projeto (botao flutuante)
+- Novo frontend/src/pages/projects/workspace/imprimirProjeto.ts: copia a tela (titulos e tabelas, filtros aplicados) sem botoes, campos, cores e elementos data-noprint; select vira o texto escolhido; usa o helper compartilhado imprimirRelatorio (cabecalho com o nome do projeto).
+- usePrintHandler (botao flutuante global) em Custodia (resumo em tabela + envios, devolucoes e registros manuais; sem a fila de validacao), Aplicacoes (por natureza + lista, com periodo, natureza e filtro DARF), Anexo V (a aba aberta) e Fontes e usos (quadro, origens, aportes, aplicacoes e o detalhamento aberto).
+- imprimirRelatorio.ts: a linha do CNPJ so aparece quando houver CNPJ (o projeto nao tem); as demais telas nao mudam.
+- ProjetoWorkspace passa projetoNome as quatro telas.
+- Custodia Josi fechada em 14/10/2026: envios casados com pagamentos diretos e devolucoes; repasses mensais (aportes VAL via Josi, A Vieira ou JAAH) como recebimentos de terceiros (R$ 179.000,00). Saldo a explicar R$ 80.355,67 (doc de prestacao de contas enviado a Josi). Decisao: reconhecer esses repasses como aporte VAL indireto (opcao b) - nao constam da Conta Individual; implementacao pendente.

@@ -2,11 +2,13 @@
 // Fase 1.11 parte A / A2 (04/10/2026): aplicacoes de recursos da operacao - so o que o Financeiro classificou no LEDGR,
 // cada uma com a saida do extrato como prova. Totais por natureza; devolucoes destacadas. Master: encerrar com motivo
 // (a saida volta a triagem no LEDGR).
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import api from '../../../services/api';
 import { Operacao, fmtBRL, fmtData, cardSt, thSt, tdSt, erroSt, secTitle, tituloSt, subtituloSt } from './projetoTema';
 import { ModalProjeto, Secao, ErroModal, BotaoSec, BotaoPri, inputModal, erroApi } from './ModalProjeto';
+import { usePrintHandler } from '../../../contexts/PrintContext';
+import { imprimirProjeto } from './imprimirProjeto';
 
 interface Aplicacao {
   id: string; dataAplicacao: string; valor: string; descricao: string | null; motivo: string; lancamento: string | null;
@@ -21,7 +23,7 @@ function ChipsDarf({ valor, set, contagem }: { valor: string; set: (v: string) =
       background: valor === k ? COR_DARF[k] : '#fff', color: valor === k ? '#fff' : COR_DARF[k], fontWeight: 600 }}>{r} ({contagem[k] || 0})</button>))}</div>;
 }
 
-export default function AplicacoesProjeto({ operacao, master }: { operacao: Operacao | null; master: boolean }) {
+export default function AplicacoesProjeto({ operacao, master, projetoNome }: { operacao: Operacao | null; master: boolean; projetoNome?: string }) {
   const [lista, setLista] = useState<Aplicacao[]>([]);
   const [erro, setErro] = useState('');
   const [encerrando, setEncerrando] = useState<Aplicacao | null>(null);
@@ -59,21 +61,26 @@ export default function AplicacoesProjeto({ operacao, master }: { operacao: Oper
   const br = (d: string) => d.split('-').reverse().join('/');
   const periodo = de && ate ? `de ${br(de)} a ${br(ate)}` : ate ? `até ${br(ate)}` : de ? `desde ${br(de)}` : 'geral';
   const anoAtual = String(new Date().getFullYear());
+  // Impressao (14/10/2026): botao flutuante global - totais por natureza e a lista como estao na tela (periodo e filtros).
+  const raiz = useRef<HTMLDivElement>(null);
+  usePrintHandler(operacao && lista.length ? () => imprimirProjeto({ projetoNome, titulo: 'Aplicações de recursos',
+    subtitulo: operacao.nome + (natSel ? ' · ' + (porNatureza.find((n) => n.codigo === natSel)?.nome || '') : '') + (fDarf !== 'TODOS' ? ' · DARF: ' + (ROT_DARF.find(([k]) => k === fDarf)?.[1] || fDarf) : ''),
+    periodo, raiz: raiz.current, larguraTotal: true }) : null, 'Imprimir Aplicações', [operacao, lista, periodo, natSel, fDarf, comprov, projetoNome]);
   if (!operacao) return <div style={{ color: '#6B7280' }}>Nenhuma operação disponível para o seu acesso.</div>;
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+    <div ref={raiz} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div>
-        <div style={tituloSt}>Aplicações de recursos</div>
-        <div style={subtituloSt}>{operacao.nome} · saídas classificadas pelo Financeiro no LEDGR, comprovadas no extrato · total {periodo}: {fmtBRL(total)}</div>
+        <div data-noprint="1" style={tituloSt}>Aplicações de recursos</div>
+        <div data-noprint="1" style={subtituloSt}>{operacao.nome} · saídas classificadas pelo Financeiro no LEDGR, comprovadas no extrato · total {periodo}: {fmtBRL(total)}</div>
       </div>
       {erro && <div style={erroSt}>⚠ {erro}</div>}
       <div style={{ ...cardSt, padding: 14 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
           <div style={{ ...secTitle, marginBottom: 0 }}>Por natureza · {periodo}</div>
           <div style={{ flex: 1 }} />
-          <span style={{ fontSize: 12, color: '#6B7280' }}>De</span>
+          <span data-noprint="1" style={{ fontSize: 12, color: '#6B7280' }}>De</span>
           <input type="date" value={de} onChange={(e) => setDe(e.target.value)} style={{ ...inputModal, width: 150, padding: '5px 8px' }} />
-          <span style={{ fontSize: 12, color: '#6B7280' }}>Até</span>
+          <span data-noprint="1" style={{ fontSize: 12, color: '#6B7280' }}>Até</span>
           <input type="date" value={ate} onChange={(e) => setAte(e.target.value)} style={{ ...inputModal, width: 150, padding: '5px 8px' }} />
           {([['Até 31/12/2025', '', '2025-12-31'], ['Ano atual', anoAtual + '-01-01', ''], ['Tudo', '', '']] as [string, string, string][]).map(([rot, d, a]) => (
             <button key={rot} onClick={() => { setDe(d); setAte(a); }} style={{ padding: '4px 10px', fontSize: 12, borderRadius: 7, cursor: 'pointer', border: '0.5px solid #E5E7EB', background: de === d && ate === a ? '#134E4A' : '#fff', color: de === d && ate === a ? '#fff' : '#134E4A' }}>{rot}</button>
@@ -99,7 +106,7 @@ export default function AplicacoesProjeto({ operacao, master }: { operacao: Oper
       </div>
       <div style={{ ...cardSt, overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          {master && <caption style={{ textAlign: 'left', padding: '10px 10px 6px', captionSide: 'top' }}><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><span style={{ fontSize: 11, fontWeight: 700, color: '#6B7280', letterSpacing: 0.4 }}>COMPROVAÇÃO FISCAL</span><ChipsDarf valor={fDarf} set={setFDarf} contagem={contDarf} /></div></caption>}<thead><tr><th style={thSt}>Data</th><th style={thSt}>Natureza</th><th style={{ ...thSt, textAlign: 'right' }}>Valor</th><th style={thSt}>Descrição e motivo</th><th style={thSt}>Devolvido a / crédito</th><th style={thSt}>Lançamento do extrato</th>{master && <th style={thSt}></th>}</tr></thead>
+          {master && <caption data-noprint="1" style={{ textAlign: 'left', padding: '10px 10px 6px', captionSide: 'top' }}><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><span style={{ fontSize: 11, fontWeight: 700, color: '#6B7280', letterSpacing: 0.4 }}>COMPROVAÇÃO FISCAL</span><ChipsDarf valor={fDarf} set={setFDarf} contagem={contDarf} /></div></caption>}<thead><tr><th style={thSt}>Data</th><th style={thSt}>Natureza</th><th style={{ ...thSt, textAlign: 'right' }}>Valor</th><th style={thSt}>Descrição e motivo</th><th style={thSt}>Devolvido a / crédito</th><th style={thSt}>Lançamento do extrato</th>{master && <th style={thSt}></th>}</tr></thead>
           <tbody>
             {lista.length === 0 && <tr><td colSpan={7} style={{ ...tdSt, textAlign: 'center', color: '#9CA3AF', padding: 24 }}>Nenhuma aplicação classificada ainda. A classificação é feita no LEDGR, em Projetos → Classificar saídas.</td></tr>}
             {visiveis.map((a) => (
