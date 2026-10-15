@@ -474,6 +474,72 @@ export class ProjectsController {
     });
   }
 
+  // Rateio e reclassificacao de aplicacoes (14/10/2026), so o Master. A aplicacao e imutavel: e encerrada e substituida por
+  // uma ou mais partes (natureza, valor e descricao proprios) que somam o valor original, na mesma saida do extrato, com a
+  // mesma data, beneficiario e credito. A classificacao da original no Anexo V e encerrada (cada parte e classificada de
+  // novo). Com DARF vinculado, desvincular antes (Comprovantes fiscais). O gatilho confere que as partes nao passam da saida.
+  @Get('operacoes/:operacaoId/naturezas-aplicacao')
+  @UseGuards(MasterOnlyGuard)
+  @ProjAcao('autenticado')
+  naturezasAplicacao(@Param('operacaoId') operacaoId: string, @Req() req: any) {
+    if (!UUID_RE.test(operacaoId)) throw new NotFoundException('Registro nao encontrado.');
+    return this.db.comoUsuario(req.user.id, async (tx) => tx.projNaturezaAplicacao.findMany({ where: { ativo: true, tipo: 'APLICACAO' }, orderBy: { nome: 'asc' }, select: { codigo: true, nome: true } }));
+  }
+
+  @Post('operacoes/:operacaoId/aplicacoes/reclassificar')
+  @UseGuards(MasterOnlyGuard)
+  @ProjAcao('autenticado')
+  reclassificarAplicacoes(@Param('operacaoId') operacaoId: string, @Body() b: any, @Req() req: any) {
+    if (!UUID_RE.test(operacaoId)) throw new NotFoundException('Registro nao encontrado.');
+    const motivo = String(b?.motivo || '').trim();
+    if (motivo.length < 10) throw new BadRequestException('Informe o motivo (minimo 10 caracteres). Ele fica na trilha de auditoria.');
+    const itens: any[] = Array.isArray(b?.itens) ? b.itens : [];
+    if (!itens.length || itens.length > 50) throw new BadRequestException('Envie de 1 a 50 aplicacoes por vez.');
+    for (const it of itens) {
+      if (!UUID_RE.test(String(it?.aplicacaoId || ''))) throw new BadRequestException('Aplicacao invalida.');
+      if (!Array.isArray(it?.partes) || !it.partes.length || it.partes.length > 20) throw new BadRequestException('Cada aplicacao precisa de 1 a 20 partes.');
+    }
+    return this.db.comoUsuario(req.user.id, async (tx) => {
+      const codigos = [...new Set(itens.flatMap((it: any) => it.partes.map((p: any) => String(p?.naturezaCodigo || ''))))] as string[];
+      const nats = await tx.projNaturezaAplicacao.findMany({ where: { codigo: { in: codigos }, ativo: true, tipo: 'APLICACAO' }, select: { id: true, codigo: true } });
+      const natId = new Map<string, string>(nats.map((n) => [n.codigo, n.id]));
+      let novas = 0;
+      for (const it of itens) {
+        const ap = await tx.projAplicacao.findFirst({ where: { id: String(it.aplicacaoId), operacaoId, canceladoEm: null },
+          select: { id: true, bankTransactionId: true, dataAplicacao: true, valor: true, beneficiarioId: true, creditoId: true, descricao: true, natureza: { select: { codigo: true, tipo: true } } } });
+        if (!ap) throw new NotFoundException('Aplicacao vigente nao encontrada (talvez ja reclassificada).');
+        if (ap.natureza.tipo !== 'APLICACAO') throw new BadRequestException('Devolucoes nao sao reclassificadas aqui.');
+        const totalC = Math.round(Number(ap.valor) * 100);
+        const partes = it.partes.map((p: any) => ({ codigo: String(p?.naturezaCodigo || ''), c: Math.round(Number(p?.valor) * 100), descricao: p?.descricao ? String(p.descricao).trim().slice(0, 500) : '' }));
+        for (const p of partes) {
+          if (!natId.has(p.codigo)) throw new BadRequestException(`Natureza invalida: ${p.codigo || '(vazia)'}.`);
+          if (!(p.c > 0)) throw new BadRequestException('Cada parte precisa de valor positivo.');
+        }
+        const somaC = partes.reduce((s: number, p: any) => s + p.c, 0);
+        if (somaC !== totalC) throw new BadRequestException(`As partes somam ${(somaC / 100).toFixed(2)}, mas a aplicacao vale ${(totalC / 100).toFixed(2)}.`);
+        const darf: any[] = await tx.$queryRaw`SELECT 1 FROM proj_comprovante_vinculos WHERE aplicacao_id = ${ap.id}::uuid AND cancelado_em IS NULL LIMIT 1`;
+        if (darf.length) throw new BadRequestException('A aplicacao tem DARF vinculado: desvincule em Comprovantes fiscais antes de reclassificar.');
+        const mot = 'Reclassificada/rateada: ' + motivo;
+        await tx.$executeRaw`UPDATE proj_aplicacao_anexo_v SET cancelado_em = CURRENT_TIMESTAMP, cancelado_por_id = ${req.user.id}::uuid, motivo_cancelamento = ${mot}
+          WHERE aplicacao_id = ${ap.id}::uuid AND cancelado_em IS NULL`;
+        await tx.projAplicacao.update({ where: { id: ap.id }, data: { canceladoEm: new Date(), canceladoPorId: req.user.id, motivoCancelamento: mot } });
+        const ids: string[] = [];
+        for (const p of partes) {
+          const nova = await tx.projAplicacao.create({
+            data: { operacaoId, bankTransactionId: ap.bankTransactionId, naturezaId: natId.get(p.codigo) as string, dataAplicacao: ap.dataAplicacao, valor: (p.c / 100).toFixed(2),
+              beneficiarioId: ap.beneficiarioId, creditoId: ap.creditoId, descricao: p.descricao || ap.descricao, motivo: mot, criadoPorId: req.user.id },
+            select: { id: true },
+          });
+          ids.push(nova.id);
+        }
+        await tx.auditLog.create({ data: { actorId: req.user.id, action: 'PROJ_APLICACAO_RECLASSIFICADA', targetId: ap.id,
+          after: { operacaoId, de: ap.natureza.codigo, valor: (totalC / 100).toFixed(2), partes: partes.map((p: any, i: number) => ({ id: ids[i], natureza: p.codigo, valor: (p.c / 100).toFixed(2), descricao: p.descricao })), motivo } } });
+        novas += ids.length;
+      }
+      return { reclassificadas: itens.length, novas };
+    });
+  }
+
   // -- Saldos informados e Intercompany (Fase 1.11 parte B, 04/10/2026) -------------------------------------
   // Saldos informados = referencia externa (contabilidade, auditoria) so para conferencia; nunca entram no calculo.
   @Get('operacoes/:operacaoId/saldos-informados')

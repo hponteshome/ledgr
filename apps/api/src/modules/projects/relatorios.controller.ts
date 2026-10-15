@@ -782,12 +782,12 @@ export class RelatoriosController {
     let fu: any = null;
     try { fu = await this.fontesUsos(projetoId, '', ateOk, req); } catch { fu = null; }
     const ancoraPorMov = new Map<string, number>();
-    for (const a of fu?.aplicacoes || []) ancoraPorMov.set(String(a.id), Math.round(Number(a.ancora || 0) * 100));
+    for (const a of fu?.aplicacoes || []) ancoraPorMov.set(String(a.aplId || a.id), Math.round(Number(a.ancora || 0) * 100));
     // 3d so com origem confirmada fora da VAL (13/10/2026): creditos desvinculados e saldo anterior. Origem a confirmar (outras
     // entradas, devolucoes sem envio, recebimentos de terceiros, nao identificada) fica como 3c presumido, com alerta.
     const NAO_VAL = new Set(['CREDITO_DESVINCULADO', 'SALDO_ANTERIOR']);
     const naoValPorMov = new Map<string, number>();
-    for (const a of fu?.aplicacoes || []) naoValPorMov.set(String(a.id), (a.composicao || []).filter((x: any) => NAO_VAL.has(x.origem)).reduce((s: number, x: any) => s + Math.round(Number(x.valor) * 100), 0));
+    for (const a of fu?.aplicacoes || []) naoValPorMov.set(String(a.aplId || a.id), (a.composicao || []).filter((x: any) => NAO_VAL.has(x.origem)).reduce((s: number, x: any) => s + Math.round(Number(x.valor) * 100), 0));
     const custodiaSaldo = Math.round(Number(fu?.custodia?.saldo || 0) * 100);
     const devSemEnvioC = Math.round(Number((fu?.matriz || []).find((x: any) => x.origem === 'DEVOLUCAO_CUSTODIA')?.entrou || 0) * 100);
     return this.db.comoUsuario(req.user.id, async (tx) => {
@@ -817,7 +817,7 @@ export class RelatoriosController {
         WHERE l.cancelado_em IS NULL AND l.tipo = 'PAGAMENTO_DIRETO' AND l.situacao = 'VALIDADO' AND n.tipo = 'APLICACAO'
           AND cu.operacao_id = ANY(${ops.map((o) => o.id)}::uuid[]) AND l.data <= ${hoje}::date`;
       for (const r of pdRows) movMap.set(String(r.id), String(r.id));
-      const apls: any[] = [...aplsBanco, ...pdRows.map((r: any) => ({ id: String(r.id), valor: r.valor, dataAplicacao: new Date(r.data), natureza: { pagaPassivo: !!r.pagaPassivo, codigo: String(r.codigo) }, custodia: true }))];
+      const apls: any[] = [...aplsBanco, ...pdRows.map((r: any) => ({ id: String(r.id), valor: r.valor, dataAplicacao: new Date(r.data), natureza: { pagaPassivo: !!r.pagaPassivo, codigo: String(r.codigo) }, custodia: true }))].filter((a: any) => a.natureza.codigo !== 'DESPESA_PROPRIA_SUNSYS'); // 14/10/2026: folha, bancarias e PJ da propria Sunsys nao entram no E3
       const clsRows: any[] = await tx.$queryRaw`SELECT coalesce(aplicacao_id, custodia_lancamento_id)::text AS id, lower(fora_anexo::text) AS fora FROM proj_aplicacao_anexo_v WHERE cancelado_em IS NULL`;
       const clsMap = new Map<string, boolean>(clsRows.map((r: any) => [r.id as string, ['true', 't', 's', 'sim', '1'].includes(String(r.fora))]));
       // E3: 3a ate a confissao e 3b depois (fora do Anexo V ou sem classificacao) vao ao mutuo SUNSYS x HOTELSYS; itens do Anexo V
@@ -829,7 +829,7 @@ export class RelatoriosController {
         if (dt <= CONF) { mutuo.push(a); antesC += vC; continue; }
         if (!clsMap.has(a.id)) { mutuo.push(a); depoisForaC += vC; semClasQtd += 1; semClasC += vC; continue; }
         if (clsMap.get(a.id)) { mutuo.push(a); depoisForaC += vC; continue; }
-        const mk = movMap.get(a.id) || '';
+        const mk = String(a.id); // rateio (14/10/2026): a origem do PEPS e por aplicacao (aplId)
         const anc = Math.min(vC, ancoraPorMov.get(mk) || 0);
         const nv = fu ? Math.min(vC - anc, naoValPorMov.get(mk) || 0) : vC - anc;
         const conf = vC - anc - nv;
@@ -1484,13 +1484,15 @@ export class RelatoriosController {
         WHERE l.cancelado_em IS NULL AND l.bank_transaction_id IS NULL AND l.situacao = 'VALIDADO'
           AND l.tipo IN ('PAGAMENTO_DIRETO', 'RECEBIMENTO_TERCEIRO') AND l.data <= ${ate}::date
         ORDER BY l.data, l.criado_em`;
-      const aplRows: any[] = await tx.$queryRaw`SELECT a.bank_transaction_id AS id, n.nome AS natureza, a.descricao FROM proj_aplicacoes a
-        JOIN proj_naturezas_aplicacao n ON n.id = a.natureza_id WHERE a.operacao_id = ${op}::uuid AND a.cancelado_em IS NULL`;
+      const aplRows: any[] = await tx.$queryRaw`SELECT a.id::text AS apl, a.bank_transaction_id AS id, n.nome AS natureza, a.descricao, a.valor FROM proj_aplicacoes a
+        JOIN proj_naturezas_aplicacao n ON n.id = a.natureza_id WHERE a.operacao_id = ${op}::uuid AND a.cancelado_em IS NULL ORDER BY a.criado_em, a.id`;
       const est = new Set(estRows.map((r) => r.id));
       const cred = new Map(credRows.map((r) => [r.id, r]));
       const cust = new Map(custRows.map((r) => [r.id, r.tipo]));
       const custDe = new Map(custRows.map((r) => [r.id, String(r.cust)]));
-      const apl = new Map(aplRows.map((r) => [r.id, r]));
+      // Rateio (14/10/2026): uma saida pode ter varias aplicacoes (partes), na ordem em que foram criadas.
+      const apl = new Map<string, any[]>();
+      for (const r of aplRows) { const lp = apl.get(r.id) || []; lp.push(r); apl.set(r.id, lp); }
       const NOMES: Record<string, string> = {
         SALDO_ANTERIOR: 'Saldo anterior ao extrato', APORTE_ANCORA: 'Aportes do Cliente Âncora', DEVOLUCAO_CUSTODIA: 'Devoluções da custódia sem envio correspondente', RECEBIMENTO_TERCEIRO: 'Recebimentos de terceiros na custódia',
         CREDITO_DESVINCULADO: 'Créditos desvinculados', OUTRA_ENTRADA: 'Outras entradas da conta', NAO_IDENTIFICADA: 'Origem não identificada' };
@@ -1548,7 +1550,7 @@ export class RelatoriosController {
           if (de && dm < de) continue;
           um.comp.forEach((x, o) => somaM(o, colm, x));
           movimentos.push({ id: m.id, data: dm, valor: vm / 100, uso: colm, lancamento: m.favorecido || m.descricao || '', categoria: null, decisao: 'Pagamento direto da custodia', parcelas: um.parc, custodia: true });
-          aplicacoes.push({ id: m.id, data: dm, valor: vm / 100, natureza: colm, descricao: m.descricao, lancamento: m.favorecido || m.descricao || '', custodia: true,
+          aplicacoes.push({ id: m.id, aplId: m.id, data: dm, valor: vm / 100, natureza: colm, descricao: m.descricao, lancamento: m.favorecido || m.descricao || '', custodia: true,
             composicao: [...um.comp.entries()].map(([o, x]) => ({ origem: o, valor: x / 100 })), ancora: (um.comp.get('APORTE_ANCORA') || 0) / 100 });
         }
       };
@@ -1574,7 +1576,25 @@ export class RelatoriosController {
           if (origem === 'APORTE_ANCORA') aportes.set(t.id, { numero: Number(c.numero), data: d, valor: v, destinos: new Map() });
           continue;
         }
-        const a: any = apl.get(t.id);
+        const partes: any[] = apl.get(t.id) || [];
+        if (partes.length > 1) {
+          // Rateio da saida (14/10/2026): cada parte consome a fila em ordem (PEPS dentro da saida); sobra da saida = outra saida.
+          let restaMov = v;
+          const fatias: { p: any; vp: number }[] = partes.map((p) => { const vp = Math.min(restaMov, cent(p.valor)); restaMov -= vp; return { p, vp }; });
+          if (restaMov > 0) fatias.push({ p: null, vp: restaMov });
+          for (const fa of fatias) {
+            if (!fa.vp) continue;
+            const colp = fa.p ? fa.p.natureza : OUTRA;
+            const up = usar(fila, fa.vp, colp);
+            if (de && d < de) continue;
+            up.comp.forEach((x, o) => somaM(o, colp, x));
+            movimentos.push({ id: fa.p ? fa.p.apl : `${t.id}:resto`, data: d, valor: fa.vp / 100, uso: colp, lancamento: t.description || t.counterparty_name || '', categoria: t.categoria || null, decisao: t.decisao || null, parcelas: up.parc });
+            if (fa.p) aplicacoes.push({ id: t.id, aplId: fa.p.apl, data: d, valor: fa.vp / 100, natureza: fa.p.natureza, descricao: fa.p.descricao, lancamento: t.description || t.counterparty_name || '',
+              composicao: [...up.comp.entries()].map(([o, x]) => ({ origem: o, valor: x / 100 })), ancora: (up.comp.get('APORTE_ANCORA') || 0) / 100 });
+          }
+          continue;
+        }
+        const a: any = partes[0];
         const envio = !a && cust.get(t.id) === 'ENVIO';
         const col = a ? a.natureza : envio ? ENVIO : OUTRA;
         const u = usar(fila, v, envio ? null : col);
@@ -1587,7 +1607,7 @@ export class RelatoriosController {
         if (de && d < de) continue;
         if (!envio) u.comp.forEach((x, o) => somaM(o, col, x));
         movimentos.push({ id: t.id, data: d, valor: v / 100, uso: col, lancamento: t.description || t.counterparty_name || '', categoria: t.categoria || null, decisao: t.decisao || null, parcelas: u.parc });
-        if (a) aplicacoes.push({ id: t.id, data: d, valor: v / 100, natureza: a.natureza, descricao: a.descricao, lancamento: t.description || t.counterparty_name || '',
+        if (a) aplicacoes.push({ id: t.id, aplId: a.apl, data: d, valor: v / 100, natureza: a.natureza, descricao: a.descricao, lancamento: t.description || t.counterparty_name || '',
           composicao: [...u.comp.entries()].map(([o, x]) => ({ origem: o, valor: x / 100 })), ancora: (u.comp.get('APORTE_ANCORA') || 0) / 100 });
       }
       manuais(ate, true);
@@ -1872,7 +1892,7 @@ export class RelatoriosController {
   // Anexo V (09/10/2026): itens da confissao de 31/10/2025 (cl. 2.A.2), classificacao das aplicacoes e desembolsos no layout
   // do Nei (colunas A-G, origem pelo PEPS). Anexo I: reconciliacao dos 58 aportes com os creditos do LEDGR. Calculo a cada consulta.
   private anexoVSugestao(codigo: string, texto: string): { ordem: number | null; fora: boolean } {
-    if (['MANUTENCAO_OPERACAO', 'PAGAMENTO_ORDEM_INTERMEDIARIO', 'DEVOLUCAO_ADQUIRENTE'].includes(codigo)) return { ordem: null, fora: true };
+    if (['MANUTENCAO_OPERACAO', 'PAGAMENTO_ORDEM_INTERMEDIARIO', 'DEVOLUCAO_ADQUIRENTE', 'DESPESA_PROPRIA_SUNSYS'].includes(codigo)) return { ordem: null, fora: true };
     if (codigo === 'IMPOSTOS') return { ordem: 5, fora: false };
     if (codigo === 'TRABALHISTA' || codigo === 'SALARIOS') return { ordem: 4, fora: false };
     if (codigo === 'HONORARIOS' && /arbitragem/i.test(texto || '')) return { ordem: null, fora: true };
@@ -1896,7 +1916,8 @@ export class RelatoriosController {
     const ateOk = ateQ && /^\d{4}-\d{2}-\d{2}$/.test(ateQ) ? ateQ : '';
     const fu: any = await this.fontesUsos(projetoId, '', ateOk, req);
     const porTx = new Map<string, any>();
-    for (const a of fu.aplicacoes || []) porTx.set(String(a.id), a);
+    const porAplFu = new Map<string, any>();
+    for (const a of fu.aplicacoes || []) { porTx.set(String(a.id), a); porAplFu.set(String(a.aplId || a.id), a); }
     const txIds = [...porTx.keys()];
     const CONTRATO = '2025-10-31';
     const cent = (v: any) => Math.round(Number(v || 0) * 100);
@@ -1925,7 +1946,7 @@ export class RelatoriosController {
       const pago = new Map<string, { f5: number; outros: number; antes: number; antesSim: number }>();
       const linhas: any[] = [];
       const aplicacoes = apl.map((a) => {
-        const f = porTx.get(String(a.txId));
+        const f = porAplFu.get(String(a.id)) || porTx.get(String(a.txId));
         let itemId: string | null = a.itemId ? String(a.itemId) : null;
         let fora = !!a.fora;
         let situacao = a.vinculoId ? 'CONFIRMADO' : 'PENDENTE';

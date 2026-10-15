@@ -10605,3 +10605,10 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 ## 2026-10-14 - Filtro nos cards da Reconciliacao do Anexo I
 - AnexoVProjeto, aba Reconciliacao do Anexo I: clique no card (Bate, Encerrado no LEDGR, So no LEDGR...) filtra a lista pela situacao; clique de novo mostra todos; a impressao segue o filtro.
 - Remuneracao da Josivani: extra folha, PJ sem NF (transferencias SISPAG TRANSF CC ITAU, ex.: 05/11/2025 R$ 13.000,00).
+
+## 2026-10-14 - Rateio da saida e natureza Despesa propria da Sunsys
+- Migracao 20261014_proj_aplicacao_rateio.sql: sai o indice unico (uma aplicacao vigente por saida); gatilho proj_aplicacoes_validar exige saida DEBIT da recebedora, valor positivo e soma das vigentes <= valor da saida (trava por saida com pg_advisory_xact_lock); natureza DESPESA_PROPRIA_SUNSYS (paga_passivo false).
+- projects.controller: GET operacoes/:id/naturezas-aplicacao; POST operacoes/:id/aplicacoes/reclassificar { motivo, itens: [{ aplicacaoId, partes: [{ naturezaCodigo, valor, descricao }] }] } (ate 50 por chamada): encerra a aplicacao e a classificacao dela no Anexo V e cria as partes (soma = valor original; mesma saida, data, beneficiario e credito); recusa se houver DARF vinculado. Auditoria PROJ_APLICACAO_RECLASSIFICADA.
+- fontesUsos (PEPS): saida com varias partes - cada parte consome a fila em ordem; aplicacoes trazem aplId. Fluxo: origem por aplicacao (aplId); DESPESA_PROPRIA_SUNSYS fora do E3 (sem mutuo com a Hotelsys). Anexo V: Parte VAL por aplicacao; sugestao 'fora' para DESPESA_PROPRIA_SUNSYS.
+- AplicacoesProjeto: busca no lancamento, selecao (Selecionar visiveis), 'Reclassificar selecionadas' (lotes de 25) e 'Ratear' por aplicacao.
+- Decisoes: folha, bancarias e remuneracao da Josivani (PJ sem NF, extra folha) = Despesa propria da Sunsys. 18/11/2025 R$ 60.945,00 = 50.945,00 processo trabalhista Roberto Herculano (Anexo V item 4) + 10.000,00 sinal do contrato Visao Contabil (fora do Anexo V).

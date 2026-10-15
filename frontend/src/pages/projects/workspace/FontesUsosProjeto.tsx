@@ -113,7 +113,7 @@ function TabelaAplicacoes({ itens, periodo }: { itens: any[]; periodo: string })
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead><tr>{th('data', 'Data')}{th('natureza', 'Natureza')}{th('valor', 'Valor', dir)}{th('ancora', 'Do Âncora', dir)}<th style={thSt}>Composição da origem</th>{th('lancamento', 'Lançamento do extrato')}</tr></thead>
         <tbody>{ordenada.map((x) => (
-          <tr key={x.id}><td style={tdSt}>{fmtData(x.data)}</td><td style={tdSt}>{x.natureza}</td><td style={{ ...num, fontWeight: 600 }}>{fmtBRL(x.valor)}</td>
+          <tr key={x.aplId || x.id}><td style={tdSt}>{fmtData(x.data)}</td><td style={tdSt}>{x.natureza}</td><td style={{ ...num, fontWeight: 600 }}>{fmtBRL(x.valor)}</td>
             <td style={num}>{fmtBRL(x.ancora)}</td><td style={tdSt}>{x.composicao.map((c: any) => chip(c.origem, c.valor))}</td><td style={{ ...tdSt, fontSize: 12 }}>{x.lancamento}</td></tr>))}</tbody>
         <tfoot><tr style={{ borderTop: '1.5px solid #134E4A' }}><td colSpan={2} style={{ ...tdSt, fontWeight: 700 }}>{itens.length} aplicação(ões)</td>
           <td style={{ ...num, fontWeight: 700 }}>{fmtBRL(total)}</td><td style={{ ...num, fontWeight: 700 }}>{fmtBRL(anc)}</td><td colSpan={2} style={tdSt}></td></tr></tfoot>
