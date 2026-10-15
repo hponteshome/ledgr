@@ -25,7 +25,7 @@ export default function CustodiaProjeto({ projetoId, projetoNome }: { projetoId:
   const [origem, setOrigem] = useState<any>(null);
   const [acao, setAcao] = useState<{ tipo: 'recusar' | 'encerrar'; alvo: 'lancamento' | 'alocacao'; id: string; rotulo: string } | null>(null);
   // So pendencias (14/10/2026): filtra envios a justificar e devolucoes sem origem (tela, impressao e Excel).
-  const [soPend, setSoPend] = useState(false);
+  const [soPend, setSoPend] = useState(() => new URLSearchParams(window.location.search).get('pend') === '1');
   const base = `/projects-relatorios/projetos/${projetoId}/custodias`;
   useEffect(() => {
     api.get(base).then((r) => { setLista(r.data || []); if (r.data?.length) setCodigo(r.data[0].codigo); }).catch((e) => setErro(erroApi(e, 'Falha ao carregar as custódias.')));

@@ -10612,3 +10612,8 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - fontesUsos (PEPS): saida com varias partes - cada parte consome a fila em ordem; aplicacoes trazem aplId. Fluxo: origem por aplicacao (aplId); DESPESA_PROPRIA_SUNSYS fora do E3 (sem mutuo com a Hotelsys). Anexo V: Parte VAL por aplicacao; sugestao 'fora' para DESPESA_PROPRIA_SUNSYS.
 - AplicacoesProjeto: busca no lancamento, selecao (Selecionar visiveis), 'Reclassificar selecionadas' (lotes de 25) e 'Ratear' por aplicacao.
 - Decisoes: folha, bancarias e remuneracao da Josivani (PJ sem NF, extra folha) = Despesa propria da Sunsys. 18/11/2025 R$ 60.945,00 = 50.945,00 processo trabalhista Roberto Herculano (Anexo V item 4) + 10.000,00 sinal do contrato Visao Contabil (fora do Anexo V).
+
+## 2026-10-15 - Links nas tarjas do Fluxo contabil
+- FluxoContabilProjeto: cada tarja com destino ganha link - sem classificacao no Anexo V -> anexo-v?aba=classificar&filtro=SUGERIDO&manut=1; origem a confirmar -> custodia; saldo na custodia e devolucoes sem envio -> custodia?pend=1.
+- AnexoVProjeto le ?aba, ?filtro e ?manut=1 (mostra a Manutencao); CustodiaProjeto le ?pend=1 (So pendencias).
+- Conciliacao Sunsys 2024-2025 (projeto x Contabil) por conta 12101020022, 22101050005 e 11304010009: D:\Temp\conc_contabil.sql (considera os recebimentos de terceiros como aporte VAL indireto, opcao b).

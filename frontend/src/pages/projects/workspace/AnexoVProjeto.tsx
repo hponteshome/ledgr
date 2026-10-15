@@ -38,9 +38,10 @@ export default function AnexoVProjeto({ projetoId, projetoNome }: { projetoId: s
   const [ai, setAi] = useState<any>(null);
   const [erro, setErro] = useState('');
   const [aviso, setAviso] = useState('');
-  const [aba, setAba] = useState<Aba>('itens');
-  const [filtro, setFiltro] = useState<string>('PENDENTE');
-  const [semManut, setSemManut] = useState(true);
+  const qs = new URLSearchParams(window.location.search);
+  const [aba, setAba] = useState<Aba>(() => { const q = qs.get('aba') as Aba; return (['itens', 'classificar', 'desembolsos', 'anexoi'] as Aba[]).includes(q) ? q : 'itens'; });
+  const [filtro, setFiltro] = useState<string>(() => (['PENDENTE', 'SUGERIDO', 'CONFIRMADO', 'TODAS'].includes(qs.get('filtro') || '') ? String(qs.get('filtro')) : 'PENDENTE'));
+  const [semManut, setSemManut] = useState(qs.get('manut') !== '1');
   const [escolhas, setEscolhas] = useState<Record<string, Escolha>>({});
   const [soConfirmadas, setSoConfirmadas] = useState(true);
   const [modal, setModal] = useState<null | { tipo: 'gravar' | 'sugestoes' | 'encerrar'; lista?: any[]; vinculo?: any }>(null);

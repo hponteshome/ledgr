@@ -2,6 +2,7 @@
 // Fluxo contabil (06/10/2026), so o Master: regua de eventos numerados e quadros por empresa com os lancamentos propostos,
 // valores pela trilha do LEDGR. Clicar num evento destaca os seus reflexos em todas as empresas. Nada e gravado no Contabil.
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../../../services/api';
 import { cardSt, erroSt, tituloSt, subtituloSt, fmtBRL, fmtData } from './projetoTema';
 import CambioPtaxCard from './CambioPtaxCard';
@@ -24,6 +25,14 @@ export default function FluxoContabilProjeto({ projetoId }: { projetoId: string 
   if (!d) return <div style={{ color: '#6B7280' }}>Montando o fluxo...</div>;
   const famDe = (n: number) => d.eventos.find((e: any) => e.numero === n)?.familia || 'origem';
   const bola = (n: number) => { const [bg, fg] = FAM[famDe(n)]; return <span style={{ display: 'inline-flex', width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, background: bg, color: fg, flexShrink: 0 }}>{n}</span>; };
+  // Links nas tarjas (15/10/2026): cada aviso leva a tela onde se resolve (o filtro vai no endereco).
+  const linkAlerta = (a: string): [string, string] | null => {
+    const b = `/projetos/${projetoId}`;
+    if (/sem classifica/i.test(a)) return [`${b}/anexo-v?aba=classificar&filtro=SUGERIDO&manut=1`, 'Classificar no Anexo V'];
+    if (/origem a confirmar/i.test(a)) return [`${b}/custodia`, 'Abrir a Custódia'];
+    if (/cust/i.test(a)) return [`${b}/custodia?pend=1`, 'Ver as pendências da custódia'];
+    return null;
+  };
   const tag = (txt: string, bg: string, fg: string) => <span style={{ fontSize: 10, fontWeight: 700, borderRadius: 999, padding: '1px 7px', background: bg, color: fg, marginLeft: 6 }}>{txt}</span>;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -40,7 +49,7 @@ export default function FluxoContabilProjeto({ projetoId }: { projetoId: string 
             <button key={rot} onClick={() => setDataBase(v)} style={{ padding: '4px 10px', fontSize: 12, borderRadius: 7, cursor: 'pointer', border: '0.5px solid #E5E7EB', background: dataBase === v ? '#134E4A' : '#fff', color: dataBase === v ? '#fff' : '#134E4A' }}>{rot}</button>)); })()}
       </div>
       {d.ultimoExtrato && d.apuradoEm > d.ultimoExtrato && <div style={{ fontSize: 12, background: '#FFFBEB', border: '1px solid #FCD34D', color: '#78350F', borderRadius: 8, padding: '8px 12px' }}>⚠ Extratos carregados só até {fmtData(d.ultimoExtrato)}: os saldos depois dessa data estão incompletos.</div>}
-        {(d.alertas || []).map((a: string, i: number) => <div key={i} style={{ fontSize: 12, background: '#FFFBEB', border: '1px solid #FCD34D', color: '#78350F', borderRadius: 8, padding: '8px 12px', marginTop: 8 }}>⚠ {a}</div>)}
+        {(d.alertas || []).map((a: string, i: number) => <div key={i} style={{ fontSize: 12, background: '#FFFBEB', border: '1px solid #FCD34D', color: '#78350F', borderRadius: 8, padding: '8px 12px', marginTop: 8 }}>⚠ {a}{(() => { const l = linkAlerta(a); return l ? <Link to={l[0]} style={{ color: '#134E4A', fontWeight: 600, marginLeft: 8, whiteSpace: 'nowrap' }}>{l[1]} →</Link> : null; })()}</div>)}
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
         {d.eventos.map((e: any) => (
