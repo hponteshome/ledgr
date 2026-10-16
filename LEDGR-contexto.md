@@ -10623,3 +10623,6 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 
 ## 2026-10-16 - Diario de lancamentos: coluna Registrado em
 - JournalPage: nova coluna "Registrado em" depois de Fonte, com data e hora (local) em que o lancamento foi gravado no LEDGR (createdAt, que a API ja devolvia). Helper fmtRegistro. Sem ordenacao por essa coluna.
+
+## 2026-10-16 - Diario de lancamentos: ordenacao em todas as colunas
+- JournalPage: Fonte e Registrado em passam a ordenar pelo cabecalho (as demais ja ordenavam). Data, Nr Lanc e Historico ordenam no servidor; Debito, Credito, Valor, Fonte e Registrado em ordenam sobre os lancamentos carregados (usar "mostrar mais" ou filtro de periodo para pegar todos).

@@ -381,7 +381,7 @@ const JournalPage: React.FC = () => {
     const [showLotdModal, setShowLotdModal] = useState(false);
     const [showManualModal, setShowManualModal] = useState(false);
     const [showRecent, setShowRecent] = useState(true);
-    const [sortBy, setSortBy] = useState<'date' | 'value' | 'description' | 'debitCode' | 'creditCode' | 'reference'>('date');
+    const [sortBy, setSortBy] = useState<'date' | 'value' | 'description' | 'debitCode' | 'creditCode' | 'reference' | 'sourceModule' | 'createdAt'>('date');
     const [sortDir, setSortDir] = useState<'desc' | 'asc'>('desc');
 
     // Modal "conta não encontrada"
@@ -460,6 +460,19 @@ const JournalPage: React.FC = () => {
                     const va = a.items.reduce((s: number, i: any) => i.type === 'DEBIT' ? s + Number(i.value) : s, 0);
                     const vb = b.items.reduce((s: number, i: any) => i.type === 'DEBIT' ? s + Number(i.value) : s, 0);
                     return sortDir === 'asc' ? va - vb : vb - va;
+                });
+            }
+            // NOVO (16/10/2026): ordenacao por Fonte e por Registrado em (sobre os lancamentos carregados, como Debito/Credito/Valor)
+            if (sortBy === 'sourceModule') {
+                entries = [...entries].sort((a: any, b: any) => {
+                    const la = getSource(a.sourceModule).label; const lb = getSource(b.sourceModule).label;
+                    return sortDir === 'asc' ? la.localeCompare(lb) : lb.localeCompare(la);
+                });
+            }
+            if (sortBy === 'createdAt') {
+                entries = [...entries].sort((a: any, b: any) => {
+                    const ta = new Date(a.createdAt).getTime() || 0; const tb = new Date(b.createdAt).getTime() || 0;
+                    return sortDir === 'asc' ? ta - tb : tb - ta;
                 });
             }
             setData({ ...r.data, entries });
@@ -1025,8 +1038,8 @@ const JournalPage: React.FC = () => {
                                             {sortable("debitCode", "Débito", "w-32")}
                                             {sortable("creditCode", "Crédito", "w-32")}
                                             {sortable("value", "Valor", "w-36 text-right")}
-                                            <th className={`${thBase} w-20 text-gray-400`}>Fonte</th>
-                                            <th className={`${thBase} w-32 text-gray-400`}>Registrado em</th>
+                                            {sortable("sourceModule", "Fonte", "w-20")}
+                                            {sortable("createdAt", "Registrado em", "w-32")}
                                             <th className="px-3 py-2 border-b border-gray-100 w-16"></th>
                                         </>);
                                     })()}
