@@ -16,7 +16,7 @@ const fmtData = (iso?: string | null) => { if (!iso) return '-'; const [a, m, d]
 const thSt: React.CSSProperties = { padding: '8px 10px', fontSize: 11, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.3px', textAlign: 'left', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' };
 const tdSt: React.CSSProperties = { padding: '8px 10px', fontSize: 13, borderBottom: '0.5px solid #F3F4F6', verticalAlign: 'top' };
 
-interface Saida { id: string; data: string; valor: string; lancamento: string; favorecidoNome: string | null; favorecidoDocumento: string | null; anotacao: string | null; }
+interface Saida { id: string; data: string; valor: string; lancamento: string; favorecidoNome: string | null; favorecidoDocumento: string | null; anotacao: string | null; motivo?: string | null; }
 interface Destino { operacaoId: string; nome: string; contrapartes: { id: string; nome: string; papeis: string }[]; creditos: { id: string; rotulo: string }[]; }
 interface Apoio { naturezas: { codigo: string; nome: string; tipo: string }[]; destinos: Destino[]; }
 // Ordenacao por coluna (06/10/2026): clicar no titulo ordena; clicar de novo inverte; vazios sempre no fim.
@@ -33,23 +33,30 @@ export default function TriagemSaidasPage() {
   const [aplicando, setAplicando] = useState<Saida | null>(null);
   const [decidindo, setDecidindo] = useState<Saida | null>(null);
   const [rotulos, setRotulos] = useState<string[]>([]);
+  // Visao Nao pertence (16/10/2026): lista as saidas marcadas como Nao pertence, com Desfazer (volta para A classificar).
+  const [visao, setVisao] = useState<'PENDENTES' | 'NAO_PERTENCE'>('PENDENTES');
+  const pend = visao === 'PENDENTES';
+  const [naoPert, setNaoPert] = useState<Saida[]>([]);
+  const [desfazendo, setDesfazendo] = useState<Saida | null>(null);
 
   const carregar = useCallback(() => {
     setErro('');
     api.get('/projects-financeiro/saidas').then((r) => setSaidas(r.data || [])).catch((e) => setErro(erroApi(e, 'Falha ao carregar as saídas.')));
-  }, []);
+    if (master) api.get('/projects-financeiro/decididas', { params: { tipo: 'DEBIT', decisao: 'NAO_PERTENCE' } }).then((r) => setNaoPert(r.data || [])).catch(() => setNaoPert([]));
+  }, [master]);
   useEffect(() => {
     carregar();
     if (master) api.get('/projects-financeiro/saidas/apoio').then((r) => setApoio(r.data)).catch(() => {});
     if (master) api.get('/projects-financeiro/circuitos').then((r) => setRotulos((r.data || []).map((c: any) => c.circuito))).catch(() => {});
   }, [carregar, master]);
 
-  const anos = useMemo(() => [...new Set(saidas.map((s) => s.data.slice(0, 4)))].sort(), [saidas]);
+  const fonte = pend ? saidas : naoPert;
+  const anos = useMemo(() => [...new Set(fonte.map((s) => s.data.slice(0, 4)))].sort(), [fonte]);
   const lista = useMemo(() => {
     const t = busca.trim().toLowerCase();
-    return saidas.filter((s) => (ano === 'TODOS' || s.data.startsWith(ano)) &&
+    return fonte.filter((s) => (ano === 'TODOS' || s.data.startsWith(ano)) &&
       (!t || [s.lancamento, s.favorecidoNome, s.anotacao].some((x) => (x || '').toLowerCase().includes(t))));
-  }, [saidas, ano, busca]);
+  }, [fonte, ano, busca]);
   const { ordenada, ord, alternar } = useOrdenacao(lista, COLS_SAIDA, { col: 'data', dir: 'asc' });
   // Selecao para decisao em lote (06/10/2026): cada linha segue pela mesma rota da decisao individual.
   const sel = useSelecao();
@@ -69,6 +76,7 @@ export default function TriagemSaidasPage() {
       {erro && <div style={{ background: '#FCEBEB', color: '#A32D2D', borderRadius: 7, padding: '8px 12px', fontSize: 12, marginBottom: 12 }}>⚠ {erro}</div>}
       {semDestino && <div style={{ background: '#F3F4F6', color: '#374151', borderRadius: 8, padding: '10px 14px', fontSize: 13, marginBottom: 12 }}>A empresa ativa não é recebedora de nenhuma operação de projeto.</div>}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
+        {master && <select value={visao} onChange={(e) => { setVisao(e.target.value as any); sel.limpar(); }} style={{ padding: '7px 10px', border: '0.5px solid #E5E7EB', borderRadius: 7, fontSize: 13 }}><option value="PENDENTES">A classificar</option><option value="NAO_PERTENCE">Não pertence</option></select>}
         <select value={ano} onChange={(e) => setAno(e.target.value)} style={{ padding: '7px 10px', border: '0.5px solid #E5E7EB', borderRadius: 7, fontSize: 13 }}>
           <option value="TODOS">Todos os anos</option>
           {anos.map((a) => <option key={a} value={a}>{a}</option>)}
@@ -77,7 +85,7 @@ export default function TriagemSaidasPage() {
         <div style={{ flex: 1 }} />
         <div style={{ fontSize: 13, color: '#374151' }}>{lista.length} saída(s) · <b>{fmtBRL(total)}</b></div>
       </div>
-      {master && !semDestino && selecionadas.length > 0 && (
+      {master && !semDestino && pend && selecionadas.length > 0 && (
         <BarraSelecao quantidade={selecionadas.length} total={selecionadas.reduce((s, x) => s + Number(x.valor), 0)} onLimpar={sel.limpar}>
           <button onClick={() => setLoteAplicar(true)} disabled={!apoio} style={{ padding: '6px 12px', fontSize: 12, border: 'none', borderRadius: 7, background: '#1A4A3A', color: '#fff', cursor: 'pointer' }}>Aplicação em lote</button>
           <button onClick={() => setLoteDecidir(true)} style={{ padding: '6px 12px', fontSize: 12, border: '0.5px solid #E5E7EB', borderRadius: 7, background: '#fff', color: '#374151', cursor: 'pointer' }}>Outra decisão em lote</button>
@@ -85,11 +93,11 @@ export default function TriagemSaidasPage() {
       )}
       <div style={{ background: '#fff', border: '0.5px solid #E5E7EB', borderRadius: 10, overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead><tr>{master && !semDestino && <th style={{ ...thSt, width: 28 }}><input type="checkbox" checked={sel.todos(ordenada)} onChange={() => sel.alternarTodos(ordenada)} title="Marcar ou desmarcar todas as linhas visíveis" /></th>}<ThOrdenavel col="data" rotulo="Data" ord={ord} alternar={alternar} style={thSt} /><ThOrdenavel col="valor" rotulo="Valor" ord={ord} alternar={alternar} style={{ ...thSt, textAlign: 'right' }} /><ThOrdenavel col="lancamento" rotulo="Lançamento" ord={ord} alternar={alternar} style={thSt} /><ThOrdenavel col="favorecido" rotulo="Favorecido (extrato)" ord={ord} alternar={alternar} style={thSt} /><ThOrdenavel col="anotacao" rotulo="Anotação da planilha (apoio)" ord={ord} alternar={alternar} style={thSt} />{master && !semDestino && <th style={thSt}></th>}</tr></thead>
+          <thead><tr>{master && !semDestino && pend && <th style={{ ...thSt, width: 28 }}><input type="checkbox" checked={sel.todos(ordenada)} onChange={() => sel.alternarTodos(ordenada)} title="Marcar ou desmarcar todas as linhas visíveis" /></th>}<ThOrdenavel col="data" rotulo="Data" ord={ord} alternar={alternar} style={thSt} /><ThOrdenavel col="valor" rotulo="Valor" ord={ord} alternar={alternar} style={{ ...thSt, textAlign: 'right' }} /><ThOrdenavel col="lancamento" rotulo="Lançamento" ord={ord} alternar={alternar} style={thSt} /><ThOrdenavel col="favorecido" rotulo="Favorecido (extrato)" ord={ord} alternar={alternar} style={thSt} /><ThOrdenavel col="anotacao" rotulo="Anotação da planilha (apoio)" ord={ord} alternar={alternar} style={thSt} />{master && !semDestino && <th style={thSt}></th>}</tr></thead>
           <tbody>
-            {lista.length === 0 && <tr><td colSpan={6} style={{ ...tdSt, textAlign: 'center', color: '#9CA3AF', padding: 24 }}>Nenhuma saída para classificar.</td></tr>}
+            {lista.length === 0 && <tr><td colSpan={6} style={{ ...tdSt, textAlign: 'center', color: '#9CA3AF', padding: 24 }}>{pend ? 'Nenhuma saída para classificar.' : 'Nenhuma saída marcada como Não pertence.'}</td></tr>}
             {ordenada.map((s) => (
-              <tr key={s.id} style={sel.tem(s.id) ? { background: '#F0FDFA' } : undefined}>{master && !semDestino && <td style={{ ...tdSt, width: 28 }}><input type="checkbox" checked={sel.tem(s.id)} onChange={() => sel.alternar(s.id)} /></td>}
+              <tr key={s.id} style={sel.tem(s.id) ? { background: '#F0FDFA' } : undefined}>{master && !semDestino && pend && <td style={{ ...tdSt, width: 28 }}><input type="checkbox" checked={sel.tem(s.id)} onChange={() => sel.alternar(s.id)} /></td>}
                 <td style={{ ...tdSt, whiteSpace: 'nowrap' }}>{fmtData(s.data)}</td>
                 <td style={{ ...tdSt, textAlign: 'right', whiteSpace: 'nowrap', fontWeight: 600 }}>{fmtBRL(s.valor)}</td>
                 <td style={{ ...tdSt, fontSize: 12 }}>{s.lancamento}</td>
@@ -97,11 +105,13 @@ export default function TriagemSaidasPage() {
                   {s.favorecidoNome ? <div>{s.favorecidoNome}</div> : <i style={{ color: '#9CA3AF' }}>-</i>}
                   {s.favorecidoDocumento && <div style={{ fontSize: 11, color: '#6B7280', fontFamily: 'monospace' }}>{s.favorecidoDocumento}</div>}
                 </td>
-                <td style={{ ...tdSt, fontSize: 12, color: '#6B7280', fontStyle: 'italic', maxWidth: 320 }}>{s.anotacao || ''}</td>
+                <td style={{ ...tdSt, fontSize: 12, color: '#6B7280', fontStyle: 'italic', maxWidth: 320 }}>{s.anotacao || ''}{!pend && s.motivo && <div style={{ fontStyle: 'normal', color: '#A32D2D', marginTop: 2 }}>Não pertence: {s.motivo}</div>}</td>
                 {master && !semDestino && (
                   <td style={{ ...tdSt, textAlign: 'right', whiteSpace: 'nowrap' }}>
-                    <button onClick={() => setAplicando(s)} style={{ padding: '4px 10px', fontSize: 12, border: 'none', borderRadius: 7, background: '#1A4A3A', color: '#fff', cursor: 'pointer', marginRight: 6 }}>Aplicação</button>
+                    {!pend ? <button onClick={() => setDesfazendo(s)} style={{ padding: '4px 10px', fontSize: 12, border: '0.5px solid #E5E7EB', borderRadius: 7, background: '#fff', color: '#A32D2D', cursor: 'pointer' }}>Desfazer</button> : <>
+                      <button onClick={() => setAplicando(s)} style={{ padding: '4px 10px', fontSize: 12, border: 'none', borderRadius: 7, background: '#1A4A3A', color: '#fff', cursor: 'pointer', marginRight: 6 }}>Aplicação</button>
                     <button onClick={() => setDecidindo(s)} style={{ padding: '4px 10px', fontSize: 12, border: '0.5px solid #E5E7EB', borderRadius: 7, background: '#fff', color: '#374151', cursor: 'pointer' }}>Outra decisão</button>
+                      </>}
                   </td>
                 )}
               </tr>
@@ -113,7 +123,33 @@ export default function TriagemSaidasPage() {
       {loteAplicar && apoio && selecionadas.length > 0 && <AplicarModal saidas={selecionadas} apoio={apoio} onClose={fecharLote} onFeito={fecharLote} />}
       {loteDecidir && selecionadas.length > 0 && <LoteDecisaoModal rotaBase="/projects-financeiro/saidas" itens={selecionadas} rotulos={rotulos} onClose={fecharLote} onFeito={fecharLote} />}
       {decidindo && <DecisaoMovimentoModal rota={`/projects-financeiro/saidas/${decidindo.id}/decidir`} mov={decidindo} rotulos={rotulos} onClose={() => setDecidindo(null)} onFeito={() => { setDecidindo(null); carregar(); }} />}
+      {desfazendo && <DesfazerNaoPertenceModal s={desfazendo} onClose={() => setDesfazendo(null)} onFeito={() => { setDesfazendo(null); carregar(); }} />}
     </div>
+  );
+}
+
+// Desfazer o Nao pertence (16/10/2026): encerra a decisao com motivo (rota ja usada pelos Circuitos neutros); a saida volta para A classificar.
+function DesfazerNaoPertenceModal({ s, onClose, onFeito }: { s: Saida; onClose: () => void; onFeito: () => void }) {
+  const [motivo, setMotivo] = useState('');
+  const [erro, setErro] = useState('');
+  const [enviando, setEnviando] = useState(false);
+  const valido = motivo.trim().length >= 10;
+  const enviar = async () => {
+    if (!valido) return;
+    setErro(''); setEnviando(true);
+    try {
+      await api.post(`/projects-financeiro/decisoes/${s.id}/encerrar`, { motivo: motivo.trim() });
+      toast.success('Decisão desfeita; a saída voltou para A classificar.');
+      onFeito();
+    } catch (e: any) { setErro(erroApi(e, 'Falha ao desfazer.')); } finally { setEnviando(false); }
+  };
+  return (
+    <ModalProjeto titulo="Desfazer Não pertence" subtitulo={`${fmtData(s.data)} · ${fmtBRL(s.valor)} · ${s.lancamento}`} largura={480} onClose={onClose}
+      rodape={<><BotaoSec onClick={onClose}>Voltar</BotaoSec><BotaoPri onClick={enviar} ativo={valido && !enviando} perigo>{enviando ? 'Aguarde...' : 'Desfazer'}</BotaoPri></>}>
+      <ErroModal msg={erro} />
+      <Secao><div style={{ fontSize: 12, color: '#374151' }}>A decisão fica no histórico, encerrada com o motivo, e a saída volta para A classificar, onde pode ir para a Custódia ou virar aplicação.</div></Secao>
+      <Secao titulo="MOTIVO *"><textarea style={{ ...inputModal, minHeight: 64, resize: 'vertical' }} value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Mínimo de 10 caracteres." /></Secao>
+    </ModalProjeto>
   );
 }
 

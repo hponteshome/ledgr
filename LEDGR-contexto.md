@@ -10626,3 +10626,8 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 
 ## 2026-10-16 - Diario de lancamentos: ordenacao em todas as colunas
 - JournalPage: Fonte e Registrado em passam a ordenar pelo cabecalho (as demais ja ordenavam). Data, Nr Lanc e Historico ordenam no servidor; Debito, Credito, Valor, Fonte e Registrado em ordenam sobre os lancamentos carregados (usar "mostrar mais" ou filtro de periodo para pegar todos).
+
+## 2026-10-16 - Classificar saidas: visao Nao pertence com Desfazer
+- projetos-financeiro.controller: GET projects-financeiro/decididas?tipo=DEBIT|CREDIT&decisao=NAO_PERTENCE|TRANSFERENCIA_INTERNA|CUSTODIA (Master, empresa ativa): movimentos com decisao vigente, com anotacao e motivo.
+- TriagemSaidasPage: seletor "A classificar / Nao pertence"; na visao Nao pertence cada saida mostra o motivo e tem Desfazer (POST decisoes/:id/encerrar, motivo obrigatorio) - a saida volta para A classificar.
+- Uso imediato: 4 saidas marcadas Nao pertence em 06/10 ("Transitou por c/c Josi": 23/07/2025 25,23; 28/08/2025 313,49; 01/12/2025 201,42 e 375,00) voltam para a triagem e vao para Custodia (envio), alinhando a Custodia do LEDGR ao Contabil (1062).

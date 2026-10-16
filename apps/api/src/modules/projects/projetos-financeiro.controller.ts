@@ -5,7 +5,7 @@
 //  - encaminhar: cria o credito (origem EXTRATO) ja comprovado pela entrada, com o vinculo PENDENTE (decisao do projeto)
 //  - nao pertence: a entrada sai da triagem, com motivo (reversivel)
 //  - acoes so Master por enquanto (as politicas de RLS de gravacao do dominio sao so Master)
-import { Controller, Get, Post, Param, Body, Req, UseGuards, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, Req, Query, UseGuards, NotFoundException, BadRequestException } from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/guards/jwt.guard';
 import { MasterOnlyGuard } from '../../auth/guards/master-only.guard';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -343,6 +343,31 @@ export class ProjetosFinanceiroController {
           itens: g.itens.sort((a, b) => String(a.data).localeCompare(String(b.data))),
         }))
         .sort((a, b) => a.circuito.localeCompare(b.circuito));
+    });
+  }
+
+  // Decididas (16/10/2026): movimentos da empresa ativa com decisao vigente (padrao: Nao pertence), para Desfazer na triagem.
+  @Get('decididas')
+  @UseGuards(MasterOnlyGuard)
+  async decididas(@Req() req: any, @Query('tipo') tipoQ?: string, @Query('decisao') decisaoQ?: string) {
+    const companyId = this.empresa(req);
+    const tipo = tipoQ === 'CREDIT' ? 'CREDIT' : 'DEBIT';
+    const decisao = ['NAO_PERTENCE', 'TRANSFERENCIA_INTERNA', 'CUSTODIA'].includes(String(decisaoQ)) ? String(decisaoQ) : 'NAO_PERTENCE';
+    const notas = await this.anotacoes(companyId);
+    return this.db.comoUsuario(req.user.id, async (tx) => {
+      const decs = await tx.projExtratoDecisao.findMany({ where: { canceladoEm: null, decisao: decisao as any }, select: { bankTransactionId: true, motivo: true } });
+      const motivos = new Map<string, string>();
+      decs.forEach((d) => { if (!motivos.has(d.bankTransactionId)) motivos.set(d.bankTransactionId, String(d.motivo || '')); });
+      const ids = [...motivos.keys()];
+      if (!ids.length) return [];
+      const txs = await tx.bankTransaction.findMany({
+        where: { id: { in: ids }, companyId, type: tipo as any }, orderBy: { transactionDate: 'asc' },
+        select: { id: true, transactionDate: true, amount: true, description: true, counterpartyName: true, counterpartyDoc: true },
+      });
+      return txs.map((t) => ({
+        id: t.id, data: t.transactionDate, valor: t.amount, lancamento: t.description,
+        favorecidoNome: t.counterpartyName || null, favorecidoDocumento: mascarar(t.counterpartyDoc), anotacao: notas.get(t.id) || null, motivo: motivos.get(t.id) || null,
+      }));
     });
   }
 
