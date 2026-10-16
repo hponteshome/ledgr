@@ -869,7 +869,7 @@ const TrialBalanceView: React.FC = () => {
         if (viewMode === 'monthly') {
             const linhas = flatMonthly.map(r => `
               <tr>
-                <td style="padding-left:${8 + r.depth * 14}px">${r.item.account.code}</td>
+                <td>${r.item.account.code}</td>
                 <td>${r.item.account.name}</td>
                 <td class="num">${r.item.balance > 0 ? fmt(r.item.balance) : '—'}</td>
                 <td class="num">${r.item.balance < 0 ? fmt(Math.abs(r.item.balance)) : '—'}</td>
@@ -881,7 +881,7 @@ const TrialBalanceView: React.FC = () => {
                 const saldoFinal = r.item.previousBalance + r.item.debits - r.item.credits;
                 return `
               <tr>
-                <td style="padding-left:${8 + r.depth * 14}px">${r.item.account.code}</td>
+                <td>${r.item.account.code}</td>
                 <td>${r.item.account.name}</td>
                 <td class="num">${fmt(Math.abs(r.item.previousBalance))} ${dc(r.item.previousBalance)}</td>
                 <td class="num">${r.item.debits ? fmt(r.item.debits) : '—'}</td>

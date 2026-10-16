@@ -10617,3 +10617,6 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - FluxoContabilProjeto: cada tarja com destino ganha link - sem classificacao no Anexo V -> anexo-v?aba=classificar&filtro=SUGERIDO&manut=1; origem a confirmar -> custodia; saldo na custodia e devolucoes sem envio -> custodia?pend=1.
 - AnexoVProjeto le ?aba, ?filtro e ?manut=1 (mostra a Manutencao); CustodiaProjeto le ?pend=1 (So pendencias).
 - Conciliacao Sunsys 2024-2025 (projeto x Contabil) por conta 12101020022, 22101050005 e 11304010009: D:\Temp\conc_contabil.sql (considera os recebimentos de terceiros como aporte VAL indireto, opcao b).
+
+## 2026-10-16 - Impressao do balancete sem recuo no codigo
+- TrialBalanceView (Balancete Mensal e de Verificacao): na impressao o codigo da conta ficava recuado por nivel (padding-left 8 + nivel x 14px). Agora fica alinhado a esquerda, igual a tela.
