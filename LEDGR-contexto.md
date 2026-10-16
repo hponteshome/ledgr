@@ -10620,3 +10620,6 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 
 ## 2026-10-16 - Impressao do balancete sem recuo no codigo
 - TrialBalanceView (Balancete Mensal e de Verificacao): na impressao o codigo da conta ficava recuado por nivel (padding-left 8 + nivel x 14px). Agora fica alinhado a esquerda, igual a tela.
+
+## 2026-10-16 - Diario de lancamentos: coluna Registrado em
+- JournalPage: nova coluna "Registrado em" depois de Fonte, com data e hora (local) em que o lancamento foi gravado no LEDGR (createdAt, que a API ja devolvia). Helper fmtRegistro. Sem ordenacao por essa coluna.

@@ -71,6 +71,15 @@ const fmtDate = (d: string) => {
     return `${dd}/${mm}/${yy}`;
 };
 
+// NOVO (16/10/2026): data e hora em que o lancamento foi gravado no LEDGR (createdAt, hora local).
+const fmtRegistro = (d?: string) => {
+    if (!d) return '—';
+    const dt = new Date(d);
+    if (isNaN(dt.getTime())) return '—';
+    const p = (n: number) => String(n).padStart(2, '0');
+    return `${p(dt.getDate())}/${p(dt.getMonth() + 1)}/${dt.getFullYear()} ${p(dt.getHours())}:${p(dt.getMinutes())}`;
+};
+
 const fmtCurrency = (v: number) =>
     Math.abs(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -1017,6 +1026,7 @@ const JournalPage: React.FC = () => {
                                             {sortable("creditCode", "Crédito", "w-32")}
                                             {sortable("value", "Valor", "w-36 text-right")}
                                             <th className={`${thBase} w-20 text-gray-400`}>Fonte</th>
+                                            <th className={`${thBase} w-32 text-gray-400`}>Registrado em</th>
                                             <th className="px-3 py-2 border-b border-gray-100 w-16"></th>
                                         </>);
                                     })()}
@@ -1065,6 +1075,7 @@ const JournalPage: React.FC = () => {
                                             <td className="px-3 py-2 whitespace-nowrap">
                                                 <span className={`text-[13px] px-2 py-0.5 rounded-full font-bold uppercase ${src.cls}`}>{src.label}</span>
                                             </td>
+                                            <td className="px-3 py-2 font-mono text-gray-400 whitespace-nowrap text-[12px]" title="Data e hora em que o lançamento foi gravado no LEDGR">{fmtRegistro(entry.createdAt)}</td>
                                             <td className="px-3 py-2">
                                                 <div className="flex gap-1 opacity-0 group-hover:opacity-100 justify-end">
                                                     <button onClick={() => setEditEntry(entry)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md" title={entry.description}><FiEdit2 size={14} /></button>
