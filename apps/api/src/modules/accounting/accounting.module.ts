@@ -34,6 +34,7 @@ import { HistoricoPadraoController } from './controllers/historico-padrao.contro
 import { ImportLoteController } from './controllers/import-lote.controller';
 import { EquityMethodController } from './controllers/equity-method.controller';
 import { SpedPlanoReferencialController } from './controllers/sped-plano-referencial.controller';
+import { ConsolidationController } from './controllers/consolidation.controller';
 
 // Services
 import { AccountingService }        from './services/accounting.service';
@@ -61,6 +62,7 @@ import { HistoricoPadraoService } from './services/historico-padrao.service';
 import { ImportLoteService } from './services/import-lote.service';
 import { EquityMethodService } from './services/equity-method.service';
 import { SpedPlanoReferencialService } from './services/sped-plano-referencial.service';
+import { ConsolidationService } from './services/consolidation.service';
 import { IobLotdParserService }     from './services/iob-lotd-parser.service';
 import { FixedIncomeModule } from './fixed-income/fixed-income.module';
 import { CdiModule } from './cdi/cdi.module';
@@ -104,6 +106,7 @@ import { SidebarResourceGuard } from '../../auth/guards/sidebar-resource.guard';
     ImportLoteController,
     EquityMethodController,
     SpedPlanoReferencialController,
+    ConsolidationController,
   ],
   providers: [
     AccountingConfigService,
@@ -132,6 +135,7 @@ import { SidebarResourceGuard } from '../../auth/guards/sidebar-resource.guard';
     ImportLoteService,
     EquityMethodService,
     SpedPlanoReferencialService,
+    ConsolidationService,
     MatrizPlanoParserService,
     IobLotdParserService,
     IobLotdImportService,

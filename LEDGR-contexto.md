@@ -10637,3 +10637,7 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - TrialBalanceView: coluna Reduzido entre Codigo e Conta (so contas analiticas, sem zeros a esquerda), na tela e na impressao; redimensionavel.
 - Coluna Conta sem recuo por nivel (alinhada a esquerda, como o Codigo); analiticas com o espaco da seta para alinhar os nomes; largura padrao 520px. Chave das larguras salvas passou a ledgr:trial-balance:col-widths:v2 (larguras antigas ignoradas).
 - Rodape Totais Gerais: colSpan 3 e removida a celula vazia extra que deslocava os totais uma coluna para a direita.
+
+## 2026-10-19 - Fix Balanco Consolidado: interfaces exportadas
+- consolidation.service.ts: Linha e LancamentoEliminacao passam a ser exportadas. O watch da API (com declaracoes) falhava com TS4053 no retorno do controller e a rota accounting/consolidation nao subia; o tsc --noEmit do bloco nao pega esse erro.
+- Aprendizado: tipos usados no retorno de metodo publico de controller precisam ser exportados do servico.
