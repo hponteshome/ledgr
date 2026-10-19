@@ -10647,3 +10647,9 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - consolidation.service: contas dos pares sem saldo na data aparecem com o nome e "(sem saldo)" em vez de "conta nao encontrada".
 - Sunsys: a conta Custodia - Operacao Ancora (reduzido 1062) saiu do codigo 11304010009 (o mesmo da Hotelsys 1065, Passivos quitados) para o primeiro codigo livre do grupo 1130401 nas 4 empresas (migracao 20261019_sunsys_custodia_codigo.sql). Id, reduzido, nome e lancamentos inalterados. Planilhas e lotes usam o reduzido 1062 e nao mudam.
 - Observacao: a rotina de Equivalencia (equity-method.service, calcularPLInvestida) usa o mesmo criterio de nivel 1 - revisar.
+
+## 2026-10-19 - Comprovantes de pagamento no projeto (Operacao Ancora)
+- Nova tabela proj_documento_vinculos (migracao 20261019_proj_documento_vinculos.sql): liga documento do projeto a uma aplicacao OU a um lancamento da custodia; motivo obrigatorio; imutavel por trigger (so cancelamento com motivo, sem DELETE); RLS ENABLE + FORCE com as mesmas politicas de proj_documentos (leitura pela operacao do documento; gravacao so Master).
+- Carga: 29 comprovantes de D:\comprovantes (renomeados por data - valor - empresa - descricao) como documentos da Operacao Ancora (27 COMPROVANTE, 2 TERMO), arquivo pelo SHA-256 no PROJ_STORAGE_DIR; 34 vinculos (aplicacoes e custodia). Script de carga fora do repositorio (D:\Temp), idempotente pelo SHA-256.
+- Sem vinculo (pagos com recursos sob custodia da Josi, sem lancamento na custodia do LEDGR): DARF Solsys 29/10/2024 (207.678,30) e custas INSS Cintia Nere 25/02/2025 (6.684,47, guia e comprovante); contratos Carlos Brito/Eliane e Seg. O acordo Josineide (37.700,00, 14/12/2024) ficou ligado ao pagamento direto da custodia de 13/12/2024 (67.000,00, registrado como Cintia Nere).
+- Pendente: registrar na Custodia os pagamentos diretos sem lancamento e ligar os documentos; exibir os comprovantes nas telas de Aplicacoes e Custodia.
