@@ -10631,3 +10631,9 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - projetos-financeiro.controller: GET projects-financeiro/decididas?tipo=DEBIT|CREDIT&decisao=NAO_PERTENCE|TRANSFERENCIA_INTERNA|CUSTODIA (Master, empresa ativa): movimentos com decisao vigente, com anotacao e motivo.
 - TriagemSaidasPage: seletor "A classificar / Nao pertence"; na visao Nao pertence cada saida mostra o motivo e tem Desfazer (POST decisoes/:id/encerrar, motivo obrigatorio) - a saida volta para A classificar.
 - Uso imediato: 4 saidas marcadas Nao pertence em 06/10 ("Transitou por c/c Josi": 23/07/2025 25,23; 28/08/2025 313,49; 01/12/2025 201,42 e 375,00) voltam para a triagem e vao para Custodia (envio), alinhando a Custodia do LEDGR ao Contabil (1062).
+
+## 2026-10-19 - Balancete: coluna Reduzido e Conta alinhada a esquerda
+- trial-balance.service (getAccounts): select passa a trazer reducedCode (Balancete Mensal e de Verificacao).
+- TrialBalanceView: coluna Reduzido entre Codigo e Conta (so contas analiticas, sem zeros a esquerda), na tela e na impressao; redimensionavel.
+- Coluna Conta sem recuo por nivel (alinhada a esquerda, como o Codigo); analiticas com o espaco da seta para alinhar os nomes; largura padrao 520px. Chave das larguras salvas passou a ledgr:trial-balance:col-widths:v2 (larguras antigas ignoradas).
+- Rodape Totais Gerais: colSpan 3 e removida a celula vazia extra que deslocava os totais uma coluna para a direita.

@@ -46,6 +46,7 @@ select: {
     level     : true,
     parentId  : true,
     isAnalytic: true,
+    reducedCode: true,
 },
       orderBy: { code: 'asc' },
     });

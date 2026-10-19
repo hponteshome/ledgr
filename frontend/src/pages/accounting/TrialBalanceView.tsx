@@ -33,6 +33,8 @@ interface Account {
     nature: string; // DEBIT | CREDIT
     level: number;
     parentId?: string;
+    isAnalytic?: boolean;
+    reducedCode?: string | null;
 }
 
 interface MonthlyBalanceItem {
@@ -119,6 +121,10 @@ function filterByResultVerification(
                 : [],
         }));
 }
+
+// NOVO (19/10/2026): codigo reduzido so nas contas analiticas, sem zeros a esquerda
+const reduzidoDe = (a: Account): string =>
+    a.isAnalytic && a.reducedCode ? a.reducedCode.replace(/^0+(?=\d)/, '') : '';
 
 // ─── Hierarchy builders ───────────────────────────────────────────────────────
 
@@ -590,10 +596,11 @@ const TrialBalanceView: React.FC = () => {
 
     // ── NOVO: largura das colunas do Balancete, redimensionavel por arrasto,
     // persistida no localStorage do navegador (por usuario, nao vai ao banco).
-    const COL_WIDTHS_KEY = 'ledgr:trial-balance:col-widths';
+    const COL_WIDTHS_KEY = 'ledgr:trial-balance:col-widths:v2';
     const COL_WIDTHS_DEFAULT = {
-        codigo: 130,
-        conta: 340,
+        codigo: 120,
+        reduzido: 80,
+        conta: 520,
         saldoAnterior: 130,
         debitos: 130,
         creditos: 130,
@@ -870,18 +877,20 @@ const TrialBalanceView: React.FC = () => {
             const linhas = flatMonthly.map(r => `
               <tr>
                 <td>${r.item.account.code}</td>
+                <td>${reduzidoDe(r.item.account)}</td>
                 <td>${r.item.account.name}</td>
                 <td class="num">${r.item.balance > 0 ? fmt(r.item.balance) : '—'}</td>
                 <td class="num">${r.item.balance < 0 ? fmt(Math.abs(r.item.balance)) : '—'}</td>
                 <td class="num">${fmt(Math.abs(r.item.balance))} ${dc(r.item.balance)}</td>
               </tr>`).join('');
-            corpoHtml = `<table><thead><tr><th>Código</th><th>Conta</th><th class="num">Débito</th><th class="num">Crédito</th><th class="num">Saldo Final</th></tr></thead><tbody>${linhas}</tbody></table>`;
+            corpoHtml = `<table><thead><tr><th>Código</th><th>Reduzido</th><th>Conta</th><th class="num">Débito</th><th class="num">Crédito</th><th class="num">Saldo Final</th></tr></thead><tbody>${linhas}</tbody></table>`;
         } else {
             const linhas = flatVerification.map(r => {
                 const saldoFinal = r.item.previousBalance + r.item.debits - r.item.credits;
                 return `
               <tr>
                 <td>${r.item.account.code}</td>
+                <td>${reduzidoDe(r.item.account)}</td>
                 <td>${r.item.account.name}</td>
                 <td class="num">${fmt(Math.abs(r.item.previousBalance))} ${dc(r.item.previousBalance)}</td>
                 <td class="num">${r.item.debits ? fmt(r.item.debits) : '—'}</td>
@@ -889,7 +898,7 @@ const TrialBalanceView: React.FC = () => {
                 <td class="num">${fmt(Math.abs(saldoFinal))} ${dc(saldoFinal)}</td>
               </tr>`;
             }).join('');
-            corpoHtml = `<table><thead><tr><th>Código</th><th>Conta</th><th class="num">Saldo Anterior</th><th class="num">Débito</th><th class="num">Crédito</th><th class="num">Saldo Final</th></tr></thead><tbody>${linhas}</tbody></table>`;
+            corpoHtml = `<table><thead><tr><th>Código</th><th>Reduzido</th><th>Conta</th><th class="num">Saldo Anterior</th><th class="num">Débito</th><th class="num">Crédito</th><th class="num">Saldo Final</th></tr></thead><tbody>${linhas}</tbody></table>`;
         }
         imprimirRelatorio({
             titulo: viewMode === 'monthly' ? 'BALANCETE MENSAL' : 'BALANCETE DE VERIFICAÇÃO',
@@ -997,10 +1006,12 @@ const TrialBalanceView: React.FC = () => {
                 >
                     {item.account.code}
                 </td>
+                <td style={{ ...tdStyle(), fontFamily: 'monospace', fontSize: 11, color: '#6B7280' }}>
+                    {reduzidoDe(item.account)}
+                </td>
                 <td style={tdStyle()}>
                     <span
                         style={{
-                            paddingLeft: depth * 18,
                             display: 'flex',
                             alignItems: 'center',
                             gap: 4,
@@ -1008,6 +1019,7 @@ const TrialBalanceView: React.FC = () => {
                         }}
                         onClick={() => isGroup && toggleMonthly(item)}
                     >
+                        {!isGroup && <span style={{ width: 13, flexShrink: 0 }} />}
                         {isGroup &&
                             (item.expanded ? (
                                 <FiChevronDown
@@ -1080,10 +1092,12 @@ const TrialBalanceView: React.FC = () => {
                 >
                     {item.account.code}
                 </td>
+                <td style={{ ...tdStyle(), fontFamily: 'monospace', fontSize: 11, color: '#6B7280' }}>
+                    {reduzidoDe(item.account)}
+                </td>
                 <td style={tdStyle()}>
                     <span
                         style={{
-                            paddingLeft: depth * 18,
                             display: 'flex',
                             alignItems: 'center',
                             gap: 4,
@@ -1091,6 +1105,7 @@ const TrialBalanceView: React.FC = () => {
                         }}
                         onClick={() => isGroup && toggleVerification(item)}
                     >
+                        {!isGroup && <span style={{ width: 13, flexShrink: 0 }} />}
                         {isGroup &&
                             (item.expanded ? (
                                 <FiChevronDown
@@ -1660,6 +1675,7 @@ const TrialBalanceView: React.FC = () => {
                             >
                                 <colgroup>
                                     <col style={{ width: colWidths.codigo }} />
+                                    <col style={{ width: colWidths.reduzido }} />
                                     <col style={{ width: colWidths.conta }} />
                                     {viewMode === 'verification' && (
                                         <col style={{ width: colWidths.saldoAnterior }} />
@@ -1673,6 +1689,10 @@ const TrialBalanceView: React.FC = () => {
                                         <th style={{ ...thStyle, textAlign: 'left', position: 'relative' }}>
                                             Código
                                             <ResizeHandle col="codigo" />
+                                        </th>
+                                        <th style={{ ...thStyle, textAlign: 'left', position: 'relative' }}>
+                                            Reduzido
+                                            <ResizeHandle col="reduzido" />
                                         </th>
                                         <th style={{ ...thStyle, textAlign: 'left', position: 'relative' }}>
                                             Conta
@@ -1724,11 +1744,10 @@ const TrialBalanceView: React.FC = () => {
                                                     textTransform: 'uppercase',
                                                     letterSpacing: '0.3px',
                                                 }}
-                                                colSpan={2}
+                                                colSpan={3}
                                             >
                                                 Totais Gerais
                                             </td>
-                                            <td />
                                             <td
                                                 style={{
                                                     ...tdStyle('right'),
@@ -1788,11 +1807,10 @@ const TrialBalanceView: React.FC = () => {
                                                     textTransform: 'uppercase',
                                                     letterSpacing: '0.3px',
                                                 }}
-                                                colSpan={2}
+                                                colSpan={3}
                                             >
                                                 Totais Gerais
                                             </td>
-                                            <td />
                                             <td
                                                 style={{
                                                     ...tdStyle('right'),
