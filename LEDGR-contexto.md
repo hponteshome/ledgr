@@ -10670,3 +10670,7 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 
 ## 2026-10-19 - Credito n. 83 vinculado a Conta Individual
 - Credito n. 83 (25.000,00 J.A.A.H. de 04/09/2026) vinculado ao Adquirente como aporte VAL indireto, pelo mesmo titular do credito anterior da J.A.A.H. (mesma gravacao da tela de Creditos; AuditLog PROJ_CREDITO_VINCULO_ALTERADO).
+
+## 2026-10-19 - Creditos de 2026 (n. 60 a 82) vinculados a Conta Individual
+- Decisao do Hpontes: todos os creditos de 2026 sao de origem da VAL Investimentos, por meio do intermediario Antonio Vieira / J.A.A.H., como em 2025 (inclusive os que chegaram de terceiros: Posto Perola, ENAC, Bienal, Marciel, GFX, Fernanda Mello, Jose Pelucio, Alvo 4You, Ellen Silva).
+- 23 creditos, R$ 1.121.500,00, vinculados a VAL INVESTIMENTOS S/A como aporte indireto (mesma gravacao da tela de Creditos; AuditLog PROJ_CREDITO_VINCULO_ALTERADO, lote vinculo-lote-20261019). Junto com o n. 83, a Operacao Ancora fica sem credito pendente de vinculo.
