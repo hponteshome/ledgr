@@ -10641,3 +10641,9 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 ## 2026-10-19 - Fix Balanco Consolidado: interfaces exportadas
 - consolidation.service.ts: Linha e LancamentoEliminacao passam a ser exportadas. O watch da API (com declaracoes) falhava com TS4053 no retorno do controller e a rota accounting/consolidation nao subia; o tsc --noEmit do bloco nao pega esse erro.
 - Aprendizado: tipos usados no retorno de metodo publico de controller precisam ser exportados do servico.
+
+## 2026-10-19 - Balanco Consolidado: PL da investida e Custodia Sunsys com codigo proprio
+- consolidation.service: PL da investida passa a ser a soma das contas EQUITY analiticas. Antes usava contas EQUITY de nivel 1, que nao existem no plano da Matriz (o grupo 23 fica abaixo da raiz 2): o PL saia zerado e nao controladores/diferenca de consolidacao so refletiam o resultado em aberto.
+- consolidation.service: contas dos pares sem saldo na data aparecem com o nome e "(sem saldo)" em vez de "conta nao encontrada".
+- Sunsys: a conta Custodia - Operacao Ancora (reduzido 1062) saiu do codigo 11304010009 (o mesmo da Hotelsys 1065, Passivos quitados) para o primeiro codigo livre do grupo 1130401 nas 4 empresas (migracao 20261019_sunsys_custodia_codigo.sql). Id, reduzido, nome e lancamentos inalterados. Planilhas e lotes usam o reduzido 1062 e nao mudam.
+- Observacao: a rotina de Equivalencia (equity-method.service, calcularPLInvestida) usa o mesmo criterio de nivel 1 - revisar.

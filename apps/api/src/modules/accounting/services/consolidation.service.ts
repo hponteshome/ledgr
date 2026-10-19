@@ -157,7 +157,8 @@ export class ConsolidationService {
           if (a.isAnalytic) resultadoAberto[emp.id] += v;
           continue;
         }
-        if (a.type === 'EQUITY' && a.level === 1) equityLevel1[emp.id] += v;
+        // CORRIGIDO 19/10/2026: PL = soma das contas EQUITY analiticas (no plano da Matriz o grupo 23 nao e nivel 1)
+        if (a.type === 'EQUITY' && a.isAnalytic) equityLevel1[emp.id] += v;
         let l = linhas.get(a.code);
         if (!l) {
           l = {
@@ -189,6 +190,15 @@ export class ConsolidationService {
 
     // (1) Pares intercompany
     const paresDb = await this.paresAtivos();
+    // Nome das contas dos pares que nao vieram no balancete (sem saldo na data)
+    for (const p of paresDb) {
+      for (const [cid, code] of [[p.companyAId, p.accountACode], [p.companyBId, p.accountBCode]] as [string, string][]) {
+        const k = `${cid}|${code}`;
+        if (nomeConta.has(k) || !ids.includes(cid)) continue;
+        const c = await this.prisma.chartOfAccounts.findFirst({ where: { companyId: cid, code, deletedAt: null }, select: { name: true } });
+        nomeConta.set(k, c ? `${c.name} (sem saldo)` : '(conta n\u00e3o encontrada)');
+      }
+    }
     const pares = paresDb
       .filter((p: any) => ids.includes(p.companyAId) && ids.includes(p.companyBId))
       .map((p: any) => {
