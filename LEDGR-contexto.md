@@ -10667,3 +10667,6 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - 19 saidas aplicadas (mesma gravacao da tela de triagem): 18 como Despesa propria da Sunsys (salarios, vale-refeicao, juros e IOF) e o PIX de 30,00 de 18/09 (Copa e Cozinha) como Manutencao da Operacao, no padrao dos meses anteriores.
 - 1 entrada (25.000,00 J.A.A.H. de 04/09) encaminhada como credito da Operacao Ancora, com prova no extrato e o remetente do ultimo credito da J.A.A.H.; vinculo a Conta Individual pendente (aporte VAL indireto, decidir na tela de Creditos).
 - AuditLog PROJ_APLICACAO_REGISTRADA e PROJ_CREDITO_ENCAMINHADO. SQL em D:\Temp (fora do repositorio).
+
+## 2026-10-19 - Credito n. 83 vinculado a Conta Individual
+- Credito n. 83 (25.000,00 J.A.A.H. de 04/09/2026) vinculado ao Adquirente como aporte VAL indireto, pelo mesmo titular do credito anterior da J.A.A.H. (mesma gravacao da tela de Creditos; AuditLog PROJ_CREDITO_VINCULO_ALTERADO).
