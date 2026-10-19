@@ -318,10 +318,35 @@ export class ProjectsController {
       const cts = ctIds.length ? await tx.projContraparte.findMany({ where: { id: { in: ctIds } }, select: { id: true, nome: true } }) : [];
       const mc = new Map(creds.map((c) => [c.id, c.numeroOrdem]));
       const mt = new Map(cts.map((c) => [c.id, c.nome]));
+      // Vinculos vigentes com aplicacao ou lancamento da custodia (19/10/2026). Os dados da custodia so aparecem para quem
+      // a enxerga pelo RLS (hoje, o Master); para os demais o vinculo aparece sem o detalhe.
+      const vinc = await tx.$queryRaw<any[]>`SELECT v.id::text AS id, v.documento_id::text AS doc, v.aplicacao_id::text AS apl,
+          v.custodia_lancamento_id::text AS cus, v.motivo, coalesce(a.data_aplicacao, l.data) AS data, coalesce(a.valor, l.valor) AS valor,
+          n.nome AS natureza, a.descricao AS apl_desc, l.favorecido, l.descricao AS cus_desc, l.tipo AS cus_tipo, cu.nome AS cus_nome,
+          (a.cancelado_em IS NOT NULL OR l.cancelado_em IS NOT NULL) AS encerrado
+        FROM proj_documento_vinculos v
+        JOIN proj_documentos d ON d.id = v.documento_id AND d.operacao_id = ${operacaoId}::uuid
+        LEFT JOIN proj_aplicacoes a ON a.id = v.aplicacao_id
+        LEFT JOIN proj_custodia_lancamentos l ON l.id = v.custodia_lancamento_id
+        LEFT JOIN proj_custodias cu ON cu.id = l.custodia_id
+        LEFT JOIN proj_naturezas_aplicacao n ON n.id = coalesce(a.natureza_id, l.natureza_id)
+        WHERE v.cancelado_em IS NULL
+        ORDER BY coalesce(a.data_aplicacao, l.data), v.criado_em`;
+      const porDoc = new Map<string, any[]>();
+      for (const v of vinc) {
+        const item = {
+          id: v.id, aplicacaoId: v.apl, custodiaLancamentoId: v.cus, motivo: v.motivo,
+          data: v.data ? new Date(v.data).toISOString().slice(0, 10) : null, valor: v.valor == null ? null : Number(v.valor),
+          natureza: v.natureza ?? null, descricao: (v.apl ? v.apl_desc : v.favorecido || v.cus_desc) ?? null,
+          custodiaTipo: v.cus_tipo ?? null, custodiaNome: v.cus_nome ?? null, encerrado: !!v.encerrado,
+        };
+        porDoc.set(v.doc, [...(porDoc.get(v.doc) || []), item]);
+      }
       return docs.map((d) => ({
         ...d,
         creditoNumero: d.creditoId ? mc.get(d.creditoId) ?? null : null,
         contraparteNome: d.contraparteId ? mt.get(d.contraparteId) ?? null : null,
+        vinculos: porDoc.get(d.id) || [],
       }));
     });
   }
@@ -389,6 +414,12 @@ export class ProjectsController {
       await tx.auditLog.create({
         data: { actorId: req.user.id, action: 'PROJ_DOCUMENTO_ENVIADO', targetId: doc.id, after: { operacaoId, titulo, tipo: tipoCodigo, sha256: sha, tamanho: file.size, versao, creditoId, contraparteId } },
       });
+      if (substituiId) {
+        // a nova versao herda os vinculos vigentes da anterior (os da anterior ficam no historico, com o documento encerrado)
+        await tx.$executeRaw`INSERT INTO proj_documento_vinculos (documento_id, aplicacao_id, custodia_lancamento_id, motivo, criado_por_id)
+          SELECT ${doc.id}::uuid, v.aplicacao_id, v.custodia_lancamento_id, 'Herdado da versao anterior: ' || v.motivo, ${req.user.id}::uuid
+          FROM proj_documento_vinculos v WHERE v.documento_id = ${substituiId}::uuid AND v.cancelado_em IS NULL`;
+      }
       return { id: doc.id, versao, sha256: sha };
     });
   }
@@ -429,6 +460,86 @@ export class ProjectsController {
       const r = await tx.projDocumento.update({ where: { id: doc.id }, data: { canceladoEm: new Date(), canceladoPorId: req.user.id, motivoCancelamento: motivo } });
       await tx.auditLog.create({ data: { actorId: req.user.id, action: 'PROJ_DOCUMENTO_CANCELADO', targetId: doc.id, after: { operacaoId, titulo: doc.titulo, motivo } } });
       return { id: r.id };
+    });
+  }
+
+  // -- Vinculos de documento com aplicacao / lancamento da custodia (19/10/2026) ------------------------------------
+  // Registro imutavel: vincular cria; desvincular so cancela, com motivo. Gravacao so Master (guard + RLS).
+  @Get('operacoes/:operacaoId/documentos-alvos')
+  @ProjAcao('ver')
+  alvosVinculo(@Param('operacaoId') operacaoId: string, @Req() req: any) {
+    if (!UUID_RE.test(operacaoId)) throw new NotFoundException('Registro nao encontrado.');
+    const master = isMasterAdmin(req.user);
+    return this.db.comoUsuario(req.user.id, async (tx) => {
+      const apl = await tx.$queryRaw<any[]>`SELECT a.id::text AS id, a.data_aplicacao AS data, a.valor, a.descricao, n.nome AS natureza, n.tipo::text AS tipo,
+          (SELECT count(*) FROM proj_documento_vinculos v JOIN proj_documentos d ON d.id = v.documento_id AND d.cancelado_em IS NULL
+            WHERE v.aplicacao_id = a.id AND v.cancelado_em IS NULL)::int AS docs,
+          EXISTS (SELECT 1 FROM proj_comprovante_vinculos cv JOIN proj_comprovantes_fiscais cf ON cf.id = cv.comprovante_id AND cf.cancelado_em IS NULL
+            WHERE cv.aplicacao_id = a.id AND cv.cancelado_em IS NULL) AS fiscal,
+          bt.description AS lancamento
+        FROM proj_aplicacoes a JOIN proj_naturezas_aplicacao n ON n.id = a.natureza_id LEFT JOIN bank_transactions bt ON bt.id = a.bank_transaction_id
+        WHERE a.operacao_id = ${operacaoId}::uuid AND a.cancelado_em IS NULL ORDER BY a.data_aplicacao, a.criado_em`;
+      const cus = master ? await tx.$queryRaw<any[]>`SELECT l.id::text AS id, l.tipo, l.data, l.valor, l.favorecido, l.descricao, l.situacao, cu.nome AS custodia, n.nome AS natureza,
+          (SELECT count(*) FROM proj_documento_vinculos v JOIN proj_documentos d ON d.id = v.documento_id AND d.cancelado_em IS NULL
+            WHERE v.custodia_lancamento_id = l.id AND v.cancelado_em IS NULL)::int AS docs
+        FROM proj_custodia_lancamentos l JOIN proj_custodias cu ON cu.id = l.custodia_id AND cu.operacao_id = ${operacaoId}::uuid
+        LEFT JOIN proj_naturezas_aplicacao n ON n.id = l.natureza_id
+        WHERE l.cancelado_em IS NULL ORDER BY l.data, l.criado_em` : [];
+      const dia = (d: any) => (d ? new Date(d).toISOString().slice(0, 10) : null);
+      return {
+        aplicacoes: apl.map((a) => ({ id: a.id, data: dia(a.data), valor: Number(a.valor), descricao: a.descricao, natureza: a.natureza, tipo: a.tipo, documentos: Number(a.docs), comprovanteFiscal: !!a.fiscal, lancamento: a.lancamento })),
+        custodia: cus.map((l) => ({ id: l.id, tipo: l.tipo, data: dia(l.data), valor: Number(l.valor), favorecido: l.favorecido, descricao: l.descricao, situacao: l.situacao, custodia: l.custodia, natureza: l.natureza, documentos: Number(l.docs) })),
+        custodiaVisivel: master,
+      };
+    });
+  }
+
+  @Post('operacoes/:operacaoId/documentos/:documentoId/vinculos')
+  @UseGuards(MasterOnlyGuard)
+  @ProjAcao('autenticado') // decisao do MasterOnlyGuard do metodo (403 consistente)
+  vincularDocumento(@Param('operacaoId') operacaoId: string, @Param('documentoId') documentoId: string, @Body() b: any, @Req() req: any) {
+    if (!UUID_RE.test(operacaoId) || !UUID_RE.test(documentoId)) throw new NotFoundException('Registro nao encontrado.');
+    const aplicacaoId = b?.aplicacaoId ? String(b.aplicacaoId) : null;
+    const custodiaLancamentoId = b?.custodiaLancamentoId ? String(b.custodiaLancamentoId) : null;
+    if (!aplicacaoId === !custodiaLancamentoId) throw new BadRequestException('Informe uma aplicacao OU um lancamento da custodia.');
+    const alvo = (aplicacaoId || custodiaLancamentoId) as string;
+    if (!UUID_RE.test(alvo)) throw new BadRequestException('Identificador invalido.');
+    const motivo = String(b?.motivo || '').trim();
+    if (motivo.length < 10) throw new BadRequestException('Informe o motivo (minimo 10 caracteres). Ele fica na trilha de auditoria.');
+    return this.db.comoUsuario(req.user.id, async (tx) => {
+      const doc = await tx.projDocumento.findFirst({ where: { id: documentoId, operacaoId, canceladoEm: null }, select: { id: true, titulo: true } });
+      if (!doc) throw new NotFoundException('Documento vigente nao encontrado.');
+      const ok = aplicacaoId
+        ? await tx.$queryRaw<any[]>`SELECT 1 FROM proj_aplicacoes WHERE id = ${aplicacaoId}::uuid AND operacao_id = ${operacaoId}::uuid AND cancelado_em IS NULL`
+        : await tx.$queryRaw<any[]>`SELECT 1 FROM proj_custodia_lancamentos l JOIN proj_custodias cu ON cu.id = l.custodia_id
+            WHERE l.id = ${custodiaLancamentoId}::uuid AND cu.operacao_id = ${operacaoId}::uuid AND l.cancelado_em IS NULL`;
+      if (!ok.length) throw new BadRequestException(aplicacaoId ? 'Aplicacao vigente nao encontrada nesta operacao.' : 'Lancamento da custodia nao encontrado nesta operacao.');
+      const dup = await tx.$queryRaw<any[]>`SELECT 1 FROM proj_documento_vinculos WHERE documento_id = ${documentoId}::uuid AND cancelado_em IS NULL
+        AND coalesce(aplicacao_id, custodia_lancamento_id) = ${alvo}::uuid`;
+      if (dup.length) throw new ConflictException('O documento ja esta vinculado a este lancamento.');
+      const ins = await tx.$queryRaw<any[]>`INSERT INTO proj_documento_vinculos (documento_id, aplicacao_id, custodia_lancamento_id, motivo, criado_por_id)
+        VALUES (${documentoId}::uuid, ${aplicacaoId}::uuid, ${custodiaLancamentoId}::uuid, ${motivo}, ${req.user.id}::uuid) RETURNING id::text AS id`;
+      await tx.auditLog.create({ data: { actorId: req.user.id, action: 'PROJ_DOCUMENTO_VINCULADO', targetId: ins[0].id, after: { operacaoId, documentoId, titulo: doc.titulo, aplicacaoId, custodiaLancamentoId, motivo } } });
+      return { id: ins[0].id };
+    });
+  }
+
+  @Post('operacoes/:operacaoId/documentos/:documentoId/vinculos/:vinculoId/cancelar')
+  @UseGuards(MasterOnlyGuard)
+  @ProjAcao('autenticado') // decisao do MasterOnlyGuard do metodo (403 consistente)
+  desvincularDocumento(@Param('operacaoId') operacaoId: string, @Param('documentoId') documentoId: string, @Param('vinculoId') vinculoId: string, @Body() b: any, @Req() req: any) {
+    if (!UUID_RE.test(operacaoId) || !UUID_RE.test(documentoId) || !UUID_RE.test(vinculoId)) throw new NotFoundException('Registro nao encontrado.');
+    const motivo = String(b?.motivo || '').trim();
+    if (motivo.length < 10) throw new BadRequestException('Informe o motivo (minimo 10 caracteres). Ele fica na trilha de auditoria.');
+    return this.db.comoUsuario(req.user.id, async (tx) => {
+      const v = await tx.$queryRaw<any[]>`SELECT v.id::text AS id, v.aplicacao_id::text AS apl, v.custodia_lancamento_id::text AS cus FROM proj_documento_vinculos v
+        JOIN proj_documentos d ON d.id = v.documento_id AND d.operacao_id = ${operacaoId}::uuid
+        WHERE v.id = ${vinculoId}::uuid AND v.documento_id = ${documentoId}::uuid AND v.cancelado_em IS NULL`;
+      if (!v.length) throw new NotFoundException('Vinculo vigente nao encontrado.');
+      await tx.$executeRaw`UPDATE proj_documento_vinculos SET cancelado_em = now(), cancelado_por_id = ${req.user.id}::uuid, motivo_cancelamento = ${motivo}
+        WHERE id = ${vinculoId}::uuid`;
+      await tx.auditLog.create({ data: { actorId: req.user.id, action: 'PROJ_DOCUMENTO_DESVINCULADO', targetId: vinculoId, after: { operacaoId, documentoId, aplicacaoId: v[0].apl, custodiaLancamentoId: v[0].cus, motivo } } });
+      return { id: vinculoId };
     });
   }
 
