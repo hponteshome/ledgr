@@ -10674,3 +10674,14 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 ## 2026-10-19 - Creditos de 2026 (n. 60 a 82) vinculados a Conta Individual
 - Decisao do Hpontes: todos os creditos de 2026 sao de origem da VAL Investimentos, por meio do intermediario Antonio Vieira / J.A.A.H., como em 2025 (inclusive os que chegaram de terceiros: Posto Perola, ENAC, Bienal, Marciel, GFX, Fernanda Mello, Jose Pelucio, Alvo 4You, Ellen Silva).
 - 23 creditos, R$ 1.121.500,00, vinculados a VAL INVESTIMENTOS S/A como aporte indireto (mesma gravacao da tela de Creditos; AuditLog PROJ_CREDITO_VINCULO_ALTERADO, lote vinculo-lote-20261019). Junto com o n. 83, a Operacao Ancora fica sem credito pendente de vinculo.
+
+## 2026-10-19 - ENCERRAMENTO DA SESSAO (onde paramos)
+### Feito hoje
+- Documentos do projeto: tabela proj_documento_vinculos (RLS), carga de 29 comprovantes com 34 vinculos; tela com totalizadores, filtros Todos/Vinculados/Pendentes, vincular/desvincular (commits 217c5cc e 353c12f).
+- Extrato Sunsys de 08/08 a 30/09/2026 carregado no Financeiro sem lancamento contabil; 481 debitos e 131 creditos classificados no projeto (0 pendentes).
+- Creditos n. 60 a 83 vinculados a VAL como aporte indireto (via Antonio Vieira / J.A.A.H.): Conta Individual = 71 creditos, R$ 4.441.765,82 (faltam R$ 558.234,18 para a cota senior de R$ 5 mi).
+- Doc. 30 (instrumento de reconhecimento da transferencia interna do passivo) preenchido em .docx, com pendencias em XXXXXX vermelho (fora do repositorio).
+### Pendente
+- Doc. 30: lancamentos do considerando (D) (informados pelo contador externo), data do registro JUCEPE da F5 como socia unica da Sunrise (mar/2026), data da assinatura, cargo da Josivani na Hotelsys e Sunsys, conferir NIRE da Hotelsys (veio igual ao da Sunrise), qualidade da Josivani na Hotelsys/Sunsys (texto copiado da Sunrise). Anexo I (18 obrigacoes do Anexo V com devedor originario): rodar inspecao_doc30.
+- Custodia: registrar pagamentos diretos sem lancamento (Solsys 29/10/2024 207.678,30; Custas INSS Cintia 25/02/2025 6.684,47) e vincular os documentos; revisar o lancamento de 67.000 "Cintia Nere".
+- Contabil: cadeia do Anexo V na Sunrise/F5; recalculo da equivalencia e correcao de calcularPLInvestida (nivel 1); encerramento 2025 da F5; reclassificacao restante da 1065 (Solsys aguarda socios; 782.137,63 a comprovar); Seg 150.000 (empresa); decisao dos R$ 505 de 02/04/2026.
