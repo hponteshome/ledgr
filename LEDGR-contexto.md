@@ -10685,3 +10685,6 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - Doc. 30: lancamentos do considerando (D) (informados pelo contador externo), data do registro JUCEPE da F5 como socia unica da Sunrise (mar/2026), data da assinatura, cargo da Josivani na Hotelsys e Sunsys, conferir NIRE da Hotelsys (veio igual ao da Sunrise), qualidade da Josivani na Hotelsys/Sunsys (texto copiado da Sunrise). Anexo I (18 obrigacoes do Anexo V com devedor originario): rodar inspecao_doc30.
 - Custodia: registrar pagamentos diretos sem lancamento (Solsys 29/10/2024 207.678,30; Custas INSS Cintia 25/02/2025 6.684,47) e vincular os documentos; revisar o lancamento de 67.000 "Cintia Nere".
 - Contabil: cadeia do Anexo V na Sunrise/F5; recalculo da equivalencia e correcao de calcularPLInvestida (nivel 1); encerramento 2025 da F5; reclassificacao restante da 1065 (Solsys aguarda socios; 782.137,63 a comprovar); Seg 150.000 (empresa); decisao dos R$ 505 de 02/04/2026.
+
+## 2026-10-20 - Creditos do projeto: totalizadores de aportes
+- CreditosProjeto.tsx: cartoes com os aportes (so creditos vinculados ao Adquirente): ate 31/10/2025; de 01/11/2025 a 22/07/2026; de 23/07/2026 ate a data escolhida; e total ate a data (campo SmartDateInput, padrao hoje). Desvinculados (n. 1, 2, 20 e 24) ficam fora. So frontend; API sem mudanca.

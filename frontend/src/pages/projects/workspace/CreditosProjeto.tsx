@@ -6,6 +6,11 @@ import { FiLink } from 'react-icons/fi';
 import api from '../../../services/api';
 import { Operacao, Credito, fmtBRL, fmtData, cardSt, thSt, tdSt, erroSt, inputSt, tituloSt, subtituloSt } from './projetoTema';
 import VinculoModal from './VinculoModal';
+import { SmartDateInput } from '../../../components/SmartDateInput';
+
+// Totalizadores dos aportes (20/10/2026): so creditos vinculados ao Adquirente, por periodo; o ultimo periodo vai ate a data escolhida.
+const hojeIso = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
+const fmtDia = (iso: string) => iso.split('-').reverse().join('/');
 
 export default function CreditosProjeto({ operacao, master }: { operacao: Operacao | null; master: boolean }) {
   const [lista, setLista] = useState<Credito[]>([]);
@@ -33,6 +38,21 @@ export default function CreditosProjeto({ operacao, master }: { operacao: Operac
         .some((x) => (x || '').toLowerCase().includes(t))));
   }, [lista, busca, soPendentes]);
   const total = filtrados.reduce((s, c) => s + Number(c.valor), 0);
+  const [ate, setAte] = useState<string>(hojeIso());
+  const aportes = useMemo(() => {
+    const lim = /^\d{4}-\d{2}-\d{2}$/.test(ate) ? ate : hojeIso();
+    const faixas = [
+      { rotulo: 'Até 31/10/2025', de: '0000-01-01', a: '2025-10-31' },
+      { rotulo: 'De 01/11/2025 a 22/07/2026', de: '2025-11-01', a: '2026-07-22' },
+      { rotulo: 'De 23/07/2026 até ' + fmtDia(lim), de: '2026-07-23', a: '9999-12-31' },
+    ];
+    const vinc = lista.filter((c) => c.vinculoAtual?.situacao === 'VINCULADO');
+    const soma = (de: string, a: string) => {
+      const sel = vinc.filter((c) => { const d = String(c.dataCredito).slice(0, 10); return d >= de && d <= a && d <= lim; });
+      return { qtd: sel.length, valor: sel.reduce((s, c) => s + Math.round(Number(c.valor) * 100), 0) / 100 };
+    };
+    return { lim, faixas: faixas.map((f) => ({ ...f, ...soma(f.de, f.a) })), total: soma('0000-01-01', '9999-12-31') };
+  }, [lista, ate]);
 
   if (!operacao) return <div style={{ color: '#6B7280' }}>Nenhuma operação disponível para o seu acesso.</div>;
 
@@ -41,6 +61,23 @@ export default function CreditosProjeto({ operacao, master }: { operacao: Operac
       <div>
         <div style={tituloSt}>Créditos</div>
         <div style={subtituloSt}>{operacao.nome} · dado bancário de origem (intocado) e titular da Conta Individual</div>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 10 }}>
+        {aportes.faixas.map((f, i) => (
+          <div key={i} style={{ ...cardSt, padding: '12px 14px', borderTop: '3px solid #0F766E' }}>
+            <div style={{ fontSize: 11, color: '#6B7280', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.3 }}>Aportes · {f.rotulo}</div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: '#111827', marginTop: 4 }}>{fmtBRL(f.valor)}</div>
+            <div style={{ fontSize: 11, color: '#6B7280', marginTop: 2 }}>{f.qtd} crédito(s) vinculado(s)</div>
+          </div>
+        ))}
+        <div style={{ ...cardSt, padding: '12px 14px', borderTop: '3px solid #134E4A', background: '#F0FDFA' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <div style={{ fontSize: 11, color: '#134E4A', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3 }}>Total de aportes até</div>
+            <SmartDateInput style={{ ...inputSt, width: 120, padding: '3px 8px', fontSize: 12 }} value={ate} onChange={(v: string) => setAte(v)} />
+          </div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: '#134E4A', marginTop: 4 }}>{fmtBRL(aportes.total.valor)}</div>
+          <div style={{ fontSize: 11, color: '#6B7280', marginTop: 2 }}>{aportes.total.qtd} crédito(s) vinculado(s) à Conta Individual · desvinculados fora</div>
+        </div>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <input style={{ ...inputSt, width: 320 }} placeholder="Buscar por remetente, titular, referência ou nº" value={busca} onChange={(e) => setBusca(e.target.value)} />
