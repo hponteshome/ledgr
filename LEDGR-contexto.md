@@ -10688,3 +10688,8 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 
 ## 2026-10-20 - Creditos do projeto: totalizadores de aportes
 - CreditosProjeto.tsx: cartoes com os aportes (so creditos vinculados ao Adquirente): ate 31/10/2025; de 01/11/2025 a 22/07/2026; de 23/07/2026 ate a data escolhida; e total ate a data (campo SmartDateInput, padrao hoje). Desvinculados (n. 1, 2, 20 e 24) ficam fora. So frontend; API sem mudanca.
+
+## 2026-10-20 - Data da insolvencia (correcao) e botao OK no Demonstrativo do Termo VAL
+- DATA CORRETA DA INSOLVENCIA DA REAL MOUCHAO: sentenca de declaracao em 20/07/2026, as 11:55, Tribunal Judicial da Comarca de Santarem, Juizo de Comercio - Juiz 3, proc. 1419/26.2T8STR (peticao inicial de 21/05/2026; requerente Nuno Miguel Duarte Lima). NAO e 22/07/2026. Confirmado pelo Hpontes com a imagem do anuncio.
+- Reflexo: juros de 2026 ate a insolvencia = 201 dias (01/01 a 20/07) = EUR 385.433,07 (cerca de R$ 2.397.393,70 a 6,22); antes EUR 389.268,22 / R$ 2.421.248,34 (203 dias). Docs do projeto (premissas-plano-nei, fluxo-contabil-modelo-nei, mapa-contas) corrigidos; Simulador RM / Fluxo contabil a conferir antes de mudar calculos.
+- Demonstrativo do Termo VAL: botao OK por linha "a revisar" - grava a sugestao como texto final (POST demonstrativo-val/texto; historico preservado). Sem aceite em lote: cada linha conferida uma a uma.
