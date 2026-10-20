@@ -43,8 +43,8 @@ export default function CreditosProjeto({ operacao, master }: { operacao: Operac
     const lim = /^\d{4}-\d{2}-\d{2}$/.test(ate) ? ate : hojeIso();
     const faixas = [
       { rotulo: 'Até 31/10/2025', de: '0000-01-01', a: '2025-10-31' },
-      { rotulo: 'De 01/11/2025 a 22/07/2026', de: '2025-11-01', a: '2026-07-22' },
-      { rotulo: 'De 23/07/2026 até ' + fmtDia(lim), de: '2026-07-23', a: '9999-12-31' },
+      { rotulo: 'De 01/11/2025 a 20/07/2026', de: '2025-11-01', a: '2026-07-20' },
+      { rotulo: 'De 21/07/2026 até ' + fmtDia(lim), de: '2026-07-21', a: '9999-12-31' },
     ];
     const vinc = lista.filter((c) => c.vinculoAtual?.situacao === 'VINCULADO');
     const soma = (de: string, a: string) => {

@@ -49,6 +49,10 @@ const linkBtn: React.CSSProperties = { background: 'none', border: 'none', color
 const mono: React.CSSProperties = { ...tdSt, fontFamily: 'ui-monospace, Consolas, monospace', fontSize: 11, whiteSpace: 'nowrap' };
 const inputSt: React.CSSProperties = { width: '100%', padding: '7px 9px', border: '1px solid #D1D5DB', borderRadius: 6, fontSize: 13, boxSizing: 'border-box', background: '#fff' };
 const pequeno: React.CSSProperties = { fontSize: 11, color: '#6B7280' };
+// Modelo do instrumento (20/10/2026): referencia_minuta pode trazer o link do documento de minutas; a ultima versao
+// MINUTA e o modelo em Word. Os dois aparecem na lista enquanto nao houver versao produzida (Revisao, Final ou Assinada).
+const urlMinuta = (s?: string | null): string => (String(s || '').match(/https?:\/\/\S+/) || [])[0] || '';
+const rotMinuta = (s?: string | null): string => String(s || '').replace(/\s*-?\s*https?:\/\/\S+/, '').trim();
 
 type Acao = { para: string; rot: string; precisa?: 'versao' | 'substituto'; tom?: 'pri' | 'perigo'; dica?: string };
 type Aba = 'versoes' | 'partes' | 'assinatura' | 'registro' | 'valores' | 'dependencias' | 'trilha';
@@ -380,6 +384,15 @@ export default function InstrumentosProjeto({ projetoId }: { projetoId: string }
                   <td style={tdSt}>
                     <div style={{ color: '#111827' }}>{x.titulo}</div>
                     <div style={pequeno}>Item {x.itemPlanilha || '-'} da planilha · {LEI[x.lei] || x.lei}{x.requerRegistro ? ' · registro: ' + (x.orgaoRegistro || 'a definir') : ''}</div>
+                    {!x.versoesProduzidas && (x.minuta || urlMinuta(x.referenciaMinuta)) && (
+                      <div style={{ marginTop: 3, fontSize: 12 }} onClick={(e) => e.stopPropagation()}>
+                        <span style={pequeno}>Modelo: </span>
+                        {x.minuta && <button type="button" style={linkBtn} title={x.minuta.nome}
+                          onClick={() => baixar(`${base}/${x.id}/versoes/${x.minuta.id}/arquivo`, x.minuta.nome).catch((e) => toast.error(msgErro(e)))}>Word (v{x.minuta.numero})</button>}
+                        {x.minuta && urlMinuta(x.referenciaMinuta) && <span style={pequeno}> · </span>}
+                        {urlMinuta(x.referenciaMinuta) && <a href={urlMinuta(x.referenciaMinuta)} target="_blank" rel="noopener noreferrer" style={{ ...linkBtn, fontSize: 12 }}
+                          title={rotMinuta(x.referenciaMinuta)}>minuta online ↗</a>}
+                      </div>)}
                   </td>
                   <td style={tdSt}><Chip s={x.situacao} /></td>
                   <td style={tdSt}>
@@ -428,7 +441,9 @@ export default function InstrumentosProjeto({ projetoId }: { projetoId: string }
               <Tag>{LEI[inst.lei] || inst.lei}</Tag>
               <Tag>{inst.requerAssinatura ? 'Exige assinatura' : 'Sem assinatura'}</Tag>
               <Tag>{inst.requerRegistro ? 'Registro: ' + (inst.orgaoRegistro || 'a definir') : 'Sem registro'}</Tag>
-              {inst.referenciaMinuta && <Tag>{inst.referenciaMinuta}</Tag>}
+              {inst.referenciaMinuta && (urlMinuta(inst.referenciaMinuta)
+                ? <a href={urlMinuta(inst.referenciaMinuta)} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}><Tag cor={PROJ} fundo="#E6F4F1" title="Abrir a minuta online">{rotMinuta(inst.referenciaMinuta) || 'Minuta online'} ↗</Tag></a>
+                : <Tag>{inst.referenciaMinuta}</Tag>)}
             </div>
           </div>
           <div style={{ textAlign: 'right' }}>
@@ -470,7 +485,7 @@ export default function InstrumentosProjeto({ projetoId }: { projetoId: string }
             <div style={pequeno}>Cada arquivo é guardado pelo seu SHA-256. Baixar confere a integridade antes de entregar.</div>
             {tiposV.length > 0 && <button style={botaoPri} onClick={() => abrir({ tipo: 'versao' })}>Enviar versão</button>}
           </div>
-          {det.versoes.length === 0 ? <div style={pequeno}>Nenhuma versão enviada. A minuta está no Doc de minutas ({inst.referenciaMinuta || '-'}); exporte para Word e envie como Minuta.</div> : (
+          {det.versoes.length === 0 ? <div style={pequeno}>Nenhuma versão enviada. A minuta está no documento de minutas ({rotMinuta(inst.referenciaMinuta) || '-'}{urlMinuta(inst.referenciaMinuta) && <> · <a href={urlMinuta(inst.referenciaMinuta)} target="_blank" rel="noopener noreferrer">abrir</a></>}); exporte para Word e envie como Minuta: ela vira o modelo na lista.</div> : (
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 720 }}>
                 <thead><tr><th style={thSt}>Nº</th><th style={thSt}>Tipo</th><th style={thSt}>Arquivo</th><th style={thSt}>SHA-256</th><th style={thSt}>Enviado por</th><th style={thSt}>Comentário</th><th style={thSt}></th></tr></thead>

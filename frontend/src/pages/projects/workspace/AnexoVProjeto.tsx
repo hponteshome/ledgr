@@ -7,6 +7,7 @@ import { thSt, tdSt, erroSt, fmtBRL, fmtData, PROJ } from './projetoTema';
 import { ModalProjeto, BotaoSec, erroApi } from './ModalProjeto';
 import { usePrintHandler } from '../../../contexts/PrintContext';
 import { imprimirProjeto } from './imprimirProjeto';
+import DemonstrativoTermoVal from './DemonstrativoTermoVal';
 
 const CONTRATO = '2025-10-31';
 const FORA = 'FORA';
@@ -31,7 +32,7 @@ function Chip({ s }: { s: string }) {
   return <span style={{ fontSize: 11, fontWeight: 600, color: c.cor, background: c.fundo, borderRadius: 10, padding: '1px 8px', whiteSpace: 'nowrap' }}>{c.rot}</span>;
 }
 type Escolha = { destino: string; consta: string };
-type Aba = 'itens' | 'classificar' | 'desembolsos' | 'anexoi';
+type Aba = 'itens' | 'classificar' | 'desembolsos' | 'anexoi' | 'termo';
 
 export default function AnexoVProjeto({ projetoId, projetoNome }: { projetoId: string; projetoNome?: string }) {
   const [d, setD] = useState<any>(null);
@@ -39,7 +40,7 @@ export default function AnexoVProjeto({ projetoId, projetoNome }: { projetoId: s
   const [erro, setErro] = useState('');
   const [aviso, setAviso] = useState('');
   const qs = new URLSearchParams(window.location.search);
-  const [aba, setAba] = useState<Aba>(() => { const q = qs.get('aba') as Aba; return (['itens', 'classificar', 'desembolsos', 'anexoi'] as Aba[]).includes(q) ? q : 'itens'; });
+  const [aba, setAba] = useState<Aba>(() => { const q = qs.get('aba') as Aba; return (['itens', 'classificar', 'desembolsos', 'anexoi', 'termo'] as Aba[]).includes(q) ? q : 'itens'; });
   const [filtro, setFiltro] = useState<string>(() => (['PENDENTE', 'SUGERIDO', 'CONFIRMADO', 'TODAS'].includes(qs.get('filtro') || '') ? String(qs.get('filtro')) : 'PENDENTE'));
   const [semManut, setSemManut] = useState(qs.get('manut') !== '1');
   const [escolhas, setEscolhas] = useState<Record<string, Escolha>>({});
@@ -117,7 +118,7 @@ export default function AnexoVProjeto({ projetoId, projetoNome }: { projetoId: s
   const totAntes = soma(itens, 'pagoAntes'), totAntesSim = soma(itens, 'pagoAntesReconciliado');
   // Impressao (14/10/2026): botao flutuante global - a aba aberta, como esta na tela (filtros aplicados), sem botoes e campos.
   const raiz = useRef<HTMLDivElement>(null);
-  const NOME_ABA: Record<Aba, string> = { itens: 'Itens do Anexo V', classificar: 'Classificação das aplicações', desembolsos: 'Desembolsos', anexoi: 'Reconciliação do Anexo I' };
+  const NOME_ABA: Record<Aba, string> = { itens: 'Itens do Anexo V', classificar: 'Classificação das aplicações', desembolsos: 'Desembolsos', anexoi: 'Reconciliação do Anexo I', termo: 'Demonstrativo do Termo VAL' };
   usePrintHandler(d ? () => imprimirProjeto({ projetoNome, titulo: 'Anexo V e desembolsos - ' + NOME_ABA[aba],
     subtitulo: 'Passivo de R$ 54.418.451,00 na confissão de ' + fmtData(CONTRATO) + ' (cl. 2.A.2)', raiz: raiz.current, larguraTotal: true }) : null,
     'Imprimir Anexo V', [d, ai, aba, filtro, semManut, soConfirmadas, escolhas, projetoNome, filtroAi]);
@@ -137,6 +138,7 @@ export default function AnexoVProjeto({ projetoId, projetoNome }: { projetoId: s
         {abaBtn('classificar', `Classificação (${contagem.PENDENTE || 0} a classificar)`)}
         {abaBtn('desembolsos', 'Desembolsos')}
         {abaBtn('anexoi', 'Reconciliação do Anexo I')}
+        {abaBtn('termo', 'Demonstrativo do Termo VAL')}
       </div>
       {!d && !erro && <div style={{ color: '#6B7280' }}>Carregando...</div>}
 
@@ -234,6 +236,7 @@ export default function AnexoVProjeto({ projetoId, projetoNome }: { projetoId: s
           </div>
         </div>)}
 
+      {aba === 'termo' && <DemonstrativoTermoVal projetoId={projetoId} />}
       {modal && (
         <ModalProjeto titulo={modal.tipo === 'encerrar' ? 'Encerrar classificação' : modal.tipo === 'sugestoes' ? 'Confirmar sugestões' : 'Gravar classificações'}
           subtitulo={modal.tipo === 'encerrar' ? `${fmtData(modal.vinculo.data)} · ${fmtBRL(modal.vinculo.valor)} · ${modal.vinculo.natureza}` : `${(modal.lista || []).length} aplicação(ões); o vínculo só muda depois, se for encerrado com motivo`}

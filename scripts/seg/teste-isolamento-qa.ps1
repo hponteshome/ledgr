@@ -137,13 +137,16 @@ if ($global:tok) {
   Teste "Projetos: detalhe do projeto concedido"       GET    "/projects/${projId}"                          200
   Teste "Projetos: participacoes da Operacao Ancora"   GET    "/projects/operacoes/${opId}/participacoes"    200 -msg '"codigo":"ADQUIRENTE"'
   Teste "Projetos: creditos da Operacao Ancora"        GET    "/projects/operacoes/${opId}/creditos"         200 -msg '"numeroOrdem":1,'
-  Teste "Projetos: resumo - saldo contratual conciliado" GET    "/projects/operacoes/${opId}/resumo"           200 -msg '"saldoContratual":"3295265.82"'
+  Teste "Projetos: resumo - saldo contratual informado"   GET    "/projects/operacoes/${opId}/resumo"           200 -msg '"saldoContratual":"\d'
   Teste "Projetos: resumo - creditos com prova bancaria" GET    "/projects/operacoes/${opId}/resumo"           200 -msg '"semProvaBancaria":0'
   Teste "Projetos: VAL aparece como Conta Individual"   GET    "/projects/operacoes/${opId}/resumo"           200 -msg '"nome":"VAL INVESTIMENTOS S/A"'
   Teste "Projetos: resumo traz os pendentes de vinculo"    GET    "/projects/operacoes/${opId}/resumo"           200 -msg '"semVinculoTotal":'
   $rs = $null; try { $rs = Invoke-RestMethod -Uri "$base/projects/operacoes/${opId}/resumo" -Headers @{ Authorization = "Bearer $global:tok" } } catch {}
   $somaContas = 0; if ($rs) { foreach ($ci in @($rs.contasIndividuais)) { $somaContas += [decimal]$ci.total }; $somaContas += [decimal]$rs.desvinculados.total; $somaContas += [decimal]$rs.semVinculoTotal }
   if ($rs -and $somaContas -eq [decimal]$rs.totalGeral) { Write-Host ("OK     esperado fecha | obtido fecha ({0}) | Projetos: contas individuais + desvinculados + pendentes = total" -f $somaContas) -ForegroundColor Green } else { $global:falhas++; Write-Host ("FALHA  contas individuais + desvinculados ({0}) diferente do total ({1})" -f $somaContas, $rs.totalGeral) -ForegroundColor Red }
+  # 20/10/2026: em vez de um valor fixo (quebrava a cada aporte novo), confere a regra: saldo contratual = contas individuais - devolucoes, sem pendentes de identificacao
+  $somaCI = 0; if ($rs) { foreach ($ci in @($rs.contasIndividuais)) { $somaCI += [decimal]$ci.total }; $somaCI -= [decimal]$rs.devolucoesAdquirente.total }
+  if ($rs -and $somaCI -eq [decimal]$rs.saldoContratual -and [int]$rs.pendentesIdentificacao -eq 0) { Write-Host ("OK     esperado fecha | obtido fecha ({0}) | Projetos: saldo contratual conciliado com as contas individuais" -f $somaCI) -ForegroundColor Green } else { $global:falhas++; Write-Host ("FALHA  saldo contratual ({0}) diferente de contas individuais - devolucoes ({1}) ou pendentes de identificacao" -f $rs.saldoContratual, $somaCI) -ForegroundColor Red }
   Teste "Projetos: creditos trazem o vinculo vigente"     GET    "/projects/operacoes/${opId}/creditos"         200 -msg '"situacao":"VINCULADO"'
   Teste "Projetos: pendencias do projeto (sem extrato)"   GET    "/projects/operacoes/${opId}/pendencias"        200
   Teste "Financeiro: entradas da empresa ativa (LEDGR)"   GET    "/projects-financeiro/entradas"                 200

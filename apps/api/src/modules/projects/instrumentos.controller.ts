@@ -370,6 +370,9 @@ export class InstrumentosController {
                i.situacao, i.situacao_em AS "situacaoEm", i.versao_aprovada_id AS "versaoAprovadaId",
                proj_instr_pendencias(i.id) AS pendencias,
                (SELECT count(*)::int FROM proj_instrumento_versoes v WHERE v.instrumento_id = i.id AND v.cancelado_em IS NULL) AS versoes,
+               (SELECT count(*)::int FROM proj_instrumento_versoes v WHERE v.instrumento_id = i.id AND v.cancelado_em IS NULL AND v.tipo <> 'MINUTA') AS "versoesProduzidas",
+               (SELECT jsonb_build_object('id', v.id, 'numero', v.numero, 'nome', v.arquivo_nome) FROM proj_instrumento_versoes v
+                 WHERE v.instrumento_id = i.id AND v.cancelado_em IS NULL AND v.tipo = 'MINUTA' ORDER BY v.numero DESC LIMIT 1) AS minuta,
                (SELECT count(*)::int FROM proj_instrumento_partes p WHERE p.instrumento_id = i.id AND p.cancelado_em IS NULL) AS partes,
                (SELECT max(e.criado_em) FROM proj_instrumento_eventos e WHERE e.instrumento_id = i.id) AS "ultimoEvento"
         FROM proj_instrumentos i WHERE i.projeto_id = ${projetoId}::uuid ORDER BY i.ordem, i.codigo`;

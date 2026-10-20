@@ -2029,6 +2029,213 @@ export class RelatoriosController {
     return { ok: true };
   }
 
+  // -- Demonstrativo do Termo VAL (20/10/2026) - Anexo I do Doc. 21 -----------------------------------------------------
+  // So pagamentos a credores do Anexo V com classificacao confirmada, um por linha (debito com varios pagamentos e dividido
+  // em partes). Datas fixas para todos os documentos: Bloco 1 de 01/11/2025 a 20/07/2026 (insolvencia; principal) e
+  // Bloco 2 de 21/07/2026 a 30/09/2026 (complementar). Transferencias da VAL (creditos vinculados) com as mesmas datas.
+  // Texto do credor para o termo em proj_demonstrativo_textos (imutavel: novo texto encerra o anterior).
+  private readonly blocosVal = [
+    { codigo: 'B1', rotulo: 'Bloco 1', de: '2025-11-01', ate: '2026-07-20' },
+    { codigo: 'B2', rotulo: 'Bloco 2', de: '2026-07-21', ate: '2026-09-30' },
+  ];
+
+  private erroDemonstrativo(e: any): never {
+    if (typeof e?.getStatus === 'function') throw e;
+    const m = String(e?.meta?.message || e?.message || '');
+    const t = m.match(/(As aplicacoes[^"\n]{0,180}|Aplicacao[^"\n]{0,160}|Anexo V:[^"\n]{0,160}|Demonstrativo:[^"\n]{0,160})/);
+    if (t) throw new BadRequestException(t[1].replace(/\s+$/, ''));
+    throw e;
+  }
+
+  @Get('projetos/:projetoId/demonstrativo-val')
+  @UseGuards(MasterOnlyGuard)
+  @ProjAcao('autenticado')
+  async demonstrativoVal(@Param('projetoId') projetoId: string, @Req() req: any) {
+    if (!UUID_RE.test(projetoId)) throw new NotFoundException('Registro nao encontrado.');
+    const B = this.blocosVal;
+    const av: any = await this.anexoV(projetoId, B[1].ate, req);
+    const itens = new Map<string, any>((av.itens || []).map((i: any) => [String(i.id), i]));
+    const noPeriodo = (av.aplicacoes || []).filter((a: any) => a.data >= B[0].de && a.data <= B[1].ate);
+    const conf = noPeriodo.filter((a: any) => a.situacao === 'CONFIRMADO' && !a.fora && a.itemId);
+    const correntes = new Set(['MANUTENCAO_OPERACAO', 'DESPESA_PROPRIA_SUNSYS', 'PAGAMENTO_ORDEM_INTERMEDIARIO']);
+    const pend = noPeriodo.filter((a: any) => a.situacao !== 'CONFIRMADO' && ((a.itemId && !a.fora) || (a.situacao === 'PENDENTE' && !correntes.has(String(a.codigo)))));
+    const aplIds = conf.filter((a: any) => !a.custodia).map((a: any) => String(a.id));
+    const cusIds = conf.filter((a: any) => a.custodia).map((a: any) => String(a.id));
+    return this.db.comoUsuario(req.user.id, async (tx: any) => {
+      const ext: any[] = aplIds.length ? await tx.$queryRaw`SELECT a.id::text AS id, bt.transaction_date::date::text AS "dataExtrato", bt.amount::float AS "valorExtrato",
+          bt.description AS "lancExtrato", bt.counterparty_name AS favorecido,
+          (SELECT count(*) FROM proj_aplicacoes x WHERE x.bank_transaction_id = a.bank_transaction_id AND x.cancelado_em IS NULL)::int AS partes,
+          (SELECT an.texto FROM proj_anotacoes_extrato an WHERE an.bank_transaction_id = a.bank_transaction_id LIMIT 1) AS anotacao,
+          (SELECT string_agg(dd.titulo, ' ; ' ORDER BY dd.titulo) FROM proj_documento_vinculos dv JOIN proj_documentos dd ON dd.id = dv.documento_id AND dd.cancelado_em IS NULL
+            WHERE dv.aplicacao_id = a.id AND dv.cancelado_em IS NULL) AS documentos
+        FROM proj_aplicacoes a JOIN bank_transactions bt ON bt.id = a.bank_transaction_id WHERE a.id = ANY(${aplIds}::uuid[])` : [];
+      const extCus: any[] = cusIds.length ? await tx.$queryRaw`SELECT l.id::text AS id, l.favorecido, l.descricao, cu.nome AS custodia,
+          (SELECT string_agg(dd.titulo, ' ; ' ORDER BY dd.titulo) FROM proj_documento_vinculos dv JOIN proj_documentos dd ON dd.id = dv.documento_id AND dd.cancelado_em IS NULL
+            WHERE dv.custodia_lancamento_id = l.id AND dv.cancelado_em IS NULL) AS documentos
+        FROM proj_custodia_lancamentos l JOIN proj_custodias cu ON cu.id = l.custodia_id WHERE l.id = ANY(${cusIds}::uuid[])` : [];
+      const todos = [...aplIds, ...cusIds];
+      const txt: any[] = todos.length ? await tx.$queryRaw`SELECT coalesce(aplicacao_id, custodia_lancamento_id)::text AS id, texto, criado_em AS "criadoEm"
+        FROM proj_demonstrativo_textos WHERE cancelado_em IS NULL AND coalesce(aplicacao_id, custodia_lancamento_id) = ANY(${todos}::uuid[])` : [];
+      const cred: any[] = await tx.$queryRaw`SELECT c.data_credito::text AS data, c.valor::float AS valor FROM proj_creditos c
+        JOIN proj_operacoes o ON o.id = c.operacao_id AND o.projeto_id = ${projetoId}::uuid
+        JOIN proj_credito_vinculos v ON v.credito_id = c.id AND v.cancelado_em IS NULL AND v.situacao::text = 'VINCULADO'
+        WHERE c.cancelado_em IS NULL AND c.data_credito BETWEEN ${B[0].de}::date AND ${B[1].ate}::date`;
+      const nats: any[] = await tx.$queryRaw`SELECT codigo, nome FROM proj_naturezas_aplicacao WHERE ativo AND tipo = 'APLICACAO' ORDER BY nome`;
+      const mE = new Map(ext.map((e) => [e.id, e])); const mC = new Map(extCus.map((e) => [e.id, e])); const mT = new Map(txt.map((t) => [t.id, t]));
+      const blocoDe = (d: string) => (d <= B[0].ate ? 'B1' : 'B2');
+      const dia = (s: string) => String(s || '').slice(0, 10).split('-').reverse().join('/');
+      const cent = (v: any) => Math.round(Number(v || 0) * 100);
+      const linhas = conf.map((a: any) => {
+        const id = String(a.id); const it = itens.get(String(a.itemId)); const e: any = a.custodia ? mC.get(id) : mE.get(id); const t: any = mT.get(id);
+        const desc = a.descricao && !String(a.descricao).startsWith('Comprovante') ? String(a.descricao) : '';
+        const sugestao = [e?.favorecido || '', desc, e?.anotacao ? String(e.anotacao).replace(/\s*\|\s*/g, ' - ') : ''].filter(Boolean).join(' - ') || a.lancamento || '-';
+        const comprovante = [e?.documentos || '', a.darfs ? 'DARF ' + a.darfs : '', a.custodia ? 'Pagamento direto da custódia (lançamento validado)' : 'Extrato Itaú Sunsys ' + dia(a.data)].filter(Boolean).join('; ');
+        return { id, custodia: !!a.custodia, bloco: blocoDe(a.data), data: a.data, valor: cent(a.valor) / 100, natureza: a.natureza, codigo: a.codigo,
+          itemId: String(a.itemId), itemOrdem: it?.ordem ?? null, itemCredor: it?.credor ?? '', texto: t?.texto || null, textoEm: t?.criadoEm || null,
+          sugestao: sugestao.slice(0, 600), comprovante, vinculoId: a.vinculoId, vinculoMotivo: a.vinculoMotivo, lancamento: a.lancamento || '',
+          extrato: a.custodia ? null : { data: e?.dataExtrato || null, valor: e?.valorExtrato ?? null, lancamento: e?.lancExtrato || '', partes: e?.partes || 1 },
+          anotacao: e?.anotacao || null, custodiaNome: a.custodia ? e?.custodia || null : null };
+      }).sort((x: any, y: any) => x.data.localeCompare(y.data) || y.valor - x.valor);
+      const credB = cred.map((c) => ({ ...c, bloco: blocoDe(c.data) }));
+      const soma = (lista: any[], k: string) => lista.filter((x) => x.bloco === k).reduce((s, x) => s + cent(x.valor), 0) / 100;
+      const blocos = B.map((b) => ({ ...b, pagamentos: soma(linhas, b.codigo), qtdPagamentos: linhas.filter((l: any) => l.bloco === b.codigo).length,
+        transferencias: soma(credB, b.codigo), qtdTransferencias: credB.filter((c) => c.bloco === b.codigo).length }));
+      const pi = new Map<string, any>();
+      for (const l of linhas) {
+        const k = String(l.itemOrdem); const p = pi.get(k) || { ordem: l.itemOrdem, credor: l.itemCredor, B1: 0, B2: 0, qtd: 0 };
+        p[l.bloco] += cent(l.valor); p.qtd += 1; pi.set(k, p);
+      }
+      const porItem = [...pi.values()].sort((x, y) => x.ordem - y.ordem).map((p) => ({ ...p, B1: p.B1 / 100, B2: p.B2 / 100, total: (p.B1 + p.B2) / 100 }));
+      const pendentes = pend.map((a: any) => ({ id: String(a.id), custodia: !!a.custodia, data: a.data, valor: Number(a.valor), natureza: a.natureza, lancamento: a.lancamento || '',
+        descricao: a.descricao || '', situacao: a.situacao, sugestaoItem: a.itemId && !a.fora ? (itens.get(String(a.itemId))?.credor || '') : '' }));
+      return { blocos, linhas, porItem, pendentes, naturezas: nats, itens: (av.itens || []).map((i: any) => ({ id: i.id, ordem: i.ordem, credor: i.credor })) };
+    });
+  }
+
+  @PostC('projetos/:projetoId/demonstrativo-val/texto')
+  @UseGuards(MasterOnlyGuard)
+  @ProjAcao('autenticado')
+  async demonstrativoValTexto(@Param('projetoId') projetoId: string, @BodyC() b: any, @Req() req: any) {
+    if (!UUID_RE.test(projetoId)) throw new NotFoundException('Registro nao encontrado.');
+    const alvo = String(b?.id || ''); const custodia = !!b?.custodia;
+    if (!UUID_RE.test(alvo)) throw new BadRequestException('Linha invalida.');
+    const texto = String(b?.texto || '').replace(/\s+/g, ' ').trim().slice(0, 600);
+    if (texto.length < 3) throw new BadRequestException('Informe o texto do credor / obrigacao (minimo 3 caracteres).');
+    try {
+      return await this.db.comoUsuario(req.user.id, async (tx: any) => {
+        const ok: any[] = custodia
+          ? await tx.$queryRaw`SELECT 1 FROM proj_custodia_lancamentos l JOIN proj_custodias cu ON cu.id = l.custodia_id JOIN proj_operacoes o ON o.id = cu.operacao_id
+              WHERE l.id = ${alvo}::uuid AND o.projeto_id = ${projetoId}::uuid AND l.cancelado_em IS NULL`
+          : await tx.$queryRaw`SELECT 1 FROM proj_aplicacoes a JOIN proj_operacoes o ON o.id = a.operacao_id WHERE a.id = ${alvo}::uuid AND o.projeto_id = ${projetoId}::uuid AND a.cancelado_em IS NULL`;
+        if (!ok.length) throw new NotFoundException('Pagamento vigente nao encontrado neste projeto.');
+        const ant: any[] = custodia
+          ? await tx.$queryRaw`UPDATE proj_demonstrativo_textos SET cancelado_em = now(), cancelado_por_id = ${req.user.id}::uuid, motivo_cancelamento = 'Substituido por novo texto'
+              WHERE custodia_lancamento_id = ${alvo}::uuid AND cancelado_em IS NULL RETURNING texto`
+          : await tx.$queryRaw`UPDATE proj_demonstrativo_textos SET cancelado_em = now(), cancelado_por_id = ${req.user.id}::uuid, motivo_cancelamento = 'Substituido por novo texto'
+              WHERE aplicacao_id = ${alvo}::uuid AND cancelado_em IS NULL RETURNING texto`;
+        const ins: any[] = custodia
+          ? await tx.$queryRaw`INSERT INTO proj_demonstrativo_textos (custodia_lancamento_id, texto, criado_por_id) VALUES (${alvo}::uuid, ${texto}, ${req.user.id}::uuid) RETURNING id::text AS id`
+          : await tx.$queryRaw`INSERT INTO proj_demonstrativo_textos (aplicacao_id, texto, criado_por_id) VALUES (${alvo}::uuid, ${texto}, ${req.user.id}::uuid) RETURNING id::text AS id`;
+        await tx.auditLog.create({ data: { actorId: req.user.id, action: 'PROJ_DEMONSTRATIVO_TEXTO', targetId: alvo, after: { projetoId, custodia, antes: ant[0]?.texto ?? null, depois: texto } } });
+        return { id: ins[0].id };
+      });
+    } catch (e: any) { this.erroDemonstrativo(e); }
+  }
+
+  @PostC('projetos/:projetoId/demonstrativo-val/item')
+  @UseGuards(MasterOnlyGuard)
+  @ProjAcao('autenticado')
+  async demonstrativoValItem(@Param('projetoId') projetoId: string, @BodyC() b: any, @Req() req: any) {
+    if (!UUID_RE.test(projetoId)) throw new NotFoundException('Registro nao encontrado.');
+    const alvo = String(b?.id || ''); const custodia = !!b?.custodia; const fora = !!b?.fora;
+    const itemId = fora ? null : String(b?.itemId || '');
+    if (!UUID_RE.test(alvo)) throw new BadRequestException('Linha invalida.');
+    if (!fora && !UUID_RE.test(String(itemId))) throw new BadRequestException('Escolha o item do Anexo V ou marque fora do Anexo V.');
+    const motivo = String(b?.motivo || '').trim();
+    if (motivo.length < 10) throw new BadRequestException('Informe o motivo (minimo de 10 caracteres).');
+    try {
+      return await this.db.comoUsuario(req.user.id, async (tx: any) => {
+        const ant: any[] = custodia
+          ? await tx.$queryRaw`UPDATE proj_aplicacao_anexo_v SET cancelado_em = CURRENT_TIMESTAMP, cancelado_por_id = ${req.user.id}::uuid, motivo_cancelamento = ${'Reclassificada no demonstrativo do termo VAL: ' + motivo}
+              WHERE custodia_lancamento_id = ${alvo}::uuid AND cancelado_em IS NULL RETURNING item_id::text AS "itemId", fora_anexo AS fora, consta_reconciliacao AS consta`
+          : await tx.$queryRaw`UPDATE proj_aplicacao_anexo_v SET cancelado_em = CURRENT_TIMESTAMP, cancelado_por_id = ${req.user.id}::uuid, motivo_cancelamento = ${'Reclassificada no demonstrativo do termo VAL: ' + motivo}
+              WHERE aplicacao_id = ${alvo}::uuid AND cancelado_em IS NULL RETURNING item_id::text AS "itemId", fora_anexo AS fora, consta_reconciliacao AS consta`;
+        const consta = ant[0]?.consta ?? null;
+        if (custodia) await tx.$queryRaw`INSERT INTO proj_aplicacao_anexo_v (custodia_lancamento_id, item_id, fora_anexo, consta_reconciliacao, motivo, criado_por_id)
+            VALUES (${alvo}::uuid, ${itemId}::uuid, ${fora}, ${consta}::varchar, ${motivo}, ${req.user.id}::uuid) RETURNING id`;
+        else await tx.$queryRaw`INSERT INTO proj_aplicacao_anexo_v (aplicacao_id, item_id, fora_anexo, consta_reconciliacao, motivo, criado_por_id)
+            VALUES (${alvo}::uuid, ${itemId}::uuid, ${fora}, ${consta}::varchar, ${motivo}, ${req.user.id}::uuid) RETURNING id`;
+        await tx.auditLog.create({ data: { actorId: req.user.id, action: 'PROJ_ANEXO_V_RECLASSIFICADO', targetId: alvo, after: { projetoId, custodia, antes: ant[0] || null, depois: { itemId, fora }, motivo } } });
+        return { ok: true };
+      });
+    } catch (e: any) { this.erroDemonstrativo(e); }
+  }
+
+  @PostC('projetos/:projetoId/demonstrativo-val/dividir')
+  @UseGuards(MasterOnlyGuard)
+  @ProjAcao('autenticado')
+  async demonstrativoValDividir(@Param('projetoId') projetoId: string, @BodyC() b: any, @Req() req: any) {
+    if (!UUID_RE.test(projetoId)) throw new NotFoundException('Registro nao encontrado.');
+    const aplicacaoId = String(b?.aplicacaoId || '');
+    if (!UUID_RE.test(aplicacaoId)) throw new BadRequestException('Pagamento invalido.');
+    const motivo = String(b?.motivo || '').trim();
+    if (motivo.length < 10) throw new BadRequestException('Informe o motivo (minimo de 10 caracteres).');
+    const partes: any[] = Array.isArray(b?.partes) ? b.partes : [];
+    if (partes.length < 2 || partes.length > 20) throw new BadRequestException('Informe de 2 a 20 partes.');
+    const ps = partes.map((p: any) => ({ c: Math.round(Number(p?.valor) * 100), codigo: String(p?.naturezaCodigo || ''), fora: !!p?.fora,
+      itemId: p?.fora ? null : String(p?.itemId || ''), texto: String(p?.texto || '').replace(/\s+/g, ' ').trim().slice(0, 600) }));
+    for (const p of ps) {
+      if (!(p.c > 0)) throw new BadRequestException('Cada parte precisa de valor positivo.');
+      if (!p.codigo) throw new BadRequestException('Informe a natureza de cada parte.');
+      if (!p.fora && !UUID_RE.test(String(p.itemId))) throw new BadRequestException('Cada parte precisa de um item do Anexo V ou ficar fora do Anexo V.');
+    }
+    try {
+      return await this.db.comoUsuario(req.user.id, async (tx: any) => {
+        const r: any[] = await tx.$queryRaw`SELECT a.id::text AS id, a.operacao_id::text AS "operacaoId", a.bank_transaction_id::text AS "txId", a.data_aplicacao AS data, a.valor,
+            a.beneficiario_id::text AS "beneficiarioId", a.credito_id::text AS "creditoId", a.descricao, n.tipo::text AS tipo, n.codigo
+          FROM proj_aplicacoes a JOIN proj_naturezas_aplicacao n ON n.id = a.natureza_id JOIN proj_operacoes o ON o.id = a.operacao_id AND o.projeto_id = ${projetoId}::uuid
+          WHERE a.id = ${aplicacaoId}::uuid AND a.cancelado_em IS NULL`;
+        if (!r.length) throw new NotFoundException('Pagamento vigente nao encontrado (talvez ja dividido).');
+        const ap = r[0];
+        if (ap.tipo !== 'APLICACAO') throw new BadRequestException('Devolucoes nao sao divididas aqui.');
+        const total = Math.round(Number(ap.valor) * 100);
+        const somaC = ps.reduce((s, p) => s + p.c, 0);
+        if (somaC !== total) throw new BadRequestException(`As partes somam ${(somaC / 100).toFixed(2)}, mas o pagamento vale ${(total / 100).toFixed(2)}.`);
+        const darf: any[] = await tx.$queryRaw`SELECT 1 FROM proj_comprovante_vinculos WHERE aplicacao_id = ${ap.id}::uuid AND cancelado_em IS NULL LIMIT 1`;
+        if (darf.length) throw new BadRequestException('O pagamento tem DARF vinculado: desvincule em Comprovantes fiscais antes de dividir.');
+        const codigos = [...new Set(ps.map((p) => p.codigo))];
+        const nats: any[] = await tx.$queryRaw`SELECT id::text AS id, codigo FROM proj_naturezas_aplicacao WHERE ativo AND tipo = 'APLICACAO' AND codigo = ANY(${codigos}::text[])`;
+        const natId = new Map(nats.map((n) => [n.codigo, n.id]));
+        for (const p of ps) if (!natId.has(p.codigo)) throw new BadRequestException(`Natureza invalida: ${p.codigo}.`);
+        const mot = 'Dividida no demonstrativo do termo VAL: ' + motivo;
+        await tx.$executeRaw`UPDATE proj_aplicacao_anexo_v SET cancelado_em = CURRENT_TIMESTAMP, cancelado_por_id = ${req.user.id}::uuid, motivo_cancelamento = ${mot}
+          WHERE aplicacao_id = ${ap.id}::uuid AND cancelado_em IS NULL`;
+        await tx.$executeRaw`UPDATE proj_demonstrativo_textos SET cancelado_em = now(), cancelado_por_id = ${req.user.id}::uuid, motivo_cancelamento = ${mot}
+          WHERE aplicacao_id = ${ap.id}::uuid AND cancelado_em IS NULL`;
+        const docs: any[] = await tx.$queryRaw`UPDATE proj_documento_vinculos SET cancelado_em = now(), cancelado_por_id = ${req.user.id}::uuid, motivo_cancelamento = ${mot}
+          WHERE aplicacao_id = ${ap.id}::uuid AND cancelado_em IS NULL RETURNING documento_id::text AS "documentoId", motivo`;
+        await tx.projAplicacao.update({ where: { id: ap.id }, data: { canceladoEm: new Date(), canceladoPorId: req.user.id, motivoCancelamento: mot } });
+        const novas: string[] = [];
+        for (const p of ps) {
+          const nova = await tx.projAplicacao.create({
+            data: { operacaoId: ap.operacaoId, bankTransactionId: ap.txId, naturezaId: natId.get(p.codigo) as string, dataAplicacao: ap.data, valor: (p.c / 100).toFixed(2),
+              beneficiarioId: ap.beneficiarioId, creditoId: ap.creditoId, descricao: p.texto || ap.descricao, motivo: mot, criadoPorId: req.user.id },
+            select: { id: true },
+          });
+          novas.push(nova.id);
+          await tx.$queryRaw`INSERT INTO proj_aplicacao_anexo_v (aplicacao_id, item_id, fora_anexo, consta_reconciliacao, motivo, criado_por_id)
+            VALUES (${nova.id}::uuid, ${p.itemId}::uuid, ${p.fora}, NULL::varchar, ${mot}, ${req.user.id}::uuid) RETURNING id`;
+          if (p.texto && !p.fora) await tx.$queryRaw`INSERT INTO proj_demonstrativo_textos (aplicacao_id, texto, criado_por_id) VALUES (${nova.id}::uuid, ${p.texto}, ${req.user.id}::uuid) RETURNING id`;
+          for (const d of docs) await tx.$queryRaw`INSERT INTO proj_documento_vinculos (documento_id, aplicacao_id, motivo, criado_por_id)
+            VALUES (${d.documentoId}::uuid, ${nova.id}::uuid, ${'Herdado do pagamento dividido: ' + d.motivo}, ${req.user.id}::uuid) RETURNING id`;
+        }
+        await tx.auditLog.create({ data: { actorId: req.user.id, action: 'PROJ_APLICACAO_DIVIDIDA', targetId: ap.id,
+          after: { projetoId, de: ap.codigo, valor: (total / 100).toFixed(2), partes: ps.map((p, i) => ({ id: novas[i], natureza: p.codigo, valor: (p.c / 100).toFixed(2), itemId: p.itemId, fora: p.fora, texto: p.texto })), motivo } } });
+        return { ok: true, partes: novas };
+      });
+    } catch (e: any) { this.erroDemonstrativo(e); }
+  }
+
   @Get('projetos/:projetoId/anexo-i')
   @UseGuards(MasterOnlyGuard)
   @ProjAcao('autenticado')
