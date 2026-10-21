@@ -10714,3 +10714,9 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - I02 (F5-VAL) decidido: instrumento particular de divida; R$ 4.441.765,82 (71 aportes de 30/08/2024 a 30/09/2026); 7,52% a.a. juros simples base 365 desde cada aporte; vencimento 31/10/2028, pagamento unico, antecipacao sem multa; sem garantia; foro Sao Paulo-SP. I01: credito F5 x Sunrise ate 31/10/2028 sem atualizacao, com compensacao.
 - Suite QA: o teste do saldo contratual deixou de comparar valor fixo (R$ 3.295.265,82) e passou a conferir a regra (saldo contratual = contas individuais - devolucoes, sem pendentes de identificacao).
 - Este commit inclui tambem os arquivos do Demonstrativo do Termo VAL que tinham ficado fora (relatorios.controller.ts, AnexoVProjeto.tsx, CreditosProjeto.tsx, migracao 20261020_proj_demonstrativo_textos.sql): os commits anteriores pararam na suite por causa do valor fixo.
+
+## 2026-10-21 - Comprovantes de 2026 (Sunsys, jan a jun) no projeto
+- Pasta "PRESTACAO CONTAS 2026": 6 PDFs mensais escaneados (1.1 a 6.1) com 51 comprovantes Itau (1 por pagina) + 10 extratos mensais (fora da carga, como no lote de 2024-2025).
+- Cada pagina virou um PDF proprio, renomeado "AAAA-MM-DD - valor - empresa - descricao (mes-pagina)", extraido em D:\Comprovantes e carregado como COMPROVANTE da Operacao Ancora (SHA-256 no PROJ_STORAGE_DIR; idempotente).
+- Vinculo pelo debito bancario (bank_transaction_id): aplicacao de mesmo valor; senao, a aplicacao do valor somado do lote (ex.: Gurgel 100.000 + 40.000 = parte de 140.000 do lote de 05/05/2026); senao, todas as partes do debito; sem aplicacao, o lancamento da custodia (TED a Josi 16/03/2026).
+- Achado: os Pix de 30.000 de 25/03 e 24/04/2026 anotados como acordo Claudio Auchio Neto (parc 1/3 e 2/3) foram pagos a Michely Charlene de Morais, a mesma favorecida dos acordos "michelly" de 20/01 e 23/02/2026 - confirmar o credor no Doc. 21.
