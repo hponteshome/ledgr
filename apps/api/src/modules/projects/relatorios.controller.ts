@@ -862,7 +862,8 @@ export class RelatoriosController {
       // E8: o credito foi registrado ao cambio contratual (6,22); a cada fim de mes o saldo em euros (principal + juros) e
       // atualizado pela PTAX de venda gravada em cambio_cotacoes (CPC 02). E6: spread de 20% dos aportes; E7: retorno da VAL de
       // 7,52% a.a. (simples, base 365, aporte a aporte), ambos na data do titulo (premissa 51 = 0).
-      const INSOLV = '2026-07-22'; const JUROS = 0.08; const SPREAD = 0.2; const RET_VAL = 0.0752;
+      const INSOLV = '2026-07-20'; // sentenca de insolvencia da RM: 20/07/2026 (corrigido em 21/10/2026)
+      const JUROS = 0.08; const SPREAD = 0.2; const RET_VAL = 0.0752;
       const cot = await this.cotacoesEur(tx);
       const ptax = new Map<string, number>(cot.map((c: any) => [c.dataReferencia as string, Number(c.taxaVenda)]));
       const datasC = this.datasCambio(CONF, hoje).filter((x) => x > CONF);
@@ -1991,13 +1992,20 @@ export class RelatoriosController {
           if (s.fora || itemId) situacao = 'SUGERIDO';
         }
         const item = itemId ? porId.get(itemId) : null;
-        const total = cent(a.valor); const ancora = Math.min(total, cent(f?.ancora)); const outros = total - ancora;
+        // Origem (21/10/2026): mesma regra do Fluxo contabil. So credito desvinculado e saldo anterior ao extrato sao "outra
+        // origem" (3d, reduz o credito da F5); recebimentos de terceiros pela custodia, devolucoes sem envio, outras entradas e
+        // nao identificada ficam como VAL a confirmar (3c presumido). Sem PEPS, tudo que nao e aporte fica como outra origem.
+        const total = cent(a.valor); const anc0 = Math.min(total, cent(f?.ancora));
+        const naoVal = f ? Math.min(total - anc0, (f.composicao || []).filter((x: any) => x.origem === 'CREDITO_DESVINCULADO' || x.origem === 'SALDO_ANTERIOR')
+          .reduce((s: number, x: any) => s + cent(x.valor), 0)) : total - anc0;
+        const aConf = total - anc0 - naoVal; const ancora = anc0 + aConf; const outros = naoVal;
         if (item && !fora && situacao !== 'PENDENTE') {
           const consta = a.data <= CONTRATO ? (a.consta || 'Não') : '';
           const base = { aplicacaoId: a.id, data: a.data, credor: f?.lancamento || a.descricao || '', item: `Anexo V - ${item.credor}`, consta,
             comprovante: a.custodia ? `Pagamento direto da custódia ${String(a.data).split('-').reverse().join('/')}` : a.darfs ? `DARF ${a.darfs}` : `Extrato LEDGR ${String(a.data).split('-').reverse().join('/')}`, situacao };
-          if (ancora) linhas.push({ ...base, valor: ancora / 100, origem: 'VAL (via título F5)' });
-          if (outros) linhas.push({ ...base, valor: outros / 100, origem: 'Receita própria da Sunrise' });
+          if (anc0) linhas.push({ ...base, valor: anc0 / 100, origem: 'VAL (via título F5)' });
+          if (aConf) linhas.push({ ...base, valor: aConf / 100, origem: 'VAL (via título F5) - origem a confirmar' });
+          if (outros) linhas.push({ ...base, valor: outros / 100, origem: 'Outra origem, fora da VAL (reduz o crédito da F5)' });
           const p = pago.get(String(item.id)) || { f5: 0, outros: 0, antes: 0, antesSim: 0 };
           if (a.data <= CONTRATO) { p.antes += total; if (consta === 'Sim') p.antesSim += total; } else { p.f5 += ancora; p.outros += outros; }
           pago.set(String(item.id), p);

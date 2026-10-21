@@ -10756,3 +10756,9 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - API: POST .../custodias/:codigo/retencoes {envioId, valor, motivo} (AuditLog PROJ_CUSTODIA_RETENCAO_REGISTRADA); encerrar com alvo retencao. Detalhe: retido e retencoes por envio; resumo.mantidoAutorizado e enviosMantidos.
 - Tela: botao Manter por envio, coluna e selo Mantido (autorizado), card Saldo em poder autorizado (tambem na impressao).
 - Pendente (decisao do Hpontes, pela tela): autorizar ou nao os envios de 1.000,00 (08/09/2025) e 6.500,00 (05/12/2025).
+
+## [PROJETOS] 21/10/2026 - Anexo V: origem do pagamento (3c x 3d)
+- Tela Anexo V tratava como "receita propria" tudo que nao era aporte cadastrado (ex.: R$ 93.000 da VAL repassados pela custodia em 2026). Agora usa a regra do Fluxo contabil: 3d so com credito desvinculado ou saldo anterior; o resto e VAL a confirmar (3c presumido).
+- Coluna renomeada para "Pago com outra origem (depois)". Rotulo das linhas: "VAL (via titulo F5)", "VAL (via titulo F5) - origem a confirmar", "Outra origem, fora da VAL".
+- Fluxo contabil: INSOLV = 2026-07-20.
+- Pendente: cadastrar os R$ 93.000 (recebimentos de terceiro da VAL via custodia) como aporte indireto na Conta Individual, para sair de "a confirmar".
