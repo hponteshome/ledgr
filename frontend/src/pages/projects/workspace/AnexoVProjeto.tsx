@@ -92,6 +92,40 @@ export default function AnexoVProjeto({ projetoId, projetoNome }: { projetoId: s
     } catch (e) { setErroModal(erroApi(e, 'Falha ao gravar.')); }
   };
 
+  // Exportacao da aba Itens do Anexo V (21/10/2026): mesmas colunas da tela; totais e % por formula.
+  const exportarItens = async () => {
+    const ExcelJS = await import('exceljs');
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Itens do Anexo V');
+    const hoje = new Date();
+    ws.addRow([`Anexo V e desembolsos - itens do Anexo V${projetoNome ? ' - ' + projetoNome : ''}`]);
+    ws.addRow([`Passivo de R$ 54.418.451,00 na confissão de ${fmtData(CONTRATO)} (cl. 2.A.2) · posição em ${hoje.toLocaleDateString('pt-BR')} · inclui classificações sugeridas ainda não confirmadas`]);
+    ws.addRow([]);
+    ws.addRow(['#', 'Credor', 'Valor na confissão (R$)', 'Pago antes de 31/10/2025 (R$)', 'Pago antes de 31/10/2025 que reduz o saldo (R$)', 'Pago com VAL depois de 31/10/2025 (R$)', 'Total que reduz o saldo (R$)', 'Saldo (R$)', '% pago']);
+    const ini = 5;
+    itens.forEach((i, k) => {
+      const r = ini + k;
+      ws.addRow([i.ordem, i.credor, Number(i.valorFace || 0), Number(i.pagoAntes || 0), Number(i.pagoAntesReconciliado || 0), Number(i.pagoF5 || 0) + Number(i.pagoOutros || 0),
+        { formula: `E${r}+F${r}` }, { formula: `C${r}-G${r}` }, { formula: `IF(C${r}=0,0,G${r}/C${r})` }]);
+    });
+    const fim = ini + itens.length - 1;
+    const tot = ws.addRow(['', 'Total', ...['C', 'D', 'E', 'F', 'G', 'H'].map((c) => ({ formula: `SUM(${c}${ini}:${c}${fim})` })), { formula: `IF(C${fim + 1}=0,0,G${fim + 1}/C${fim + 1})` }]);
+    tot.font = { bold: true };
+    ws.addRow([]);
+    ws.addRow(['', 'Pagamentos anteriores a 31/10/2025 só reduzem o saldo se constarem da reconciliação da cl. 1.F.1. Pago não é o mesmo que quitado: a diferença para a face pode ser desconto obtido.']);
+    ws.getRow(1).font = { bold: true, size: 12 };
+    ws.getRow(4).font = { bold: true };
+    ws.getRow(4).alignment = { wrapText: true, vertical: 'middle' };
+    ['C', 'D', 'E', 'F', 'G', 'H'].forEach((c) => { ws.getColumn(c).numFmt = '#,##0.00'; });
+    ws.getColumn('I').numFmt = '0.0%';
+    [5, 42, 18, 18, 20, 20, 18, 18, 9].forEach((w, k) => { ws.getColumn(k + 1).width = w; });
+    ws.views = [{ state: 'frozen', ySplit: 4 }];
+    const buf = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const u = URL.createObjectURL(blob); const el = document.createElement('a');
+    el.href = u; el.download = `itens-anexo-v-${hoje.toISOString().slice(0, 10)}.xlsx`; document.body.appendChild(el); el.click(); el.remove(); URL.revokeObjectURL(u);
+  };
+
   const exportar = async () => {
     const ExcelJS = await import('exceljs');
     const wb = new ExcelJS.Workbook();
@@ -144,16 +178,19 @@ export default function AnexoVProjeto({ projetoId, projetoNome }: { projetoId: s
 
       {d && aba === 'itens' && (
         <div style={painel}>
+          <div data-noprint="1" style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+            <button type="button" style={{ ...botaoPri, opacity: itens.length ? 1 : 0.5 }} disabled={!itens.length} onClick={exportarItens}>Exportar para Excel</button>
+          </div>
           <div style={{ fontSize: 12, color: '#6B7280', marginBottom: 8 }}>A carteira do Anexo V é a posição em 31/10/2025: pagamentos anteriores só reduzem o saldo se constarem da reconciliação da cl. 1.F.1 (Sim: entram na confissão da RM); com Não, são crédito da F5 sobre a Sunrise, e os aportes da VAL que os pagaram continuam sendo da VAL. Os valores incluem classificações sugeridas ainda não confirmadas. Pago não é o mesmo que quitado: a diferença para a face pode ser desconto obtido.</div>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 900 }}>
-              <thead><tr><th style={thSt}>#</th><th style={thSt}>Credor</th><th style={dir}>Valor na confissão</th><th style={dir}>Pago antes de 31/10/2025</th><th style={dir} title="Itens pagos depois de 31/10/2025 com recursos da VAL (inclui origem a confirmar pelo PEPS): desembolso da F5 por conta da RM (3c)">Pago com VAL (depois)</th><th style={dir} title="Itens pagos depois de 31/10/2025 com dinheiro que não veio da VAL (crédito desvinculado ou saldo anterior ao extrato): único caso que reduz o crédito da F5 contra a RM (3d)">Pago com outra origem (depois)</th><th style={dir}>Total que reduz o saldo</th><th style={dir}>Saldo</th><th style={dir}>% pago</th></tr></thead>
+              <thead><tr><th style={thSt}>#</th><th style={thSt}>Credor</th><th style={dir}>Valor na confissão</th><th style={dir}>Pago antes de 31/10/2025</th><th style={dir} title="Itens pagos depois de 31/10/2025 com recursos da VAL (inclui origem a confirmar pelo PEPS): desembolso da F5 por conta da RM (3c)">Pago com VAL (depois)</th><th style={dir}>Total que reduz o saldo</th><th style={dir}>Saldo</th><th style={dir}>% pago</th></tr></thead>
               <tbody>{itens.map((i) => { const pago = i.pagoF5 + i.pagoOutros + (i.pagoAntesReconciliado || 0); return (
                 <tr key={i.id}><td style={tdSt}>{i.ordem}</td><td style={{ ...tdSt, fontWeight: 600 }}>{i.credor}</td><td style={num}>{fmtBRL(i.valorFace)}</td>
-                  <td style={num} title="Só reduz o saldo se constar da reconciliação da cl. 1.F.1">{fmtBRL(i.pagoAntes || 0)}</td><td style={num}>{fmtBRL(i.pagoF5)}</td><td style={num}>{fmtBRL(i.pagoOutros)}</td><td style={{ ...num, fontWeight: 600 }}>{fmtBRL(pago)}</td>
+                  <td style={num} title="Só reduz o saldo se constar da reconciliação da cl. 1.F.1">{fmtBRL(i.pagoAntes || 0)}</td><td style={num}>{fmtBRL(i.pagoF5)}</td><td style={{ ...num, fontWeight: 600 }}>{fmtBRL(pago)}</td>
                   <td style={num}>{fmtBRL(i.saldo)}</td><td style={num}>{i.valorFace ? `${((pago / i.valorFace) * 100).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%` : '-'}</td></tr>); })}</tbody>
               <tfoot><tr style={{ borderTop: '1.5px solid #134E4A' }}><td style={tdSt}></td><td style={{ ...tdSt, fontWeight: 700 }}>Total</td><td style={{ ...num, fontWeight: 700 }}>{fmtBRL(totFace)}</td>
-                <td style={{ ...num, fontWeight: 700 }}>{fmtBRL(totAntes)}</td><td style={{ ...num, fontWeight: 700 }}>{fmtBRL(totF5)}</td><td style={{ ...num, fontWeight: 700 }}>{fmtBRL(totOut)}</td><td style={{ ...num, fontWeight: 700 }}>{fmtBRL(totF5 + totOut + totAntesSim)}</td>
+                <td style={{ ...num, fontWeight: 700 }}>{fmtBRL(totAntes)}</td><td style={{ ...num, fontWeight: 700 }}>{fmtBRL(totF5)}</td><td style={{ ...num, fontWeight: 700 }}>{fmtBRL(totF5 + totOut + totAntesSim)}</td>
                 <td style={{ ...num, fontWeight: 700 }}>{fmtBRL(totSaldo)}</td><td style={num}>{totFace ? `${(((totF5 + totOut + totAntesSim) / totFace) * 100).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%` : '-'}</td></tr></tfoot>
             </table>
           </div>

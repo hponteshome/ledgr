@@ -10762,3 +10762,6 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - Coluna renomeada para "Pago com outra origem (depois)". Rotulo das linhas: "VAL (via titulo F5)", "VAL (via titulo F5) - origem a confirmar", "Outra origem, fora da VAL".
 - Fluxo contabil: INSOLV = 2026-07-20.
 - Pendente: cadastrar os R$ 93.000 (recebimentos de terceiro da VAL via custodia) como aporte indireto na Conta Individual, para sair de "a confirmar".
+
+## [PROJETOS] 21/10/2026 - Anexo V: exportar para Excel (Itens do Anexo V)
+- Botao na aba Itens do Anexo V gera itens-anexo-v-AAAA-MM-DD.xlsx: credor, face, pago antes de 31/10/2025 (e parte reconciliada), pago com VAL depois, total que reduz o saldo, saldo e % pago (formulas).
