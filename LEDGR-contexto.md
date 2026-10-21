@@ -10737,3 +10737,8 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - Folha mostra Josi tambem em 04/07/2025 (13.000 dentro do lote TRANSF CC ITAU de 20.287,11), 08/09/2025 (Pix de 14.000) e 05/12/2025 (13.000 dentro do debito de 19.500): a declaracao de 182.000 precisa ser cancelada e reemitida.
 - Custodia: PAGAMENTO_DIRETO Neilson 5.000 + 4.500 (02/06/2025, MANUAL-2025-0462) e VJL Cabras 313,49 (28/08/2025) como uniformes e calcados de funcionarios (Despesa propria da Sunsys); Contabil da VJL pendente do par D despesa / C 1062.
 - Divergencia registrada (sem ajuste, folha intacta): 13o de Izaquiel (201,42) e Jose Claudio (375,00) em 01/12/2025 estao como envio a custodia, mas os comprovantes mostram pagamento direto da Sunsys.
+
+## [PROJETOS] 21/10/2026 - VT, Josi set/dez 2025 e declaracao
+- 8 vales transporte (comprovantes de 30/05 e 01/07/2025) ligados aos debitos SISPAG SALARIOS de 02/05 e 01/08/2025, por decisao do Hpontes.
+- 08/09/2025 (14.000) e 05/12/2025 (19.500): aplicacoes canceladas; decisao CUSTODIA + ENVIO pelo valor do debito + PAGAMENTO_DIRETO de 13.000 (remuneracao Josi). Saldo na custodia: +1.000 e +6.500. Contabil da Sunsys pendente de alinhar (D 1062 / C Banco e D despesa PJ / C 1062).
+- Declaracao de 182.000 cancelada (excluia 07, 09 e 12/2025 por engano); nova declaracao de 26.000 (07 e 09/2026), versao 2 com documento de origem.
