@@ -10720,3 +10720,8 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - Cada pagina virou um PDF proprio, renomeado "AAAA-MM-DD - valor - empresa - descricao (mes-pagina)", extraido em D:\Comprovantes e carregado como COMPROVANTE da Operacao Ancora (SHA-256 no PROJ_STORAGE_DIR; idempotente).
 - Vinculo pelo debito bancario (bank_transaction_id): aplicacao de mesmo valor; senao, a aplicacao do valor somado do lote (ex.: Gurgel 100.000 + 40.000 = parte de 140.000 do lote de 05/05/2026); senao, todas as partes do debito; sem aplicacao, o lancamento da custodia (TED a Josi 16/03/2026).
 - Achado: os Pix de 30.000 de 25/03 e 24/04/2026 anotados como acordo Claudio Auchio Neto (parc 1/3 e 2/3) foram pagos a Michely Charlene de Morais, a mesma favorecida dos acordos "michelly" de 20/01 e 23/02/2026 - confirmar o credor no Doc. 21.
+
+## [PROJETOS] 21/10/2026 - Comprovantes desmembrados (2024-2025)
+- 6 PDFs de 2024-2025 com varios pagamentos viraram 28 arquivos; 8 PDFs de jun-dez/2025 (80 paginas) viraram 76 (2 paginas duplicadas de DARF PGFN ignoradas). Originais em D:\Comprovantes\_originais_antigos.
+- Carga dos 104 em proj_documentos (tipo COMPROVANTE), idempotente pelo SHA-256; vinculo ao debito: valor exato +-3 dias (preferindo pagamento sem documento) ou soma do lote do dia (SISPAG). Relatorio em D:\Temp\carga_104_relatorio.txt (fora do repo, LGPD).
+- Pix a Josi ficaram 'finalidade a confirmar' ate a conciliacao da custodia com os pagamentos feitos por ela.
