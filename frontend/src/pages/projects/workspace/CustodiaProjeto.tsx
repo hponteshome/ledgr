@@ -2,6 +2,8 @@
 // Custodia (Etapa B, 06/10/2026), so o Master por ora: prestacao de contas dos recursos enviados as contas de terceiros
 // (Josi). Envios e devolucoes vem do extrato; pagamentos diretos e recebimentos de terceiros sao registrados com comprovante
 // e validados; alocacoes ligam cada envio a sua justificativa e cada devolucao a sua origem.
+// 21/10/2026: Justificar/Explicar origem listam primeiro os pagamentos diretos e recebimentos de terceiros ja registrados
+// com saldo livre (evita duplicidade); "Manter" registra o mantido em custodia autorizado (proj_custodia_retencoes).
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import api from '../../../services/api';
@@ -23,7 +25,8 @@ export default function CustodiaProjeto({ projetoId, projetoNome }: { projetoId:
   const [erro, setErro] = useState('');
   const [justificar, setJustificar] = useState<any>(null);
   const [origem, setOrigem] = useState<any>(null);
-  const [acao, setAcao] = useState<{ tipo: 'recusar' | 'encerrar'; alvo: 'lancamento' | 'alocacao'; id: string; rotulo: string } | null>(null);
+  const [manter, setManter] = useState<any>(null);
+  const [acao, setAcao] = useState<{ tipo: 'recusar' | 'encerrar'; alvo: 'lancamento' | 'alocacao' | 'retencao'; id: string; rotulo: string } | null>(null);
   // So pendencias (14/10/2026): filtra envios a justificar e devolucoes sem origem (tela, impressao e Excel).
   const [soPend, setSoPend] = useState(() => new URLSearchParams(window.location.search).get('pend') === '1');
   const base = `/projects-relatorios/projetos/${projetoId}/custodias`;
@@ -45,7 +48,7 @@ export default function CustodiaProjeto({ projetoId, projetoNome }: { projetoId:
     imprimirProjeto({ projetoNome, titulo: d.custodia.nome + (soPend ? ' - pendências' : ''), subtitulo: 'Prestação de contas da custódia' + (d.custodia.descricao ? ' · ' + d.custodia.descricao : ''), raiz: raiz.current,
       antesHtml: tabelaResumo([['Enviado', fmtBRL(r.enviado)], ['Devolvido', fmtBRL(r.devolvido)], ['Pagamentos diretos validados', fmtBRL(r.pagosDiretos)],
         ['Recebimentos de terceiros validados', fmtBRL(r.recebidosTerceiros)], ['Saldo em poder', fmtBRL(r.saldoEmPoder)],
-        ['Envios a justificar', fmtBRL(r.enviosPendentes)], ['Devoluções sem origem', fmtBRL(r.devolucoesSemOrigem)]]) });
+        ['Saldo em poder autorizado (mantido)', fmtBRL(r.mantidoAutorizado || 0)], ['Envios a justificar', fmtBRL(r.enviosPendentes)], ['Devoluções sem origem', fmtBRL(r.devolucoesSemOrigem)]]) });
   } : null, 'Imprimir Custódia', [d, projetoNome, soPend]);
   if (erro) return <div style={erroSt}>⚠ {erro}</div>;
   if (!lista.length) return <div style={{ color: '#6B7280' }}>Nenhuma custódia cadastrada neste projeto.</div>;
@@ -100,6 +103,7 @@ export default function CustodiaProjeto({ projetoId, projetoNome }: { projetoId:
         {card('Pagamentos diretos', fmtBRL(r.pagosDiretos), r.pagosDiretosEmAnalise ? `+ ${fmtBRL(r.pagosDiretosEmAnalise)} em análise` : 'validados')}
         {card('Recebimentos de terceiros', fmtBRL(r.recebidosTerceiros), r.recebidosEmAnalise ? `+ ${fmtBRL(r.recebidosEmAnalise)} em análise` : 'validados')}
         {card('Saldo em poder', fmtBRL(r.saldoEmPoder), r.saldoEmPoder < 0 ? 'devolvido a mais: origem a justificar' : 'a devolver ou comprovar', r.saldoEmPoder < 0 ? '#B45309' : undefined)}
+        {card('Saldo em poder autorizado', fmtBRL(r.mantidoAutorizado || 0), r.enviosMantidos ? `mantido com autorização · ${r.enviosMantidos} envio(s)` : 'nenhuma autorização', r.mantidoAutorizado ? '#1E40AF' : undefined)}
         {card('Envios a justificar', fmtBRL(r.enviosPendentes), `${r.enviosVencidos} vencido(s)`, r.enviosVencidos ? '#A32D2D' : undefined)}
         {card('Devoluções sem origem', fmtBRL(r.devolucoesSemOrigem), 'a explicar', r.devolucoesSemOrigem ? '#B45309' : undefined)}
       </div>
@@ -121,11 +125,13 @@ export default function CustodiaProjeto({ projetoId, projetoNome }: { projetoId:
         <div style={{ flex: 1 }} />
         <button style={{ ...btnPri, opacity: pendEnv.length || pendDev.length ? 1 : 0.5 }} disabled={!pendEnv.length && !pendDev.length} onClick={exportarPendencias}>Exportar pendências (Excel)</button>
       </div>
-      <TabelaEnvios itens={soPend ? pendEnv : envios} onJustificar={setJustificar} />
+      <TabelaEnvios itens={soPend ? pendEnv : envios} onJustificar={setJustificar} onManter={setManter}
+        onEncerrarRet={(x: any, rt: any) => setAcao({ tipo: 'encerrar', alvo: 'retencao', id: rt.id, rotulo: `Mantido autorizado ${fmtBRL(rt.valor)} do envio de ${fmtData(x.data)} · ${rt.motivo}` })} />
       <TabelaDevolucoes itens={soPend ? pendDev : devol} onOrigem={setOrigem} />
       {!soPend && <TabelaManuais itens={manuais} onEncerrar={(x: any) => setAcao({ tipo: 'encerrar', alvo: 'lancamento', id: x.id, rotulo: `${fmtData(x.data)} · ${fmtBRL(x.valor)}` })} />}
       {justificar && <JustificarModal base={`${base}/${codigo}`} envio={justificar} d={d} onClose={() => setJustificar(null)} onFeito={() => { setJustificar(null); carregar(); }} />}
       {origem && <OrigemModal base={`${base}/${codigo}`} devolucao={origem} d={d} onClose={() => setOrigem(null)} onFeito={() => { setOrigem(null); carregar(); }} />}
+      {manter && <ManterModal base={`${base}/${codigo}`} envio={manter} onClose={() => setManter(null)} onFeito={() => { setManter(null); carregar(); }} />}
       {acao && <MotivoModal titulo={acao.tipo === 'recusar' ? 'Recusar' : 'Encerrar'} rotulo={acao.rotulo} onClose={() => setAcao(null)}
         enviar={async (motivo) => { if (acao.tipo === 'recusar') await api.post(`${base}/${codigo}/validar`, { alvo: acao.alvo, id: acao.id, decisao: 'RECUSADO', motivo }); else await api.post(`${base}/${codigo}/encerrar`, { alvo: acao.alvo, id: acao.id, motivo }); }}
         onFeito={() => { setAcao(null); carregar(); }} />}
@@ -134,25 +140,28 @@ export default function CustodiaProjeto({ projetoId, projetoNome }: { projetoId:
 }
 
 // Ordenacao por coluna (06/10/2026): mesmo componente das telas de triagem; vazios sempre no fim.
-const COLS_ENV: Record<string, (x: any) => any> = { data: (x) => x.data, valor: (x) => x.valor, justificado: (x) => x.alocadoValidado, analise: (x) => x.alocadoEmAnalise, pendente: (x) => x.pendente, prazo: (x) => (x.pendente <= 0 ? '9999' : x.prazo) };
+const COLS_ENV: Record<string, (x: any) => any> = { data: (x) => x.data, valor: (x) => x.valor, justificado: (x) => x.alocadoValidado, analise: (x) => x.alocadoEmAnalise, mantido: (x) => x.retido, pendente: (x) => x.pendente, prazo: (x) => (x.pendente <= 0 ? '9999' : x.prazo) };
 const COLS_DEV: Record<string, (x: any) => any> = { data: (x) => x.data, valor: (x) => x.valor, pagador: (x) => x.contraparte || x.lancamentoBanco, origem: (x) => x.alocadoValidado + x.alocadoEmAnalise, sem: (x) => x.pendente };
 const COLS_MAN: Record<string, (x: any) => any> = { data: (x) => x.data, tipo: (x) => x.tipo, valor: (x) => x.valor, natureza: (x) => `${x.natureza || ''} ${x.favorecido || ''}`.trim(), comprovante: (x) => x.descricao, situacao: (x) => x.situacao };
 const dir: React.CSSProperties = { ...thSt, textAlign: 'right' };
 
-function TabelaEnvios({ itens, onJustificar }: { itens: any[]; onJustificar: (x: any) => void }) {
+function TabelaEnvios({ itens, onJustificar, onManter, onEncerrarRet }: { itens: any[]; onJustificar: (x: any) => void; onManter: (x: any) => void; onEncerrarRet: (x: any, rt: any) => void }) {
   const { ordenada, ord, alternar } = useOrdenacao(itens, COLS_ENV, { col: 'data', dir: 'asc' });
   const th = (col: string, rot: string, st: React.CSSProperties = thSt) => <ThOrdenavel col={col} rotulo={rot} ord={ord} alternar={alternar} style={st} />;
   return (
     <div style={{ ...cardSt, overflowX: 'auto' }}>
       <div style={{ ...secTitle, padding: '12px 14px 0' }}>Envios</div>
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-        <thead><tr>{th('data', 'Data')}{th('valor', 'Valor', dir)}{th('justificado', 'Justificado', dir)}{th('analise', 'Em análise', dir)}{th('pendente', 'A justificar', dir)}{th('prazo', 'Prazo')}<th style={thSt}></th></tr></thead>
+        <thead><tr>{th('data', 'Data')}{th('valor', 'Valor', dir)}{th('justificado', 'Justificado', dir)}{th('analise', 'Em análise', dir)}{th('mantido', 'Mantido (autorizado)', dir)}{th('pendente', 'A justificar', dir)}{th('prazo', 'Prazo')}<th style={thSt}></th></tr></thead>
         <tbody>{ordenada.map((x) => (
           <tr key={x.id}><td style={tdSt}>{fmtData(x.data)}{x.anotacao && <div style={{ fontSize: 11, color: '#6B7280', marginTop: 2, minWidth: 260, whiteSpace: 'normal' }}>{x.anotacao}</div>}</td><td style={{ ...tdSt, textAlign: 'right', fontWeight: 600 }}>{fmtBRL(x.valor)}</td>
             <td style={{ ...tdSt, textAlign: 'right' }}>{fmtBRL(x.alocadoValidado)}</td><td style={{ ...tdSt, textAlign: 'right' }}>{fmtBRL(x.alocadoEmAnalise)}</td>
+            <td style={{ ...tdSt, textAlign: 'right' }}>{x.retido > 0 ? (x.retencoes || []).map((rt: any) => (
+              <div key={rt.id} title={rt.motivo} style={{ color: '#1E40AF', whiteSpace: 'nowrap' }}>{fmtBRL(rt.valor)}
+                <button style={{ ...btn, padding: '0 6px', fontSize: 11, marginLeft: 6 }} title={'Encerrar a autorização: ' + rt.motivo} onClick={() => onEncerrarRet(x, rt)}>encerrar</button></div>)) : fmtBRL(0)}</td>
             <td style={{ ...tdSt, textAlign: 'right', fontWeight: 600 }}>{fmtBRL(x.pendente)}</td>
-            <td style={tdSt}>{x.pendente <= 0 ? selo('Justificado', '#DCFCE7', '#166534') : x.vencido ? selo(`Vencido em ${fmtData(x.prazo)}`, '#FCEBEB', '#A32D2D') : selo(`Até ${fmtData(x.prazo)}`, '#FEF3C7', '#78350F')}</td>
-            <td style={{ ...tdSt, textAlign: 'right' }}>{x.pendente > 0 && <button style={btnPri} onClick={() => onJustificar(x)}>Justificar</button>}</td></tr>))}</tbody>
+            <td style={tdSt}>{x.pendente <= 0 ? (x.retido > 0 ? selo('Mantido (autorizado)', '#DBEAFE', '#1E40AF') : selo('Justificado', '#DCFCE7', '#166534')) : x.vencido ? selo(`Vencido em ${fmtData(x.prazo)}`, '#FCEBEB', '#A32D2D') : selo(`Até ${fmtData(x.prazo)}`, '#FEF3C7', '#78350F')}</td>
+            <td style={{ ...tdSt, textAlign: 'right', whiteSpace: 'nowrap' }}>{x.pendente > 0 && <><button style={btn} title="Autorizar a custodiante a manter este valor" onClick={() => onManter(x)}>Manter</button>{' '}<button style={btnPri} onClick={() => onJustificar(x)}>Justificar</button></>}</td></tr>))}</tbody>
       </table>
     </div>
   );
@@ -203,8 +212,14 @@ function Abas({ abas, ativa, set }: { abas: [string, string][]; ativa: string; s
 
 function JustificarModal({ base, envio, d, onClose, onFeito }: { base: string; envio: any; d: any; onClose: () => void; onFeito: () => void }) {
   const devs = (d.lancamentos as any[]).filter((x) => x.tipo === 'DEVOLUCAO' && x.pendente > 0);
+  // Pagamentos diretos ja registrados com saldo livre, do mais proximo da data do envio ao mais distante.
+  const dist = (x: any) => Math.abs(Date.parse(x.data) - Date.parse(envio.data));
+  const pds = (d.lancamentos as any[]).filter((x) => x.tipo === 'PAGAMENTO_DIRETO' && x.situacao !== 'RECUSADO' && x.pendente > 0).sort((a, b) => dist(a) - dist(b));
   const [aba, setAba] = useState(devs.length ? 'devolucao' : 'pagamento');
   const [devId, setDevId] = useState('');
+  const [pdId, setPdId] = useState('');
+  const [novoPd, setNovoPd] = useState(pds.length === 0);
+  const pdSel = pds.find((x) => x.id === pdId);
   const [valor, setValor] = useState(String(envio.pendente));
   const [data, setData] = useState(envio.data);
   const [natureza, setNatureza] = useState('');
@@ -214,11 +229,13 @@ function JustificarModal({ base, envio, d, onClose, onFeito }: { base: string; e
   const [erro, setErro] = useState('');
   const [enviando, setEnviando] = useState(false);
   const v = Number(String(valor).replace(',', '.'));
-  const valido = v > 0 && v <= envio.pendente + 0.001 && motivo.trim().length >= 10 && (aba === 'devolucao' ? !!devId : !!natureza && comprovante.trim().length >= 3 && !!data);
+  const valido = v > 0 && v <= envio.pendente + 0.001 && motivo.trim().length >= 10 && (aba === 'devolucao' ? !!devId : !novoPd ? !!pdSel && v <= pdSel.pendente + 0.001 : !!natureza && comprovante.trim().length >= 3 && !!data);
+  const parecido = aba === 'pagamento' && novoPd && v > 0 ? pds.find((x) => Math.abs(x.valor - v) < 0.005 || Math.abs(x.pendente - v) < 0.005) : undefined;
   const enviar = async () => {
     if (!valido) return; setErro(''); setEnviando(true);
     try {
       if (aba === 'devolucao') await api.post(`${base}/alocacoes`, { origemId: envio.id, destinoId: devId, valor: v, motivo: motivo.trim() });
+      else if (!novoPd) await api.post(`${base}/alocacoes`, { origemId: envio.id, destinoId: pdId, valor: v, motivo: motivo.trim() });
       else await api.post(`${base}/lancamentos`, { tipo: 'PAGAMENTO_DIRETO', data, valor: v, naturezaCodigo: natureza, favorecido, comprovante, motivo: motivo.trim(), alocarEm: envio.id });
       toast.success('Registrado; aguarda validação.'); onFeito();
     } catch (e: any) { setErro(erroApi(e, 'Falha ao registrar.')); } finally { setEnviando(false); }
@@ -234,7 +251,22 @@ function JustificarModal({ base, envio, d, onClose, onFeito }: { base: string; e
             <option value="">Selecione...</option>{devs.map((x) => <option key={x.id} value={x.id}>{fmtData(x.data)} · {fmtBRL(x.valor)} · disponível {fmtBRL(x.pendente)}</option>)}</select></Campo>
         </Secao>
       ) : (
+        <>
+        {pds.length > 0 && (
+          <div style={{ display: 'flex', gap: 16, fontSize: 13, marginBottom: 8 }}>
+            <label style={{ display: 'flex', gap: 6, alignItems: 'center', cursor: 'pointer' }}><input type="radio" checked={!novoPd} onChange={() => setNovoPd(false)} />Pagamento já registrado ({pds.length})</label>
+            <label style={{ display: 'flex', gap: 6, alignItems: 'center', cursor: 'pointer' }}><input type="radio" checked={novoPd} onChange={() => setNovoPd(true)} />Registrar novo pagamento</label>
+          </div>
+        )}
+        {!novoPd ? (
+        <Secao titulo="PAGAMENTO DIRETO JÁ REGISTRADO">
+          <Campo rotulo="Pagamento *"><select style={inputModal} value={pdId} onChange={(e) => { setPdId(e.target.value); const x = pds.find((y) => y.id === e.target.value); if (x) setValor(String(Math.min(envio.pendente, x.pendente))); }}>
+            <option value="">Selecione...</option>{pds.map((x) => <option key={x.id} value={x.id}>{fmtData(x.data)} · {fmtBRL(x.valor)} · livre {fmtBRL(x.pendente)} · {x.favorecido || x.natureza || '-'}{x.situacao === 'REGISTRADO' ? ' (em análise)' : ''}</option>)}</select></Campo>
+          {pdSel && <div style={{ fontSize: 11, color: '#6B7280', marginTop: 6 }}>{[pdSel.natureza, pdSel.favorecido, pdSel.descricao].filter(Boolean).join(' · ')}</div>}
+        </Secao>
+        ) : (
         <Secao titulo="PAGAMENTO DIRETO FEITO PELA CUSTODIANTE">
+          {parecido && <div style={{ fontSize: 12, color: '#B45309', marginBottom: 8 }}>⚠ Já existe pagamento direto de {fmtData(parecido.data)} com valor {fmtBRL(parecido.valor)} (livre {fmtBRL(parecido.pendente)}). Se for o mesmo, use "Pagamento já registrado".</div>}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <Campo rotulo="Data do pagamento *"><input type="date" style={inputModal} value={data} onChange={(e) => setData(e.target.value)} /></Campo>
             <Campo rotulo="Natureza *"><select style={inputModal} value={natureza} onChange={(e) => setNatureza(e.target.value)}><option value="">Selecione...</option>{(d.naturezas as any[]).map((n) => <option key={n.codigo} value={n.codigo}>{n.nome}</option>)}</select></Campo>
@@ -242,6 +274,8 @@ function JustificarModal({ base, envio, d, onClose, onFeito }: { base: string; e
             <Campo rotulo="Comprovante *"><input style={inputModal} value={comprovante} onChange={(e) => setComprovante(e.target.value)} placeholder="Nº do DARF, recibo, processo..." /></Campo>
           </div>
         </Secao>
+        )}
+        </>
       )}
       <Secao titulo="VALOR E MOTIVO *">
         <Campo rotulo={`Valor (até ${fmtBRL(envio.pendente)})`}><input style={inputModal} value={valor} onChange={(e) => setValor(e.target.value)} /></Campo>
@@ -253,8 +287,14 @@ function JustificarModal({ base, envio, d, onClose, onFeito }: { base: string; e
 
 function OrigemModal({ base, devolucao, d, onClose, onFeito }: { base: string; devolucao: any; d: any; onClose: () => void; onFeito: () => void }) {
   const envs = (d.lancamentos as any[]).filter((x) => x.tipo === 'ENVIO' && x.pendente > 0);
+  // Recebimentos de terceiros ja registrados com saldo livre, do mais proximo da data da devolucao ao mais distante.
+  const dist = (x: any) => Math.abs(Date.parse(x.data) - Date.parse(devolucao.data));
+  const rts = (d.lancamentos as any[]).filter((x) => x.tipo === 'RECEBIMENTO_TERCEIRO' && x.situacao !== 'RECUSADO' && x.pendente > 0).sort((a, b) => dist(a) - dist(b));
   const [aba, setAba] = useState(envs.length ? 'envio' : 'terceiro');
   const [envId, setEnvId] = useState('');
+  const [rtId, setRtId] = useState('');
+  const [novoRt, setNovoRt] = useState(rts.length === 0);
+  const rtSel = rts.find((x) => x.id === rtId);
   const [valor, setValor] = useState(String(devolucao.pendente));
   const [data, setData] = useState(devolucao.data);
   const [favorecido, setFavorecido] = useState('');
@@ -263,11 +303,12 @@ function OrigemModal({ base, devolucao, d, onClose, onFeito }: { base: string; d
   const [erro, setErro] = useState('');
   const [enviando, setEnviando] = useState(false);
   const v = Number(String(valor).replace(',', '.'));
-  const valido = v > 0 && v <= devolucao.pendente + 0.001 && motivo.trim().length >= 10 && (aba === 'envio' ? !!envId : favorecido.trim().length >= 3 && comprovante.trim().length >= 3 && !!data);
+  const valido = v > 0 && v <= devolucao.pendente + 0.001 && motivo.trim().length >= 10 && (aba === 'envio' ? !!envId : !novoRt ? !!rtSel && v <= rtSel.pendente + 0.001 : favorecido.trim().length >= 3 && comprovante.trim().length >= 3 && !!data);
   const enviar = async () => {
     if (!valido) return; setErro(''); setEnviando(true);
     try {
       if (aba === 'envio') await api.post(`${base}/alocacoes`, { origemId: envId, destinoId: devolucao.id, valor: v, motivo: motivo.trim() });
+      else if (!novoRt) await api.post(`${base}/alocacoes`, { origemId: rtId, destinoId: devolucao.id, valor: v, motivo: motivo.trim() });
       else await api.post(`${base}/lancamentos`, { tipo: 'RECEBIMENTO_TERCEIRO', data, valor: v, favorecido, comprovante, motivo: motivo.trim(), alocarEm: devolucao.id });
       toast.success('Registrado; aguarda validação.'); onFeito();
     } catch (e: any) { setErro(erroApi(e, 'Falha ao registrar.')); } finally { setEnviando(false); }
@@ -283,6 +324,20 @@ function OrigemModal({ base, devolucao, d, onClose, onFeito }: { base: string; d
             <option value="">Selecione...</option>{envs.map((x) => <option key={x.id} value={x.id}>{fmtData(x.data)} · {fmtBRL(x.valor)} · a justificar {fmtBRL(x.pendente)}</option>)}</select></Campo>
         </Secao>
       ) : (
+        <>
+        {rts.length > 0 && (
+          <div style={{ display: 'flex', gap: 16, fontSize: 13, marginBottom: 8 }}>
+            <label style={{ display: 'flex', gap: 6, alignItems: 'center', cursor: 'pointer' }}><input type="radio" checked={!novoRt} onChange={() => setNovoRt(false)} />Recebimento já registrado ({rts.length})</label>
+            <label style={{ display: 'flex', gap: 6, alignItems: 'center', cursor: 'pointer' }}><input type="radio" checked={novoRt} onChange={() => setNovoRt(true)} />Registrar novo recebimento</label>
+          </div>
+        )}
+        {!novoRt ? (
+        <Secao titulo="RECEBIMENTO DE TERCEIRO JÁ REGISTRADO">
+          <Campo rotulo="Recebimento *"><select style={inputModal} value={rtId} onChange={(e) => { setRtId(e.target.value); const x = rts.find((y) => y.id === e.target.value); if (x) setValor(String(Math.min(devolucao.pendente, x.pendente))); }}>
+            <option value="">Selecione...</option>{rts.map((x) => <option key={x.id} value={x.id}>{fmtData(x.data)} · {fmtBRL(x.valor)} · livre {fmtBRL(x.pendente)} · {x.favorecido || '-'}{x.situacao === 'REGISTRADO' ? ' (em análise)' : ''}</option>)}</select></Campo>
+          {rtSel && <div style={{ fontSize: 11, color: '#6B7280', marginTop: 6 }}>{[rtSel.favorecido, rtSel.descricao].filter(Boolean).join(' · ')}</div>}
+        </Secao>
+        ) : (
         <Secao titulo="RECEBIMENTO NA CONTA DA CUSTODIANTE">
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <Campo rotulo="Data do recebimento *"><input type="date" style={inputModal} value={data} onChange={(e) => setData(e.target.value)} /></Campo>
@@ -290,10 +345,39 @@ function OrigemModal({ base, devolucao, d, onClose, onFeito }: { base: string; d
             <Campo rotulo="Comprovante *" largo><input style={inputModal} value={comprovante} onChange={(e) => setComprovante(e.target.value)} placeholder="Recibo, nota, contrato, transferência..." /></Campo>
           </div>
         </Secao>
+        )}
+        </>
       )}
       <Secao titulo="VALOR E MOTIVO *">
         <Campo rotulo={`Valor (até ${fmtBRL(devolucao.pendente)})`}><input style={inputModal} value={valor} onChange={(e) => setValor(e.target.value)} /></Campo>
         <textarea style={{ ...inputModal, minHeight: 56, marginTop: 8, resize: 'vertical' }} value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Mínimo de 10 caracteres. Fica na trilha de auditoria." />
+      </Secao>
+    </ModalProjeto>
+  );
+}
+
+// Mantido em custodia autorizado (21/10/2026): o valor fica com a custodiante, com autorizacao registrada; sai de "a justificar"
+// e de "vencido". Para usar depois numa justificativa, encerra-se a autorizacao (com motivo).
+function ManterModal({ base, envio, onClose, onFeito }: { base: string; envio: any; onClose: () => void; onFeito: () => void }) {
+  const [valor, setValor] = useState(String(envio.pendente));
+  const [motivo, setMotivo] = useState('');
+  const [erro, setErro] = useState('');
+  const [enviando, setEnviando] = useState(false);
+  const v = Number(String(valor).replace(',', '.'));
+  const valido = v > 0 && v <= envio.pendente + 0.001 && motivo.trim().length >= 10;
+  const enviar = async () => {
+    if (!valido) return; setErro(''); setEnviando(true);
+    try { await api.post(`${base}/retencoes`, { envioId: envio.id, valor: v, motivo: motivo.trim() }); toast.success('Autorização registrada.'); onFeito(); }
+    catch (e: any) { setErro(erroApi(e, 'Falha ao registrar.')); } finally { setEnviando(false); }
+  };
+  return (
+    <ModalProjeto titulo="Manter em custódia (autorizado)" subtitulo={`${fmtData(envio.data)} · ${fmtBRL(envio.valor)} · a justificar ${fmtBRL(envio.pendente)}`} onClose={onClose}
+      rodape={<><BotaoSec onClick={onClose}>Cancelar</BotaoSec><BotaoPri onClick={enviar} ativo={valido && !enviando}>{enviando ? 'Aguarde...' : 'Autorizar'}</BotaoPri></>}>
+      <ErroModal msg={erro} />
+      <div style={{ fontSize: 12, color: '#6B7280', marginBottom: 10 }}>O valor continua em poder da custodiante, com autorização: sai de "a justificar" e de "vencido" e passa a compor o saldo em poder autorizado. Para usá-lo depois numa justificativa, encerre a autorização.</div>
+      <Secao titulo="VALOR E MOTIVO *">
+        <Campo rotulo={`Valor (até ${fmtBRL(envio.pendente)})`}><input style={inputModal} value={valor} onChange={(e) => setValor(e.target.value)} /></Campo>
+        <textarea style={{ ...inputModal, minHeight: 56, marginTop: 8, resize: 'vertical' }} value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Quem autorizou, por quê e até quando. Mínimo de 10 caracteres; fica na trilha de auditoria." />
       </Secao>
     </ModalProjeto>
   );

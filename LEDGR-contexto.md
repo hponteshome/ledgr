@@ -10749,3 +10749,10 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - PAGAMENTO_DIRETO de 208.718,71 (03/12/2024) esta RECUSADO desde 14/10 e nao entra no saldo. Pix de 208.000,00 de 06/01/2025 mantido como aplicacao PGFN Solsys (repasse da Josi para a DARF parcela 4), coerente com o Contabil (1208).
 - Saldo da custodia: projeto = Contabil (1062) = +2.962,32 esperado apos o estorno.
 - Pendente para o contador (sem ajuste, regra da folha): remuneracao da Josi (PJ) esta em 4201 Salarios; o natural seria 4432 Servicos de Terceiros PJ.
+
+## [PROJETOS] 21/10/2026 - Custodia: justificar com escolha e mantido autorizado
+- Justificar (aba pagamento direto) e Explicar origem (aba recebimento de terceiro) listam primeiro os lancamentos ja registrados com saldo livre; a alocacao usa o escolhido. Novo registro so como segunda opcao (aviso de valor parecido). Origem das duplicidades de PD corrigida.
+- Mantido em custodia (autorizado): tabela proj_custodia_retencoes (migrations-manuais/20261021_proj_custodia_retencoes.sql), imutavel, RLS Master, encerra so com motivo. Gatilho: alocacoes + retencoes <= valor do envio; gatilho das alocacoes passou a descontar retencoes.
+- API: POST .../custodias/:codigo/retencoes {envioId, valor, motivo} (AuditLog PROJ_CUSTODIA_RETENCAO_REGISTRADA); encerrar com alvo retencao. Detalhe: retido e retencoes por envio; resumo.mantidoAutorizado e enviosMantidos.
+- Tela: botao Manter por envio, coluna e selo Mantido (autorizado), card Saldo em poder autorizado (tambem na impressao).
+- Pendente (decisao do Hpontes, pela tela): autorizar ou nao os envios de 1.000,00 (08/09/2025) e 6.500,00 (05/12/2025).

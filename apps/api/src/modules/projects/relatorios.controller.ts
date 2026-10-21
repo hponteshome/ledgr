@@ -1266,7 +1266,7 @@ export class RelatoriosController {
 
   private erroCustodia(e: any): never {
     const m = String(e?.meta?.message || e?.message || '');
-    const t = m.match(/((Aloca|Lancamento|Validacao|Encerramento|Envio)[^"\n]{0,180})/);
+    const t = m.match(/((Aloca|Lancamento|Validacao|Encerramento|Envio|Retencao)[^"\n]{0,180})/);
     if (t) throw new BadRequestException(t[1].replace(/\s+$/, ''));
     throw e;
   }
@@ -1294,6 +1294,9 @@ export class RelatoriosController {
         WHERE l.custodia_id = ${c.id}::uuid AND l.cancelado_em IS NULL ORDER BY l.data, l.criado_em`;
       const aloc: any[] = await tx.$queryRaw`SELECT id, origem_id, destino_id, valor, situacao, motivo, motivo_validacao FROM proj_custodia_alocacoes
         WHERE custodia_id = ${c.id}::uuid AND cancelado_em IS NULL ORDER BY criado_em`;
+      // Mantido em custodia (21/10/2026): autorizacoes vigentes por envio (proj_custodia_retencoes) saem de "a justificar" e de "vencido".
+      const ret: any[] = await tx.$queryRaw`SELECT id, envio_id, valor, motivo, criado_em FROM proj_custodia_retencoes
+        WHERE custodia_id = ${c.id}::uuid AND cancelado_em IS NULL ORDER BY criado_em`;
       const naturezas: any[] = await tx.$queryRaw`SELECT codigo, nome FROM proj_naturezas_aplicacao WHERE ativo AND tipo = 'APLICACAO' ORDER BY nome`;
       const cent = (v: any) => Math.round(Number(v) * 100);
       const hoje = new Date().toISOString().slice(0, 10);
@@ -1304,9 +1307,12 @@ export class RelatoriosController {
         const vC = cent(l.valor); const val = soma(campo, l.id, 'VALIDADO'); const reg = soma(campo, l.id, 'REGISTRADO');
         const data = (l.data as Date).toISOString().slice(0, 10);
         const limite = new Date(new Date(data + 'T00:00:00Z').getTime() + Number(c.prazo_dias) * 86400000).toISOString().slice(0, 10);
-        const pend = l.situacao === 'RECUSADO' ? 0 : Math.max(0, vC - val - reg);
+        const retL = l.tipo === 'ENVIO' ? ret.filter((x) => x.envio_id === l.id) : [];
+        const retido = retL.reduce((s, x) => s + cent(x.valor), 0);
+        const pend = l.situacao === 'RECUSADO' ? 0 : Math.max(0, vC - val - reg - retido);
         return { id: l.id, tipo: l.tipo, data, valor: vC / 100, situacao: l.situacao, favorecido: l.favorecido, descricao: l.descricao, motivo: l.motivo,
           motivoValidacao: l.motivo_validacao, natureza: l.natureza, lancamentoBanco: l.lancamento_banco, contraparte: l.contraparte, anotacao: l.anotacao || null, extrato: !!l.bank_transaction_id,
+          retido: retido / 100, retencoes: retL.map((x) => ({ id: x.id, valor: cent(x.valor) / 100, motivo: x.motivo, criadoEm: x.criado_em })),
           alocadoValidado: val / 100, alocadoEmAnalise: reg / 100, pendente: pend / 100, prazo: l.tipo === 'ENVIO' ? limite : null, vencido: l.tipo === 'ENVIO' && pend > 0 && limite < hoje };
       });
       const tot = (t: string, sit?: string) => itens.filter((i) => i.tipo === t && i.situacao !== 'RECUSADO' && (!sit || i.situacao === sit)).reduce((s, i) => s + cent(i.valor), 0);
@@ -1319,6 +1325,7 @@ export class RelatoriosController {
           recebidosTerceiros: recebidos / 100, recebidosEmAnalise: tot('RECEBIMENTO_TERCEIRO', 'REGISTRADO') / 100, saldoEmPoder: (enviado + recebidos - devolvido - pagos) / 100,
           enviosPendentes: itens.filter((i) => i.tipo === 'ENVIO').reduce((s, i) => s + cent(i.pendente), 0) / 100, enviosVencidos: itens.filter((i) => i.vencido).length,
           devolucoesSemOrigem: itens.filter((i) => i.tipo === 'DEVOLUCAO').reduce((s, i) => s + cent(i.pendente), 0) / 100,
+          mantidoAutorizado: itens.reduce((s, i) => s + cent(i.retido), 0) / 100, enviosMantidos: itens.filter((i) => i.retido > 0).length,
         },
         lancamentos: itens,
         alocacoes: aloc.map((a) => ({ id: a.id, origemId: a.origem_id, destinoId: a.destino_id, origem: rot.get(a.origem_id) || '-', destino: rot.get(a.destino_id) || '-', valor: cent(a.valor) / 100, situacao: a.situacao, motivo: a.motivo, motivoValidacao: a.motivo_validacao })),
@@ -1393,6 +1400,30 @@ export class RelatoriosController {
     });
   }
 
+  // Mantido em custodia autorizado (21/10/2026): a custodiante fica com parte de um envio, com autorizacao registrada (valor,
+  // motivo, quem e quando). Sai de "a justificar" e de "vencido". Imutavel (proj_custodia_retencoes); so encerra com motivo.
+  @PostC('projetos/:projetoId/custodias/:codigo/retencoes')
+  @UseGuards(MasterOnlyGuard)
+  @ProjAcao('autenticado')
+  custodiaManter(@Param('projetoId') projetoId: string, @Param('codigo') codigo: string, @BodyC() b: any, @Req() req: any) {
+    if (!UUID_RE.test(projetoId)) throw new NotFoundException('Registro nao encontrado.');
+    const envio = String(b?.envioId || '');
+    if (!UUID_RE.test(envio)) throw new BadRequestException('Informe o envio.');
+    const valor = Math.round(Number(b?.valor) * 100) / 100;
+    if (!(valor > 0)) throw new BadRequestException('Informe um valor positivo.');
+    const motivo = String(b?.motivo || '').trim();
+    if (motivo.length < 10) throw new BadRequestException('Informe o motivo (minimo 10 caracteres).');
+    return this.db.comoUsuario(req.user.id, async (tx: any) => {
+      const c = await this.custodiaBase(tx, projetoId, codigo);
+      try {
+        const r: any[] = await tx.$queryRaw`INSERT INTO proj_custodia_retencoes (custodia_id, envio_id, valor, motivo, criado_por_id)
+          VALUES (${c.id}::uuid, ${envio}::uuid, ${valor.toFixed(2)}::numeric, ${motivo}, ${req.user.id}::uuid) RETURNING id`;
+        await tx.auditLog.create({ data: { actorId: req.user.id, action: 'PROJ_CUSTODIA_RETENCAO_REGISTRADA', targetId: r[0].id, after: { custodia: c.codigo, envio, valor: valor.toFixed(2), motivo } } });
+        return { id: r[0].id };
+      } catch (e) { this.erroCustodia(e); }
+    });
+  }
+
   @PostC('projetos/:projetoId/custodias/:codigo/validar')
   @UseGuards(MasterOnlyGuard)
   @ProjAcao('autenticado')
@@ -1423,7 +1454,7 @@ export class RelatoriosController {
   custodiaEncerrar(@Param('projetoId') projetoId: string, @Param('codigo') codigo: string, @BodyC() b: any, @Req() req: any) {
     if (!UUID_RE.test(projetoId)) throw new NotFoundException('Registro nao encontrado.');
     const alvo = String(b?.alvo || ''); const id = String(b?.id || ''); const motivo = String(b?.motivo || '').trim();
-    if (!['lancamento', 'alocacao'].includes(alvo) || !UUID_RE.test(id)) throw new BadRequestException('Pedido invalido.');
+    if (!['lancamento', 'alocacao', 'retencao'].includes(alvo) || !UUID_RE.test(id)) throw new BadRequestException('Pedido invalido.');
     if (motivo.length < 10) throw new BadRequestException('Informe o motivo (minimo 10 caracteres).');
     return this.db.comoUsuario(req.user.id, async (tx: any) => {
       const c = await this.custodiaBase(tx, projetoId, codigo);
@@ -1435,6 +1466,9 @@ export class RelatoriosController {
         const n: number = alvo === 'lancamento'
           ? await tx.$executeRaw`UPDATE proj_custodia_lancamentos SET cancelado_em = now(), cancelado_por_id = ${req.user.id}::uuid, motivo_cancelamento = ${motivo}
               WHERE id = ${id}::uuid AND custodia_id = ${c.id}::uuid AND cancelado_em IS NULL AND bank_transaction_id IS NULL`
+          : alvo === 'retencao'
+          ? await tx.$executeRaw`UPDATE proj_custodia_retencoes SET cancelado_em = now(), cancelado_por_id = ${req.user.id}::uuid, motivo_cancelamento = ${motivo}
+              WHERE id = ${id}::uuid AND custodia_id = ${c.id}::uuid AND cancelado_em IS NULL`
           : await tx.$executeRaw`UPDATE proj_custodia_alocacoes SET cancelado_em = now(), cancelado_por_id = ${req.user.id}::uuid, motivo_cancelamento = ${motivo}
               WHERE id = ${id}::uuid AND custodia_id = ${c.id}::uuid AND cancelado_em IS NULL`;
         if (!n) throw new BadRequestException('Nada a encerrar (envios e devolucoes do extrato so saem da custodia pela triagem).');
