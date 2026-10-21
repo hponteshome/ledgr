@@ -10742,3 +10742,10 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - 8 vales transporte (comprovantes de 30/05 e 01/07/2025) ligados aos debitos SISPAG SALARIOS de 02/05 e 01/08/2025, por decisao do Hpontes.
 - 08/09/2025 (14.000) e 05/12/2025 (19.500): aplicacoes canceladas; decisao CUSTODIA + ENVIO pelo valor do debito + PAGAMENTO_DIRETO de 13.000 (remuneracao Josi). Saldo na custodia: +1.000 e +6.500. Contabil da Sunsys pendente de alinhar (D 1062 / C Banco e D despesa PJ / C 1062).
 - Declaracao de 182.000 cancelada (excluia 07, 09 e 12/2025 por engano); nova declaracao de 26.000 (07 e 09/2026), versao 2 com documento de origem.
+
+## [PROJETOS/CONTABIL] 21/10/2026 - Josi, custodia e Contabil da Sunsys conciliados
+- Contabil Sunsys: MANUAL-2025-0467/0468 (set/2025: D 1062 / C 4201 14.000; D 4201 / C 1062 13.000), 0469/0470 (dez/2025: 19.500 / 13.000), 0471 (VJL 313,49 C 1062) e 0472 (VJL reclassificada de 1061 EPI para 42103010042 Uniformes e Vestuario). Efeito em 2025: Salarios -7.500,00; Uniformes +313,49. Encerramento 2025 da Sunsys a refazer.
+- Projeto: duplicidade de Neilson corrigida (PAGAMENTO_DIRETO de 9.500 ja existia; 5.000 + 4.500 cancelados, comprovantes religados). Par de 505,00 de 02/04/2026 tratado como ESTORNO_BANCARIO (devolucao da custodia e aplicacao canceladas).
+- PAGAMENTO_DIRETO de 208.718,71 (03/12/2024) esta RECUSADO desde 14/10 e nao entra no saldo. Pix de 208.000,00 de 06/01/2025 mantido como aplicacao PGFN Solsys (repasse da Josi para a DARF parcela 4), coerente com o Contabil (1208).
+- Saldo da custodia: projeto = Contabil (1062) = +2.962,32 esperado apos o estorno.
+- Pendente para o contador (sem ajuste, regra da folha): remuneracao da Josi (PJ) esta em 4201 Salarios; o natural seria 4432 Servicos de Terceiros PJ.
