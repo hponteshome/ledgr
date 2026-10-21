@@ -10765,3 +10765,5 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 
 ## [PROJETOS] 21/10/2026 - Anexo V: exportar para Excel (Itens do Anexo V)
 - Botao na aba Itens do Anexo V gera itens-anexo-v-AAAA-MM-DD.xlsx: credor, face, pago antes de 31/10/2025 (e parte reconciliada), pago com VAL depois, total que reduz o saldo, saldo e % pago (formulas).
+
+- 21/10/2026: exportacao Itens do Anexo V passou a espelhar a tela (8 colunas, valores da tabela, totais por formula).

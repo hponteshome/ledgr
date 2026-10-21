@@ -92,34 +92,40 @@ export default function AnexoVProjeto({ projetoId, projetoNome }: { projetoId: s
     } catch (e) { setErroModal(erroApi(e, 'Falha ao gravar.')); }
   };
 
-  // Exportacao da aba Itens do Anexo V (21/10/2026): mesmas colunas da tela; totais e % por formula.
+  // Exportacao da aba Itens do Anexo V - espelho da tela (21/10/2026): mesmas colunas, textos e valores da tabela;
+  // so os totais da ultima linha sao formulas (somas das colunas e % pago do total).
   const exportarItens = async () => {
     const ExcelJS = await import('exceljs');
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet('Itens do Anexo V');
     const hoje = new Date();
-    ws.addRow([`Anexo V e desembolsos - itens do Anexo V${projetoNome ? ' - ' + projetoNome : ''}`]);
-    ws.addRow([`Passivo de R$ 54.418.451,00 na confissão de ${fmtData(CONTRATO)} (cl. 2.A.2) · posição em ${hoje.toLocaleDateString('pt-BR')} · inclui classificações sugeridas ainda não confirmadas`]);
+    ws.addRow(['Anexo V e desembolsos']);
+    ws.addRow([`Passivo brasileiro de R$ 54.418.451,00 na confissão de ${fmtData(CONTRATO)} (cl. 2.A.2) · pagamentos classificados por credor, com a origem do dinheiro pelo PEPS · tudo em reconciliação: recalculado a cada consulta`]);
+    ws.addRow([`${projetoNome ? projetoNome + ' · ' : ''}Itens do Anexo V · posição em ${hoje.toLocaleDateString('pt-BR')} ${hoje.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`]);
+    ws.addRow(['A carteira do Anexo V é a posição em 31/10/2025: pagamentos anteriores só reduzem o saldo se constarem da reconciliação da cl. 1.F.1 (Sim: entram na confissão da RM); com Não, são crédito da F5 sobre a Sunrise, e os aportes da VAL que os pagaram continuam sendo da VAL. Os valores incluem classificações sugeridas ainda não confirmadas. Pago não é o mesmo que quitado: a diferença para a face pode ser desconto obtido.']);
     ws.addRow([]);
-    ws.addRow(['#', 'Credor', 'Valor na confissão (R$)', 'Pago antes de 31/10/2025 (R$)', 'Pago antes de 31/10/2025 que reduz o saldo (R$)', 'Pago com VAL depois de 31/10/2025 (R$)', 'Total que reduz o saldo (R$)', 'Saldo (R$)', '% pago']);
-    const ini = 5;
-    itens.forEach((i, k) => {
-      const r = ini + k;
-      ws.addRow([i.ordem, i.credor, Number(i.valorFace || 0), Number(i.pagoAntes || 0), Number(i.pagoAntesReconciliado || 0), Number(i.pagoF5 || 0) + Number(i.pagoOutros || 0),
-        { formula: `E${r}+F${r}` }, { formula: `C${r}-G${r}` }, { formula: `IF(C${r}=0,0,G${r}/C${r})` }]);
-    });
-    const fim = ini + itens.length - 1;
-    const tot = ws.addRow(['', 'Total', ...['C', 'D', 'E', 'F', 'G', 'H'].map((c) => ({ formula: `SUM(${c}${ini}:${c}${fim})` })), { formula: `IF(C${fim + 1}=0,0,G${fim + 1}/C${fim + 1})` }]);
+    const cab = ws.addRow(['#', 'Credor', 'Valor na confissão', 'Pago antes de 31/10/2025', 'Pago com VAL (depois)', 'Total que reduz o saldo', 'Saldo', '% pago']);
+    const ini = cab.number + 1;
+    for (const i of itens) {
+      const pago = Number(i.pagoF5 || 0) + Number(i.pagoOutros || 0) + Number(i.pagoAntesReconciliado || 0);
+      const face = Number(i.valorFace || 0);
+      const r = ws.addRow([i.ordem, i.credor, face, Number(i.pagoAntes || 0), Number(i.pagoF5 || 0) + Number(i.pagoOutros || 0), pago, Number(i.saldo || 0), face ? pago / face : 0]);
+      r.getCell(2).font = { bold: true }; r.getCell(6).font = { bold: true };
+    }
+    const fim = ws.lastRow ? ws.lastRow.number : ini - 1;
+    const tot = ws.addRow(['', 'Total', ...['C', 'D', 'E', 'F', 'G'].map((c) => ({ formula: `SUM(${c}${ini}:${c}${fim})` })), { formula: `IF(C${fim + 1}=0,0,F${fim + 1}/C${fim + 1})` }]);
     tot.font = { bold: true };
-    ws.addRow([]);
-    ws.addRow(['', 'Pagamentos anteriores a 31/10/2025 só reduzem o saldo se constarem da reconciliação da cl. 1.F.1. Pago não é o mesmo que quitado: a diferença para a face pode ser desconto obtido.']);
-    ws.getRow(1).font = { bold: true, size: 12 };
-    ws.getRow(4).font = { bold: true };
-    ws.getRow(4).alignment = { wrapText: true, vertical: 'middle' };
-    ['C', 'D', 'E', 'F', 'G', 'H'].forEach((c) => { ws.getColumn(c).numFmt = '#,##0.00'; });
-    ws.getColumn('I').numFmt = '0.0%';
-    [5, 42, 18, 18, 20, 20, 18, 18, 9].forEach((w, k) => { ws.getColumn(k + 1).width = w; });
-    ws.views = [{ state: 'frozen', ySplit: 4 }];
+    tot.eachCell((c) => { c.border = { top: { style: 'medium', color: { argb: 'FF134E4A' } } }; });
+    ws.getRow(1).font = { bold: true, size: 14, color: { argb: 'FF0F2747' } };
+    [2, 3].forEach((n) => { ws.getRow(n).font = { size: 9, color: { argb: 'FF6B7280' } }; });
+    ws.getRow(4).font = { size: 9, color: { argb: 'FF6B7280' } };
+    ws.mergeCells(4, 1, 4, 8); ws.getRow(4).alignment = { wrapText: true, vertical: 'top' }; ws.getRow(4).height = 40;
+    cab.font = { bold: true, size: 9, color: { argb: 'FF6B7280' } };
+    cab.eachCell((c, n) => { c.alignment = { horizontal: n >= 3 ? 'right' : 'left', vertical: 'middle' }; c.border = { bottom: { style: 'thin', color: { argb: 'FFE5E7EB' } } }; });
+    ['C', 'D', 'E', 'F', 'G'].forEach((c) => { ws.getColumn(c).numFmt = '"R$" #,##0.00'; });
+    ws.getColumn('H').numFmt = '0.0%';
+    [5, 44, 20, 22, 20, 22, 20, 9].forEach((w, k) => { ws.getColumn(k + 1).width = w; });
+    ws.views = [{ state: 'frozen', ySplit: cab.number }];
     const buf = await wb.xlsx.writeBuffer();
     const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const u = URL.createObjectURL(blob); const el = document.createElement('a');
