@@ -10725,3 +10725,9 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - 6 PDFs de 2024-2025 com varios pagamentos viraram 28 arquivos; 8 PDFs de jun-dez/2025 (80 paginas) viraram 76 (2 paginas duplicadas de DARF PGFN ignoradas). Originais em D:\Comprovantes\_originais_antigos.
 - Carga dos 104 em proj_documentos (tipo COMPROVANTE), idempotente pelo SHA-256; vinculo ao debito: valor exato +-3 dias (preferindo pagamento sem documento) ou soma do lote do dia (SISPAG). Relatorio em D:\Temp\carga_104_relatorio.txt (fora do repo, LGPD).
 - Pix a Josi ficaram 'finalidade a confirmar' ate a conciliacao da custodia com os pagamentos feitos por ela.
+
+## [PROJETOS] 21/10/2026 - Remuneracao Josi e custodia
+- Declaracao interna de classificacao (Hpontes): remuneracao mensal da Josi = R$ 13.000,00 (PJ, sem vinculo). Vinculada a 14 aplicacoes (TRANSF CC ITAU 04/2025-04/2026 e SISPAG SALARIOS 05, 07 e 09/2026), total R$ 182.000,00. Nao sao dela: TRANSF CC ITAU de 415,00, 2.305,00 (2x), 7.609,95, 20.287,11, 14.000,00 e 19.500,00; SISPAG SALARIOS de 18.000,00.
+- Comprovante do Pix de 51.179,00 (19/12/2025) vinculado as 3 aplicacoes desmembradas (41.718 + 7.761 + 1.700).
+- Custodia: PAGAMENTO_DIRETO de 5.000 + 4.500 (Neilson, trabalhista Hotelsys, 02/06/2025), alinhado ao Contabil MANUAL-2025-0462; PAGAMENTO_DIRETO de 313,49 (VJL Cabras, 28/08/2025) - Contabil pendente do par D despesa / C 1062.
+- Divergencia registrada (opcao B, sem ajuste): 13o de Izaquiel (201,42) e Jose Claudio (375,00) em 01/12/2025 estao como envio a custodia (Contabil D 1062), mas os comprovantes mostram pagamento direto da Sunsys aos funcionarios. Folha nao foi alterada.
