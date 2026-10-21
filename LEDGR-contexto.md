@@ -10731,3 +10731,9 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - Comprovante do Pix de 51.179,00 (19/12/2025) vinculado as 3 aplicacoes desmembradas (41.718 + 7.761 + 1.700).
 - Custodia: PAGAMENTO_DIRETO de 5.000 + 4.500 (Neilson, trabalhista Hotelsys, 02/06/2025), alinhado ao Contabil MANUAL-2025-0462; PAGAMENTO_DIRETO de 313,49 (VJL Cabras, 28/08/2025) - Contabil pendente do par D despesa / C 1062.
 - Divergencia registrada (opcao B, sem ajuste): 13o de Izaquiel (201,42) e Jose Claudio (375,00) em 01/12/2025 estao como envio a custodia (Contabil D 1062), mas os comprovantes mostram pagamento direto da Sunsys aos funcionarios. Folha nao foi alterada.
+
+## [PROJETOS] 21/10/2026 - Folha, VT e custodia
+- 65 comprovantes (folha 37, vale transporte 28) carregados e vinculados por valor exato +-3 dias ou soma do lote do dia. Relatorio em D:\Temp\carga_folha_vt_relatorio.txt.
+- Folha mostra Josi tambem em 04/07/2025 (13.000 dentro do lote TRANSF CC ITAU de 20.287,11), 08/09/2025 (Pix de 14.000) e 05/12/2025 (13.000 dentro do debito de 19.500): a declaracao de 182.000 precisa ser cancelada e reemitida.
+- Custodia: PAGAMENTO_DIRETO Neilson 5.000 + 4.500 (02/06/2025, MANUAL-2025-0462) e VJL Cabras 313,49 (28/08/2025) como uniformes e calcados de funcionarios (Despesa propria da Sunsys); Contabil da VJL pendente do par D despesa / C 1062.
+- Divergencia registrada (sem ajuste, folha intacta): 13o de Izaquiel (201,42) e Jose Claudio (375,00) em 01/12/2025 estao como envio a custodia, mas os comprovantes mostram pagamento direto da Sunsys.
