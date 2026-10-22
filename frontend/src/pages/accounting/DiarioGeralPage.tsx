@@ -402,7 +402,7 @@ const DiarioGeralPage: React.FC = () => {
         const buf = await wb.xlsx.writeBuffer();
         const u = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
         const el = document.createElement('a');
-        el.href = u; el.download = `LoteContador_${(activeCompany?.tradeName || 'empresa').replace(/[^A-Za-z0-9]+/g, '_')}_${filters.dateFrom}_${filters.dateTo}.xlsx`;
+        el.href = u; el.download = `Lote_Alterdata_${(activeCompany?.tradeName || 'empresa').replace(/[^A-Za-z0-9]+/g, '_')}_${filters.dateFrom}_${filters.dateTo}.xlsx`;
         document.body.appendChild(el); el.click(); el.remove(); URL.revokeObjectURL(u);
     };
 
@@ -455,16 +455,9 @@ const DiarioGeralPage: React.FC = () => {
                 onFilter={() => setShowModal(true)}
                 onPrint={printLivroDiario}
                 onExportCSV={data ? exportCSV : undefined}
+                extraExports={data ? [{ label: 'Lote Alterdata (.xlsx)', onClick: exportLoteContador }] : undefined}
                 hasData={!!data}
             />
-            {data && data.entries.length > 0 && (
-                <div className="no-print" style={{ display: 'flex', justifyContent: 'flex-end', margin: '-4px 0 10px' }}>
-                    <button onClick={exportLoteContador} title="Planilha no layout de importação do contador (códigos reduzidos do LEDGR)"
-                        style={{ padding: '6px 14px', borderRadius: 8, border: '0.5px solid #E5E7EB', background: '#fff', fontSize: 13, fontWeight: 500, color: '#111', cursor: 'pointer' }}>
-                        Exportar lote do contador (.xlsx)
-                    </button>
-                </div>
-            )}
 
             {loading ? (
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 80, gap: 12, color: '#9CA3AF' }}>

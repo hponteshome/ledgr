@@ -45,6 +45,7 @@ interface ReportToolbarProps {
     onExportCSV?: () => void;
     onExportPDF?: () => void;
     onExportXLSX?: () => void;
+    extraExports?: { label: string; onClick: () => void }[]; // 22/10/2026: opcoes extras do menu Exportar
     hasData: boolean;
     filterLabel?: string;
     extraContent?: React.ReactNode;
@@ -55,7 +56,7 @@ export const ReportToolbar: React.FC<ReportToolbarProps> = ({
     badge = '◆ Contábil', badgeColor = '#1D4ED8', badgeBg = '#EFF6FF',
     dateFrom, dateTo, onPeriodChange,
     count, countLabel = 'registros',
-    onFilter, onPrint, onExportCSV, onExportPDF, onExportXLSX,
+    onFilter, onPrint, onExportCSV, onExportPDF, onExportXLSX, extraExports,
     hasData, filterLabel = 'Mais filtros',
     extraContent,
 }) => {
@@ -71,7 +72,7 @@ export const ReportToolbar: React.FC<ReportToolbarProps> = ({
     const handleToChange = (v: string) => { setTo(v); setDirty(true); };
     const handleApply = () => { if (from && to) { onPeriodChange(from, to); setDirty(false); } };
 
-    const hasExport = onExportCSV || onExportPDF || onExportXLSX;
+    const hasExport = onExportCSV || onExportPDF || onExportXLSX || (extraExports && extraExports.length > 0);
 
     const inpStyle: React.CSSProperties = {
         height: 30, border: '0.5px solid #E5E7EB', borderRadius: 6,
@@ -200,7 +201,7 @@ export const ReportToolbar: React.FC<ReportToolbarProps> = ({
                                         position: 'absolute', top: '100%', right: 0, marginTop: 4,
                                         background: '#fff', border: '0.5px solid #E5E7EB',
                                         borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.10)',
-                                        zIndex: 50, minWidth: 160, overflow: 'hidden',
+                                        zIndex: 50, minWidth: 210, overflow: 'hidden',
                                     }}>
                                         {onExportPDF && (
                                             <button onClick={() => { onExportPDF(); setExportOpen(false); }}
@@ -226,6 +227,14 @@ export const ReportToolbar: React.FC<ReportToolbarProps> = ({
                                                 <FiDownload size={13} color="#1D4ED8" /> Exportar CSV
                                             </button>
                                         )}
+                                        {(extraExports || []).map(x => (
+                                            <button key={x.label} onClick={() => { x.onClick(); setExportOpen(false); }}
+                                                style={dropItem}
+                                                onMouseEnter={e => e.currentTarget.style.background = '#F0FDF4'}
+                                                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                                                <FiDownload size={13} color="#15803D" /> {x.label}
+                                            </button>
+                                        ))}
                                     </div>
                                 </>
                             )}
