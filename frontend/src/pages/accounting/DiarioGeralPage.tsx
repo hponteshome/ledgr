@@ -356,6 +356,56 @@ const DiarioGeralPage: React.FC = () => {
         const w = window.open('', '_blank');
         if (w) { w.document.write(html); w.document.close(); }
     };
+    // 22/10/2026: lote no layout de importacao do contador (.xlsx). Codigos = reduzido do LEDGR.
+    const exportLoteContador = async () => {
+        if (!data?.entries.length) return;
+        const ExcelJS = await import('exceljs');
+        const wb = new ExcelJS.Workbook();
+        const ws = wb.addWorksheet('Lancamentos');
+        ws.columns = [
+            { header: 'lancto auto', key: 'auto', width: 12 }, { header: 'debito', key: 'deb', width: 12 }, { header: 'credito', key: 'cre', width: 12 },
+            { header: 'data', key: 'data', width: 12 }, { header: 'valor', key: 'valor', width: 16 }, { header: 'cód histórico', key: 'codh', width: 14 },
+            { header: 'complemento historico', key: 'hist', width: 70 }, { header: 'Ccusto debito', key: 'ccd', width: 14 },
+            { header: 'Ccusto credito', key: 'ccc', width: 14 }, { header: 'NrDocumento', key: 'doc', width: 16 },
+        ];
+        const semRed = new Map<string, string>();
+        const cod = (acc?: Account) => {
+            if (!acc) return '';
+            if (acc.reducedCode) return Number(acc.reducedCode) || acc.reducedCode;
+            semRed.set(acc.code, acc.name); return acc.code;
+        };
+        const dt = (d: string) => { const { y, m, day } = parseDate(d); return new Date(Date.UTC(y, m - 1, day)); };
+        const limpa = (s?: string) => (s || '').replace(/[\r\n]+/g, ' ').trim();
+        let n = 0;
+        grouped.forEach(({ days }) => days.forEach(({ entries }) => entries.forEach(entry => {
+            n++;
+            const debs = entry.items.filter(i => i.type === 'DEBIT');
+            const cres = entry.items.filter(i => i.type === 'CREDIT');
+            const base = { auto: n, data: dt(entry.date), codh: '', hist: limpa(entry.description), ccd: '', ccc: '', doc: entry.reference || loteLctoLabel(entry) };
+            if (debs.length === 1 && cres.length === 1) {
+                ws.addRow({ ...base, deb: cod(debs[0].account), cre: cod(cres[0].account), valor: Number(debs[0].value) });
+            } else {
+                debs.forEach(i => ws.addRow({ ...base, deb: cod(i.account), cre: '', valor: Number(i.value) }));
+                cres.forEach(i => ws.addRow({ ...base, deb: '', cre: cod(i.account), valor: Number(i.value) }));
+            }
+        })));
+        ws.getRow(1).font = { bold: true };
+        ws.getColumn('data').numFmt = 'dd/mm/yyyy';
+        ws.getColumn('valor').numFmt = '#,##0.00';
+        ws.views = [{ state: 'frozen', ySplit: 1 }];
+        if (semRed.size) {
+            const av = wb.addWorksheet('Contas sem reduzido');
+            av.columns = [{ header: 'Conta (codigo completo usado no lote)', key: 'c', width: 24 }, { header: 'Nome', key: 'n', width: 50 }];
+            semRed.forEach((nome, c) => av.addRow({ c, n: nome }));
+            av.getRow(1).font = { bold: true };
+        }
+        const buf = await wb.xlsx.writeBuffer();
+        const u = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+        const el = document.createElement('a');
+        el.href = u; el.download = `LoteContador_${(activeCompany?.tradeName || 'empresa').replace(/[^A-Za-z0-9]+/g, '_')}_${filters.dateFrom}_${filters.dateTo}.xlsx`;
+        document.body.appendChild(el); el.click(); el.remove(); URL.revokeObjectURL(u);
+    };
+
     const exportCSV = () => {
         // 22/10/2026: data completa (DD/MM/AAAA) e historico em todas as linhas; separador "|" (Regra 12)
         if (!data?.entries.length) return;
@@ -407,6 +457,14 @@ const DiarioGeralPage: React.FC = () => {
                 onExportCSV={data ? exportCSV : undefined}
                 hasData={!!data}
             />
+            {data && data.entries.length > 0 && (
+                <div className="no-print" style={{ display: 'flex', justifyContent: 'flex-end', margin: '-4px 0 10px' }}>
+                    <button onClick={exportLoteContador} title="Planilha no layout de importação do contador (códigos reduzidos do LEDGR)"
+                        style={{ padding: '6px 14px', borderRadius: 8, border: '0.5px solid #E5E7EB', background: '#fff', fontSize: 13, fontWeight: 500, color: '#111', cursor: 'pointer' }}>
+                        Exportar lote do contador (.xlsx)
+                    </button>
+                </div>
+            )}
 
             {loading ? (
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 80, gap: 12, color: '#9CA3AF' }}>
