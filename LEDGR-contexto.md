@@ -10784,3 +10784,5 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - 22/10/2026: 'Manutencao da Operacao' nao existe: despesa propria da Sunsys. Contabil 37 pagamentos (119.033,52) e projeto 93 aplicacoes (174.984,63). Pendente: 150.000,00 de 08/2024 (emprestimo com garantia); refazer encerramentos 2024 e 2025 da Hotelsys e da Sunsys.
 
 - 22/10/2026: projeto - 8 aplicacoes de honorarios contabeis/reembolso depois de 31/10/2025 (36.136,46) para Despesa propria da Sunsys. Operacao Ancora conferida: mutuo, aportes VAL, Anexo V pago e custodia batem entre Sunsys, Hotelsys e projeto.
+
+- 22/10/2026: Hotelsys - IPTU 2025 em 02/01/2025 (513.823,45, fato gerador), 7 lancamentos de 31/12/2025 do contador anterior excluidos; emprestimo com garantia de 150.000,00 restabelecido. Refazer encerramentos 2024 e 2025.
