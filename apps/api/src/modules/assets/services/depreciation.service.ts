@@ -55,6 +55,11 @@ export class DepreciationService {
         if (alreadyProcessed) continue;
 
         const monthlyCharge = this.calculateCharge(asset);
+        if (!(monthlyCharge > 0)) {
+          // 22/10/2026: base ja completa - nao gera parcela e inativa o bem
+          await this.prisma.fixedAsset.update({ where: { id: asset.id }, data: { remainingLifeMonths: 0, status: 'INACTIVE' } });
+          continue;
+        }
         const accumDeprecBefore = Number(asset.accumulatedDeprec);
         const accumDeprecAfter  = accumDeprecBefore + monthlyCharge;
         const bookValueAfter    = Number(asset.bookValue) - monthlyCharge;
@@ -132,6 +137,7 @@ export class DepreciationService {
       ? `DATE_TRUNC('month', '${dateTo}'::date)`
       : `DATE_TRUNC('month', CURRENT_DATE)`;
 
+    // 22/10/2026 - limite: depreciacao nunca passa do custo depreciavel (custo - terreno - residual) nem da vida util.
     const result = await this.prisma.$executeRawUnsafe(`
       WITH params AS (
         SELECT
@@ -139,32 +145,41 @@ export class DepreciationService {
           company_id,
           depreciation_method,
           acquisition_cost,
-          COALESCE(land_value_amount, 0) AS land_amount,
-          residual_value,
+          (acquisition_cost - COALESCE(land_value_amount,0) - residual_value) AS base,
           useful_life_months,
-          ROUND((acquisition_cost - COALESCE(land_value_amount,0) - residual_value) / useful_life_months, 2) AS monthly_charge
+          ROUND((acquisition_cost - COALESCE(land_value_amount,0) - residual_value) / NULLIF(useful_life_months, 0), 2) AS monthly_charge
         FROM fixed_assets
-        WHERE id = '${assetId}' AND company_id = '${companyId}'
+        WHERE id = '${assetId}' AND company_id = '${companyId}' AND non_depreciable = false
       ),
       months AS (
         SELECT
           gs::date AS period,
-          (ROW_NUMBER() OVER () - 1) AS idx
+          (ROW_NUMBER() OVER (ORDER BY gs) - 1) AS idx
         FROM generate_series(${fromClause}, ${toClause}, '1 month'::interval) AS gs
+      ),
+      calc AS (
+        SELECT
+          p.id, p.company_id, p.depreciation_method, p.acquisition_cost, m.period,
+          LEAST(p.base, ROUND(p.monthly_charge * m.idx, 2)) AS acc_before,
+          CASE WHEN m.idx = p.useful_life_months - 1 THEN p.base
+               ELSE LEAST(p.base, ROUND(p.monthly_charge * (m.idx + 1), 2)) END AS acc_after
+        FROM months m, params p
+        WHERE p.base > 0 AND p.monthly_charge > 0 AND m.idx < p.useful_life_months
       )
       INSERT INTO asset_depreciation_logs
         (id, company_id, asset_id, period, method, monthly_charge, accum_deprec_before, accum_deprec_after, book_value_after)
       SELECT
         gen_random_uuid(),
-        p.company_id,
-        p.id,
-        m.period,
-        p.depreciation_method,
-        p.monthly_charge,
-        ROUND(p.monthly_charge * m.idx, 2),
-        ROUND(p.monthly_charge * (m.idx + 1), 2),
-        ROUND(p.acquisition_cost - ROUND(p.monthly_charge * (m.idx + 1), 2), 2)
-      FROM months m, params p
+        c.company_id,
+        c.id,
+        c.period,
+        c.depreciation_method,
+        c.acc_after - c.acc_before,
+        c.acc_before,
+        c.acc_after,
+        ROUND(c.acquisition_cost - c.acc_after, 2)
+      FROM calc c
+      WHERE c.acc_after > c.acc_before
       ON CONFLICT (asset_id, method, period) DO UPDATE SET
         monthly_charge      = EXCLUDED.monthly_charge,
         accum_deprec_before = EXCLUDED.accum_deprec_before,
@@ -172,23 +187,21 @@ export class DepreciationService {
         book_value_after    = EXCLUDED.book_value_after
     `);
 
-    // 3 — Atualizar o ativo com os valores finais
+    // 3 - Atualizar o ativo com a soma real das parcelas
     await this.prisma.$executeRawUnsafe(`
-      WITH params AS (
-        SELECT
-          ROUND((acquisition_cost - COALESCE(land_value_amount,0) - residual_value) / useful_life_months, 2) AS monthly_charge,
-          useful_life_months
-        FROM fixed_assets WHERE id = '${assetId}'
-      ),
-      log_count AS (
-        SELECT COUNT(*) AS cnt FROM asset_depreciation_logs WHERE asset_id = '${assetId}' AND company_id = '${companyId}'
+      WITH s AS (
+        SELECT COALESCE(SUM(monthly_charge), 0) AS acc, COUNT(*) AS cnt
+        FROM asset_depreciation_logs WHERE asset_id = '${assetId}' AND company_id = '${companyId}'
       )
-      UPDATE fixed_assets SET
-        accumulated_depreciation = (SELECT ROUND(monthly_charge * cnt, 2) FROM params, log_count),
-        book_value               = acquisition_cost - (SELECT ROUND(monthly_charge * cnt, 2) FROM params, log_count),
-        remaining_life_months    = (SELECT useful_life_months - cnt::int FROM params, log_count),
-        status                   = CASE WHEN (SELECT useful_life_months - cnt::int FROM params, log_count) <= 0 THEN 'INACTIVE'::asset_status ELSE 'ACTIVE'::asset_status END
-      WHERE id = '${assetId}' AND company_id = '${companyId}'
+      UPDATE fixed_assets f SET
+        accumulated_depreciation = s.acc,
+        book_value               = f.acquisition_cost - s.acc,
+        remaining_life_months    = GREATEST(f.useful_life_months - s.cnt::int, 0),
+        status                   = CASE WHEN s.acc >= (f.acquisition_cost - COALESCE(f.land_value_amount,0) - f.residual_value)
+                                          OR f.useful_life_months - s.cnt::int <= 0
+                                        THEN 'INACTIVE'::asset_status ELSE 'ACTIVE'::asset_status END
+      FROM s
+      WHERE f.id = '${assetId}' AND f.company_id = '${companyId}'
     `);
 
     return result;
@@ -221,7 +234,7 @@ export class DepreciationService {
       include: { asset: { select: { id: true, description: true, depreciationAccId: true, accumDeprecAccId: true } } },
     });
 
-    const logsWithAccounts = logs.filter(l => l.asset.depreciationAccId && l.asset.accumDeprecAccId);
+    const logsWithAccounts = logs.filter(l => l.asset.depreciationAccId && l.asset.accumDeprecAccId && Number(l.monthlyCharge) > 0);
     if (logsWithAccounts.length === 0) return { created: false, totalAssets: 0, totalAmount: 0 };
 
     const totalAmount = logsWithAccounts.reduce((s, l) => s + Number(l.monthlyCharge), 0);
