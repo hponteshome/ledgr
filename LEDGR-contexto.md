@@ -10788,3 +10788,5 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - 22/10/2026: Hotelsys - IPTU 2025 em 02/01/2025 (513.823,45, fato gerador), 7 lancamentos de 31/12/2025 do contador anterior excluidos; emprestimo com garantia de 150.000,00 restabelecido. Refazer encerramentos 2024 e 2025.
 
 - 22/10/2026: Hotelsys - 11304010009 zerada: pagamentos antes de 31/10/2025 baixam passivo (federais, trabalhistas, item 7) ou viram despesa (Solsys, devolucoes AV, arbitragem, custas, taxas). Federais 31/10/2025 = 17.371.723,23. Refazer encerramentos 2024 e 2025.
+
+- 22/10/2026: Hotelsys - equivalencia sobre a Sunsys refeita (99,92%, realizacao do ganho da integralizacao de 2018); CC Matriz sem os ajustes de 31/12/2024. Pendente: depreciacao acima do custo (modulo de ativo) e equivalencia da Sunrise.
