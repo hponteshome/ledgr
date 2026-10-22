@@ -6,6 +6,7 @@
 // zerar erros - suporta correcao inline das linhas problematicas sem
 // obrigar reupload de arquivo.
 
+import toast from 'react-hot-toast';
 import React, { useState, useRef } from 'react';
 import { FiUpload, FiCheckCircle, FiAlertTriangle, FiX, FiInfo } from 'react-icons/fi';
 
@@ -20,6 +21,10 @@ const EXEMPLO = `05736256000185|Manual
 05072018||1001||Aporte de Caixa nesta data|||10000,00
 06072018||4042||Pagto IPTU nesta data|||5000,00
 06072018|||2028|Aporte AFAC nesta data|||15000,00`;
+
+// 22/10/2026: 401 (token vencido) vira "Sessão Expirada!!!"; avisos por toast em vez de alert() do navegador.
+const msgErroImport = (m?: string, padrao = 'Erro ao importar.') =>
+  (/unauthori[sz]ed|jwt expired|\b401\b/i.test(String(m || '')) ? 'Sessão Expirada!!!' : (m || padrao));
 
 export const JournalManualImportModal: React.FC<Props> = ({ onClose, onSuccess }) => {
     const [text, setText]         = useState('');
@@ -67,7 +72,7 @@ export const JournalManualImportModal: React.FC<Props> = ({ onClose, onSuccess }
             const res  = await fetch(`${API}/accounting/journal/preview-manual-import`, { method: 'POST', headers, body: fd });
             const data = await res.json();
             setPreview(data);
-        } catch (e: any) { alert(e.message); }
+        } catch (e: any) { toast.error(msgErroImport(e.message)); }
         finally { setLoading(false); }
     }
 
@@ -94,7 +99,7 @@ export const JournalManualImportModal: React.FC<Props> = ({ onClose, onSuccess }
                 return;
             }
             if (!res.ok) {
-                alert(data?.message || 'Erro ao importar.');
+                toast.error(msgErroImport(data?.message));
                 setLoading(false);
                 return;
             }
@@ -104,7 +109,7 @@ export const JournalManualImportModal: React.FC<Props> = ({ onClose, onSuccess }
             // NAO chama onSuccess aqui - o pai (JournalPage) fecha o modal
             // instantaneamente no onSuccess, impedindo a tela "Importacao
             // concluida" de aparecer. onSuccess so dispara no botao Fechar.
-        } catch (e: any) { alert(e.message); }
+        } catch (e: any) { toast.error(msgErroImport(e.message)); }
         finally { setLoading(false); }
     }
 

@@ -10772,3 +10772,5 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - Lancamento unico em 31/12/2024 contra Ajustes de Exercicios Anteriores (D 1.797.815,35): saldos de 31/10/2025 = relacao de credores (R$ 67.258.658,64).
 - Itens 1 e 3 em 22101060001 (20.586.670,77); Outras trabalhistas 6.272.441,00 (sai o item 2); Federais 18.838.519,51 sem IRPJ/CSLL (diferenca de 10.465.532,79 no INSS, a redistribuir se houver composicao); Municipais 11.714.225,36 (ISS zerado, IPTU ajustado); Rescisoes a pagar 934.080,00 (21101040005); item 18 retirado.
 - Preservados: provisoes de IRPJ e CSLL, ICMS, FGTS, SPU, trabalhistas menores, emprestimo com garantia 150 mil, mutuo Sunsys, CC Matriz, IR/CSLL diferido.
+
+- 22/10/2026: 401 sem renovacao mostra 'Sessao Expirada!!!' (toast unico, volta ao login em 1,5 s); Importar Manual sem alert().

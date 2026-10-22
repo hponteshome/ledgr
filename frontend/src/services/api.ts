@@ -54,6 +54,7 @@ api.interceptors.request.use(
 // Rotas de autenticacao (login, 2fa, refresh, logout) nunca disparam renovacao nem logout:
 // um codigo 2FA errado (401) nao pode derrubar a sessao do usuario logado.
 let renovando: Promise<string | null> | null = null;
+let sessaoAvisada = false;
 
 async function renovarAcesso(): Promise<string | null> {
   const rt = localStorage.getItem('@ledgr:refresh');
@@ -109,7 +110,8 @@ api.interceptors.response.use(
         }
       }
       console.warn('[API] Sessao expirada. Redirecionando...');
-      encerrarSessaoLocal();
+      // 22/10/2026: aviso unico antes de voltar ao login (varias requisicoes podem falhar juntas).
+      if (!sessaoAvisada) { sessaoAvisada = true; toast.error('Sessão Expirada!!!', { id: 'sessao-expirada' }); setTimeout(encerrarSessaoLocal, 1500); }
     }
 
     if (error.response?.status === 403) {
