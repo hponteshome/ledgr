@@ -357,30 +357,32 @@ const DiarioGeralPage: React.FC = () => {
         if (w) { w.document.write(html); w.document.close(); }
     };
     const exportCSV = () => {
+        // 22/10/2026: data completa (DD/MM/AAAA) e historico em todas as linhas; separador "|" (Regra 12)
         if (!data?.entries.length) return;
-        const rows = [['Mês', 'Dia', 'Conta', 'Nome', 'Red.', 'Histórico', 'Lcto', 'Débito', 'Crédito']];
-        grouped.forEach(({ month, days }) => {
-            days.forEach(({ day, entries }) => {
+        const limpa = (s?: string) => (s || '').replace(/[|\r\n]+/g, ' ').trim();
+        const valor = (v: number) => Number(v).toFixed(2).replace('.', ',');
+        const rows: string[][] = [['Data', 'Lote/Lcto', 'Conta', 'Nome', 'Red.', 'Histórico', 'Débito', 'Crédito']];
+        grouped.forEach(({ days }) => {
+            days.forEach(({ entries }) => {
                 entries.forEach(entry => {
                     const allItems = [...entry.items.filter(i => i.type === 'DEBIT'), ...entry.items.filter(i => i.type === 'CREDIT')];
-                    allItems.forEach((item, idx) => {
+                    allItems.forEach(item => {
                         rows.push([
-                            fmtMonthYear(day),
-                            idx === 0 ? fmtDay(entry.date) : '',
+                            fmtDateFull(entry.date),
+                            loteLctoLabel(entry),
                             item.account?.code || '',
-                            `"${item.account?.name || ''}"`,
-                            '',
-                            idx === 0 ? `"${entry.description}"` : '',
-                            idx === 0 ? loteLctoLabel(entry) : '',
-                            item.type === 'DEBIT' ? Number(item.value).toFixed(2).replace('.', ',') : '',
-                            item.type === 'CREDIT' ? Number(item.value).toFixed(2).replace('.', ',') : '',
+                            limpa(item.account?.name),
+                            item.account?.reducedCode || '',
+                            limpa(entry.description),
+                            item.type === 'DEBIT' ? valor(item.value) : '',
+                            item.type === 'CREDIT' ? valor(item.value) : '',
                         ]);
                     });
                 });
             });
         });
         const a = document.createElement('a');
-        a.href = URL.createObjectURL(new Blob(['\uFEFF' + rows.map(r => r.join(',')).join('\n')], { type: 'text/csv;charset=utf-8' }));
+        a.href = URL.createObjectURL(new Blob(['\uFEFF' + rows.map(r => r.join('|')).join('\r\n')], { type: 'text/csv;charset=utf-8' }));
         a.download = `DiarioGeral_${filters.dateFrom}_${filters.dateTo}.csv`; a.click();
     };
 
