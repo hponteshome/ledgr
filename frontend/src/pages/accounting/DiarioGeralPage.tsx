@@ -356,10 +356,87 @@ const DiarioGeralPage: React.FC = () => {
         const w = window.open('', '_blank');
         if (w) { w.document.write(html); w.document.close(); }
     };
-    // 22/10/2026: lote no layout de importacao do contador (.xlsx). Codigos = reduzido do LEDGR.
-    const exportLoteContador = async () => {
+    // 22/10/2026 (rev.): lote no layout de importacao do Alterdata (contador) (.xlsx).
+    // - Contas = reduzido do contador, pelo arquivo de de-para escolhido na hora (col. A codigo LEDGR, col. B reduzido do contador).
+    // - So partidas dobradas (o Alterdata recusa partida simples em empresa com SPED): lancamento com varias partidas
+    //   e desdobrado em pares debito/credito com o mesmo numero de lancamento.
+    // - Encerramentos (RESULT_TRANSFER) ficam fora: o contador encerra o exercicio no proprio sistema.
+    const exportLoteContador = () => {
         if (!data?.entries.length) return;
+        const inp = document.createElement('input');
+        inp.type = 'file'; inp.accept = '.xlsx';
+        inp.onchange = () => { const f = inp.files?.[0]; if (f) void gerarLoteContador(f); };
+        inp.click();
+    };
+    const gerarLoteContador = async (arq: File) => {
         const ExcelJS = await import('exceljs');
+        const empresa = (activeCompany?.tradeName || 'empresa').replace(/[^A-Za-z0-9]+/g, '_');
+        const baixar = async (wb: any, nome: string) => {
+            const buf = await wb.xlsx.writeBuffer();
+            const u = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+            const el = document.createElement('a');
+            el.href = u; el.download = nome;
+            document.body.appendChild(el); el.click(); el.remove(); URL.revokeObjectURL(u);
+        };
+        // de-para: codigo LEDGR -> reduzido do contador
+        const dp = new ExcelJS.Workbook();
+        try { await dp.xlsx.load(await arq.arrayBuffer()); } catch { window.alert('Não foi possível ler o arquivo de de-para (.xlsx).'); return; }
+        const mapa = new Map<string, number>();
+        dp.worksheets[0]?.eachRow((row: any) => {
+            const a = String(row.getCell(1).text || '').replace(/\D/g, '');
+            const b = String(row.getCell(2).text || '').trim();
+            if (a && /^\d+$/.test(b)) mapa.set(a, Number(b));
+        });
+        if (!mapa.size) { window.alert('O de-para não tem linhas válidas (coluna A = código LEDGR, coluna B = reduzido do contador).'); return; }
+        const faltam = new Map<string, string>();
+        const cod = (acc?: Account) => {
+            const k = (acc?.code || '').replace(/\D/g, '');
+            const v = mapa.get(k);
+            if (v === undefined) faltam.set(acc?.code || '(sem conta)', acc?.name || '');
+            return v;
+        };
+        // pares debito/credito em centavos: primeiro os de mesmo valor, depois o restante em ordem
+        const pares = (items: JournalItem[]) => {
+            const D = items.filter(i => i.type === 'DEBIT').map(i => ({ acc: i.account, v: Math.round(Number(i.value) * 100) }));
+            const C = items.filter(i => i.type === 'CREDIT').map(i => ({ acc: i.account, v: Math.round(Number(i.value) * 100) }));
+            const out: { d?: Account; c?: Account; v: number }[] = [];
+            D.forEach(d => { const c = C.find(x => x.v > 0 && x.v === d.v); if (c && d.v > 0) { out.push({ d: d.acc, c: c.acc, v: d.v }); d.v = 0; c.v = 0; } });
+            for (;;) {
+                const d = D.find(x => x.v > 0); const c = C.find(x => x.v > 0);
+                if (!d || !c) break;
+                const v = Math.min(d.v, c.v); out.push({ d: d.acc, c: c.acc, v }); d.v -= v; c.v -= v;
+            }
+            const sobra = D.reduce((s, x) => s + x.v, 0) + C.reduce((s, x) => s + x.v, 0);
+            return { out, sobra };
+        };
+        const dt = (d: string) => { const { y, m, day } = parseDate(d); return new Date(Date.UTC(y, m - 1, day)); };
+        const limpa = (s?: string) => (s || '').replace(/[\r\n]+/g, ' ').trim();
+        type Linha = { auto: number; deb: number; cre: number; data: Date; valor: number; codh: string; hist: string; ccd: string; ccc: string; doc: string };
+        const linhas: Linha[] = [];
+        const desbal: string[] = [];
+        let n = 0, enc = 0;
+        grouped.forEach(({ days }) => days.forEach(({ entries }) => entries.forEach(entry => {
+            if (entry.sourceModule === 'RESULT_TRANSFER') { enc++; return; }
+            n++;
+            const { out, sobra } = pares(entry.items);
+            if (sobra !== 0) desbal.push(`${fmtDateFull(entry.date)} ${entry.reference || loteLctoLabel(entry)}`);
+            out.forEach(p => {
+                const deb = cod(p.d); const cre = cod(p.c);
+                if (deb === undefined || cre === undefined || deb === cre) return; // mesma conta do contador nos dois lados: sem efeito
+                linhas.push({ auto: n, deb, cre, data: dt(entry.date), valor: p.v / 100, codh: '', hist: limpa(entry.description), ccd: '', ccc: '', doc: entry.reference || loteLctoLabel(entry) });
+            });
+        })));
+        if (faltam.size || desbal.length) {
+            const wb = new ExcelJS.Workbook();
+            const ws = wb.addWorksheet('Pendencias');
+            ws.columns = [{ header: 'Conta LEDGR / lançamento', key: 'c', width: 30 }, { header: 'Descrição', key: 'n', width: 60 }];
+            faltam.forEach((nome, c) => ws.addRow({ c, n: `Sem de-para: ${nome}` }));
+            desbal.forEach(x => ws.addRow({ c: x, n: 'Lançamento desbalanceado' }));
+            ws.getRow(1).font = { bold: true };
+            await baixar(wb, `Lote_Alterdata_pendencias_${empresa}.xlsx`);
+            window.alert(`Lote não gerado: ${faltam.size} conta(s) sem de-para e ${desbal.length} lançamento(s) desbalanceado(s). Veja o arquivo de pendências.`);
+            return;
+        }
         const wb = new ExcelJS.Workbook();
         const ws = wb.addWorksheet('Lancamentos');
         ws.columns = [
@@ -368,42 +445,13 @@ const DiarioGeralPage: React.FC = () => {
             { header: 'complemento historico', key: 'hist', width: 70 }, { header: 'Ccusto debito', key: 'ccd', width: 14 },
             { header: 'Ccusto credito', key: 'ccc', width: 14 }, { header: 'NrDocumento', key: 'doc', width: 16 },
         ];
-        const semRed = new Map<string, string>();
-        const cod = (acc?: Account) => {
-            if (!acc) return '';
-            if (acc.reducedCode) return Number(acc.reducedCode) || acc.reducedCode;
-            semRed.set(acc.code, acc.name); return acc.code;
-        };
-        const dt = (d: string) => { const { y, m, day } = parseDate(d); return new Date(Date.UTC(y, m - 1, day)); };
-        const limpa = (s?: string) => (s || '').replace(/[\r\n]+/g, ' ').trim();
-        let n = 0;
-        grouped.forEach(({ days }) => days.forEach(({ entries }) => entries.forEach(entry => {
-            n++;
-            const debs = entry.items.filter(i => i.type === 'DEBIT');
-            const cres = entry.items.filter(i => i.type === 'CREDIT');
-            const base = { auto: n, data: dt(entry.date), codh: '', hist: limpa(entry.description), ccd: '', ccc: '', doc: entry.reference || loteLctoLabel(entry) };
-            if (debs.length === 1 && cres.length === 1) {
-                ws.addRow({ ...base, deb: cod(debs[0].account), cre: cod(cres[0].account), valor: Number(debs[0].value) });
-            } else {
-                debs.forEach(i => ws.addRow({ ...base, deb: cod(i.account), cre: '', valor: Number(i.value) }));
-                cres.forEach(i => ws.addRow({ ...base, deb: '', cre: cod(i.account), valor: Number(i.value) }));
-            }
-        })));
+        linhas.forEach(l => ws.addRow(l));
         ws.getRow(1).font = { bold: true };
         ws.getColumn('data').numFmt = 'dd/mm/yyyy';
         ws.getColumn('valor').numFmt = '#,##0.00';
         ws.views = [{ state: 'frozen', ySplit: 1 }];
-        if (semRed.size) {
-            const av = wb.addWorksheet('Contas sem reduzido');
-            av.columns = [{ header: 'Conta (codigo completo usado no lote)', key: 'c', width: 24 }, { header: 'Nome', key: 'n', width: 50 }];
-            semRed.forEach((nome, c) => av.addRow({ c, n: nome }));
-            av.getRow(1).font = { bold: true };
-        }
-        const buf = await wb.xlsx.writeBuffer();
-        const u = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
-        const el = document.createElement('a');
-        el.href = u; el.download = `Lote_Alterdata_${(activeCompany?.tradeName || 'empresa').replace(/[^A-Za-z0-9]+/g, '_')}_${filters.dateFrom}_${filters.dateTo}.xlsx`;
-        document.body.appendChild(el); el.click(); el.remove(); URL.revokeObjectURL(u);
+        await baixar(wb, `Lote_Alterdata_${empresa}_${filters.dateFrom}_${filters.dateTo}.xlsx`);
+        if (enc) window.alert(`Lote gerado com ${n} lançamento(s) em ${linhas.length} linha(s). ${enc} lançamento(s) de encerramento ficaram fora (o contador encerra no sistema dele).`);
     };
 
     const exportCSV = () => {
