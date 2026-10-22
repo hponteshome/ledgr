@@ -10776,3 +10776,5 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - 22/10/2026: 401 sem renovacao mostra 'Sessao Expirada!!!' (toast unico, volta ao login em 1,5 s); Importar Manual sem alert().
 
 - 22/10/2026 Hotelsys: ajuste do passivo ao Anexo V vale pelo lote do Importar Manual (31/12/2024, 35 partidas); o lancamento do script 20261021 (duplicado) foi excluido com soft delete. Licao: nao rodar script e lote para o mesmo ajuste.
+
+- 22/10/2026: Anexo V pago depois de 31/10/2025 corrigido na origem (Hotelsys/Sunsys, 11 lancamentos, estornos 0049/0464 excluidos). Projeto (bloqueios no item 4): False.
