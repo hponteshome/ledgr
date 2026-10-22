@@ -10782,3 +10782,5 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - 22/10/2026: bloqueios judiciais de 23/12/2025 e 21/01/2026 no Anexo V item 4 (pagamento VAL); encargos CLT 2025 (161.232,60) movidos para Rescisoes Trabalhistas; Fornecedores zerado pelo lote de 31/12/2024.
 
 - 22/10/2026: 'Manutencao da Operacao' nao existe: despesa propria da Sunsys. Contabil 37 pagamentos (119.033,52) e projeto 93 aplicacoes (174.984,63). Pendente: 150.000,00 de 08/2024 (emprestimo com garantia); refazer encerramentos 2024 e 2025 da Hotelsys e da Sunsys.
+
+- 22/10/2026: projeto - 8 aplicacoes de honorarios contabeis/reembolso depois de 31/10/2025 (36.136,46) para Despesa propria da Sunsys. Operacao Ancora conferida: mutuo, aportes VAL, Anexo V pago e custodia batem entre Sunsys, Hotelsys e projeto.
