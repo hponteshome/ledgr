@@ -116,8 +116,19 @@ export class RentalContractsService {
         continue;
       }
 
-      const venc = new Date(Date.UTC(y, m - 1, contrato.dueDay, 12));
-      if (venc.getUTCMonth() !== m - 1) venc.setUTCDate(0);
+      // CORRIGIDO 23/10/2026: aluguel e pago no mes SEGUINTE ao da competencia (vencido),
+      // no dia contratado; periodicidade nao mensal (ex.: temporada) usa as datas explicitas.
+      let venc = new Date(Date.UTC(y, m, contrato.dueDay, 12));
+      if (venc.getUTCMonth() !== m % 12) venc.setUTCDate(0);
+      const datasExplicitas: string[] = Array.isArray(contrato.explicitDueDates) ? (contrato.explicitDueDates as any[]).map(String) : [];
+      if (contrato.duePeriodicity !== 'MENSAL' && datasExplicitas.length > 0) {
+        const ini = new Date(contrato.startDate);
+        const idx = (y - ini.getUTCFullYear()) * 12 + (m - 1 - ini.getUTCMonth());
+        const d = datasExplicitas[Math.min(Math.max(idx, 0), datasExplicitas.length - 1)];
+        if (/^\d{4}-\d{2}-\d{2}$/.test(d)) venc = new Date(d + 'T12:00:00Z');
+      }
+      // receita reconhecida no ultimo dia do mes de competencia (Lucro Real)
+      const dataCompetencia = new Date(Date.UTC(y, m, 0, 12));
 
       const amount = contrato.rentAmount;
       const titulo = "Aluguel " + contrato.fixedAsset.internalCode + " - " + competencia;
@@ -126,7 +137,7 @@ export class RentalContractsService {
         const journalEntry = await tx.journalEntry.create({
           data: {
             companyId,
-            date: venc,
+            date: dataCompetencia,
             description: "Receita de competência: " + titulo,
             sourceModule: "FINANCE",
             createdById: userId,
@@ -136,6 +147,20 @@ export class RentalContractsService {
                 { accountId: config.locacaoContaReceitaAlugueisId!, value: amount, type: "CREDIT", assetId: contrato.fixedAssetId },
               ],
             },
+          },
+        });
+
+        // NOVO 23/10/2026: evento na Agenda Financeira para o recebimento
+        const agenda = await tx.agendaEvent.create({
+          data: {
+            companyId,
+            eventType: 'OTHER',
+            title: 'Recebimento ' + titulo,
+            description: contrato.tenantName,
+            color: 'BLUE',
+            dueDate: venc,
+            amount,
+            createdById: userId,
           },
         });
 
@@ -156,6 +181,7 @@ export class RentalContractsService {
             revenueAccountId: config.locacaoContaReceitaAlugueisId!,
             receivableAccountId: config.locacaoContaAlugueisAReceberId!,
             journalEntryId: journalEntry.id,
+            agendaEventId: agenda.id,
             createdById: userId,
           },
         });
