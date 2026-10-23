@@ -15,6 +15,10 @@ const TIPOS = [
     { value: 'ACORDO_ACIONISTAS', label: 'Acordo de Acionistas' },
     { value: 'ADITIVO_CONTRATUAL', label: 'Aditivo Contratual' },
   ]},
+  // NOVO 23/10/2026: Locacao (faltava - contratos de locacao iam para 'Outro documento' e sumiam da prateleira)
+  { group: 'Locação', items: [
+    { value: 'CONTRATO_LOCACAO', label: 'Contrato de Locação (e aditivos de locação)' },
+  ]},
   { group: 'Livros Societários', items: [
     { value: 'LIVRO_REGISTRO_ACOES', label: 'Livro de Registro de Ações/Quotas' },
     { value: 'LIVRO_TRANSFERENCIA_ACOES', label: 'Livro de Transferência de Ações' },
@@ -51,6 +55,7 @@ const PRATELEIRA: Record<string, string> = {
   CONTABIL: 'Arquivo → Contábil',
   FISCAL: 'Arquivo → Fiscal',
   TRABALHISTA: 'Arquivo → RH / Trabalhista',
+  CONTRATO_LOCACAO: 'Arquivo → Contratos de Locação',
   OUTRO: 'Arquivo → Outros',
 };
 

@@ -273,7 +273,8 @@ export const RepositorioPage: React.FC = () => {
       <input ref={importInputRef} type="file" accept=".docx" className="hidden"
         onChange={e => { const f = e.target.files?.[0]; if (f) importarRevisao(f); }} />
       {showRedigir && <RedigirProcuracaoModal onClose={() => setShowRedigir(false)} onSuccess={() => window.location.reload()} />}
-      {showImport  && <ImportarDocumentoModal onClose={() => setShowImport(false)}  onSuccess={() => window.location.reload()} />}
+      {showImport  && <ImportarDocumentoModal onClose={() => setShowImport(false)}  onSuccess={() => window.location.reload()}
+        defaultType={config.types.length === 1 ? config.types[0] : undefined} />}
       {viewDoc !== null && (
         <DocumentViewModal documentId={viewDoc.id} documentTitle={viewDoc.title}
           onClose={() => { setViewDoc(null); window.location.reload(); }} onValidate={(id) => { setValidateDocId(id); setViewDoc(null); }} />
