@@ -34,6 +34,14 @@ export class RentalContractsController {
     return this.svc.findAll(companyId, status);
   }
 
+  // NOVO 23/10/2026: alertas de locacao (antes de GET :id)
+  @Get('alerts')
+  @RequireResourceAccess('rental-contracts', 'VIEW')
+  alertas(@Req() req: any) {
+    const companyId = req.headers['x-company-id'] ?? '';
+    return this.svc.alertas(companyId);
+  }
+
   @Get(':id')
   @RequireResourceAccess('rental-contracts', 'VIEW')
   findOne(@Req() req: any, @Param('id') id: string) {

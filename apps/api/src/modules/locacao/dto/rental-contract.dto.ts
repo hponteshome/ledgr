@@ -155,6 +155,13 @@ export class CreateRentalContractDto {
   @IsOptional() @IsUUID('4')
   documentId?: string;
 
+  // NOVO 23/10/2026: datas de reajuste
+  @IsOptional() @IsDateString()
+  nextReadjustmentDate?: string;
+
+  @IsOptional() @IsDateString()
+  lastReadjustmentDate?: string;
+
   @IsOptional() @IsString()
   notes?: string;
 }

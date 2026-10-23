@@ -2635,6 +2635,9 @@ model RentalContract {
   specificClauses String? @map("specific_clauses") @db.Text
   guarantorHasSpouse Boolean @default(false) @map("guarantor_has_spouse")
   instrumentDate DateTime? @map("instrument_date") @db.Date
+  // NOVO 23/10/2026: reajuste - proximo (quando difere do aniversario do inicio) e ultimo aplicado
+  nextReadjustmentDate DateTime? @map("next_readjustment_date") @db.Date
+  lastReadjustmentDate DateTime? @map("last_readjustment_date") @db.Date
   templateId String? @map("template_id") @db.Uuid
   tenantNationality   String?        @default("Brasileira") @map("tenant_nationality") @db.VarChar
   tenantStreet        String?        @map("tenant_street") @db.VarChar

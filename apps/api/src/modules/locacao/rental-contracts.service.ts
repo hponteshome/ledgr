@@ -193,6 +193,93 @@ export class RentalContractsService {
     return { competencia, total: contratos.length, results };
   }
 
+  // NOVO 23/10/2026: alertas de locacao para o Dashboard - fim de contrato (90 dias),
+  // reajuste pendente (aniversario/data-base ja passou e nao ha reajuste aplicado depois dele),
+  // reajuste proximo (60 dias) e recebimentos de aluguel vencidos ou a vencer em 15 dias.
+  // Temporada (periodicidade nao mensal) nao gera alerta de reajuste.
+  async alertas(companyId: string) {
+    const DIA = 86400000;
+    const hoje = new Date(new Date().toISOString().slice(0, 10) + 'T00:00:00Z');
+    const iso = (d: Date) => d.toISOString().slice(0, 10);
+    const dias = (d: Date) => Math.round((d.getTime() - hoje.getTime()) / DIA);
+    const utc = (v: Date | string) => { const s = new Date(v).toISOString().slice(0, 10); return new Date(s + 'T00:00:00Z'); };
+    const addMeses = (d: Date, n: number) => {
+      const r = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + n, d.getUTCDate()));
+      if (r.getUTCDate() !== d.getUTCDate()) r.setUTCDate(0);
+      return r;
+    };
+
+    const contratos = await this.prisma.rentalContract.findMany({
+      where: { companyId, deletedAt: null, status: 'ATIVO' },
+      include: { fixedAsset: { select: { internalCode: true } } },
+    });
+    const alertas: any[] = [];
+    for (const c of contratos) {
+      const imovel = c.fixedAsset.internalCode;
+      const ini = utc(c.startDate);
+      const fim = c.endDate ? utc(c.endDate) : null;
+      if (fim) {
+        const d = dias(fim);
+        if (d <= 90) alertas.push({
+          tipo: 'FIM_CONTRATO', severidade: d <= 30 ? 'alta' : 'media', contratoId: c.id, imovel, data: iso(fim), dias: d,
+          mensagem: d < 0 ? `Contrato venceu há ${-d} dias - renovar ou encerrar` : d === 0 ? 'Contrato termina hoje' : `Contrato termina em ${d} dias`,
+        });
+      }
+      if (c.duePeriodicity !== 'MENSAL') continue;
+      const per = c.readjustmentPeriodMonths || 12;
+      const aplicado = c.lastReadjustmentDate ? utc(c.lastReadjustmentDate) : null;
+      let ultimoAniv: Date | null = null;
+      let proximo: Date | null = null;
+      for (let k = 1; k < 200; k++) {
+        const a = addMeses(ini, per * k);
+        if (a <= hoje) ultimoAniv = a; else { proximo = a; break; }
+      }
+      if (c.nextReadjustmentDate) {
+        const nx = utc(c.nextReadjustmentDate);
+        if (nx <= hoje) { ultimoAniv = nx; proximo = addMeses(nx, per); } else { ultimoAniv = null; proximo = nx; }
+      }
+      const indice = c.readjustmentIndex ?? 'sem índice cadastrado';
+      if (ultimoAniv && hoje.getTime() - ultimoAniv.getTime() <= 365 * DIA && (!aplicado || aplicado < ultimoAniv)) {
+        alertas.push({
+          tipo: 'REAJUSTE_PENDENTE', severidade: 'media', contratoId: c.id, imovel, data: iso(ultimoAniv), dias: dias(ultimoAniv),
+          mensagem: `Reajuste (${indice}) a aplicar - data-base ${iso(ultimoAniv).split('-').reverse().join('/')}`,
+        });
+      }
+      if (proximo && fim && proximo > fim) proximo = null;
+      if (proximo && dias(proximo) <= 60) {
+        alertas.push({
+          tipo: 'REAJUSTE_PROXIMO', severidade: 'baixa', contratoId: c.id, imovel, data: iso(proximo), dias: dias(proximo),
+          mensagem: `Reajuste (${indice}) em ${dias(proximo)} dias`,
+        });
+      }
+    }
+
+    const titulos = await this.prisma.arEntry.findMany({
+      where: {
+        companyId, deletedAt: null, rentalContractId: { not: null },
+        status: { in: ['OPEN', 'OVERDUE', 'PARTIAL'] as any },
+        dueDate: { lte: new Date(hoje.getTime() + 15 * DIA) },
+      },
+      include: { fixedAsset: { select: { internalCode: true } } },
+      orderBy: { dueDate: 'asc' },
+    });
+    for (const t of titulos) {
+      const venc = utc(t.dueDate);
+      const d = dias(venc);
+      const saldo = Number(t.amount) - Number(t.receivedAmount ?? 0);
+      if (saldo <= 0) continue;
+      alertas.push({
+        tipo: 'RECEBIMENTO', severidade: d < 0 ? 'alta' : 'baixa', contratoId: t.rentalContractId, imovel: t.fixedAsset?.internalCode ?? '',
+        data: iso(venc), dias: d, valor: saldo,
+        mensagem: d < 0 ? `Aluguel ${t.competenceMonth ?? ''} vencido há ${-d} dias` : `Aluguel ${t.competenceMonth ?? ''} vence em ${d} dias`,
+      });
+    }
+
+    const ordem: Record<string, number> = { alta: 0, media: 1, baixa: 2 };
+    alertas.sort((a, b) => ordem[a.severidade] - ordem[b.severidade] || String(a.data).localeCompare(String(b.data)));
+    return { geradoEm: new Date().toISOString(), total: alertas.length, alertas };
+  }
+
   async create(companyId: string, userId: string, dto: CreateRentalContractDto) {
     return this.prisma.rentalContract.create({
       data: {
@@ -251,6 +338,8 @@ export class RentalContractsService {
         status: dto.status,
         documentId: dto.documentId,
         notes: dto.notes,
+        nextReadjustmentDate: toDate(dto.nextReadjustmentDate),
+        lastReadjustmentDate: toDate(dto.lastReadjustmentDate),
       },
     });
   }
@@ -314,6 +403,8 @@ export class RentalContractsService {
         status: dto.status,
         documentId: dto.documentId,
         notes: dto.notes,
+        nextReadjustmentDate: toDate(dto.nextReadjustmentDate),
+        lastReadjustmentDate: toDate(dto.lastReadjustmentDate),
       },
     });
   }
