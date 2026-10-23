@@ -50,7 +50,8 @@ export class AssetsService {
           _count: { select: { improvements: true, retrofitProjects: true } },
           assetAccount: { select: { id: true, code: true, name: true } },
           rentalContracts: {
-            where: { status: 'ATIVO', deletedAt: null },
+            // NOVO 23/10/2026: so contrato vigente hoje marca o imovel como Alugado
+            where: { status: 'ATIVO', deletedAt: null, startDate: { lte: new Date() }, OR: [{ endDate: null }, { endDate: { gte: new Date(new Date().toISOString().slice(0, 10)) } }] },
             select: {
               id: true,
               tenantName: true,
@@ -66,6 +67,33 @@ export class AssetsService {
       }),
       this.prisma.fixedAsset.count({ where }),
     ]);
+
+    // NOVO 23/10/2026: imovel unico formado por varios ativos (mesmo propertyId, ex.: Landmark
+    // 137/138/139-A em contrato unico). O contrato ATIVO de um ativo do grupo vale para os demais.
+    const semContrato = data.filter((a: any) => a.propertyId && (!a.rentalContracts || a.rentalContracts.length === 0));
+    if (semContrato.length > 0) {
+      const propIds = [...new Set(semContrato.map((a: any) => a.propertyId as string))];
+      const doGrupo = await this.prisma.rentalContract.findMany({
+        where: {
+          companyId, status: 'ATIVO', deletedAt: null, fixedAsset: { propertyId: { in: propIds }, deletedAt: null },
+          startDate: { lte: new Date() }, OR: [{ endDate: null }, { endDate: { gte: new Date(new Date().toISOString().slice(0, 10)) } }],
+        },
+        select: {
+          id: true, tenantName: true, rentAmount: true, dueDay: true, firstDueDate: true, status: true, documentId: true,
+          fixedAsset: { select: { propertyId: true } },
+        },
+        orderBy: { startDate: 'desc' },
+      });
+      const porImovel = new Map<string, any>();
+      for (const c of doGrupo) {
+        const { fixedAsset, ...resumo } = c as any;
+        if (fixedAsset?.propertyId && !porImovel.has(fixedAsset.propertyId)) porImovel.set(fixedAsset.propertyId, resumo);
+      }
+      for (const a of semContrato as any[]) {
+        const c = porImovel.get(a.propertyId);
+        if (c) a.rentalContracts = [c];
+      }
+    }
 
     const kpis = await this.prisma.fixedAsset.aggregate({
       where: { companyId, deletedAt: null, status: { not: 'WRITTEN_OFF' } },
