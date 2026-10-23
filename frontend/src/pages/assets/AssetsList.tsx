@@ -53,6 +53,8 @@ export default function AssetsList() {
     const [search, setSearch] = useState('');
     const [grupo, setGrupo] = useState<AssetGroup | ''>('');
     const [status, setStatus] = useState('');
+    // NOVO 23/10/2026: filtro por ocupacao (Alugado = contrato de locacao ativo; demais = ocupacao manual)
+    const [ocupacao, setOcupacao] = useState('');
     const [showForm, setShowForm] = useState(false);
     const [showImport, setShowImport] = useState(false);
     const [rentalModalAsset, setRentalModalAsset] = useState<FixedAsset | null>(null);
@@ -91,7 +93,13 @@ export default function AssetsList() {
     }
 
     const sorted = useMemo(() => {
-        const rows = [...(data?.data ?? [])];
+        const rows = [...(data?.data ?? [])].filter(a => {
+            if (!ocupacao) return true;
+            const alugado = !!(a.rentalContracts && a.rentalContracts.length > 0);
+            if (ocupacao === 'ALUGADO') return alugado;
+            if (ocupacao === 'NAO_ALUGADO') return !alugado;
+            return !alugado && a.occupancyStatus === ocupacao;
+        });
         rows.sort((a, b) => {
             let va: any, vb: any;
             switch (sortKey) {
@@ -109,7 +117,7 @@ export default function AssetsList() {
             return 0;
         });
         return rows;
-    }, [data?.data, sortKey, sortDir]);
+    }, [data?.data, sortKey, sortDir, ocupacao]);
 
     // Checkbox helpers
     const allSelected = sorted.length > 0 && selected.size === sorted.length;
@@ -241,6 +249,16 @@ export default function AssetsList() {
                         value={status} onChange={e => setStatus(e.target.value)}>
                         <option value="">Todos</option>
                         {Object.entries(ASSET_STATUS_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                    </select>
+                </div>
+                <div className="min-w-40">
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Ocupação</label>
+                    <select className="w-full border border-gray-300 rounded-lg text-sm py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        value={ocupacao} onChange={e => { setOcupacao(e.target.value); setSelected(new Set()); }}>
+                        <option value="">Todos</option>
+                        <option value="ALUGADO">Alugados</option>
+                        <option value="NAO_ALUGADO">Não alugados</option>
+                        {Object.entries(ASSET_OCCUPANCY_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                     </select>
                 </div>
                 <button onClick={handleFilter}
