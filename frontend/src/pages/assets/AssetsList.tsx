@@ -110,6 +110,12 @@ export default function AssetsList() {
                 case 'bookValue': va = Number(a.bookValue); vb = Number(b.bookValue); break;
                 case 'accumDeprec': va = Number(a.accumulatedDeprec ?? 0); vb = Number(b.accumulatedDeprec ?? 0); break;
                 case 'status': va = a.status; vb = b.status; break;
+                // NOVO 23/10/2026: Ocupacao = Alugado (contrato ativo) ou a ocupacao manual
+                case 'ocupacao': {
+                    const oc = (x: any) => (x.rentalContracts && x.rentalContracts.length > 0) ? 'Alugado'
+                        : (x.occupancyStatus ? ((ASSET_OCCUPANCY_LABELS as any)[x.occupancyStatus] ?? '') : '');
+                    va = oc(a); vb = oc(b); break;
+                }
                 default: va = ''; vb = '';
             }
             if (va < vb) return sortDir === 'asc' ? -1 : 1;
@@ -343,7 +349,9 @@ export default function AssetsList() {
                             <th className={`${thCls} text-center`} onClick={() => handleSort('status')}>
                                 Status <SortIcon col="status" sortKey={sortKey} sortDir={sortDir} />
                             </th>
-                            <th className="px-3 py-3 text-center font-medium">Ocupação</th>
+                            <th className={`${thCls} text-center`} onClick={() => handleSort('ocupacao')}>
+                                Ocupação <SortIcon col="ocupacao" sortKey={sortKey} sortDir={sortDir} />
+                            </th>
                             <th className="px-3 py-3 text-center font-medium">OS</th>
                         </tr>
                     </thead>
