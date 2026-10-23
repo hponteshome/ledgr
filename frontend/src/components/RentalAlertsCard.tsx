@@ -34,7 +34,7 @@ const COR: Record<Alerta['severidade'], string> = {
 const fmtData = (iso: string) => iso ? iso.slice(0, 10).split('-').reverse().join('/') : '-';
 const fmtValor = (v?: number) => v === undefined ? '' : v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-export const RentalAlertsCard: React.FC = () => {
+export const RentalAlertsCard: React.FC<{ refreshKey?: unknown }> = ({ refreshKey }) => {
   const [alertas, setAlertas] = useState<Alerta[] | null>(null);
   const [erro, setErro] = useState('');
 
@@ -48,7 +48,7 @@ export const RentalAlertsCard: React.FC = () => {
       .then(r => (r.ok ? r.json() : Promise.reject(r.status)))
       .then(d => setAlertas(d?.alertas ?? []))
       .catch(() => { setErro('Não foi possível carregar os alertas de locação.'); setAlertas([]); });
-  }, []);
+  }, [refreshKey]);
 
   if (alertas === null) return null;
   // empresa sem contratos de locacao: nao ocupa espaco no Dashboard

@@ -9,6 +9,7 @@ import {
 } from 'react-icons/fi';
 import api from '../services/api';
 import { ObrigacoesWidget } from '../components/ObrigacoesWidget';
+import { RentalAlertsCard } from '../components/RentalAlertsCard';
 import { useCompany } from '../contexts/CompanyContext';
 import { useSidebarPermissions } from '../contexts/SidebarPermissionsContext';
 
@@ -48,7 +49,7 @@ const lastBizDay = (year: number, month: number): Date => {
   return d;
 };
 
-const buildStaticAgenda = (activeMonth: string): AgendaEvt[] => {
+const buildStaticAgenda = (activeMonth: string, taxRegime?: string): AgendaEvt[] => {
   const [y, m] = activeMonth.split('-').map(Number);
   const events: Omit<AgendaEvt, 'id'>[] = [
     { title: 'FGTS — competencia ' + activeMonth,
@@ -73,6 +74,22 @@ const buildStaticAgenda = (activeMonth: string): AgendaEvt[] => {
       dueDate: new Date(y, 6, 31).toISOString(),
       eventType: 'TAX', color: 'BLUE', amount: null, isPaid: false, route: '/app/sped/ecf' },
   ];
+  // NOVO 23/10/2026: tributos do Lucro Real (PIS/COFINS nao cumulativo e IRPJ/CSLL por estimativa)
+  if (taxRegime === 'LUCRO_REAL') {
+    const diaUtilAte = (d: Date) => { while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() - 1); return d; };
+    const hoje0 = new Date(); hoje0.setHours(0, 0, 0, 0);
+    const tributos = (comp: string, cy: number, cm: number): Omit<AgendaEvt, 'id'>[] => ([
+      { title: 'DARF PIS/COFINS (6912/5856) — ' + comp,
+        dueDate: diaUtilAte(new Date(cy, cm, 25)).toISOString(),
+        eventType: 'TAX', color: 'GREEN', amount: null, isPaid: false, route: '/app/finance/agenda' },
+      { title: 'DARF IRPJ/CSLL estimativa (2362/2484) — ' + comp,
+        dueDate: lastBizDay(cy, cm + 1).toISOString(),
+        eventType: 'TAX', color: 'GREEN', amount: null, isPaid: false, route: '/app/finance/agenda' },
+    ]);
+    events.push(...tributos(activeMonth, y, m));
+    const py = m === 1 ? y - 1 : y; const pm = m === 1 ? 12 : m - 1;
+    events.push(...tributos(py + '-' + String(pm).padStart(2, '0'), py, pm).filter(e => new Date(e.dueDate) >= hoje0));
+  }
   const windowStart = new Date(y, m - 1, 1);
   windowStart.setDate(windowStart.getDate() - 60);
   const windowEnd = new Date(y, m - 1, 1);
@@ -198,7 +215,14 @@ export const DashboardPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState(new Date());
 
-  const agendaStatic = useMemo(() => buildStaticAgenda(activeMonth), [activeMonth]);
+  const [regimeApi, setRegimeApi] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    setRegimeApi(undefined);
+    if (!activeCompany?.id || (activeCompany as any)?.taxRegime) return;
+    api.get('/companies/' + activeCompany.id).then(r => setRegimeApi(r.data?.taxRegime ?? r.data?.data?.taxRegime)).catch(() => {});
+  }, [activeCompany?.id]);
+  const taxRegime: string | undefined = (activeCompany as any)?.taxRegime ?? regimeApi;
+  const agendaStatic = useMemo(() => buildStaticAgenda(activeMonth, taxRegime), [activeMonth, taxRegime]);
 
   const load = useCallback(async () => {
     if (!activeCompany?.id) return;
@@ -305,66 +329,12 @@ export const DashboardPage: React.FC = () => {
         </div>
       </div>
 
-      {/* KPI CARDS */}
-      <SectionTitle>Indicadores do mes</SectionTitle>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 8 }}>
-
-        {show('/app/finance/accounts-payable') && (
-        <KpiCard accent="#0369A1" icon={<FiTrendingDown size={12} color="#0369A1" />}
-          label="Contas a pagar"
-          value={kpi ? BRL(kpi.apTotal) : '—'}
-          sub={kpi ? kpi.apCount + ' titulo' + (kpi.apCount !== 1 ? 's' : '') + ' em aberto' : 'Carregando...'}
-          linkColor="#0369A1" linkText="Ver contas a pagar"
-          onClick={() => navigate('/app/finance/accounts-payable')} />
-        )}
-
-        {show('/app/finance/contas-receber') && (
-        <KpiCard accent="#059669" icon={<FiTrendingUp size={12} color="#059669" />}
-          label="Contas a receber"
-          value={kpi ? BRL(kpi.arTotal) : '—'}
-          sub={kpi ? kpi.arCount + ' titulo' + (kpi.arCount !== 1 ? 's' : '') + ' em aberto' : 'Carregando...'}
-          linkColor="#059669" linkText="Ver contas a receber"
-          onClick={() => navigate('/app/finance/contas-receber')} />
-        )}
-
-        {show('/app/finance/fiscal-documents') && (
-        <KpiCard accent="#DC2626"
-          label="NFs pendentes"
-          icon={<><FiFileText size={12} color="#DC2626" />{kpi && kpi.nfPending > 0 && <span style={{ ...pill('#FEE2E2','#991B1B'), fontSize: 10, marginLeft: 4 }}>!</span>}</>}
-          value={kpi ? kpi.nfPending : '—'}
-          sub="Sem integracao contabil"
-          linkColor="#DC2626" linkText="Ver documentos fiscais"
-          onClick={() => navigate('/app/finance/fiscal-documents')} />
-        )}
-
-        {show('/app/accounting/journal') && (
-        <KpiCard accent="#2563EB" icon={<FiBook size={12} color="#2563EB" />}
-          label="Lancamentos contabeis"
-          value={kpi ? kpi.journalCount : '—'}
-          sub={monthLabel}
-          linkColor="#2563EB" linkText="Ver lancamentos"
-          onClick={() => navigate('/app/accounting/journal')} />
-        )}
-
-        {show('/app/finance/fechamento') && (
-        <KpiCard accent="#7C3AED" icon={<FiLock size={12} color="#7C3AED" />}
-          label="Fechamento mensal"
-          value={<span style={{ ...pill(chip.bg, chip.color), fontSize: 13 }}>{chip.label}</span>}
-          sub={kpi?.fechamentoCompetencia ? (() => { const [fy, fm] = (kpi.fechamentoCompetencia ?? activeMonth).split('-'); return months[parseInt(fm) - 1] + ' / ' + fy; })() : monthLabel}
-          linkColor="#7C3AED" linkText="Ir para fechamento"
-          onClick={() => navigate('/app/finance/fechamento')} />
-        )}
-
-        {show('/app/arquivo') && (
-        <KpiCard accent="#0891B2" icon={<FiCheckSquare size={12} color="#0891B2" />}
-          label="Aguard. assinatura"
-          value={kpi ? kpi.docsAguardando : '—'}
-          sub="Societario — ClickSign"
-          linkColor="#0891B2" linkText="Ver arquivo societario"
-          onClick={() => navigate('/app/arquivo/societario')} />
-        )}
-
-      </div>
+      {/* NOVO 23/10/2026: alertas de locacao (some quando a empresa nao tem contratos) */}
+      {show('/app/assets/rental-contracts') && (
+        <div style={{ margin: '0.75rem 0 8px' }}>
+          <RentalAlertsCard key={activeCompany?.id} refreshKey={lastUpdate.getTime()} />
+        </div>
+      )}
 
       {/* AGENDA */}
       {show('/app/finance/agenda') && (
@@ -494,6 +464,69 @@ export const DashboardPage: React.FC = () => {
 
       </div>
       )}
+
+      {/* INDICADORES MOVIDOS PARA O FIM (23/10/2026): o operador ve primeiro o que vence */}
+      {/* KPI CARDS */}
+      <SectionTitle>Indicadores do mes</SectionTitle>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 8 }}>
+
+        {show('/app/finance/accounts-payable') && (
+        <KpiCard accent="#0369A1" icon={<FiTrendingDown size={12} color="#0369A1" />}
+          label="Contas a pagar"
+          value={kpi ? BRL(kpi.apTotal) : '—'}
+          sub={kpi ? kpi.apCount + ' titulo' + (kpi.apCount !== 1 ? 's' : '') + ' em aberto' : 'Carregando...'}
+          linkColor="#0369A1" linkText="Ver contas a pagar"
+          onClick={() => navigate('/app/finance/accounts-payable')} />
+        )}
+
+        {show('/app/finance/contas-receber') && (
+        <KpiCard accent="#059669" icon={<FiTrendingUp size={12} color="#059669" />}
+          label="Contas a receber"
+          value={kpi ? BRL(kpi.arTotal) : '—'}
+          sub={kpi ? kpi.arCount + ' titulo' + (kpi.arCount !== 1 ? 's' : '') + ' em aberto' : 'Carregando...'}
+          linkColor="#059669" linkText="Ver contas a receber"
+          onClick={() => navigate('/app/finance/contas-receber')} />
+        )}
+
+        {show('/app/finance/fiscal-documents') && (
+        <KpiCard accent="#DC2626"
+          label="NFs pendentes"
+          icon={<><FiFileText size={12} color="#DC2626" />{kpi && kpi.nfPending > 0 && <span style={{ ...pill('#FEE2E2','#991B1B'), fontSize: 10, marginLeft: 4 }}>!</span>}</>}
+          value={kpi ? kpi.nfPending : '—'}
+          sub="Sem integracao contabil"
+          linkColor="#DC2626" linkText="Ver documentos fiscais"
+          onClick={() => navigate('/app/finance/fiscal-documents')} />
+        )}
+
+        {show('/app/accounting/journal') && (
+        <KpiCard accent="#2563EB" icon={<FiBook size={12} color="#2563EB" />}
+          label="Lancamentos contabeis"
+          value={kpi ? kpi.journalCount : '—'}
+          sub={monthLabel}
+          linkColor="#2563EB" linkText="Ver lancamentos"
+          onClick={() => navigate('/app/accounting/journal')} />
+        )}
+
+        {show('/app/finance/fechamento') && (
+        <KpiCard accent="#7C3AED" icon={<FiLock size={12} color="#7C3AED" />}
+          label="Fechamento mensal"
+          value={<span style={{ ...pill(chip.bg, chip.color), fontSize: 13 }}>{chip.label}</span>}
+          sub={kpi?.fechamentoCompetencia ? (() => { const [fy, fm] = (kpi.fechamentoCompetencia ?? activeMonth).split('-'); return months[parseInt(fm) - 1] + ' / ' + fy; })() : monthLabel}
+          linkColor="#7C3AED" linkText="Ir para fechamento"
+          onClick={() => navigate('/app/finance/fechamento')} />
+        )}
+
+        {show('/app/arquivo') && (
+        <KpiCard accent="#0891B2" icon={<FiCheckSquare size={12} color="#0891B2" />}
+          label="Aguard. assinatura"
+          value={kpi ? kpi.docsAguardando : '—'}
+          sub="Societario — ClickSign"
+          linkColor="#0891B2" linkText="Ver arquivo societario"
+          onClick={() => navigate('/app/arquivo/societario')} />
+        )}
+
+      </div>
+
     </div>
   );
 };
