@@ -218,7 +218,7 @@ export class RentalContractsService {
       const imovel = c.fixedAsset.internalCode;
       const ini = utc(c.startDate);
       const fim = c.endDate ? utc(c.endDate) : null;
-      if (fim) {
+      if (fim && c.duePeriodicity === 'MENSAL') { // temporada termina por natureza - sem alerta
         const d = dias(fim);
         if (d <= 90) alertas.push({
           tipo: 'FIM_CONTRATO', severidade: d <= 30 ? 'alta' : 'media', contratoId: c.id, imovel, data: iso(fim), dias: d,
