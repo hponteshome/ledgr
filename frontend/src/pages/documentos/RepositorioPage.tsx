@@ -62,6 +62,26 @@ export const RepositorioPage: React.FC = () => {
   const config = SHELF_CONFIG[shelf] ?? { label: 'Arquivo', types: [] };
   const isProcuracoes = shelf === 'societario/procuracoes';
 
+  // NOVO 23/10/2026: ordenacao por coluna (Documento, Tipo, Data, Status)
+  type SortKey = 'title' | 'type' | 'createdAt' | 'status';
+  const [sortKey, setSortKey] = useState<SortKey>('createdAt');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const handleSort = (k: SortKey) => {
+    if (k === sortKey) setSortDir(d => (d === 'asc' ? 'desc' : 'asc'));
+    else { setSortKey(k); setSortDir(k === 'createdAt' ? 'desc' : 'asc'); }
+  };
+  const sortVal = (d: any): string | number =>
+    sortKey === 'createdAt' ? new Date(d.createdAt ?? 0).getTime()
+    : sortKey === 'status' ? (STATUS_CONFIG[d.status]?.label ?? d.status ?? '')
+    : String(d[sortKey] ?? '');
+  const sortedDocs = [...docs].sort((a, b) => {
+    const va = sortVal(a), vb = sortVal(b);
+    const r = typeof va === 'number' && typeof vb === 'number' ? va - vb
+      : String(va).localeCompare(String(vb), 'pt-BR', { sensitivity: 'base', numeric: true });
+    return sortDir === 'asc' ? r : -r;
+  });
+  const sortIcon = (k: SortKey) => (sortKey === k ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ' ↕');
+
   useEffect(() => {
     const load = async () => {
       setLoading(true);
@@ -178,10 +198,10 @@ export const RepositorioPage: React.FC = () => {
         <table className="w-full">
           <thead>
             <tr>
-              <th className="px-4 py-2.5 text-left text-[11px] font-medium uppercase tracking-wide text-gray-500 bg-gray-50 border-b border-gray-200">Documento</th>
-              <th className="px-4 py-2.5 text-left text-[11px] font-medium uppercase tracking-wide text-gray-500 bg-gray-50 border-b border-gray-200">Tipo</th>
-              <th className="px-4 py-2.5 text-left text-[11px] font-medium uppercase tracking-wide text-gray-500 bg-gray-50 border-b border-gray-200">Data</th>
-              <th className="px-4 py-2.5 text-left text-[11px] font-medium uppercase tracking-wide text-gray-500 bg-gray-50 border-b border-gray-200">Status</th>
+              <th onClick={() => handleSort('title')} title="Clique para ordenar" className="px-4 py-2.5 text-left text-[11px] font-medium uppercase tracking-wide text-gray-500 bg-gray-50 border-b border-gray-200 cursor-pointer select-none hover:text-gray-800">Documento{sortIcon('title')}</th>
+              <th onClick={() => handleSort('type')} title="Clique para ordenar" className="px-4 py-2.5 text-left text-[11px] font-medium uppercase tracking-wide text-gray-500 bg-gray-50 border-b border-gray-200 cursor-pointer select-none hover:text-gray-800">Tipo{sortIcon('type')}</th>
+              <th onClick={() => handleSort('createdAt')} title="Clique para ordenar" className="px-4 py-2.5 text-left text-[11px] font-medium uppercase tracking-wide text-gray-500 bg-gray-50 border-b border-gray-200 cursor-pointer select-none hover:text-gray-800">Data{sortIcon('createdAt')}</th>
+              <th onClick={() => handleSort('status')} title="Clique para ordenar" className="px-4 py-2.5 text-left text-[11px] font-medium uppercase tracking-wide text-gray-500 bg-gray-50 border-b border-gray-200 cursor-pointer select-none hover:text-gray-800">Status{sortIcon('status')}</th>
               <th className="px-4 py-2.5 text-left text-[11px] font-medium uppercase tracking-wide text-gray-500 bg-gray-50 border-b border-gray-200">Acoes</th>
             </tr>
           </thead>
@@ -194,7 +214,7 @@ export const RepositorioPage: React.FC = () => {
                 <p className="text-[14px] text-gray-400">Nenhum documento nesta prateleira</p>
                 <p className="text-[12px] text-gray-300 mt-1">Os documentos aparecem aqui automaticamente quando finalizados</p>
               </td></tr>
-            ) : docs.map(doc => {
+            ) : sortedDocs.map(doc => {
               const st = STATUS_CONFIG[doc.status] ?? STATUS_CONFIG['RASCUNHO'];
               const isExpanded = expandedDoc === doc.id;
               return (
