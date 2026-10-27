@@ -1,7 +1,7 @@
 // frontend/src/pages/sistema/IntegridadePage.tsx
 // CRIADO 27/10/2026 - Central de Integridade: verificacoes automaticas de consistencia da escrituracao
 import React, { useCallback, useEffect, useState } from 'react';
-import { FiShield, FiPlay, FiAlertOctagon, FiAlertTriangle, FiInfo, FiCheckCircle, FiChevronDown, FiChevronRight, FiClock } from 'react-icons/fi';
+import { FiShield, FiPlay, FiAlertOctagon, FiAlertTriangle, FiInfo, FiCheckCircle, FiChevronDown, FiChevronRight, FiClock, FiPrinter, FiCopy, FiDownload, FiShare2 } from 'react-icons/fi';
 import api from '../../services/api';
 import { useCompany } from '../../contexts/CompanyContext';
 
@@ -25,18 +25,53 @@ const ROTULO: Record<string, string> = {
   receita_apuracao: 'Receita na apuração', receita_contabil: 'Receita contábil', item: 'Item', situacao: 'Situação', regime_atual: 'Regime atual',
 };
 const OCULTAS = new Set(['id', 'ultimo']);
+// o banco (jsonb) devolve as chaves fora de ordem: a ordem das colunas segue a lista do ROTULO
+const ORDEM = Object.keys(ROTULO);
+const colunas = (linhas: any[]) => Object.keys(linhas[0] ?? {}).filter(c => !OCULTAS.has(c))
+  .sort((a, b) => (ORDEM.indexOf(a) < 0 ? 999 : ORDEM.indexOf(a)) - (ORDEM.indexOf(b) < 0 ? 999 : ORDEM.indexOf(b)));
+const fmtCel = (v: any, c: string) => {
+  if (v === null || v === undefined || v === '') return '-';
+  if (typeof v === 'number' && !['partidas', 'lanc_anteriores', 'meses', 'bens', 'qtd'].includes(c)) return BRL(v);
+  if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v)) return v.split('-').reverse().join('/');
+  return String(v);
+};
+
+// ── Relatorio em Markdown (copiar para colar no chat / baixar) ──
+const achadoMd = (a: Achado) => {
+  const s = SEV[a.severity] ?? SEV.INFO;
+  const l: string[] = [`### [${s.label.toUpperCase()}] ${a.title}`, `Código: ${a.code}` + (a.valor !== null && a.valor !== undefined ? ` · Valor: R$ ${BRL(Number(a.valor))}` : '') + ` · Qtd: ${a.qtd}`, '', a.detail, ''];
+  if (a.amostra?.length) {
+    const cols = colunas(a.amostra);
+    l.push('| ' + cols.map(c => ROTULO[c] ?? c).join(' | ') + ' |', '|' + cols.map(() => '---').join('|') + '|');
+    a.amostra.forEach(r => l.push('| ' + cols.map(c => fmtCel(r[c], c).replace(/\|/g, '/')).join(' | ') + ' |'));
+    if (a.amostra.length < a.qtd) l.push('', `(amostra: ${a.amostra.length} de ${a.qtd})`);
+    l.push('');
+  }
+  return l.join('\n');
+};
+const relatorioMd = (empresa: string, exec: Execucao | null, achados: Achado[]) => [
+  `# Central de Integridade - ${empresa}`,
+  `Verificação de ${exec ? new Date(exec.finished_at).toLocaleString('pt-BR') : '-'} (${exec?.triggered_by ?? '-'}) · ` +
+  `${achados.filter(a => a.severity === 'CRITICO').length} crítico(s), ${achados.filter(a => a.severity === 'ALERTA').length} alerta(s), ${achados.filter(a => a.severity === 'INFO').length} info`,
+  '', ...achados.map(achadoMd)].join('\n');
+const copiar = async (texto: string) => {
+  try { await navigator.clipboard.writeText(texto); return true; }
+  catch {
+    const t = document.createElement('textarea'); t.value = texto; document.body.appendChild(t); t.select();
+    const ok = document.execCommand('copy'); document.body.removeChild(t); return ok;
+  }
+};
+const baixar = (nome: string, texto: string) => {
+  const url = URL.createObjectURL(new Blob([texto], { type: 'text/markdown;charset=utf-8' }));
+  const a = document.createElement('a'); a.href = url; a.download = nome; a.click(); URL.revokeObjectURL(url);
+};
 
 const pill = (bg: string, fg: string): React.CSSProperties => ({ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 9px', borderRadius: 9999, fontSize: 11, fontWeight: 500, background: bg, color: fg, whiteSpace: 'nowrap' });
 
 const Tabela: React.FC<{ linhas: any[] }> = ({ linhas }) => {
   if (!linhas?.length) return null;
-  const cols = Object.keys(linhas[0]).filter(c => !OCULTAS.has(c));
-  const fmt = (v: any, c: string) => {
-    if (v === null || v === undefined || v === '') return '-';
-    if (typeof v === 'number' && !['partidas', 'lanc_anteriores', 'meses', 'bens', 'qtd'].includes(c)) return BRL(v);
-    if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v)) return v.split('-').reverse().join('/');
-    return String(v);
-  };
+  const cols = colunas(linhas);
+  const fmt = fmtCel;
   return (
     <div style={{ overflowX: 'auto', borderTop: '0.5px solid #E5E7EB' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
@@ -53,8 +88,9 @@ const Tabela: React.FC<{ linhas: any[] }> = ({ linhas }) => {
   );
 };
 
-const CardAchado: React.FC<{ a: Achado }> = ({ a }) => {
-  const [aberto, setAberto] = useState(a.severity === 'CRITICO');
+const CardAchado: React.FC<{ a: Achado; forcarAberto?: boolean; onCopiado: (m: string) => void }> = ({ a, forcarAberto, onCopiado }) => {
+  const [abertoUser, setAberto] = useState(a.severity === 'CRITICO');
+  const aberto = forcarAberto || abertoUser;
   const s = SEV[a.severity] ?? SEV.INFO;
   return (
     <div style={{ background: '#fff', border: '0.5px solid #E5E7EB', borderLeft: '3px solid ' + s.borda, borderRadius: 10, overflow: 'hidden' }}>
@@ -70,6 +106,11 @@ const CardAchado: React.FC<{ a: Achado }> = ({ a }) => {
         <div style={{ textAlign: 'right', flexShrink: 0 }}>
           {a.valor !== null && a.valor !== undefined && <div style={{ fontSize: 13, fontWeight: 500, color: '#111' }}>R$ {BRL(Number(a.valor))}</div>}
           <div style={{ fontSize: 10, color: '#9CA3AF', fontFamily: 'monospace' }}>{a.code}</div>
+          <button className="no-print" title="Copiar este achado (para colar no chat)"
+            onClick={async e => { e.stopPropagation(); onCopiado((await copiar(achadoMd(a))) ? 'Achado copiado' : 'Não foi possível copiar'); }}
+            style={{ marginTop: 4, display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#0369A1', background: 'none', border: '0.5px solid #BFDBFE', borderRadius: 6, padding: '2px 7px', cursor: 'pointer' }}>
+            <FiCopy size={11} /> Copiar
+          </button>
         </div>
       </div>
       {aberto && <Tabela linhas={a.amostra} />}
@@ -86,6 +127,12 @@ export default function IntegridadePage() {
   const [carregando, setCarregando] = useState(true);
   const [rodando, setRodando] = useState(false);
   const [erro, setErro] = useState('');
+  const [menu, setMenu] = useState(false);
+  const [imprimindo, setImprimindo] = useState(false);
+  const [aviso, setAviso] = useState('');
+  const empresa = activeCompany?.legalName ?? activeCompany?.tradeName ?? '';
+  const avisar = (m: string) => { setAviso(m); setTimeout(() => setAviso(''), 2500); };
+  const imprimir = () => { setMenu(false); setImprimindo(true); setTimeout(() => { window.print(); setImprimindo(false); }, 150); };
 
   const carregar = useCallback(async () => {
     if (!activeCompany?.id) return;
@@ -112,7 +159,14 @@ export default function IntegridadePage() {
   const n = (s: Sev) => achados.filter(a => a.severity === s).length;
 
   return (
-    <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+    <div id="integridade-print" style={{ maxWidth: 1200, margin: '0 auto' }} onClick={() => menu && setMenu(false)}>
+      <style>{`@media print {
+        body * { visibility: hidden !important; }
+        #integridade-print, #integridade-print * { visibility: visible !important; }
+        #integridade-print { position: absolute; left: 0; top: 0; width: 100%; max-width: none !important; }
+        #integridade-print .no-print { display: none !important; }
+        @page { size: A4 landscape; margin: 12mm; }
+      }`}</style>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: '1rem' }}>
         <div>
           <h1 style={{ fontSize: 20, fontWeight: 500, color: '#111', display: 'flex', alignItems: 'center', gap: 8 }}><FiShield color="#0369A1" /> Central de Integridade</h1>
@@ -120,10 +174,36 @@ export default function IntegridadePage() {
             {activeCompany?.legalName ?? activeCompany?.tradeName ?? ''} · Verificações automáticas de consistência da escrituração (somente leitura)
           </p>
         </div>
+        <div className="no-print" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        {aviso && <span style={{ fontSize: 12, color: '#166534' }}>{aviso}</span>}
+        {exec && (
+          <div style={{ position: 'relative' }}>
+            <button onClick={() => setMenu(v => !v)}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 8, background: '#fff', color: '#374151', border: '0.5px solid #D1D5DB', fontSize: 13, cursor: 'pointer' }}>
+              <FiShare2 size={13} /> Exportar <FiChevronDown size={12} />
+            </button>
+            {menu && (
+              <div style={{ position: 'absolute', right: 0, top: 'calc(100% + 4px)', zIndex: 20, background: '#fff', border: '0.5px solid #E5E7EB', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.08)', minWidth: 270, overflow: 'hidden' }}>
+                {[
+                  { ic: <FiPrinter size={14} />, t: 'Imprimir / salvar em PDF', s: 'Todos os achados abertos', f: imprimir },
+                  { ic: <FiCopy size={14} />, t: 'Copiar relatório completo', s: 'Texto com tabelas, para colar no chat', f: async () => { setMenu(false); avisar((await copiar(relatorioMd(empresa, exec, achados))) ? 'Relatório copiado' : 'Não foi possível copiar'); } },
+                  { ic: <FiDownload size={14} />, t: 'Baixar relatório (.md)', s: 'Arquivo para anexar ou arquivar', f: () => { setMenu(false); baixar(`integridade_${(empresa || 'empresa').split(' ')[0]}_${new Date().toISOString().slice(0, 10)}.md`, relatorioMd(empresa, exec, achados)); } },
+                ].map(o => (
+                  <div key={o.t} onClick={o.f} style={{ display: 'flex', gap: 10, padding: '0.6rem 0.9rem', cursor: 'pointer', borderBottom: '0.5px solid #F3F4F6' }}
+                    onMouseEnter={e => (e.currentTarget.style.background = '#F9FAFB')} onMouseLeave={e => (e.currentTarget.style.background = '#fff')}>
+                    <span style={{ color: '#0369A1', marginTop: 2 }}>{o.ic}</span>
+                    <div><div style={{ fontSize: 13, color: '#111' }}>{o.t}</div><div style={{ fontSize: 11, color: '#9CA3AF' }}>{o.s}</div></div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         <button onClick={executar} disabled={rodando || !activeCompany?.id}
           style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 8, background: '#111', color: '#fff', border: 'none', fontSize: 13, cursor: 'pointer', opacity: rodando ? 0.6 : 1 }}>
           <FiPlay size={13} /> {rodando ? 'Verificando...' : 'Executar verificações'}
         </button>
+        </div>
       </div>
 
       {erro && <div style={{ ...pill(SEV.CRITICO.bg, SEV.CRITICO.fg), borderRadius: 8, padding: '8px 12px', marginBottom: 10 }}>{erro}</div>}
@@ -161,7 +241,7 @@ export default function IntegridadePage() {
               <FiCheckCircle /> Nenhuma inconsistência encontrada nas {exec.summary?.verificacoes ?? ''} verificações.
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>{achados.map(a => <CardAchado key={a.code} a={a} />)}</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>{achados.map(a => <CardAchado key={a.code} a={a} forcarAberto={imprimindo} onCopiado={avisar} />)}</div>
           )}
         </>
       )}
