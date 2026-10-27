@@ -72,6 +72,7 @@ import { EcdViewerPage } from '../pages/sped/EcdViewerPage';
 import JournalPage from '../pages/accounting/JournalPage';
 import ImportJournalPage from '../pages/accounting/ImportJournalPage';
 import AssetsList from '../pages/assets/AssetsList';
+import IntegridadePage from '../pages/sistema/IntegridadePage';
 import AssetsView from '../pages/assets/AssetsView';
 import MaintenancesPage from '../pages/assets/MaintenancesPage';
 import RentalContractsListPage from '../pages/assets/RentalContractsListPage';
@@ -339,6 +340,7 @@ export const AppRoutes = () => {
                 <Route path="app/system/backup" element={<ProtectedRoute><BackupRestore /></ProtectedRoute>} />
                 <Route path="app/system/matriz-master-accounts" element={<ProtectedRoute><MatrizMasterAccountsPage /></ProtectedRoute>} />
                 <Route path="app/sistema/sped-plano-referencial" element={<ProtectedRoute><SpedPlanoReferencialPage /></ProtectedRoute>} />
+                <Route path="app/sistema/integridade" element={<ProtectedRoute><IntegridadePage /></ProtectedRoute>} />
                 <Route path="app/system/audit" element={<ProtectedRoute><AuditList /></ProtectedRoute>} />
 
                 {/* Ativo Imobilizado */}

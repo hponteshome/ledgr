@@ -5966,3 +5966,48 @@ model ProjQuota {
 
   @@map("proj_quotas")
 }
+
+// =============================================================================
+// CENTRAL DE INTEGRIDADE - CRIADO 27/10/2026
+// Execucoes e achados das verificacoes automaticas de consistencia. companyId escalar
+// (FK so no SQL). Migracao manual: prisma/migrations-manuais/20261027_integridade.sql
+// =============================================================================
+
+model IntegrityRun {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId     String    @map("company_id") @db.Uuid
+  startedAt     DateTime  @default(now()) @map("started_at") @db.Timestamp(6)
+  finishedAt    DateTime? @map("finished_at") @db.Timestamp(6)
+  triggeredBy   String    @default("MANUAL") @map("triggered_by") @db.VarChar(20)
+  userId        String?   @map("user_id") @db.Uuid
+  totalFindings Int       @default(0) @map("total_findings")
+  criticos      Int       @default(0)
+  alertas       Int       @default(0)
+  infos         Int       @default(0)
+  summary       Json?     @db.JsonB
+
+  findings IntegrityFinding[]
+
+  @@index([companyId, startedAt(sort: Desc)], map: "integrity_runs_company_idx")
+  @@map("integrity_runs")
+}
+
+model IntegrityFinding {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  runId     String   @map("run_id") @db.Uuid
+  companyId String   @map("company_id") @db.Uuid
+  checkCode String   @map("check_code") @db.VarChar(40)
+  severity  String   @db.VarChar(10)
+  title     String   @db.VarChar(200)
+  detail    String?  @db.Text
+  qtd       Int?
+  valor     Decimal? @db.Decimal(18, 2)
+  amostra   Json?    @db.JsonB
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+
+  run IntegrityRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([runId], map: "integrity_findings_run_idx")
+  @@index([companyId, checkCode], map: "integrity_findings_check_idx")
+  @@map("integrity_findings")
+}
