@@ -234,7 +234,13 @@ export const DashboardPage: React.FC = () => {
       const [kpiRes, upRes, agRes, agingApRes, agingArRes] = await Promise.allSettled([
         api.get('/dashboard/kpi', { params: { month: activeMonth } }),
         api.get('/finance/accounts-payable', { params: { status: 'OPEN,OVERDUE', limit: 5, orderBy: 'dueDate', order: 'asc' } }),
-        api.get('/finance/agenda', { params: { from: today, to: horizon, limit: 50 } }),
+        // CORRIGIDO 23/10/2026: a API da agenda filtra por ?month= e devolve { events, byDay }
+        (async () => {
+          const agendaMeses = [0, 1, 2].map(k => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() + k);
+            return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); });
+          const rs = await Promise.all(agendaMeses.map(mes => api.get('/finance/agenda', { params: { month: mes } }).catch(() => ({ data: [] }))));
+          return { data: rs.flatMap((r: any) => r.data?.events ?? r.data?.data ?? (Array.isArray(r.data) ? r.data : [])) };
+        })(),
         api.get('/finance/accounts-payable/aging'),
         api.get('/finance/ar/aging'),
       ]);
@@ -248,11 +254,14 @@ export const DashboardPage: React.FC = () => {
 
       if (agRes.status === 'fulfilled') {
         const rows: any[] = agRes.value.data?.data ?? agRes.value.data ?? [];
-        setAgendaReal((Array.isArray(rows) ? rows : []).map(e => ({
+        setAgendaReal((Array.isArray(rows) ? rows : [])
+          .filter((e: any) => { const d = String(e.dueDate ?? '').slice(0, 10); return !!d && d <= horizon && (d >= today || !e.isPaid); })
+          .map(e => ({
           id: e.id, title: e.title, dueDate: e.dueDate,
           eventType: e.eventType, color: e.color,
           amount: e.amount ?? null, isPaid: e.isPaid ?? false,
           route: e.eventType === 'CLOSING' ? '/app/finance/fechamento'
+            : String(e.title ?? '').startsWith('Recebimento') ? '/app/finance/contas-receber'
             : e.eventType === 'TAX' ? '/app/hr/pro-labore'
             : '/app/finance/agenda',
         })));
