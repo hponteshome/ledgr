@@ -10792,3 +10792,66 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - 22/10/2026: Hotelsys - equivalencia sobre a Sunsys refeita (99,92%, realizacao do ganho da integralizacao de 2018); CC Matriz sem os ajustes de 31/12/2024. Pendente: depreciacao acima do custo (modulo de ativo) e equivalencia da Sunrise.
 
 - 22/10/2026: modulo de ativo - backfill limitado ao custo e a vida util. Hotelsys: 2.883.985,70 de depreciacao alem do custo retirados na origem. Refazer encerramentos 2019 a 2025 da Hotelsys.
+
+- 22/10/2026: Hotelsys - equivalencia de 2025 sobre a Sunsys dividida em 31/10/2025 (jan-out) e 31/12/2025 (nov-dez), base do balancete de abertura do contador em 31/10/2025.
+
+- 22/10/2026: Livro de Registro - Sunsys 99,9204% (Hotelsys) / 0,0796% (Mohamed); MEP Hotelsys->Sunsys 99,9204%; integralizado preenchido (Sunsys, F5, Sunrise).
+
+- 22/10/2026: MEP Hotelsys->Sunsys - custo inicial corrigido para 62.750.000,00 (estava 92.750.000,00).
+
+- 22/10/2026: Livro de Registro - Sunsys 99,9204% (Hotelsys) / 0,0796% (Mohamed); MEP Hotelsys->Sunsys 99,9204%; integralizado preenchido (Sunsys, F5, Sunrise).
+
+- 22/10/2026: Hotelsys - prejuizo de 2017 (3.421.552,46) da ABERTURA-2018 passa de Lucro do Exercicio para Prejuizo do Exercicio. Mantidos: CC Matriz x Mutuo Ligadas, Banco Nao Identificado e Terceiros.
+
+- 22/10/2026: Hotelsys - Anexo V no longo prazo (grupo 223, 13 contas); AJ-ANEXOV-LP em 31/10/2025 (41.098.105,59); pagamentos posteriores (1.214.275,29) nas contas de longo prazo.
+
+- 22/10/2026: Hotelsys - espelho CC Filial x Matriz (16.890.513,66) eliminado na ABERTURA-2018; Mutuo Diretor 557.016,31 em Socios e Diretores; emprestimo 08/2024 (150.000,00) em 22101060004 (longo prazo).
+
+- 22/10/2026: Sunrise - equivalencia sobre a Hotelsys limitada ao investimento (CPC 18 38-39): apuracoes 2024/2025 excluidas, provisao ate 2023 (36.489.480,45) revertida em 31/12/2024 contra AEA; MEP sem conta de provisao.
+
+- 22/10/2026: Sunrise - equivalencia sobre a Hotelsys limitada ao investimento (CPC 18 38-39): apuracoes 2024/2025 excluidas, provisao ate 2023 (36.489.480,45) revertida em 31/12/2024 contra AEA; MEP sem conta de provisao.
+
+- 22/10/2026: F5 - perda de equivalencia na aquisicao da Sunrise (09/07/2025) limitada a R$ 1,00, provisao de 15.354.090,02 retirada; Sunrise - AFAC irrevogavel (8.485.474,63) no PL em 23101020001.
+
+- 22/10/2026: Sunrise - PL: 23501002 (22.400.584,97) e Lucros Acumulados devedor (25.248.344,65) em 23301020001 Prejuizos Acumulados; configuracao do encerramento corrigida.
+
+- 22/10/2026: Operacao Ancora caso 3c - pernas da Sunrise (CC Hotelsys / A receber F5) e da F5 (obrigacao Anexo V / CC Sunsys), 1.214.275,29, em lote exclusivo por empresa e ano.
+
+- 23/10/2026: Doc. 21 igual ao Anexo I da advogada (29 linhas, 1.118.997,87; saldo 352.482,13). Projeto: aplicacoes de 18/11/2025, 05/12/2025 e 23/03/2026 rateadas (2.151,69 sem comprovante individual); credores de 28/11, 05/12 e 19/12/2025 conforme comprovante; custodia da Josi: pagamentos diretos de 1.000,00 (02/12/2025) e 124,30 (19/12/2025) com saldo em custodia, Anexo V item 4. Script em D:\Temp (nao versionado). Contabilidade inalterada.
+
+- 23/10/2026: Doc. 21 versao final (31 linhas, 1.213.247,90; saldo 258.232,10) refletida no projeto: descricoes das aplicacoes = Credor/obrigacao do Anexo I; 9a (custodia 23/12/2025, 45.000,00) e 10a (21/01/2026, 49.250,03) = reembolso a Josi do bloqueio SISBAJUD de 94.611,11 (proc. 0001685-52.2016.5.06.0143, bloqueio 05/12/2025); Pix de 46.800,00 de 23/12/2025 = 45.000,00 reembolso + 1.800,00 cestas de Natal; saldo de 361,08 a liquidar pela custodia. Script em D:\Temp (nao versionado). Contabilidade inalterada.
+
+- 23/10/2026: custodia da Josi - pagamento direto de 361,08 em 21/01/2026 (saldo do reembolso do bloqueio SISBAJUD de 94.611,11; Anexo V item 4). Decisoes: complementos de 1.124,30 entram na contabilidade (caso 3c); cestas de Natal de 1.800,00 = despesa propria da Sunsys. Script em D:\Temp (nao versionado).
+
+- 23/10/2026: Operacao Ancora 3c - pagamentos da custodia da Josi lancados nas 4 empresas (1.000,00 em 02/12/2025, 124,30 em 19/12/2025, 361,08 em 21/01/2026; refs OA-CUST-* e OA-3C-*-C1..C3). Contas correntes Hotelsys/Sunrise/F5 = 1.215.760,67 = Doc. 8. Cestas de Natal 1.800,00 ja eram despesa da Sunsys. Script em D:\Temp (nao versionado).
+
+- 23/10/2026: Operacao Ancora 3c - pagamentos da custodia da Josi lancados nas 4 empresas (1.000,00 em 02/12/2025, 124,30 em 19/12/2025, 361,08 em 21/01/2026; refs OA-CUST-* e OA-3C-*-C1..C3). Contas correntes Hotelsys/Sunrise/F5 = 1.215.760,67 = Doc. 8. Cestas de Natal 1.800,00 ja eram despesa da Sunsys. Script em D:\Temp (nao versionado).
+
+- 23/10/2026: Operacao Ancora 3c - pagamentos da custodia da Josi lancados nas 4 empresas (1.000,00 em 02/12/2025, 124,30 em 19/12/2025, 361,08 em 21/01/2026; refs OA-CUST-* e OA-3C-*-C1..C3). Contas correntes Hotelsys/Sunrise/F5 = 1.215.760,67 = Doc. 8. Cestas de Natal 1.800,00 ja eram despesa da Sunsys. Script em D:\Temp (nao versionado).
+
+- 23/10/2026: historicos posteriores a 31/10/2025 corrigidos na origem nas 4 empresas para coerencia com o Doc. 21/Doc. 8 (Edenilson Laurentino, Cristiane Carmo, reembolso do bloqueio de Joao Paulo dos Santos Bomfim 1a e 2a parte, Michelly, PRALHISTA). So texto. Script em D:\Temp (nao versionado).
+
+- 23/10/2026: limpeza de historicos para os Razoes da acao judicial (4 empresas): marcadores ??? retirados; referencias internas (caso 3c), (3c) e 'Doc. 21 linha N' retiradas. So texto. Script em D:\Temp.
+
+- 23/10/2026: Ativo Imobilizado - filtro por Ocupacao (Alugados / Nao alugados / ocupacao manual) na lista, no cliente; rodape segue o filtro.
+
+- 23/10/2026: Ativo Imobilizado - coluna Ocupacao classificavel (Alugado / ocupacao manual).
+
+## 23/10/2026 - LM: contratos de locacao arquivados
+- Contratos Conj32, Landmark (sala unica 137/138/139-A, ligado ao 137-A), NorthYork e Ecoville (Galvao) e Guaruja temporada 28/12/2026-04/01/2027 (R$ 49.000) cadastrados; Campos inicio 01/04/2026 + acordo R$ 2.000 + R$ 4.000 em obras ate 03/2027.
+- properties 'GRUPO LANDMARK' liga os 3 ativos; assets.service.findAll: Alugado = contrato ATIVO vigente hoje, estendido aos ativos do mesmo propertyId.
+- Pendente: reajustes IGP-M out/2026 (Conj32 e Landmark; tabela IGP-M sem jul-set/2026), contas contabeis de locacao da LM, taxa de administracao da Galvao, vencimento/indice NorthYork e Ecoville, renovacao Ecoville (30/10/2026).
+
+
+### 30/10/2026 - Impressao: barra de opcoes
+- imprimirRelatorio.ts: opcoesImpressaoHtml(comAssinaturas) inserida logo apos <body> em todas as janelas de relatorio (helper + DRE, BP, Diario, Razao). Classe opt-datahora = elementos de data/hora; classe assinaturas = bloco de assinaturas. A janela nao chama mais window.print() no load.
+- Assinaturas (DRE/BP): montarAssinaturasHtml(companyId) - mesmos signatarios do J930 (persons/links/company assinaEcd + accounting/config contador).
+- Pendente: ECD (Razao do arquivo fiel) e relatorios fora da Contabilidade ainda sem a barra.
+
+## 2026-10-30 - Impressao, Alterdata, Diario, porta da API
+- Impressao: utils/imprimirRelatorio.ts ganhou opcoesImpressaoHtml (barra fixa com checkboxes Data/Hora e Com assinaturas, botao Imprimir, escolhas em localStorage ledgr.print.dataHora / ledgr.print.assinaturas), buscarSignatarios e montarAssinaturasHtml (responsavel legal via /persons/links/company/:id assinaEcd + contador via /accounting/config; linhas em branco se nao houver cadastro). Classe opt-datahora na linha de emissao. Auto window.print removido.
+- DRE e Balanco Patrimonial: printDRE/printBP async com assinaturas; Diario Geral e Razao Analitico: opcoesImpressaoHtml(false).
+- Diario Geral - Lote Alterdata (.xlsx): revokeObjectURL adiado 60s (o download nao abria), confirm explicando que o proximo dialogo e o DE-PARA, .catch com alerta.
+- Diario Geral - modal "Diario Geral - Parametros de Emissao": botao x no cabecalho e Cancelar no rodape (onClose), titulo com hifen.
+- API: main.ts listen(Number(process.env.PORT) || 3000) - permite segunda instancia (clone ledgr_clone na 3001); sem PORT continua na 3000.
+- Recomposicao Hotelsys (ECD x Ledgr 2018-2025) concluida em banco clone ledgr_clone; resumo no projeto: claude/hotelsys-recomposicao-status.md. Oficial: 36 ajustes de 31/12/2024 movidos para 01/01/2024 e lote HotelsysAjustesDez2024 renomeado para Ajustes2024 (backup D:\Backup\ledgr_app_antes_aj2024_20261030_1639.dump).

@@ -84,7 +84,7 @@ const groupByMonthDay = (entries: JournalEntry[]) => {
 };
 
 // ── Modal de filtros ───────────────────────────────────────────
-const FilterModal: React.FC<{ f: F; onApply: (f: F) => void; inclTermos: boolean; setInclTermos: (v: boolean) => void; termoAbertura: string; setTermoAbertura: (v: string) => void; termoEncerramento: string; setTermoEncerramento: (v: string) => void }> = ({ f: init, onApply, inclTermos, setInclTermos, termoAbertura, setTermoAbertura, termoEncerramento, setTermoEncerramento }) => {
+const FilterModal: React.FC<{ f: F; onApply: (f: F) => void; onClose: () => void; inclTermos: boolean; setInclTermos: (v: boolean) => void; termoAbertura: string; setTermoAbertura: (v: string) => void; termoEncerramento: string; setTermoEncerramento: (v: string) => void }> = ({ f: init, onApply, onClose, inclTermos, setInclTermos, termoAbertura, setTermoAbertura, termoEncerramento, setTermoEncerramento }) => {
     const [f, setF] = useState<F>({ ...init });
     const s = (p: Partial<F>) => setF(prev => ({ ...prev, ...p }));
     const tog = (v: string) => s({ sources: f.sources.includes(v) ? f.sources.filter(x => x !== v) : [...f.sources, v] });
@@ -95,7 +95,8 @@ const FilterModal: React.FC<{ f: F; onApply: (f: F) => void; inclTermos: boolean
             <div style={{ background: '#fff', borderRadius: 10, width: '100%', maxWidth: 520, overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.18)' }}>
                 <div style={{ padding: '12px 20px', borderBottom: '0.5px solid #E5E7EB', background: '#F9FAFB', display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 20, background: '#EFF6FF', color: '#1D4ED8' }}>◆ Contábil</span>
-                    <span style={{ fontSize: 14, fontWeight: 500, color: '#111' }}>Diário Geral — Parâmetros de Emissão</span>
+                    <span style={{ fontSize: 14, fontWeight: 500, color: '#111' }}>Diário Geral - Parâmetros de Emissão</span>
+                    <button type="button" onClick={onClose} title="Fechar" style={{ marginLeft: 'auto', border: 'none', background: 'transparent', fontSize: 20, lineHeight: 1, color: '#6B7280', cursor: 'pointer' }}>×</button>
                 </div>
                 <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
                     <div>
@@ -150,7 +151,11 @@ const FilterModal: React.FC<{ f: F; onApply: (f: F) => void; inclTermos: boolean
                     </div>
                   </div>
                 )}
-                <div style={{ padding: '12px 20px', borderTop: '0.5px solid #E5E7EB', background: '#F9FAFB', display: 'flex', justifyContent: 'flex-end' }}>
+                <div style={{ padding: '12px 20px', borderTop: '0.5px solid #E5E7EB', background: '#F9FAFB', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                    <button type="button" onClick={onClose}
+                        style={{ padding: '8px 20px', borderRadius: 8, border: '0.5px solid #D1D5DB', background: '#fff', fontSize: 13, fontWeight: 500, color: '#374151', cursor: 'pointer' }}>
+                        Cancelar
+                    </button>
                     <button onClick={() => onApply(f)}
                         style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 20px', borderRadius: 8, border: 'none', background: '#111', fontSize: 13, fontWeight: 500, color: '#fff', cursor: 'pointer' }}>
                         <FiSearch size={13} /> Gerar Diário
@@ -365,7 +370,9 @@ const DiarioGeralPage: React.FC = () => {
         if (!data?.entries.length) return;
         const inp = document.createElement('input');
         inp.type = 'file'; inp.accept = '.xlsx';
-        inp.onchange = () => { const f = inp.files?.[0]; if (f) void gerarLoteContador(f); };
+        // 30/10/2026: a janela que abre e de ABRIR (o de-para), nao de salvar - avisar antes; erros passam a aparecer
+        inp.onchange = () => { const f = inp.files?.[0]; if (f) gerarLoteContador(f).catch((e: any) => window.alert('Erro ao gerar o lote Alterdata: ' + (e?.message || e))); };
+        if (!window.confirm('Lote Alterdata\n\n1. A seguir, selecione o arquivo de DE-PARA (.xlsx): coluna A = codigo da conta no LEDGR, coluna B = codigo reduzido do contador.\n2. Com o de-para lido, o lote e gerado e o navegador pede onde salvar.')) return;
         inp.click();
     };
     const gerarLoteContador = async (arq: File) => {
@@ -376,7 +383,8 @@ const DiarioGeralPage: React.FC = () => {
             const u = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
             const el = document.createElement('a');
             el.href = u; el.download = nome;
-            document.body.appendChild(el); el.click(); el.remove(); URL.revokeObjectURL(u);
+            // 30/10/2026: revogar so depois - revogar no mesmo instante do click podia cancelar o download no Chrome
+            document.body.appendChild(el); el.click(); el.remove(); setTimeout(() => URL.revokeObjectURL(u), 60000);
         };
         // de-para: codigo LEDGR -> reduzido do contador
         const dp = new ExcelJS.Workbook();
@@ -486,7 +494,7 @@ const DiarioGeralPage: React.FC = () => {
 
     return (
         <div style={{ padding: 24, background: 'var(--color-background-tertiary)', minHeight: '100vh' }}>
-            {showModal && <FilterModal f={filters} onApply={handleApply} inclTermos={inclTermos} setInclTermos={setInclTermos} termoAbertura={termoAbertura} setTermoAbertura={setTermoAbertura} termoEncerramento={termoEncerramento} setTermoEncerramento={setTermoEncerramento} />}
+            {showModal && <FilterModal f={filters} onApply={handleApply} onClose={() => setShowModal(false)} inclTermos={inclTermos} setInclTermos={setInclTermos} termoAbertura={termoAbertura} setTermoAbertura={setTermoAbertura} termoEncerramento={termoEncerramento} setTermoEncerramento={setTermoEncerramento} />}
 
             {/* Toolbar flutuante */}
             <ReportToolbar

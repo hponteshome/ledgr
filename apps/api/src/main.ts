@@ -60,7 +60,7 @@ async function bootstrap() {
     verify: (req: any, _res, buf) => { req.rawBody = buf; },
   }));
   app.use(require('express').urlencoded({ limit: '10mb', extended: true }));
-  await app.listen(3000);
+  await app.listen(Number(process.env.PORT) || 3000);
   console.log('🚀 Servidor rodando em http://localhost:3000');
 }
 bootstrap();
