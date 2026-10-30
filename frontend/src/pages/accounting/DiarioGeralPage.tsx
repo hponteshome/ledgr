@@ -6,6 +6,7 @@ import api from '../../services/api';
 import { SmartDateInput } from '../../components/SmartDateInput';
 import { useCompany } from '../../contexts/CompanyContext';
 import { ReportToolbar } from '../../components/accounting/ReportToolbar';
+import { opcoesImpressaoHtml } from '../../utils/imprimirRelatorio';
 
 // ── Tipos ──────────────────────────────────────────────────────
 interface Account { id: string; code: string; name: string; reducedCode?: string; }
@@ -337,11 +338,11 @@ const DiarioGeralPage: React.FC = () => {
             ".termo pre{font-family:'Courier New',monospace;font-size:9pt;white-space:pre-wrap;line-height:1.6}";
         const html = "<!DOCTYPE html><html lang='pt-BR'><head><meta charset='UTF-8'/>"  +
             "<title>Livro Di&aacute;rio - " + empresa + "</title>" +
-            "<style>" + css + "</style></head><body>" +
+            "<style>" + css + "</style></head><body>" + opcoesImpressaoHtml(false) +
             "<div class='header-top'>" +
             "<div><h2>" + empresa + "</h2><div>Contabilidade</div></div>" +
             "<div style='text-align:center'><h2>Di&aacute;rio Geral</h2></div>" +
-            "<div style='text-align:right'><div>Data: " + hoje + "</div><div>Hora: " + hora + "</div></div>" +
+            "<div class='opt-datahora' style='text-align:right'><div>Data: " + hoje + "</div><div>Hora: " + hora + "</div></div>" +
             "</div>" +
             "<div><b>Per&iacute;odo: " + periodo + "</b></div>" +
             (inclTermos ? "<div class='termo'><pre>" + termoAbertura + "</pre></div><hr/>" : '') +
@@ -350,7 +351,6 @@ const DiarioGeralPage: React.FC = () => {
             "<col style='width:9%'><col style='width:9%'><col style='width:18.5%'><col style='width:18.5%'>" +
             "</colgroup>" + rows + "</table>" +
             (inclTermos ? "<hr/><div class='termo'><pre>" + termoEncerramento + "</pre></div>" : '') +
-            "<script>window.onload=function(){window.print();}<\/script>" +
             "</body></html>";
 
         const w = window.open('', '_blank');

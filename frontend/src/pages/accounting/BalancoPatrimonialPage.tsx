@@ -4,6 +4,7 @@ import { FiLoader, FiAlertCircle, FiPrinter } from 'react-icons/fi';
 import api from '../../services/api';
 import { useCompany } from '../../contexts/CompanyContext';
 import { ReportToolbar } from '../../components/accounting/ReportToolbar';
+import { opcoesImpressaoHtml, montarAssinaturasHtml } from '../../utils/imprimirRelatorio';
 
 interface Account { id: string; code: string; name: string; type: string; nature: string; isAnalytic: boolean; level: number; }
 interface BPItem { account: Account; previousBalance: number; debits: number; credits: number; currentBalance: number; children?: BPItem[]; }
@@ -92,8 +93,9 @@ const BalancoPatrimonialPage: React.FC = () => {
         </tr>
     );
 
-    const printBP = () => {
+    const printBP = async () => {
         if (!generated || !activeCompany) return;
+        const assinaturasHtml = await montarAssinaturasHtml(activeCompany.id);
         const empresa = activeCompany.legalName || activeCompany.tradeName || '';
         const cnpj = fmtCnpj(activeCompany.taxId || '');
         const hoje = new Date().toLocaleDateString('pt-BR');
@@ -127,11 +129,11 @@ const BalancoPatrimonialPage: React.FC = () => {
             ".total{border-top:2px solid #000;font-weight:700;background:#E5E7EB}" +
             ".two-col{display:grid;grid-template-columns:1fr 1fr;gap:20px}";
 
-        const html = "<!DOCTYPE html><html><head><meta charset='UTF-8'/><title>BP - " + empresa + "</title><style>" + css + "</style></head><body>" +
+        const html = "<!DOCTYPE html><html><head><meta charset='UTF-8'/><title>BP - " + empresa + "</title><style>" + css + "</style></head><body>" + opcoesImpressaoHtml(true) +
             "<div class='header'>" +
             "<div><h2>" + empresa + "</h2><p style='margin:2px 0;font-size:8pt'>CNPJ: " + cnpj + "</p></div>" +
             "<div style='text-align:center'><h2>BALANCO PATRIMONIAL</h2><p style='margin:2px 0;font-size:9pt'>Data-base: " + dataBase + "</p></div>" +
-            "<div style='text-align:right;font-size:8pt'><div>Emissao: " + hoje + "</div></div>" +
+            "<div class='opt-datahora' style='text-align:right;font-size:8pt'><div>Emissao: " + hoje + " " + new Date().toLocaleTimeString('pt-BR') + "</div></div>" +
             "</div>" +
             "<div class='two-col'>" +
             "<div><table><thead><tr><th colspan='3'>ATIVO</th></tr><tr><th>Conta</th><th class='num'>Parcial</th><th class='num'>Total</th></tr></thead><tbody>" +
@@ -144,7 +146,7 @@ const BalancoPatrimonialPage: React.FC = () => {
             "<tr class='total'><td colspan='2'>TOTAL PASSIVO + PL</td><td class='num'>" + fmtNum(totalPasivoPL) + "</td></tr>" +
             "</tbody></table></div>" +
             "</div>" +
-            "<script>window.onload=function(){window.print();}<\/script>" +
+            assinaturasHtml +
             "</body></html>";
 
         const w = window.open('', '_blank');

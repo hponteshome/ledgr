@@ -4,6 +4,7 @@ import { FiLoader, FiAlertCircle } from 'react-icons/fi';
 import api from '../../services/api';
 import { useCompany } from '../../contexts/CompanyContext';
 import { ReportToolbar } from '../../components/accounting/ReportToolbar';
+import { opcoesImpressaoHtml, montarAssinaturasHtml } from '../../utils/imprimirRelatorio';
 
 interface Account { id: string; code: string; name: string; type: string; nature: string; isAnalytic: boolean; level: number; }
 interface DREItem { account: Account; previousBalance: number; debits: number; credits: number; currentBalance: number; children?: DREItem[]; }
@@ -186,8 +187,9 @@ const DrePage: React.FC = () => {
         );
     };
 
-    const printDRE = () => {
+    const printDRE = async () => {
         if (!generated || !activeCompany) return;
+        const assinaturasHtml = await montarAssinaturasHtml(activeCompany.id);
         const empresa = activeCompany.legalName || activeCompany.tradeName || '';
         const cnpj = fmtCnpj(activeCompany.taxId || '');
         const hoje = new Date().toLocaleDateString('pt-BR');
@@ -203,7 +205,7 @@ const DrePage: React.FC = () => {
             return "<tr style='background:" + bg + "'><td style='padding:2px 4px;font-weight:" + (item.account.isAnalytic ? 400 : 700) + ";font-size:10pt'><span style='font-family:monospace;color:#888;font-size:9pt;margin-right:6px'>" + item.account.code + "</span>" + item.account.name + "</td><td style='text-align:right;font-family:monospace;padding:2px 4px;color:" + cor + "'>" + (item.account.isAnalytic ? fmtNum(v) : '') + "</td><td style='text-align:right;font-family:monospace;padding:2px 4px;font-weight:700;color:" + cor + "'>" + (!item.account.isAnalytic ? fmtNum(v) : '') + "</td></tr>";
         }).join('');
         const css = "@page{size:A4 portrait;margin:12mm 14mm}body{font-family:Arial,sans-serif;font-size:10pt}.header{display:flex;justify-content:space-between;border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:8px}table{width:100%;border-collapse:collapse}th{padding:4px 4px;border-bottom:1px solid #000;border-top:1px solid #000;font-size:9pt;text-transform:uppercase}th.num{text-align:right}td{padding:2px 4px;border-bottom:0.5px solid #eee}.sec{background:#F3F4F6;font-weight:700}.tot{border-top:1px solid #000;font-weight:700;background:#E5E7EB}.res{border-top:2px solid #000;font-weight:700;font-size:11pt}";
-        const html = "<!DOCTYPE html><html><head><meta charset='UTF-8'/><title>DRE</title><style>" + css + "</style></head><body><div class='header'><div><b>" + empresa + "</b><br/><span style='font-size:8pt'>CNPJ: " + cnpj + "</span></div><div style='text-align:center'><b>DEMONSTRACAO DO RESULTADO DO EXERCICIO</b><br/>" + periodo + "</div><div style='text-align:right;font-size:8pt'>Emissao: " + hoje + "</div></div><table><thead><tr><th>Conta</th><th class='num' style='width:110px'>Parcial</th><th class='num' style='width:110px'>Total</th></tr></thead><tbody><tr><td class='sec' colspan='3'>RECEITAS</td></tr>" + buildRows(receitasVisiveis) + "<tr class='tot'><td colspan='2'>TOTAL DAS RECEITAS</td><td style='text-align:right;font-family:monospace'>" + fmtNum(totalReceitas) + "</td></tr><tr><td class='sec' colspan='3'>DESPESAS</td></tr>" + buildRows(despesasVisiveis) + "<tr class='tot'><td colspan='2'>TOTAL DAS DESPESAS</td><td style='text-align:right;font-family:monospace'>" + fmtNum(totalDespesas) + "</td></tr><tr class='res' style='background:" + (resultado >= 0 ? '#F0FDF4' : '#FEF2F2') + ";color:" + (resultado >= 0 ? '#16A34A' : '#DC2626') + "'><td colspan='2'>" + (resultado >= 0 ? 'LUCRO DO EXERCICIO' : 'PREJUIZO DO EXERCICIO') + "</td><td style='text-align:right;font-family:monospace'>" + fmtNum(Math.abs(resultado)) + "</td></tr></tbody></table><script>window.onload=function(){window.print();}<\/script></body></html>";
+        const html = "<!DOCTYPE html><html><head><meta charset='UTF-8'/><title>DRE</title><style>" + css + "</style></head><body>" + opcoesImpressaoHtml(true) + "<div class='header'><div><b>" + empresa + "</b><br/><span style='font-size:8pt'>CNPJ: " + cnpj + "</span></div><div style='text-align:center'><b>DEMONSTRACAO DO RESULTADO DO EXERCICIO</b><br/>" + periodo + "</div><div class='opt-datahora' style='text-align:right;font-size:8pt'>Emissao: " + hoje + " " + new Date().toLocaleTimeString('pt-BR') + "</div></div><table><thead><tr><th>Conta</th><th class='num' style='width:110px'>Parcial</th><th class='num' style='width:110px'>Total</th></tr></thead><tbody><tr><td class='sec' colspan='3'>RECEITAS</td></tr>" + buildRows(receitasVisiveis) + "<tr class='tot'><td colspan='2'>TOTAL DAS RECEITAS</td><td style='text-align:right;font-family:monospace'>" + fmtNum(totalReceitas) + "</td></tr><tr><td class='sec' colspan='3'>DESPESAS</td></tr>" + buildRows(despesasVisiveis) + "<tr class='tot'><td colspan='2'>TOTAL DAS DESPESAS</td><td style='text-align:right;font-family:monospace'>" + fmtNum(totalDespesas) + "</td></tr><tr class='res' style='background:" + (resultado >= 0 ? '#F0FDF4' : '#FEF2F2') + ";color:" + (resultado >= 0 ? '#16A34A' : '#DC2626') + "'><td colspan='2'>" + (resultado >= 0 ? 'LUCRO DO EXERCICIO' : 'PREJUIZO DO EXERCICIO') + "</td><td style='text-align:right;font-family:monospace'>" + fmtNum(Math.abs(resultado)) + "</td></tr></tbody></table>" + assinaturasHtml + "</body></html>";
         const w = window.open('', '_blank');
         if (w) { w.document.write(html); w.document.close(); }
     };

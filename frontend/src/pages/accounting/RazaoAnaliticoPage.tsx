@@ -5,6 +5,7 @@ import { FiSearch, FiLoader, FiAlertCircle } from 'react-icons/fi';
 import api from '../../services/api';
 import { useCompany } from '../../contexts/CompanyContext';
 import { ReportToolbar } from '../../components/accounting/ReportToolbar';
+import { opcoesImpressaoHtml } from '../../utils/imprimirRelatorio';
 
 // ── Tipos ──────────────────────────────────────────────────────
 interface AccountInfo {
@@ -555,11 +556,11 @@ const RazaoAnaliticoPage: React.FC = () => {
         const html =
             "<!DOCTYPE html><html lang='pt-BR'><head><meta charset='UTF-8'/>" +
             "<title>" + tituloArquivo + "</title>" +
-            "<style>" + css + "</style></head><body>" +
+            "<style>" + css + "</style></head><body>" + opcoesImpressaoHtml(false) +
             "<div class='header'>" +
             "<div class='header-left'><h2>" + empresa + "</h2><p>CNPJ: " + cnpj + "</p></div>" +
             "<div class='header-center'>Razão Analítico</div>" +
-            "<div class='header-right'><div>Data: " + hoje + "</div><div>Hora: " + hora + "</div></div>" +
+            "<div class='header-right opt-datahora'><div>Data: " + hoje + "</div><div>Hora: " + hora + "</div></div>" +
             "</div>" +
             "<div class='periodo'>Período: " + periodo + " · " + rows.length + " contas</div>" +
             body +
@@ -567,7 +568,6 @@ const RazaoAnaliticoPage: React.FC = () => {
             "<span>Total Débitos: <b>" + fmtSaldo(totD) + "</b></span>" +
             "<span>Total Créditos: <b>" + fmtSaldo(totC) + "</b></span>" +
             "</div>" +
-            "<script>window.onload=function(){window.print();}<\/script>" +
             "</body></html>";
 
         const w = window.open('', '_blank');
