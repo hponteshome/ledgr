@@ -9,13 +9,14 @@ import { ProjetosFinanceiroController } from './projetos-financeiro.controller';
 import { CadastrosController } from './cadastros.controller';
 import { RelatoriosController } from './relatorios.controller';
 import { InstrumentosController } from './instrumentos.controller';
+import { JuridicoController } from './juridico.controller';
 import { ConcessoesService } from './concessoes.service';
 import { ProjEscopoGuard } from './proj-escopo.guard';
 import { ProjDbService } from './proj-db.service';
 
 @Module({
   imports: [SignaturesModule, AccountingModule],
-  controllers: [ProjectsController, ProjetosFinanceiroController, CadastrosController, RelatoriosController, InstrumentosController],
+  controllers: [ProjectsController, ProjetosFinanceiroController, CadastrosController, RelatoriosController, InstrumentosController, JuridicoController],
   providers: [ConcessoesService, ProjEscopoGuard, ProjDbService],
   exports: [ConcessoesService],
 })

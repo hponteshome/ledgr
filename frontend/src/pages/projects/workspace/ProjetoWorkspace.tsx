@@ -5,7 +5,7 @@
 import React, { useEffect, useState } from 'react';
 import { Routes, Route, Navigate, NavLink, useNavigate, useParams } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import { FiGrid, FiDollarSign, FiUsers, FiKey, FiAlertCircle, FiRepeat, FiFileText, FiArrowLeft, FiLogOut, FiLayers, FiTrendingDown, FiClipboard, FiClock, FiBriefcase, FiGitMerge, FiShield, FiShuffle, FiCheckSquare, FiSliders, FiList, FiPenTool } from 'react-icons/fi';
+import { FiGrid, FiDollarSign, FiUsers, FiKey, FiAlertCircle, FiRepeat, FiFileText, FiArrowLeft, FiLogOut, FiLayers, FiTrendingDown, FiClipboard, FiClock, FiBriefcase, FiGitMerge, FiShield, FiShuffle, FiCheckSquare, FiSliders, FiList, FiPenTool, FiBookOpen } from 'react-icons/fi';
 import api from '../../../services/api';
 import { useAuth } from '../../../contexts/AuthContext';
 import ConcessoesPage from '../ConcessoesPage';
@@ -27,6 +27,7 @@ import ComprovantesFiscaisProjeto from './ComprovantesFiscaisProjeto';
 import SimuladorRmProjeto from './SimuladorRmProjeto';
 import AnexoVProjeto from './AnexoVProjeto';
 import InstrumentosProjeto from './InstrumentosProjeto';
+import JuridicoProjeto from './JuridicoProjeto';
 import { PROJ, PROJ_ACCENT, Projeto, erroSt } from './projetoTema';
 
 const itemSt = (ativo: boolean): React.CSSProperties => ({
@@ -55,6 +56,7 @@ const MENU: { to: string; label: string; icon: React.ElementType; end?: boolean;
   { to: 'simulador-rm', label: 'Simulador RM', icon: FiSliders, master: true },
   { to: 'anexo-v', label: 'Anexo V e desembolsos', icon: FiList, master: true },
   { to: 'instrumentos', label: 'Instrumentos do plano', icon: FiPenTool, master: true },
+  { to: 'juridico', label: 'Jurídico RM', icon: FiBookOpen, master: true },
   { to: 'participantes', label: 'Participantes', icon: FiUsers },
   { to: 'documentos', label: 'Documentos', icon: FiFileText },
 ];
@@ -106,7 +108,7 @@ export default function ProjetoWorkspace() {
           <div style={{ fontSize: 15, fontWeight: 700, marginTop: 3, lineHeight: 1.25 }}>{projeto?.nome || '...'}</div>
         </div>
         <nav style={{ padding: 10, flex: 1, display: 'flex', flexDirection: 'column', gap: 2, overflowY: 'auto' }}>
-          {MENU.filter((m) => (soRevisor ? m.to === 'instrumentos' : (!m.master || master || (m.to === 'instrumentos' && revisor)))).map((m) => (
+          {MENU.filter((m) => (soRevisor ? (m.to === 'instrumentos' || m.to === 'juridico') : (!m.master || master || ((m.to === 'instrumentos' || m.to === 'juridico') && revisor)))).map((m) => (
             <NavLink key={m.label} to={m.to ? `${base}/${m.to}` : base} end={m.end} style={({ isActive }) => itemSt(isActive)}>
               <m.icon size={15} /> {m.label}
             </NavLink>
@@ -171,6 +173,7 @@ export default function ProjetoWorkspace() {
               {master && <Route path="simulador-rm" element={<SimuladorRmProjeto projetoId={projeto.id} />} />}
               {master && <Route path="anexo-v" element={<AnexoVProjeto projetoId={projeto.id} projetoNome={projeto.nome} />} />}
               {(master || revisor) && <Route path="instrumentos" element={<InstrumentosProjeto projetoId={projeto.id} />} />}
+              {(master || revisor) && <Route path="juridico" element={<JuridicoProjeto projetoId={projeto.id} />} />}
               <Route path="participantes" element={<ParticipantesProjeto operacao={operacao} master={master} />} />
               <Route path="documentos" element={<DocumentosProjeto operacao={operacao} master={master} />} />
               <Route path="pendencias" element={<PendenciasProjeto operacao={operacao} master={master} />} />
