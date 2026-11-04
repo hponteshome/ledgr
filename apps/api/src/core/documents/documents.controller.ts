@@ -317,4 +317,45 @@ export class DocumentsController {
     body.companyId = this.empresaEfetiva(req, body.companyId) as string;
     return this.documentsService.importSignedPdf(file, body, req.user.id);
   }
+
+  // ── Imoveis: matriculas e escrituras (04/11/2026) ─────────────
+  // GET /documents/imoveis/vinculos?companyId=&tipo=MATRICULA|ESCRITURA
+  @Get('imoveis/vinculos')
+  listarDocsImoveis(@Req() req: any, @Query('companyId') companyId: string, @Query('tipo') tipo?: string) {
+    return this.documentsService.listarDocsImoveis(this.empresaEfetiva(req, companyId) as string, tipo);
+  }
+
+  // POST /documents/imoveis/importar - PDF + vinculo com o imovel e situacao registral
+  @Post('imoveis/importar')
+  @UseInterceptors(FileInterceptor('file', { storage: require('multer').memoryStorage(), limits: { fileSize: 30 * 1024 * 1024 } }))
+  importarDocImovel(@Req() req: any, @UploadedFile() file: Express.Multer.File, @Body() body: any) {
+    if (!file) throw new BadRequestException('Arquivo PDF nao enviado.');
+    body.companyId = this.empresaEfetiva(req, body.companyId) as string;
+    return this.documentsService.importarDocImovel(file, body, req.user.id);
+  }
+
+  // PATCH /documents/imoveis/vinculos/:id - situacao registral e observacao
+  @Patch('imoveis/vinculos/:id')
+  atualizarDocImovel(@Req() req: any, @Param('id') id: string, @Body() body: any) {
+    return this.documentsService.atualizarDocImovel(this.empresaEfetiva(req, body?.companyId) as string, id, body, req.user.id);
+  }
+
+  // ── Arquivo Digital reorganizado (04/11/2026) ─────────────────
+  // GET /documents/arquivo/lista?companyId=&types=A,B&q=texto
+  @Get('arquivo/lista')
+  listarArquivo(@Req() req: any, @Query('companyId') companyId: string, @Query('types') types?: string, @Query('q') q?: string) {
+    return this.documentsService.listarArquivo(this.empresaEfetiva(req, companyId) as string, types, q);
+  }
+
+  // GET /documents/imoveis/locacoes - contratos de locacao arquivados, com o imovel
+  @Get('imoveis/locacoes')
+  listarLocacoesImoveis(@Req() req: any, @Query('companyId') companyId: string) {
+    return this.documentsService.listarLocacoesImoveis(this.empresaEfetiva(req, companyId) as string);
+  }
+
+  // PATCH /documents/:id/subtipo - classifica Balancete/ECD/ECF/Obrigacao etc.
+  @Patch(':id/subtipo')
+  definirSubtipo(@Req() req: any, @Param('id') id: string, @Body() body: any) {
+    return this.documentsService.definirSubtipo(this.empresaEfetiva(req, body?.companyId) as string, id, body?.subtipo ?? null, req.user.id);
+  }
 }

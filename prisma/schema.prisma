@@ -900,6 +900,9 @@ enum DocumentType {
   LIVRO_ATAS_AGE
   CONTRATO_SOCIAL
   CONTRATO_LOCACAO
+  MATRICULA_IMOVEL
+  ESCRITURA_PUBLICA
+  CONTRATO_CESSAO
   ADITIVO_CONTRATUAL
   PROCURACAO
   FISCAL
@@ -974,6 +977,7 @@ model Document {
   requiresJucesp     Boolean   @default(false) @map("requires_jucesp")
 
   notes       String?   @map("notes") @db.Text
+  subtipo     String?   @map("subtipo") @db.VarChar(30) /// 04/11/2026: Balancete, Demonstracao, ECD, ECF, Obrigacao...
   createdById String    @map("created_by_id") @db.Uuid
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)

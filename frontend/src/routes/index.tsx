@@ -123,6 +123,8 @@ import SidebarPermissionsPage from '../pages/sistema/SidebarPermissionsPage';
 import MenuUsageAuditPage from '../pages/sistema/MenuUsageAuditPage';
 import ShareholdersPage from '../pages/corporate/shareholders/ShareholdersPage';
 import { RepositorioPage } from '../pages/documentos/RepositorioPage';
+import { ImoveisDocumentosPage } from '../pages/documentos/ImoveisDocumentosPage';
+import { ArquivoAreaPage } from '../pages/documentos/ArquivoAreaPage';
 import { LogotiposPage } from '../pages/documentos/LogotiposPage';
 import { DocumentTemplatesPage } from '../pages/documentos/DocumentTemplatesPage';
 import { CertificatesPage } from '../pages/certificates/CertificatesPage';
@@ -304,30 +306,34 @@ export const AppRoutes = () => {
                 <Route path="app/documents/signatures/request" element={<ProtectedRoute><SignatureRequest /></ProtectedRoute>} />
                 <Route path="app/signatures/validate" element={<ProtectedRoute><SignatureValidatePage /></ProtectedRoute>} />
                 {/* Repositório de Documentos */}
-                <Route path="app/arquivo/societario" element={<ProtectedRoute><RepositorioPage /></ProtectedRoute>} />
-                <Route path="app/arquivo/societario/contratos" element={<ProtectedRoute><RepositorioPage /></ProtectedRoute>} />
-                <Route path="app/arquivo/societario/atas" element={<ProtectedRoute><RepositorioPage /></ProtectedRoute>} />
-                <Route path="app/arquivo/societario/procuracoes" element={<ProtectedRoute><RepositorioPage /></ProtectedRoute>} />
-                <Route path="app/arquivo/societario/acordos" element={<ProtectedRoute><RepositorioPage /></ProtectedRoute>} />
-                <Route path="app/arquivo/livros" element={<ProtectedRoute><RepositorioPage /></ProtectedRoute>} />
-                <Route path="app/arquivo/livros/acoes" element={<ProtectedRoute><RepositorioPage /></ProtectedRoute>} />
-                <Route path="app/arquivo/livros/transferencias" element={<ProtectedRoute><RepositorioPage /></ProtectedRoute>} />
-                <Route path="app/arquivo/livros/atas-ago" element={<ProtectedRoute><RepositorioPage /></ProtectedRoute>} />
-                <Route path="app/arquivo/livros/atas-age" element={<ProtectedRoute><RepositorioPage /></ProtectedRoute>} />
-                <Route path="app/arquivo/livros/presenca" element={<ProtectedRoute><RepositorioPage /></ProtectedRoute>} />
-                <Route path="app/arquivo/contabil" element={<ProtectedRoute><RepositorioPage /></ProtectedRoute>} />
-                <Route path="app/arquivo/contabil/balancetes" element={<ProtectedRoute><RepositorioPage /></ProtectedRoute>} />
-                <Route path="app/arquivo/contabil/ecd" element={<ProtectedRoute><RepositorioPage /></ProtectedRoute>} />
-                <Route path="app/arquivo/contabil/demonstracoes" element={<ProtectedRoute><RepositorioPage /></ProtectedRoute>} />
-                <Route path="app/arquivo/fiscal" element={<ProtectedRoute><RepositorioPage /></ProtectedRoute>} />
-                <Route path="app/arquivo/fiscal/nf" element={<ProtectedRoute><RepositorioPage /></ProtectedRoute>} />
-                <Route path="app/arquivo/fiscal/ecf" element={<ProtectedRoute><RepositorioPage /></ProtectedRoute>} />
-                <Route path="app/arquivo/fiscal/obrigacoes" element={<ProtectedRoute><RepositorioPage /></ProtectedRoute>} />
-                <Route path="app/arquivo/rh" element={<ProtectedRoute><RepositorioPage /></ProtectedRoute>} />
-                <Route path="app/arquivo/rh/contratos" element={<ProtectedRoute><RepositorioPage /></ProtectedRoute>} />
-                <Route path="app/arquivo/rh/procuracoes" element={<ProtectedRoute><RepositorioPage /></ProtectedRoute>} />
-                <Route path="app/arquivo/rh/acordos" element={<ProtectedRoute><RepositorioPage /></ProtectedRoute>} />
-                <Route path="app/arquivo/locacao" element={<ProtectedRoute><RepositorioPage /></ProtectedRoute>} />
+                <Route path="app/arquivo/societario" element={<ProtectedRoute><ArquivoAreaPage /></ProtectedRoute>} />
+                <Route path="app/arquivo/societario/contratos" element={<ProtectedRoute><ArquivoAreaPage /></ProtectedRoute>} />
+                <Route path="app/arquivo/societario/atas" element={<ProtectedRoute><ArquivoAreaPage /></ProtectedRoute>} />
+                <Route path="app/arquivo/societario/procuracoes" element={<ProtectedRoute><ArquivoAreaPage /></ProtectedRoute>} />
+                <Route path="app/arquivo/societario/acordos" element={<ProtectedRoute><ArquivoAreaPage /></ProtectedRoute>} />
+                <Route path="app/arquivo/livros" element={<ProtectedRoute><ArquivoAreaPage /></ProtectedRoute>} />
+                <Route path="app/arquivo/livros/acoes" element={<ProtectedRoute><ArquivoAreaPage /></ProtectedRoute>} />
+                <Route path="app/arquivo/livros/transferencias" element={<ProtectedRoute><ArquivoAreaPage /></ProtectedRoute>} />
+                <Route path="app/arquivo/livros/atas-ago" element={<ProtectedRoute><ArquivoAreaPage /></ProtectedRoute>} />
+                <Route path="app/arquivo/livros/atas-age" element={<ProtectedRoute><ArquivoAreaPage /></ProtectedRoute>} />
+                <Route path="app/arquivo/livros/presenca" element={<ProtectedRoute><ArquivoAreaPage /></ProtectedRoute>} />
+                <Route path="app/arquivo/contabil" element={<ProtectedRoute><ArquivoAreaPage /></ProtectedRoute>} />
+                <Route path="app/arquivo/contabil/balancetes" element={<ProtectedRoute><ArquivoAreaPage /></ProtectedRoute>} />
+                <Route path="app/arquivo/contabil/ecd" element={<ProtectedRoute><ArquivoAreaPage /></ProtectedRoute>} />
+                <Route path="app/arquivo/contabil/demonstracoes" element={<ProtectedRoute><ArquivoAreaPage /></ProtectedRoute>} />
+                <Route path="app/arquivo/fiscal" element={<ProtectedRoute><ArquivoAreaPage /></ProtectedRoute>} />
+                <Route path="app/arquivo/fiscal/nf" element={<ProtectedRoute><ArquivoAreaPage /></ProtectedRoute>} />
+                <Route path="app/arquivo/fiscal/ecf" element={<ProtectedRoute><ArquivoAreaPage /></ProtectedRoute>} />
+                <Route path="app/arquivo/fiscal/obrigacoes" element={<ProtectedRoute><ArquivoAreaPage /></ProtectedRoute>} />
+                <Route path="app/arquivo/rh" element={<ProtectedRoute><ArquivoAreaPage /></ProtectedRoute>} />
+                <Route path="app/arquivo/rh/contratos" element={<ProtectedRoute><ArquivoAreaPage /></ProtectedRoute>} />
+                <Route path="app/arquivo/rh/procuracoes" element={<ProtectedRoute><ArquivoAreaPage /></ProtectedRoute>} />
+                <Route path="app/arquivo/rh/acordos" element={<ProtectedRoute><ArquivoAreaPage /></ProtectedRoute>} />
+                <Route path="app/arquivo/locacao" element={<ProtectedRoute><ImoveisDocumentosPage /></ProtectedRoute>} />
+                <Route path="app/arquivo/imoveis" element={<ProtectedRoute><ImoveisDocumentosPage /></ProtectedRoute>} />
+                <Route path="app/arquivo/imoveis/matriculas" element={<ProtectedRoute><ImoveisDocumentosPage /></ProtectedRoute>} />
+                <Route path="app/arquivo/imoveis/escrituras" element={<ProtectedRoute><ImoveisDocumentosPage /></ProtectedRoute>} />
+                <Route path="app/arquivo/todos" element={<ProtectedRoute><RepositorioPage /></ProtectedRoute>} />
                 <Route path="app/arquivo/templates/logotipos" element={<ProtectedRoute><LogotiposPage /></ProtectedRoute>} />
                 <Route path="app/arquivo/templates/documentos" element={<ProtectedRoute><DocumentTemplatesPage /></ProtectedRoute>} />
 

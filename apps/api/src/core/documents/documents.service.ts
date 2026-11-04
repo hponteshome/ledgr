@@ -1136,4 +1136,187 @@ async handleGovBrCallback(
 
     return { id: doc.id, title: doc.title, status, contentHash, hasSignature };
   }
+
+  // ── Imoveis: matriculas e escrituras (04/11/2026) ─────────────
+  // Vinculo documento x imovel em asset_documents (migracao 20261104_imoveis_matriculas.sql),
+  // com a situacao registral. A matricula mais recente atualiza numero/cartorio no cadastro do imovel.
+  private readonly SITUACOES_IMOVEL = ['EMPRESA', 'SOCIO_PENDENTE_REGISTRO', 'GRUPO_TERCEIRO', 'SEM_MATRICULA'];
+
+  async listarDocsImoveis(companyId: string, tipo?: string) {
+    this.validateUuid(companyId, 'companyId');
+    const t = tipo === 'MATRICULA' || tipo === 'ESCRITURA' || tipo === 'CESSAO' ? tipo : null;
+    return this.prisma.$queryRawUnsafe(
+      `SELECT v.id, v.tipo, v.fixed_asset_id::text AS "fixedAssetId", a.internal_code AS "internalCode",
+              a.description AS "assetDescription", v.numero_matricula AS "numeroMatricula", v.cartorio,
+              to_char(v.data_certidao, 'YYYY-MM-DD') AS "dataCertidao", v.ultimo_ato AS "ultimoAto",
+              v.proprietario_registral AS "proprietarioRegistral", v.situacao, v.observacao,
+              d.id::text AS "documentId", d.title, d.status::text AS status, d.file_url AS "fileUrl"
+         FROM asset_documents v
+         JOIN documents d ON d.id = v.document_id AND d.deleted_at IS NULL
+         JOIN fixed_assets a ON a.id = v.fixed_asset_id
+        WHERE v.company_id = $1::uuid AND v.deleted_at IS NULL AND ($2::text IS NULL OR v.tipo = $2::text)
+        ORDER BY a.internal_code, v.tipo, v.data_certidao DESC NULLS LAST, v.created_at DESC`,
+      companyId, t,
+    );
+  }
+
+  async importarDocImovel(file: Express.Multer.File, body: any, userId: string) {
+    // 04/11/2026: tipo CESSAO (contrato de cessao) pode cobrir varios imoveis (fixedAssetIds separados por virgula)
+    const companyId = body.companyId;
+    this.validateUuid(companyId, 'companyId');
+    const tipo = body.tipo === 'ESCRITURA' ? 'ESCRITURA' : body.tipo === 'CESSAO' ? 'CESSAO' : 'MATRICULA';
+    const ids: string[] = Array.from(new Set(String(body.fixedAssetIds || body.fixedAssetId || '')
+      .split(',').map((x: string) => x.trim()).filter(Boolean)));
+    if (!ids.length) throw new BadRequestException('Informe o imovel.');
+    if (tipo !== 'CESSAO' && ids.length > 1) throw new BadRequestException('Matricula e escritura sao de um imovel so.');
+    ids.forEach(x => this.validateUuid(x, 'fixedAssetId'));
+    if (!/\.pdf$/i.test(file.originalname ?? '')) throw new BadRequestException('Envie o documento em PDF.');
+    if (!body.dataCertidao) throw new BadRequestException('Informe a data do documento.');
+    if (!body.title || String(body.title).trim().length < 3) throw new BadRequestException('Informe o titulo do documento.');
+    const situacao = tipo === 'CESSAO' ? 'EMPRESA' : (this.SITUACOES_IMOVEL.includes(body.situacao) ? body.situacao : 'EMPRESA');
+    const assets = await this.prisma.fixedAsset.findMany({
+      where: { id: { in: ids }, companyId, deletedAt: null },
+      select: { id: true, internalCode: true },
+    });
+    if (assets.length !== ids.length) throw new BadRequestException('Imovel nao encontrado nesta empresa.');
+    const vazio = (v: any) => (v === undefined || v === null || String(v).trim() === '' ? null : String(v).trim());
+    const descricao = [vazio(body.ultimoAto),
+      vazio(body.proprietarioRegistral) ? (tipo === 'CESSAO' ? 'Cedente: ' : 'Proprietario registral: ') + vazio(body.proprietarioRegistral) : null,
+      tipo === 'CESSAO' ? 'Imoveis: ' + assets.map(a => a.internalCode).join(', ') : null]
+      .filter(Boolean).join(' | ');
+
+    const r = await this.importSignedPdf(file, {
+      companyId,
+      type: tipo === 'ESCRITURA' ? 'ESCRITURA_PUBLICA' : tipo === 'CESSAO' ? 'CONTRATO_CESSAO' : 'MATRICULA_IMOVEL',
+      title: String(body.title).trim(),
+      date: body.dataCertidao,
+      description: descricao,
+      validate: tipo === 'CESSAO' ? 'true' : 'false',
+    }, userId);
+    await this.prisma.document.update({
+      where: { id: r.id },
+      data: {
+        ...(tipo === 'CESSAO' ? {} : { status: 'REGISTRADO' as any, registrationNumber: vazio(body.numeroMatricula), registrationDate: new Date(body.dataCertidao) }),
+        notes: vazio(body.observacao),
+      },
+    });
+
+    const vinculos: string[] = [];
+    let cadastroAtualizado = false;
+    for (const asset of assets) {
+      const ins: any[] = await this.prisma.$queryRawUnsafe(
+        `INSERT INTO asset_documents (company_id, fixed_asset_id, document_id, tipo, numero_matricula, cartorio, data_certidao,
+                                      ultimo_ato, proprietario_registral, situacao, observacao, created_by_id)
+         VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7::date, $8, $9, $10, $11, $12::uuid) RETURNING id::text AS id`,
+        companyId, asset.id, r.id, tipo, tipo === 'CESSAO' ? null : vazio(body.numeroMatricula), tipo === 'CESSAO' ? null : vazio(body.cartorio),
+        body.dataCertidao, vazio(body.ultimoAto), vazio(body.proprietarioRegistral), situacao, vazio(body.observacao), userId,
+      );
+      vinculos.push(ins[0]?.id);
+      if (tipo === 'MATRICULA' && (vazio(body.numeroMatricula) || vazio(body.cartorio))) {
+        const recente: any[] = await this.prisma.$queryRawUnsafe(
+          `SELECT id::text AS id FROM asset_documents
+            WHERE fixed_asset_id = $1::uuid AND tipo = 'MATRICULA' AND deleted_at IS NULL
+            ORDER BY data_certidao DESC NULLS LAST, created_at DESC LIMIT 1`, asset.id);
+        if (recente[0]?.id === ins[0]?.id) {
+          await this.prisma.fixedAsset.update({
+            where: { id: asset.id },
+            data: {
+              ...(vazio(body.numeroMatricula) ? { registryNumber: vazio(body.numeroMatricula) as string } : {}),
+              ...(vazio(body.cartorio) ? { registryOffice: vazio(body.cartorio) as string } : {}),
+            },
+          });
+          cadastroAtualizado = true;
+        }
+      }
+    }
+
+    await this.prisma.auditLog.create({
+      data: {
+        actorId: userId,
+        action: tipo === 'CESSAO' ? 'IMOVEL_CESSAO_ARQUIVADA' : 'IMOVEL_DOCUMENTO_ARQUIVADO',
+        targetId: assets[0].id,
+        after: { documentId: r.id, vinculos, imoveis: assets.map(a => a.internalCode), tipo, numeroMatricula: vazio(body.numeroMatricula), situacao, cadastroAtualizado },
+      },
+    });
+    return { id: vinculos[0], vinculos, documentId: r.id, status: tipo === 'CESSAO' ? r.status : 'REGISTRADO', contentHash: r.contentHash, cadastroAtualizado };
+  }
+
+  async atualizarDocImovel(companyId: string, id: string, body: any, userId: string) {
+    this.validateUuid(companyId, 'companyId');
+    this.validateUuid(id, 'id');
+    if (body?.situacao && !this.SITUACOES_IMOVEL.includes(body.situacao)) throw new BadRequestException('Situacao invalida.');
+    const antes: any[] = await this.prisma.$queryRawUnsafe(
+      `SELECT situacao, observacao FROM asset_documents WHERE id = $1::uuid AND company_id = $2::uuid AND deleted_at IS NULL`, id, companyId);
+    if (!antes.length) throw new NotFoundException('Documento do imovel nao encontrado.');
+    await this.prisma.$executeRawUnsafe(
+      `UPDATE asset_documents SET situacao = COALESCE($3::varchar, situacao), observacao = COALESCE($4::text, observacao), updated_at = now()
+        WHERE id = $1::uuid AND company_id = $2::uuid`,
+      id, companyId, body?.situacao ?? null, body?.observacao ?? null);
+    await this.prisma.auditLog.create({
+      data: {
+        actorId: userId, action: 'IMOVEL_DOCUMENTO_SITUACAO', targetId: id,
+        before: antes[0], after: { situacao: body?.situacao ?? antes[0].situacao, observacao: body?.observacao ?? antes[0].observacao },
+      },
+    });
+    return { ok: true };
+  }
+
+  // ── Arquivo Digital reorganizado (04/11/2026) ─────────────────
+  // Areas com abas; subtipo (coluna documents.subtipo) separa Balancete/ECD/ECF/Obrigacao etc.
+  private readonly SUBTIPOS_DOC: Record<string, string[]> = {
+    CONTABIL: ['BALANCETE', 'DEMONSTRACAO', 'ECD'],
+    FISCAL: ['ECF', 'OBRIGACAO'],
+    TRABALHISTA: ['CONTRATO_TRABALHO', 'ACORDO_COLETIVO'],
+  };
+
+  async listarArquivo(companyId: string, types?: string, q?: string) {
+    this.validateUuid(companyId, 'companyId');
+    const tipos = (types ?? '').split(',').map(s => s.trim()).filter(s => /^[A-Z_]+$/.test(s));
+    const busca = (q ?? '').trim();
+    return this.prisma.$queryRawUnsafe(
+      `SELECT d.id::text AS id, d.type::text AS type, d.subtipo, d.title, d.description, d.status::text AS status,
+              d.visibility::text AS visibility, to_char(d.date, 'YYYY-MM-DD') AS date, d.created_at AS "createdAt"
+         FROM documents d
+        WHERE d.company_id = $1::uuid AND d.deleted_at IS NULL AND d.is_template = false
+          AND ($2::text IS NULL OR d.type::text = ANY (string_to_array($2::text, ',')))
+          AND ($3::text IS NULL OR d.title ILIKE '%' || $3::text || '%' OR coalesce(d.description, '') ILIKE '%' || $3::text || '%')
+        ORDER BY d.date DESC NULLS LAST, d.created_at DESC
+        LIMIT 1000`,
+      companyId, tipos.length ? tipos.join(',') : null, busca || null,
+    );
+  }
+
+  async listarLocacoesImoveis(companyId: string) {
+    this.validateUuid(companyId, 'companyId');
+    return this.prisma.$queryRawUnsafe(
+      `SELECT d.id::text AS "documentId", d.title, d.status::text AS status, to_char(d.date, 'YYYY-MM-DD') AS date,
+              rc.contract_number AS "contractNumber", rc.status::text AS "contractStatus",
+              to_char(rc.start_date, 'YYYY-MM-DD') AS "startDate", to_char(rc.end_date, 'YYYY-MM-DD') AS "endDate",
+              rc.tenant_name AS "tenantName", a.internal_code AS "internalCode"
+         FROM documents d
+         LEFT JOIN rental_contracts rc ON rc.document_id = d.id AND rc.deleted_at IS NULL
+         LEFT JOIN fixed_assets a ON a.id = rc.fixed_asset_id
+        WHERE d.company_id = $1::uuid AND d.deleted_at IS NULL AND d.is_template = false AND d.type::text = 'CONTRATO_LOCACAO'
+        ORDER BY a.internal_code NULLS LAST, d.date DESC NULLS LAST`,
+      companyId,
+    );
+  }
+
+  async definirSubtipo(companyId: string, id: string, subtipo: string | null, userId: string) {
+    this.validateUuid(companyId, 'companyId');
+    this.validateUuid(id, 'id');
+    const docs: any[] = await this.prisma.$queryRawUnsafe(
+      `SELECT type::text AS type, subtipo FROM documents WHERE id = $1::uuid AND company_id = $2::uuid AND deleted_at IS NULL`, id, companyId);
+    if (!docs.length) throw new NotFoundException('Documento nao encontrado.');
+    const novo = subtipo ? String(subtipo) : null;
+    if (novo && !(this.SUBTIPOS_DOC[docs[0].type] ?? []).includes(novo)) {
+      throw new BadRequestException(`Subtipo ${novo} nao se aplica a documentos do tipo ${docs[0].type}.`);
+    }
+    await this.prisma.$executeRawUnsafe(
+      `UPDATE documents SET subtipo = $3::varchar, updated_at = now() WHERE id = $1::uuid AND company_id = $2::uuid`, id, companyId, novo);
+    await this.prisma.auditLog.create({
+      data: { actorId: userId, action: 'DOCUMENT_SUBTIPO', targetId: id, before: { subtipo: docs[0].subtipo }, after: { subtipo: novo } },
+    });
+    return { ok: true, subtipo: novo };
+  }
 }
