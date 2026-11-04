@@ -42,6 +42,15 @@ export class RentalContractsController {
     return this.svc.alertas(companyId);
   }
 
+  // 04/11/2026: encerramento por fim de prazo ou rescisao
+  @Post(':id/encerrar')
+  @RequireResourceAccess('rental-contracts', 'EDIT')
+  encerrar(@Req() req: any, @Param('id') id: string, @Body() body: any) {
+    const companyId = req.headers['x-company-id'] ?? '';
+    const userId = req.user?.id ?? req.user?.sub ?? '';
+    return this.svc.encerrar(companyId, userId, id, body);
+  }
+
   @Get(':id')
   @RequireResourceAccess('rental-contracts', 'VIEW')
   findOne(@Req() req: any, @Param('id') id: string) {

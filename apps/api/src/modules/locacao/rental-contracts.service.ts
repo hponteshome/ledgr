@@ -66,14 +66,21 @@ export class RentalContractsService {
       include: { fixedAsset: true, tenant: true },
     });
     if (!found) throw new NotFoundException('Contrato de locacao nao encontrado.');
+    // 04/11/2026: renovacao - contrato que renovou este e contrato que este renova
+    const renovadoPor = found.renewedByContractId
+      ? await this.prisma.rentalContract.findFirst({ where: { id: found.renewedByContractId }, select: { id: true, contractNumber: true, startDate: true, endDate: true } })
+      : null;
+    const renova = await this.prisma.rentalContract.findFirst({
+      where: { renewedByContractId: id, deletedAt: null }, select: { id: true, contractNumber: true, startDate: true, endDate: true },
+    });
     if (found.documentId) {
       const doc = await this.prisma.document.findUnique({
         where: { id: found.documentId },
         select: { id: true, status: true, currentVersion: true },
       });
-      return { ...found, document: doc };
+      return { ...found, document: doc, renovadoPor, renova };
     }
-    return found;
+    return { ...found, renovadoPor, renova };
   }
 
   // Recorrencia mensal de aluguel: gera o ArEntry (origin ALUGUEL) + JournalEntry
@@ -99,9 +106,13 @@ export class RentalContractsService {
       where: {
         companyId,
         deletedAt: null,
-        status: "ATIVO",
         startDate: { lte: fimMes },
-        OR: [{ endDate: null }, { endDate: { gte: inicioMes } }],
+        // 04/11/2026: contrato encerrado/rescindido continua gerando as competencias ate a data de fim
+        // (regularizacao de meses atrasados); depois do fim, nada e gerado.
+        AND: [
+          { OR: [{ status: "ATIVO" }, { status: { in: ["ENCERRADO", "RESCINDIDO", "RENOVADO"] as any }, endDate: { not: null } }] },
+          { OR: [{ endDate: null }, { endDate: { gte: inicioMes } }] },
+        ],
       },
       include: { fixedAsset: { select: { id: true, internalCode: true, description: true } } },
     });
@@ -191,6 +202,68 @@ export class RentalContractsService {
     }
 
     return { competencia, total: contratos.length, results };
+  }
+
+  // NOVO 04/11/2026: encerramento do contrato - fim de prazo (ENCERRADO) ou rescisao antecipada (RESCINDIDO).
+  // Grava a data efetiva de fim (endDate), acrescenta a nota ao contrato e audita. Bloqueia se ja houver
+  // aluguel gerado para competencia posterior ao mes do encerramento (cancelar antes).
+  async encerrar(companyId: string, userId: string, id: string, body: { data?: string; motivo?: string; observacao?: string; renovadoPorId?: string }) {
+    const c = await this.prisma.rentalContract.findFirst({
+      where: { id, companyId, deletedAt: null },
+      include: { fixedAsset: { select: { internalCode: true } } },
+    });
+    if (!c) throw new NotFoundException('Contrato de locacao nao encontrado.');
+    if (c.status !== 'ATIVO') throw new BadRequestException(`O contrato ja esta ${c.status === 'RESCINDIDO' ? 'rescindido' : c.status === 'RENOVADO' ? 'renovado' : 'encerrado'}.`);
+    const renovacao = body?.motivo === 'RENOVACAO';
+    const rescisao = !renovacao && body?.motivo === 'RESCISAO';
+    const fim = toDate(body?.data);
+    if (!fim) throw new BadRequestException('Informe a data de encerramento.');
+    const ini = new Date(c.startDate);
+    if (fim.getTime() < new Date(ini.getFullYear(), ini.getMonth(), ini.getDate()).getTime()) {
+      throw new BadRequestException('A data de encerramento e anterior ao inicio do contrato.');
+    }
+    const obs = String(body?.observacao ?? '').trim();
+    if (rescisao && obs.length < 10) throw new BadRequestException('Informe o motivo da rescisao (minimo 10 caracteres).');
+    let novo: { id: string; contractNumber: string | null; startDate: Date } | null = null;
+    if (renovacao) {
+      const nid = String(body?.renovadoPorId ?? '');
+      novo = nid ? await this.prisma.rentalContract.findFirst({
+        where: { id: nid, companyId, deletedAt: null, fixedAssetId: c.fixedAssetId, NOT: { id } },
+        select: { id: true, contractNumber: true, startDate: true },
+      }) : null;
+      if (!novo) throw new BadRequestException('Informe o contrato que renova este (mesmo imovel).');
+    }
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const compFim = `${fim.getFullYear()}-${pad(fim.getMonth() + 1)}`;
+    const posteriores = await this.prisma.arEntry.findMany({
+      where: { rentalContractId: id, deletedAt: null, competenceMonth: { gt: compFim } },
+      select: { competenceMonth: true },
+      orderBy: { competenceMonth: 'asc' },
+    });
+    if (posteriores.length > 0) {
+      throw new BadRequestException(
+        `Ha aluguel gerado para competencia posterior ao encerramento (${posteriores.map(p => p.competenceMonth).join(', ')}). Cancele-o antes de encerrar o contrato.`,
+      );
+    }
+    const dataBr = `${pad(fim.getDate())}/${pad(fim.getMonth() + 1)}/${fim.getFullYear()}`;
+    const nota = renovacao
+      ? `Renovado pelo contrato ${novo?.contractNumber ?? novo?.id} - fim em ${dataBr}${obs ? ' - ' + obs : ''}.`
+      : `${rescisao ? 'Rescindido' : 'Encerrado por fim de prazo'} em ${dataBr}${obs ? ' - ' + obs : ''}.`;
+    const status = renovacao ? 'RENOVADO' : rescisao ? 'RESCINDIDO' : 'ENCERRADO';
+    const atualizado = await this.prisma.$transaction(async (tx) => {
+      const r = await tx.rentalContract.update({
+        where: { id },
+        data: { status: status as any, endDate: fim, notes: c.notes ? `${c.notes}\n${nota}` : nota, updatedById: userId, ...(renovacao ? { renewedByContractId: novo!.id } : {}) },
+      });
+      await (tx as any).auditLog.create({
+        data: {
+          actorId: userId, action: renovacao ? 'LOCACAO_CONTRATO_RENOVADO' : rescisao ? 'LOCACAO_CONTRATO_RESCINDIDO' : 'LOCACAO_CONTRATO_ENCERRADO', targetId: id,
+          after: { contrato: c.contractNumber, imovel: c.fixedAsset?.internalCode, fim: body?.data, fimAnterior: c.endDate, status, observacao: obs || null, renovadoPor: novo?.contractNumber ?? novo?.id ?? null },
+        },
+      });
+      return r;
+    });
+    return atualizado;
   }
 
   // NOVO 23/10/2026: alertas de locacao para o Dashboard - fim de contrato (90 dias),

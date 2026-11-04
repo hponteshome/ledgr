@@ -14,12 +14,14 @@ const STATUS_LABELS: Record<string, string> = {
     ATIVO: 'Ativo',
     ENCERRADO: 'Encerrado',
     RESCINDIDO: 'Rescindido',
+    RENOVADO: 'Renovado',
 };
 
 const STATUS_COLORS: Record<string, string> = {
     ATIVO: 'bg-green-100 text-green-700',
     ENCERRADO: 'bg-gray-100 text-gray-600',
     RESCINDIDO: 'bg-red-100 text-red-700',
+    RENOVADO: 'bg-blue-100 text-blue-700',
 };
 
 function fmtCurrency(v: number | string | undefined): string {
@@ -93,6 +95,7 @@ export default function RentalContractsListPage() {
                             <option value="ATIVO">Ativo</option>
                             <option value="ENCERRADO">Encerrado</option>
                             <option value="RESCINDIDO">Rescindido</option>
+                            <option value="RENOVADO">Renovado</option>
                         </select>
                     </div>
                 </div>

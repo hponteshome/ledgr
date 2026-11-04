@@ -2606,6 +2606,7 @@ enum RentalContractStatus {
   ATIVO
   ENCERRADO
   RESCINDIDO
+  RENOVADO
 
   @@map("rental_contract_status")
 }
@@ -2697,6 +2698,7 @@ model RentalContract {
   // -- Status e documento --------------------------------------------------
   status     RentalContractStatus @default(ATIVO) @map("status")
   documentId String?              @map("document_id") @db.Uuid /// Vinculo futuro (validacao automatica) - PENDENTE
+  renewedByContractId String? @map("renewed_by_contract_id") @db.Uuid /// 04/11/2026: contrato que renovou este (status RENOVADO)
 
   notes String? @map("notes") @db.Text
 

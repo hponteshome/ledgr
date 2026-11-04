@@ -32,12 +32,14 @@ const STATUS_LABELS: Record<string, string> = {
     ATIVO: 'Ativo',
     ENCERRADO: 'Encerrado',
     RESCINDIDO: 'Rescindido',
+    RENOVADO: 'Renovado',
 };
 
 const STATUS_COLORS: Record<string, string> = {
     ATIVO: 'bg-green-100 text-green-700',
     ENCERRADO: 'bg-gray-100 text-gray-600',
     RESCINDIDO: 'bg-red-100 text-red-700',
+    RENOVADO: 'bg-blue-100 text-blue-700',
 };
 
 const MARITAL_STATUS_OPTIONS = [
@@ -193,6 +195,15 @@ export function RentalContractDetailModal({ contractId, title, onClose }: { cont
     // Fluxo de geracao (30/09/2026): template + data confirmados ANTES da qualificacao do locatario
     const [startFlow, setStartFlow] = useState(false);
     const [chosen, setChosen] = useState<{ data: string; tpl?: string } | null>(null);
+    // Encerramento (04/11/2026): fim de prazo ou rescisao
+    const [closing, setClosing] = useState(false);
+    const [closeData, setCloseData] = useState('');
+    const [closeMotivo, setCloseMotivo] = useState<'RENOVACAO' | 'FIM_PRAZO' | 'RESCISAO'>('FIM_PRAZO');
+    const [closeNovoId, setCloseNovoId] = useState('');
+    const [closeCandidatos, setCloseCandidatos] = useState<any[]>([]);
+    const [closeObs, setCloseObs] = useState('');
+    const [closeErr, setCloseErr] = useState('');
+    const [closeSaving, setCloseSaving] = useState(false);
 
     function loadContract() {
         if (!contractId) { setError('Contrato não encontrado.'); setLoading(false); return; }
@@ -345,6 +356,59 @@ export function RentalContractDetailModal({ contractId, title, onClose }: { cont
         }
     }
 
+    function abrirEncerrar() {
+        const fim = contract?.endDate ? String(contract.endDate).slice(0, 10) : '';
+        const hoje = new Date().toISOString().slice(0, 10);
+        setCloseMotivo(fim && fim <= hoje ? 'FIM_PRAZO' : 'RESCISAO');
+        setCloseData(fim && fim <= hoje ? fim : hoje);
+        setCloseObs('');
+        setCloseErr('');
+        setCloseNovoId('');
+        setCloseCandidatos([]);
+        setClosing(true);
+        // renovacao: outros contratos ativos do mesmo imovel
+        fetch(`${API}/rental-contracts?status=ATIVO`, {
+            headers: { 'Authorization': `Bearer ${token}`, 'x-company-id': activeCompany?.id ?? '' },
+        })
+            .then(r => (r.ok ? r.json() : []))
+            .then((lista: any[]) => {
+                const cands = (Array.isArray(lista) ? lista : []).filter(x => x.id !== contractId && (x.fixedAsset?.id ?? x.fixedAssetId) === contract?.fixedAssetId)
+                    .sort((a, b) => String(a.startDate).localeCompare(String(b.startDate)));
+                setCloseCandidatos(cands);
+                if (cands.length > 0) { setCloseMotivo('RENOVACAO'); setCloseNovoId(cands[cands.length - 1].id); }
+            })
+            .catch(() => setCloseCandidatos([]));
+    }
+
+    async function confirmarEncerrar() {
+        setCloseErr('');
+        if (!closeData) { setCloseErr('Informe a data de encerramento.'); return; }
+        if (closeMotivo === 'RESCISAO' && closeObs.trim().length < 10) { setCloseErr('Informe o motivo da rescisão (mínimo 10 caracteres).'); return; }
+        if (closeMotivo === 'RENOVACAO' && !closeNovoId) { setCloseErr('Escolha o contrato que renova este. Cadastre-o antes, se ainda não existir.'); return; }
+        setCloseSaving(true);
+        try {
+            const res = await fetch(`${API}/rental-contracts/${contractId}/encerrar`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                    'x-company-id': activeCompany?.id ?? '',
+                },
+                body: JSON.stringify({ data: closeData, motivo: closeMotivo, observacao: closeObs.trim(), renovadoPorId: closeMotivo === 'RENOVACAO' ? closeNovoId : undefined }),
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(Array.isArray(err?.message) ? err.message.join(' ') : (err?.message ?? `Erro ${res.status}`));
+            }
+            setClosing(false);
+            loadContract();
+        } catch (e: any) {
+            setCloseErr(e?.message || 'Não foi possível encerrar o contrato.');
+        } finally {
+            setCloseSaving(false);
+        }
+    }
+
     return (
         <>
         <ModalWrapper title={title} onClose={onClose}>
@@ -367,6 +431,16 @@ export function RentalContractDetailModal({ contractId, title, onClose }: { cont
                                 <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[contract.status] ?? 'bg-gray-100 text-gray-600'}`}>
                                     {STATUS_LABELS[contract.status] ?? contract.status}
                                 </span>
+                                {contract.status === 'ATIVO' && (
+                                    <button
+                                        type="button"
+                                        title="Encerrar contrato (fim de prazo ou rescisão)"
+                                        onClick={abrirEncerrar}
+                                        className="text-xs font-medium text-red-700 border border-red-200 hover:bg-red-50 rounded px-2 py-0.5"
+                                    >
+                                        Encerrar
+                                    </button>
+                                )}
                                 {(!contract.document?.status || contract.document.status === 'RASCUNHO') ? (
                                     <button
                                         type="button"
@@ -446,6 +520,17 @@ export function RentalContractDetailModal({ contractId, title, onClose }: { cont
                             <Field label="Nº do Contrato">
                                 <div className="text-sm text-gray-900">{contract.contractNumber}</div>
                             </Field>
+                        )}
+
+                        {(contract.renovadoPor || contract.renova) && (
+                            <div className="text-xs rounded-lg bg-blue-50 text-blue-800 px-3 py-2 space-y-0.5">
+                                {contract.renovadoPor && (
+                                    <div>Renovado pelo contrato <b>{contract.renovadoPor.contractNumber || 'sem número'}</b> (início {fmtDate(contract.renovadoPor.startDate)})</div>
+                                )}
+                                {contract.renova && (
+                                    <div>Renova o contrato <b>{contract.renova.contractNumber || 'sem número'}</b> (fim {fmtDate(contract.renova.endDate)})</div>
+                                )}
+                            </div>
                         )}
 
                         <div className="pt-3 border-t border-gray-100 space-y-3">
@@ -609,6 +694,69 @@ export function RentalContractDetailModal({ contractId, title, onClose }: { cont
                 onClose={() => setEditingContract(false)}
                 onSuccess={() => { setEditingContract(false); loadContract(); if (contract.documentId && (!contract.document?.status || contract.document.status === 'RASCUNHO')) handleGenerate(); }}
             />
+        )}
+        {closing && contract && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4">
+                <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
+                    <div className="bg-gray-900 text-white px-5 py-3 flex items-start justify-between">
+                        <div>
+                            <div className="font-semibold">Encerrar contrato</div>
+                            <div className="text-xs text-gray-300 mt-0.5">
+                                {contract.contractNumber ? `${contract.contractNumber} · ` : ''}{contract.fixedAsset?.internalCode} · {contract.tenantName}
+                            </div>
+                        </div>
+                        <button type="button" onClick={() => !closeSaving && setClosing(false)} className="text-white text-xl leading-none">×</button>
+                    </div>
+                    <div className="p-5 space-y-4">
+                        {closeErr && <div className="bg-[#FCEBEB] text-red-700 text-sm rounded-lg px-3 py-2">{closeErr}</div>}
+                        <Field label="Motivo" required>
+                            <select className="w-full border border-gray-300 rounded-lg text-sm py-2 px-3" value={closeMotivo}
+                                onChange={e => setCloseMotivo(e.target.value as 'RENOVACAO' | 'FIM_PRAZO' | 'RESCISAO')}>
+                                <option value="RENOVACAO">Renovação por novo contrato (fica Renovado)</option>
+                                <option value="FIM_PRAZO">Fim do prazo, sem renovação (fica Encerrado)</option>
+                                <option value="RESCISAO">Rescisão antecipada (fica Rescindido)</option>
+                            </select>
+                        </Field>
+                        {closeMotivo === 'RENOVACAO' && (
+                            <Field label="Renovado pelo contrato" required>
+                                {closeCandidatos.length === 0 ? (
+                                    <div className="text-sm text-amber-700 bg-amber-50 rounded-lg px-3 py-2">
+                                        Nenhum outro contrato ativo deste imóvel. Cadastre primeiro o contrato novo e depois encerre este como renovado.
+                                    </div>
+                                ) : (
+                                    <select className="w-full border border-gray-300 rounded-lg text-sm py-2 px-3" value={closeNovoId} onChange={e => setCloseNovoId(e.target.value)}>
+                                        {closeCandidatos.map(x => (
+                                            <option key={x.id} value={x.id}>
+                                                {(x.contractNumber || 'sem número')} · início {fmtDate(x.startDate)} · {x.tenantName}
+                                            </option>
+                                        ))}
+                                    </select>
+                                )}
+                            </Field>
+                        )}
+                        <Field label={closeMotivo === 'RENOVACAO' ? 'Último dia deste contrato' : 'Data de encerramento'} required>
+                            <SmartDateInput className="w-full border border-gray-300 rounded-lg text-sm py-2 px-3" value={closeData} onChange={setCloseData} />
+                        </Field>
+                        <Field label={closeMotivo === 'RESCISAO' ? 'Motivo da rescisão' : 'Observação'}>
+                            <textarea className="w-full border border-gray-300 rounded-lg text-sm py-2 px-3" rows={2} value={closeObs}
+                                onChange={e => setCloseObs(e.target.value)}
+                                placeholder={closeMotivo === 'RESCISAO' ? 'Ex.: rescisão a pedido do locatário, entrega das chaves em ...' : 'Ex.: renovado pelo contrato ...'} />
+                        </Field>
+                        <div className="text-xs text-gray-500">
+                            Os aluguéis até a competência do encerramento continuam valendo e ainda podem ser gerados; depois dessa data nenhum aluguel é gerado. O contrato fica no histórico.
+                        </div>
+                    </div>
+                    <div className="px-5 py-3 bg-[#FAFAFA] border-t border-gray-100 flex justify-end gap-2">
+                        <button type="button" onClick={() => setClosing(false)} disabled={closeSaving}
+                            className="text-sm text-gray-700 border border-gray-300 rounded-lg px-4 py-2 bg-white hover:bg-gray-50">Cancelar</button>
+                        <button type="button" onClick={confirmarEncerrar} disabled={closeSaving}
+                            className="text-sm font-medium text-white bg-red-700 hover:bg-red-800 disabled:opacity-50 rounded-lg px-4 py-2 flex items-center gap-2">
+                            {closeSaving ? <Loader className="w-4 h-4 animate-spin" /> : null}
+                            Encerrar contrato
+                        </button>
+                    </div>
+                </div>
+            </div>
         )}
         {viewDoc && contract.documentId && (
             <DocumentViewModal
