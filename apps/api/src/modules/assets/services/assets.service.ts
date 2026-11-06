@@ -190,6 +190,9 @@ export class AssetsService {
         iptuRegistration:    dto.iptuRegistration    ?? null,
         registryNumber:      dto.registryNumber      ?? null,
         registryOffice:      dto.registryOffice      ?? null,
+        cib:                 dto.cib ? dto.cib.replace(/[^0-9A-Za-z]/g, '').toUpperCase() : null, // NOVO 05/11/2026
+        ibgeCode:            dto.ibgeCode ? dto.ibgeCode.replace(/\D/g, '') : null,
+        nbsLocacao:          dto.nbsLocacao || null,
         realEstateNotes:     dto.realEstateNotes     ?? null,
         totalArea:           totalArea,
         builtArea:           builtArea,

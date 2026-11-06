@@ -188,6 +188,22 @@ export class CreateAssetDto {
   @IsString()
   @MaxLength(120)
   registryOffice?: string;
+
+  // NOVO 05/11/2026: CIB, municipio IBGE e NBS de locacao (NFS-e Reforma Tributaria)
+  @IsOptional()
+  @IsString()
+  @MaxLength(9)
+  cib?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(7)
+  ibgeCode?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(12)
+  nbsLocacao?: string;
   @IsOptional()
   @IsString()
   realEstateNotes?: string;

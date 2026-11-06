@@ -1864,6 +1864,9 @@ model FixedAsset {
   occupancyStatus  AssetOccupancyStatus? @default(DISPONIVEL) @map("occupancy_status")
   propertyId       String?               @map("property_id") @db.Uuid
   iptuRegistration String?               @map("iptu_registration") @db.VarChar(50)
+  cib              String?               @map("cib") @db.VarChar(8) // NOVO 05/11/2026: Cadastro Imobiliario Brasileiro
+  ibgeCode         String?               @map("ibge_code") @db.VarChar(7) // NOVO 05/11/2026: municipio do imovel (cMun NFS-e)
+  nbsLocacao       String?               @map("nbs_locacao") @db.VarChar(12) // NOVO 05/11/2026: 1.1002.10.00 residencial / 1.1002.20.00 nao residencial
   registryNumber   String?               @map("registry_number") @db.VarChar(60)
   registryOffice   String?               @map("registry_office") @db.VarChar(120)
   realEstateNotes  String?               @map("real_estate_notes") @db.Text

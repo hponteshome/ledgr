@@ -175,6 +175,9 @@ export function AssetFormModal({ asset, onClose, onSuccess }: Props) {
         iptuRegistration:  asset?.iptuRegistration ?? '',
         registryNumber:    asset?.registryNumber ?? '',
         registryOffice:    (asset as any)?.registryOffice ?? '',
+        cib:               (asset as any)?.cib ?? '',
+        ibgeCode:          (asset as any)?.ibgeCode ?? '',
+        nbsLocacao:        (asset as any)?.nbsLocacao ?? '',
         totalArea:         asset?.totalArea  ? fmtNum(asset.totalArea)  : '',
         builtArea:         asset?.builtArea  ? fmtNum(asset.builtArea)  : '',
         assessedValueItbi: asset?.assessedValue ? fmtNum(asset.assessedValue) : '',
@@ -490,6 +493,30 @@ export function AssetFormModal({ asset, onClose, onSuccess }: Props) {
                                 onChange={e => set('iptuRegistration', e.target.value)}
                                 placeholder="Nº de inscrição municipal" />
                         </Field>
+                        <div className="grid grid-cols-3 gap-4">
+                            <Field label="CIB (Cadastro Imobiliário Brasileiro)">
+                                <div className="flex gap-2">
+                                    <input className={input} value={(v => v.length === 8 ? v.slice(0, 7) + '-' + v.slice(7) : v)(form.cib ?? '')} maxLength={9}
+                                        onChange={e => set('cib', e.target.value.replace(/[^0-9A-Za-z]/g, '').toUpperCase().slice(0, 8))}
+                                        placeholder="AAAAAAA-D" />
+                                    <button type="button" title="Abre a ficha do imóvel no Sinter (Receita, login gov.br) pelo IBGE + inscrição do IPTU"
+                                        onClick={() => { const insc = (form.iptuRegistration ?? '').replace(/\D/g, ''); const base = 'https://servicos.receitafederal.gov.br/servico/consultar-gerir-imoveis/'; if (insc) navigator.clipboard?.writeText(insc).catch(() => {}); window.open(form.ibgeCode && insc ? base + '#/imovel/urbano/u' + form.ibgeCode + '.' + insc : base, '_blank', 'noopener'); }}
+                                        className="px-3 text-[12px] border border-gray-200 rounded-lg hover:bg-gray-50 whitespace-nowrap">Sinter</button>
+                                </div>
+                            </Field>
+                            <Field label="Município (IBGE)">
+                                <input className={input} value={form.ibgeCode ?? ''} maxLength={7}
+                                    onChange={e => set('ibgeCode', e.target.value.replace(/\D/g, '').slice(0, 7))}
+                                    placeholder="7 dígitos" />
+                            </Field>
+                            <Field label="Uso na NFS-e de locação">
+                                <select className={input} value={form.nbsLocacao ?? ''} onChange={e => set('nbsLocacao', e.target.value)}>
+                                    <option value="">Não se aplica</option>
+                                    <option value="1.1002.10.00">Residencial (1.1002.10.00)</option>
+                                    <option value="1.1002.20.00">Não residencial (1.1002.20.00)</option>
+                                </select>
+                            </Field>
+                        </div>
 
                         <Field label="Observações">
                             <textarea className={`${input} resize-none`} rows={3}

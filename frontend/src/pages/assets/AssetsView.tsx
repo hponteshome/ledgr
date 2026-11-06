@@ -279,6 +279,9 @@ function ResumoTab({ asset }: { asset: FixedAsset }) {
                     <h3 className="font-semibold text-gray-800 text-sm uppercase tracking-wide">Dados do Imóvel</h3>
                     <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
                         {asset.iptuRegistration && <InfoRow label="Inscrição IPTU" value={asset.iptuRegistration} />}
+                        {((asset as any).cib || (asset as any).nbsLocacao) && <InfoRow label="CIB" value={(asset as any).cib ? String((asset as any).cib).replace(/^(.{7})(.)$/, '$1-$2') : 'Pendente - consultar no Sinter'} />}
+                        {(asset as any).ibgeCode && <InfoRow label="Município (IBGE)" value={(asset as any).ibgeCode} />}
+                        {(asset as any).nbsLocacao && <InfoRow label="NFS-e de locação" value={(asset as any).nbsLocacao === '1.1002.10.00' ? 'Residencial (1.1002.10.00)' : 'Não residencial (1.1002.20.00)'} />}
                         {asset.registryNumber && <InfoRow label="Matrícula / Cartório" value={[asset.registryNumber, (asset as any).registryOffice].filter(Boolean).join(" - ")} />}
                         {asset.totalArea && <InfoRow label="Área Total" value={`${asset.totalArea} m²`} />}
                         {asset.builtArea && <InfoRow label="Área Construída" value={`${asset.builtArea} m²`} />}

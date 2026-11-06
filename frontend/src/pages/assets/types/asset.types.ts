@@ -195,6 +195,9 @@ export interface FixedAsset {
   occupancyStatus?:  AssetOccupancyStatus;
   registryNumber?:   string;
   registryOffice?:   string;
+cib?:              string;
+ibgeCode?:         string;
+nbsLocacao?:       string;
   totalArea?:        number;
   builtArea?:        number;
   assessedValue?:    number;
@@ -372,6 +375,9 @@ export interface CreateAssetForm {
   nonDepreciable?:    boolean;
   // Real estate
   iptuRegistration?:  string;
+cib?:               string;
+ibgeCode?:          string;
+nbsLocacao?:        string;
   registryNumber?:    string;
   totalArea?:         number | string;
   builtArea?:         number | string;
