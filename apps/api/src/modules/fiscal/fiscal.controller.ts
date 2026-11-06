@@ -10,6 +10,7 @@ import { CompanyInterceptor } from '@/multi-company/company.interceptor';
 import { NfseImportService } from './services/nfse-import.service';
 import { NfeImportService  } from './services/nfe-import.service';
 import { NfseNacionalService } from './services/nfse-nacional.service';
+import { NfseLocacaoService } from './services/nfse-locacao.service';
 import { NfseSpConsultaService } from './services/nfse-sp-consulta.service';
 import { NfseSpCsvService } from './services/nfse-sp-csv.service';
 import { NfseSpEmissaoService } from './services/nfse-sp-emissao.service';
@@ -25,6 +26,7 @@ export class FiscalController {
     private nfse:    NfseImportService,
     private nfe:     NfeImportService,
     private nfseNac: NfseNacionalService,
+    private nfseLoc: NfseLocacaoService,
     private spConsulta: NfseSpConsultaService,
     private spEmissao: NfseSpEmissaoService,
     private spCsv: NfseSpCsvService,
@@ -112,6 +114,32 @@ export class FiscalController {
   }
 
   // ── NFS-e Nacional (Emissor RFB) ─────────────────────────────
+  // NOVO 06/11/2026: NFS-e de locacao (99.03) - servico isolado; nao altera o emitir/reenviar/cancelar abaixo
+  @Post('nfse-nacional/locacao/preparar')
+  prepararNfseLocacao(@Req() req: any, @Body() dto: any) {
+    return this.nfseLoc.preparar(req.companyId, dto, req.user.id);
+  }
+
+  @Post('nfse-nacional/locacao/:id/retorno')
+  retornoNfseLocacao(@Req() req: any, @Param('id') id: string, @Body() body: any) {
+    return this.nfseLoc.registrarRetorno(req.companyId, id, body);
+  }
+
+  @Post('nfse-nacional/locacao/:id/enviar')
+  enviarNfseLocacao(@Req() req: any, @Param('id') id: string, @Body('certId') certId?: string) {
+    return this.nfseLoc.enviar(req.companyId, id, certId);
+  }
+
+  @Get('nfse-nacional/locacao/regime')
+  regimeNfseLocacao(@Req() req: any, @Query('data') data: string) {
+    return this.nfseLoc.consultarRegime(req.companyId, data);
+  }
+
+  @Get('nfse-nacional/locacao')
+  listarNfseLocacao(@Req() req: any, @Query('contrato') contrato?: string) {
+    return this.nfseLoc.listar(req.companyId, contrato);
+  }
+
   @Post('nfse-nacional/emitir')
   emitirNfseNacional(@Req() req: any, @Body() dto: any) {
     return this.nfseNac.emitir(req.companyId, dto, req.user.id);

@@ -10,6 +10,7 @@ import { ModalWrapper, Field } from './ModalComponents';
 import { DocumentViewModal } from '../../documentos/DocumentViewModal';
 import { RentalContractFormModal } from './RentalContractFormModal';
 import { SmartDateInput } from '../../../components/SmartDateInput';
+import { EmitirNfseLocacaoModal } from './EmitirNfseLocacaoModal';
 
 const API = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3000';
 
@@ -175,6 +176,7 @@ export function RentalContractDetailModal({ contractId, title, onClose }: { cont
     const { token } = useAuth();
     const { activeCompany } = useCompany();
     const [contract, setContract] = useState<any>(null);
+    const [showNfse, setShowNfse] = useState(false); // NOVO 06/11/2026: NFS-e de locacao
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
@@ -412,6 +414,16 @@ export function RentalContractDetailModal({ contractId, title, onClose }: { cont
     return (
         <>
         <ModalWrapper title={title} onClose={onClose}>
+            {/* NOVO 06/11/2026: NFS-e de locacao (Reforma Tributaria) */}
+            {contract && (
+                <div className="flex justify-end mb-2">
+                    <button type="button" onClick={() => setShowNfse(true)} title="Emitir NFS-e de locação (homologação)"
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] border border-gray-200 rounded-lg hover:bg-gray-50">
+                        <FileText size={13} /> Emitir NFS-e
+                    </button>
+                </div>
+            )}
+            {showNfse && contract && <EmitirNfseLocacaoModal contrato={contract} onClose={() => setShowNfse(false)} />}
             <div className="p-6 space-y-4">
                 {loading && (
                     <div className="flex items-center justify-center py-10 text-gray-400">

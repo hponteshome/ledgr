@@ -139,6 +139,75 @@ app.post('/nfse-sp/soap', async (req, res) => {
   }
 });
 
+// NOVO 06/11/2026: NFS-e Nacional (Reforma Tributaria) com certificado A3 - assina a DPS no token (PIN),
+// compacta (gzip + base64) e envia a Sefin Nacional por mTLS. Entradas validadas antes de entrar no script.
+app.post('/nfse-nacional/enviar', async (req, res) => {
+  const { thumbprint, xml, idDps, url } = req.body || {};
+  if (!thumbprint || !xml || !idDps || !url) return res.status(400).json({ error: 'thumbprint, xml, idDps e url obrigatorios' });
+  if (!/^[0-9A-Fa-f]{40}$/.test(String(thumbprint))) return res.status(400).json({ error: 'thumbprint invalido' });
+  if (!/^DPS\d{42}$/.test(String(idDps))) return res.status(400).json({ error: 'idDps invalido' });
+  if (!/^https:\/\/sefin\.(producaorestrita\.)?nfse\.gov\.br\/SefinNacional\/nfse$/.test(String(url))) return res.status(400).json({ error: 'URL da Sefin invalida' });
+  const xmlTmp = join(tmpdir(), 'dps_' + Date.now() + '.xml');
+  writeFileSync(xmlTmp, String(xml), 'utf-8');
+  const script = [
+    '$ErrorActionPreference = "Stop"',
+    'Add-Type -AssemblyName System.Security',
+    'Add-Type -AssemblyName System.Net.Http',
+    '$store = New-Object System.Security.Cryptography.X509Certificates.X509Store("My","CurrentUser")',
+    '$store.Open("ReadOnly")',
+    '$cert = $store.Certificates | Where-Object { $_.Thumbprint -eq "' + thumbprint + '" } | Select-Object -First 1',
+    'if (-not $cert) { throw "Certificado nao encontrado: ' + thumbprint + '" }',
+    '$doc = New-Object System.Xml.XmlDocument',
+    '$doc.PreserveWhitespace = $true',
+    '$doc.Load("' + xmlTmp + '")',
+    '$sx = New-Object System.Security.Cryptography.Xml.SignedXml($doc)',
+    '$sx.SigningKey = [System.Security.Cryptography.X509Certificates.RSACertificateExtensions]::GetRSAPrivateKey($cert)',
+    '$sx.SignedInfo.SignatureMethod = "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"',
+    '$sx.SignedInfo.CanonicalizationMethod = "http://www.w3.org/TR/2001/REC-xml-c14n-20010315"',
+    '$ref = New-Object System.Security.Cryptography.Xml.Reference("#' + idDps + '")',
+    '$ref.AddTransform((New-Object System.Security.Cryptography.Xml.XmlDsigEnvelopedSignatureTransform))',
+    '$ref.AddTransform((New-Object System.Security.Cryptography.Xml.XmlDsigC14NTransform))',
+    '$ref.DigestMethod = "http://www.w3.org/2001/04/xmlenc#sha256"',
+    '$sx.AddReference($ref)',
+    '$ki = New-Object System.Security.Cryptography.Xml.KeyInfo',
+    '$ki.AddClause((New-Object System.Security.Cryptography.Xml.KeyInfoX509Data($cert)))',
+    '$sx.KeyInfo = $ki',
+    '$sx.ComputeSignature()',
+    '$null = $doc.DocumentElement.AppendChild($doc.ImportNode($sx.GetXml(), $true))',
+    '$assinado = $doc.OuterXml',
+    '$bytes = [System.Text.Encoding]::UTF8.GetBytes($assinado)',
+    '$ms = New-Object System.IO.MemoryStream',
+    '$gz = New-Object System.IO.Compression.GZipStream($ms, [System.IO.Compression.CompressionMode]::Compress)',
+    '$gz.Write($bytes, 0, $bytes.Length)',
+    '$gz.Close()',
+    '$b64 = [Convert]::ToBase64String($ms.ToArray())',
+    '[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12',
+    '$h = New-Object System.Net.Http.HttpClientHandler',
+    '$null = $h.ClientCertificates.Add($cert)',
+    '$cli = New-Object System.Net.Http.HttpClient($h)',
+    '$cli.Timeout = [TimeSpan]::FromSeconds(60)',
+    '$body = New-Object System.Net.Http.StringContent(("{""dpsXmlGZipB64"":""" + $b64 + """}"), [System.Text.Encoding]::UTF8, "application/json")',
+    '$resp = $cli.PostAsync("' + url + '", $body).GetAwaiter().GetResult()',
+    '$txt = $resp.Content.ReadAsStringAsync().GetAwaiter().GetResult()',
+    '$out = @{ httpStatus = [int]$resp.StatusCode; resposta = $txt; xmlAssinadoB64 = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($assinado)) }',
+    '$out | ConvertTo-Json -Compress',
+  ].join('\n');
+  try {
+    const out = await ps(script, true); // interactive: PIN do A3
+    const linha = out.trim().split(/\r?\n/).pop() || '{}';
+    res.json(JSON.parse(linha));
+  } catch (e: any) {
+    const __msgA3 = String((e as any)?.message ?? e);
+    if (/GetRSAPrivateKey|provedor|keyset|smart ?card|0x8010|TOKEN_A3/i.test(__msgA3)) {
+      return res.status(409).json({ error: 'Token A3 não conectado (ou PIN cancelado). Conecte o token e clique em Enviar novamente.', message: 'Token A3 não conectado (ou PIN cancelado). Conecte o token e clique em Enviar novamente.', codigo: 'TOKEN_A3' });
+    }
+    console.error('[NFSE-NACIONAL A3]', e.message);
+    res.status(500).json({ error: e.message });
+  } finally {
+    if (existsSync(xmlTmp)) unlinkSync(xmlTmp);
+  }
+});
+
 const buildSoap = (tipo: 'TOMADOR'|'EMITIDAS', cnpj: string, pag: number, dtI?: string, dtF?: string): string => {
   const periodo = dtI && dtF
     ? '<tc:PeriodoInicial>' + dtI.replace(/-/g,'') + '</tc:PeriodoInicial><tc:PeriodoFinal>' + dtF.replace(/-/g,'') + '</tc:PeriodoFinal>'

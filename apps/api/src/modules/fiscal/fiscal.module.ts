@@ -11,6 +11,7 @@ import { NfseImportService } from './services/nfse-import.service';
 import { NfeParserService } from './services/nfe-parser.service';
 import { NfeImportService } from './services/nfe-import.service';
 import { NfseNacionalService } from './services/nfse-nacional.service';
+import { NfseLocacaoService } from './services/nfse-locacao.service';
 import { NfseSpConsultaService } from './services/nfse-sp-consulta.service';
 import { NfseSpCsvService } from './services/nfse-sp-csv.service';
 import { NfseSpEmissaoService } from './services/nfse-sp-emissao.service';
@@ -27,6 +28,7 @@ import { NfseSpEmissaoService } from './services/nfse-sp-emissao.service';
     NfseSpParserService, NfseImportService,
     NfeParserService,    NfeImportService,
     NfseNacionalService, NfseSpConsultaService,
+    NfseLocacaoService,
     NfseSpCsvService,
     NfseSpEmissaoService,
   ],

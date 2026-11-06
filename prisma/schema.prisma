@@ -5152,6 +5152,22 @@ model NfseNacionalEmissao {
   // Municipio de incidencia (IBGE)
   codigoIbge String @default("3550308") @map("codigo_ibge") @db.VarChar(7)
 
+  // NOVO 06/11/2026: NFS-e de locacao (99.03) - Reforma Tributaria (NT 009)
+  tipoOperacao     String?   @map("tipo_operacao") @db.VarChar(20)
+  rentalContractId String?   @map("rental_contract_id") @db.Uuid
+  arEntryId        String?   @map("ar_entry_id") @db.Uuid
+  idDps            String?   @map("id_dps") @db.VarChar(50)
+  dCompet          DateTime? @map("d_compet") @db.Date
+  dataPagamento    DateTime? @map("data_pagamento") @db.Date
+  vTotOper         Decimal?  @map("v_tot_oper") @db.Decimal(15, 2)
+  vAjusteBcLoc     Decimal?  @map("v_ajuste_bc_loc") @db.Decimal(15, 2)
+  vPis             Decimal?  @map("v_pis") @db.Decimal(15, 2)
+  vCofins          Decimal?  @map("v_cofins") @db.Decimal(15, 2)
+  cstIbsCbs        String?   @map("cst_ibs_cbs") @db.VarChar(3)
+  cClassTrib       String?   @map("c_class_trib") @db.VarChar(6)
+  certThumbprint   String?   @map("cert_thumbprint") @db.VarChar(64)
+  dadosOperacao    Json?     @map("dados_operacao")
+
   // Status e retorno RFB
   ambiente       String  @default("HOMOLOGACAO") @map("ambiente") @db.VarChar(20)
   status         String  @default("RASCUNHO") @map("status") @db.VarChar(20)
@@ -5176,6 +5192,7 @@ model NfseNacionalEmissao {
   @@index([companyId, competencia])
   @@index([companyId, status])
   @@index([chaveNfse])
+  @@index([rentalContractId])
   @@map("nfse_nacional_emissoes")
 }
 
