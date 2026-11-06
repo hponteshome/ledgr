@@ -62,6 +62,7 @@ export function EmitirNfseLocacaoModal({ contrato, onClose }: { contrato: any; o
   const [certKey, setCertKey] = useState('');
   const [agentOnline, setAgentOnline] = useState(false);
   const [iniciandoAgent, setIniciandoAgent] = useState(false);
+  const iniciarAgent = () => { setErro(''); setIniciandoAgent(true); window.location.href = 'ledgr-agent://iniciar'; };
 
   // Opcao "A3 (token) - iniciar LEDGR Agent": abre o Agent (protocolo ledgr-agent://), aguarda subir e carrega os A3.
   useEffect(() => {
@@ -297,7 +298,7 @@ export function EmitirNfseLocacaoModal({ contrato, onClose }: { contrato: any; o
               ? <p className="text-[12px] text-red-700">Nenhum certificado disponível. Carregue o A1 em Certificados ou conecte o token A3.</p>
               : (
                 <select className={inputSt} value={certKey} disabled={iniciandoAgent}
-                  onChange={e => { const v = e.target.value; if (v === 'a3:iniciar') { setErro(''); setIniciandoAgent(true); window.location.href = 'ledgr-agent://iniciar'; } else setCertKey(v); }}>
+                  onChange={e => { const v = e.target.value; if (v === 'a3:iniciar') iniciarAgent(); else setCertKey(v); }}>
                   {certs.length === 0 && <option value="">Selecione o certificado</option>}
                   {certs.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
                   {!agentOnline && <option value="a3:iniciar">A3 (token) - iniciar LEDGR Agent</option>}
@@ -306,7 +307,8 @@ export function EmitirNfseLocacaoModal({ contrato, onClose }: { contrato: any; o
             <p className="text-[11px] text-gray-400">
               {iniciandoAgent
                 ? 'Iniciando o LEDGR Agent... (se o navegador perguntar, permita abrir o LEDGR Agent)'
-                : `LEDGR Agent: ${agentOnline ? 'online' : 'offline'} (necessário só para A3)`}
+                : <>LEDGR Agent: {agentOnline ? 'online' : 'offline'} (necessário só para A3)
+                  {!agentOnline && <> - <button type="button" className="underline font-medium text-blue-600" onClick={() => iniciarAgent()}>Iniciar Agent</button></>}</>}
             </p>
           </Secao>
 
