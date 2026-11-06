@@ -3,7 +3,6 @@
 // Rotina universal (qualquer empresa): regime lido do historico na data do pagamento e confirmado pelo usuario;
 // certificado A1 (padrao - assinatura e envio pela API) ou A3 (LEDGR Agent, porta 7778).
 // Nao interfere nas demais emissoes de NFS-e (Prefeitura SP, Simples, Pontes).
-import { AgentIniciar } from './AgentIniciar';
 import { useEffect, useState } from 'react';
 import api from '../../../services/api';
 import { SmartDateInput } from '../../../components/SmartDateInput';
@@ -62,6 +61,37 @@ export function EmitirNfseLocacaoModal({ contrato, onClose }: { contrato: any; o
   const [certs, setCerts] = useState<Cert[]>([]);
   const [certKey, setCertKey] = useState('');
   const [agentOnline, setAgentOnline] = useState(false);
+  const [iniciandoAgent, setIniciandoAgent] = useState(false);
+
+  // Opcao "A3 (token) - iniciar LEDGR Agent": abre o Agent (protocolo ledgr-agent://), aguarda subir e carrega os A3.
+  useEffect(() => {
+    if (!iniciandoAgent) return;
+    let vivo = true; let tentativas = 0; let subiu = false;
+    const id = setInterval(async () => {
+      tentativas++;
+      try {
+        if (!subiu) { await fetch(AGENT + '/health', { signal: AbortSignal.timeout(1500) }); subiu = true; clearInterval(id); }
+        let cnpj = '';
+        try { const c: any = await api.get('/companies/me'); cnpj = String(c.data?.taxId || '').replace(/\D/g, ''); } catch (e) { /* sem CNPJ */ }
+        const r = await fetch(AGENT + '/certificates');
+        const l = await r.json();
+        const novos: Cert[] = (Array.isArray(l) ? l : []).filter((c: any) => !cnpj || c.cnpj === cnpj)
+          .map((c: any) => ({ key: 'a3:' + c.thumbprint, id: c.thumbprint, tipo: 'A3' as const,
+            label: 'A3 (Agent) - ' + String(c.subject || '').split(',')[0].replace('CN=', '') + ' (até ' + dataBR(c.validTo) + ')' }));
+        if (!vivo) return;
+        setAgentOnline(true);
+        setCerts(prev => [...prev.filter(x => x.tipo !== 'A3'), ...novos]);
+        if (novos[0]) setCertKey(novos[0].key);
+        else setErro('LEDGR Agent no ar, mas nenhum certificado A3 desta empresa foi encontrado. Conecte o token.');
+        setIniciandoAgent(false);
+      } catch (e) {
+        if (!vivo) return;
+        if (subiu) { setIniciandoAgent(false); setErro('LEDGR Agent no ar, mas a leitura dos certificados falhou. Conecte o token e tente de novo.'); }
+        else if (tentativas >= 15) { clearInterval(id); setIniciandoAgent(false); setErro('O LEDGR Agent não respondeu. Inicie manualmente: scripts\\iniciar-agent.ps1'); }
+      }
+    }, 2000);
+    return () => { vivo = false; clearInterval(id); };
+  }, [iniciandoAgent]);
   const [prep, setPrep] = useState<any>(null);
   const [resultado, setResultado] = useState<any>(null);
   const [historico, setHistorico] = useState<any[]>([]);
@@ -263,15 +293,21 @@ export function EmitirNfseLocacaoModal({ contrato, onClose }: { contrato: any; o
           </Secao>
 
           <Secao titulo="Certificado">
-            {certs.length === 0
-              ? <p className="text-[12px] text-red-700">Nenhum certificado disponível. Carregue o A1 em Certificados ou conecte o token A3 com o LEDGR Agent aberto.</p>
+            {certs.length === 0 && agentOnline
+              ? <p className="text-[12px] text-red-700">Nenhum certificado disponível. Carregue o A1 em Certificados ou conecte o token A3.</p>
               : (
-                <select className={inputSt} value={certKey} onChange={e => setCertKey(e.target.value)}>
+                <select className={inputSt} value={certKey} disabled={iniciandoAgent}
+                  onChange={e => { const v = e.target.value; if (v === 'a3:iniciar') { setErro(''); setIniciandoAgent(true); window.location.href = 'ledgr-agent://iniciar'; } else setCertKey(v); }}>
+                  {certs.length === 0 && <option value="">Selecione o certificado</option>}
                   {certs.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
+                  {!agentOnline && <option value="a3:iniciar">A3 (token) - iniciar LEDGR Agent</option>}
                 </select>
               )}
-            <p className="text-[11px] text-gray-400">LEDGR Agent: {agentOnline ? 'online' : 'offline'} (necessário só para A3)</p>
-            <AgentIniciar />
+            <p className="text-[11px] text-gray-400">
+              {iniciandoAgent
+                ? 'Iniciando o LEDGR Agent... (se o navegador perguntar, permita abrir o LEDGR Agent)'
+                : `LEDGR Agent: ${agentOnline ? 'online' : 'offline'} (necessário só para A3)`}
+            </p>
           </Secao>
 
           {res && (
