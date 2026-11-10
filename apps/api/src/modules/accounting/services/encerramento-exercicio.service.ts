@@ -171,9 +171,14 @@ export class EncerramentoExercicioService {
     // e na aba Contábil, mas nunca usadas aqui. Só roda quando há saldo de
     // fato a mover (primeiro encerramento de sempre não move nada). Falha
     // ANTES de gravar qualquer coisa se faltar configurar as contas.
-    const dataAnoAnterior = `${year - 1}-12-31`;
+    // CORRIGIDO 10/11/2026: o saldo a reclassificar e o saldo REAL da conta de
+    // Lucro/Prejuizo do Exercicio na data do encerramento (antes dos lancamentos
+    // de encerramento deste ano, que ainda nao existem aqui - jaEncerrado bloqueia),
+    // e nao o de 31/12 do ano anterior. Achado real na LM: a transferencia do
+    // resultado de 2021 ja vinha no diario IOB (02/01/2022) e a reclassificacao
+    // pelo saldo de 31/12/2021 duplicou 832.212,55 em Lucros Acumulados.
     const antes = await this.trialBalance.getVerificationBalance(
-      companyId, this.toUTC(dataAnoAnterior), this.toUTCEnd(dataAnoAnterior),
+      companyId, this.toUTC(closingDate), this.toUTCEnd(closingDate),
     );
     const saldoAntesMap = new Map<string, number>(
       (antes.balances as any[]).map((b) => [b.account.id, b.currentBalance]),

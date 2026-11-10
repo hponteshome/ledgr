@@ -10867,3 +10867,16 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - Retroativo LM (prisma/migrations-manuais/20261110_import_lotes_iob_lm.sql): 14 lotes criados
   (2013 n1, 2015 n1, 2021 n1-12), 163/163 lancamentos ligados, contagens = stats.imported.
 - Obs: o "Carregando..." travado na tela era o container ledgr-postgres parado.
+
+
+### Sessao 10/11/2026 - LM: diario 2022, encerramentos 2021/2022 e bug da reclassificacao
+- Diario IOB 2022 (xls) convertido para a importacao manual: lote 1/2022, 255 lancamentos, D=C 3.374.431,77,
+  sem os 37 de "Apuracao de Resultado" (encerramento feito pelo LEDGR).
+- 2021: os 12 lancamentos "Apuracao Resultado" de 31/12/2021 vindos do LOTD21129 marcados is_closing_entry
+  (resultado 2021 = -832.212,55 conferido).
+- BUG encerramento-exercicio.service.ts: a reclassificacao do resultado de anos anteriores lia o saldo de
+  Lucro/Prejuizo do Exercicio em 31/12 do ano anterior e ignorava movimentos do proprio ano (transferencia do
+  IOB em 02/01/2022) -> duplicou 832.212,55 em Lucros Acumulados. Corrigido: saldo na data do encerramento.
+- Encerramento 2022 da LM apagado (hard delete, 3 lancamentos/40 partidas - livros ainda nao entregues) e
+  refeito: Lucros Acumulados -832.212,55; Do Exercicio -642.779,86.
+- Config contabil LM: ARE 49101010001, Prejuizo do Exercicio 23301010002, Prejuizos Acumulados 23301010001.
