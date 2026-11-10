@@ -195,6 +195,7 @@ const EcdPage: React.FC = () => {
     const [exportIndSitEsp, setExportIndSitEsp] = useState('');
     const [exportCodPlanRef, setExportCodPlanRef] = useState('');
     const [exportHashAnterior, setExportHashAnterior] = useState('');
+    const [exportAglutinacao, setExportAglutinacao] = useState('VISAO'); // 10/11/2026: Bloco J por Visao ou pelo Plano (padrao IOB)
     const [exporting, setExporting] = useState(false);
     const [preValidating, setPreValidating] = useState(false);
     const [preValidateResult, setPreValidateResult] = useState<any>(null);
@@ -308,7 +309,7 @@ const EcdPage: React.FC = () => {
         setExporting(true);
         try {
             const r = await api.get('/sped/ecd/export', {
-                params: { periodStart: exportPeriodStart, periodEnd: exportPeriodEnd, bookNumber: exportBookNumber, bookType: exportBookType, tipEcd: exportTipEcd, indSitEsp: exportIndSitEsp, codPlanRef: exportCodPlanRef, hashAnterior: exportHashAnterior },
+                params: { periodStart: exportPeriodStart, periodEnd: exportPeriodEnd, bookNumber: exportBookNumber, bookType: exportBookType, tipEcd: exportTipEcd, indSitEsp: exportIndSitEsp, codPlanRef: exportCodPlanRef, hashAnterior: exportHashAnterior, aglutinacao: exportAglutinacao },
                 responseType: 'blob',
             });
             const url = window.URL.createObjectURL(new Blob([r.data]));
@@ -320,6 +321,25 @@ const EcdPage: React.FC = () => {
             alert('Erro ao gerar ECD: ' + (e.response?.data?.message || e.message));
         } finally { setExporting(false); }
     };
+
+    // CORRIGIDO 10/11/2026: preview do 0000 vem do servidor (mesma funcao que grava o arquivo)
+    const [preview0000, setPreview0000] = useState<string>('');
+    const [preview0000Erro, setPreview0000Erro] = useState<string>('');
+    useEffect(() => {
+        if (tab !== 'export' || !exportPeriodStart || !exportPeriodEnd) return;
+        let vivo = true;
+        const t = setTimeout(async () => {
+            try {
+                const r = await api.get('/sped/ecd/preview-0000', {
+                    params: { periodStart: exportPeriodStart, periodEnd: exportPeriodEnd, tipEcd: exportTipEcd, indSitEsp: exportIndSitEsp, codPlanRef: exportCodPlanRef, hashAnterior: exportHashAnterior },
+                });
+                if (vivo) { setPreview0000(r.data?.linha || ''); setPreview0000Erro(''); }
+            } catch (e: any) {
+                if (vivo) { setPreview0000(''); setPreview0000Erro(e.response?.data?.message || e.message); }
+            }
+        }, 400);
+        return () => { vivo = false; clearTimeout(t); };
+    }, [tab, exportPeriodStart, exportPeriodEnd, exportTipEcd, exportIndSitEsp, exportCodPlanRef, exportHashAnterior]);
 
     // ── hasOverwrite: considera contas, saldos OU lançamentos ECD existentes
     const hasOverwrite = validation !== null && validation.existing &&
@@ -771,6 +791,14 @@ const EcdPage: React.FC = () => {
                                     </p>
                                 )}
                             </div>
+                        <div>
+                            <label className="text-xs text-gray-500 block mb-1">Aglutinação do Bloco J</label>
+                            <select value={exportAglutinacao} onChange={e => setExportAglutinacao(e.target.value)}
+                                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="VISAO">Visões Contábeis (referencial RFB)</option>
+                                <option value="PLANO">Plano de contas (padrão IOB)</option>
+                            </select>
+                        </div>
                         {exportTipEcd === '1' && (
                         <div className="col-span-2">
                             <label className="text-xs text-gray-500 block mb-1">Hash ECD Anterior (obrigatório para retificadora)</label>
@@ -782,7 +810,7 @@ const EcdPage: React.FC = () => {
                     <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 font-serif text-xs text-blue-700 overflow-x-auto">
                         <div className="text-gray-500 mb-1 text-[10px]">Preview — Registro 0000</div>
                         <div className="whitespace-nowrap">
-                            {`|0000|LECD|${exportPeriodStart.replace(/-/g,"")}|${exportPeriodEnd.replace(/-/g,"")}|EMPRESA|CNPJ|UF||CODMUN|${exportCodPlanRef||""}||${exportTipEcd}|INDNIRE|0|${exportHashAnterior||""}|0|0|${exportIndSitEsp||""}|N|N|0|0|1|`}
+                            {preview0000Erro ? <span className="text-red-600">Erro ao montar o preview: {preview0000Erro}</span> : (preview0000 || 'Carregando...')}
                         </div>
                     </div>
                     <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-xs text-yellow-700">

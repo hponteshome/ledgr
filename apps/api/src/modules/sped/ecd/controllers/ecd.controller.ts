@@ -158,6 +158,30 @@ export class EcdController {
     return this.preValidator.validate(companyId, periodStart, periodEnd);
   }
 
+  // ── GET /sped/ecd/preview-0000 — CRIADO 10/11/2026: registro 0000 exatamente como sai no arquivo
+  @Get('preview-0000')
+  async preview0000(
+    @Query('periodStart') periodStart: string,
+    @Query('periodEnd') periodEnd: string,
+    @Query('tipEcd') tipEcd: string,
+    @Query('indSitEsp') indSitEsp: string,
+    @Query('codPlanRef') codPlanRef: string,
+    @Query('hashAnterior') hashAnterior: string,
+    @Req() req: any,
+  ) {
+    const companyId = req.headers['x-company-id'];
+    if (!periodStart || !periodEnd) throw new BadRequestException('Informe periodStart e periodEnd (YYYY-MM-DD).');
+    return this.exporter.preview0000({
+      companyId,
+      periodStart: new Date(periodStart),
+      periodEnd:   new Date(periodEnd),
+      tipEcd:       tipEcd || '0',
+      indSitEsp:    indSitEsp || '',
+      codPlanRef:   codPlanRef || '',
+      hashAnterior: hashAnterior || '',
+    });
+  }
+
   @Get('export')
   async export(
     @Query('periodStart') periodStart: string,
@@ -169,6 +193,7 @@ export class EcdController {
     @Query('codPlanRef') codPlanRef: string,
     @Query('hashAnterior') hashAnterior: string,
     @Query('includeBlocoJ') includeBlocoJ: string,
+    @Query('aglutinacao') aglutinacao: string,
     @Req() req: any,
     @Res() res: Response,
   ) {
@@ -189,6 +214,7 @@ export class EcdController {
       includeBlocoJ: includeBlocoJ !== 'false',
       bookNumber:  bookNumber || undefined,
       bookType:    (bookType as any) || 'G',
+      aglutinacao: aglutinacao === 'PLANO' ? 'PLANO' : 'VISAO', // 10/11/2026
     });
 
     const companyForName = await this.prisma.company.findUnique({ where: { id: companyId }, select: { taxId: true } });

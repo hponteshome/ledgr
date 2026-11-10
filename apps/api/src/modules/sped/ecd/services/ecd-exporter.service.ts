@@ -17,6 +17,7 @@ export interface EcdExportOptions {
   hashAnterior?: string;
   includeBlocoJ?: boolean;
   layoutVersion?: string;
+  aglutinacao?: "VISAO" | "PLANO"; // 10/11/2026: VISAO = Visoes Contabeis/RFB; PLANO = plano de contas (padrao IOB)
 }
 
 @Injectable()
@@ -24,12 +25,64 @@ export class EcdExporterService {
   private readonly logger = new Logger(EcdExporterService.name);
   constructor(private prisma: PrismaService) {}
 
+  // CRIADO 10/11/2026: montagem UNICA do registro 0000. Usada pelo arquivo (export) e
+  // pelo preview da tela (preview0000): o que aparece na tela e o que vai no arquivo.
+  build0000(d: {
+    dtIni: string; dtFin: string; cnpj: string;
+    company: { legalName: string | null; state: string | null; codMun: string | null; nire: string | null };
+    indSitEsp: string; tipEcd: string; hashAnterior: string; codPlanRef: string;
+  }): string {
+    const P = "|";
+    const { dtIni, dtFin, company, cnpj, indSitEsp, tipEcd, hashAnterior, codPlanRef } = d;
+    return (
+        P+"0000"
+        +P+"LECD"                          // 1  LECD
+        +P+dtIni                           // 2  DT_INI
+        +P+dtFin                           // 3  DT_FIN
+        +P+company.legalName               // 4  NOME
+        +P+cnpj                            // 5  CNPJ
+        +P+(company.state||"")             // 6  UF
+        +P+""                              // 7  IE (vazio)
+        +P+(company.codMun||"3550308")     // 8  COD_MUN
+        +P+(company.nire||"")              // 9  NRE - real, nao mais sempre vazio
+        +P+(indSitEsp||"")                 // 10 (vazio no arquivo real)
+        +P+"0"                             // 11
+        +P+"0"                             // 12
+        +P+tipEcd                          // 13
+        +P+(hashAnterior||"")              // 14 (vazio no arquivo real)
+        +P+"0"                             // 15
+        +P+"0"                             // 16
+        +P+""                              // 17 (vazio no arquivo real)
+        +P+"N"                             // 18
+        +P+"N"                             // 19
+        +P+"0"                             // 20
+        +P+"0"                             // 21
+        +P+(codPlanRef||"")                // 22 (arquivo real tinha "2" aqui - significado nao confirmado, mantido vazio)
+        +P
+    );
+  }
+
+  async preview0000(options: EcdExportOptions): Promise<{ linha: string }> {
+    const { companyId, periodStart, periodEnd, tipEcd = "0", indSitEsp = "", codPlanRef = "", hashAnterior = "" } = options;
+    const company = await this.prisma.company.findUnique({
+      where: { id: companyId },
+      select: { taxId: true, legalName: true, state: true, nire: true, codMun: true },
+    });
+    if (!company) throw new NotFoundException("Empresa nao encontrada.");
+    const linha = this.build0000({
+      dtIni: this.fmtDate(periodStart), dtFin: this.fmtDate(periodEnd),
+      cnpj: company.taxId.replace(/\D/g, ""), company,
+      indSitEsp, tipEcd, hashAnterior, codPlanRef,
+    });
+    return { linha };
+  }
+
   async export(options: EcdExportOptions): Promise<{ buffer: Buffer; warnings: string[] }> {
     const {
       companyId, periodStart, periodEnd,
       bookNumber = String(periodStart.getUTCFullYear()).slice(-2), bookNature = "Livro Diario Geral",
       bookType = "G", layoutVersion = "9.00",
-      tipEcd = "0", indSitEsp = "", codPlanRef = "", hashAnterior = "", includeBlocoJ = true,
+      tipEcd = "0", indSitEsp = "", codPlanRef = "", hashAnterior = "", includeBlocoJ = true, aglutinacao = "VISAO",
     } = options;
 
     const company = await this.prisma.company.findUnique({
@@ -183,6 +236,46 @@ export class EcdExporterService {
       dreRollup.set(acc.parentId, { deb: parent.deb + child.deb, cre: parent.cre + child.cre });
     }
 
+    // CRIADO 10/11/2026 (PGE LM 2022, 19 erros I355): a conta de Apuracao do Resultado (ARE)
+    // configurada no encerramento, quando cadastrada como conta de RESULTADO, vai com COD_NAT 09
+    // (Outras) no I050, junto com os sinteticos que so existem para ela - igual as ECDs 2023-2025
+    // da IOB (grupo 49 = 09). Com natureza 04 o PGE exige I355 para ela, e ela nao tem saldo
+    // antes do encerramento (so movimenta nos lancamentos de encerramento).
+    const nat09 = new Set<string>();
+    const cfgEnc = await this.prisma.companyAccountingConfig.findUnique({
+      where: { companyId }, select: { encerramentoContaApuracaoResultadoId: true },
+    });
+    const areAcc = accounts.find(a => a.id === cfgEnc?.encerramentoContaApuracaoResultadoId);
+    if (areAcc && ["REVENUE", "EXPENSE"].includes(areAcc.type.toString())) {
+      const byIdN = new Map(accounts.map(a => [a.id, a]));
+      const desceDe = (a: any, alvo: string) => { let c: any = a; while (c?.parentId) { if (c.parentId === alvo) return true; c = byIdN.get(c.parentId); } return false; };
+      nat09.add(areAcc.id);
+      let pai: any = areAcc.parentId ? byIdN.get(areAcc.parentId) : undefined;
+      while (pai) {
+        const paiId = pai.id;
+        if (accounts.some(a => a.isAnalytic && a.id !== areAcc.id && desceDe(a, paiId))) break;
+        nat09.add(paiId);
+        pai = pai.parentId ? byIdN.get(pai.parentId) : undefined;
+      }
+    }
+    // CRIADO 10/11/2026: aglutinacao PLANO - I052 pela propria conta (BAL_/DRE_ + codigo),
+    // so para contas com saldo/movimento, no lugar dos codigos das Visoes Contabeis.
+    if (aglutinacao === "PLANO") {
+      i052Map.clear();
+      for (const acc of accounts) {
+        if (!acc.isAnalytic || nat09.has(acc.id)) continue;
+        const t = acc.type.toString();
+        if (t === "REVENUE" || t === "EXPENSE") {
+          const mv = dreMap.get(acc.id);
+          if (mv && Math.abs(mv.deb - mv.cre) >= 0.005) i052Map.set(acc.id, "DRE_" + acc.code);
+        } else {
+          const ini = saldoIni.get(acc.id) ?? 0;
+          const fin = saldoFinalMap.get(acc.id) ?? 0;
+          if (Math.abs(ini) >= 0.005 || Math.abs(fin) >= 0.005) i052Map.set(acc.id, "BAL_" + acc.code);
+        }
+      }
+    }
+
     const months = this.monthRange(periodStart, periodEnd);
     const lines: string[] = [];
     const add = (l: string) => lines.push(l);
@@ -190,32 +283,8 @@ export class EcdExporterService {
     // ── BLOCO 0 ──────────────────────────────────────────────────────────
     // |0000|LECD|DT_INI|DT_FIN|NOME|CNPJ|UF|COD_MUN|COD_PLAN_REF|IND_ESC|COD_SCP|
     //       HASH|VERSAO_APP|DT_LAS_EXP|TP_LIVRACAO|IND_SIT|NR_REC_ANT|NR_SEQ_ECD|
-      add(
-        P+"0000"
-        +P+"LECD"                          // 1  LECD
-        +P+dtIni                           // 2  DT_INI
-        +P+dtFin                           // 3  DT_FIN
-        +P+company.legalName               // 4  NOME
-        +P+cnpj                            // 5  CNPJ
-        +P+(company.state||"")             // 6  UF
-        +P+""                              // 7  IE (vazio)
-        +P+(company.codMun||"3550308")     // 8  COD_MUN
-        +P+(company.nire||"")              // 9  NRE - real, nao mais sempre vazio
-        +P+(indSitEsp||"")                 // 10 (vazio no arquivo real)
-        +P+"0"                             // 11
-        +P+"0"                             // 12
-        +P+tipEcd                          // 13
-        +P+(hashAnterior||"")              // 14 (vazio no arquivo real)
-        +P+"0"                             // 15
-        +P+"0"                             // 16
-        +P+""                              // 17 (vazio no arquivo real)
-        +P+"N"                             // 18
-        +P+"N"                             // 19
-        +P+"0"                             // 20
-        +P+"0"                             // 21
-        +P+(codPlanRef||"")                // 22 (arquivo real tinha "2" aqui - significado nao confirmado, mantido vazio)
-        +P
-      );
+      // CORRIGIDO 10/11/2026: 0000 montado por build0000() - mesma funcao do preview da tela
+      add(this.build0000({ dtIni, dtFin, company, cnpj, indSitEsp, tipEcd, hashAnterior, codPlanRef }));
     add(P+"0001"+P+"0"+P);
     add(P+"0007"+P+(company.state||"")+P+P);
     const idx0990 = lines.length;
@@ -292,7 +361,7 @@ export class EcdExporterService {
       const createdAtDate = acc.createdAt instanceof Date ? acc.createdAt : new Date(acc.createdAt);
       const periodEndDate = periodEnd instanceof Date ? periodEnd : new Date(periodEnd);
       const dtAlt      = this.fmtDate(createdAtDate > periodEndDate ? periodEndDate : createdAtDate);
-      const natCode    = this.typeToNat(acc.type.toString());
+      const natCode    = nat09.has(acc.id) ? "09" : this.typeToNat(acc.type.toString()); // 10/11/2026: ARE de resultado = 09 (padrao IOB)
       const indCta     = acc.isAnalytic ? "A" : "S";
       const parentCode = acc.parentId ? (codeById.get(acc.parentId) ?? "") : "";
       const reducedCode = acc.code;
@@ -323,7 +392,7 @@ export class EcdExporterService {
       const monthKey = year + "-" + String(month).padStart(2, "0");
       const accMap   = byMonthAcc.get(monthKey);
       const contasDoMes = new Set<string>([
-        ...Array.from(saldoCorrente.entries()).filter(([, v]) => v !== 0).map(([k]) => k),
+        ...Array.from(saldoCorrente.entries()).filter(([, v]) => Math.abs(v) >= 0.005).map(([k]) => k), // 10/11/2026: residuo de ponto flutuante gerava I155 zerado (22 advertencias PGE LM 2022)
         ...(accMap ? Array.from(accMap.keys()) : []),
       ]);
       if (contasDoMes.size === 0) {
@@ -419,6 +488,58 @@ export class EcdExporterService {
     if (includeBlocoJ) {
       add(P+"J005"+P+dtIni+P+dtFin+P+"1"+P+P);
   
+      // CRIADO 10/11/2026 (PGE LM 2022): aglutinacao PLANO = estrutura das ECDs 2023-2025 da IOB
+      // transmitidas pela LM. J100 = arvore do plano com prefixo BAL_ (T = sintetica, D = analitica,
+      // nivel = nivel da conta, superior = BAL_<conta pai>). J150 = DRE_<conta> nivel 2 sob um unico
+      // totalizador DRE_RESULTADO nivel 1. Os I052 dessas contas sao montados antes do I050.
+      if (aglutinacao === "PLANO") {
+        const bpTypesP = new Set(["ASSET", "LIABILITY", "EQUITY"]);
+        const byIdP = new Map(accounts.map(a => [a.id, a]));
+        const iniP = new Map<string, number>(saldoIni);
+        for (const acc of [...accounts].sort((a, b) => b.code.localeCompare(a.code))) {
+          if (!acc.parentId) continue;
+          iniP.set(acc.parentId, (iniP.get(acc.parentId) ?? 0) + (iniP.get(acc.id) ?? 0));
+        }
+        // mantem a conta com saldo (inicial ou final) e TODOS os seus ancestrais
+        const manter = new Set<string>();
+        for (const acc of accounts) {
+          if (!acc.isAnalytic || !bpTypesP.has(acc.type.toString()) || nat09.has(acc.id)) continue;
+          const ini = saldoIni.get(acc.id) ?? 0;
+          const fin = saldoFinalMap.get(acc.id) ?? 0;
+          if (Math.abs(ini) < 0.005 && Math.abs(fin) < 0.005) continue;
+          let cur: any = acc;
+          while (cur) { manter.add(cur.id); cur = cur.parentId ? byIdP.get(cur.parentId) : undefined; }
+        }
+        const bpAccs = accounts.filter(a => manter.has(a.id)).sort((a, b) => a.code.localeCompare(b.code));
+        for (const acc of bpAccs) {
+          const ini = iniP.get(acc.id) ?? 0;
+          const fin = rollupMap.get(acc.id) ?? 0;
+          const grp = acc.code.startsWith("1") ? "A" : "P";
+          const zeroDc = grp === "A" ? "D" : "C";
+          const dcI = Math.abs(ini) < 0.005 ? zeroDc : (ini > 0 ? "D" : "C");
+          const dcF = Math.abs(fin) < 0.005 ? zeroDc : (fin > 0 ? "D" : "C");
+          const pai = acc.parentId ? (codeById.get(acc.parentId) ?? "") : "";
+          add(P+"J100"+P+"BAL_"+acc.code+P+(acc.isAnalytic ? "D" : "T")+P+acc.level+P+(pai ? "BAL_"+pai : "")+P+grp+P+acc.name.substring(0, 60)+P+this.fmtDec(ini)+P+dcI+P+this.fmtDec(fin)+P+dcF+P+P);
+        }
+        // J150: mesmas contas e valores do I355 (saldo antes do encerramento)
+        let nuP = 0;
+        let totP = 0;
+        const dreAccsP = accounts
+          .filter(a => a.isAnalytic && ["REVENUE", "EXPENSE"].includes(a.type.toString()) && !nat09.has(a.id))
+          .sort((a, b) => a.code.localeCompare(b.code));
+        for (const acc of dreAccsP) {
+          const mv = dreMap.get(acc.id);
+          if (!mv) continue;
+          const v = mv.deb - mv.cre; // > 0 devedor (despesa), < 0 credor (receita)
+          if (Math.abs(v) < 0.005) continue;
+          totP += v;
+          const dc = v > 0 ? "D" : "C";
+          add(P+"J150"+P+nuP+P+"DRE_"+acc.code+P+"D"+P+"2"+P+"DRE_RESULTADO"+P+acc.name.substring(0, 60)+P+"0,00"+P+dc+P+this.fmtDec(v)+P+dc+P+(v > 0 ? "D" : "R")+P+P);
+          nuP++;
+        }
+        const dcT = totP > 0 ? "D" : "C";
+        add(P+"J150"+P+nuP+P+"DRE_RESULTADO"+P+"T"+P+"1"+P+P+(totP > 0 ? "PREJUIZO LIQUIDO DO EXERCICIO" : "LUCRO LIQUIDO DO EXERCICIO")+P+"0,00"+P+dcT+P+this.fmtDec(totP)+P+dcT+P+(totP > 0 ? "D" : "R")+P+P);
+      } else {
       // J100 — Balanco Patrimonial usando codigos BAL_ do referencial
       // |J100|COD_AGL|IND_TIPO_CALC|NIVEL|COD_AGL_SUP|IND_CTA|NOME_CTA|VL_CTA_INI|IND_DC_INI|VL_CTA_FIN|IND_DC_FIN|
       const bpTypes = new Set(["ASSET","LIABILITY","EQUITY"]);
@@ -559,6 +680,7 @@ export class EcdExporterService {
           }
   
           for (const l152 of j150Lines) add(l152);
+      } // fim aglutinacao VISAO
     }
     // J900 — Termo de Encerramento
     // |J900|DESC_ESC|NR_LIVRO|TIPO_LIVRO|NOME|QTD_PAG|DT_INI|DT_FIN|
