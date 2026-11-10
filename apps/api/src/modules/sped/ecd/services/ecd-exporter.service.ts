@@ -82,7 +82,7 @@ export class EcdExporterService {
       companyId, periodStart, periodEnd,
       bookNumber = String(periodStart.getUTCFullYear()).slice(-2), bookNature = "Livro Diario Geral",
       bookType = "G", layoutVersion = "9.00",
-      tipEcd = "0", indSitEsp = "", codPlanRef = "", hashAnterior = "", includeBlocoJ = true, aglutinacao = "VISAO",
+      tipEcd = "0", indSitEsp = "", codPlanRef = "", hashAnterior = "", includeBlocoJ = true, aglutinacao = "PLANO", // 10/11/2026: Plano de Contas e o padrao
     } = options;
 
     const company = await this.prisma.company.findUnique({

@@ -30,12 +30,16 @@ export class EcdPreValidateService {
   async validate(
     companyId: string,
     periodStart: string,
-    periodEnd: string
+    periodEnd: string,
+    aglutinacao: string = "PLANO"
   ): Promise<PreValidateResult> {
     const checks: PreValidateCheck[] = [];
     const ps = new Date(periodStart + "T00:00:00.000Z");
     const pe = new Date(periodEnd + "T23:59:59.999Z");
     const year = parseInt(periodStart.substring(0, 4), 10);
+    // CRIADO 10/11/2026: com Bloco J pelo Plano de Contas (padrao), as checagens de Visoes
+    // Contabeis (C5, C6, C7, C8, C9, C9b, W1) nao se aplicam a ECD e sao puladas.
+    const usaVisao = aglutinacao === "VISAO";
 
     const company = await this.prisma.company.findUnique({ where: { id: companyId } });
 
@@ -140,10 +144,10 @@ export class EcdPreValidateService {
     });
     type ViewWithMappings = (typeof views)[0];
 
-    const bpView: ViewWithMappings | undefined = views.find((v) => v.tipo === "BP");
-    const dreView: ViewWithMappings | undefined = views.find((v) => v.tipo === "DRE");
+    const bpView: ViewWithMappings | undefined = !usaVisao ? undefined : views.find((v) => v.tipo === "BP");
+    const dreView: ViewWithMappings | undefined = !usaVisao ? undefined : views.find((v) => v.tipo === "DRE");
 
-    if (!bpView) {
+    if (usaVisao && !bpView) {
       checks.push({
         id: "C5", level: "ERROR",
         title: "Visao Contabil BP nao configurada para " + year,
@@ -159,7 +163,7 @@ export class EcdPreValidateService {
       });
     }
 
-    if (!dreView) {
+    if (usaVisao && !dreView) {
       checks.push({
         id: "C6", level: "ERROR",
         title: "Visao Contabil DRE nao configurada para " + year,
@@ -373,7 +377,8 @@ export class EcdPreValidateService {
     const syntheticCount = allAccounts.filter((a) => !a.isAnalytic).length;
     checks.push({ id: "I1", level: "INFO", title: "Plano de contas: " + analyticCount + " analiticas, " + syntheticCount + " sinteticas", description: "Total de contas ativas no plano para a empresa." });
     checks.push({ id: "I2", level: "INFO", title: entryCount + " lancamento(s) no periodo", description: "Lancamentos em journal_entries entre " + periodStart + " e " + periodEnd + "." });
-    checks.push({ id: "I3", level: "INFO", title: "Visoes: " + (bpView?.mappings.length ?? 0) + " contas BP mapeadas, " + (dreView?.mappings.length ?? 0) + " contas DRE mapeadas", description: "Mapeamentos configurados para o ano " + year + "." });
+    if (usaVisao) checks.push({ id: "I3", level: "INFO", title: "Visoes: " + (bpView?.mappings.length ?? 0) + " contas BP mapeadas, " + (dreView?.mappings.length ?? 0) + " contas DRE mapeadas", description: "Mapeamentos configurados para o ano " + year + "." });
+    else checks.push({ id: "I3", level: "INFO", title: "Bloco J pelo Plano de Contas (padrao IOB)", description: "Codigos de aglutinacao BAL_/DRE_ gerados do proprio plano de contas. As Visoes Contabeis nao sao usadas na ECD (seguem em uso na ECF, como plano referencial)." });
 
     return {
       companyId, periodStart, periodEnd, checks,

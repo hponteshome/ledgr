@@ -155,7 +155,7 @@ export class EcdController {
   ) {
     const companyId = req.headers['x-company-id'];
     if (!periodStart || !periodEnd) throw new BadRequestException('Informe periodStart e periodEnd (YYYY-MM-DD).');
-    return this.preValidator.validate(companyId, periodStart, periodEnd);
+    return this.preValidator.validate(companyId, periodStart, periodEnd, req.query?.aglutinacao === 'VISAO' ? 'VISAO' : 'PLANO'); // 10/11/2026
   }
 
   // ── GET /sped/ecd/preview-0000 — CRIADO 10/11/2026: registro 0000 exatamente como sai no arquivo
@@ -214,7 +214,7 @@ export class EcdController {
       includeBlocoJ: includeBlocoJ !== 'false',
       bookNumber:  bookNumber || undefined,
       bookType:    (bookType as any) || 'G',
-      aglutinacao: aglutinacao === 'PLANO' ? 'PLANO' : 'VISAO', // 10/11/2026
+      aglutinacao: aglutinacao === 'VISAO' ? 'VISAO' : 'PLANO', // 10/11/2026: Plano de Contas e o padrao; VISAO so se pedido
     });
 
     const companyForName = await this.prisma.company.findUnique({ where: { id: companyId }, select: { taxId: true } });

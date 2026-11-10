@@ -195,7 +195,7 @@ const EcdPage: React.FC = () => {
     const [exportIndSitEsp, setExportIndSitEsp] = useState('');
     const [exportCodPlanRef, setExportCodPlanRef] = useState('');
     const [exportHashAnterior, setExportHashAnterior] = useState('');
-    const [exportAglutinacao, setExportAglutinacao] = useState('VISAO'); // 10/11/2026: Bloco J por Visao ou pelo Plano (padrao IOB)
+    const [exportAglutinacao, setExportAglutinacao] = useState('PLANO'); // 10/11/2026: Bloco J por Visao ou pelo Plano (padrao IOB)
     const [exporting, setExporting] = useState(false);
     const [preValidating, setPreValidating] = useState(false);
     const [preValidateResult, setPreValidateResult] = useState<any>(null);
@@ -297,7 +297,7 @@ const EcdPage: React.FC = () => {
         setPreValidating(true);
         try {
             const r = await api.get('/sped/ecd/pre-validate', {
-                params: { periodStart: exportPeriodStart, periodEnd: exportPeriodEnd },
+                params: { periodStart: exportPeriodStart, periodEnd: exportPeriodEnd, aglutinacao: exportAglutinacao },
             });
             setPreValidateResult(r.data);
             setShowPreValidate(true);
@@ -795,8 +795,8 @@ const EcdPage: React.FC = () => {
                             <label className="text-xs text-gray-500 block mb-1">Aglutinação do Bloco J</label>
                             <select value={exportAglutinacao} onChange={e => setExportAglutinacao(e.target.value)}
                                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                <option value="VISAO">Visões Contábeis (referencial RFB)</option>
-                                <option value="PLANO">Plano de contas (padrão IOB)</option>
+                                <option value="PLANO">Plano de contas (padrão IOB - recomendado)</option>
+                                <option value="VISAO">Visões Contábeis (antigo)</option>
                             </select>
                         </div>
                         {exportTipEcd === '1' && (
