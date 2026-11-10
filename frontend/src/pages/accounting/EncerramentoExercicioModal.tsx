@@ -270,7 +270,16 @@ export const EncerramentoExercicioModal: React.FC<Props> = ({ defaultYear, onClo
                 <div style={{ background: '#FEF3C7', border: '0.5px solid #FDE68A', borderRadius: 8, padding: 12, marginBottom: 16, color: '#92400E', fontSize: 13, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
                   <FiAlertTriangle size={15} style={{ flexShrink: 0, marginTop: 1 }} />
                   <span>
-                    Configure antes, na aba Contábil da empresa: <strong>{preview.missingConfig.join(', ')}</strong>.
+                    Configure antes, na aba Contábil da empresa: <strong>{preview.missingConfig.join(', ')}</strong>.{' '}
+                    {/* NOVO (10/11/2026): atalho para a aba Contabil da empresa atual (nova aba) */}
+                    <a
+                      href={localStorage.getItem('@ledgr:companyId') ? `/app/companies/edit/${localStorage.getItem('@ledgr:companyId')}?tab=contabil` : '/app/companies'}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ color: '#92400E', fontWeight: 600, textDecoration: 'underline', whiteSpace: 'nowrap' }}
+                    >
+                      Configurar agora
+                    </a>
                   </span>
                 </div>
               )}

@@ -148,11 +148,17 @@ export const CompanyEdit: React.FC = () => {
               className="px-4 py-2 text-gray-400 font-bold text-xs uppercase hover:text-red-500 transition">
               Cancelar
             </button>
-            <button type="submit" disabled={saving}
-              className="px-8 py-2.5 bg-blue-600 text-white rounded-lg font-black text-xs uppercase
-                         hover:bg-blue-700 disabled:bg-blue-300 transition">
-              {saving ? 'Gravando…' : 'Gravar'}
-            </button>
+            {/* ALTERADO (10/11/2026): o Gravar do topo salva so os dados da empresa (Geral/eSocial/SPED);
+                a aba Contabil tem salvamento proprio - evita salvar a aba errada */}
+            {activeTab === 'contabil' ? (
+              <span className="text-xs text-gray-500 italic">Esta aba salva pelo botão <b>Salvar Configuração Contábil</b>, no rodapé.</span>
+            ) : (
+              <button type="submit" disabled={saving}
+                className="px-8 py-2.5 bg-blue-600 text-white rounded-lg font-black text-xs uppercase
+                           hover:bg-blue-700 disabled:bg-blue-300 transition">
+                {saving ? 'Gravando…' : 'Gravar dados da empresa'}
+              </button>
+            )}
           </div>
         </div>
 
