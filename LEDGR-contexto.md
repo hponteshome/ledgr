@@ -10855,3 +10855,15 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - Diario Geral - modal "Diario Geral - Parametros de Emissao": botao x no cabecalho e Cancelar no rodape (onClose), titulo com hifen.
 - API: main.ts listen(Number(process.env.PORT) || 3000) - permite segunda instancia (clone ledgr_clone na 3001); sem PORT continua na 3000.
 - Recomposicao Hotelsys (ECD x Ledgr 2018-2025) concluida em banco clone ledgr_clone; resumo no projeto: claude/hotelsys-recomposicao-status.md. Oficial: 36 ajustes de 31/12/2024 movidos para 01/01/2024 e lote HotelsysAjustesDez2024 renomeado para Ajustes2024 (backup D:\Backup\ledgr_app_antes_aj2024_20261030_1639.dump).
+
+
+### Sessao 10/11/2026 - Lotes de Importacao: importacao IOB passa a numerar lote
+- Falha: iob-lotd-import.service.ts gravava so em lote_imports (controle de arquivo) e criava os
+  lancamentos sem importLoteId -> tela Lotes de Importacao (import_lotes) nao mostrava os IOB.
+- Correcao: getOrCreateLote (pg_advisory_xact_lock + MAX(numero) por empresa/ano, tipo IOB), cada
+  journalEntry recebe importLoteId e o lote grava quantidade/total debito/credito ao final.
+- import-lote.service.ts remove(): lote IOB excluido tambem marca deleted_at em lote_imports
+  (libera o arquivo para reimportar).
+- Retroativo LM (prisma/migrations-manuais/20261110_import_lotes_iob_lm.sql): 14 lotes criados
+  (2013 n1, 2015 n1, 2021 n1-12), 163/163 lancamentos ligados, contagens = stats.imported.
+- Obs: o "Carregando..." travado na tela era o container ledgr-postgres parado.

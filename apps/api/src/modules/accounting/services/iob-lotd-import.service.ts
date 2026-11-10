@@ -179,19 +179,37 @@ export class IobLotdImportService {
     }
 
     // ── Importar ──────────────────────────────────────────────────
+    // NOVO (10/11/2026): lote numerado (import_lotes, tipo IOB) por ano - mesma regra da
+    // importacao manual; o lote aparece em Lotes de Importacao, no Diario e no Razao.
+    const loteIdByYear = new Map<number, string>();
+    const loteTot = new Map<string, { count: number; deb: number; cre: number }>();
     for (const g of groups) {
+      const year = g.date.getUTCFullYear();
+      if (!loteIdByYear.has(year)) {
+        const lote = await this.prisma.$transaction((tx) => this.getOrCreateLote(tx, companyId, year, fileName, userId));
+        loteIdByYear.set(year, lote.id);
+        loteTot.set(lote.id, { count: 0, deb: 0, cre: 0 });
+      }
+      const importLoteId = loteIdByYear.get(year)!;
       try {
         const je = await this.prisma.journalEntry.create({
-          data: { companyId, date: g.date, description: g.desc, sourceModule: 'ACCOUNTING', createdById: userId },
+          data: { companyId, date: g.date, description: g.desc, sourceModule: 'ACCOUNTING', createdById: userId, importLoteId },
         });
         await this.prisma.journalEntryItem.createMany({
           data: g.items.map(i => ({ journalEntryId: je.id, accountId: i.accountId, value: i.value, type: i.type })),
         });
         stats.imported++;
+        const tot = loteTot.get(importLoteId)!; tot.count++; tot.deb += g.totalDeb; tot.cre += g.totalCre;
       } catch (e: any) {
         stats.skipped++;
         parsed.errors.push({ line: 0, message: e.message });
       }
+    }
+    for (const [id, tot] of loteTot) {
+      await this.prisma.importLote.update({
+        where: { id },
+        data: { quantidadeLancamentos: tot.count, totalDebito: Math.round(tot.deb * 100) / 100, totalCredito: Math.round(tot.cre * 100) / 100 },
+      });
     }
 
 
@@ -214,6 +232,18 @@ export class IobLotdImportService {
     this.logger.log(`IOB LOTD [CONFIRM] groups=${groups.length} imported=${stats.imported} balanced=${balanced}`);
     return { status: stats.skipped > 0 ? 'partial' : 'done', stats, errors: parsed.errors };
   }
+  // NOVO (10/11/2026): numero sequencial por empresa+ano, com trava atomica (mesmo padrao de
+  // journal-manual-import.service.ts, getOrCreateLoteForYear).
+  private async getOrCreateLote(tx: any, companyId: string, ano: number, nomeArquivo: string, createdById: string) {
+    await tx.$executeRawUnsafe(`SELECT pg_advisory_xact_lock(hashtext('${companyId}'))`);
+    const maxRow: { numero: number | null }[] = await tx.$queryRawUnsafe(
+      `SELECT MAX(numero)::int AS numero FROM import_lotes WHERE company_id = '${companyId}'::uuid AND ano = ${ano}`,
+    );
+    return tx.importLote.create({
+      data: { companyId, ano, numero: (maxRow[0]?.numero ?? 0) + 1, nomeArquivo: nomeArquivo || null, tipo: 'IOB', createdById },
+    });
+  }
+
   async listLoteImports(companyId: string) {
     return this.prisma.loteImport.findMany({
       where:   { companyId, deletedAt: null },

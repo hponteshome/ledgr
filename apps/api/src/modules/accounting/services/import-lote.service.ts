@@ -58,6 +58,13 @@ export class ImportLoteService {
       });
       await tx.journalEntry.deleteMany({ where: { importLoteId: loteId } });
       await tx.importLote.delete({ where: { id: loteId } });
+      // NOVO (10/11/2026): lote IOB excluido libera o arquivo para reimportar (lote_imports)
+      if (lote.tipo === 'IOB' && lote.nomeArquivo) {
+        await tx.loteImport.updateMany({
+          where: { companyId, fileName: lote.nomeArquivo, deletedAt: null },
+          data: { deletedAt: new Date() },
+        });
+      }
       return count;
     });
 
