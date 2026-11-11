@@ -6037,3 +6037,28 @@ model IntegrityFinding {
   @@index([companyId, checkCode], map: "integrity_findings_check_idx")
   @@map("integrity_findings")
 }
+/// Comparativo de Regimes (Real x Presumido) - ESTUDOS de apoio a decisao (nao alteram company_tax_regimes) (20261111)
+model TaxRegimeStudy {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId       String    @map("company_id") @db.Uuid
+  ano             Int
+  versao          Int
+  titulo          String?   @db.VarChar(200)
+  premissas       Json
+  resultado       Json
+  status          String    @default("RASCUNHO") @db.VarChar(20)
+  regimeRecomendado String? @map("regime_recomendado") @db.VarChar(20)
+  justificativa   String?
+  concluidoEm     DateTime? @map("concluido_em") @db.Timestamp(6)
+  concluidoPorId  String?   @map("concluido_por_id") @db.Uuid
+  concluidoPorNome String?  @map("concluido_por_nome") @db.VarChar(150)
+  createdById     String?   @map("created_by_id") @db.Uuid
+  autorNome       String?   @map("autor_nome") @db.VarChar(150)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  deletedAt       DateTime? @map("deleted_at") @db.Timestamp(6)
+
+  @@unique([companyId, ano, versao])
+  @@index([companyId, ano])
+  @@map("tax_regime_studies")
+}

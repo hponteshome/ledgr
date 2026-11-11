@@ -10880,3 +10880,10 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - Encerramento 2022 da LM apagado (hard delete, 3 lancamentos/40 partidas - livros ainda nao entregues) e
   refeito: Lucros Acumulados -832.212,55; Do Exercicio -642.779,86.
 - Config contabil LM: ARE 49101010001, Prejuizo do Exercicio 23301010002, Prejuizos Acumulados 23301010001.
+
+## 2026-11-11 - Comparativo de Regimes (Real x Presumido)
+- Tela Fiscal > Comparativo de Regimes; API apps/api/src/modules/regime-comparativo; tabela tax_regime_studies (migracao 20261111).
+- Regra: estudos sao apoio a decisao (exercicio nao definido ou mudanca futura); NUNCA alteram company_tax_regimes nem regimes escolhidos. Status RASCUNHO | CONCLUIDO | SUBSTITUIDO; coluna regime_recomendado.
+- Receita lida do razao (contas REVENUE, sem lancamentos que tocam a conta de apuracao); exclusoes mensais informadas no estudo (ex.: receitas de terceiros estornadas por ajuste de exercicios anteriores).
+- Selic: indicadores_economicos (SELIC, taxa_mensal); juros = Selic do mes seguinte ao vencimento ate o mes anterior ao pagamento + 1%.
+- Licao: blocos muito grandes (~60 KB) falham ao colar no PowerShell - dividir em blocos de ate ~30 KB, com codigo em texto puro (sem base64).

@@ -100,6 +100,7 @@ import FolhaPage from '../pages/hr/FolhaPage';
 import EmployeeDetailPage from '../pages/hr/EmployeeDetailPage';
 import FechamentoPage from '../pages/finance/FechamentoPage';
 import ApuracaoImpostosPage from '../pages/fiscal/ApuracaoImpostosPage';
+import RegimeComparativoPage from '../pages/fiscal/RegimeComparativoPage';
 import LalurConfigPage from '../pages/fiscal/LalurConfigPage';
 import ContasAReceberPage from '../pages/finance/ContasAReceberPage';
 import ContasAPagarPage from '../pages/finance/ContasAPagarPage';
@@ -224,6 +225,7 @@ export const AppRoutes = () => {
                     <Route path="app/sistema/menu-usage" element={<ProtectedRoute><MenuUsageAuditPage /></ProtectedRoute>} />
                 <Route path="app/finance/fechamento" element={<ProtectedRoute><FechamentoPage /></ProtectedRoute>} />
                 <Route path="app/fiscal/apuracao" element={<ProtectedRoute><ApuracaoImpostosPage /></ProtectedRoute>} />
+                <Route path="app/fiscal/comparativo-regimes" element={<ProtectedRoute><RegimeComparativoPage /></ProtectedRoute>} />
                 <Route path="app/fiscal/lalur-config" element={<ProtectedRoute><LalurConfigPage /></ProtectedRoute>} />
                 <Route path="app/finance/petty-cash" element={<ProtectedRoute><PettyCashPage /></ProtectedRoute>} />
                 <Route path="app/finance/fluxo-caixa" element={<ProtectedRoute><FluxoCaixaPage /></ProtectedRoute>} />
