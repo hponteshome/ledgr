@@ -9,6 +9,7 @@ import { HrModule } from './modules/hr/hr.module';
 import { TabelasLegaisModule } from './modules/tabelas-legais/tabelas-legais.module';
 import { ApuracaoModule } from './modules/apuracao/apuracao.module';
 import { RegimeComparativoModule } from './modules/regime-comparativo/regime-comparativo.module';
+import { DarfsModule } from './modules/darfs/darfs.module';
 import { RfbModule } from './modules/rfb/rfb.module';
 import { AuthModule } from './auth/auth.module';
 import { CompaniesModule } from './core/companies/company.module';
@@ -61,6 +62,7 @@ import { ChatModule } from './chat/chat.module';
     TabelasLegaisModule,
     ApuracaoModule,
     RegimeComparativoModule,
+    DarfsModule,
     DocumentsModule,
     ContratosModule,
     PersonsModule,

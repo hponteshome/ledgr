@@ -6062,3 +6062,39 @@ model TaxRegimeStudy {
   @@index([companyId, ano])
   @@map("tax_regime_studies")
 }
+
+
+/// DARFs gerados pelo LEDGR - controle de emissao e pagamento (20261111)
+model TaxDarf {
+  id                    String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId             String    @map("company_id") @db.Uuid
+  loteId                String    @map("lote_id") @db.Uuid
+  origem                String    @default("MANUAL") @db.VarChar(20)
+  origemId              String?   @map("origem_id") @db.Uuid
+  codigo                String    @db.VarChar(6)
+  descricao             String?   @db.VarChar(200)
+  periodoApuracao       DateTime  @map("periodo_apuracao") @db.Date
+  vencimento            DateTime  @db.Date
+  numeroReferencia      String?   @map("numero_referencia") @db.VarChar(30)
+  dataPagamentoPrevista DateTime  @map("data_pagamento_prevista") @db.Date
+  principal             Decimal   @db.Decimal(15, 2)
+  multaModo             String    @default("SICALC") @map("multa_modo") @db.VarChar(10)
+  multaPct              Decimal   @default(0) @map("multa_pct") @db.Decimal(7, 2)
+  multa                 Decimal   @default(0) @db.Decimal(15, 2)
+  selicPct              Decimal   @default(0) @map("selic_pct") @db.Decimal(9, 2)
+  juros                 Decimal   @default(0) @db.Decimal(15, 2)
+  total                 Decimal   @db.Decimal(15, 2)
+  status                String    @default("GERADO") @db.VarChar(10)
+  pagoEm                DateTime? @map("pago_em") @db.Date
+  valorPago             Decimal?  @map("valor_pago") @db.Decimal(15, 2)
+  numeroDocumento       String?   @map("numero_documento") @db.VarChar(40)
+  createdById           String?   @map("created_by_id") @db.Uuid
+  autorNome             String?   @map("autor_nome") @db.VarChar(150)
+  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt             DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  deletedAt             DateTime? @map("deleted_at") @db.Timestamp(6)
+
+  @@index([companyId, periodoApuracao])
+  @@index([loteId])
+  @@map("tax_darfs")
+}

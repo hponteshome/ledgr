@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import api from '../../services/api';
 import { useCompany } from '../../contexts/CompanyContext';
+import DarfModal from '../../components/fiscal/DarfModal';
 
 const fmt = (v: any) => (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const fmtN = (v: any) => (Number(v) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -69,6 +70,17 @@ export default function RegimeComparativoPage() {
   const [erro, setErro] = useState<string | null>(null);
   const [dec, setDec] = useState<any>(null);
   const reqRef = useRef(0); // so vale a resposta do ultimo exercicio pedido
+  const [darfModal, setDarfModal] = useState<any>(null);
+  const ultimoDia = (y: number, m: number) => y + '-' + String(m).padStart(2, '0') + '-' + String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, '0');
+  const paDe = (p: string) => (/^\d{2}\/\d{4}$/.test(p) ? ultimoDia(Number(p.slice(3)), Number(p.slice(0, 2)))
+    : /^\dT\/\d{4}$/.test(p) ? ultimoDia(Number(p.slice(3)), Number(p[0]) * 3) : p.slice(0, 4) + '-12-31');
+  const ORD_COD = ['2089', '2372', '2430', '6773', '8109', '2172', '6912', '5856'];
+  function abrirDarfs(rg: 'REAL' | 'PRESUMIDO') {
+    const itens = (res?.darfs ?? []).filter((d: any) => d.regime === rg)
+      .map((d: any) => ({ codigo: d.codigo, descricao: d.tributo + ' ' + d.periodo, periodoApuracao: paDe(d.periodo), vencimento: d.vencimento, principal: d.principal }))
+      .sort((a: any, b: any) => a.periodoApuracao.localeCompare(b.periodoApuracao) || ORD_COD.indexOf(a.codigo) - ORD_COD.indexOf(b.codigo));
+    setDarfModal({ itens, quotaOpcao: rg === 'PRESUMIDO', titulo: 'DARFs ' + ano + ' - ' + REG[rg], subtitulo: (aberto?.versao ? 'Estudo v' + aberto.versao + ' - ' : '') + 'multa de mora e juros Selic calculados para a data de pagamento' });
+  }
 
   const anos: number[] = [];
   for (let a = hoje.getFullYear(); a >= 2013; a--) anos.push(a);
@@ -85,6 +97,8 @@ export default function RegimeComparativoPage() {
       (b.data?.receitas ?? []).forEach((r: any) => { c[r.id] = r.sugestao; });
       setClassif(c); setExclusoes(Array(12).fill(0)); setLr(LR0); setDistrib(false); setMultas({}); setRes(null); setAberto(null);
       setTitulo('Estudo ' + a);
+      const conc = (e.data ?? []).find((x: any) => x.status === 'CONCLUIDO'); // estudo concluido do exercicio abre direto, com as exclusoes salvas
+      if (conc) abrir(conc.id);
     } catch (e: any) { setErro(e?.response?.data?.message ?? 'Erro ao carregar o exercicio'); }
     finally { setLoading(false); }
   }
@@ -186,6 +200,7 @@ export default function RegimeComparativoPage() {
               <select style={{ ...S.input, width: 76 }} value={pagMes} onChange={(e) => setPagMes(Number(e.target.value))}>{MESES.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}</select>
               <select style={{ ...S.input, width: 84 }} value={pagAno} onChange={(e) => setPagAno(Number(e.target.value))}>{[hoje.getFullYear(), hoje.getFullYear() + 1].map((a) => <option key={a} value={a}>{a}</option>)}</select>
             </div></div>
+          <button style={S.btnO} onClick={() => setDarfModal({ itens: [], titulo: 'DARFs gerados' })}>DARFs gerados</button>
           <button style={S.btn(FIN_ACCENT)} onClick={calcular} disabled={loading || !base}>Calcular</button>
         </div>
       </div>
@@ -270,6 +285,10 @@ export default function RegimeComparativoPage() {
           <ColTot rg="REAL" cor={COR_REAL} />
           <ColTot rg="PRESUMIDO" cor={COR_PRES} />
         </div>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginBottom: 10 }}>
+          {(['PRESUMIDO', 'REAL'] as const).map((rg) => (
+            <button key={rg} style={S.btn(rg === 'REAL' ? COR_REAL : COR_PRES)} onClick={() => abrirDarfs(rg)}>Gerar DARFs - {REG[rg]}</button>))}
+        </div>
         <div style={{ background: r.maisVantajoso === 'EMPATE' ? '#F3F4F6' : '#F0FDF4', border: '0.5px solid #BBF7D0', borderRadius: 8, padding: '10px 14px', fontSize: 13, marginBottom: 16 }}>
           {r.maisVantajoso === 'EMPATE' ? 'Os dois regimes têm o mesmo custo estimado.'
             : <><b>{REG[r.maisVantajoso]}</b> custa <b>{fmt(Math.abs(r.diferenca))}</b> a menos (pagamento em {String(r.pagamento).slice(5, 7)}/{String(r.pagamento).slice(0, 4)}). Lucro Real ajustado: {fmt(r.lucroReal?.lucroReal)}.</>}
@@ -293,19 +312,85 @@ export default function RegimeComparativoPage() {
         </div>
 
         <div style={S.card}>
-          <div style={S.secTit}>DARFs por regime</div>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead><tr><th style={S.th}>Regime</th><th style={S.th}>Tributo</th><th style={S.th}>Código</th><th style={S.th}>Período</th><th style={S.th}>Vencimento</th>
-              <th style={S.thR}>Principal</th><th style={S.thR}>Selic</th><th style={S.thR}>Juros</th><th style={S.thR}>Total</th></tr></thead>
-            <tbody>{(r.darfs ?? []).map((d: any, i: number) => (
-              <tr key={i}>
-                <td style={S.td}><span style={S.badge(d.regime === 'REAL' ? COR_REAL : COR_PRES)}>{REG[d.regime]}</span></td>
-                <td style={S.td}>{d.tributo}</td><td style={{ ...S.td, fontFamily: 'monospace' }}>{d.codigo}</td><td style={S.td}>{d.periodo}</td><td style={S.td}>{fmtD(d.vencimento)}</td>
-                <td style={S.tdR}>{fmtN(d.principal)}</td><td style={S.tdR}>{fmtP(d.selicPct)}</td><td style={S.tdR}>{fmtN(d.juros)}</td><td style={S.tdR}><b>{fmtN(d.total)}</b></td>
-              </tr>))}
-              {(r.darfs ?? []).length === 0 && <tr><td style={S.td} colSpan={9}>Nenhum tributo devido nas premissas informadas.</td></tr>}
-            </tbody>
-          </table>
+          <div style={S.secTit}>DARFs - Lucro Presumido x Lucro Real</div>
+          {(() => {
+            const FAM: Record<string, string> = { '8109': 'PIS', '6912': 'PIS', '2172': 'Cofins', '5856': 'Cofins', '2089': 'IRPJ', '2430': 'IRPJ', '2372': 'CSLL', '6773': 'CSLL' };
+            const ORD = ['PIS', 'Cofins', 'IRPJ', 'CSLL'];
+            const chave = (p: string) => (/^\d{2}\/\d{4}$/.test(p) ? p.slice(3) + p.slice(0, 2) : /^\dT\/\d{4}$/.test(p) ? p.slice(3) + 'T' + p[0] : p + 'Z');
+            const linhas: Record<string, any> = {};
+            (r.darfs ?? []).forEach((d: any) => {
+              const f = FAM[d.codigo] ?? d.tributo;
+              const k = f + '|' + d.periodo;
+              if (!linhas[k]) linhas[k] = { fam: f, periodo: d.periodo, PRESUMIDO: null, REAL: null };
+              linhas[k][d.regime] = d;
+            });
+            const todas: any[] = Object.values(linhas);
+            const fams: string[] = ORD.concat(todas.map((l: any) => l.fam)).filter((f: string, i: number, a: string[]) => a.indexOf(f) === i);
+            const grupos = fams
+              .map((f) => ({ fam: f, rows: todas.filter((l: any) => l.fam === f).sort((a: any, b: any) => chave(a.periodo).localeCompare(chave(b.periodo))) }))
+              .filter((g) => g.rows.length > 0);
+            const soma = (rows: any[], rg: string, campo: string) => rows.reduce((s: number, l: any) => s + (Number(l[rg]?.[campo]) || 0), 0);
+            const cel = (d: any, campo: string) => (d ? fmtN(d[campo]) : '-');
+            const sep = { borderLeft: '2px solid var(--color-border-secondary)' };
+            const thG = (cor: string) => ({ ...S.th, textAlign: 'center' as const, color: cor, borderLeft: '2px solid var(--color-border-secondary)' });
+            const REGS = ['PRESUMIDO', 'REAL'] as const;
+            const linhaSoma = (rows: any[], rotulo: string, destaque: boolean) => (
+              <tr style={{ background: destaque ? FIN_LIGHT : 'var(--color-background-secondary)', fontWeight: 600 }}>
+                <td style={S.td} colSpan={2}>{rotulo}</td>
+                {REGS.map((rg) => (
+                  <React.Fragment key={rg}>
+                    <td style={{ ...S.td, ...sep }} colSpan={2}></td>
+                    <td style={S.tdR}>{fmtN(soma(rows, rg, 'principal'))}</td>
+                    <td style={S.tdR}>{fmtN(soma(rows, rg, 'juros'))}</td>
+                    <td style={S.tdR}>{fmtN(soma(rows, rg, 'total'))}</td>
+                  </React.Fragment>))}
+              </tr>
+            );
+            if (!todas.length) return <div style={{ fontSize: 12 }}>Nenhum tributo devido nas premissas informadas.</div>;
+            return (
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr>
+                    <th style={S.th} colSpan={2}></th>
+                    <th style={thG(COR_PRES)} colSpan={5}>Lucro Presumido</th>
+                    <th style={thG(COR_REAL)} colSpan={5}>Lucro Real</th>
+                  </tr>
+                  <tr>
+                    <th style={S.th}>Tributo</th><th style={S.th}>Período</th>
+                    {REGS.map((rg) => (
+                      <React.Fragment key={rg}>
+                        <th style={{ ...S.th, ...sep }}>Código</th><th style={S.th}>Vencimento</th>
+                        <th style={S.thR}>Principal</th><th style={S.thR}>Juros</th><th style={S.thR}>Total</th>
+                      </React.Fragment>))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {grupos.map((g) => (
+                    <React.Fragment key={g.fam}>
+                      {g.rows.map((l: any, i: number) => (
+                        <tr key={g.fam + '|' + l.periodo}>
+                          <td style={S.td}>{i === 0 ? <b>{g.fam}</b> : ''}</td>
+                          <td style={S.td}>{l.periodo}</td>
+                          {REGS.map((rg) => {
+                            const d = l[rg];
+                            return (
+                              <React.Fragment key={rg}>
+                                <td style={{ ...S.td, ...sep, fontFamily: 'monospace' }}>{d?.codigo ?? '-'}</td>
+                                <td style={S.td}>{d ? fmtD(d.vencimento) : '-'}</td>
+                                <td style={S.tdR}>{cel(d, 'principal')}</td>
+                                <td style={S.tdR} title={d ? 'Selic acumulada ' + fmtP(d.selicPct) : ''}>{cel(d, 'juros')}</td>
+                                <td style={S.tdR}><b>{cel(d, 'total')}</b></td>
+                              </React.Fragment>);
+                          })}
+                        </tr>))}
+                      {linhaSoma(g.rows, 'Subtotal ' + g.fam, false)}
+                    </React.Fragment>))}
+                  {linhaSoma(todas, 'Total dos DARFs', true)}
+                </tbody>
+              </table>
+            );
+          })()}
+          <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginTop: 6 }}>Juros: Selic acumulada do mês seguinte ao vencimento até o mês anterior ao pagamento + 1% (passe o mouse sobre o valor dos juros para ver a taxa). No Lucro Real, IRPJ e CSLL são anuais e só aparecem se houver lucro real positivo.</div>
         </div>
 
         {(r.alertas ?? []).length > 0 && <div style={{ ...S.card, background: '#FFFBEB', borderColor: '#FDE68A' }}>
@@ -341,6 +426,8 @@ export default function RegimeComparativoPage() {
         </table>
         {concluido?.justificativa && <div style={{ fontSize: 12, marginTop: 10, borderLeft: '3px solid #16A34A', paddingLeft: 10 }}><b>Justificativa da conclusão (v{concluido.versao}):</b> {concluido.justificativa}</div>}
       </div>
+
+      {darfModal && <DarfModal onClose={() => setDarfModal(null)} titulo={darfModal.titulo} subtitulo={darfModal.subtitulo} itensIniciais={darfModal.itens} origem={darfModal.itens.length ? 'ESTUDO_REGIME' : 'MANUAL'} origemId={aberto?.id ?? null} abaInicial={darfModal.itens.length ? 'GERAR' : 'GERADOS'} quotaOpcaoPresumido={!!darfModal.quotaOpcao} />}
 
       {dec && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>

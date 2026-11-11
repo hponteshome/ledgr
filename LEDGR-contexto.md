@@ -10887,3 +10887,9 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - Receita lida do razao (contas REVENUE, sem lancamentos que tocam a conta de apuracao); exclusoes mensais informadas no estudo (ex.: receitas de terceiros estornadas por ajuste de exercicios anteriores).
 - Selic: indicadores_economicos (SELIC, taxa_mensal); juros = Selic do mes seguinte ao vencimento ate o mes anterior ao pagamento + 1%.
 - Licao: blocos muito grandes (~60 KB) falham ao colar no PowerShell - dividir em blocos de ate ~30 KB, com codigo em texto puro (sem base64).
+
+## 2026-11-11 - DARFs (Fiscal) + Comparativo v2
+- Modulo `darfs` (API): calcular (Selic acumulada + 1%, multa Sicalc 0,33%/dia teto 20% ou denuncia espontanea), gravar lote em `tax_darfs`, listar, registrar pagamento, cancelar (so GERADO), HTML/PDF (resumo + 2 DARFs por A4).
+- `DarfModal` (frontend): abas Gerar / DARFs gerados, marcar-desmarcar todos, 1a quota IRPJ 2089 com multa para formalizar opcao pelo Presumido.
+- Comparativo de Regimes: DARFs em colunas por regime; estudo CONCLUIDO abre direto com as exclusoes salvas.
+- LM 2022: 20 DARFs Presumido gerados (principal 17.121,91; multa 196,80; total 25.832,40 p/ 11/11/2026).
