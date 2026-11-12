@@ -1,5 +1,6 @@
 // apps/api/src/core/companies/company.controller.ts
 
+import { CompanyHistoryService } from './company-history.service';
 import {
   Controller,
   Get,
@@ -45,7 +46,10 @@ import { CompanyDto } from '../../core/dto/company.dto';
 @UseGuards(JwtAuthGuard, SidebarResourceGuard)
 export class CompanyController {
 
-  constructor(private readonly companyService: CompanyService) {}
+  constructor(
+    private readonly companyService: CompanyService,
+    private readonly historySvc: CompanyHistoryService,
+  ) {}
 
   // ── Rotas sem empresa ativa (Master Admin / pré-login) ──────────────────────
 
@@ -144,6 +148,10 @@ export class CompanyController {
       statusDate:  body.statusDate  ? new Date(body.statusDate)  : new Date(),
     };
     const result = await this.companyService.create(data);
+    // IMPL-RFB-02 (12/11/2026): apos criar, o backend completa o cadastro pela RFB (RfbClientService, fonte unica)
+    // e registra no historico. Falha na RFB nao impede a criacao - refazer em "Comparar com a RFB".
+    try { await this.historySvc.syncFromRfb(result.id, user?.id); }
+    catch (e: any) { console.warn("[IMPL-RFB-02] sync RFB apos criar empresa falhou: " + (e?.message || e)); }
     return new CompanyDto(result);
   }
 

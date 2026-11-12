@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { PrismaService } from "@prisma/prisma.service";
+import { getEcfLayout } from "./ecf-exporter.service";
 
 export type EcfCheckLevel = "ERROR" | "WARNING" | "INFO";
 
@@ -120,7 +121,7 @@ export class EcfPreValidateService {
     }
 
     const shareholders = await this.prisma.companyShareholder.findMany({
-      where: { companyId, shareholderType: "PF" },
+      where: { companyId }, // IMPL-ECF-01: socios PF e PJ
       include: { person: { select: { fullName: true } } },
     });
 
@@ -176,12 +177,32 @@ export class EcfPreValidateService {
       });
     }
 
+    // IMPL-ECF-02: TIP_ESC_PRE do regime do periodo x condicoes da dispensa da ECD
+    const reg: any[] = await this.prisma.$queryRawUnsafe(
+      `SELECT forma_tributacao, tip_esc_pre FROM company_tax_regimes WHERE company_id = $1::uuid AND dt_ini <= $3::date
+        AND (dt_fin IS NULL OR dt_fin >= $2::date) ORDER BY dt_ini DESC LIMIT 1`, companyId, periodStart, periodEnd);
+    const est: any[] = await this.prisma.$queryRawUnsafe(
+      `SELECT premissas FROM tax_regime_studies WHERE company_id = $1::uuid AND ano = $2::int AND status = 'CONCLUIDO'
+        AND deleted_at IS NULL ORDER BY versao DESC LIMIT 1`, companyId, anoBase);
+    const tipEsc = reg[0]?.tip_esc_pre === "L" ? "L" : "C";
+    const presumido = ["3", "4", "5", "7"].includes(String(reg[0]?.forma_tributacao ?? "5"));
+    if (tipEsc === "L" && est[0]?.premissas?.distribuicaoAcimaBase) {
+      checks.push({ id: "E1", level: "ERROR", title: "ECD obrigatoria: distribuicao de lucros acima da base presumida",
+        description: "ECD OBRIGATORIA - o estudo concluido do ano marca distribuicao de lucros acima da base presumida (IN RFB 2.003/2021, art. 3, par. 1): TIP_ESC_PRE = L nao se aplica. Transmita a ECD e use TIP_ESC_PRE = C no regime do periodo.", action: "Transmita a ECD do periodo e altere o TIP_ESC_PRE do regime para C." });
+    } else if (tipEsc === "L") {
+      checks.push({ id: "E2", level: "WARNING", title: "Livro Caixa (TIP_ESC_PRE = L): condicoes da dispensa da ECD",
+        description: "ATENCAO - TIP_ESC_PRE = L (Livro Caixa, sem ECD). A dispensa da ECD do Presumido (IN RFB 2.003/2021, art. 3, II) so vale se: (1) o Livro Caixa ou a escrituracao contabil registrar TODA a movimentacao financeira, inclusive bancaria (Lei 8.981/1995, art. 45, par. unico) - mantenha o Diario/Livro Caixa do periodo arquivado e disponivel; (2) nao houver distribuicao de lucros, sem IRRF, acima da base presumida menos os tributos (IN RFB 2.003/2021, art. 3, par. 1) - se houver, a ECD e obrigatoria e o TIP_ESC_PRE deve ser C.", action: "Arquive o Diario/Livro Caixa do periodo e confirme que nao houve distribuicao acima da base presumida." });
+    } else if (presumido) {
+      checks.push({ id: "E3", level: "WARNING", title: "Escrituracao contabil (TIP_ESC_PRE = C): ECD do periodo transmitida?",
+        description: "ATENCAO - TIP_ESC_PRE = C (escrituracao contabil) no Presumido: a ECD do periodo deve estar transmitida (obrigatoria ou facultativa) - o PVA recupera a ECD. Se a ECD nao for entregue, cadastre TIP_ESC_PRE = L no regime do periodo e mantenha o Livro Caixa.", action: "Confirme a transmissao da ECD ou cadastre TIP_ESC_PRE = L no regime do periodo." });
+    }
+
     const entryCount = await this.prisma.journalEntry.count({
       where: { companyId, date: { gte: ps, lte: pe }, deletedAt: null },
     });
 
-    const codVer = anoBase >= 2025 ? "0012" : "0011";
-    checks.push({ id: "I1", level: "INFO", title: "Leiaute ECF em uso: " + codVer, description: "Determinado pelo ano-calendario " + anoBase + " (>= 2025 usa leiaute 12)." });
+    const codVer = getEcfLayout(anoBase).codVer; // IMPL-ECF-01: mesma tabela do exporter
+    checks.push({ id: "I1", level: "INFO", title: "Leiaute ECF em uso: " + codVer, description: "Determinado pelo ano-calendario " + anoBase + " (tabela ECF_LAYOUT_BY_YEAR do exporter)." });
 
     const analyticCount = allAccounts.filter((a) => a.isAnalytic).length;
     checks.push({ id: "I2", level: "INFO", title: "Plano de contas: " + analyticCount + " conta(s) analitica(s) ativa(s)", description: "Total de contas analiticas ativas no plano." });

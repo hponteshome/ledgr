@@ -6,6 +6,7 @@
 //   4. Leiaute e tipo de conteúdo exibidos nos cards de resumo
 //   5. Query journalEntries no backend agora filtra sourceModule: ECD_IMPORT (fix no controller)
 
+import { apiErrorMessage } from '../../utils/apiError';
 import React, { useState, useRef, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
@@ -318,7 +319,7 @@ const EcdPage: React.FC = () => {
             a.click();
             window.URL.revokeObjectURL(url);
         } catch (e: any) {
-            alert('Erro ao gerar ECD: ' + (e.response?.data?.message || e.message));
+            alert('Erro ao gerar ECD:\n\n' + await apiErrorMessage(e));
         } finally { setExporting(false); }
     };
 

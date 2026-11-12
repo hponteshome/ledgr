@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common'; // Seguranca 0A (04/10/2026): erros de negocio com o codigo HTTP certo
+import { NotFoundException, BadRequestException } from '@nestjs/common'; // Seguranca 0A (04/10/2026): erros de negocio com o codigo HTTP certo
 // apps/api/src/modules/sped/ecf/services/ecf-exporter.service.ts
 // Confrontado campo a campo contra 2 fontes reais: LM/ECF_2024_LM.TXT (gabarito
 // generico do repo) e um ECF REAL da propria GRB (2025, ja transmitido/validado,
@@ -33,13 +33,19 @@ interface EcfLayoutConfig {
   campo0020ExtrasCount: number; // quantos pipes extras alem dos 27 flags "N"
 }
 const ECF_LAYOUT_BY_YEAR: Record<number, EcfLayoutConfig> = {
+  // IMPL-ECF-01 (12/11/2026): leiaute 0009 - ano-calendario 2022 e 0010 - ano-calendario 2023.
+  // campo0020ExtrasCount a confirmar pelo PVA (mesma metodologia das linhas abaixo).
+  // 0009: 0020 com 30 campos (27 flags + 1 campo final) - confirmado pelo PVA em 12/11/2026 (LM 2022: "30 esperado, 31 encontrado")
+  2022: { codVer: "0009", campo0020ExtrasCount: 1 },
+  // 0010: 0020 por analogia com o 0009 - a confirmar no PVA
+  2023: { codVer: "0010", campo0020ExtrasCount: 1 },
   // leiaute 0011 - ano-calendario 2024 (entrega 2025)
   2024: { codVer: "0011", campo0020ExtrasCount: 2 },
   // leiaute 0012 - ano-calendario >= 2025 (entrega 2026) - confirmado
   // contra PVA 12.2.2 real em 15-16/08/2026 (GRB 2025)
   2025: { codVer: "0012", campo0020ExtrasCount: 3 },
 };
-function getEcfLayout(anoBase: number): EcfLayoutConfig {
+export function getEcfLayout(anoBase: number): EcfLayoutConfig {
   // Anos nao mapeados usam a config do leiaute conhecido mais recente -
   // arriscado (ver pendencia), mas melhor que travar a geracao. Loga um
   // aviso explicito na lista de warnings via warnings.push no export().
@@ -60,6 +66,12 @@ export interface EcfExportOptions {
   // permite a forma de tributacao P". Presumido puro e sempre "5".
   formaTributacao?: "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9";
   tipEcf?: "0" | "1" | "2" | "3";
+  // IMPL-ECF-01: escrituracao do Presumido (0010.TIP_ESC_PRE): C = contabil (ECD vinculada), L = livro caixa (sem ECD).
+  // Padrao: company_tax_regimes.tip_esc_pre do periodo; sem cadastro = C.
+  tipEscPre?: "C" | "L";
+  // IMPL-ECF-01: origem da receita do Bloco P: RAZAO (lancamentos) ou ESTUDO (estudo CONCLUIDO do Comparativo de Regimes do ano).
+  // Padrao: ESTUDO quando houver estudo concluido do ano, senao RAZAO.
+  fonteReceita?: "RAZAO" | "ESTUDO";
 }
 
 interface Period { label: string; firstDay: Date; lastDay: Date }
@@ -73,10 +85,22 @@ export class EcfExporterService {
   async export(options: EcfExportOptions): Promise<{ buffer: Buffer; warnings: string[] }> {
     const {
       companyId, periodStart, periodEnd,
-      formaTributacao = "5", // 5=Lucro Presumido (puro) - default pra GRB, ajustar via cadastro no futuro
       tipEcf = "0",
     } = options;
     const warnings: string[] = [];
+    // IMPL-ECF-01: regime do periodo (company_tax_regimes) e a fonte padrao de FORMA_TRIB, FORMA_APUR,
+    // TIP_ESC_PRE e IND_REC_RECEITA - vale para qualquer empresa/ano; parametros explicitos prevalecem.
+    const regRows: any[] = await this.prisma.$queryRawUnsafe(
+      `SELECT forma_tributacao, periodo_apuracao_irpj, tip_esc_pre, criterio_receita FROM company_tax_regimes
+        WHERE company_id = $1::uuid AND dt_ini <= $3::date AND (dt_fin IS NULL OR dt_fin >= $2::date)
+        ORDER BY dt_ini DESC LIMIT 1`,
+      companyId, periodStart.toISOString().slice(0, 10), periodEnd.toISOString().slice(0, 10));
+    const regime = regRows[0] ?? null;
+    const formaTributacao: string = options.formaTributacao ?? regime?.forma_tributacao ?? "5";
+    if (!options.formaTributacao && !regime) warnings.push("Regime do periodo nao cadastrado (company_tax_regimes) - usando FORMA_TRIB 5 (Presumido).");
+    const formaApur = (["1", "2"].includes(formaTributacao) && regime?.periodo_apuracao_irpj === "A") ? "A" : "T";
+    const tipEscPre: "C" | "L" = options.tipEscPre ?? (regime?.tip_esc_pre === "L" ? "L" : "C");
+    const indRecReceita = regime?.criterio_receita === "CAIXA" ? "1" : "2";
 
     const company = await this.prisma.company.findUnique({
       where: { id: companyId },
@@ -127,7 +151,6 @@ export class EcfExporterService {
     if (!company.mainActivity) {
       warnings.push("CNAE (codigo RFB, ex: 6911701) nao cadastrado em Atividade Principal - registro 0030 sai sem esse campo.");
     }
-    warnings.push("Natureza Juridica (codigo RFB do 0030, ex: 2232) nao tem campo de codigo numerico no cadastro hoje (so texto livre) - registro sai sem esse campo ate essa pendencia ser resolvida.");
 
     // ── Dados base compartilhados por varios blocos ─────────────────────────
     const accounts = await this.prisma.chartOfAccounts.findMany({
@@ -219,9 +242,10 @@ export class EcfExporterService {
     // partidas dobradas). Confirmado campo a campo contra o ECF real 2025 da
     // propria GRB: |0010|<hash>|N|5|T|01|PPPP||C||||2|
     const mesBalRed = "";
-    const tipEscPre = "C";
-    const campoFinal0010 = "2"; // achado real (ECF 2025 GRB) - significado exato nao confirmado, valor copiado do arquivo real da mesma empresa/regime
-    add(P+"0010"+P+P+"N"+P+formaTributacao+P+"T"+P+"01"+P+formaTribPer+P+mesBalRed+P+tipEscPre+P+P+P+P+campoFinal0010+P);
+    // IMPL-ECF-01: ultimo campo do 0010 = IND_REC_RECEITA (criterio de reconhecimento de receitas do Presumido):
+    // 1 = caixa, 2 = competencia (GRB = 2, o valor antes fixo). Vem de company_tax_regimes.criterio_receita.
+    const campoFinal0010 = indRecReceita;
+    add(P+"0010"+P+P+"N"+P+formaTributacao+P+formaApur+P+"01"+P+formaTribPer+P+mesBalRed+P+tipEscPre+P+P+P+P+campoFinal0010+P);
     // 0020: flags operacionais (S/N) - todas "N" pra GRB (escritorio de
     // advocacia domestico, sem operacoes especiais). IND_ALIQ_CSLL=1 (9%, a
     // aliquota que GRB de fato paga). 27 flags "N" confirmados contra o ECF
@@ -255,39 +279,79 @@ export class EcfExporterService {
     // NAT_JUR|CNAE|LOGRADOURO|NUMERO|COMPLEMENTO|BAIRRO|UF|COD_MUN|CEP|FONE|
     // EMAIL (11 campos). NAT_JUR/CNAE ficam vazios quando o cadastro nao tem
     // o codigo RFB numerico - ver warnings acima.
-    const cnaeCode = (company.mainActivity || "").replace(/\D/g, "");
-    add(P+"0030"+P+P+cnaeCode+P+normSpedText(company.street)+P+company.number+P+normSpedText(company.complement || "")+P+normSpedText(company.neighborhood)+P+company.state+P+(company.codMun || "")+P+(company.zipCode || "")+P+(company.phone1 || "").replace(/\D/g, "")+P+(company.email || "")+P);
+    // IMPL-ECF-04: 0030 - natureza juridica (codigo RFB a partir do texto do cadastro) e e-mail com fallback.
+    const natJurCode = this.natJurCode(company.legalNature);
+    // IMPL-ECF-05: a ECF usa somente o cadastro LEDGR. Pendencias/inconsistencias bloqueiam a geracao (lista completa).
+    const pendCad: string[] = [];
+    if (!natJurCode) pendCad.push("Cadastro da empresa > Natureza Juridica: '" + (company.legalNature || "") + "' nao corresponde a um codigo da tabela RFB (ex.: Sociedade Empresaria Limitada, Sociedade Simples Limitada).");
+    const email0030 = (company.email || "").trim();
+    if (!email0030) pendCad.push("Cadastro da empresa > E-mail: obrigatorio (registro 0030).");
+    else if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email0030)) pendCad.push("Cadastro da empresa > E-mail invalido: " + email0030);
+    // IMPL-RFB-01: CNAE = codigo no inicio do campo ("6462000 - Holdings..." ou "64.62-0-00 - ...")
+    const cnaeCode = ((company.mainActivity || "").match(/^\s*([\d.\-\/]+)/)?.[1] || "").replace(/\D/g, "");
+    if (cnaeCode.length !== 7) pendCad.push("Cadastro da empresa > Atividade Principal (CNAE): " + (company.mainActivity ? "'" + company.mainActivity + "' nao e um CNAE de 7 digitos" : "nao preenchida") + ".");
+    if (!company.codMun) pendCad.push("Cadastro da empresa > Codigo do municipio (IBGE): nao preenchido.");
+    if (!company.street || !company.number || !company.neighborhood || !company.zipCode) pendCad.push("Cadastro da empresa > Endereco incompleto (logradouro, numero, bairro e CEP).");
+    add(P+"0030"+P+natJurCode+P+cnaeCode+P+normSpedText(company.street)+P+company.number+P+normSpedText(company.complement || "")+P+normSpedText(company.neighborhood)+P+company.state+P+(company.codMun || "")+P+(company.zipCode || "")+P+(company.phone1 || "").replace(/\D/g, "")+P+email0030+P);
     // 0930: signatarios via CompanyShareholder/PersonCompany com assinaEcf=true.
     const accConfigForCrc = await this.prisma.companyAccountingConfig.findUnique({ where: { companyId } });
     const signers = await this.prisma.personCompany.findMany({
       where: { companyId, assinaEcf: true },
-      include: { person: { select: { fullName: true, cpf: true, crcNumber: true, crcState: true } } },
+      include: { person: { select: { fullName: true, cpf: true, crcNumber: true, crcState: true, email: true, phone1: true } } },
     });
-    if (signers.length === 0) {
-      warnings.push("Nenhum signatario com assinaEcf=true cadastrado - registro 0930 ficara vazio.");
-    }
-    for (const s of signers) {
-      const isContador = (s.role || "").toLowerCase() === "contador";
-      if (!isContador) {
-        // Achado real (ECF 2025 GRB): o arquivo real tem uma 2a linha 0930
-        // pra qualificacao 309-Procurador, mas nao ha em rfb_global_tables
-        // nem em PersonCompany.role uma fonte confiavel pra resolver esse
-        // codigo por papel - "205" hardcoded anterior nao aparece no arquivo
-        // real, era invencao. Pulando ate essa regra de negocio ser
-        // confirmada com o usuario (ver pendencia registrada em contexto).
-        warnings.push(`Signatario ${s.person?.fullName ?? s.id} marcado assinaEcf mas role != contador - qualificacao (COD_QUALIF) do 0930 ainda nao resolvida para este papel, linha nao gerada.`);
-        continue;
+    // IMPL-ECF-04: 0930 generico - signatarios sem repetir CPF, vindos de: vinculos de pessoas com "assina ECF",
+    // socios PF com "assina ECF", responsavel legal e contador da configuracao contabil. COD_QUALIF pela tabela de
+    // qualificacao do assinante (900 contador, 205 administrador, 203 diretor, 309 procurador...). A ECF exige
+    // contador + representante legal (exceto imunes/isentas sem ECD).
+    const sig0930: { nome: string; cpf: string; qualif: string; crc: string; email: string; fone: string }[] = [];
+    const addSig = (o: { nome?: string | null; cpf?: string | null; qualif: string | null; origem: string; email?: string | null; fone?: string | null; crcNum?: string | null; crcUf?: string | null }) => {
+      const cpfS = (o.cpf || "").replace(/\D/g, "");
+      if (!cpfS || sig0930.some(x => x.cpf === cpfS)) return;
+      if (!o.qualif) {
+        warnings.push("0930: " + (o.nome || cpfS) + " (" + o.origem + ") marcado para assinar a ECF, mas o papel nao corresponde a uma qualificacao de assinante (administrador, diretor, procurador, contador...) - linha nao gerada.");
+        return;
       }
-      const cpf  = (s.person?.cpf || "").replace(/\D/g, "");
-      const nome = normSpedText(s.person?.fullName || "");
-      const codQualif = "900";
-      const crcVal = isContador ? (s.person?.crcNumber || accConfigForCrc?.accountantCrc || "").replace(/\D/g, "") : "";
-      const crcUf  = isContador ? (s.person?.crcState || accConfigForCrc?.accountantCrcState || "") : "";
-      const email  = isContador ? (accConfigForCrc?.accountantEmail || accConfigForCrc?.escritorioEmail || "") : "";
-      const fone   = isContador ? (accConfigForCrc?.accountantPhone || accConfigForCrc?.escritorioTelefone || "").replace(/\D/g, "") : "";
-      const crcFmt = crcVal ? crcUf + crcVal : "";
-      add(P+"0930"+P+nome+P+cpf+P+codQualif+P+crcFmt+P+email+P+fone+P);
+      const isCont = o.qualif === "900";
+      const crcNum = isCont ? (o.crcNum || accConfigForCrc?.accountantCrc || "").replace(/\D/g, "") : "";
+      const crcUf = isCont ? (o.crcUf || accConfigForCrc?.accountantCrcState || "") : "";
+      if (isCont) {
+        const pN = (o.crcNum || "").replace(/\D/g, "").replace(/^0+/, ""), cN = (accConfigForCrc?.accountantCrc || "").replace(/\D/g, "").replace(/^0+/, "");
+        const pU = (o.crcUf || "").trim().toUpperCase(), cU = (accConfigForCrc?.accountantCrcState || "").trim().toUpperCase();
+        if (pN && cN && pN !== cN) pendCad.push("CRC do contador " + (o.nome || cpfS) + " divergente: cadastro da pessoa " + pN + " x configuracao contabil " + cN + ".");
+        if (pU && cU && pU !== cU) pendCad.push("UF do CRC do contador " + (o.nome || cpfS) + " divergente: cadastro da pessoa " + pU + " x configuracao contabil " + cU + ".");
+        if (!crcNum || !crcUf) pendCad.push("CRC do contador " + (o.nome || cpfS) + " incompleto (numero e UF) - cadastro da pessoa ou configuracao contabil.");
+      }
+      const email = ((isCont ? (accConfigForCrc?.accountantEmail || accConfigForCrc?.escritorioEmail || o.email) : (o.email || company.email)) || "").trim();
+      const fone = ((isCont ? (accConfigForCrc?.accountantPhone || accConfigForCrc?.escritorioTelefone || o.fone) : (o.fone || company.phone1)) || "").replace(/\D/g, "");
+      if (!email) pendCad.push("Signatario " + (o.nome || cpfS) + " > E-mail: obrigatorio no 0930 (" + (isCont ? "configuracao contabil ou cadastro da pessoa" : "cadastro da pessoa ou da empresa") + ").");
+      sig0930.push({ nome: normSpedText(o.nome || ""), cpf: cpfS, qualif: o.qualif, crc: crcNum ? crcUf + crcNum : "", email, fone });
+    };
+    for (const s of signers) {
+      addSig({ nome: s.person?.fullName, cpf: s.person?.cpf, qualif: this.qualifAssinante(s.role, (s as any).qualificacaoCvm), origem: "vinculo " + s.role,
+        email: s.person?.email, fone: s.person?.phone1, crcNum: s.person?.crcNumber, crcUf: s.person?.crcState });
     }
+    const shSigners = await this.prisma.companyShareholder.findMany({
+      where: { companyId, assinaEcf: true, personId: { not: null } },
+      include: { person: { select: { fullName: true, cpf: true, email: true, phone1: true } } },
+    });
+    for (const s of shSigners) {
+      addSig({ nome: s.person?.fullName, cpf: s.person?.cpf, qualif: this.qualifAssinante(s.qualificacao, null), origem: "socio", email: s.person?.email, fone: s.person?.phone1 });
+    }
+    if (accConfigForCrc?.legalRepCpf) {
+      addSig({ nome: accConfigForCrc.legalRepName, cpf: accConfigForCrc.legalRepCpf, qualif: this.qualifAssinante(accConfigForCrc.legalRepRole, null) ?? "205", origem: "responsavel legal da configuracao contabil" });
+    }
+    if (accConfigForCrc?.accountantCpf) {
+      addSig({ nome: accConfigForCrc.accountantName, cpf: accConfigForCrc.accountantCpf, qualif: "900", origem: "contador da configuracao contabil" });
+    }
+    const exigeContador = !["8", "9"].includes(formaTributacao); // imunes/isentas sem ECD: so representante legal
+    const contadores = sig0930.filter(x => x.qualif === "900");
+    if (exigeContador && contadores.length === 0) pendCad.push("Signatarios ECF: nenhum contador - marque 'assina ECF' no vinculo do contador ou preencha o contador na configuracao contabil.");
+    if (contadores.length > 1) pendCad.push("Signatarios ECF: mais de um contador (" + contadores.map(x => x.nome).join(", ") + ") - o contador da configuracao contabil deve ser o mesmo marcado 'assina ECF'.");
+    if (!sig0930.some(x => x.qualif !== "900")) pendCad.push("Signatarios ECF: nenhum representante legal - marque 'assina ECF' no socio-administrador ou preencha o responsavel legal na configuracao contabil.");
+    if (pendCad.length) {
+      throw new BadRequestException("ECF nao gerada - corrija o cadastro no LEDGR:\n- " + pendCad.join("\n- "));
+    }
+    for (const g of sig0930) add(P+"0930"+P+g.nome+P+g.cpf+P+g.qualif+P+g.crc+P+g.email+P+g.fone+P);
     const idx0990 = lines.length;
     add(P+"0990"+P+"PLACEHOLDER"+P);
 
@@ -305,41 +369,47 @@ export class EcfExporterService {
     const accountsAtivas = accounts.filter(a => activeIds.has(a.id));
     const hasEncerramentoReal = periodItems.some(it => it.journalEntry.isClosingEntry);
 
-    // ── BLOCO C (escrituracao contabil - copia fiel da ECD vinculada) ───────
-    // Mesma estrutura do Bloco I do ECD (I010/I030->C040, I050/I051->C050/C051,
-    // I150/I155->C150/C155, I350/I355->C350/C355), so retagueada. Confirmado
-    // campo a campo contra o ECF real 2025 da GRB.
-    add(P+"C001"+P+"0"+P);
-    // C040: identificacao do livro contabil vinculado (mesmos parametros do
-    // ecd-exporter.service.ts: bookNumber/bookNature/layoutVersion/bookType).
-    const bookNumber = String(anoBase).slice(-2);
-    const bookNature = "Livro Diario Geral";
-    add(P+"C040"+P+P+dtIni+P+dtFin+P+P+cnpj+P+bookNumber+P+P+bookNature+P+"9.00"+P+"G"+P+"N"+P+"N"+P+"0"+P+"0"+P+"2"+P);
-    this.emitPlanoDeContas(add, P, "C050", "C051", accountsAtivas, codeById, i052Map, periodEnd);
-    this.emitSaldosPeriodicos(add, P, "C150", "C155", months, analyticIds, accountById, codeById, saldoAberturaPeriodo, periodItems);
-    if (hasEncerramentoReal) {
-      this.emitPreEncerramento(add, P, "C350", "C355", dtFin, dreMap, accounts);
-    }
-    const idxC001 = lines.findIndex(l => l === P+"C001"+P+"0"+P);
-    add(P+"C990"+P+(lines.length - idxC001 + 1)+P);
+    // IMPL-ECF-01: TIP_ESC_PRE=C -> blocos C/J/K completos (escrituracao contabil vinculada, validado GRB 2025).
+    // TIP_ESC_PRE=L -> livro caixa, sem ECD: blocos C/J/K vazios (indicador 1).
+    const idxC001 = lines.length;
+    if (tipEscPre === "L") {
+      for (const tag of ["C", "J", "K"]) { add(P+tag+"001"+P+"1"+P); add(P+tag+"990"+P+"2"+P); }
+    } else {
+      // ── BLOCO C (escrituracao contabil - copia fiel da ECD vinculada) ───────
+      // Mesma estrutura do Bloco I do ECD (I010/I030->C040, I050/I051->C050/C051,
+      // I150/I155->C150/C155, I350/I355->C350/C355), so retagueada. Confirmado
+      // campo a campo contra o ECF real 2025 da GRB.
+      add(P+"C001"+P+"0"+P);
+      // C040: identificacao do livro contabil vinculado (mesmos parametros do
+      // ecd-exporter.service.ts: bookNumber/bookNature/layoutVersion/bookType).
+      const bookNumber = String(anoBase).slice(-2);
+      const bookNature = "Livro Diario Geral";
+      add(P+"C040"+P+P+dtIni+P+dtFin+P+P+cnpj+P+bookNumber+P+P+bookNature+P+"9.00"+P+"G"+P+"N"+P+"N"+P+"0"+P+"0"+P+"2"+P);
+      this.emitPlanoDeContas(add, P, "C050", "C051", accountsAtivas, codeById, i052Map, periodEnd);
+      this.emitSaldosPeriodicos(add, P, "C150", "C155", months, analyticIds, accountById, codeById, saldoAberturaPeriodo, periodItems);
+      if (hasEncerramentoReal) {
+        this.emitPreEncerramento(add, P, "C350", "C355", dtFin, dreMap, accounts);
+      }
+      add(P+"C990"+P+(lines.length - idxC001 + 1)+P);
 
-    // ── BLOCO J (plano de contas referencial) ───────────────────────────────
-    add(P+"J001"+P+"0"+P);
-    this.emitPlanoDeContas(add, P, "J050", "J051", accountsAtivas, codeById, i052Map, periodEnd);
-    const idxJ001 = lines.findIndex(l => l === P+"J001"+P+"0"+P);
-    add(P+"J990"+P+(lines.length - idxJ001 + 1)+P);
+      // ── BLOCO J (plano de contas referencial) ───────────────────────────────
+      add(P+"J001"+P+"0"+P);
+      this.emitPlanoDeContas(add, P, "J050", "J051", accountsAtivas, codeById, i052Map, periodEnd);
+      const idxJ001 = lines.findIndex(l => l === P+"J001"+P+"0"+P);
+      add(P+"J990"+P+(lines.length - idxJ001 + 1)+P);
 
-    // ── BLOCO K (periodos e saldos trimestrais + referencial K156/K356) ─────
-    add(P+"K001"+P+"0"+P);
-    for (const q of quarters) {
-      add(P+"K030"+P+this.fmtDate(q.firstDay)+P+this.fmtDate(q.lastDay)+P+q.label+P);
+      // ── BLOCO K (periodos e saldos trimestrais + referencial K156/K356) ─────
+      add(P+"K001"+P+"0"+P);
+      for (const q of quarters) {
+        add(P+"K030"+P+this.fmtDate(q.firstDay)+P+this.fmtDate(q.lastDay)+P+q.label+P);
+      }
+      this.emitSaldosPeriodicosComReferencial(add, P, "K155", "K156", quarters, analyticIds, accountById, codeById, i052Map, saldoAberturaPeriodo, periodItems);
+      if (hasEncerramentoReal) {
+        this.emitPreEncerramentoComReferencial(add, P, "K355", "K356", dreMap, accounts, i052Map);
+      }
+      const idxK001 = lines.findIndex(l => l === P+"K001"+P+"0"+P);
+      add(P+"K990"+P+(lines.length - idxK001 + 1)+P);
     }
-    this.emitSaldosPeriodicosComReferencial(add, P, "K155", "K156", quarters, analyticIds, accountById, codeById, i052Map, saldoAberturaPeriodo, periodItems);
-    if (hasEncerramentoReal) {
-      this.emitPreEncerramentoComReferencial(add, P, "K355", "K356", dreMap, accounts, i052Map);
-    }
-    const idxK001 = lines.findIndex(l => l === P+"K001"+P+"0"+P);
-    add(P+"K990"+P+(lines.length - idxK001 + 1)+P);
 
     // ── BLOCO L (LALUR - so Lucro Real, GRB e Presumido) ─────────────────────
     add(P+"L001"+P+"1"+P);
@@ -362,14 +432,53 @@ export class EcfExporterService {
     // contra o ECF real 2025 da GRB (base 7.360,00 -> IRPJ 1.104,00, CSLL
     // 662,40 - bate com a formula ja usada, so precisava ir pro bloco certo).
     add(P+"P001"+P+"0"+P);
-    const PERC_PRESUNCAO = 0.32;
+    // IMPL-ECF-04: codigos/descricoes oficiais das tabelas dinamicas do PVA (linha vigente no periodo).
+    const tabP = this.loadEcfDynamicTables(["P200", "P300", "P400", "P500"], periodStart, periodEnd, warnings);
+    const dP = (reg: string, cod: string, fb: string) => tabP[reg]?.get(cod) ?? fb;
+    // IMPL-ECF-01: receita do Bloco P - ESTUDO (estudo CONCLUIDO do Comparativo de Regimes do ano: receita
+    // tributavel apos exclusoes, outras receitas e % de presuncao) ou RAZAO (lancamentos, comportamento anterior).
+    const estRows: any[] = await this.prisma.$queryRawUnsafe(
+      `SELECT resultado, premissas FROM tax_regime_studies WHERE company_id = $1::uuid AND ano = $2::int
+        AND status = 'CONCLUIDO' AND deleted_at IS NULL ORDER BY versao DESC LIMIT 1`, companyId, anoBase);
+    const estudo: any = estRows[0]?.resultado ?? null;
+    // IMPL-ECF-02: condicoes da dispensa da ECD no Presumido - aviso destacado (topo da lista) e bloqueio na contradicao
+    const distribAcima = !!estRows[0]?.premissas?.distribuicaoAcimaBase;
+    if (tipEscPre === "L") {
+      if (distribAcima) throw new BadRequestException("ECD OBRIGATORIA - o estudo concluido do ano marca distribuicao de lucros acima da base presumida (IN RFB 2.003/2021, art. 3, par. 1): TIP_ESC_PRE = L nao se aplica. Transmita a ECD e use TIP_ESC_PRE = C no regime do periodo.");
+      warnings.unshift("ATENCAO - TIP_ESC_PRE = L (Livro Caixa, sem ECD). A dispensa da ECD do Presumido (IN RFB 2.003/2021, art. 3, II) so vale se: (1) o Livro Caixa ou a escrituracao contabil registrar TODA a movimentacao financeira, inclusive bancaria (Lei 8.981/1995, art. 45, par. unico) - mantenha o Diario/Livro Caixa do periodo arquivado e disponivel; (2) nao houver distribuicao de lucros, sem IRRF, acima da base presumida menos os tributos (IN RFB 2.003/2021, art. 3, par. 1) - se houver, a ECD e obrigatoria e o TIP_ESC_PRE deve ser C.");
+    } else if (["3", "4", "5", "7"].includes(formaTributacao)) {
+      warnings.unshift("ATENCAO - TIP_ESC_PRE = C (escrituracao contabil) no Presumido: a ECD do periodo deve estar transmitida (obrigatoria ou facultativa) - o PVA recupera a ECD. Se a ECD nao for entregue, cadastre TIP_ESC_PRE = L no regime do periodo e mantenha o Livro Caixa.");
+    }
+    const fonteReceita = options.fonteReceita ?? (estudo ? "ESTUDO" : "RAZAO");
+    if (fonteReceita === "ESTUDO" && !estudo) throw new NotFoundException("Fonte de receita ESTUDO: nao ha estudo CONCLUIDO do Comparativo de Regimes para " + anoBase + ".");
+    warnings.push("Bloco P: receita lida do " + (fonteReceita === "ESTUDO" ? "estudo concluido do Comparativo de Regimes (receita tributavel apos exclusoes)" : "razao (lancamentos de receita)") + ".");
+    const PERC_PRESUNCAO = fonteReceita === "ESTUDO" && estudo?.presuncao != null ? Number(estudo.presuncao) / 100 : 0.32;
+    if (Math.abs(PERC_PRESUNCAO - 0.32) > 0.0001) warnings.push("Presuncao de " + (PERC_PRESUNCAO * 100) + "%: P200/P400 deste exporter so tem a linha de 32% - conferir as linhas no PVA.");
     const ALIQ_IRPJ = 0.15;
     const ALIQ_ADIC_IRPJ = 0.10;
     const LIMITE_ADIC_TRIMESTRE = 60000;
     const ALIQ_CSLL = 0.09;
+    // IMPL-ECF-04: linha do P200/P400 conforme o % de presuncao (P200: 2=1,6% 4=8% 6=16% 8=32% 9=38,4%;
+    // P400: 2=12% 4=32% 5=38,4%). Antes a receita saia sempre no codigo 2 do P200 (que e 1,6%).
+    const ppIrpj = Math.round(PERC_PRESUNCAO * 1000) / 10;
+    const COD_P200: Record<string, string> = { "1.6": "2", "8": "4", "16": "6", "32": "8", "38.4": "9" };
+    const codP200 = COD_P200[String(ppIrpj)] ?? "8";
+    if (!COD_P200[String(ppIrpj)]) warnings.push("P200: presuncao de " + ppIrpj + "% sem linha na tabela - usada a de 32%. Conferir no PVA.");
+    const ppCsll = ppIrpj === 32 ? 32 : ppIrpj === 38.4 ? 38.4 : 12;
+    const codP400 = ppCsll === 32 ? "4" : ppCsll === 38.4 ? "5" : "2";
+    const pctTxt = (n: number) => String(n).replace(".", ",");
+    // IMPL-ECF-07: receitas do periodo para o Y672 (mesma base do bloco P)
+    var totRecY672 = 0;
     for (const q of quarters) {
       add(P+"P030"+P+this.fmtDate(q.firstDay)+P+this.fmtDate(q.lastDay)+P+q.label+P);
-      const receitaBruta = periodItems
+      let receitaBruta = 0, outrasReceitas = 0;
+      if (fonteReceita === "ESTUDO") {
+        const m0 = q.firstDay.getUTCMonth(), m1 = q.lastDay.getUTCMonth();
+        for (const m of (estudo?.receita?.meses ?? [])) {
+          const i = Number(m.mes) - 1;
+          if (i >= m0 && i <= m1) { receitaBruta += Number(m.tributavel) || 0; outrasReceitas += Number(m.outras) || 0; }
+        }
+      } else receitaBruta = periodItems
         .filter(it => {
           const acc = accountById.get(it.accountId);
           if (!acc || acc.type.toString() !== "REVENUE") return false;
@@ -379,27 +488,29 @@ export class EcfExporterService {
         })
         .reduce((s, it) => s + (it.type === "CREDIT" ? Number(it.value) : -Number(it.value)), 0);
 
-      const baseIrpj = receitaBruta * PERC_PRESUNCAO;
-      const baseCsll = receitaBruta * PERC_PRESUNCAO;
+      const baseIrpj = receitaBruta * PERC_PRESUNCAO + outrasReceitas;
+      const baseCsll = receitaBruta * PERC_PRESUNCAO + outrasReceitas;
       const irpjNormal = baseIrpj * ALIQ_IRPJ;
       const adicIrpj = Math.max(0, baseIrpj - LIMITE_ADIC_TRIMESTRE) * ALIQ_ADIC_IRPJ;
       const csll = baseCsll * ALIQ_CSLL;
 
       // P200: discriminacao da receita bruta por percentual de presuncao IRPJ
-      add(P+"P200"+P+"1"+P+"DISCRIMINACAO DA RECEITA BRUTA"+P+P);
-      add(P+"P200"+P+"2"+P+"Receita Bruta Sujeita ao Percentual de 32%"+P+this.fmtDec(receitaBruta)+P);
+      add(P+"P200"+P+"1"+P+dP("P200", "1", "DISCRIMINAÇÃO DA RECEITA BRUTA")+P+P);
+      add(P+"P200"+P+codP200+P+dP("P200", codP200, "Receita Bruta Sujeita ao Percentual de " + pctTxt(ppIrpj) + "%")+P+this.fmtDec(receitaBruta)+P);
+      if (outrasReceitas > 0) add(P+"P200"+P+"20"+P+dP("P200", "20", "Demais Receitas e Ganhos de Capital")+P+this.fmtDec(outrasReceitas)+P);
+      totRecY672 += receitaBruta + outrasReceitas;
       // P300: apuracao IRPJ
-      add(P+"P300"+P+"1"+P+"BASE DE CALCULO DO IMPOSTO SOBRE O LUCRO PRESUMIDO"+P+this.fmtDec(baseIrpj)+P);
-      add(P+"P300"+P+"2"+P+"IMPOSTO APURADO COM BASE NO LUCRO PRESUMIDO"+P+P);
-      add(P+"P300"+P+"3"+P+"Aliquota de 15%"+P+this.fmtDec(irpjNormal)+P);
-      add(P+"P300"+P+"4"+P+"Adicional"+P+this.fmtDec(adicIrpj)+P);
+      add(P+"P300"+P+"1"+P+dP("P300", "1", "BASE DE CÁLCULO DO IMPOSTO SOBRE O LUCRO PRESUMIDO")+P+this.fmtDec(baseIrpj)+P);
+      add(P+"P300"+P+"2"+P+dP("P300", "2", "IMPOSTO APURADO COM BASE NO LUCRO PRESUMIDO")+P+P);
+      add(P+"P300"+P+"3"+P+dP("P300", "3", "Alíquota de 15%")+P+this.fmtDec(irpjNormal)+P);
+      add(P+"P300"+P+"4"+P+dP("P300", "4", "Adicional")+P+this.fmtDec(adicIrpj)+P);
       // P400: discriminacao da receita bruta por percentual de presuncao CSLL
-      add(P+"P400"+P+"1"+P+"CALCULO DA CSLL"+P+P);
-      add(P+"P400"+P+"4"+P+"Receita Bruta Sujeita ao Percentual de 32%"+P+this.fmtDec(receitaBruta)+P);
+      add(P+"P400"+P+"1"+P+dP("P400", "1", "CÁLCULO DA CSLL")+P+P);
+      add(P+"P400"+P+codP400+P+dP("P400", codP400, "Receita Bruta Sujeita ao Percentual de " + pctTxt(ppCsll) + "%")+P+this.fmtDec(receitaBruta)+P);
       // P500: apuracao CSLL
-      add(P+"P500"+P+"1"+P+"BASE DE CALCULO DA CSLL"+P+this.fmtDec(baseCsll)+P);
-      add(P+"P500"+P+"2"+P+"CSLL Apurada"+P+this.fmtDec(csll)+P);
-      add(P+"P500"+P+"4"+P+"TOTAL DA CONTRIBUICAO SOCIAL SOBRE O LUCRO LIQUIDO"+P+this.fmtDec(csll)+P);
+      add(P+"P500"+P+"1"+P+dP("P500", "1", "BASE DE CÁLCULO DA CSLL")+P+this.fmtDec(baseCsll)+P);
+      add(P+"P500"+P+"2"+P+dP("P500", "2", "CSLL Apurada")+P+this.fmtDec(csll)+P);
+      add(P+"P500"+P+"4"+P+dP("P500", "4", "TOTAL DA CONTRIBUIÇÃO SOCIAL SOBRE O LUCRO LÍQUIDO")+P+this.fmtDec(csll)+P);
     }
     const idxP001 = lines.findIndex(l => l === P+"P001"+P+"0"+P);
     add(P+"P990"+P+(lines.length - idxP001 + 1)+P);
@@ -412,31 +523,74 @@ export class EcfExporterService {
 
     // ── BLOCO Y (socios e outras informacoes) ────────────────────────────────
     add(P+"Y001"+P+"0"+P);
-    const shareholders = await this.prisma.companyShareholder.findMany({
-      where: { companyId, shareholderType: "PF" },
+    // IMPL-ECF-01: Y600 com socios PF e PJ vigentes no periodo (entrada ate o fim e sem retirada antes do inicio).
+    const shareholders: any[] = await this.prisma.companyShareholder.findMany({
+      where: { companyId },
       include: { person: { select: { fullName: true, cpf: true } } },
     });
-    if (shareholders.length === 0) {
-      warnings.push("Nenhum socio (CompanyShareholder) cadastrado - bloco Y600 ficara vazio.");
-    }
-    for (const sh of shareholders) {
-      if (sh.participacaoPercent == null) {
-        warnings.push(`Socio ${sh.person?.fullName ?? sh.id} sem participacaoPercent cadastrado - Y600 gerado com 0,00.`);
-      }
-      const cpf = (sh.person?.cpf || "").replace(/\D/g, "");
-      const nome = normSpedText(sh.person?.fullName || "");
+    const vigentes = shareholders.filter((sh: any) =>
+      (!sh.dataEntrada || new Date(sh.dataEntrada) <= periodEnd) && (!sh.dataRetirada || new Date(sh.dataRetirada) >= periodStart));
+    if (vigentes.length === 0) warnings.push("Nenhum socio vigente no periodo (company_shareholders) - Y600 ficara vazio.");
+    const pjIds = vigentes.filter((sh: any) => sh.shareholderType === "PJ" && sh.shareholderCompanyId).map((sh: any) => sh.shareholderCompanyId);
+    const pjs: any[] = pjIds.length ? await this.prisma.company.findMany({ where: { id: { in: pjIds } }, select: { id: true, taxId: true, legalName: true } }) : [];
+    const pjById = new Map(pjs.map((c: any) => [c.id, c]));
+    for (const sh of vigentes) {
+      const isPj = sh.shareholderType === "PJ";
+      const pj: any = isPj ? pjById.get(sh.shareholderCompanyId) : null;
+      if (isPj && !pj) { warnings.push("Socio PJ " + sh.id + " sem empresa vinculada (shareholder_company_id) - linha Y600 nao gerada."); continue; }
+      const doc = String((isPj ? pj.taxId : sh.person?.cpf) || "").replace(/\D/g, "");
+      const nome = normSpedText(String((isPj ? pj.legalName : sh.person?.fullName) || ""));
+      if (sh.participacaoPercent == null) warnings.push("Socio " + nome + " sem participacaoPercent cadastrado - Y600 gerado com 0,00.");
       const dtEntrada = sh.dataEntrada ? this.fmtDate(sh.dataEntrada) : "";
-      const dtRetirada = sh.dataRetirada ? this.fmtDate(sh.dataRetirada) : "";
+      const dtRetirada = sh.dataRetirada && new Date(sh.dataRetirada) <= periodEnd ? this.fmtDate(sh.dataRetirada) : "";
       const perc = this.fmtDec(sh.participacaoPercent ? Number(sh.participacaoPercent) : 0);
-      add(P+"Y600"+P+dtEntrada+P+dtRetirada+P+"105"+P+"PF"+P+cpf+P+nome+P+"01"+P+perc+P+perc+P+P+P+"0,00"+P+"0,00"+P+"0,00"+P+"0,00"+P+"0,00"+P);
+      add(P+"Y600"+P+dtEntrada+P+dtRetirada+P+"105"+P+(isPj ? "PJ" : "PF")+P+doc+P+nome+P+this.qualifSocioY600(natJurCode, isPj)+P+perc+P+perc+P+P+P+"0,00"+P+"0,00"+P+"0,00"+P+"0,00"+P+"0,00"+P);
     }
     // Y720: registro obrigatorio, campos vazios quando nao aplicavel (confirmado
     // no ECF real 2025 da GRB - ocorre sempre, mesmo totalmente vazio).
-    add(P+"Y720"+P+P+P+P+P+P);
+    // IMPL-ECF-07 (12/11/2026): Y672 (Outras Informacoes - Presumido/Arbitrado) gerado pelo LEDGR - regra geral.
+    // Capital: Livro de Registro de Quotas/Acoes (registros ativos, descontando emissoes posteriores a cada data);
+    // sem livro, capital do cadastro (equity). Receitas = mesma base do bloco P. Demais campos 0,00 (saldos
+    // contabeis de caixa/aplicacoes/contas: proxima evolucao). Sem capital no LEDGR a geracao e bloqueada.
+    if (["3", "4", "5", "6", "7"].includes(formaTributacao)) {
+      const regs = await this.prisma.shareholderRecord.findMany({
+        where: { companyId, deletedAt: null, isActive: true }, select: { totalValue: true },
+      });
+      const emis = await this.prisma.shareTransfer.findMany({
+        where: { companyId, fromRecordId: null }, select: { transferDate: true, quantity: true, nominalValue: true },
+      });
+      const eqRow = await this.prisma.company.findUnique({ where: { id: companyId }, select: { equity: true } });
+      const capCadastro = Number(eqRow?.equity ?? 0);
+      const somaLivro = regs.reduce((s, r) => s + Number(r.totalValue ?? 0), 0);
+      const capEm = (d: Date) => {
+        if (!regs.length) return capCadastro;
+        const posteriores = emis.filter(x => new Date(x.transferDate) > d)
+          .reduce((s, x) => s + Number(x.quantity ?? 0) * Number(x.nominalValue ?? 0), 0);
+        return somaLivro - posteriores;
+      };
+      const capIni = capEm(new Date(periodStart.getTime() - 86400000)), capFim = capEm(periodEnd);
+      if (!(capFim > 0)) {
+        throw new BadRequestException("ECF nao gerada - corrija o cadastro no LEDGR:\n- Capital social (Y672): nao encontrado no Livro de Registro de Quotas/Acoes nem no capital do cadastro da empresa.");
+      }
+      if (!regs.length) warnings.push("Y672: Livro de Registro de Quotas/Acoes sem registros - capital do cadastro (" + this.fmtDec(capCadastro) + ") usado no inicio e no fim do periodo.");
+      else if (Math.abs(somaLivro - capCadastro) > 0.005) warnings.push("Y672: capital do Livro de Quotas/Acoes (" + this.fmtDec(somaLivro) + ") difere do capital do cadastro (" + this.fmtDec(capCadastro) + ") - usado o do livro.");
+      const z = "0,00";
+      const y672 = [this.fmtDec(capIni), this.fmtDec(capFim), z, z, z, z, z, z, z, z, z, z, z, z, this.fmtDec(totRecY672), z, ""];
+      add(P+"Y672"+P+y672.join(P)+P);
+    }
+    // IMPL-ECF-04: Y720 so no Lucro Real (formas 1-4) - no Presumido o PVA exige INTIMACAO e o registro nao se aplica.
+    if (["1", "2", "3", "4"].includes(formaTributacao)) add(P+"Y720"+P+P+P+P+P+P);
     const idxY001 = lines.findIndex(l => l === P+"Y001"+P+"0"+P);
     add(P+"Y990"+P+(lines.length - idxY001 + 1)+P);
 
     // ── BLOCO 9 (encerramento) ───────────────────────────────────────────
+    // IMPL-ECF-06 (12/11/2026): blocos sem dados (X001 seguido de X990|2|) nao sao gerados - padrao do ECF
+    // aceito pela RFB (LM 2024: so 0, J, L, M, Y e 9). Vale para qualquer empresa/regime; blocos 0 e 9 e blocos
+    // com conteudo permanecem. 0990/9900/9999 sao calculados depois desta etapa.
+    for (let i = lines.length - 2; i >= 0; i--) {
+      const mb = /^\|([A-Z])001\|[01]\|$/.exec(lines[i]);
+      if (mb && lines[i + 1] === P + mb[1] + "990" + P + "2" + P) lines.splice(i, 2);
+    }
     add(P+"9001"+P+"0"+P);
     const regCounts = new Map<string, number>();
     for (const l of lines) {
@@ -459,6 +613,92 @@ export class EcfExporterService {
     this.logger.log("ECF: " + lines.length + " linhas | " + accounts.length + " contas | " + quarters.length + " trimestres");
     const content = lines.join("\n") + "\n";
     return { buffer: Buffer.from(content, "latin1"), warnings };
+  }
+
+  // IMPL-ECF-04: tabelas dinamicas do PVA ECF (recursos/tabelas): "SPEDECF_DINAMICO_<ano>$SPEDECF_DINAMICA_<REG>$<versao>$<id>",
+  // latin1, linhas CODIGO|DESCRICAO|DT_INI|DT_FIM|... - usa a linha vigente no periodo, da tabela mais recente.
+  private loadEcfDynamicTables(regs: string[], periodStart: Date, periodEnd: Date, warnings: string[]): Record<string, Map<string, string>> {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const fs = require("fs"); const path = require("path");
+    const dir = process.env.ECF_PVA_TABELAS_DIR || "C:\\Arquivos de Programas RFB\\Programas SPED\\SpedECF\\recursos\\tabelas";
+    const out: Record<string, Map<string, string>> = {};
+    let files: string[] = [];
+    try { files = fs.readdirSync(dir); } catch {
+      warnings.push("Tabelas dinamicas do PVA ECF nao encontradas em " + dir + " (defina ECF_PVA_TABELAS_DIR) - descricoes do bloco P saem do texto interno.");
+      return out;
+    }
+    const parseD = (s: string) => (s && s.length === 8 ? Date.UTC(+s.slice(4), +s.slice(2, 4) - 1, +s.slice(0, 2)) : NaN);
+    const ini = periodStart.getTime(), fim = periodEnd.getTime();
+    for (const reg of regs) {
+      const cand = files
+        .map(f => { const m = /^SPEDECF_DINAMICO_(\d{4})\$SPEDECF_DINAMICA_([A-Z0-9]+)\$(\d+)\$(\d+)$/.exec(f); return m && m[2] === reg ? { f, ano: +m[1], ver: +m[3] } : null; })
+        .filter((x): x is { f: string; ano: number; ver: number } => !!x)
+        .sort((a, b) => a.ano - b.ano || a.ver - b.ver);
+      const map = new Map<string, string>();
+      for (const c of cand) {
+        let txt = "";
+        try { txt = fs.readFileSync(path.join(dir, c.f), "latin1"); } catch { continue; }
+        for (const ln of txt.split(/\r?\n/)) {
+          const p = ln.split("|");
+          if (p.length < 4 || !p[0] || p[0].startsWith("vers")) continue;
+          const di = parseD(p[2]); const df = p[3] ? parseD(p[3]) : Infinity;
+          if (!isNaN(di) && di > fim) continue;
+          if (df < ini) continue;
+          map.set(p[0].trim(), p[1].trim());
+        }
+      }
+      if (map.size) out[reg] = map;
+      else warnings.push("Tabela dinamica " + reg + " do PVA nao encontrada em " + dir + " - descricoes internas usadas.");
+    }
+    return out;
+  }
+
+  // IMPL-ECF-04: codigo RFB de natureza juridica a partir do texto do cadastro (ou do proprio codigo, ex "224-0").
+  private natJurCode(txt?: string | null): string {
+    const s = (txt || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[()]/g, " ").replace(/\s+/g, " ").trim();
+    const dig = s.replace(/\D/g, "");
+    if (dig.length === 4 && /^[\d\s.\-]+$/.test(s)) return dig;
+    const T: [string, string][] = [
+      ["empresa publica", "2011"], ["sociedade de economia mista", "2038"], ["sociedade anonima aberta", "2046"],
+      ["sociedade anonima fechada", "2054"], ["sociedade empresaria limitada", "2062"], ["sociedade empresaria em nome coletivo", "2076"],
+      ["sociedade empresaria em comandita simples", "2089"], ["sociedade empresaria em comandita por acoes", "2097"],
+      ["sociedade em conta de participacao", "2127"], ["empresario individual", "2135"], ["cooperativas de consumo", "2330"], ["cooperativa", "2143"],
+      ["consorcio de sociedades", "2151"], ["grupo de sociedades", "2160"], ["sociedade simples pura", "2232"],
+      ["sociedade simples limitada", "2240"], ["sociedade simples em nome coletivo", "2259"], ["sociedade simples em comandita simples", "2267"],
+      ["empresa binacional", "2275"], ["consorcio de empregadores", "2283"], ["consorcio simples", "2291"],
+      ["eireli de natureza simples", "2313"], ["natureza simples", "2313"], ["empresa individual de responsabilidade limitada", "2305"], ["eireli", "2305"],
+      ["sociedade unipessoal de advocacia", "2321"], ["empresa simples de inovacao", "2348"],
+      ["associacao privada", "3999"], ["fundacao privada", "3069"], ["sociedade anonima", "2054"], ["sociedade limitada", "2062"], ["ltda", "2062"],
+    ];
+    for (const [k, v] of T) if (s === k) return v;
+    for (const [k, v] of T) if (s.includes(k)) return v;
+    return "";
+  }
+
+  // IMPL-ECF-04: Y600 QUALIF - 01/02 acionista/socio PF, 03/04 acionista/socio PJ (Brasil), 09 titular.
+  private qualifSocioY600(natJur: string, isPj: boolean): string {
+    if (!isPj && ["2135", "2305", "2313"].includes(natJur)) return "09";
+    const acionista = ["2038", "2046", "2054", "2097"].includes(natJur);
+    return isPj ? (acionista ? "03" : "04") : (acionista ? "01" : "02");
+  }
+
+  // IMPL-ECF-04: COD_QUALIF do 0930 (tabela de qualificacao do assinante) a partir do papel/qualificacao cadastrada.
+  private qualifAssinante(role?: string | null, cvm?: string | null): string | null {
+    const s = (role || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    if (s.includes("contador") || s.includes("contabilista")) return "900";
+    if (s.includes("procurador")) return "309";
+    if (s.includes("inventariante")) return "312";
+    if (s.includes("liquidante")) return "313";
+    if (s.includes("interventor")) return "315";
+    if (s.includes("conselheiro")) return "204";
+    if (s.includes("diretor") || s.includes("presidente")) return "203";
+    if (s.includes("administrador")) return "205";
+    if (s.includes("titular")) return "401";
+    if (s.includes("empresario")) return "801";
+    const c = (cvm || "").replace(/\D/g, "");
+    if (["49", "05", "5"].includes(c)) return "205";
+    if (["10", "16"].includes(c)) return "203";
+    return null;
   }
 
   // Plano de contas + referencial (usado por C050/C051 e J050/J051 - mesma

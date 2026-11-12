@@ -16,13 +16,61 @@ export class RfbClientService {
       const response = await firstValueFrom(
         this.httpService.get(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`)
       );
-      return this.formatarDados(response.data);
+      const dados = this.formatarDados(response.data);
+      // IMPL-RFB-03 (12/11/2026): a BrasilAPI nao devolve o e-mail do estabelecimento - complementa pelo CNPJ.ws.
+      if (!dados.contato?.email) {
+        const email = await this.emailCnpjWs(cnpj);
+        if (email) { dados.contato.email = email; dados.fonteEmail = 'CNPJ.ws'; }
+      }
+      return dados;
     } catch (error) {
       throw new HttpException(
         'Erro ao consultar CNPJ na Receita Federal',
         HttpStatus.SERVICE_UNAVAILABLE
       );
     }
+  }
+
+  // IMPL-RFB-03/04: API publica do CNPJ.ws (estabelecimento.email). Limite de 3 consultas/minuto por IP.
+  // IMPL-RFB-04 (12/11/2026): fila unica (uma consulta por vez, mesmo com sincronizacoes simultaneas),
+  // intervalo de 25s e, no 429, espera a liberacao informada pelo CNPJ.ws (ou 60s) e tenta de novo (ate 3x).
+  // Falha aqui nao derruba a consulta principal (o e-mail fica vazio).
+  private static filaCnpjWs: Promise<any> = Promise.resolve();
+  private static ultimaCnpjWs = 0;
+  private emailCnpjWs(cnpj: string): Promise<string> {
+    const tarefa = () => this.consultarEmailCnpjWs(cnpj);
+    const p: Promise<string> = RfbClientService.filaCnpjWs.then(tarefa, tarefa);
+    RfbClientService.filaCnpjWs = p.catch(() => undefined);
+    return p;
+  }
+  private async consultarEmailCnpjWs(cnpj: string): Promise<string> {
+    const dormir = (ms: number) => new Promise(r => setTimeout(r, ms));
+    for (let tentativa = 1; tentativa <= 3; tentativa++) {
+      const espera = RfbClientService.ultimaCnpjWs + 25000 - Date.now();
+      if (espera > 0) await dormir(espera);
+      RfbClientService.ultimaCnpjWs = Date.now();
+      try {
+        const r = await firstValueFrom(this.httpService.get(`https://publica.cnpj.ws/cnpj/${cnpj}`, { timeout: 15000 }));
+        return String(r.data?.estabelecimento?.email || '').trim();
+      } catch (e: any) {
+        const st = e?.response?.status;
+        if (st === 429 && tentativa < 3) {
+          const det = String(e?.response?.data?.detalhes || '');
+          const m = det.match(/em (.+)$/);
+          const lib = m ? Date.parse(m[1]) : NaN;
+          const ra = Number(e?.response?.headers?.['retry-after']);
+          let ms = !isNaN(lib) ? lib - Date.now() + 2000 : ra > 0 ? ra * 1000 : 60000;
+          ms = Math.min(Math.max(ms, 30000), 120000);
+          console.warn('[IMPL-RFB-04] CNPJ.ws 429 para ' + cnpj + ' - aguardando ' + Math.round(ms / 1000) + 's (tentativa ' + tentativa + '/3)');
+          await dormir(ms);
+          RfbClientService.ultimaCnpjWs = 0;
+          continue;
+        }
+        console.warn('[IMPL-RFB-04] CNPJ.ws sem e-mail para ' + cnpj + ': ' + (st || e?.message || e));
+        return '';
+      }
+    }
+    return '';
   }
 
   async consultarCNPJComFallback(cnpj: string): Promise<any> {

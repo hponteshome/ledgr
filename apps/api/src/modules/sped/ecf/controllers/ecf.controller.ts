@@ -158,6 +158,8 @@ export class EcfController {
     @Query('periodStart') periodStart: string,
     @Query('periodEnd')   periodEnd: string,
     @Query('formaTributacao') formaTributacao: string,
+    @Query('tipEscPre') tipEscPre: string,
+    @Query('fonteReceita') fonteReceita: string,
     @Res() res: Response,
   ) {
     if (!periodStart || !periodEnd)
@@ -167,7 +169,10 @@ export class EcfController {
       companyId,
       periodStart: new Date(periodStart),
       periodEnd: new Date(periodEnd),
-      formaTributacao: (formaTributacao as any) || '5',
+      // IMPL-ECF-01: sem parametro, o exporter usa o regime do periodo (company_tax_regimes)
+      formaTributacao: (formaTributacao as any) || undefined,
+      tipEscPre: (tipEscPre as any) || undefined,
+      fonteReceita: (fonteReceita as any) || undefined,
     });
 
     const companyForName = await this.prisma.company.findUnique({ where: { id: companyId }, select: { taxId: true } });

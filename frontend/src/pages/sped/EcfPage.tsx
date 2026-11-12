@@ -1,4 +1,5 @@
 // src/pages/sped/EcfPage.tsx
+import { apiErrorMessage } from '../../utils/apiError';
 import React, { useState, useRef, useEffect } from 'react';
 import {
     FiUpload, FiDownload, FiCheckCircle, FiAlertCircle,
@@ -410,7 +411,7 @@ const EcfPage: React.FC = () => {
             a.click();
             window.URL.revokeObjectURL(url);
         } catch (e: any) {
-            alert('Erro ao gerar ECF: ' + (e.response?.data?.message || e.message));
+            alert('Erro ao gerar ECF:\n\n' + await apiErrorMessage(e));
         } finally {
             setExporting(false);
         }

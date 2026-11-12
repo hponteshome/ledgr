@@ -10893,3 +10893,21 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - `DarfModal` (frontend): abas Gerar / DARFs gerados, marcar-desmarcar todos, 1a quota IRPJ 2089 com multa para formalizar opcao pelo Presumido.
 - Comparativo de Regimes: DARFs em colunas por regime; estudo CONCLUIDO abre direto com as exclusoes salvas.
 - LM 2022: 20 DARFs Presumido gerados (principal 17.121,91; multa 196,80; total 25.832,40 p/ 11/11/2026).
+
+## 2026-11-12 - ECF 2022 LM (Presumido/Livro Caixa) validada no PVA + cadastro pela RFB
+- Resultado: ECF 2022 da LM validada no PVA sem erros (1 advertencia correta: P200 cod. 26 do T1 sem receita).
+- ECF: regime do periodo (company_tax_regimes: tip_esc_pre/criterio_receita) define 0010; estudo do Comparativo alimenta o bloco P.
+- Bloco P: codigo da receita pelo % de presuncao (P200 2=1,6 4=8 6=16 8=32 9=38,4; P400 2=12 4=32 5=38,4) - antes saia sempre no codigo 2 (1,6%).
+- Descricoes P200-P500 lidas das tabelas dinamicas do PVA (recursos\tabelas\SPEDECF_DINAMICO_<ano>$SPEDECF_DINAMICA_<REG>$...), latin1.
+- 0030 natureza juridica pelo texto do cadastro (Sociedade Simples Limitada=2240); 0930 generico (205/900...); Y600 QUALIF 02/04 (Ltda), 01/03 (S/A), 09 (titular).
+- Y672 (Presumido/Arbitrado, formas 3-7) gerado pelo LEDGR: capital do Livro de Quotas/Acoes (emissoes posteriores descontadas) ou do cadastro; receitas = base do bloco P.
+- Geracao bloqueia com lista de pendencias de cadastro (CNAE, e-mail, CRC divergente, signatarios, capital) - ECF usa SO dados do LEDGR.
+- Blocos sem dados nao sao gerados (padrao do ECF aceito pela RFB) - com eles o PVA recusou por hierarquia (N990 x P001).
+- Leiaute 0009 (2022): registro 0020 com 30 campos. Ordem de campos de registros: base MySQL do PVA (mysql\data\bd*\reg_<reg>.frm).
+- RfbClientService = fonte unica do cadastro: compare/apply/sync no backend (company-history), sync ao criar empresa, sync em lote (Master).
+  BrasilAPI nao traz e-mail -> CNPJ.ws publica (3 req/min/IP): fila unica + intervalo 25s + nova tentativa no 429.
+- Front: downloads com responseType blob precisam ler a mensagem de erro do Blob (frontend/src/utils/apiError.ts).
+- Processo: frontend em frontend/src (API em apps/api/src); ao mudar resposta de erro da API, inspecionar quem consome;
+  erro de hierarquia do PVA = comparar a sequencia de registros com um ECF aceito pela RFB antes de levantar hipoteses;
+  regras de declaracao sao do LEDGR (genericas), nunca ajuste de uma empresa.
+- Pendente: Y672 caixa/aplicacoes/contas a receber e a pagar a partir dos saldos contabeis; transmissao ECF 2022 em 23/11 e DIMOB logo apos o recibo.

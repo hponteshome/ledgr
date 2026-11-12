@@ -374,6 +374,8 @@ model CompanyTaxRegime {
 
   @@unique([companyId, dtIni])
   @@index([companyId])
+  tipEscPre       String?  @map("tip_esc_pre") @db.VarChar(1)
+  criterioReceita String?  @map("criterio_receita") @db.VarChar(12)
   @@map("company_tax_regimes")
 }
 

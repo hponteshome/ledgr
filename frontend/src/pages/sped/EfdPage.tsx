@@ -1,4 +1,5 @@
 // src/pages/sped/EfdPage.tsx
+import { apiErrorMessage } from '../../utils/apiError';
 import React, { useState } from 'react';
 import { FiDownload, FiEye, FiCheckCircle, FiAlertCircle, FiFileText, FiInfo } from 'react-icons/fi';
 import api from '../../services/api';
@@ -61,7 +62,7 @@ export default function EfdPage() {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (e: any) {
-      setError(e?.response?.data?.message ?? 'Erro ao gerar lote');
+      setError(await apiErrorMessage(e, 'Erro ao gerar lote'));
     } finally { setLoadingLote(false); }
   }
 
@@ -90,7 +91,7 @@ export default function EfdPage() {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (e: any) {
-      setError(e?.response?.data?.message ?? 'Erro ao gerar EFD');
+      setError(await apiErrorMessage(e, 'Erro ao gerar EFD'));
     } finally { setLoading(false); }
   }
 

@@ -1,18 +1,16 @@
 // apps/api/src/core/companies/company-history.controller.ts
+// IMPL-RFB-01 (12/11/2026): comparar/aplicar/sincronizar usam o RfbClientService via CompanyHistoryService
+// (antes o compare fazia chamada propria a BrasilAPI e gravava o CNAE so com a descricao).
 import { Controller, Get, Post, Body, Param, Request, UseGuards } from "@nestjs/common";
-import { HttpService } from "@nestjs/axios";
 import { JwtAuthGuard } from "@/auth/guards/jwt.guard";
 import { CompanyHistoryService } from "./company-history.service";
-import { firstValueFrom } from "rxjs";
 import { EscopoEmpresaGuard, EscopoEmpresa } from '../../multi-company/escopo-empresa.guard';
+import { MasterOnlyGuard } from '../../auth/guards/master-only.guard';
 
 @Controller("companies")
 @UseGuards(JwtAuthGuard)
 export class CompanyHistoryController {
-  constructor(
-    private readonly historySvc: CompanyHistoryService,
-    private readonly http: HttpService,
-  ) {}
+  constructor(private readonly historySvc: CompanyHistoryService) {}
 
   // GET /companies/:id/history
   @UseGuards(EscopoEmpresaGuard) // Seguranca 0A (04/10/2026): vinculo com a empresa dona do registro
@@ -22,45 +20,22 @@ export class CompanyHistoryController {
     return this.historySvc.findByCompany(id);
   }
 
-  // POST /companies/:id/rfb-compare
-  // Consulta RFB pelo CNPJ da empresa e retorna divergencias
+  // POST /companies/rfb-sync-all - sincroniza todas as empresas com a RFB (somente Master)
+  @UseGuards(MasterOnlyGuard)
+  @Post("rfb-sync-all")
+  syncAll(@Request() req: any) {
+    return this.historySvc.syncAll(req.user.id);
+  }
+
+  // POST /companies/:id/rfb-compare - consulta a RFB pelo CNPJ cadastrado e retorna as divergencias
   @UseGuards(EscopoEmpresaGuard) // Seguranca 0A (04/10/2026): vinculo com a empresa dona do registro
   @EscopoEmpresa('param:id')
   @Post(":id/rfb-compare")
-  async compareWithRfb(
-    @Param("id") id: string,
-    @Body() body: { cnpj: string },
-  ) {
-    const cnpj = body.cnpj.replace(/\D/g, "");
-    const { data } = await firstValueFrom(
-      this.http.get(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`)
-    );
-    const rfbData = {
-      razaoSocial:       data.razao_social,
-      nomeFantasia:      data.nome_fantasia,
-      situacaoCadastral: data.descricao_situacao_cadastral,
-      dataSituacao:      data.data_situacao_cadastral,
-      cnaePrincipal:     { descricao: data.cnae_fiscal_descricao },
-      endereco: {
-        logradouro: data.logradouro,
-        numero:     data.numero,
-        bairro:     data.bairro,
-        municipio:  data.municipio,
-        uf:         data.uf,
-        cep:        (data.cep || "").replace(/\D/g, ""),
-      },
-      contato: {
-        email:    data.email,
-        telefone1: data.ddd_telefone_1 || "",
-      },
-      naturezaJuridica: data.natureza_juridica,
-      porte:            data.porte,
-    };
-    const divergences = await this.historySvc.compareWithRfb(id, rfbData);
-    return { divergences, rfbData };
+  compareWithRfb(@Param("id") id: string) {
+    return this.historySvc.compareWithRfb(id);
   }
 
-  // POST /companies/:id/rfb-apply
+  // POST /companies/:id/rfb-apply - aplica as divergencias selecionadas na tela
   @UseGuards(EscopoEmpresaGuard) // Seguranca 0A (04/10/2026): vinculo com a empresa dona do registro
   @EscopoEmpresa('param:id')
   @Post(":id/rfb-apply")
@@ -70,5 +45,13 @@ export class CompanyHistoryController {
     @Body() body: { changes: any[] },
   ) {
     return this.historySvc.applyRfbChanges(id, req.user.id, body.changes);
+  }
+
+  // POST /companies/:id/rfb-sync - aplica todas as divergencias com a RFB
+  @UseGuards(EscopoEmpresaGuard)
+  @EscopoEmpresa('param:id')
+  @Post(":id/rfb-sync")
+  syncOne(@Param("id") id: string, @Request() req: any) {
+    return this.historySvc.syncFromRfb(id, req.user.id);
   }
 }

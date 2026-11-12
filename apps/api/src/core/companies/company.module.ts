@@ -7,6 +7,7 @@ import { CompanyTaxRegimeController } from './company-tax-regime.controller';
 import { CompanyTaxRegimeService } from './company-tax-regime.service';
 import { CompanyHistoryService } from './company-history.service';
 import { AuditModule } from '../audit/audit.module';
+import { RfbModule } from '../../modules/rfb/rfb.module';
 import { ShareholderController } from './shareholder.controller';
 import { ShareholderService } from './shareholder.service';
 import { PrismaModule } from '../../prisma/prisma.module';
@@ -14,7 +15,7 @@ import { SidebarPermissionsModule } from '../../modules/sidebar-permissions/side
 import { SidebarResourceGuard } from '../../auth/guards/sidebar-resource.guard';
 
 @Module({
-  imports: [PrismaModule, AuditModule, HttpModule, SidebarPermissionsModule],
+  imports: [PrismaModule, AuditModule, HttpModule, SidebarPermissionsModule, RfbModule],
   controllers: [CompanyController, CompanyHistoryController, CompanyTaxRegimeController, ShareholderController],
   providers: [CompanyService, CompanyHistoryService, CompanyTaxRegimeService, ShareholderService, SidebarResourceGuard],
   exports: [CompanyService, CompanyHistoryService, CompanyTaxRegimeService, ShareholderService],
