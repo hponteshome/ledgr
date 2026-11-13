@@ -3928,6 +3928,8 @@ enum FiscalObligationStatus {
   IN_PROGRESS
   DONE
   OVERDUE
+  DISPENSED /// Dispensada no periodo (motivo em notes)
+  RECTIFY /// Entregue com informacao a corrigir - retificar
 }
 
 /// Obrigações fiscais e acessórias por empresa/competência.
@@ -3943,6 +3945,9 @@ model FiscalObligation {
   notes      String?                @map("notes") @db.Text
   doneAt     DateTime?              @map("done_at") @db.Timestamp(6)
   doneById   String?                @map("done_by_id") @db.Uuid
+  receiptNumber String?  @map("receipt_number") @db.VarChar(120)
+  deliveredAt   DateTime? @map("delivered_at") @db.Timestamp(6)
+  dependsOn     String?  @map("depends_on") @db.Text
   createdAt  DateTime               @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt  DateTime               @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
 
@@ -3953,6 +3958,26 @@ model FiscalObligation {
   @@index([companyId, dueDate])
   @@index([companyId, status])
   @@map("fiscal_obligations")
+}
+
+/// DASH-03 (13/11/2026): alertas da empresa exibidos no Dashboard.
+/// locked = so sai com resolucao registrada (motivo). blocksAction = acao do sistema bloqueada enquanto aberto (ex.: ECF_EXPORT).
+model CompanyAlert {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId      String    @map("company_id") @db.Uuid
+  severity       String    @default("WARNING") @db.VarChar(10)
+  title          String    @db.VarChar(250)
+  message        String?   @db.Text
+  blocksAction   String?   @map("blocks_action") @db.VarChar(40)
+  locked         Boolean   @default(false)
+  createdByName  String?   @map("created_by_name") @db.VarChar(150)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  resolvedAt     DateTime? @map("resolved_at") @db.Timestamp(6)
+  resolvedById   String?   @map("resolved_by_id") @db.Uuid
+  resolutionNote String?   @map("resolution_note") @db.Text
+
+  @@index([companyId, resolvedAt])
+  @@map("company_alerts")
 }
 
 // =============================================================================

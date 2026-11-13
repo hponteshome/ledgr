@@ -10,6 +10,7 @@ import {
 import api from '../services/api';
 import { ObrigacoesWidget } from '../components/ObrigacoesWidget';
 import { RentalAlertsCard } from '../components/RentalAlertsCard';
+import { SituacaoFiscalCard } from '../components/SituacaoFiscalCard';
 import { useCompany } from '../contexts/CompanyContext';
 import { useSidebarPermissions } from '../contexts/SidebarPermissionsContext';
 
@@ -303,7 +304,7 @@ export const DashboardPage: React.FC = () => {
   const chip = statusChip(kpi?.fechamentoStatus ?? null);
 
   return (
-    <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+    <div style={{ width: '100%' }}>  {/* DASH-03: tela inteira (antes maxWidth 1200) */}
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
 
       {/* CABEÇALHO */}
@@ -318,7 +319,7 @@ export const DashboardPage: React.FC = () => {
           {overdueCount > 0 && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 8, background: '#FEE2E2', border: '0.5px solid #FECACA', fontSize: 12, fontWeight: 500, color: '#991B1B' }}>
               <FiAlertTriangle size={13} />
-              {overdueCount} obrigac{overdueCount > 1 ? 'oes vencidas' : 'ao vencida'}
+              {overdueCount} evento{overdueCount > 1 ? 's' : ''} vencido{overdueCount > 1 ? 's' : ''} na agenda
             </div>
           )}
           {overdueCount === 0 && urgentCount > 0 && (
@@ -337,6 +338,13 @@ export const DashboardPage: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* NOVO 13/11/2026 (DASH-03): situacao fiscal - alertas travados, obrigacoes em atraso/a retificar, DARFs em aberto */}
+      {show('/app/sistema/obrigacoes') && (
+        <div style={{ margin: '0.75rem 0 8px' }}>
+          <SituacaoFiscalCard key={activeCompany?.id} refreshKey={lastUpdate.getTime()} />
+        </div>
+      )}
 
       {/* NOVO 23/10/2026: alertas de locacao (some quando a empresa nao tem contratos) */}
       {show('/app/assets/rental-contracts') && (

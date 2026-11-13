@@ -1,6 +1,7 @@
 // app.module.ts
 import { join } from 'path';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { SituacaoFiscalModule } from './modules/situacao-fiscal/situacao-fiscal.module';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_INTERCEPTOR } from '@nestjs/core';
@@ -29,7 +30,8 @@ import { AccountingModule } from './modules/accounting/accounting.module';
 import { CalendarModule } from './modules/calendar/calendar.module';
 import { SpedModule } from './modules/sped/sped.module';
 import { AssetsModule } from './modules/assets/assets.module';
-import { RentalContractsModule } from './modules/locacao/rental-contracts.module';
+import { RentalContractsModule } from './modules/locacao/rental-contracts.module';
+
 import { IntegridadeModule } from './modules/integridade/integridade.module';
 import { Reflector } from '@nestjs/core';
 import { FinanceModule } from './modules/finance/finance.module';
@@ -43,7 +45,7 @@ import { ChatModule } from './chat/chat.module';
 
 @Module({
   imports: [
-    DashboardModule,
+    DashboardModule, SituacaoFiscalModule,
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: join(process.cwd(), '../../.env'),
