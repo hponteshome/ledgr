@@ -6,6 +6,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FiLock, FiAlertTriangle, FiAlertOctagon, FiRotateCcw, FiClock, FiDollarSign, FiChevronRight, FiGrid } from 'react-icons/fi';
 import api from '../services/api';
+import { ListaRecolhida } from './ListaRecolhida';
 
 type Sit = 'ATRASADA' | 'RETIFICAR' | 'PENDENTE' | 'ENTREGUE' | 'DISPENSADA';
 interface Alerta { id: string; severity: string; title: string; message: string | null; locked: boolean; blocksAction: string | null; createdByName: string | null; createdAt: string; }
@@ -114,16 +115,16 @@ export const SituacaoFiscalCard: React.FC<{ refreshKey?: number }> = ({ refreshK
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 3fr) minmax(0, 2fr)', gap: 10 }}>
         <div style={caixa}>
           <div style={cab}>
-            <span style={titulo}><FiAlertTriangle size={14} color="#DC2626" /> Pendências de obrigações</span>
+            <span style={titulo}><FiAlertTriangle size={14} color="#DC2626" /> Pendências de obrigações <span style={{ fontSize: 11, color: '#9CA3AF', fontWeight: 400 }}>({d.grupos.length})</span></span>
             <span onClick={irObrigacoes} style={{ fontSize: 11, color: '#0369A1', cursor: 'pointer', fontWeight: 400 }}>Ver obrigações →</span>
           </div>
           {d.grupos.length === 0 && <div style={{ padding: '1.25rem', textAlign: 'center', fontSize: 13, color: '#9CA3AF' }}>Nenhuma pendência.</div>}
-          {d.grupos.map((g, i) => {
+          <ListaRecolhida itens={d.grupos} render={(g, i, vis) => {
             const c = COR[g.sit];
             return (
               <div key={g.code + g.de + g.sit} onClick={irObrigacoes}
                 style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '0.6rem 1rem', cursor: 'pointer',
-                  borderBottom: i === d.grupos.length - 1 ? 'none' : '0.5px solid #F3F4F6' }}>
+                  borderBottom: i === vis.length - 1 ? 'none' : '0.5px solid #F3F4F6' }}>
                 <span style={{ ...pill(c.bg, c.fg), minWidth: 74, justifyContent: 'center' }}>{c.rot}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 500, color: '#111' }}>
@@ -138,14 +139,14 @@ export const SituacaoFiscalCard: React.FC<{ refreshKey?: number }> = ({ refreshK
                 </div>
               </div>
             );
-          })}
+          }} />
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div style={caixa}>
-            <div style={cab}><span style={titulo}><FiClock size={14} color="#2563EB" /> Vencendo em 30 dias</span></div>
+            <div style={cab}><span style={titulo}><FiClock size={14} color="#2563EB" /> Vencendo em 30 dias <span style={{ fontSize: 11, color: '#9CA3AF', fontWeight: 400 }}>({d.proximas.length})</span></span></div>
             {d.proximas.length === 0 && <div style={{ padding: '1rem', textAlign: 'center', fontSize: 12, color: '#9CA3AF' }}>Nada a entregar nos próximos 30 dias.</div>}
-            {d.proximas.map(p => {
+            <ListaRecolhida itens={d.proximas} render={p => {
               const n = dias(p.dueDate);
               return (
                 <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem 1rem', borderBottom: '0.5px solid #F3F4F6', fontSize: 12 }}>
@@ -153,12 +154,12 @@ export const SituacaoFiscalCard: React.FC<{ refreshKey?: number }> = ({ refreshK
                   <span style={pill(n <= 3 ? '#FEF3C7' : '#D1FAE5', n <= 3 ? '#92400E' : '#065F46')}>{fmtD(p.dueDate)} · {n === 0 ? 'hoje' : n + 'd'}</span>
                 </div>
               );
-            })}
+            }} />
           </div>
           <div style={caixa}>
-            <div style={cab}><span style={titulo}><FiDollarSign size={14} color="#7C3AED" /> DARFs em aberto (tributos e multas)</span></div>
+            <div style={cab}><span style={titulo}><FiDollarSign size={14} color="#7C3AED" /> DARFs em aberto (tributos e multas) <span style={{ fontSize: 11, color: '#9CA3AF', fontWeight: 400 }}>({d.darfs.length})</span></span></div>
             {d.darfs.length === 0 && <div style={{ padding: '1rem', textAlign: 'center', fontSize: 12, color: '#9CA3AF' }}>Nenhum DARF em aberto.</div>}
-            {d.darfs.map(x => {
+            <ListaRecolhida itens={d.darfs} render={x => {
               const n = dias(x.vencimento);
               return (
                 <div key={x.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, padding: '0.5rem 1rem', borderBottom: '0.5px solid #F3F4F6', fontSize: 12 }}>
@@ -174,7 +175,7 @@ export const SituacaoFiscalCard: React.FC<{ refreshKey?: number }> = ({ refreshK
                   </div>
                 </div>
               );
-            })}
+            }} />
           </div>
         </div>
       </div>
