@@ -1264,8 +1264,8 @@ async handleGovBrCallback(
   // ── Arquivo Digital reorganizado (04/11/2026) ─────────────────
   // Areas com abas; subtipo (coluna documents.subtipo) separa Balancete/ECD/ECF/Obrigacao etc.
   private readonly SUBTIPOS_DOC: Record<string, string[]> = {
-    CONTABIL: ['BALANCETE', 'DEMONSTRACAO', 'ECD'],
-    FISCAL: ['ECF', 'OBRIGACAO'],
+    CONTABIL: ['BALANCETE', 'DEMONSTRACAO', 'ECD', 'LIVRO_CAIXA', 'EXTRATO_BANCARIO'],
+    FISCAL: ['ECF', 'OBRIGACAO', 'DARF', 'NOTIFICACAO'],
     TRABALHISTA: ['CONTRATO_TRABALHO', 'ACORDO_COLETIVO'],
   };
 

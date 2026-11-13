@@ -33,8 +33,12 @@ const AREAS: Record<string, Area> = {
     abas: [
       { key: 'balancetes', label: 'Balancetes e demonstrações', types: ['CONTABIL'], subtipos: ['BALANCETE', 'DEMONSTRACAO'] },
       { key: 'ecd', label: 'ECD', types: ['CONTABIL'], subtipos: ['ECD'] },
+      { key: 'livrocaixa', label: 'Livro Caixa', types: ['CONTABIL'], subtipos: ['LIVRO_CAIXA'] },
+      { key: 'extratos', label: 'Extratos bancários', types: ['CONTABIL'], subtipos: ['EXTRATO_BANCARIO'] },
       { key: 'ecf', label: 'ECF', types: ['FISCAL'], subtipos: ['ECF'] },
       { key: 'obrigacoes', label: 'Obrigações', types: ['FISCAL'], subtipos: ['OBRIGACAO'] },
+      { key: 'darfs', label: 'DARFs e comprovantes', types: ['FISCAL'], subtipos: ['DARF'] },
+      { key: 'notificacoes', label: 'Notificações e intimações', types: ['FISCAL'], subtipos: ['NOTIFICACAO'] },
       { key: 'classificar', label: 'A classificar', types: ['CONTABIL', 'FISCAL'], semSubtipo: true },
     ],
   },
@@ -51,11 +55,12 @@ const AREAS: Record<string, Area> = {
 const SUBTIPO_LABEL: Record<string, string> = {
   BALANCETE: 'Balancete', DEMONSTRACAO: 'Demonstração financeira', ECD: 'ECD',
   ECF: 'ECF', OBRIGACAO: 'Obrigação acessória',
+  LIVRO_CAIXA: 'Livro Caixa', EXTRATO_BANCARIO: 'Extrato bancário', DARF: 'DARF / comprovante', NOTIFICACAO: 'Notificação / intimação',
   CONTRATO_TRABALHO: 'Contrato de trabalho', ACORDO_COLETIVO: 'Acordo coletivo',
 };
 const SUBTIPOS_POR_TIPO: Record<string, string[]> = {
-  CONTABIL: ['BALANCETE', 'DEMONSTRACAO', 'ECD'],
-  FISCAL: ['ECF', 'OBRIGACAO'],
+  CONTABIL: ['BALANCETE', 'DEMONSTRACAO', 'ECD', 'LIVRO_CAIXA', 'EXTRATO_BANCARIO'],
+  FISCAL: ['ECF', 'OBRIGACAO', 'DARF', 'NOTIFICACAO'],
   TRABALHISTA: ['CONTRATO_TRABALHO', 'ACORDO_COLETIVO'],
 };
 const TIPO_LABEL: Record<string, string> = {

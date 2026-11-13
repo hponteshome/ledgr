@@ -1,0 +1,47 @@
+rKFd?Qy%9?UhtU%tjJRqP!6!
+
+powershell -ExecutionPolicy Bypass -File scripts\controle\sessao.ps1 inicio -Fase 1 -Item "Comprovantes e documentos"
+
+abrindo sessão
+powershell -ExecutionPolicy Bypass -File scripts\controle\sessao.ps1 inicio -Fase 1 -Item "xxxxxx1.1 Schema do dominio"; powershell -ExecutionPolicy Bypass -File scripts\controle\sessao.ps1 status
+
+
+Para a próxima sessão, os itens restantes da Fase 1, em ordem de valor:
+
+Conciliação da diferença de R$ 200.515,33, quando a planilha auditada estiver pronta (o sistema já mostra os três saldos lado a lado e a trilha de cada ajuste).
+Comprovantes e documentos dos créditos (o menu "Documentos", hoje em breve), começando pelos 3 remetentes não identificados.
+Cadastros pela tela (1.4 e 1.5): projeto, operação e contrapartes, incluindo identificar um remetente sem precisar de SQL.
+Intercompany (1.11): a SUNSYS recebe por conta da HOTELSYS, e isso precisa refletir na contabilidade das duas.
+
+Na retomada: sessao.ps1 inicio -Fase 1 -Item "<item escolhido>" e me diga por onde quer seguir.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/////fechando sessão ///////
+cls; powershell -ExecutionPolicy Bypass -File scripts\controle\sessao.ps1 fim -Obs "resumo do que foi feito"; powershell -ExecutionPolicy Bypass -File scripts\controle\sessao.ps1 relatorio

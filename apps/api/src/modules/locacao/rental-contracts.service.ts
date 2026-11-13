@@ -41,6 +41,16 @@ function toDate(value: string | undefined | null): Date | undefined {
   return new Date(y, m - 1, d);
 }
 
+// IMPL-LOC-02 (13/11/2026): CPF/CNPJ gravado em formato bruto (so digitos); mascara so nas telas e formularios.
+// Documento estrangeiro ou fora do padrao (ex.: "Id 6.337.334-5") fica como digitado.
+function docBruto(v?: string | null): string | null | undefined {
+  if (v == null) return v;
+  const t = String(v).trim();
+  if (!t) return null;
+  const d = t.replace(/\D/g, '');
+  return /^[\d.\-\/\s]+$/.test(t) && (d.length === 11 || d.length === 14) ? d : t;
+}
+
 @Injectable()
 export class RentalContractsService {
   constructor(private prisma: PrismaService, private documents: DocumentsService) {}
@@ -353,16 +363,33 @@ export class RentalContractsService {
     return { geradoEm: new Date().toISOString(), total: alertas.length, alertas };
   }
 
+  // IMPL-LOC-02 (13/11/2026): numero do contrato = AA (ano do contrato: data do instrumento ou inicio) + sequencial
+  // de 4 digitos por empresa e ano (6 posicoes, cabe no campo da DIMOB). Considera tambem excluidos: numero nao se repete.
+  private async proximoNumeroContrato(companyId: string, ref: Date): Promise<string> {
+    const aa = String(ref.getUTCFullYear()).slice(-2);
+    const rows = await this.prisma.rentalContract.findMany({
+      where: { companyId, contractNumber: { startsWith: aa } }, select: { contractNumber: true },
+    });
+    let max = 0;
+    for (const r of rows) {
+      const m = /^(\d{2})(\d{4})$/.exec(r.contractNumber ?? '');
+      if (m && m[1] === aa) max = Math.max(max, Number(m[2]));
+    }
+    return aa + String(max + 1).padStart(4, '0');
+  }
+
   async create(companyId: string, userId: string, dto: CreateRentalContractDto) {
+    const refNumero = toDate((dto as any).instrumentDate) ?? toDate(dto.startDate)!;
+    const numero = (dto.contractNumber ?? '').trim() || await this.proximoNumeroContrato(companyId, refNumero);
     return this.prisma.rentalContract.create({
       data: {
         companyId,
         createdById: userId,
-        contractNumber: dto.contractNumber,
+        contractNumber: numero,
         fixedAssetId: dto.fixedAssetId,
         tenantId: dto.tenantId,
         tenantName: dto.tenantName,
-        tenantTaxId: dto.tenantTaxId,
+        tenantTaxId: docBruto(dto.tenantTaxId),
         tenantRg: dto.tenantRg,
         tenantProfession: dto.tenantProfession,
         tenantMaritalStatus: dto.tenantMaritalStatus,
@@ -403,7 +430,7 @@ export class RentalContractsService {
         hasIntermediary: dto.hasIntermediary ?? false,
         intermediaryType: dto.intermediaryType,
         intermediaryName: dto.intermediaryName,
-        intermediaryTaxId: dto.intermediaryTaxId,
+        intermediaryTaxId: docBruto(dto.intermediaryTaxId),
         intermediaryCreci: dto.intermediaryCreci,
         intermediaryManagesCollection: dto.intermediaryManagesCollection ?? false,
         intermediaryAdminFeeAmount: toDecimal(dto.intermediaryAdminFeeAmount),
@@ -427,7 +454,7 @@ export class RentalContractsService {
         fixedAssetId: dto.fixedAssetId,
         tenantId: dto.tenantId,
         tenantName: dto.tenantName,
-        tenantTaxId: dto.tenantTaxId,
+        tenantTaxId: docBruto(dto.tenantTaxId),
         tenantRg: dto.tenantRg,
         tenantProfession: dto.tenantProfession,
         tenantMaritalStatus: dto.tenantMaritalStatus,
@@ -468,7 +495,7 @@ export class RentalContractsService {
         hasIntermediary: dto.hasIntermediary,
         intermediaryType: dto.intermediaryType,
         intermediaryName: dto.intermediaryName,
-        intermediaryTaxId: dto.intermediaryTaxId,
+        intermediaryTaxId: docBruto(dto.intermediaryTaxId),
         intermediaryCreci: dto.intermediaryCreci,
         intermediaryManagesCollection: dto.intermediaryManagesCollection,
         intermediaryAdminFeeAmount: toDecimal(dto.intermediaryAdminFeeAmount),

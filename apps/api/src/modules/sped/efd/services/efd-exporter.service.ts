@@ -1,6 +1,6 @@
 // apps/api/src/modules/sped/efd/services/efd-exporter.service.ts
 // EFD-Contribuicoes — Leiaute 1.34 (IN RFB 1252/2012 e atualizacoes)
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 
 export interface EfdExportOptions {
@@ -22,7 +22,8 @@ export class EfdExporterService {
     return (s || '')
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')  // remove diacriticos
-      .replace(/[^\x00-\xFF]/g, '?');    // substitui chars fora latin1
+      .replace(/[^\x00-\xFF]/g, '?')     // substitui chars fora latin1
+      .replace(/\|/g, ' ').replace(/\s+/g, ' ').trim(); // FIX-EFD-06: '|' e o delimitador do SPED
   }
   private fmtDate(d: Date | string): string {
     const dt = d instanceof Date ? d : new Date(d);
@@ -57,8 +58,8 @@ export class EfdExporterService {
     const mes = dtFin.getUTCMonth() + 1; // 1-12
     const anoMes = ano * 100 + mes;
     // Tabela de versoes vigentes por periodo de apuracao
-    if (anoMes >= 202501) return '006'; // leiaute 006 - PA >= 01/2025 (Nota Tecnica 009/2024)
-    if (anoMes >= 202001) return '005'; // leiaute 005 - PA >= 01/2020
+    // FIX-EFD-07 (13/11/2026): o PVA 6.2.0 recusou COD_VER 005 em PA 06/2022 e exige 006 (antes: 005 para 2020-2024).
+    if (anoMes >= 202001) return '006';
     if (anoMes >= 201806) return '004'; // leiaute 004 - PA >= 06/2018
     if (anoMes >= 201501) return '003'; // leiaute 003 - PA >= 01/2015
     if (anoMes >= 201301) return '002'; // leiaute 002 - PA >= 01/2013
@@ -74,10 +75,11 @@ export class EfdExporterService {
       select: { taxId:true, legalName:true, state:true, city:true, codMun:true },
     });
 
+    let criterioReceita: string | null = null; // IMPL-EFD-05
     // Buscar regime tributario vigente na data do periodo — se nao informado nos options
     if (!options.regime || !options.incidencia) {
       const regimeRows = await this.prisma.$queryRaw<any[]>`
-        SELECT forma_tributacao FROM company_tax_regimes
+        SELECT forma_tributacao, criterio_receita FROM company_tax_regimes
         WHERE company_id = ${companyId}
           AND dt_ini <= ${periodStart}
           AND (dt_fin IS NULL OR dt_fin >= ${periodEnd})
@@ -87,17 +89,20 @@ export class EfdExporterService {
       this.logger.log(`Regime query: companyId=${companyId} periodStart=${periodStart.toISOString()} rows=${regimeRows.length} forma=${regimeRows[0]?.forma_tributacao}`);
       if (regimeRows.length > 0) {
         const forma = regimeRows[0].forma_tributacao;
+        criterioReceita = regimeRows[0].criterio_receita ?? null; // IMPL-EFD-05
         // forma: '1'=LR '2'=LP '3'=Simples '8'=MEI
         if (!options.regime) {
-          options.regime = forma === '1' ? 'LUCRO_REAL' : 'LUCRO_PRESUMIDO';
+          options.regime = ['1', '2'].includes(forma) ? 'LUCRO_REAL' : 'LUCRO_PRESUMIDO'; // IMPL-EFD-05: 1 = Real, 2 = Real/Arbitrado
         }
         if (!options.incidencia) {
-          options.incidencia = forma === '1' ? 'NAO_CUMULATIVO' : 'CUMULATIVO';
+          options.incidencia = ['1', '2'].includes(forma) ? 'NAO_CUMULATIVO' : 'CUMULATIVO';
         }
       }
     }
     const regime     = options.regime     ?? 'LUCRO_REAL';
     const incidencia = options.incidencia ?? 'NAO_CUMULATIVO';
+    // IMPL-EFD-05 (13/11/2026): Presumido pelo regime de caixa (criterio_receita = CAIXA no regime do periodo) -> F500/F525
+    const regimeCaixa = incidencia === 'CUMULATIVO' && criterioReceita === 'CAIXA';
 
     const cnpj  = company.taxId.replace(/\D/g,'');
     const dtIni = this.fmtDate(periodStart);
@@ -109,7 +114,8 @@ export class EfdExporterService {
     // Indicador de apuracao: 0=mensal  1=trimestral  2=evento especifico
     const indApur = '0';
     // Codigo de atividade: 0=outros
-    const codAtiv = '0';
+    // FIX-EFD-03 (13/11/2026): 0000.IND_ATIV - 0 = industrial/equiparado; 9 = outros (padrao ate o cadastro informar a atividade).
+    const codAtiv = '9';
 
     const competencia = `${periodStart.getUTCFullYear()}-${String(periodStart.getUTCMonth()+1).padStart(2,'0')}`;
 
@@ -128,11 +134,51 @@ export class EfdExporterService {
       },
       _sum: { value: true },
     });
+    // IMPL-EFD-05: no regime de caixa a receita e a soma dos recebimentos registrados (ar_payments) do periodo, por pagador.
+    // Os lancamentos contabeis nao entram (ex.: diario do periodo com receitas de terceiros). Confere com o estudo concluido do ano.
+    let receitaCaixa = 0;
+    let caixaQtdDocs = 0; // FIX-EFD-08: recebimentos (recibos) do periodo - registro 1900
+    const caixaPorPagador = new Map<string, { doc: string; nome: string; valor: number }>();
+    const caixaMesesComReceita = new Set<number>();
+    if (regimeCaixa) {
+      const anoIni = new Date(Date.UTC(periodStart.getUTCFullYear(), 0, 1));
+      const anoFim = new Date(Date.UTC(periodStart.getUTCFullYear() + 1, 0, 1));
+      const fimPer = new Date(periodEnd.getTime() + 86399999);
+      const pagAno: any[] = await this.prisma.$queryRaw`
+        SELECT p.received_at AS dt, p.amount AS valor, e.customer_cnpj_cpf AS doc, e.customer_name AS nome
+          FROM ar_payments p JOIN ar_entries e ON e.id = p.ar_entry_id
+         WHERE e.company_id = ${companyId}::uuid AND e.deleted_at IS NULL AND e.revenue_account_id IS NOT NULL
+           AND p.received_at >= ${anoIni} AND p.received_at < ${anoFim}`;
+      for (const p of pagAno) {
+        const dt = new Date(p.dt); const v = Number(p.valor) || 0;
+        if (v > 0) caixaMesesComReceita.add(dt.getUTCMonth() + 1);
+        if (dt >= periodStart && dt <= fimPer) {
+          receitaCaixa += v;
+          caixaQtdDocs++;
+          const doc = String(p.doc ?? '').replace(/\D/g, '');
+          const k = doc || ('SEM_DOC:' + String(p.nome ?? ''));
+          const cur = caixaPorPagador.get(k) ?? { doc, nome: String(p.nome ?? ''), valor: 0 };
+          cur.valor += v; caixaPorPagador.set(k, cur);
+        }
+      }
+      receitaCaixa = Math.round(receitaCaixa * 100) / 100;
+      for (const p of caixaPorPagador.values()) {
+        if (!p.doc) throw new BadRequestException('EFD nao gerada: recebimento sem CPF/CNPJ do pagador (' + p.nome + ') - obrigatorio no F525.');
+      }
+      const est: any[] = await this.prisma.$queryRaw`
+        SELECT resultado FROM tax_regime_studies
+         WHERE company_id = ${companyId}::uuid AND ano = ${periodStart.getUTCFullYear()} AND status = 'CONCLUIDO' AND deleted_at IS NULL
+         ORDER BY versao DESC LIMIT 1`;
+      const mesEst = (est[0]?.resultado?.receita?.meses ?? []).find((m: any) => Number(m.mes) === periodStart.getUTCMonth() + 1);
+      if (mesEst && Math.abs(Number(mesEst.tributavel || 0) - receitaCaixa) > 0.009) {
+        throw new BadRequestException('EFD nao gerada: recebimentos registrados no mes (' + receitaCaixa.toFixed(2) + ') diferentes da receita tributavel do estudo concluido do Comparativo de Regimes (' + Number(mesEst.tributavel).toFixed(2) + '), fonte da ECF.');
+      }
+    }
     const receitaBaseApuracao = Number(apuracao?.receitaBruta ?? 0);
     const receitaBaseJournal  = Math.abs(Number(receitaRowsBase._sum.value ?? 0));
-    const receitaBase   = receitaBaseApuracao > 0 ? receitaBaseApuracao : receitaBaseJournal;
-    const pisDevido     = Number(apuracao?.pisDevido     ?? receitaBase * pisAliq    / 100);
-    const cofinsDevido  = Number(apuracao?.cofinsDevido  ?? receitaBase * cofinsAliq / 100);
+    const receitaBase   = regimeCaixa ? receitaCaixa : (receitaBaseApuracao > 0 ? receitaBaseApuracao : receitaBaseJournal);
+    const pisDevido     = regimeCaixa ? receitaBase * pisAliq / 100 : Number(apuracao?.pisDevido     ?? receitaBase * pisAliq    / 100);
+    const cofinsDevido  = regimeCaixa ? receitaBase * cofinsAliq / 100 : Number(apuracao?.cofinsDevido  ?? receitaBase * cofinsAliq / 100);
     // Valores arredondados para 2 casas (evitar M205/M605 com valor 0,00)
     const pisDevidoRnd    = Math.round(pisDevido    * 100) / 100;
     const cofinsDevidoRnd = Math.round(cofinsDevido * 100) / 100;
@@ -193,7 +239,8 @@ export class EfdExporterService {
       const cpfCont = (accConfig.accountantCpf||'').replace(/\D/g,'');
       const crcCont = accConfig.accountantCrc||'';
       const emailCont = accConfig.accountantEmail || accConfig.escritorioEmail || '';
-      const foneCont  = accConfig.accountantPhone || accConfig.escritorioTelefone || '';
+      // FIX-EFD-03: FONE so digitos (campo numerico de ate 11 posicoes; mascara so na tela)
+      const foneCont  = String(accConfig.accountantPhone || accConfig.escritorioTelefone || '').replace(/\D/g, '').slice(0, 11);
       add(P+'0100'+P
         +this.norm(accConfig.accountantName||'')+P  // 02 NOME
         +cpfCont+P                                   // 03 CPF
@@ -225,7 +272,7 @@ export class EfdExporterService {
         +codInc+P    // 01 COD_INC_TRIB: 2=Cumulativo
         +'1'+P       // 02 IND_APRO_CRED: 1=Apropriacao Direta
         +'1'+P       // 03 COD_TIPO_CONT: 1=Aliquota Basica
-        +'9'+P       // 04 IND_REG_CUM: 9=Competencia detalhada (Blocos A/C/D/F)
+        +(regimeCaixa ? '1' : '9')+P // 04 IND_REG_CUM: 1=Caixa consolidada (F500/F525) | 9=Competencia detalhada (IMPL-EFD-05)
       );
     } else {
       // Lucro Real nao-cumulativo ou Ambos: IND_REG_CUM vazio (campo obrigatorio no PVA 6.1.2)
@@ -235,6 +282,13 @@ export class EfdExporterService {
         +'1'+P       // 03 COD_TIPO_CONT: 1=Aliquota Basica
         +P           // 04 IND_REG_CUM: vazio para nao-cumulativo
       );
+    }
+    // IMPL-EFD-05: 0120 no arquivo de dezembro - meses do ano sem receita (dispensados, IN RFB 1.252 art. 5 par. 7),
+    // codigo 04 = PJ em geral sem operacoes geradoras de receitas ou creditos. Regime de caixa: mes sem recebimento.
+    if (regimeCaixa && periodEnd.getUTCMonth() === 11) {
+      for (let m = 1; m <= 12; m++) {
+        if (!caixaMesesComReceita.has(m)) add(P+'0120'+P+String(m).padStart(2, '0')+String(periodEnd.getUTCFullYear())+P+'04'+P);
+      }
     }
     // 0140 — Identificacao do estabelecimento
     // 0140: |0140|COD_EST|NOME|CNPJ|UF|IE|COD_MUN|IM|SUFRAMA| — 9 campos
@@ -267,7 +321,7 @@ export class EfdExporterService {
       );
     }
     // 0150 — Tabela de cadastro do participante (vazio para aluguel puro)
-    const idx0990 = lines.length;
+    let idx0990 = lines.length; // IMPL-EFD-04: let - o 0900 entra antes do 0990
     add(P+'0990'+P+'PLACEHOLDER'+P);
 
     // ── BLOCO A (vazio — sem NFS-e escriturada) ──────────────────────
@@ -286,9 +340,22 @@ export class EfdExporterService {
     // Usado para receitas de aluguel (contratos / recibos sem NF)
     add(P+'F001'+P+'0'+P);
     add(P+'F010'+P+cnpj+P);
+    // IMPL-EFD-05: regime de caixa - F500 (consolidado por CST 01) + F525 (por pagador, IND_REC 01 = clientes).
+    // COD_CTA vazio: dispensado para o Presumido com Livro Caixa (sem ECD).
+    if (regimeCaixa && receitaCaixa > 0) {
+      add(P+'F500'+P
+        +this.fmtDec(receitaCaixa)+P
+        +'01'+P+'0,00'+P+this.fmtDec(receitaCaixa)+P+pisAliq.toFixed(4).replace('.', ',')+P+this.fmtDec(pisDevidoRnd)+P
+        +'01'+P+'0,00'+P+this.fmtDec(receitaCaixa)+P+cofinsAliq.toFixed(4).replace('.', ',')+P+this.fmtDec(cofinsDevidoRnd)+P
+        +P+P+P+P);
+      for (const p of Array.from(caixaPorPagador.values()).sort((a, b) => a.doc.localeCompare(b.doc))) {
+        const v = Math.round(p.valor * 100) / 100;
+        add(P+'F525'+P+this.fmtDec(v)+P+'01'+P+p.doc+P+P+P+this.fmtDec(v)+P+'01'+P+'01'+P+this.norm(p.nome).substring(0, 100)+P+P);
+      }
+    }
 
     // F100 — uma linha por conta de receita no periodo
-    for (const row of receitaRows) {
+    for (const row of (regimeCaixa ? [] : receitaRows)) { // IMPL-EFD-05: caixa nao usa F100 de lancamentos
       const conta = contaMap.get(row.accountId);
       if (!conta) continue;
       const val      = Number(row._sum.value??0);
@@ -323,8 +390,58 @@ export class EfdExporterService {
       );
     }
 
+    // IMPL-EFD-02 (13/11/2026): periodo sem lancamentos de receita (ex.: contabilidade em reconstrucao), mas com
+    // apuracao gravada -> uma linha F100 com a base da apuracao, na conta de receita de locacao configurada.
+    // Sem conta configurada, a geracao para (nao inventa conta).
+    if (!regimeCaixa && receitaRows.length === 0 && receitaBase > 0) {
+      const ctaRecId = (accConfig as any)?.locacaoContaReceitaAlugueisId as string | undefined;
+      const ctaRec = ctaRecId ? await this.prisma.chartOfAccounts.findUnique({ where: { id: ctaRecId }, select: { code: true, name: true } }) : null;
+      if (!ctaRec) throw new BadRequestException('EFD nao gerada: periodo sem lancamentos de receita e sem conta de Receita de Alugueis na configuracao contabil - configure a conta ou lance a receita.');
+      add(P+'F100'+P
+        +'1'+P+P+P
+        +dtFin+P
+        +this.fmtDec(receitaBase)+P
+        +'01'+P+this.fmtDec(receitaBase)+P+pisAliq.toFixed(4).replace('.',',')+P+this.fmtDec(receitaBase * pisAliq / 100)+P
+        +'01'+P+this.fmtDec(receitaBase)+P+cofinsAliq.toFixed(4).replace('.',',')+P+this.fmtDec(receitaBase * cofinsAliq / 100)+P
+        +P+P
+        +ctaRec.code+P
+        +P
+        +this.norm('Receita do periodo pela apuracao (sem lancamentos contabeis)').substring(0,60)+P
+      );
+      this.logger.warn(`EFD ${competencia}: F100 gerado a partir da apuracao (sem lancamentos de receita no periodo)`);
+    }
     const idxF001 = lines.findIndex(l => l === P+'F001'+P+'0'+P);
     add(P+'F990'+P+(lines.length - idxF001 + 1)+P);
+
+    // IMPL-EFD-04 (13/11/2026): 0900 - Composicao das Receitas do Periodo. Obrigatorio na escrituracao original
+    // transmitida apos o prazo (10o dia util do 2o mes seguinte ao periodo). Receita total por bloco = receita bruta +
+    // demais receitas escrituradas no bloco; aqui so o bloco F e usado (F100 de receita e F500 do regime de caixa).
+    {
+      const feriados = (y: number) => ['01-01', '04-21', '05-01', '09-07', '10-12', '11-02', '11-15', '11-20', '12-25'].map(md => y + '-' + md);
+      const ini = new Date(Date.UTC(periodEnd.getUTCFullYear(), periodEnd.getUTCMonth() + 2, 1));
+      const fer = new Set(feriados(ini.getUTCFullYear()));
+      let uteis = 0; const prazo = new Date(ini);
+      for (;;) {
+        const dow = prazo.getUTCDay(); const iso = prazo.toISOString().slice(0, 10);
+        if (dow !== 0 && dow !== 6 && !fer.has(iso)) { uteis++; if (uteis === 10) break; }
+        prazo.setUTCDate(prazo.getUTCDate() + 1);
+      }
+      const emAtraso = Date.now() > prazo.getTime() + 86400000;
+      if (emAtraso) {
+        const num = (s: string) => Number(String(s || '0').replace(/\./g, '').replace(',', '.')) || 0;
+        let recF = 0;
+        for (const l of lines) {
+          const c = l.split(P);
+          if (c[1] === 'F100' && c[2] !== '0') recF += num(c[6]);
+          else if (c[1] === 'F500') recF += num(c[2]);
+        }
+        const z = '0,00';
+        const l0900 = P+'0900'+P+z+P+z+P+z+P+z+P+z+P+z+P+this.fmtDec(recF)+P+z+P+z+P+z+P+z+P+z+P+this.fmtDec(recF)+P+z+P;
+        lines.splice(idx0990, 0, l0900);
+        idx0990++;
+        this.logger.log(`EFD ${competencia}: 0900 incluido (entrega apos o prazo ${prazo.toISOString().slice(0, 10)}) - receita bloco F ${recF.toFixed(2)}`);
+      }
+    }
 
     // ── BLOCO I (vazio — sem operacoes de importacao) ────────────────
     add(P+'I001'+P+'1'+P);
@@ -533,8 +650,16 @@ export class EfdExporterService {
     add(P+'P990'+P+'2'+P);
 
     // ── BLOCO 1 (vazio — sem processos judiciais referenciados) ─────────────────
-    add(P+'1001'+P+'1'+P);  // IND_MOV=1: sem dados
-    add(P+'1990'+P+'2'+P);
+    // FIX-EFD-08 (13/11/2026): 1900 obrigatorio quando F500 > 0 (Presumido, regime de caixa) - documentos emitidos no
+    // periodo. Sem nota fiscal (ex.: aluguel), os documentos sao os recibos dos recebimentos: modelo 99, situacao 00, CST 01.
+    if (regimeCaixa && receitaCaixa > 0) {
+      add(P+'1001'+P+'0'+P);
+      add(P+'1900'+P+cnpj+P+'99'+P+P+P+'00'+P+this.fmtDec(receitaCaixa)+P+String(caixaQtdDocs)+P+'01'+P+'01'+P+P+'RECIBOS DE RECEBIMENTO'+P+P);
+      add(P+'1990'+P+'3'+P);
+    } else {
+      add(P+'1001'+P+'1'+P);  // IND_MOV=1: sem dados
+      add(P+'1990'+P+'2'+P);
+    }
     // ── BLOCO 9 — Encerramento ────────────────────────────────────────
     add(P+'9001'+P+'0'+P);
 

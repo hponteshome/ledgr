@@ -10911,3 +10911,22 @@ independente da profundidade). Contraste ajustado a pedido do usuario
   erro de hierarquia do PVA = comparar a sequencia de registros com um ECF aceito pela RFB antes de levantar hipoteses;
   regras de declaracao sao do LEDGR (genericas), nunca ajuste de uma empresa.
 - Pendente: Y672 caixa/aplicacoes/contas a receber e a pagar a partir dos saldos contabeis; transmissao ECF 2022 em 23/11 e DIMOB logo apos o recibo.
+
+## 2026-11-13 - PENDENTE: integracao DARF -> Contas a Pagar (fazer logo apos a DCTF 2022 da LM)
+- Regra do LEDGR (qualquer empresa/tributo): tax_darfs guarda o detalhe fiscal; cada DARF emitido gera ApEntry vinculada pelo ID
+  (vencimento = validade do calculo; valor = principal + multa + juros).
+- Baixa nos dois sentidos: pagar em Contas a Pagar marca o DARF Pago; registrar pagamento na lista de DARFs baixa a ApEntry.
+- DARF reemitido/recalculado atualiza a mesma ApEntry (valor/vencimento), nunca duplica.
+- Conta do titulo = passivo do tributo (IRPJ/CSLL/PIS/Cofins a recolher), nao Fornecedores; lancamento do pagamento por um lado so.
+- Vale para DARFs da rotina, parcelamentos e notificacoes de multa (MAED). Os 20 DARFs 2022 da LM pagos em 13/11 ficam so com "Pago".
+
+## 13/11/2026 (tarde) - ECF/DIMOB 2022 LM transmitidas; Ficha do Imovel (Locacoes); regras de contrato
+- LM: ECF 2022 transmitida 13/11 10:34:24 (PVA 12.2.8) e DIMOB 2022 12:18:06 (nada entre as duas). Multa ECF 377,80 (DARF 3624) paga em 13/11.
+- ALERTA TRAVADO (a implementar): LM NAO PODE GERAR ECF antes de regularizar as DIMOBs 2021/2023-2025 (faixa R$ 500 do art. 57).
+- IMPL-ECF-08: Y720 gerado na entrega apos o prazo; Presumido/Arbitrado/Imune so INTIMACAO = N.
+- FIX-DARF-UI-01: DarfModal largura/descricao/acoes fixas; "Pago" com data de hoje.
+- Decisao de arquitetura: cadastro centralizado com views e links (claude/arquitetura-ficha-imovel.md). Locacao: centro = grupo (propertyId); contabilidade: cada bem.
+- FICHA-01/02: aba Locacoes na pagina do bem (AssetsView) com contratos do bem e do grupo; aviso ao criar contrato em bem secundario.
+- FIX-LOC-01: dialogo Encerrar so sugere Renovacao quando o contrato ativo comeca ate 45 dias apos o fim.
+- IMPL-LOC-02: numero do contrato AA + seq 4 digitos por empresa/ano (reinicia a cada ano; numeros existentes nao mudam); CPF/CNPJ bruto no banco (docBruto), mascara na view.
+- Pendentes: Livro Caixa (Presumido/caixa) -> EFD F500/F525; exportador EFD (caixa, 0900, 0120, forma 2 = Real); DARFs de multa (origem notificacao); trava ECF LM; vinculo generico de documentos; gerarLancamentos respeitar regime do periodo; mascaras nos forms de contrato; IMPL-CRC-01.

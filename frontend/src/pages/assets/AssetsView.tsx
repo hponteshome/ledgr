@@ -27,13 +27,15 @@ const fmtCep = (v?: string | null) => {
 import { MaintenanceTab } from './components/MaintenanceTab';
 import { ImprovementTab } from './components/ImprovementTab';
 import { RetrofitTab } from './components/RetrofitTab';
+import { RentalTab } from './components/RentalTab';
+import { Key as KeyIcon } from 'lucide-react';
 import { AppraisalTab } from './components/AppraisalTab';
 import { DepreciationTab } from './components/DepreciationTab';
 import { HistoryTab } from './components/HistoryTab';
 import { AssetFormModal } from './modals/AssetFormModal';
 import { WriteOffModal } from './modals/WriteOffModal';
 
-type Tab = 'resumo' | 'depreciacao' | 'manutencao' | 'benfeitoria' | 'retrofit' | 'laudos' | 'historico';
+type Tab = 'resumo' | 'depreciacao' | 'manutencao' | 'benfeitoria' | 'retrofit' | 'locacoes' | 'laudos' | 'historico';
 
 const TABS: { key: Tab; label: string; icon: any }[] = [
     { key: 'resumo', label: 'Resumo', icon: Building2 },
@@ -41,6 +43,7 @@ const TABS: { key: Tab; label: string; icon: any }[] = [
     { key: 'manutencao', label: 'Manutenção', icon: Wrench },
     { key: 'benfeitoria', label: 'Benfeitorias', icon: Layers },
     { key: 'retrofit', label: 'Retrofit', icon: RefreshCw },
+    { key: 'locacoes', label: 'Locações', icon: KeyIcon },
     { key: 'laudos', label: 'Laudos', icon: FileText },
     { key: 'historico', label: 'Histórico', icon: History },
 ];
@@ -203,6 +206,7 @@ export default function AssetShow() {
                 {tab === 'benfeitoria' && <ImprovementTab asset={asset} onRefresh={() => fetch(id!)} />}
                 {tab === 'retrofit' && <RetrofitTab asset={asset} onRefresh={() => fetch(id!)} />}
                 {tab === 'laudos' && <AppraisalTab asset={asset} onRefresh={() => fetch(id!)} />}
+                {tab === 'locacoes' && <RentalTab asset={asset} onRefresh={() => fetch(id!)} />}
                 {tab === 'historico' && <HistoryTab asset={asset} />}
             </div>
 

@@ -578,8 +578,27 @@ export class EcfExporterService {
       const y672 = [this.fmtDec(capIni), this.fmtDec(capFim), z, z, z, z, z, z, z, z, z, z, z, z, this.fmtDec(totRecY672), z, ""];
       add(P+"Y672"+P+y672.join(P)+P);
     }
-    // IMPL-ECF-04: Y720 so no Lucro Real (formas 1-4) - no Presumido o PVA exige INTIMACAO e o registro nao se aplica.
-    if (["1", "2", "3", "4"].includes(formaTributacao)) add(P+"Y720"+P+P+P+P+P+P);
+    // IMPL-ECF-08 (13/11/2026): Y720 (Informacoes de Periodos Anteriores) - obrigatorio na entrega em ATRASO, para
+    // todas as PJ. Campos: LUC_LIQ|DT_LUC_LIQ|REC_BRUT_ANT|INTIMACAO|INT_ATRASO. Presumido/Arbitrado/Imune/Isenta
+    // (formas 5-9): so INTIMACAO (LUC_LIQ/REC_BRUT_ANT nao podem ser preenchidos); INT_ATRASO so se INTIMACAO = S.
+    // Prazo: ultimo dia util de julho do ano seguinte; situacao especial (periodo nao termina em 31/12): ultimo dia
+    // util do 3o mes seguinte ao fim do periodo. Dentro do prazo, Lucro Real mantem o comportamento validado (GRB).
+    {
+      const fimPer = new Date(periodEnd);
+      const ehAnual = fimPer.getUTCMonth() === 11 && fimPer.getUTCDate() === 31;
+      const prazo = ehAnual ? new Date(Date.UTC(fimPer.getUTCFullYear() + 1, 6, 31))
+                            : new Date(Date.UTC(fimPer.getUTCFullYear(), fimPer.getUTCMonth() + 4, 0));
+      while (prazo.getUTCDay() === 0 || prazo.getUTCDay() === 6) prazo.setUTCDate(prazo.getUTCDate() - 1);
+      const emAtraso = Date.now() > prazo.getTime() + 86400000;
+      const real = ["1", "2", "3", "4"].includes(formaTributacao);
+      if (emAtraso) {
+        add(P+"Y720"+P+P+P+P+"N"+P+P);
+        warnings.push("Y720: entrega apos o prazo legal (" + this.fmtDate(prazo) + ") - INTIMACAO = N (sem termo de intimacao da RFB). Se houve intimacao, altere no PVA (INTIMACAO = S e INT_ATRASO).");
+        if (real) warnings.push("Y720: Lucro Real/forma mista em atraso - LUC_LIQ, DT_LUC_LIQ e REC_BRUT_ANT ainda nao sao calculados pelo LEDGR; preencher no PVA.");
+      } else if (real) {
+        add(P+"Y720"+P+P+P+P+P+P);
+      }
+    }
     const idxY001 = lines.findIndex(l => l === P+"Y001"+P+"0"+P);
     add(P+"Y990"+P+(lines.length - idxY001 + 1)+P);
 

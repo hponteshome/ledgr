@@ -150,7 +150,7 @@ export function DarfModal({ onClose, titulo, subtitulo, itensIniciais, origem = 
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100 }}>
-      <div style={{ width: 'min(1180px, 96vw)', maxHeight: '92vh', background: '#fff', borderRadius: 10, overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 12px 40px rgba(0,0,0,.25)' }}>
+      <div style={{ width: 'min(1600px, 98vw)', maxHeight: '92vh', background: '#fff', borderRadius: 10, overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 12px 40px rgba(0,0,0,.25)' }}>
         <div style={{ background: FIN, color: '#fff', padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
             <div style={{ fontSize: 15, fontWeight: 600 }}>{titulo ?? 'DARFs - geração e impressão'}</div>
@@ -234,18 +234,18 @@ export function DarfModal({ onClose, titulo, subtitulo, itensIniciais, origem = 
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead><tr>
                 <th style={th}><input type="checkbox" checked={gerados.length > 0 && gerados.every((g) => sel.has(g.id))} onChange={(e) => setSel(e.target.checked ? new Set(gerados.filter((g) => g.status !== 'CANCELADO').map((g) => g.id)) : new Set())} /></th>
-                <th style={th}>Código</th><th style={th}>Descrição</th><th style={th}>Período</th><th style={th}>Vencimento</th><th style={th}>Pagto previsto</th>
-                <th style={thR}>Principal</th><th style={thR}>Multa</th><th style={thR}>Juros</th><th style={thR}>Total</th><th style={th}>Situação</th><th style={th}></th>
+                <th style={th}>Código</th><th style={{ ...th, width: 260 }}>Descrição</th><th style={th}>Período</th><th style={th}>Vencimento</th><th style={th}>Pagto previsto</th>
+                <th style={thR}>Principal</th><th style={thR}>Multa</th><th style={thR}>Juros</th><th style={thR}>Total</th><th style={th}>Situação</th><th style={{ ...th, position: 'sticky', right: 0, zIndex: 1, boxShadow: '-6px 0 6px -6px rgba(0,0,0,.15)' }}>Ações</th>
               </tr></thead>
               <tbody>{gerados.map((g) => (
                 <tr key={g.id} style={{ opacity: g.status === 'CANCELADO' ? 0.5 : 1 }}>
                   <td style={td}><input type="checkbox" checked={sel.has(g.id)} disabled={g.status === 'CANCELADO'} onChange={(e) => { const s = new Set(sel); e.target.checked ? s.add(g.id) : s.delete(g.id); setSel(s); }} /></td>
-                  <td style={{ ...td, fontFamily: 'monospace' }}>{g.codigo}</td><td style={td}>{g.descricao}</td><td style={td}>{dBR(g.periodo_apuracao)}</td><td style={td}>{dBR(g.vencimento)}</td><td style={td}>{dBR(g.data_pagamento_prevista)}</td>
+                  <td style={{ ...td, fontFamily: 'monospace' }}>{g.codigo}</td><td style={{ ...td, whiteSpace: 'normal', maxWidth: 260, minWidth: 160 }} title={g.descricao}><div style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: 1.3 }}>{g.descricao}</div></td><td style={td}>{dBR(g.periodo_apuracao)}</td><td style={td}>{dBR(g.vencimento)}</td><td style={td}>{dBR(g.data_pagamento_prevista)}</td>
                   <td style={tdR}>{n2(g.principal)}</td><td style={tdR} title={g.multa_modo}>{n2(g.multa)}</td><td style={tdR}>{n2(g.juros)}</td><td style={tdR}><b>{n2(g.total)}</b></td>
                   <td style={td}><span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: corStatus[g.status] + '22', color: corStatus[g.status] }}>{g.status}</span>
-                    {g.status === 'PAGO' && <div style={{ fontSize: 10, color: '#6B7280' }}>{dBR(g.pago_em)} - {n2(g.valor_pago)}{g.numero_documento ? ' - ' + g.numero_documento : ''}</div>}</td>
-                  <td style={td}>{g.status === 'GERADO' && <>
-                    <button style={{ ...btn('#fff', FIN), height: 26 }} onClick={() => setPag({ id: g.id, desc: g.codigo + ' ' + g.descricao, pagoEm: g.data_pagamento_prevista ?? hoje(), valorPago: g.total, numeroDocumento: '' })}>Pago</button>{' '}
+                    {g.status === 'PAGO' && <div style={{ fontSize: 10, color: '#6B7280', whiteSpace: 'normal', maxWidth: 240, wordBreak: 'break-all' }}>{dBR(g.pago_em)} - {n2(g.valor_pago)}{g.numero_documento ? ' - ' + g.numero_documento : ''}</div>}</td>
+                  <td style={{ ...td, position: 'sticky', right: 0, background: '#fff', boxShadow: '-6px 0 6px -6px rgba(0,0,0,.15)' }}>{g.status === 'GERADO' && <>
+                    <button style={{ ...btn('#fff', FIN), height: 26 }} onClick={() => setPag({ id: g.id, desc: g.codigo + ' ' + g.descricao, pagoEm: hoje(), valorPago: g.total, numeroDocumento: '' })}>Pago</button>{' '}
                     <button style={{ ...btn('#fff', '#B91C1C'), height: 26 }} onClick={() => cancelar(g.id)}>Cancelar</button></>}</td>
                 </tr>))}
                 {!gerados.length && <tr><td style={td} colSpan={12}>Nenhum DARF gerado com esses filtros.</td></tr>}

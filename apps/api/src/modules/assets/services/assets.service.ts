@@ -132,7 +132,17 @@ export class AssetsService {
     });
 
     if (!asset) throw new NotFoundException('Asset not found');
-    return asset;
+    // FICHA-02 (13/11/2026): imovel formado por varios bens (mesmo propertyId, ex.: Landmark 137/138/139-A) -
+    // contratos cadastrados em outro bem do grupo tambem aparecem na ficha deste bem (somente leitura/link).
+    let groupRentalContracts: any[] = [];
+    if (asset.propertyId) {
+      groupRentalContracts = await this.prisma.rentalContract.findMany({
+        where: { companyId, deletedAt: null, fixedAssetId: { not: asset.id }, fixedAsset: { propertyId: asset.propertyId, deletedAt: null } },
+        include: { fixedAsset: { select: { id: true, internalCode: true } } },
+        orderBy: { startDate: 'desc' },
+      });
+    }
+    return { ...asset, groupRentalContracts };
   }
 
   // ── Create ───────────────────────────────────────────────

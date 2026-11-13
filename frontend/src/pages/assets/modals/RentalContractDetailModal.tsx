@@ -377,7 +377,11 @@ export function RentalContractDetailModal({ contractId, title, onClose }: { cont
                 const cands = (Array.isArray(lista) ? lista : []).filter(x => x.id !== contractId && (x.fixedAsset?.id ?? x.fixedAssetId) === contract?.fixedAssetId)
                     .sort((a, b) => String(a.startDate).localeCompare(String(b.startDate)));
                 setCloseCandidatos(cands);
-                if (cands.length > 0) { setCloseMotivo('RENOVACAO'); setCloseNovoId(cands[cands.length - 1].id); }
+                // FIX-LOC-01 (13/11/2026): so sugere Renovacao quando o contrato ativo comeca ate 45 dias apos o fim deste
+                // (renovacao de fato); contrato historico com outro ativo no imovel abre em Fim do prazo.
+                const fimEste = contract?.endDate ? new Date(String(contract.endDate).slice(0, 10)).getTime() : null;
+                const sugeridos = cands.filter((x: any) => fimEste != null && x.startDate && Math.abs(new Date(String(x.startDate).slice(0, 10)).getTime() - fimEste) <= 45 * 86400000);
+                if (sugeridos.length > 0) { setCloseMotivo('RENOVACAO'); setCloseNovoId(sugeridos[sugeridos.length - 1].id); }
             })
             .catch(() => setCloseCandidatos([]));
     }
