@@ -10930,3 +10930,18 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - FIX-LOC-01: dialogo Encerrar so sugere Renovacao quando o contrato ativo comeca ate 45 dias apos o fim.
 - IMPL-LOC-02: numero do contrato AA + seq 4 digitos por empresa/ano (reinicia a cada ano; numeros existentes nao mudam); CPF/CNPJ bruto no banco (docBruto), mascara na view.
 - Pendentes: Livro Caixa (Presumido/caixa) -> EFD F500/F525; exportador EFD (caixa, 0900, 0120, forma 2 = Real); DARFs de multa (origem notificacao); trava ECF LM; vinculo generico de documentos; gerarLancamentos respeitar regime do periodo; mascaras nos forms de contrato; IMPL-CRC-01.
+
+
+## Sessao 13/11/2026 - LM 2022 regularizada + Dashboard de situacao fiscal
+
+**Entregas da LM em 13/11/2026:** ECF 2022 (10:34:24, Presumido/Livro Caixa, multa 3624 paga a vista 377,80); DIMOB 2022 (12:18:06, logo apos a ECF - faixa R$ 500); EFD-Contribuicoes set/2026 e ago/2026 (provisorias pelos DARFs pagos, retificar depois); EFD-Contribuicoes jun-dez/2022 (caixa, F500/F525/1900/0900, 0120 de jan-mai em dezembro). Notificacoes 2203 da EFD 2022: 7 DARFs, total 377,80 a vista, vencimento 15/12/2026.
+
+**Alerta travado (company_alerts, blocks_action ECF_EXPORT):** LM NAO PODE GERAR ECF antes das DIMOBs 2023, 2024 e 2025 (faixa de R$ 500 da multa da DIMOB depende da ultima declaracao apresentada ser a ECF 2022 Presumido). DIMOB 2021 fora do escopo.
+
+**EFDs antigas encontradas no ReceitanetBX:** dez/2021 (inativa, 0120 codigo 03), dez/2023 (declara 2023 inteiro sem receita - retificar), dez/2025 (cumulativo/competencia, diverge da ECF Lucro Real - retificar). Necessidades R1-R13 em claude/lm-2022-mapa-obrigacoes.md (secao 6a).
+
+**Codigo:** EFD exporter (IMPL-EFD-02/04/05, FIX-EFD-03/06/07/08), ARQ-01, DASH-03 (situacao fiscal: fiscal_obligations com DISPENSED/RECTIFY + recibo/entrega/dependencia, company_alerts, modulo situacao-fiscal, SituacaoFiscalCard), DASH-05 (ListaRecolhida - padrao para listas longas: 3 itens + expandir).
+
+**Licao:** o teste de 401 no fim dos blocos nao prova que a rota nova existe (a autenticacao responde antes do roteamento); conferir a rota com o frontend ou com token.
+
+**Proximos passos:** DCTF jun-dez/2022 + retificadora jan/2022 (a partir de 17/11); DIMOBs 2023-2025 ate 30/11 (contratos e recebimentos 2023-2025 no LEDGR); DARF PIS/Cofins out/2026 (25/11); DCTFWeb/MIT out/2026 e IRPJ/CSLL estimativa (30/11); pagar os 7 DARFs 2203 ate 15/12. DASH-04: trava real no gerador da ECF, resolver alerta pela tela (master), marcar entregas na tela de Obrigacoes. Perguntas abertas: LM tem folha/pro-labore com recolhimento (eSocial/FGTS/GPS no painel)? ECD 2023-2025 foi entregue? Por que GET /rental-contracts/alerts nao traz RECEBIMENTO?
