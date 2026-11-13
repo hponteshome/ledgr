@@ -5,6 +5,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FiHome, FiCalendar, FiTrendingUp, FiDollarSign, FiChevronRight, FiAlertTriangle } from 'react-icons/fi';
 
+import { ListaRecolhida } from './ListaRecolhida';
+
 const API = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3000';
 
 type Tipo = 'FIM_CONTRATO' | 'REAJUSTE_PENDENTE' | 'REAJUSTE_PROXIMO' | 'RECEBIMENTO';
@@ -115,39 +117,39 @@ export const RentalAlertsCard: React.FC<{ refreshKey?: unknown }> = ({ refreshKe
           {grupos.contratos.length > 0 && (
             <Painel icone={<FiCalendar size={14} color="#DC2626" />} titulo="Contratos a vencer" total={grupos.contratos.length}
               destaque={grupos.contratos.some(x => x.dias <= 30) ? { txt: 'Renovar', c: CORES.vermelho } : undefined}>
-              {grupos.contratos.map((x, i) => {
+              <ListaRecolhida itens={grupos.contratos} render={(x, i, vis) => {
                 const p = prazo(x.dias);
-                return <Linha key={x.contratoId + x.tipo} dot={p.c.dot} titulo={x.imovel} ultima={i === grupos.contratos.length - 1} onClick={irContratos}
+                return <Linha key={x.contratoId + x.tipo} dot={p.c.dot} titulo={x.imovel} ultima={i === vis.length - 1} onClick={irContratos}
                   sub={'Termina em ' + dataBR(x.data)} direita={<span style={pill(p.c.bg, p.c.fg)}>{p.txt}</span>} />;
-              })}
+              }} />
             </Painel>
           )}
           {grupos.reajustes.length > 0 && (
             <Painel icone={<FiTrendingUp size={14} color="#EA580C" />} titulo="Reajustes" total={grupos.reajustes.length}
               destaque={pendentes > 0 ? { txt: pendentes + ' a aplicar', c: CORES.laranja } : undefined}>
-              {grupos.reajustes.map((x, i) => {
+              <ListaRecolhida itens={grupos.reajustes} render={(x, i, vis) => {
                 const pend = x.tipo === 'REAJUSTE_PENDENTE';
                 const semIndice = /sem índice/i.test(x.mensagem);
                 const indice = (x.mensagem.match(/\(([^)]+)\)/)?.[1] ?? '').replace('IGPM', 'IGP-M');
                 return <Linha key={x.contratoId + x.tipo} dot={pend ? CORES.laranja.dot : CORES.azul.dot} titulo={x.imovel}
-                  ultima={i === grupos.reajustes.length - 1} onClick={irContratos}
+                  ultima={i === vis.length - 1} onClick={irContratos}
                   sub={<>{semIndice ? <span style={{ color: '#B45309' }}>Sem índice cadastrado</span> : indice}{' · data-base ' + dataBR(x.data)}</>}
                   direita={pend ? <span style={pill(CORES.laranja.bg, CORES.laranja.fg)}>Pendente</span>
                                 : <span style={pill(CORES.azul.bg, CORES.azul.fg)}>em {x.dias} dias</span>} />;
-              })}
+              }} />
             </Painel>
           )}
           {grupos.receber.length > 0 && (
             <Painel icone={<FiDollarSign size={14} color="#059669" />} titulo="Aluguéis a receber" total={grupos.receber.length}
               destaque={{ txt: BRL(totalReceber), c: CORES.verde }}>
-              {grupos.receber.map((x, i) => {
+              <ListaRecolhida itens={grupos.receber} render={(x, i, vis) => {
                 const p = prazo(x.dias);
                 const comp = (x.mensagem.match(/(\d{4}-\d{2})/)?.[1] ?? '').split('-').reverse().join('/');
-                return <Linha key={x.contratoId + x.data} dot={p.c.dot} titulo={x.imovel} ultima={i === grupos.receber.length - 1}
+                return <Linha key={x.contratoId + x.data} dot={p.c.dot} titulo={x.imovel} ultima={i === vis.length - 1}
                   onClick={() => navigate('/app/finance/contas-receber')}
                   sub={'Aluguel ' + comp + ' · vence ' + dataBR(x.data)}
                   direita={<><span style={{ fontSize: 13, fontWeight: 500, color: '#111' }}>{BRL(x.valor ?? 0)}</span><span style={pill(p.c.bg, p.c.fg)}>{p.txt}</span></>} />;
-              })}
+              }} />
             </Painel>
           )}
         </div>

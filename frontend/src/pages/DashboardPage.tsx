@@ -11,6 +11,7 @@ import api from '../services/api';
 import { ObrigacoesWidget } from '../components/ObrigacoesWidget';
 import { RentalAlertsCard } from '../components/RentalAlertsCard';
 import { SituacaoFiscalCard } from '../components/SituacaoFiscalCard';
+import { ListaRecolhida } from '../components/ListaRecolhida';
 import { useCompany } from '../contexts/CompanyContext';
 import { useSidebarPermissions } from '../contexts/SidebarPermissionsContext';
 
@@ -292,6 +293,11 @@ export const DashboardPage: React.FC = () => {
       .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
   }, [agendaReal, agendaStatic]);
 
+  // DASH-05: recebimentos de aluguel em aberto vao para bloco proprio; o cronograma fica com os demais eventos
+  const ehRecebimento = (e: AgendaEvt) => String(e.title ?? '').startsWith('Recebimento');
+  const recebimentosAgenda = agendaMerged.filter(e => ehRecebimento(e) && !e.isPaid);
+  const cronograma = agendaMerged.filter(e => !ehRecebimento(e));
+
   const overdueCount = agendaMerged.filter(e => !e.isPaid && diffDays(e.dueDate) < 0).length;
   const urgentCount  = agendaMerged.filter(e => !e.isPaid && diffDays(e.dueDate) >= 0 && diffDays(e.dueDate) <= 7).length;
 
@@ -353,6 +359,23 @@ export const DashboardPage: React.FC = () => {
         </div>
       )}
 
+      {/* DASH-05 (13/11/2026): recebimentos de aluguel em aberto (eventos da agenda) em bloco proprio, lista recolhida */}
+      {show('/app/finance/contas-receber') && recebimentosAgenda.length > 0 && (
+        <div style={{ background: '#fff', border: '0.5px solid #E5E7EB', borderRadius: 10, overflow: 'hidden', marginBottom: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.7rem 1rem', background: '#F9FAFB', borderBottom: '0.5px solid #E5E7EB' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 500, color: '#111' }}>
+              <FiTrendingUp size={14} color="#059669" /> Recebimentos de aluguel em aberto
+              <span style={{ fontSize: 11, color: '#9CA3AF', fontWeight: 400 }}>({recebimentosAgenda.length})</span>
+            </div>
+            <span style={pill('#D1FAE5', '#065F46')}>{BRL(recebimentosAgenda.reduce((s, e) => s + Number(e.amount ?? 0), 0))}</span>
+          </div>
+          <ListaRecolhida itens={recebimentosAgenda} render={(evt, idx, vis) => {
+            const days = diffDays(evt.dueDate);
+            return <AgendaRow evt={evt} days={days} isOverdue={days < 0} isLast={idx === vis.length - 1} onClick={() => navigate(evt.route)} />;
+          }} />
+        </div>
+      )}
+
       {/* AGENDA */}
       {show('/app/finance/agenda') && (
       <>
@@ -361,6 +384,7 @@ export const DashboardPage: React.FC = () => {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1rem', background: '#F9FAFB', borderBottom: '0.5px solid #E5E7EB' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 500, color: '#111' }}>
             <FiCalendar size={15} color="#0369A1" /> Cronograma de obrigacoes
+            <span style={{ fontSize: 11, color: '#9CA3AF', fontWeight: 400 }}>({cronograma.length})</span>
           </div>
           <div style={{ display: 'flex', gap: 12, fontSize: 11, color: '#6B7280', alignItems: 'center' }}>
             {[{ c: '#10B981', l: 'Fiscal / RH' },{ c: '#2563EB', l: 'Contabil' },{ c: '#F59E0B', l: 'Financeiro' },{ c: '#EF4444', l: 'Vencido' }].map(({ c, l }) => (
@@ -371,14 +395,14 @@ export const DashboardPage: React.FC = () => {
           </div>
         </div>
 
-        {agendaMerged.length === 0 && !loading && (
+        {cronograma.length === 0 && !loading && (
           <div style={{ padding: '2rem', textAlign: 'center', color: '#9CA3AF', fontSize: 13 }}>Nenhum evento nos proximos 60 dias.</div>
         )}
 
-        {agendaMerged.map((evt, idx) => {
+        <ListaRecolhida itens={cronograma} render={(evt, idx, vis) => {
           const days = diffDays(evt.dueDate);
           const isOverdue = days < 0 && !evt.isPaid;
-          const prevDays = idx > 0 ? diffDays(agendaMerged[idx - 1].dueDate) : -999;
+          const prevDays = idx > 0 ? diffDays(vis[idx - 1].dueDate) : -999;
           const showMarker = days >= 0 && prevDays < 0;
           return (
             <React.Fragment key={evt.id}>
@@ -392,11 +416,11 @@ export const DashboardPage: React.FC = () => {
                 </div>
               )}
               <AgendaRow evt={evt} days={days} isOverdue={isOverdue}
-                isLast={idx === agendaMerged.length - 1}
+                isLast={idx === vis.length - 1}
                 onClick={() => navigate(evt.route)} />
             </React.Fragment>
           );
-        })}
+        }} />
 
         <div onClick={() => navigate('/app/finance/agenda')}
           style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0.65rem 1rem', gap: 5, fontSize: 12, color: '#0369A1', cursor: 'pointer', borderTop: '0.5px solid #E5E7EB' }}
