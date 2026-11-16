@@ -128,6 +128,7 @@ export const CompanyShow: React.FC = () => {
               <Field label="Porte" value={company.size} />
               <Field label="Regime Tributario" value={company.taxRegime} />
               <Field label="Situacao" value={company.status === 'active' ? 'ATIVA' : company.status === 'inactive' ? 'INATIVA' : company.status} />
+              <Field label="Folha / Pró-labore" value={[company.temFolha ? 'Tem folha' : 'Sem folha', company.temProLabore ? 'tem pró-labore' : 'sem pró-labore'].join(' - ')} />
             </div>
           </Section>
           <Section title="Composicao do Capital Social" color="border-indigo-500">

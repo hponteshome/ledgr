@@ -110,7 +110,8 @@ export class CompanyController {
   async getMyCompany(@Request() req: any) {
     const company = await this.companyService.findById(req.companyId);
     if (!company) throw new NotFoundException('Empresa do usuário não encontrada.');
-    return new CompanyDto(company);
+    // 16/11/2026: CompanyDto nao conhece o perfil fiscal - devolve as flags junto
+    return { ...new CompanyDto(company), temFolha: (company as any).temFolha ?? false, temProLabore: (company as any).temProLabore ?? false };
   }
 
   @Get()
@@ -132,7 +133,8 @@ export class CompanyController {
   async findOne(@Param('id') id: string) {
     const company = await this.companyService.findById(id);
     if (!company) throw new NotFoundException('Empresa não encontrada.');
-    return new CompanyDto(company);
+    // 16/11/2026: CompanyDto nao conhece o perfil fiscal - devolve as flags junto
+    return { ...new CompanyDto(company), temFolha: (company as any).temFolha ?? false, temProLabore: (company as any).temProLabore ?? false };
   }
 
   @Post('quick')
