@@ -128,7 +128,6 @@ export const CompanyShow: React.FC = () => {
               <Field label="Porte" value={company.size} />
               <Field label="Regime Tributario" value={company.taxRegime} />
               <Field label="Situacao" value={company.status === 'active' ? 'ATIVA' : company.status === 'inactive' ? 'INATIVA' : company.status} />
-              <Field label="Folha / Pró-labore" value={[company.temFolha ? 'Tem folha' : 'Sem folha', company.temProLabore ? 'tem pró-labore' : 'sem pró-labore'].join(' - ')} />
             </div>
           </Section>
           <Section title="Composicao do Capital Social" color="border-indigo-500">
@@ -281,7 +280,10 @@ export const CompanyShow: React.FC = () => {
 
       {activeTab === 'esocial' && (
         <Section title="eSocial" color="border-teal-500">
-          <p className="text-sm text-gray-400 italic">Em desenvolvimento.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Field label="Folha de pagamento (empregados)" value={company.temFolha ? 'Sim' : 'Não'} />
+            <Field label="Pró-labore com recolhimento" value={company.temProLabore ? 'Sim' : 'Não'} />
+          </div>
         </Section>
       )}
 
