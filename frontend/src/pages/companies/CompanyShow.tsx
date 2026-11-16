@@ -307,7 +307,7 @@ export const CompanyShow: React.FC = () => {
                   <tr key={r.id} className="hover:bg-gray-50">
                     <td className="py-2 font-medium">{new Date(r.dtIni).toLocaleDateString('pt-BR')} — {r.dtFin ? new Date(r.dtFin).toLocaleDateString('pt-BR') : <span style={{color:'#059669',fontWeight:600}}>Vigente</span>}</td>
                     <td className="py-2"><span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">{r.formaLabel}</span></td>
-                    <td className="py-2 text-gray-500">{r.periodoApuracaoIRPJ === 'A' ? 'Anual' : 'Trimestral'}</td>
+                    <td className="py-2 text-gray-500">{['S', 'M'].includes(r.formaTributacao) ? '-' : r.periodoApuracaoIRPJ === 'A' ? 'Anual' : 'Trimestral'}</td>
                     <td className="py-2 text-right">
                       <button onClick={() => api.delete('/companies/' + id + '/tax-regimes/' + r.id).then(() => api.get('/companies/' + id + '/tax-regimes').then(({ data }) => setRegimes(data || [])))}
                         className="text-red-400 hover:text-red-600 text-xs">Remover</button>
@@ -451,6 +451,8 @@ export const CompanyShow: React.FC = () => {
                   <option value="7">7 - Lucro Presumido/Arbitrado</option>
                   <option value="8">8 - Imune do IRPJ</option>
                   <option value="9">9 - Isenta do IRPJ</option>
+                  <option value="S">S - Simples Nacional</option>
+                  <option value="M">M - MEI</option>
                 </select>
               </div>
               <div>

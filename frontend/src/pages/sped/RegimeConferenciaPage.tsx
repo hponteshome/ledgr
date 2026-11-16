@@ -23,6 +23,7 @@ const SIT: Record<string, { rotulo: string; cor: string }> = {
   sem_declaracao: { rotulo: 'Sem ECF carregada', cor: '#B45309' },
   no_prazo: { rotulo: 'ECF ainda no prazo', cor: '#6B7280' },
   anterior_ecf: { rotulo: 'Anterior à ECF', cor: '#6B7280' },
+  nao_entrega_ecf: { rotulo: 'Não entrega ECF', cor: '#6B7280' },
   sem_dados: { rotulo: 'Sem dados', cor: '#6B7280' },
 };
 const APUR: Record<string, string> = { A: 'Anual', T: 'Trimestral' };

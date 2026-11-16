@@ -23,6 +23,10 @@ export const FORMAS_ECF: Record<string, string> = {
   '9': 'Isenta do IRPJ',
 };
 
+// Regimes que nao entregam ECF (fora da tabela FORMA_TRIB): letras, para nao colidir com 1-9.
+export const FORMAS_FORA_ECF: Record<string, string> = { S: 'Simples Nacional', M: 'MEI' };
+const descForma = (f: string): string => FORMAS_ECF[f] ?? FORMAS_FORA_ECF[f] ?? f;
+
 export interface Declarado0010 {
   forma: string;
   apuracao: string | null;
@@ -64,6 +68,7 @@ export type SituacaoConferencia =
   | 'sem_declaracao'
   | 'no_prazo'
   | 'anterior_ecf'
+  | 'nao_entrega_ecf'
   | 'sem_dados';
 
 export interface LinhaConferencia {
@@ -165,7 +170,8 @@ export class RegimeConferenciaService {
       } else if (arq && dec) {
         situacao = 'sem_cadastro';
       } else if (cad.length > 0) {
-        situacao = y < 2014 ? 'anterior_ecf' : y >= anoAtual ? 'no_prazo' : 'sem_declaracao';
+        const foraEcf = cad.every((g) => g.formaTributacao in FORMAS_FORA_ECF);
+        situacao = foraEcf ? 'nao_entrega_ecf' : y < 2014 ? 'anterior_ecf' : y >= anoAtual ? 'no_prazo' : 'sem_declaracao';
       } else {
         situacao = 'sem_dados';
       }
@@ -179,7 +185,7 @@ export class RegimeConferenciaService {
           dtIni: iso(g.dtIni),
           dtFin: g.dtFin ? iso(g.dtFin) : null,
           forma: g.formaTributacao,
-          formaDescricao: FORMAS_ECF[g.formaTributacao] ?? g.formaTributacao,
+          formaDescricao: descForma(g.formaTributacao),
           apuracao: g.periodoApuracaoIRPJ ?? null,
           tipEscPre: g.tipEscPre ?? null,
           criterioReceita: g.criterioReceita ?? null,

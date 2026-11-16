@@ -13,6 +13,8 @@ const FORMA_LABEL: Record<string, string> = {
   "7": "Lucro Presumido/Arbitrado",
   "8": "Imune do IRPJ",
   "9": "Isenta do IRPJ",
+  "S": "Simples Nacional",
+  "M": "MEI",
 };
 
 @Injectable()
