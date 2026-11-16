@@ -40,7 +40,7 @@ export const CompanyShow: React.FC = () => {
   const [qsaLinks, setQsaLinks] = useState<any[]>([]);
   const [regimes, setRegimes] = useState<any[]>([]);
   const [showRegimeModal, setShowRegimeModal] = useState(false);
-  const [regimeForm, setRegimeForm] = useState({ dtIni: '', formaTributacao: '2', periodoApuracaoIRPJ: 'A' });
+  const [regimeForm, setRegimeForm] = useState({ dtIni: '', formaTributacao: '1', periodoApuracaoIRPJ: 'A' });
   const [savingRegime, setSavingRegime] = useState(false);
   const [history, setHistory] = useState<any[]>([]);
   const [capitalSummary, setCapitalSummary] = useState<any>(null);
@@ -443,10 +443,14 @@ export const CompanyShow: React.FC = () => {
                   onChange={e => setRegimeForm(p => ({...p, formaTributacao: e.target.value}))}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
                   <option value="1">1 - Lucro Real</option>
-                  <option value="2">2 - Lucro Presumido</option>
-                  <option value="3">3 - Simples Nacional</option>
-                  <option value="4">4 - Imune / Isenta</option>
-                  <option value="8">8 - MEI</option>
+                  <option value="2">2 - Lucro Real/Arbitrado</option>
+                  <option value="3">3 - Lucro Presumido/Real</option>
+                  <option value="4">4 - Lucro Presumido/Real/Arbitrado</option>
+                  <option value="5">5 - Lucro Presumido</option>
+                  <option value="6">6 - Lucro Arbitrado</option>
+                  <option value="7">7 - Lucro Presumido/Arbitrado</option>
+                  <option value="8">8 - Imune do IRPJ</option>
+                  <option value="9">9 - Isenta do IRPJ</option>
                 </select>
               </div>
               <div>
@@ -471,9 +475,9 @@ export const CompanyShow: React.FC = () => {
                     const { data } = await api.get('/companies/' + id + '/tax-regimes');
                     setRegimes(data || []);
                     setShowRegimeModal(false);
-                    setRegimeForm({ dtIni: '', formaTributacao: '2', periodoApuracaoIRPJ: 'A' });
+                    setRegimeForm({ dtIni: '', formaTributacao: '1', periodoApuracaoIRPJ: 'A' });
                   } catch(e: any) {
-                    alert(e?.response?.data?.message || 'Erro ao salvar.');
+                    toast.error(e?.response?.data?.message || 'Erro ao salvar.');
                   }
                   setSavingRegime(false);
                 }}

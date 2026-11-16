@@ -27,6 +27,7 @@ import { EfdModule } from './efd/efd.module';
 import { EcfModule } from './ecf/ecf.module';
 import { EcdArquivoModule } from './ecd-arquivo/ecd-arquivo.module';
 import { EcfArquivoModule } from './ecf-arquivo/ecf-arquivo.module';
+import { RegimeConferenciaModule } from './regime-conferencia/regime-conferencia.module';
 
 @Module({
   imports: [SidebarPermissionsModule, 
@@ -35,6 +36,7 @@ import { EcfArquivoModule } from './ecf-arquivo/ecf-arquivo.module';
     EcfModule,
     EcdArquivoModule,
     EcfArquivoModule,
+    RegimeConferenciaModule,
     MulterModule.register({
       limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
     }),

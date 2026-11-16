@@ -50,6 +50,7 @@ import SugestaoDeParaPage from '../pages/accounting/SugestaoDeParaPage';
 import EcdMovimentacaoPage from '../pages/sped/EcdMovimentacaoPage';
 import EcdArquivoPage from '../pages/sped/EcdArquivoPage';
 import EcfArquivoPage from '../pages/sped/EcfArquivoPage';
+import RegimeConferenciaPage from '../pages/sped/RegimeConferenciaPage';
 import EcdLancamentosImportPage from '../pages/accounting/EcdLancamentosImportPage';
 import TabelaComparativaPage from '../pages/accounting/TabelaComparativaPage';
 import HistoricoPadraoPage from '../pages/accounting/HistoricoPadraoPage';
@@ -254,6 +255,7 @@ export const AppRoutes = () => {
                 <Route path="app/sped/ecd/movimentacao" element={<ProtectedRoute><EcdMovimentacaoPage /></ProtectedRoute>} />
                 <Route path="app/sped/ecd/arquivo" element={<ProtectedRoute><EcdArquivoPage /></ProtectedRoute>} />
                 <Route path="app/sped/ecf/arquivo" element={<ProtectedRoute><EcfArquivoPage /></ProtectedRoute>} />
+                <Route path="app/sped/regimes" element={<ProtectedRoute><RegimeConferenciaPage /></ProtectedRoute>} />
                 <Route path="app/sped/ecf/pre-validate" element={<ProtectedRoute><EcfPreValidatePage /></ProtectedRoute>} />
                 <Route path="app/sped/ecf/lalur" element={<ProtectedRoute><LalurViewPage /></ProtectedRoute>} />
                 <Route path="app/sped/ecf" element={<ProtectedRoute><EcfPage /></ProtectedRoute>} />

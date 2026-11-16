@@ -3,11 +3,16 @@ import { Injectable, BadRequestException } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
 
 const FORMA_LABEL: Record<string, string> = {
+  // Tabela FORMA_TRIB do registro 0010 da ECF (padrao unico do LEDGR) - corrigido em 16/11/2026
   "1": "Lucro Real",
-  "2": "Lucro Presumido",
-  "3": "Simples Nacional",
-  "4": "Imune / Isenta",
-  "8": "MEI",
+  "2": "Lucro Real/Arbitrado",
+  "3": "Lucro Presumido/Real",
+  "4": "Lucro Presumido/Real/Arbitrado",
+  "5": "Lucro Presumido",
+  "6": "Lucro Arbitrado",
+  "7": "Lucro Presumido/Arbitrado",
+  "8": "Imune do IRPJ",
+  "9": "Isenta do IRPJ",
 };
 
 @Injectable()
