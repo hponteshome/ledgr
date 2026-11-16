@@ -8,6 +8,7 @@ import {
     FiDatabase, FiFileText, FiActivity,
 } from 'react-icons/fi';
 import api from '../../services/api';
+import { Toaster, toast } from 'react-hot-toast';
 import { SmartDateInput } from '../../components/SmartDateInput';
 
 // ── Tipos ──────────────────────────────────────────────────────
@@ -411,7 +412,15 @@ const EcfPage: React.FC = () => {
             a.click();
             window.URL.revokeObjectURL(url);
         } catch (e: any) {
-            alert('Erro ao gerar ECF:\n\n' + await apiErrorMessage(e));
+            // DASH-04 (16/11/2026): bloqueio por alerta da Situacao Fiscal (409 BLOQUEIO_ALERTA) mostra titulo + detalhe.
+            const msg = await apiErrorMessage(e);
+            let detalhe = '';
+            try {
+                const d = e?.response?.data;
+                const j = d instanceof Blob ? JSON.parse(await d.text()) : d;
+                if (j?.code === 'BLOQUEIO_ALERTA' && j?.detalhe) detalhe = String(j.detalhe);
+            } catch { /* corpo da resposta nao e JSON */ }
+            toast.error(detalhe ? msg + '\n\n' + detalhe : 'Erro ao gerar ECF: ' + msg, { duration: 12000, style: { maxWidth: 560, whiteSpace: 'pre-line' } });
         } finally {
             setExporting(false);
         }
