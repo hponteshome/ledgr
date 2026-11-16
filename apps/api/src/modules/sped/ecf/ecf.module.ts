@@ -8,9 +8,10 @@ import { EcfValidatorService } from './services/ecf-validator.service';
 import { EcfImporterService } from './services/ecf-importer.service';
 import { EcfExporterService } from './services/ecf-exporter.service';
 import { EcfPreValidateService } from './services/ecf-pre-validate.service';
+import { SituacaoFiscalModule } from '../../situacao-fiscal/situacao-fiscal.module';
 
 @Module({
-  imports: [SidebarPermissionsModule, PrismaModule],
+  imports: [SidebarPermissionsModule, PrismaModule, SituacaoFiscalModule],
   controllers: [EcfController],
   providers: [EcfParserService, EcfValidatorService, EcfImporterService, EcfExporterService, EcfPreValidateService],
   exports: [EcfParserService, EcfExporterService],

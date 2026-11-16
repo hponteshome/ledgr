@@ -9,7 +9,7 @@ import { RecursoMenu } from '../../../../auth/decorators/recurso-menu.decorator'
 // ============================================================
 import {
   Controller, Delete, Post, Get, UploadedFile, UseInterceptors,
-  UseGuards, Req, Res, BadRequestException, Query, Param, ParseUUIDPipe,
+  UseGuards, Req, Res, BadRequestException, ConflictException, Query, Param, ParseUUIDPipe,
 } from '@nestjs/common';
 import { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -23,6 +23,7 @@ import { EcfPreValidateService } from '../services/ecf-pre-validate.service';
 import { Company } from '@multi-company/company.decorator';
 import { CurrentUser } from '../../../../shared/decorators/current-user.decorator';
 import { PrismaService } from '../../../../prisma/prisma.service';
+import { SituacaoFiscalService } from '../../../situacao-fiscal/situacao-fiscal.service';
 
 @Controller('sped/ecf')
 @UseGuards(SidebarResourceGuard) // Seguranca 0A (04/10/2026): perfil na API = permissoes do menu (roda depois do JwtAuthGuard)
@@ -36,6 +37,7 @@ export class EcfController {
     private exporter: EcfExporterService,   // ← INJETADO
     private preValidate: EcfPreValidateService,
     private prisma: PrismaService,   // ← INJETADO
+    private situacaoFiscal: SituacaoFiscalService,
   ) {}
 
   // ── Validação ────────────────────────────────────────────────
@@ -164,6 +166,21 @@ export class EcfController {
   ) {
     if (!periodStart || !periodEnd)
       throw new BadRequestException('Período de exportação não informado');
+
+    // DASH-04 (16/11/2026): trava efetiva - alerta aberto com blocks_action = ECF_EXPORT impede a geracao.
+    // Liberacao: resolver o alerta na Situacao Fiscal (usuario master, com motivo).
+    const alertaBloqueio = await this.situacaoFiscal.bloqueio(companyId, 'ECF_EXPORT');
+    if (alertaBloqueio) {
+      throw new ConflictException({
+        statusCode: 409,
+        error: 'Conflict',
+        code: 'BLOQUEIO_ALERTA',
+        acao: 'ECF_EXPORT',
+        alertId: alertaBloqueio.id,
+        message: alertaBloqueio.title,
+        detalhe: alertaBloqueio.message ?? null,
+      });
+    }
 
     const result = await this.exporter.export({
       companyId,
