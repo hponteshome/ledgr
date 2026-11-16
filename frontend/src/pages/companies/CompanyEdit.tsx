@@ -277,6 +277,11 @@ export const CompanyEdit: React.FC = () => {
         {activeTab === 'esocial' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 bg-white p-8 rounded-xl shadow-sm border border-gray-200">
             <SectionTitle title="eSocial" color="bg-teal-600" />
+            {/* 16/11/2026: perfil fiscal - base do catalogo de obrigacoes (Agenda Fiscal) */}
+            <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 24, padding: '8px 0', flexWrap: 'wrap' }}>
+              <label className="text-sm flex items-center gap-2"><input type="checkbox" checked={!!formData.temFolha} onChange={(e) => handleChange({ target: { name: 'temFolha', value: e.target.checked } } as any)} /> Tem folha de pagamento (empregados)</label>
+              <label className="text-sm flex items-center gap-2"><input type="checkbox" checked={!!formData.temProLabore} onChange={(e) => handleChange({ target: { name: 'temProLabore', value: e.target.checked } } as any)} /> Tem pró-labore com recolhimento</label>
+            </div>
             <div><label className={labelCls}>CNPJ Empregador (eSocial)</label>
               <input name="esocialCnpj" value={formData.esocialCnpj || ''} onChange={handleChange} className={inputCls} placeholder="00.000.000/0000-00" /></div>
             <div><label className={labelCls}>CNAE Principal</label>

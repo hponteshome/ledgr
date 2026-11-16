@@ -17,6 +17,18 @@ export class ObrigacoesController {
 
   // POST /finance/obrigacoes/gerar/:competence
   // Gera e persiste obrigações baseado no regime tributário cadastrado
+  // POST /finance/obrigacoes/gerar-historico - 16/11/2026: cria o que falta desde a abertura (nao altera o existente)
+  @Post("gerar-historico")
+  gerarHistorico(@Request() req: any) {
+    return this.svc.gerarHistorico(req.companyId);
+  }
+
+  // GET /finance/obrigacoes/catalogo
+  @Get("catalogo")
+  catalogo() {
+    return this.svc.catalogo();
+  }
+
   @Post("gerar/:competence")
   gerar(@Request() req: any, @Param("competence") competence: string) {
     return this.svc.gerarObrigacoes(req.companyId, competence);

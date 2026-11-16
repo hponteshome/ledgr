@@ -155,6 +155,9 @@ export class CompanyService {
     }
 
     const updateData: any = {};
+    // 16/11/2026: perfil fiscal (base do catalogo de obrigacoes)
+    if (data.temFolha !== undefined) updateData.temFolha = data.temFolha === true || data.temFolha === 'true';
+    if (data.temProLabore !== undefined) updateData.temProLabore = data.temProLabore === true || data.temProLabore === 'true';
     const allowedFields = [
       'taxId', 'legalName', 'tradeName', 'openingDate', 'isHeadquarter', 'type',
       'mainActivity', 'secondaryActivities', 

@@ -8,7 +8,6 @@ import {
   FiBarChart2, FiAlertCircle,
 } from 'react-icons/fi';
 import api from '../services/api';
-import { ObrigacoesWidget } from '../components/ObrigacoesWidget';
 import { RentalAlertsCard } from '../components/RentalAlertsCard';
 import { SituacaoFiscalCard } from '../components/SituacaoFiscalCard';
 import { ListaRecolhida } from '../components/ListaRecolhida';
@@ -45,61 +44,7 @@ const diffDays = (iso: string): number => {
   return Math.round((t.getTime() - today.getTime()) / 86_400_000);
 };
 
-const lastBizDay = (year: number, month: number): Date => {
-  const d = new Date(year, month, 0);
-  while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() - 1);
-  return d;
-};
 
-const buildStaticAgenda = (activeMonth: string, taxRegime?: string): AgendaEvt[] => {
-  const [y, m] = activeMonth.split('-').map(Number);
-  const events: Omit<AgendaEvt, 'id'>[] = [
-    { title: 'FGTS — competencia ' + activeMonth,
-      dueDate: new Date(y, m, 7).toISOString(),
-      eventType: 'TAX', color: 'GREEN', amount: null, isPaid: false, route: '/app/hr/pro-labore' },
-    { title: 'GPS — INSS Pro-labore ' + activeMonth,
-      dueDate: new Date(y, m, 20).toISOString(),
-      eventType: 'TAX', color: 'GREEN', amount: null, isPaid: false, route: '/app/hr/pro-labore' },
-    { title: 'DARF IRRF — Pro-labore ' + activeMonth,
-      dueDate: new Date(y, m, 20).toISOString(),
-      eventType: 'TAX', color: 'GREEN', amount: null, isPaid: false, route: '/app/hr/pro-labore' },
-    { title: 'EFD Contribuicoes PIS/COFINS — ' + activeMonth,
-      dueDate: new Date(y, m + 1, 10).toISOString(),
-      eventType: 'TAX', color: 'GREEN', amount: null, isPaid: false, route: '/app/arquivo/fiscal/obrigacoes' },
-    { title: 'Fechamento Mensal — ' + activeMonth,
-      dueDate: lastBizDay(y, m).toISOString(),
-      eventType: 'CLOSING', color: 'BLUE', amount: null, isPaid: false, route: '/app/finance/fechamento' },
-    { title: 'ECD — entrega anual (prazo 31/05)',
-      dueDate: new Date(y, 4, 31).toISOString(),
-      eventType: 'TAX', color: 'BLUE', amount: null, isPaid: false, route: '/app/sped/ecd' },
-    { title: 'ECF — entrega anual (prazo 31/07)',
-      dueDate: new Date(y, 6, 31).toISOString(),
-      eventType: 'TAX', color: 'BLUE', amount: null, isPaid: false, route: '/app/sped/ecf' },
-  ];
-  // NOVO 23/10/2026: tributos do Lucro Real (PIS/COFINS nao cumulativo e IRPJ/CSLL por estimativa)
-  if (taxRegime === 'LUCRO_REAL') {
-    const diaUtilAte = (d: Date) => { while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() - 1); return d; };
-    const hoje0 = new Date(); hoje0.setHours(0, 0, 0, 0);
-    const tributos = (comp: string, cy: number, cm: number): Omit<AgendaEvt, 'id'>[] => ([
-      { title: 'DARF PIS/COFINS (6912/5856) — ' + comp,
-        dueDate: diaUtilAte(new Date(cy, cm, 25)).toISOString(),
-        eventType: 'TAX', color: 'GREEN', amount: null, isPaid: false, route: '/app/finance/agenda' },
-      { title: 'DARF IRPJ/CSLL estimativa (2362/2484) — ' + comp,
-        dueDate: lastBizDay(cy, cm + 1).toISOString(),
-        eventType: 'TAX', color: 'GREEN', amount: null, isPaid: false, route: '/app/finance/agenda' },
-    ]);
-    events.push(...tributos(activeMonth, y, m));
-    const py = m === 1 ? y - 1 : y; const pm = m === 1 ? 12 : m - 1;
-    events.push(...tributos(py + '-' + String(pm).padStart(2, '0'), py, pm).filter(e => new Date(e.dueDate) >= hoje0));
-  }
-  const windowStart = new Date(y, m - 1, 1);
-  windowStart.setDate(windowStart.getDate() - 60);
-  const windowEnd = new Date(y, m - 1, 1);
-  windowEnd.setDate(windowEnd.getDate() + 120);
-  return events
-    .filter(e => { const d = new Date(e.dueDate); return d >= windowStart && d <= windowEnd; })
-    .map((e, i) => ({ ...e, id: 'static-' + i }));
-};
 
 const dotColor = (color: string, eventType: string): string => {
   if (eventType === 'CLOSING') return '#2563EB';
@@ -217,14 +162,6 @@ export const DashboardPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState(new Date());
 
-  const [regimeApi, setRegimeApi] = useState<string | undefined>(undefined);
-  useEffect(() => {
-    setRegimeApi(undefined);
-    if (!activeCompany?.id || (activeCompany as any)?.taxRegime) return;
-    api.get('/companies/' + activeCompany.id).then(r => setRegimeApi(r.data?.taxRegime ?? r.data?.data?.taxRegime)).catch(() => {});
-  }, [activeCompany?.id]);
-  const taxRegime: string | undefined = (activeCompany as any)?.taxRegime ?? regimeApi;
-  const agendaStatic = useMemo(() => buildStaticAgenda(activeMonth, taxRegime), [activeMonth, taxRegime]);
 
   const load = useCallback(async () => {
     if (!activeCompany?.id) return;
@@ -255,7 +192,7 @@ export const DashboardPage: React.FC = () => {
       }
 
       if (agRes.status === 'fulfilled') {
-        const rows: any[] = agRes.value.data?.data ?? agRes.value.data ?? [];
+        const ag: any = agRes.value; const rows: any[] = ag?.data?.data ?? ag?.data ?? [];
         setAgendaReal((Array.isArray(rows) ? rows : [])
           .filter((e: any) => { const d = String(e.dueDate ?? '').slice(0, 10); return !!d && d <= horizon && (d >= today || !e.isPaid); })
           .map(e => ({
@@ -287,11 +224,7 @@ export const DashboardPage: React.FC = () => {
 
   useEffect(() => { load(); }, [load]);
 
-  const agendaMerged = useMemo(() => {
-    const realIds = new Set(agendaReal.map(e => e.id));
-    return [...agendaReal, ...agendaStatic.filter(e => !realIds.has(e.id))]
-      .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
-  }, [agendaReal, agendaStatic]);
+  const agendaMerged = useMemo(() => [...agendaReal].sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()), [agendaReal]);
 
   // DASH-05: recebimentos de aluguel em aberto vao para bloco proprio; o cronograma fica com os demais eventos
   const ehRecebimento = (e: AgendaEvt) => String(e.title ?? '').startsWith('Recebimento');
@@ -379,7 +312,7 @@ export const DashboardPage: React.FC = () => {
       {/* AGENDA */}
       {show('/app/finance/agenda') && (
       <>
-      <SectionTitle>Agenda contabil, fiscal e financeira — proximos 60 dias</SectionTitle>
+      <SectionTitle>Agenda financeira - proximos 60 dias</SectionTitle>
       <div style={{ background: '#fff', border: '0.5px solid #E5E7EB', borderRadius: 10, overflow: 'hidden', marginBottom: 8 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1rem', background: '#F9FAFB', borderBottom: '0.5px solid #E5E7EB' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 500, color: '#111' }}>
@@ -433,7 +366,6 @@ export const DashboardPage: React.FC = () => {
       )}
 
       {/* WIDGET OBRIGAÇÕES */}
-      {show('/app/sistema/obrigacoes') && <ObrigacoesWidget />}
 
       {/* PAINEIS INFERIORES */}
       {(show('/app/finance/accounts-payable') || show('/app/finance/contas-receber')) && (

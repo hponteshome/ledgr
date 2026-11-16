@@ -8,10 +8,11 @@ import { PrismaService } from '../../prisma/prisma.service';
 export type SituacaoObrigacao = 'ATRASADA' | 'RETIFICAR' | 'PENDENTE' | 'ENTREGUE' | 'DISPENSADA';
 
 const ROTULOS: Record<string, string> = {
-  ECF: 'ECF', ECD: 'ECD', DIMOB: 'DIMOB', EFD_CONTRIB: 'EFD-Contribuições', DCTF: 'DCTF (PGD)',
-  DCTFWEB: 'DCTFWeb/MIT', ESOCIAL: 'eSocial', FGTS: 'FGTS', GPS_INSS: 'GPS/INSS',
+  ECF: 'ECF', ECD: 'ECD', DIMOB: 'DIMOB', EFD_CONTRIB: 'EFD-Contribuições', DCTF: 'DCTF (PGD)', DCTFWEB: 'DCTFWeb/MIT',
+  PIS_COFINS: 'PIS/Cofins (DARF)', IRPJ_CSLL_TRI: 'IRPJ/CSLL trimestral', IRPJ_CSLL_AJUSTE: 'IRPJ/CSLL ajuste anual', DAS: 'DAS', DEFIS: 'DEFIS',
+  ESOCIAL: 'eSocial', FGTS: 'FGTS', GPS_INSS: 'GPS/INSS', INSS_DARF: 'INSS (DCTFWeb)', DIRF: 'DIRF',
 };
-const ORDEM = ['ECF', 'ECD', 'DIMOB', 'EFD_CONTRIB', 'DCTF', 'DCTFWEB', 'ESOCIAL', 'FGTS', 'GPS_INSS'];
+const ORDEM = ['ECF', 'ECD', 'DIMOB', 'EFD_CONTRIB', 'DCTF', 'DCTFWEB', 'PIS_COFINS', 'IRPJ_CSLL_TRI', 'IRPJ_CSLL_AJUSTE', 'DAS', 'DEFIS', 'ESOCIAL', 'FGTS', 'GPS_INSS', 'INSS_DARF', 'DIRF'];
 const PESO: Record<SituacaoObrigacao, number> = { ATRASADA: 5, RETIFICAR: 4, PENDENTE: 3, ENTREGUE: 2, DISPENSADA: 1 };
 const STATUS_VALIDOS = ['PENDING', 'IN_PROGRESS', 'DONE', 'OVERDUE', 'DISPENSED', 'RECTIFY'];
 

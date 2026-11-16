@@ -66,7 +66,7 @@ export const SituacaoFiscalCard: React.FC<{ refreshKey?: number }> = ({ refreshK
 
   useEffect(() => {
     let vivo = true;
-    api.get('/situacao-fiscal')
+    api.post('/finance/obrigacoes/gerar-historico').catch(() => null).then(() => api.get('/situacao-fiscal'))
       .then(r => { if (vivo) { setD(r.data?.data ?? r.data); setErro(null); } })
       .catch(e => { if (vivo) setErro(e?.response?.data?.message ?? 'Falha ao carregar a situação fiscal'); });
     return () => { vivo = false; };
