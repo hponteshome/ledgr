@@ -346,6 +346,7 @@ model Company {
   temFolha                  Boolean                    @default(false) @map("tem_folha")
   temProLabore              Boolean                    @default(false) @map("tem_pro_labore")
   obrigacoesDesde           DateTime?                  @map("obrigacoes_desde") @db.Date
+  folhaDesde                DateTime?                  @map("folha_desde") @db.Date
   pettyCashEntries          PettyCashEntry[]
   fiscalObligations         FiscalObligation[]
   history                   CompanyHistory[]
@@ -3981,6 +3982,8 @@ model CompanyAlert {
   resolutionNote String?   @map("resolution_note") @db.Text
 
   @@index([companyId, resolvedAt])
+  actionUrl       String?   @map("action_url") @db.VarChar(200)
+  actionLabel     String?   @map("action_label") @db.VarChar(60)
   @@map("company_alerts")
 }
 

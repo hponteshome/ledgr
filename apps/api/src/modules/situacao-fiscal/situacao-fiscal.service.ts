@@ -2,7 +2,7 @@
 // DASH-03 (13/11/2026): situacao fiscal da empresa para o Dashboard.
 // Fonte unica: fiscal_obligations (situacao por competencia), company_alerts (alertas, inclusive travados)
 // e tax_darfs (DARFs em aberto). Generico: so le o que estiver cadastrado para a empresa.
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 
 export type SituacaoObrigacao = 'ATRASADA' | 'RETIFICAR' | 'PENDENTE' | 'ENTREGUE' | 'DISPENSADA';
@@ -99,7 +99,7 @@ export class SituacaoFiscalService {
     return {
       hoje,
       alertas: alertas.map(a => ({
-        id: a.id, severity: a.severity, title: a.title, message: a.message ?? null, locked: a.locked,
+        id: a.id, severity: a.severity, title: a.title, message: a.message ?? null, locked: a.locked, actionUrl: (a as any).actionUrl ?? null, actionLabel: (a as any).actionLabel ?? null,
         blocksAction: a.blocksAction ?? null, createdByName: a.createdByName ?? null, createdAt: a.createdAt.toISOString(),
       })),
       kpis: {
@@ -118,11 +118,12 @@ export class SituacaoFiscalService {
   }
 
   /** Resolve (encerra) um alerta. Alerta travado exige o motivo registrado. */
-  async resolverAlerta(companyId: string, userId: string, id: string, nota: string) {
+  async resolverAlerta(companyId: string, userId: string, id: string, nota: string, master = false) {
     if (!nota || !String(nota).trim()) throw new BadRequestException('Informe o motivo da resolução do alerta.');
     const a = await this.prisma.companyAlert.findFirst({ where: { id, companyId } });
     if (!a) throw new NotFoundException('Alerta não encontrado');
     if (a.resolvedAt) throw new BadRequestException('Alerta já resolvido');
+    if (a.locked && !master) throw new ForbiddenException('Alerta travado: só o administrador registra a resolução.');
     return this.prisma.companyAlert.update({
       where: { id },
       data: { resolvedAt: new Date(), resolvedById: userId || null, resolutionNote: String(nota).trim() },

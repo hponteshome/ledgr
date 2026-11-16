@@ -2,6 +2,7 @@
 // DASH-03 (13/11/2026): painel de situacao fiscal (Dashboard), resolucao de alertas e atualizacao de obrigacoes.
 import { Controller, Get, Post, Patch, Body, Param, Req, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/guards/jwt.guard';
+import { isMasterAdmin } from '../../multi-company/company.interceptor';
 import { SituacaoFiscalService } from './situacao-fiscal.service';
 
 @UseGuards(JwtAuthGuard)
@@ -16,7 +17,7 @@ export class SituacaoFiscalController {
 
   @Post('alertas/:id/resolver')
   resolver(@Req() req: any, @Param('id') id: string, @Body('nota') nota: string) {
-    return this.svc.resolverAlerta(req.headers['x-company-id'] ?? '', req.user?.id ?? req.user?.sub ?? '', id, nota);
+    return this.svc.resolverAlerta(req.headers['x-company-id'] ?? '', req.user?.id ?? req.user?.sub ?? '', id, nota, isMasterAdmin(req.user));
   }
 
   @Patch('obrigacoes/:id')

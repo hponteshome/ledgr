@@ -88,7 +88,7 @@ export class ObrigacoesService {
 
   private async contexto(companyId: string) {
     const [company, regimes, contratos, feriados] = await Promise.all([
-      this.prisma.company.findUnique({ where: { id: companyId }, select: { openingDate: true, temFolha: true, temProLabore: true, obrigacoesDesde: true } }),
+      this.prisma.company.findUnique({ where: { id: companyId }, select: { openingDate: true, temFolha: true, temProLabore: true, obrigacoesDesde: true, folhaDesde: true } }),
       this.prisma.companyTaxRegime.findMany({ where: { companyId }, orderBy: { dtIni: 'asc' } }),
       this.prisma.rentalContract.findMany({ where: { companyId }, select: { startDate: true, endDate: true } }),
       this.prisma.holiday.findMany({ where: { type: 'NACIONAL' as any }, select: { date: true } }),
@@ -121,7 +121,7 @@ export class ObrigacoesService {
     const novas: { code: string; competence: string; dueDate: Date }[] = [];
     const ctxDe = (d: Date): Ctx => {
       const g = regimeEm(d);
-      return { regime: g?.formaTributacao ?? null, apuracao: g?.periodoApuracaoIRPJ ?? null, temFolha: company.temFolha, temProLabore: company.temProLabore, temLocacao };
+      return { regime: g?.formaTributacao ?? null, apuracao: g?.periodoApuracaoIRPJ ?? null, temFolha: company.temFolha && (!company.folhaDesde || d >= company.folhaDesde), temProLabore: company.temProLabore, temLocacao };
     };
     while (y < anoAtual || (y === anoAtual && m <= mesAtual)) {
       const c = ctxDe(utc(y, m, 1)); const cp = comp(y, m);

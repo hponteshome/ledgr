@@ -159,6 +159,7 @@ export class CompanyService {
     if (data.temFolha !== undefined) updateData.temFolha = data.temFolha === true || data.temFolha === 'true';
     if (data.temProLabore !== undefined) updateData.temProLabore = data.temProLabore === true || data.temProLabore === 'true';
     if (data.obrigacoesDesde !== undefined) updateData.obrigacoesDesde = data.obrigacoesDesde ? new Date(String(data.obrigacoesDesde).slice(0, 10) + 'T00:00:00Z') : null;
+    if (data.folhaDesde !== undefined) updateData.folhaDesde = data.folhaDesde ? new Date(String(data.folhaDesde).slice(0, 10) + 'T00:00:00Z') : null;
     const allowedFields = [
       'taxId', 'legalName', 'tradeName', 'openingDate', 'isHeadquarter', 'type',
       'mainActivity', 'secondaryActivities', 

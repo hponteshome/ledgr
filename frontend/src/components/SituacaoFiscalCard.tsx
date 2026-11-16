@@ -6,10 +6,11 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FiLock, FiAlertTriangle, FiAlertOctagon, FiRotateCcw, FiClock, FiDollarSign, FiChevronRight, FiGrid } from 'react-icons/fi';
 import api from '../services/api';
+import { toast } from 'react-hot-toast';
 import { ListaRecolhida } from './ListaRecolhida';
 
 type Sit = 'ATRASADA' | 'RETIFICAR' | 'PENDENTE' | 'ENTREGUE' | 'DISPENSADA';
-interface Alerta { id: string; severity: string; title: string; message: string | null; locked: boolean; blocksAction: string | null; createdByName: string | null; createdAt: string; }
+interface Alerta { id: string; severity: string; title: string; message: string | null; locked: boolean; blocksAction: string | null; createdByName: string | null; createdAt: string; actionUrl?: string | null; actionLabel?: string | null; }
 interface Grupo { code: string; label: string; sit: Sit; de: string; ate: string; qtd: number; dueDate: string; notes: string | null; dependsOn: string | null; }
 interface Prox { id: string; code: string; label: string; competence: string; dueDate: string; notes: string | null; }
 interface Darf { id: string; codigo: string; descricao: string | null; periodoApuracao: string | null; vencimento: string; total: number; numeroReferencia: string | null; vencido: boolean; }
@@ -40,6 +41,28 @@ const COR: Record<Sit, { bg: string; fg: string; rot: string }> = {
 };
 const ORDEM_LEGENDA: Sit[] = ['ATRASADA', 'RETIFICAR', 'PENDENTE', 'ENTREGUE', 'DISPENSADA'];
 
+// Onde corrigir e orientacao de cada obrigacao (16/11/2026) - generico, para todas as empresas
+const OBRIG: Record<string, { rota: string; dica: string }> = {
+  ECF: { rota: '/app/sped/ecf', dica: 'Último dia útil de julho do ano seguinte. Atraso: Lei 8.218 art. 12 (Presumido) ou 0,25%/mês do lucro (Real).' },
+  ECD: { rota: '/app/sped/ecd', dica: 'Último dia útil de junho. Obrigatória no Lucro Real; no Presumido, facultativa e sem multa.' },
+  DIMOB: { rota: '/app/assets/rental-contracts', dica: 'Último dia útil de fevereiro. Multa por mês de atraso (MP 2.158-35, art. 57); base: contratos e recebimentos.' },
+  EFD_CONTRIB: { rota: '/app/sped/efd', dica: '10º dia útil do 2º mês seguinte. Multa 0,02%/dia sobre a receita do mês, limite 1%.' },
+  DCTF: { rota: '/app/sistema/obrigacoes', dica: 'DCTF mensal (PGD) até dez/2024: 15º dia útil do 2º mês. Multa 2%/mês sobre os tributos, mínimo R$ 500.' },
+  DCTFWEB: { rota: '/app/hr/dctfweb', dica: 'DCTFWeb/MIT: dia 25 do mês seguinte (desde 2025). Confissão dos tributos do mês.' },
+  PIS_COFINS: { rota: '/app/fiscal/apuracao', dica: 'DARF de PIS/Cofins até o dia 25 do mês seguinte.' },
+  IRPJ_CSLL_TRI: { rota: '/app/fiscal/apuracao', dica: 'DARF de IRPJ/CSLL: último dia útil do mês seguinte ao trimestre.' },
+  IRPJ_CSLL_AJUSTE: { rota: '/app/fiscal/apuracao', dica: 'Ajuste anual do Lucro Real: último dia útil de março do ano seguinte.' },
+  DAS: { rota: '/app/fiscal/apuracao', dica: 'DAS do Simples: dia 20 do mês seguinte.' },
+  DEFIS: { rota: '/app/sistema/obrigacoes', dica: 'DEFIS: 31 de março do ano seguinte.' },
+  ESOCIAL: { rota: '/app/hr/esocial', dica: 'eSocial: eventos periódicos até o dia 15 do mês seguinte.' },
+  FGTS: { rota: '/app/hr/folha', dica: 'FGTS Digital: dia 20 do mês seguinte.' },
+  INSS_DARF: { rota: '/app/hr/dctfweb', dica: 'INSS pelo DARF da DCTFWeb: dia 20 do mês seguinte.' },
+  GPS_INSS: { rota: '/app/hr/pro-labore', dica: 'GPS (até set/2021): dia 20 do mês seguinte.' },
+  DIRF: { rota: '/app/hr/informe-rendimentos', dica: 'DIRF extinta a partir do AC 2025; até então, último dia útil de fevereiro.' },
+};
+const link: React.CSSProperties = { fontSize: 12, color: '#0369A1', cursor: 'pointer', fontWeight: 500 };
+const linkCinza: React.CSSProperties = { fontSize: 12, color: '#6B7280', cursor: 'pointer' };
+
 const pill = (bg: string, color: string): React.CSSProperties => ({
   display: 'inline-flex', alignItems: 'center', gap: 3, padding: '2px 8px', borderRadius: 9999,
   fontSize: 11, fontWeight: 500, background: bg, color, whiteSpace: 'nowrap',
@@ -63,6 +86,7 @@ export const SituacaoFiscalCard: React.FC<{ refreshKey?: number }> = ({ refreshK
   const navigate = useNavigate();
   const [d, setD] = useState<Painel | null>(null);
   const [erro, setErro] = useState<string | null>(null);
+  const [resolv, setResolv] = useState<string | null>(null); const [nota, setNota] = useState(''); const [rk, setRk] = useState(0);
 
   useEffect(() => {
     let vivo = true;
@@ -70,13 +94,19 @@ export const SituacaoFiscalCard: React.FC<{ refreshKey?: number }> = ({ refreshK
       .then(r => { if (vivo) { setD(r.data?.data ?? r.data); setErro(null); } })
       .catch(e => { if (vivo) setErro(e?.response?.data?.message ?? 'Falha ao carregar a situação fiscal'); });
     return () => { vivo = false; };
-  }, [refreshKey]);
+  }, [refreshKey, rk]);
 
   if (erro) return <div style={{ ...caixa, padding: '0.75rem 1rem', fontSize: 12, color: '#991B1B', background: '#FCEBEB' }}>Situação fiscal: {erro}</div>;
   if (!d) return null;
   if (d.alertas.length === 0 && d.matriz.linhas.length === 0 && d.darfs.length === 0) return null;
   const k = d.kpis;
   const irObrigacoes = () => navigate('/app/sistema/obrigacoes');
+  const irCod = (code: string) => navigate(OBRIG[code]?.rota ?? '/app/sistema/obrigacoes');
+  const resolver = async (id: string) => {
+    if (!nota.trim()) { toast.error('Informe o motivo da resolução.'); return; }
+    try { await api.post('/situacao-fiscal/alertas/' + id + '/resolver', { nota }); toast.success('Resolução registrada.'); setResolv(null); setRk(k => k + 1); }
+    catch (e: any) { toast.error(e?.response?.data?.message ?? 'Falha ao registrar a resolução'); }
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -96,6 +126,17 @@ export const SituacaoFiscalCard: React.FC<{ refreshKey?: number }> = ({ refreshK
                 {a.locked && <span style={pill('#FEE2E2', '#991B1B')}><FiLock size={10} /> Travado - só sai com resolução registrada</span>}
                 {a.blocksAction && <span style={pill('#F3F4F6', '#374151')}>Bloqueia: {a.blocksAction === 'ECF_EXPORT' ? 'geração da ECF' : a.blocksAction}</span>}
                 <span style={{ fontSize: 11, color: '#9CA3AF' }}>desde {fmtD(a.createdAt)}{a.createdByName ? ' · ' + a.createdByName : ''}</span>
+              </div>
+              <div style={{ display: 'flex', gap: 14, marginTop: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                {a.actionUrl && <span onClick={() => navigate(a.actionUrl as string)} style={link}>{a.actionLabel || 'Ir para a correção'} →</span>}
+                {resolv !== a.id && <span onClick={() => { setResolv(a.id); setNota(''); }} style={linkCinza}>Registrar resolução</span>}
+                {resolv === a.id && (
+                  <span style={{ display: 'flex', gap: 6, alignItems: 'center', flex: 1, minWidth: 260 }}>
+                    <input autoFocus value={nota} onChange={e => setNota(e.target.value)} placeholder='Motivo da resolução (fica registrado)' style={{ flex: 1, height: 28, border: '0.5px solid #D1D5DB', borderRadius: 6, padding: '0 8px', fontSize: 12 }} />
+                    <button type='button' onClick={() => resolver(a.id)} style={{ height: 28, border: 'none', borderRadius: 6, padding: '0 12px', fontSize: 12, background: '#111827', color: '#fff', cursor: 'pointer' }}>Confirmar</button>
+                    <button type='button' onClick={() => setResolv(null)} style={{ height: 28, border: '0.5px solid #D1D5DB', borderRadius: 6, padding: '0 10px', fontSize: 12, background: '#fff', cursor: 'pointer' }}>Cancelar</button>
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -122,7 +163,7 @@ export const SituacaoFiscalCard: React.FC<{ refreshKey?: number }> = ({ refreshK
           <ListaRecolhida itens={d.grupos} render={(g, i, vis) => {
             const c = COR[g.sit];
             return (
-              <div key={g.code + g.de + g.sit} onClick={irObrigacoes}
+              <div key={g.code + g.de + g.sit} onClick={() => irCod(g.code)} title={OBRIG[g.code]?.dica}
                 style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '0.6rem 1rem', cursor: 'pointer',
                   borderBottom: i === vis.length - 1 ? 'none' : '0.5px solid #F3F4F6' }}>
                 <span style={{ ...pill(c.bg, c.fg), minWidth: 74, justifyContent: 'center' }}>{c.rot}</span>
@@ -132,6 +173,7 @@ export const SituacaoFiscalCard: React.FC<{ refreshKey?: number }> = ({ refreshK
                   </div>
                   {g.notes && <div style={{ fontSize: 11, color: '#6B7280', marginTop: 1 }}>{g.notes}</div>}
                   {g.dependsOn && <div style={{ fontSize: 11, color: '#9A3412', marginTop: 1 }}>Depende de: {g.dependsOn}</div>}
+                  {OBRIG[g.code] && <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 1 }}>{OBRIG[g.code].dica}</div>}
                 </div>
                 <div style={{ fontSize: 11, color: '#9CA3AF', whiteSpace: 'nowrap', textAlign: 'right' }}>
                   {g.sit === 'ATRASADA' ? 'prazo ' + fmtD(g.dueDate) : g.sit === 'PENDENTE' ? 'vence ' + fmtD(g.dueDate) : ''}
@@ -149,7 +191,7 @@ export const SituacaoFiscalCard: React.FC<{ refreshKey?: number }> = ({ refreshK
             <ListaRecolhida itens={d.proximas} render={p => {
               const n = dias(p.dueDate);
               return (
-                <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem 1rem', borderBottom: '0.5px solid #F3F4F6', fontSize: 12 }}>
+                <div key={p.id} onClick={() => irCod(p.code)} title={OBRIG[p.code]?.dica} style={{ cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem 1rem', borderBottom: '0.5px solid #F3F4F6', fontSize: 12 }}>
                   <span style={{ color: '#111' }}>{p.label} · {fmtComp(p.competence)}</span>
                   <span style={pill(n <= 3 ? '#FEF3C7' : '#D1FAE5', n <= 3 ? '#92400E' : '#065F46')}>{fmtD(p.dueDate)} · {n === 0 ? 'hoje' : n + 'd'}</span>
                 </div>
@@ -204,7 +246,7 @@ export const SituacaoFiscalCard: React.FC<{ refreshKey?: number }> = ({ refreshK
               <tbody>
                 {d.matriz.linhas.map(l => (
                   <tr key={l.code}>
-                    <td style={{ padding: '0.45rem 1rem', color: '#111', borderBottom: '0.5px solid #F3F4F6', whiteSpace: 'nowrap' }}>{l.label}</td>
+                    <td style={{ padding: '0.45rem 1rem', color: '#111', borderBottom: '0.5px solid #F3F4F6', whiteSpace: 'nowrap', cursor: 'pointer' }} title={OBRIG[l.code]?.dica} onClick={() => irCod(l.code)}>{l.label}</td>
                     {d.matriz.anos.map(a => {
                       const c = l.celulas[a];
                       return (
