@@ -72,7 +72,7 @@ export const CATALOGO: Regra[] = [
     aplica: (c) => c.regime === '1' && c.apuracao !== 'T', prazo: (y, _m, u) => u.ultimoUtil(y + 1, 3) },
   { code: 'ECD', label: 'ECD', tipo: 'ACESSORIA', periodicidade: 'ANUAL', aplica: (c) => c.regime === '1',
     prazo: (y, _m, u) => u.ultimoUtil(y + 1, y >= 2020 ? 6 : 5) },
-  { code: 'ECF', label: 'ECF', tipo: 'ACESSORIA', periodicidade: 'ANUAL', aplica: (c) => em(c, LUCRO), prazo: (y, _m, u) => u.ultimoUtil(y + 1, 7) },
+  { code: 'ECF', label: 'ECF', tipo: 'ACESSORIA', periodicidade: 'ANUAL', vigencia: { de: '2014' }, aplica: (c) => em(c, LUCRO), prazo: (y, _m, u) => u.ultimoUtil(y + 1, 7) },
   { code: 'DIMOB', label: 'DIMOB', tipo: 'ACESSORIA', periodicidade: 'ANUAL', aplica: (c, y) => c.temLocacao(y), prazo: (y, _m, u) => u.ultimoUtil(y + 1, 2) },
   { code: 'DIRF', label: 'DIRF', tipo: 'ACESSORIA', periodicidade: 'ANUAL', vigencia: { ate: '2024' }, aplica: folha, prazo: (y, _m, u) => u.ultimoUtil(y + 1, 2) },
   { code: 'DEFIS', label: 'DEFIS', tipo: 'ACESSORIA', periodicidade: 'ANUAL', aplica: (c) => c.regime === 'S', prazo: (y, _m, u) => u.dia(y + 1, 3, 31, 'POSTERGA') },
@@ -88,7 +88,7 @@ export class ObrigacoesService {
 
   private async contexto(companyId: string) {
     const [company, regimes, contratos, feriados] = await Promise.all([
-      this.prisma.company.findUnique({ where: { id: companyId }, select: { openingDate: true, temFolha: true, temProLabore: true } }),
+      this.prisma.company.findUnique({ where: { id: companyId }, select: { openingDate: true, temFolha: true, temProLabore: true, obrigacoesDesde: true } }),
       this.prisma.companyTaxRegime.findMany({ where: { companyId }, orderBy: { dtIni: 'asc' } }),
       this.prisma.rentalContract.findMany({ where: { companyId }, select: { startDate: true, endDate: true } }),
       this.prisma.holiday.findMany({ where: { type: 'NACIONAL' as any }, select: { date: true } }),
@@ -109,7 +109,14 @@ export class ObrigacoesService {
     if (!company) return { criadas: 0, total: 0 };
     const hoje = new Date();
     const anoAtual = hoje.getUTCFullYear(), mesAtual = hoje.getUTCMonth() + 1;
-    const ini = company.openingDate;
+    // Inicio: obrigacoes_desde da empresa ou ultimos 5 anos; nunca antes da abertura.
+    // Tributos (DARF) so a partir do ano corrente - os pagos ficam controlados em tax_darfs.
+    const abertura = company.openingDate;
+    const padrao = utc(anoAtual - 5, 1, 1);
+    const desde = company.obrigacoesDesde ?? (abertura > padrao ? abertura : padrao);
+    const ini = desde < abertura ? abertura : desde;
+    const compIniTributo = comp(anoAtual, 1);
+    const pode = (r: Regra, cp: string) => r.tipo !== 'TRIBUTO' || cp >= compIniTributo;
     let y = ini.getUTCFullYear(), m = ini.getUTCMonth() + 1;
     const novas: { code: string; competence: string; dueDate: Date }[] = [];
     const ctxDe = (d: Date): Ctx => {
@@ -119,22 +126,33 @@ export class ObrigacoesService {
     while (y < anoAtual || (y === anoAtual && m <= mesAtual)) {
       const c = ctxDe(utc(y, m, 1)); const cp = comp(y, m);
       for (const r of CATALOGO) {
-        if (r.periodicidade === 'MENSAL' && vigente(r, cp) && r.aplica(c, y, m)) novas.push({ code: r.code, competence: cp, dueDate: r.prazo(y, m, util) });
-        if (r.periodicidade === 'TRIMESTRAL' && m % 3 === 0 && vigente(r, cp) && r.aplica(c, y, m)) novas.push({ code: r.code, competence: cp, dueDate: r.prazo(y, m, util) });
+        if (r.periodicidade === 'MENSAL' && vigente(r, cp) && pode(r, cp) && r.aplica(c, y, m)) novas.push({ code: r.code, competence: cp, dueDate: r.prazo(y, m, util) });
+        if (r.periodicidade === 'TRIMESTRAL' && m % 3 === 0 && vigente(r, cp) && pode(r, cp) && r.aplica(c, y, m)) novas.push({ code: r.code, competence: cp, dueDate: r.prazo(y, m, util) });
       }
       [y, m] = mais(y, m, 1);
     }
     for (let a = ini.getUTCFullYear(); a < anoAtual; a++) {
       const c = ctxDe(utc(a, 12, 31));
       for (const r of CATALOGO) {
-        if (r.periodicidade === 'ANUAL' && vigente(r, String(a)) && r.aplica(c, a, 12)) novas.push({ code: r.code, competence: String(a), dueDate: r.prazo(a, 12, util) });
+        if (r.periodicidade === 'ANUAL' && vigente(r, String(a)) && pode(r, String(a)) && r.aplica(c, a, 12)) novas.push({ code: r.code, competence: String(a), dueDate: r.prazo(a, 12, util) });
       }
     }
+    // Reconciliacao: apaga o que o proprio gerador criou e deixou de valer (PENDING sem nenhuma intervencao do usuario).
+    const devidas = new Set(novas.map(n => n.code + '|' + n.competence));
+    const codigos = CATALOGO.map(r => r.code);
+    const pendentes = await this.prisma.fiscalObligation.findMany({
+      where: { companyId, status: 'PENDING' as any, code: { in: codigos } },
+      select: { id: true, code: true, competence: true, notes: true, receiptNumber: true, deliveredAt: true, doneAt: true, dependsOn: true },
+    });
+    const remover = pendentes
+      .filter(p => !p.notes && !p.receiptNumber && !p.deliveredAt && !p.doneAt && !p.dependsOn && !devidas.has(p.code + '|' + p.competence))
+      .map(p => p.id);
+    if (remover.length) await this.prisma.fiscalObligation.deleteMany({ where: { id: { in: remover } } });
     const existentes = await this.prisma.fiscalObligation.findMany({ where: { companyId }, select: { code: true, competence: true } });
     const chave = new Set(existentes.map(e => e.code + '|' + e.competence));
     const data = novas.filter(n => !chave.has(n.code + '|' + n.competence)).map(n => ({ companyId, code: n.code, competence: n.competence, dueDate: n.dueDate, status: 'PENDING' as any }));
     if (data.length) await this.prisma.fiscalObligation.createMany({ data, skipDuplicates: true });
-    return { criadas: data.length, total: existentes.length + data.length, regimes: regimes.length };
+    return { criadas: data.length, removidas: remover.length, total: existentes.length + data.length, desde: iso(ini), regimes: regimes.length };
   }
 
   // Compatibilidade: gera o historico e devolve a competencia pedida

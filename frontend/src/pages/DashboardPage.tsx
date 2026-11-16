@@ -316,7 +316,7 @@ export const DashboardPage: React.FC = () => {
       <div style={{ background: '#fff', border: '0.5px solid #E5E7EB', borderRadius: 10, overflow: 'hidden', marginBottom: 8 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1rem', background: '#F9FAFB', borderBottom: '0.5px solid #E5E7EB' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 500, color: '#111' }}>
-            <FiCalendar size={15} color="#0369A1" /> Cronograma de obrigacoes
+            <FiCalendar size={15} color="#0369A1" /> Cronograma financeiro
             <span style={{ fontSize: 11, color: '#9CA3AF', fontWeight: 400 }}>({cronograma.length})</span>
           </div>
           <div style={{ display: 'flex', gap: 12, fontSize: 11, color: '#6B7280', alignItems: 'center' }}>

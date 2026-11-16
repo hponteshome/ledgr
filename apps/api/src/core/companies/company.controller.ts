@@ -111,7 +111,7 @@ export class CompanyController {
     const company = await this.companyService.findById(req.companyId);
     if (!company) throw new NotFoundException('Empresa do usuário não encontrada.');
     // 16/11/2026: CompanyDto nao conhece o perfil fiscal - devolve as flags junto
-    return { ...new CompanyDto(company), temFolha: (company as any).temFolha ?? false, temProLabore: (company as any).temProLabore ?? false };
+    return { ...new CompanyDto(company), temFolha: (company as any).temFolha ?? false, temProLabore: (company as any).temProLabore ?? false, obrigacoesDesde: (company as any).obrigacoesDesde ?? null };
   }
 
   @Get()
@@ -134,7 +134,7 @@ export class CompanyController {
     const company = await this.companyService.findById(id);
     if (!company) throw new NotFoundException('Empresa não encontrada.');
     // 16/11/2026: CompanyDto nao conhece o perfil fiscal - devolve as flags junto
-    return { ...new CompanyDto(company), temFolha: (company as any).temFolha ?? false, temProLabore: (company as any).temProLabore ?? false };
+    return { ...new CompanyDto(company), temFolha: (company as any).temFolha ?? false, temProLabore: (company as any).temProLabore ?? false, obrigacoesDesde: (company as any).obrigacoesDesde ?? null };
   }
 
   @Post('quick')

@@ -283,6 +283,7 @@ export const CompanyShow: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Field label="Folha de pagamento (empregados)" value={company.temFolha ? 'Sim' : 'Não'} />
             <Field label="Pró-labore com recolhimento" value={company.temProLabore ? 'Sim' : 'Não'} />
+            <Field label="Agenda de obrigações desde" value={company.obrigacoesDesde ? String(company.obrigacoesDesde).slice(0, 10).split('-').reverse().join('/') : 'Últimos 5 anos'} />
           </div>
         </Section>
       )}

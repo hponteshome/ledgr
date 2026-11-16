@@ -345,6 +345,7 @@ model Company {
   // Perfil fiscal (16/11/2026): base do catalogo de obrigacoes
   temFolha                  Boolean                    @default(false) @map("tem_folha")
   temProLabore              Boolean                    @default(false) @map("tem_pro_labore")
+  obrigacoesDesde           DateTime?                  @map("obrigacoes_desde") @db.Date
   pettyCashEntries          PettyCashEntry[]
   fiscalObligations         FiscalObligation[]
   history                   CompanyHistory[]
