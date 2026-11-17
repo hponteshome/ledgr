@@ -46,6 +46,16 @@ export default function RentalContractsListPage() {
         try { await api.patch('/rental-contracts/' + id + '/lastro', { conferido: true }); setLastroOk(p => ({ ...p, [id]: true })); toast.success('Lastro conferido.'); }
         catch (e: any) { toast.error(e?.response?.data?.message ?? 'Falha ao registrar a conferência.'); }
     };
+    // LASTRO-02 (17/11/2026): ressalva do lastro (contrato cumprido sem assinatura) digitada na propria coluna
+    const [ressEdit, setRessEdit] = useState<string | null>(null);
+    const [ressTxt, setRessTxt] = useState('');
+    const [ressOk, setRessOk] = useState<Record<string, string>>({});
+    const salvarRessalva = async (id: string) => {
+        const t = ressTxt.trim();
+        if (t.length < 10) { toast.error('Descreva o motivo e a fonte da comprovação (mínimo 10 caracteres).'); return; }
+        try { await api.patch('/rental-contracts/' + id + '/lastro', { ressalva: t }); setRessOk(p => ({ ...p, [id]: t })); setRessEdit(null); toast.success('Ressalva registrada.'); }
+        catch (e: any) { toast.error(e?.response?.data?.message ?? 'Falha ao registrar a ressalva.'); }
+    };
     const { token } = useAuth();
     const { activeCompany } = useCompany();
 
@@ -150,10 +160,19 @@ export default function RentalContractsListPage() {
                                 <td className="px-3 py-2.5 text-center" onClick={e => e.stopPropagation()}>
                                     {(() => {
                                         const x: any = c;
+                                        if (ressEdit === x.id) return (
+                                            <div className="flex items-center gap-1 justify-center">
+                                                <input autoFocus value={ressTxt} onChange={e => setRessTxt(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') salvarRessalva(x.id); if (e.key === 'Escape') setRessEdit(null); }}
+                                                    placeholder="Ex.: minuta não assinada; aluguel recebido de mm/aa a mm/aa no Bradesco (ECD aaaa)" className="border border-gray-300 rounded px-2 py-1 text-xs w-80" />
+                                                <button type="button" onClick={() => salvarRessalva(x.id)} className="px-2 py-1 rounded text-xs bg-gray-900 text-white">Salvar</button>
+                                                <button type="button" onClick={() => setRessEdit(null)} className="px-2 py-1 rounded text-xs border border-gray-300">×</button>
+                                            </div>
+                                        );
+                                        const ress: string | null = ressOk[x.id] ?? x.lastroRessalva ?? null;
                                         if (x.lastroConferidoEm || lastroOk[x.id]) return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700" title={x.lastroRessalva ?? 'Dados conferidos com o contrato assinado'}>Conferido</span>;
                                         if (x.signedDocumentId) return <button type="button" onClick={() => conferir(x.id)} className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700 hover:bg-blue-200" title="Clique para registrar que os dados conferem com o PDF assinado">Com documento - conferir</button>;
-                                        if (x.lastroRessalva) return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800" title={x.lastroRessalva}>Ressalva</span>;
-                                        return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">Sem documento</span>;
+                                        if (ress) return <button type="button" onClick={() => { setRessEdit(x.id); setRessTxt(ress); }} className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 hover:bg-amber-200" title={ress + ' (clique para editar)'}>Ressalva</button>;
+                                        return <button type="button" onClick={() => { setRessEdit(x.id); setRessTxt(''); }} className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500 hover:bg-amber-100 hover:text-amber-800" title="Sem PDF assinado. Clique para registrar a ressalva (contrato cumprido sem assinatura)">Sem documento - ressalvar</button>;
                                     })()}
                                 </td>
                                 <td className="px-3 py-2.5 text-center">

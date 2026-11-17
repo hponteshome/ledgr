@@ -10,7 +10,7 @@ import { toast } from 'react-hot-toast';
 import { ListaRecolhida } from './ListaRecolhida';
 
 type Sit = 'ATRASADA' | 'RETIFICAR' | 'PENDENTE' | 'ENTREGUE' | 'DISPENSADA';
-interface Alerta { id: string; severity: string; title: string; message: string | null; locked: boolean; blocksAction: string | null; createdByName: string | null; createdAt: string; actionUrl?: string | null; actionLabel?: string | null; }
+interface Alerta { id: string; severity: string; title: string; message: string | null; locked: boolean; blocksAction: string | null; createdByName: string | null; createdAt: string; actionUrl?: string | null; actionLabel?: string | null; auto?: boolean; }
 interface Grupo { code: string; label: string; sit: Sit; de: string; ate: string; qtd: number; dueDate: string; notes: string | null; dependsOn: string | null; }
 interface Prox { id: string; code: string; label: string; competence: string; dueDate: string; notes: string | null; }
 interface Darf { id: string; codigo: string; descricao: string | null; periodoApuracao: string | null; vencimento: string; total: number; numeroReferencia: string | null; vencido: boolean; }
@@ -129,7 +129,7 @@ export const SituacaoFiscalCard: React.FC<{ refreshKey?: number }> = ({ refreshK
               </div>
               <div style={{ display: 'flex', gap: 14, marginTop: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                 {a.actionUrl && <span onClick={() => navigate(a.actionUrl as string)} style={link}>{a.actionLabel || 'Ir para a correção'} →</span>}
-                {resolv !== a.id && <span onClick={() => { setResolv(a.id); setNota(''); }} style={linkCinza}>Registrar resolução</span>}
+                {!a.auto && resolv !== a.id && <span onClick={() => { setResolv(a.id); setNota(''); }} style={linkCinza}>Registrar resolução</span>}
                 {resolv === a.id && (
                   <span style={{ display: 'flex', gap: 6, alignItems: 'center', flex: 1, minWidth: 260 }}>
                     <input autoFocus value={nota} onChange={e => setNota(e.target.value)} placeholder='Motivo da resolução (fica registrado)' style={{ flex: 1, height: 28, border: '0.5px solid #D1D5DB', borderRadius: 6, padding: '0 8px', fontSize: 12 }} />

@@ -96,12 +96,27 @@ export class SituacaoFiscalService {
       total: Number(x.total), numeroReferencia: x.numeroReferencia ?? null, vencido: ymd(x.vencimento) < hoje,
     }));
 
+    // LASTRO-02 (17/11/2026): alerta calculado - contrato de locacao ativo (inclusive futuro) sem PDF assinado e sem ressalva.
+    // Nao grava em company_alerts: some sozinho quando o contrato ganha lastro. Nao bloqueia nada (decisao do usuario: so alertar).
+    const semLastro = await this.prisma.rentalContract.findMany({
+      where: { companyId, deletedAt: null, status: 'ATIVO', signedDocumentId: null, lastroRessalva: null },
+      select: { contractNumber: true, fixedAsset: { select: { internalCode: true } } },
+      orderBy: { startDate: 'asc' },
+    });
+    const autoLastro = semLastro.length === 0 ? [] : [{
+      id: 'auto-lastro-contratos', severity: 'WARNING',
+      title: semLastro.length === 1 ? '1 contrato de locação sem assinatura' : semLastro.length + ' contratos de locação sem assinatura',
+      message: 'Sem PDF assinado e sem ressalva: ' + semLastro.map(c => (c.contractNumber ?? 's/n') + ' (' + (c.fixedAsset?.internalCode ?? '?') + ')').join(', ') + '. Anexe o contrato assinado ou registre a ressalva na coluna Lastro.',
+      locked: false, actionUrl: '/app/assets/rental-contracts', actionLabel: 'Ver contratos sem lastro',
+      blocksAction: null, createdByName: null, createdAt: new Date().toISOString(), auto: true,
+    }];
+
     return {
       hoje,
-      alertas: alertas.map(a => ({
+      alertas: [...alertas.map(a => ({
         id: a.id, severity: a.severity, title: a.title, message: a.message ?? null, locked: a.locked, actionUrl: (a as any).actionUrl ?? null, actionLabel: (a as any).actionLabel ?? null,
         blocksAction: a.blocksAction ?? null, createdByName: a.createdByName ?? null, createdAt: a.createdAt.toISOString(),
-      })),
+      })), ...autoLastro],
       kpis: {
         atrasadas: itens.filter(i => i.sit === 'ATRASADA').length,
         retificar: itens.filter(i => i.sit === 'RETIFICAR').length,
