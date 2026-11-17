@@ -681,7 +681,7 @@ export class DocumentsService {
   private async buildLocacaoBaseFilename(doc: any): Promise<string | null> {
     if (doc.type !== 'CONTRATO_LOCACAO') return null;
     const contract = await this.prisma.rentalContract.findFirst({
-      where: { documentId: doc.id, deletedAt: null },
+      where: { OR: [{ documentId: doc.id }, { signedDocumentId: doc.id }], deletedAt: null },
       include: { fixedAsset: { select: { internalCode: true } } },
     });
     if (!contract || !contract.fixedAsset?.internalCode) return null;
