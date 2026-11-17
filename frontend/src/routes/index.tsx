@@ -88,6 +88,7 @@ import LivroLalurPage from '../pages/accounting/LivroLalurPage';
 import RazaoAnaliticoPage from '../pages/accounting/RazaoAnaliticoPage';
 import CdbProjecaoPage from '../pages/accounting/investments/CdbProjecaoPage';
 import ProLaborePage from '../pages/hr/ProLaboreDiretoria';
+import EsocialS13Page from '../pages/hr/EsocialS13Page';
 import InformeRendimentosPage from '../pages/hr/InformeRendimentosPage';
 import { EmployeesPage } from '../pages/hr/EmployeesPage';
 import EsocialPage from '../pages/hr/EsocialPage';
@@ -235,6 +236,7 @@ export const AppRoutes = () => {
                 <Route path="app/finance/agenda" element={<ProtectedRoute><AgendaPage /></ProtectedRoute>} />
                 <Route path="app/finance/provisoes" element={<ProtectedRoute><ProvisoesPage /></ProtectedRoute>} />
                 <Route path="app/hr/pro-labore" element={<ProtectedRoute><ProLaborePage /></ProtectedRoute>} />
+                <Route path="app/hr/esocial-s13" element={<ProtectedRoute><EsocialS13Page /></ProtectedRoute>} />
                 <Route path="app/hr/informe-rendimentos" element={<ProtectedRoute><InformeRendimentosPage /></ProtectedRoute>} />
                 <Route path="app/hr/employees" element={<ProtectedRoute><EmployeesPage /></ProtectedRoute>} />
                 <Route path="/app/hr/esocial" element={<ProtectedRoute><EsocialPage /></ProtectedRoute>} />

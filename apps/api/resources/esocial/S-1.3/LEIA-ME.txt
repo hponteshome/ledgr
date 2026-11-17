@@ -1,0 +1,2 @@
+Esquemas XSD eSocial S-1.3 (pacote de 23/11/2026) e Pacote de Comunicacao v1.6, baixados de gov.br/esocial.
+Ao sair novo pacote oficial, substituir os arquivos desta pasta.

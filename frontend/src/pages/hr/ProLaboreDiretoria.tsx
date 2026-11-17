@@ -72,6 +72,7 @@ export default function ProLaboreDiretoria() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
         <span style={{ fontSize: 11, fontWeight: 600, color: '#0E7490', background: '#ECFEFF', padding: '3px 8px', borderRadius: 6 }}>◆ RH</span>
         <span style={{ fontSize: 18, fontWeight: 600, color: '#111827' }}>Pró-labore de Diretoria</span>
+        <button style={{ ...btnSec, marginLeft: 'auto' }} onClick={() => navigate('/app/hr/esocial-s13')}>eSocial S-1.3</button>
       </div>
       {erro && <div style={{ background: '#FCEBEB', color: '#A32D2D', borderRadius: 7, padding: '8px 12px', fontSize: 12, marginBottom: 12 }}>{erro}</div>}
       <div style={card}>

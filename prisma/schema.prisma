@@ -6145,3 +6145,85 @@ model TaxDarf {
   @@index([loteId])
   @@map("tax_darfs")
 }
+
+// ── eSocial S-1.3 - reconstrucao (17/11/2026) ─────────────────────────────
+model EsocialS13Config {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId     String   @unique @map("company_id") @db.Uuid
+  classTrib     String   @map("class_trib") @db.VarChar(2)
+  iniValidS1000 String   @map("ini_valid_s1000") @db.VarChar(7)
+  fpas          String   @db.VarChar(3)
+  codTercs      String   @map("cod_tercs") @db.VarChar(4)
+  codLotacao    String   @default("001") @map("cod_lotacao") @db.VarChar(30)
+  ideTabRubr    String   @default("LEDGR") @map("ide_tab_rubr") @db.VarChar(8)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  @@map("esocial_s13_config")
+}
+
+model EsocialS13Lote {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId       String    @map("company_id") @db.Uuid
+  tpAmb           Int       @map("tp_amb") @db.SmallInt
+  grupo           Int       @db.SmallInt
+  etapa           Int       @db.SmallInt
+  protocolo       String?   @db.VarChar(60)
+  status          String    @default("CRIADO") @db.VarChar(20)
+  cdResposta      Int?      @map("cd_resposta")
+  descResposta    String?   @map("desc_resposta") @db.Text
+  tempoEstimado   Int?      @map("tempo_estimado")
+  xmlEnvio        String?   @map("xml_envio") @db.Text
+  xmlRetornoEnvio String?   @map("xml_retorno_envio") @db.Text
+  xmlRetornoProc  String?   @map("xml_retorno_proc") @db.Text
+  enviadoEm       DateTime? @map("enviado_em") @db.Timestamp(6)
+  consultadoEm    DateTime? @map("consultado_em") @db.Timestamp(6)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+
+  @@index([companyId, tpAmb, status])
+  @@map("esocial_s13_lotes")
+}
+
+model EsocialS13Evento {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId    String   @map("company_id") @db.Uuid
+  tpAmb        Int      @map("tp_amb") @db.SmallInt
+  tipo         String   @db.VarChar(6)
+  perApur      String?  @map("per_apur") @db.VarChar(7)
+  chave        String   @db.VarChar(120)
+  eventoId     String   @map("evento_id") @db.VarChar(40)
+  grupo        Int      @db.SmallInt
+  etapa        Int      @db.SmallInt
+  xml          String   @db.Text
+  status       String   @default("GERADO") @db.VarChar(20)
+  validacao    String?  @db.Text
+  loteId       String?  @map("lote_id") @db.Uuid
+  nrRecibo     String?  @map("nr_recibo") @db.VarChar(60)
+  cdResposta   Int?     @map("cd_resposta")
+  descResposta String?  @map("desc_resposta") @db.Text
+  ocorrencias  Json?
+  retornoXml   String?  @map("retorno_xml") @db.Text
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  @@unique([companyId, tpAmb, chave])
+  @@index([companyId, tpAmb, status])
+  @@map("esocial_s13_eventos")
+}
+
+model ProLaborePagamento {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId    String    @map("company_id") @db.Uuid
+  configId     String?   @map("config_id") @db.Uuid
+  personId     String    @map("person_id") @db.Uuid
+  tipo         String    @default("PRO_LABORE") @db.VarChar(15) // PRO_LABORE | ADIANTAMENTO
+  competencia  String?   @db.VarChar(7)
+  dtPagamento  DateTime  @map("dt_pagamento") @db.Date
+  valorLiquido Decimal   @map("valor_liquido") @db.Decimal(15, 2)
+  observacao   String?   @db.VarChar(300)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  deletedAt    DateTime? @map("deleted_at") @db.Timestamp(6)
+
+  @@index([companyId, dtPagamento])
+  @@map("pro_labore_pagamentos")
+}

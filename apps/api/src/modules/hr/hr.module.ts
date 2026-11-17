@@ -32,10 +32,12 @@ import { RaisController } from './rais.controller';
 import { RaisService } from './services/rais.service';
 import { DctfWebController } from './dctfweb.controller';
 import { DctfWebService } from './services/dctfweb.service';
+import { EsocialS13Controller } from './esocial-s13/esocial-s13.controller';
+import { EsocialS13Service } from './esocial-s13/esocial-s13.service';
 @Module({
   imports: [SidebarPermissionsModule, PrismaModule, CertificatesModule],
-  controllers: [ProLaboreController, InformeController, EmployeeController, HrController, FolhaController, RescisaoController, FeriasController, RecessoController, DecimoTerceiroController, RaisController, DctfWebController],
-  providers: [ProLaboreService, GuiasService, InformeService, InformePdfService, EmployeePdfParserService, EmployeeService, EsocialS2200Service, EsocialEventsService, FolhaService, RescisaoService, TrctPdfService, EsocialTransmissionService, BancoHorasService, FeriasService, RecessoService, DecimoTerceiroService, RaisService, DctfWebService],
+  controllers: [ProLaboreController, InformeController, EmployeeController, HrController, FolhaController, RescisaoController, FeriasController, RecessoController, DecimoTerceiroController, RaisController, DctfWebController, EsocialS13Controller],
+  providers: [ProLaboreService, GuiasService, InformeService, InformePdfService, EmployeePdfParserService, EmployeeService, EsocialS2200Service, EsocialEventsService, FolhaService, RescisaoService, TrctPdfService, EsocialTransmissionService, BancoHorasService, FeriasService, RecessoService, DecimoTerceiroService, RaisService, DctfWebService, EsocialS13Service],
   exports: [ProLaboreService, GuiasService, InformeService, EmployeeService, EsocialS2200Service, EsocialEventsService, FolhaService, RescisaoService, TrctPdfService, EsocialTransmissionService, BancoHorasService, FeriasService],
 })
 export class HrModule {}
