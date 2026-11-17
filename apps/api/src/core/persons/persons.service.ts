@@ -180,6 +180,8 @@ async findByCpf(cpf: string) {
           : undefined,
         maritalStatus:      (dto.maritalStatus as any) === '' ? null : (dto.maritalStatus as any),
         matrimonialRegime:  (dto.matrimonialRegime as any) === '' ? null : (dto.matrimonialRegime as any),
+        racaCor:            dto.racaCor === '' ? null : dto.racaCor,
+        grauInstrucao:      dto.grauInstrucao === '' ? null : dto.grauInstrucao,
         updatedAt: new Date(),
       },
     });

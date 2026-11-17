@@ -445,6 +445,8 @@ model Person {
   birthCountry      String?            @default("Brasil") @map("birth_country") @db.VarChar
   nationality       String?            @default("Brasileira") @map("nationality") @db.VarChar
   gender            String?            @map("gender") @db.VarChar(20)
+  racaCor           String?            @map("raca_cor") @db.VarChar(1) // eSocial racaCor - autodeclaracao (17/11/2026)
+  grauInstrucao     String?            @map("grau_instrucao") @db.VarChar(2) // eSocial grauInstr 01-12
   dependents        Json?              @map("dependents") @db.Json
   maritalStatus     MaritalStatus?     @map("marital_status")
   matrimonialRegime MatrimonialRegime? @map("matrimonial_regime")

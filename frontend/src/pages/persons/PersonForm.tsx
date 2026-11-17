@@ -79,6 +79,8 @@ interface FormData {
   birthCountry: string;       // ← campo do schema
   dependents: Dependents[],
   gender: string;
+  racaCor: string;
+  grauInstrucao: string;
   nationality: string;
   maritalStatus: string;
   matrimonialRegime: string;
@@ -140,6 +142,7 @@ const EMPTY: FormData = {
   birthDate: '', birthCity: '', birthState: '', birthCountry: 'Brasil', dependents: [],
   nationality: '',
   gender: '',
+  racaCor: '', grauInstrucao: '',
   maritalStatus: '', matrimonialRegime: '',
   spouseName: '', spouseCpf: '',
   rgNumber: '', rgIssuer: '', rgIssueDate: '',
@@ -170,6 +173,30 @@ const fmtCep = (v: string) => { const d = v.replace(/\D/g,'').slice(0,8); return
 
 // Mesmo algoritmo usado no backend (apps/api/src/core/persons/persons.service.ts)
 // para manter a mesma regra de validacao nos dois lados.
+// eSocial S-1.3 - racaCor e grauInstr (conferidos com o XSD 23/11/2026). Campos opcionais da Pessoa.
+const RACA_COR_OPTIONS = [
+  { v: '1', t: '1 - Branca' },
+  { v: '2', t: '2 - Preta' },
+  { v: '3', t: '3 - Parda' },
+  { v: '4', t: '4 - Amarela' },
+  { v: '5', t: '5 - Indígena' },
+  { v: '6', t: '6 - Não informado (não aceito no eSocial para início a partir de 22/04/2024)' },
+];
+const GRAU_INSTRUCAO_OPTIONS = [
+  { v: '01', t: '01 - Analfabeto' },
+  { v: '02', t: '02 - Até o 5º ano incompleto do fundamental' },
+  { v: '03', t: '03 - 5º ano completo do fundamental' },
+  { v: '04', t: '04 - Do 6º ao 9º ano incompleto do fundamental' },
+  { v: '05', t: '05 - Ensino fundamental completo' },
+  { v: '06', t: '06 - Ensino médio incompleto' },
+  { v: '07', t: '07 - Ensino médio completo' },
+  { v: '08', t: '08 - Educação superior incompleta' },
+  { v: '09', t: '09 - Educação superior completa' },
+  { v: '10', t: '10 - Pós-graduação completa' },
+  { v: '11', t: '11 - Mestrado completo' },
+  { v: '12', t: '12 - Doutorado completo' },
+];
+
 function isValidCpf(cpf: string): boolean {
   const d = cpf.replace(/\D/g, '');
   if (d.length !== 11 || /^(\d)\1{10}$/.test(d)) return false;
@@ -313,6 +340,8 @@ export const PersonForm: React.FC = () => {
           nationality: data.nationality ?? 'Brasileiro(a)',
           dependents: data.dependents ?? [],
           gender: data.gender,
+          racaCor: data.racaCor ?? '',
+          grauInstrucao: data.grauInstrucao ?? '',
           maritalStatus: data.maritalStatus ?? '',
           matrimonialRegime: data.matrimonialRegime ?? '',
           spouseName: data.spouseName ?? '',
@@ -779,6 +808,21 @@ export const PersonForm: React.FC = () => {
                 </Field>
               </Grid>
             )}
+            {/* eSocial - opcionais (17/11/2026) */}
+            <Grid cols={2}>
+              <Field label="Raça/cor (autodeclaração)">
+                <select value={form.racaCor} onChange={e => set('racaCor', e.target.value)} className={inputCls}>
+                  <option value="">(em branco)</option>
+                  {RACA_COR_OPTIONS.map(o => <option key={o.v} value={o.v}>{o.t}</option>)}
+                </select>
+              </Field>
+              <Field label="Grau de instrução">
+                <select value={form.grauInstrucao} onChange={e => set('grauInstrucao', e.target.value)} className={inputCls}>
+                  <option value="">(em branco)</option>
+                  {GRAU_INSTRUCAO_OPTIONS.map(o => <option key={o.v} value={o.v}>{o.t}</option>)}
+                </select>
+              </Field>
+            </Grid>
           </Section>
 
           {/* 2.5 Dependentes */}

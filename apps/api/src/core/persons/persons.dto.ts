@@ -53,6 +53,8 @@ export class CreatePersonDto {
   @IsOptional() @IsString() @Length(2,2) birthState?: string;
   @IsOptional() @IsString()           birthCountry?: string;
   @IsOptional() @IsString()           nationality?: string;
+  @IsOptional() @IsString() @Matches(/^[1-6]?$/, { message: 'Raça/cor inválida (1 a 6).' }) racaCor?: string;
+  @IsOptional() @IsString() @Matches(/^(0[1-9]|1[0-2])?$/, { message: 'Grau de instrução inválido (01 a 12).' }) grauInstrucao?: string;
 
   @IsOptional() @IsEnum(MaritalStatus)     maritalStatus?: MaritalStatus;
   @IsOptional() @IsEnum(MatrimonialRegime) matrimonialRegime?: MatrimonialRegime;
