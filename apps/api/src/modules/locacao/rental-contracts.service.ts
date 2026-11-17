@@ -455,6 +455,7 @@ export class RentalContractsService {
         if (!d) throw new BadRequestException('Documento nao encontrado nesta empresa.');
       }
       data.signedDocumentId = sid; data.lastroConferidoEm = null; data.lastroConferidoPor = null;
+      if (sid && !c.documentId) data.documentId = sid; // LASTRO-04: sem documento principal, o PDF assinado e o documento do contrato (Arquivo mostra o vinculo)
     }
     if (body?.ressalva !== undefined) data.lastroRessalva = body.ressalva ? String(body.ressalva).trim() : null;
     if (body?.conferido === true) {

@@ -11,6 +11,7 @@ import { SmartDateInput } from '../../components/SmartDateInput';
 import { DocumentViewModal } from './DocumentViewModal';
 import { ImportarDocumentoModal } from './ImportarDocumentoModal';
 import api from '../../services/api';
+import toast from 'react-hot-toast';
 
 const API = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3000';
 const FIN = '#1A3A5C';
@@ -278,6 +279,24 @@ export const ImoveisDocumentosPage: React.FC = () => {
   const [todas, setTodas] = useState<any[]>([]);
   const [locacoes, setLocacoes] = useState<any[]>([]);
   const [showImportLoc, setShowImportLoc] = useState(false);
+  // LASTRO-04 (17/11/2026): vincular documento de locacao "sem vinculo" a um contrato (vira o PDF assinado do contrato)
+  const [vincDoc, setVincDoc] = useState<string | null>(null);
+  const [contratosVinc, setContratosVinc] = useState<any[]>([]);
+  const abrirVinculo = async (docId: string) => {
+    setVincDoc(docId);
+    try {
+      const r = await api.get('/rental-contracts');
+      const lista: any[] = Array.isArray(r.data) ? r.data : (r.data?.data ?? []);
+      setContratosVinc(lista.filter((c: any) => !c.signedDocumentId));
+    } catch { toast.error('Falha ao carregar os contratos.'); setVincDoc(null); }
+  };
+  const vincular = async (contratoId: string) => {
+    if (!vincDoc || !contratoId) return;
+    try {
+      await api.patch('/rental-contracts/' + contratoId + '/lastro', { signedDocumentId: vincDoc });
+      toast.success('Documento vinculado ao contrato.'); setVincDoc(null); carregar();
+    } catch (e: any) { toast.error(e?.response?.data?.message ?? 'Falha ao vincular.'); }
+  };
   const [imoveis, setImoveis] = useState<Imovel[]>([]);
   const [loading, setLoading] = useState(true);
   const [showImport, setShowImport] = useState(false);
@@ -480,7 +499,12 @@ export const ImoveisDocumentosPage: React.FC = () => {
               <tr><td colSpan={6} className="px-4 py-10 text-center text-gray-400 text-[14px]">Nenhum contrato de locação arquivado</td></tr>
             ) : locacoes.map(l => (
               <tr key={l.documentId} className="border-b border-gray-100 last:border-0 hover:bg-gray-50 align-top">
-                <td className="px-3 py-2.5 text-[13px] font-medium text-gray-900">{l.internalCode || <span className="text-gray-400 font-normal">sem vínculo</span>}</td>
+                <td className="px-3 py-2.5 text-[13px] font-medium text-gray-900">{l.internalCode || (vincDoc === (l.documentId ?? l.id) ? (
+  <select autoFocus defaultValue="" onChange={e => vincular(e.target.value)} onBlur={() => setVincDoc(null)} className="border border-gray-300 rounded px-1 py-0.5 text-[12px] font-normal max-w-[240px]">
+    <option value="">{contratosVinc.length ? 'Escolha o contrato...' : 'Nenhum contrato sem PDF assinado'}</option>
+    {contratosVinc.map((c: any) => <option key={c.id} value={c.id}>{(c.fixedAsset?.internalCode ?? '') + ' - ' + (c.tenantName ?? '') + ' - ' + String(c.startDate ?? '').slice(0, 10).split('-').reverse().join('/')}</option>)}
+  </select>
+) : <span onClick={() => abrirVinculo(l.documentId ?? l.id)} className="text-blue-600 font-normal cursor-pointer hover:underline" title="Vincular este documento a um contrato de locação">sem vínculo - vincular</span>)}</td>
                 <td className="px-3 py-2.5">
                   <button onClick={() => setViewDoc({ id: l.documentId, title: l.title })} className="text-[13px] text-gray-900 hover:text-blue-600 hover:underline text-left">{l.title}</button>
                   {l.contractNumber && <p className="text-[11px] text-gray-400">nº {l.contractNumber}</p>}
