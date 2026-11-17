@@ -29,6 +29,21 @@ export class EsocialS13Controller {
     return this.svc.xml(req.companyId, id);
   }
 
+  @Post('enviar')
+  enviar(@Body() dto: any, @Request() req: any) {
+    return this.svc.enviar(req.companyId, dto);
+  }
+
+  @Post('consultar')
+  consultar(@Body() dto: any, @Request() req: any) {
+    return this.svc.consultar(req.companyId, dto);
+  }
+
+  @Get('lotes')
+  lotes(@Query('tpAmb') tpAmb: string, @Request() req: any) {
+    return this.svc.listarLotes(req.companyId, Number(tpAmb) || 2);
+  }
+
   @Get('pagamentos')
   pagamentos(@Request() req: any) {
     return this.svc.pagamentos(req.companyId);

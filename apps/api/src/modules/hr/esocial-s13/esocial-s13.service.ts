@@ -5,6 +5,10 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as https from 'https';
+import * as tls from 'tls';
+import axios from 'axios';
+import { XMLParser } from 'fast-xml-parser';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { SigningService } from '../../../core/certificates/signing.service';
 
@@ -22,8 +26,8 @@ const DEF: Record<string, { evt: string; grupo: number; etapa: number }> = {
   'S-1020': { evt: 'evtTabLotacao', grupo: 1, etapa: 2 },
   'S-1010': { evt: 'evtTabRubrica', grupo: 1, etapa: 2 },
   'S-1200': { evt: 'evtRemun', grupo: 3, etapa: 3 },
-  'S-1210': { evt: 'evtPgtos', grupo: 3, etapa: 3 },
-  'S-1299': { evt: 'evtFechaEvPer', grupo: 3, etapa: 4 },
+  'S-1210': { evt: 'evtPgtos', grupo: 3, etapa: 4 }, // depois do S-1200 processado (ideDmDev)
+  'S-1299': { evt: 'evtFechaEvPer', grupo: 3, etapa: 5 },
 };
 const RE_COMP = /^\d{4}-(0[1-9]|1[0-2])$/;
 const esc = (s: any) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -231,6 +235,208 @@ export class EsocialS13Service {
       out.push({ chave: e.chave, status, validacao });
     }
     return { tpAmb, perApur, eventos: out };
+  }
+
+  // ── transmissao (etapa 2 - 17/11/2026) ───────────────────────────────────
+  // Envio assincrono: lote por etapa (S-1000 > tabelas > S-1200 > S-1210 > S-1299); a etapa seguinte so sai
+  // depois de a anterior ser processada. SOAP 1.1 com TLS mutuo (A1 da empresa) e cadeia ICP-Brasil verificada.
+  private readonly URLS: Record<number, { envio: string; consulta: string }> = {
+    1: { envio: 'https://webservices.envio.esocial.gov.br/servicos/empregador/enviarloteeventos/WsEnviarLoteEventos.svc',
+         consulta: 'https://webservices.consulta.esocial.gov.br/servicos/empregador/consultarloteeventos/WsConsultarLoteEventos.svc' },
+    2: { envio: 'https://webservices.producaorestrita.esocial.gov.br/servicos/empregador/enviarloteeventos/WsEnviarLoteEventos.svc',
+         consulta: 'https://webservices.producaorestrita.esocial.gov.br/servicos/empregador/consultarloteeventos/WsConsultarLoteEventos.svc' },
+  };
+  private readonly NS_WS_ENVIO = 'http://www.esocial.gov.br/servicos/empregador/lote/eventos/envio/v1_1_0';
+  private readonly NS_WS_CONSULTA = 'http://www.esocial.gov.br/servicos/empregador/lote/eventos/envio/consulta/retornoProcessamento/v1_1_0';
+
+  private dirRes(sub: string): string | null {
+    const cands = [
+      path.join(process.cwd(), 'resources', sub),
+      path.join(process.cwd(), 'apps', 'api', 'resources', sub),
+      path.join(__dirname, '..', '..', '..', '..', 'resources', sub),
+      path.join(__dirname, '..', '..', '..', '..', '..', 'resources', sub),
+    ];
+    return cands.find(c => fs.existsSync(c)) || null;
+  }
+
+  private caIcp(): string[] {
+    const d = this.dirRes(path.join('esocial', 'icp-brasil'));
+    const out: string[] = [];
+    if (!d) return out;
+    const varre = (dir: string) => {
+      for (const f of fs.readdirSync(dir)) {
+        const p = path.join(dir, f);
+        if (fs.statSync(p).isDirectory()) { varre(p); continue; }
+        if (!/\.(crt|cer|pem)$/i.test(f)) continue;
+        const b = fs.readFileSync(p); const t = b.toString('latin1');
+        if (t.includes('-----BEGIN CERTIFICATE-----')) out.push(...(t.match(/-----BEGIN CERTIFICATE-----[\s\S]+?-----END CERTIFICATE-----/g) || []));
+        else out.push('-----BEGIN CERTIFICATE-----\n' + (b.toString('base64').match(/.{1,64}/g) || []).join('\n') + '\n-----END CERTIFICATE-----');
+      }
+    };
+    varre(d);
+    return out;
+  }
+
+  private async agente(certId: string): Promise<https.Agent> {
+    const { privateKeyPem, certPem } = await this.signing.getKeyMaterial(certId);
+    return new https.Agent({ key: privateKeyPem, cert: certPem, ca: [...tls.rootCertificates, ...this.caIcp()], minVersion: 'TLSv1.2', keepAlive: false });
+  }
+
+  private async soap(url: string, acao: string, ns: string, op: string, param: string, conteudo: string, agent: https.Agent) {
+    const env = `<?xml version="1.0" encoding="utf-8"?><soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:v1="${ns}">` +
+      `<soapenv:Header/><soapenv:Body><v1:${op}><v1:${param}>${conteudo}</v1:${param}></v1:${op}></soapenv:Body></soapenv:Envelope>`;
+    try {
+      const r = await axios.post(url, env, {
+        httpsAgent: agent, timeout: 90000, responseType: 'text', transformResponse: (x: any) => x, validateStatus: () => true,
+        headers: { 'Content-Type': 'text/xml; charset=utf-8', SOAPAction: `"${ns}/${op === 'EnviarLoteEventos' ? 'ServicoEnviarLoteEventos' : 'ServicoConsultarLoteEventos'}/${op}"` },
+      });
+      return { http: r.status, body: String(r.data ?? '') };
+    } catch (err: any) {
+      throw new BadRequestException(`Falha de comunicacao com o eSocial (${err?.code || ''} ${err?.message || err}). Se o erro for de cadeia de certificado, confira resources/esocial/icp-brasil.`);
+    }
+  }
+
+  private parse(xml: string): any {
+    return new XMLParser({ ignoreAttributes: false, removeNSPrefix: true, attributeNamePrefix: '@_', parseTagValue: false }).parse(xml);
+  }
+  private achar(o: any, chave: string): any {
+    if (!o || typeof o !== 'object') return undefined;
+    if (chave in o) return o[chave];
+    for (const k of Object.keys(o)) { const r = this.achar(o[k], chave); if (r !== undefined) return r; }
+    return undefined;
+  }
+  private lista(x: any): any[] { return x === undefined || x === null ? [] : Array.isArray(x) ? x : [x]; }
+  private ocorr(x: any): { codigo: string; tipo: string; descricao: string; localizacao: string }[] {
+    return this.lista(x?.ocorrencias?.ocorrencia).map((o: any) => ({ codigo: String(o.codigo ?? ''), tipo: String(o.tipo ?? ''), descricao: String(o.descricao ?? ''), localizacao: String(o.localizacao ?? '') }));
+  }
+  private txtOcorr(oc: { codigo: string; descricao: string; localizacao: string }[]): string {
+    return oc.map(o => `${o.codigo} ${o.descricao}${o.localizacao ? ' [' + o.localizacao + ']' : ''}`).join(' | ');
+  }
+
+  private async validarLote(xml: string): Promise<string | null> {
+    const d = this.dirRes(path.join('esocial', 'S-1.3', 'comunicacao'));
+    const f = d ? path.join(d, 'EnvioLoteEventos-v1_1_1.xsd') : '';
+    if (!d || !fs.existsSync(f)) return 'XSD do lote (EnvioLoteEventos-v1_1_1.xsd) nao encontrado.';
+    const lib: any = await (new Function('m', 'return import(m)'))('xmllint-wasm');
+    const r = await lib.validateXML({ xml: [{ fileName: 'lote.xml', contents: xml }], schema: [{ fileName: 'EnvioLoteEventos-v1_1_1.xsd', contents: fs.readFileSync(f, 'utf8') }] });
+    return r.valid ? null : (r.errors || []).map((e: any) => e.message || e.rawMessage || String(e)).join(' | ');
+  }
+
+  // trava: o validador precisa recusar XML invalido e cada assinatura precisa conferir
+  private async autoteste(xmls: string[], certPem: string): Promise<void> {
+    const ruim = await this.validar(`<eSocial xmlns="http://www.esocial.gov.br/schema/evt/evtFechaEvPer/${VERSAO}"><evtFechaEvPer Id="X"/></eSocial>`, 'evtFechaEvPer.xsd');
+    if (!ruim) throw new BadRequestException('Autoteste: o validador XSD aceitou um XML invalido. Envio bloqueado.');
+    const { SignedXml } = await import('xml-crypto');
+    for (const x of xmls) {
+      const i = x.indexOf('<Signature'), f = x.indexOf('</Signature>');
+      if (i < 0 || f < 0) throw new BadRequestException('Autoteste: evento sem assinatura. Envio bloqueado.');
+      let ok = false;
+      try { const v: any = new (SignedXml as any)({ publicCert: certPem }); v.loadSignature(x.slice(i, f + 12)); ok = v.checkSignature(x); } catch { ok = false; }
+      if (!ok) throw new BadRequestException('Autoteste: assinatura de evento nao confere. Envio bloqueado.');
+    }
+  }
+
+  async enviar(companyId: string, dto: any) {
+    const tpAmb = Number(dto?.tpAmb);
+    if (![1, 2].includes(tpAmb)) throw new BadRequestException('Ambiente invalido.');
+    if (tpAmb === 1 && String(dto?.confirmacao || '').trim() !== 'ENVIAR PRODUCAO')
+      throw new BadRequestException('Envio a PRODUCAO exige digitar a confirmacao "ENVIAR PRODUCAO".');
+    if (await this.prisma.esocialS13Lote.count({ where: { companyId, tpAmb, status: 'ENVIADO' } }))
+      throw new BadRequestException('Ha lote aguardando processamento. Consulte o retorno antes de enviar a proxima etapa.');
+    const evs = await this.prisma.esocialS13Evento.findMany({ where: { companyId, tpAmb }, orderBy: [{ etapa: 'asc' }, { chave: 'asc' }] });
+    const abertos = evs.filter(e => e.status !== 'PROCESSADO');
+    if (!abertos.length) return { mensagem: 'Nada a enviar: todos os eventos ja foram processados.', lotes: [] };
+    const etapa = Math.min(...abertos.map(e => e.etapa));
+    const daEtapa = abertos.filter(e => e.etapa === etapa);
+    const bloq = daEtapa.filter(e => e.status !== 'VALIDADO');
+    if (bloq.length) throw new BadRequestException(`Etapa ${etapa} com evento(s) nao validado(s): ${bloq.map(b => b.chave + ' (' + b.status + ')').join(', ')}. Regere o pacote antes de enviar.`);
+
+    const emp: any = await this.prisma.company.findUnique({ where: { id: companyId } });
+    const cnpj = String(emp?.taxId || '').replace(/\D/g, '');
+    if (cnpj.length !== 14) throw new BadRequestException('CNPJ da empresa invalido no cadastro.');
+    const certId = await this.certId(companyId);
+    const { certPem } = await this.signing.getKeyMaterial(certId);
+    await this.autoteste(daEtapa.map(e => e.xml), certPem);
+    const agent = await this.agente(certId);
+    const grupo = daEtapa[0].grupo;
+    const res: any[] = [];
+    for (let i = 0; i < daEtapa.length; i += 50) {
+      const parte = daEtapa.slice(i, i + 50);
+      const lote = `<eSocial xmlns="http://www.esocial.gov.br/schema/lote/eventos/envio/v1_1_1"><envioLoteEventos grupo="${grupo}">` +
+        `<ideEmpregador><tpInsc>1</tpInsc><nrInsc>${cnpj.slice(0, 8)}</nrInsc></ideEmpregador>` +
+        `<ideTransmissor><tpInsc>1</tpInsc><nrInsc>${cnpj}</nrInsc></ideTransmissor>` +
+        `<eventos>${parte.map(e => `<evento Id="${e.eventoId}">${e.xml.replace(/^<\?xml[^>]*\?>/, '')}</evento>`).join('')}</eventos>` +
+        `</envioLoteEventos></eSocial>`;
+      const errLote = await this.validarLote(lote);
+      if (errLote) throw new BadRequestException('Lote invalido no XSD oficial (nada foi enviado): ' + errLote);
+      const r = await this.soap(this.URLS[tpAmb].envio, '', this.NS_WS_ENVIO, 'EnviarLoteEventos', 'loteEventos', lote, agent);
+      const ret = this.achar(this.parse(r.body), 'retornoEnvioLoteEventos');
+      const cd = Number(ret?.status?.cdResposta ?? 0);
+      const oc = this.ocorr(ret?.status);
+      const desc = (ret?.status?.descResposta ? String(ret.status.descResposta) : `HTTP ${r.http} - resposta sem retorno do eSocial`) + (oc.length ? ' | ' + this.txtOcorr(oc) : '');
+      const prot = ret?.dadosRecepcaoLote?.protocoloEnvio ? String(ret.dadosRecepcaoLote.protocoloEnvio) : null;
+      const ok = cd === 201 && !!prot;
+      const l = await this.prisma.esocialS13Lote.create({ data: {
+        companyId, tpAmb, grupo, etapa, protocolo: prot, status: ok ? 'ENVIADO' : 'REJEITADO', cdResposta: cd || null,
+        descResposta: desc, xmlEnvio: lote, xmlRetornoEnvio: r.body, enviadoEm: new Date() } });
+      if (ok) await this.prisma.esocialS13Evento.updateMany({ where: { id: { in: parte.map(p => p.id) } }, data: { status: 'ENVIADO', loteId: l.id } });
+      res.push({ etapa, protocolo: prot, cdResposta: cd, descResposta: desc, eventos: parte.length, ok });
+    }
+    return { etapa, lotes: res };
+  }
+
+  async consultar(companyId: string, dto: any) {
+    const tpAmb = Number(dto?.tpAmb);
+    if (![1, 2].includes(tpAmb)) throw new BadRequestException('Ambiente invalido.');
+    const lotes = await this.prisma.esocialS13Lote.findMany({ where: { companyId, tpAmb, status: 'ENVIADO' }, orderBy: { createdAt: 'asc' } });
+    if (!lotes.length) return { mensagem: 'Nenhum lote aguardando processamento.', lotes: [] };
+    const agent = await this.agente(await this.certId(companyId));
+    const res: any[] = [];
+    for (const l of lotes) {
+      const cons = `<eSocial xmlns="http://www.esocial.gov.br/schema/lote/eventos/envio/consulta/retornoProcessamento/v1_0_0">` +
+        `<consultaLoteEventos><protocoloEnvio>${esc(l.protocolo)}</protocoloEnvio></consultaLoteEventos></eSocial>`;
+      const r = await this.soap(this.URLS[tpAmb].consulta, '', this.NS_WS_CONSULTA, 'ConsultarLoteEventos', 'consulta', cons, agent);
+      const ret = this.achar(this.parse(r.body), 'retornoProcessamentoLoteEventos');
+      const cd = Number(ret?.status?.cdResposta ?? 0);
+      const ocL = this.ocorr(ret?.status);
+      const desc = (ret?.status?.descResposta ? String(ret.status.descResposta) : `HTTP ${r.http} - resposta sem retorno do eSocial`) + (ocL.length ? ' | ' + this.txtOcorr(ocL) : '');
+      if (cd === 101 || !ret) {
+        const tempo = Number(ret?.status?.tempoEstimadoConclusao) || null;
+        await this.prisma.esocialS13Lote.update({ where: { id: l.id }, data: { cdResposta: cd || null, descResposta: desc, tempoEstimado: tempo, consultadoEm: new Date(), xmlRetornoProc: r.body } });
+        res.push({ etapa: l.etapa, protocolo: l.protocolo, situacao: 'EM PROCESSAMENTO', tempoEstimado: tempo, descResposta: desc });
+        continue;
+      }
+      const evRet = this.lista(this.achar(ret, 'retornoEventos')?.evento);
+      let okN = 0, errN = 0;
+      for (const ev of evRet) {
+        const id = String(ev?.['@_Id'] ?? '');
+        const inner = this.achar(ev?.retornoEvento?.eSocial ?? ev?.retornoEvento ?? ev, 'retornoEvento') ?? ev?.retornoEvento;
+        const proc = inner?.processamento;
+        const cdE = Number(proc?.cdResposta ?? 0);
+        const oc = this.ocorr(proc);
+        const okE = cdE === 201 || cdE === 202;
+        await this.prisma.esocialS13Evento.updateMany({ where: { companyId, tpAmb, eventoId: id, loteId: l.id }, data: {
+          status: okE ? 'PROCESSADO' : 'REJEITADO', cdResposta: cdE || null,
+          descResposta: String(proc?.descResposta ?? '') + (oc.length ? ' | ' + this.txtOcorr(oc) : ''),
+          nrRecibo: inner?.recibo?.nrRecibo ? String(inner.recibo.nrRecibo) : null, ocorrencias: oc as any } });
+        if (okE) okN++; else errN++;
+      }
+      if (!evRet.length) {
+        await this.prisma.esocialS13Evento.updateMany({ where: { companyId, tpAmb, loteId: l.id }, data: { status: 'REJEITADO', cdResposta: cd || null, descResposta: 'Lote: ' + desc } });
+      }
+      await this.prisma.esocialS13Lote.update({ where: { id: l.id }, data: {
+        status: evRet.length ? 'PROCESSADO' : 'REJEITADO', cdResposta: cd || null, descResposta: desc, consultadoEm: new Date(), xmlRetornoProc: r.body } });
+      res.push({ etapa: l.etapa, protocolo: l.protocolo, situacao: evRet.length ? 'PROCESSADO' : 'REJEITADO', aceitos: okN, rejeitados: errN, descResposta: desc });
+    }
+    return { lotes: res };
+  }
+
+  listarLotes(companyId: string, tpAmb: number) {
+    return this.prisma.esocialS13Lote.findMany({
+      where: { companyId, tpAmb },
+      select: { id: true, etapa: true, grupo: true, protocolo: true, status: true, cdResposta: true, descResposta: true, tempoEstimado: true, enviadoEm: true, consultadoEm: true },
+      orderBy: { createdAt: 'desc' },
+    });
   }
 
   // ── consultas ──────────────────────────────────────────────────────────────
