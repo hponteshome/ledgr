@@ -25,9 +25,10 @@ const DEF: Record<string, { evt: string; grupo: number; etapa: number }> = {
   'S-1005': { evt: 'evtTabEstab', grupo: 1, etapa: 2 },
   'S-1020': { evt: 'evtTabLotacao', grupo: 1, etapa: 2 },
   'S-1010': { evt: 'evtTabRubrica', grupo: 1, etapa: 2 },
-  'S-1200': { evt: 'evtRemun', grupo: 3, etapa: 3 },
-  'S-1210': { evt: 'evtPgtos', grupo: 3, etapa: 4 }, // depois do S-1200 processado (ideDmDev)
-  'S-1299': { evt: 'evtFechaEvPer', grupo: 3, etapa: 5 },
+  'S-2300': { evt: 'evtTSVInicio', grupo: 2, etapa: 3 }, // obrigatorio p/ socio remunerado diretamente (erro 312 sem ele)
+  'S-1200': { evt: 'evtRemun', grupo: 3, etapa: 4 },
+  'S-1210': { evt: 'evtPgtos', grupo: 3, etapa: 5 }, // depois do S-1200 processado (ideDmDev)
+  'S-1299': { evt: 'evtFechaEvPer', grupo: 3, etapa: 6 },
 };
 const RE_COMP = /^\d{4}-(0[1-9]|1[0-2])$/;
 const esc = (s: any) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -168,6 +169,45 @@ export class EsocialS13Service {
         `</inclusao></infoRubrica>` });
     }
 
+    // S-2300: inicio do TSVE - socio remunerado diretamente pela empresa precisa estar no cadastro do eSocial.
+    // Dados da Pessoa (cadastro centralizado) e do pro-labore; dtInicio = inicio da primeira vigencia do socio.
+    const pessoas = await this.prisma.person.findMany({ where: { id: { in: Array.from(new Set(configs.map(c => c.personId))) } } });
+    const EST_CIV: Record<string, string> = { SOLTEIRO: '1', CASADO: '2', DIVORCIADO: '3', SEPARADO: '4', VIUVO: '5' };
+    for (const p of pessoas) {
+      const cfgsP = configs.filter(c => c.personId === p.id);
+      const ult = cfgsP[cfgsP.length - 1];
+      const falta: string[] = [];
+      const sexo = p.gender === 'Masculino' ? 'M' : p.gender === 'Feminino' ? 'F' : '';
+      if (!sexo) falta.push('sexo');
+      if (!p.racaCor) falta.push('raça/cor');
+      if (!p.grauInstrucao) falta.push('grau de instrução');
+      if (!p.birthDate) falta.push('data de nascimento');
+      if (!p.street) falta.push('logradouro');
+      const cep = String(p.zipCode || '').replace(/\D/g, '');
+      if (cep.length !== 8) falta.push('CEP');
+      if (!p.state) falta.push('UF');
+      if (!ult.cbo) falta.push('CBO (configuração do pró-labore)');
+      if (!ult.cargo) falta.push('cargo (configuração do pró-labore)');
+      if (falta.length) throw new BadRequestException(`S-2300 de ${p.fullName}: falta ${falta.join(', ')}.`);
+      if (!/^brasil/i.test(String(p.birthCountry || 'Brasil').trim()) || !/^brasil/i.test(String(p.nationality || 'Brasil').trim()))
+        throw new BadRequestException(`S-2300 de ${p.fullName}: pais de nascimento/nacionalidade fora do Brasil exige codigo da Tabela 6 (ainda nao suportado).`);
+      let codMun = '';
+      try { const rc = await axios.get(`https://viacep.com.br/ws/${cep}/json/`, { timeout: 10000 }); codMun = String(rc.data?.ibge || ''); } catch { codMun = ''; }
+      if (!/^\d{7}$/.test(codMun)) throw new BadRequestException(`S-2300 de ${p.fullName}: nao foi possivel obter o codigo IBGE do municipio pelo CEP ${cep}.`);
+      const estCiv = EST_CIV[String(p.maritalStatus || '')] || '';
+      evts.push({ tipo: 'S-2300', chave: `S-2300:${p.cpf}:${ult.categoriaEsocial}`, perApur: null, corpo:
+        `<ideEvento><indRetif>1</indRetif><tpAmb>${tpAmb}</tpAmb>${ideTab}</ideEvento>` + ideEmp +
+        `<trabalhador><cpfTrab>${p.cpf}</cpfTrab><nmTrab>${esc(p.fullName)}</nmTrab><sexo>${sexo}</sexo><racaCor>${p.racaCor}</racaCor>` +
+        (estCiv ? `<estCiv>${estCiv}</estCiv>` : '') + `<grauInstr>${p.grauInstrucao}</grauInstr>` +
+        `<nascimento><dtNascto>${ymd(p.birthDate as Date)}</dtNascto><paisNascto>105</paisNascto><paisNac>105</paisNac></nascimento>` +
+        `<endereco><brasil><dscLograd>${esc(p.street)}</dscLograd><nrLograd>${esc(p.number || 'S/N')}</nrLograd>` +
+        (p.complement ? `<complemento>${esc(p.complement)}</complemento>` : '') + (p.neighborhood ? `<bairro>${esc(p.neighborhood)}</bairro>` : '') +
+        `<cep>${cep}</cep><codMunic>${codMun}</codMunic><uf>${esc(p.state)}</uf></brasil></endereco></trabalhador>` +
+        `<infoTSVInicio><cadIni>N</cadIni><codCateg>${ult.categoriaEsocial}</codCateg><dtInicio>${cfgsP[0].competenciaIni}-01</dtInicio>` +
+        `<infoComplementares><cargoFuncao><nmCargo>${esc(ult.cargo)}</nmCargo><CBOCargo>${ult.cbo}</CBOCargo></cargoFuncao></infoComplementares>` +
+        `</infoTSVInicio>` });
+    }
+
     // S-1200: competencia do pacote + competencias pagas dentro do mes (exigidas pelo S-1210)
     const pares = new Map<string, { personId: string; comp: string }>();
     for (const c of configs) if (vigente(c.personId, perApur)) pares.set(c.personId + '|' + perApur, { personId: c.personId, comp: perApur });
@@ -188,12 +228,12 @@ export class EsocialS13Service {
       const inss = Math.round(Math.min(bruto, teto) * ALIQ_CI * 100) / 100;
       evts.push({ tipo: 'S-1200', chave: `S-1200:${comp}:${pes.cpf}`, perApur: comp, corpo:
         `<ideEvento><indRetif>1</indRetif><indApuracao>1</indApuracao><perApur>${comp}</perApur><tpAmb>${tpAmb}</tpAmb>${ideTab}</ideEvento>` + ideEmp +
-        `<ideTrabalhador><cpfTrab>${pes.cpf}</cpfTrab><infoComplem><nmTrab>${esc(pes.fullName)}</nmTrab><dtNascto>${ymd(pes.birthDate)}</dtNascto></infoComplem></ideTrabalhador>` +
+        `<ideTrabalhador><cpfTrab>${pes.cpf}</cpfTrab></ideTrabalhador>` +
         `<dmDev><ideDmDev>PL${comp.replace('-', '')}</ideDmDev><codCateg>${cfg.categoriaEsocial}</codCateg>` +
         `<infoPerApur><ideEstabLot><tpInsc>1</tpInsc><nrInsc>${cnpj}</nrInsc><codLotacao>${esc(par.codLotacao)}</codLotacao>` +
         `<remunPerApur>${item('PL001', bruto)}${item('PL002', inss)}</remunPerApur></ideEstabLot></infoPerApur>` +
-        // sem S-2300: categoria 7XX informa os dados contratuais no proprio S-1200
-        `<infoComplCont><codCBO>${cfg.cbo}</codCBO></infoComplCont></dmDev>` });
+        // com S-2300 do socio, o S-1200 nao repete dados cadastrais/contratuais (infoComplem/infoComplCont)
+        `</dmDev>` });
     }
 
     // S-1210: pagamentos feitos dentro do mes (regime de caixa)

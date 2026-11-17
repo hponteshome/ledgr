@@ -14,7 +14,7 @@ const COR: Record<string, [string, string]> = {
   VALIDADO: ['#ECFDF5', '#047857'], INVALIDO: ['#FCEBEB', '#A32D2D'], GERADO: ['#F3F4F6', '#374151'],
   ENVIADO: ['#EFF6FF', '#1D4ED8'], PROCESSADO: ['#E8F5EE', FIN], REJEITADO: ['#FCEBEB', '#A32D2D'], CRIADO: ['#F3F4F6', '#374151'],
 };
-const ETAPAS: Record<number, string> = { 1: 'S-1000', 2: 'Tabelas', 3: 'S-1200', 4: 'S-1210', 5: 'S-1299' };
+const ETAPAS: Record<number, string> = { 1: 'S-1000', 2: 'Tabelas', 3: 'S-2300', 4: 'S-1200', 5: 'S-1210', 6: 'S-1299' };
 interface Ev { id: string; tipo: string; perApur: string | null; chave: string; status: string; validacao: string | null; nrRecibo: string | null; descResposta: string | null; etapa: number; }
 interface Lt { id: string; etapa: number; protocolo: string | null; status: string; cdResposta: number | null; descResposta: string | null; tempoEstimado: number | null; enviadoEm: string | null; consultadoEm: string | null; }
 
