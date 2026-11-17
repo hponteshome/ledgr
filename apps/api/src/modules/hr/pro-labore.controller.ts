@@ -1,36 +1,20 @@
 import { SidebarResourceGuard } from '../../auth/guards/sidebar-resource.guard';
 import { RecursoMenu } from '../../auth/decorators/recurso-menu.decorator';
 // apps/api/src/modules/hr/pro-labore.controller.ts
-import { Controller, Get, Post, Put, Body, Param, Query, Request, UseGuards, Res } from '@nestjs/common';
-import { Response } from 'express';
+// 17/11/2026: rotas antigas (configs, previa, calculos, retroativos e guias GPS/DARF) removidas.
+// O pro-labore parte do QSA; calculo, recibo e guias virao do novo fluxo eSocial S-1.3 + DCTFWeb.
+import { Controller, Get, Put, Body, Param, Request, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '@/auth/guards/jwt.guard';
 import { CompanyGuard } from '@/multi-company/multi-company.guard';
 import { ProLaboreService } from './services/pro-labore.service';
-import { GuiasService } from './services/guias.service';
 
 @UseGuards(SidebarResourceGuard) // Seguranca 0A (04/10/2026): perfil na API = permissoes do menu (roda depois do JwtAuthGuard)
 @RecursoMenu('folha')
 @UseGuards(JwtAuthGuard, CompanyGuard)
 @Controller('hr/pro-labore')
 export class ProLaboreController {
-  constructor(private readonly svc: ProLaboreService, private readonly guias: GuiasService) {}
+  constructor(private readonly svc: ProLaboreService) {}
 
-  @Get('configs')
-  findAllConfigs(@Request() req: any) {
-    return this.svc.findAllConfigs(req.companyId);
-  }
-
-  @Post('configs')
-  createConfig(@Body() dto: any, @Request() req: any) {
-    return this.svc.createConfig(req.companyId, dto);
-  }
-
-  @Put('configs/:id')
-  updateConfig(@Param('id') id: string, @Body() dto: any, @Request() req: any) {
-    return this.svc.updateConfig(id, req.companyId, dto);
-  }
-
-  // Diretoria a partir do QSA (17/11/2026)
   @Get('diretoria')
   diretoria(@Request() req: any) {
     return this.svc.diretoria(req.companyId);
@@ -40,54 +24,4 @@ export class ProLaboreController {
   salvarDiretoria(@Param('shareholderId') shareholderId: string, @Body() dto: any, @Request() req: any) {
     return this.svc.salvarDiretoria(req.companyId, shareholderId, dto);
   }
-
-  @Get('previa')
-  calcularPrevia(@Query('valorBruto') valorBruto: string) {
-    return this.svc.calcularPrevia(parseFloat(valorBruto));
-  }
-
-  @Post('calculos')
-  gerarCalculo(@Body() dto: any, @Request() req: any) {
-    return this.svc.gerarCalculo(req.companyId, req.user.id, dto);
-  }
-
-  @Get('calculos')
-  findCalculos(@Request() req: any, @Query('competencia') competencia?: string) {
-    return this.svc.findCalculos(req.companyId, competencia);
-  }
-
-  @Post('calculos/retroativos')
-  gerarRetroativos(@Body() body: any, @Request() req: any) {
-    return this.svc.gerarLancamentosRetroativos(req.companyId, req.user.id, body?.competenceFrom, body?.competenceTo);
-  }
-
-  @Get('guias/lote')
-  async downloadGuiasLote(@Query('competencia') competencia: string, @Request() req: any, @Res() res: Response) {
-    const pdf = await this.guias.gerarGuiasLote(req.companyId, competencia);
-    res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename=Guias-' + competencia + '.pdf' });
-    res.send(pdf);
-  }
-
-  @Get('calculos/:id/guias')
-  async getGuiasData(@Param('id') id: string, @Request() req: any) {
-    const result = await this.guias.gerarGuias(req.companyId, id);
-    return { dados: result.dados, gpsHtml: result.gpsHtml, darfHtml: result.darfHtml };
-  }
-
-  @Get('calculos/:id/guias/gps.pdf')
-  async downloadGPS(@Param('id') id: string, @Request() req: any, @Res() res: Response) {
-    const result = await this.guias.gerarGuias(req.companyId, id);
-    res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': "attachment; filename=GPS-" + result.dados.competencia + ".pdf" });
-    res.send(result.gpsPdf);
-  }
-
-  @Get('calculos/:id/guias/darf.pdf')
-  async downloadDARF(@Param('id') id: string, @Request() req: any, @Res() res: Response) {
-    const result = await this.guias.gerarGuias(req.companyId, id);
-    if (!result.darfPdf) { res.status(204).send(); return; }
-    res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': "attachment; filename=DARF-" + result.dados.competencia + ".pdf" });
-    res.send(result.darfPdf);
-  }
 }
-
-
