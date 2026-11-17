@@ -56,6 +56,12 @@ export default function RentalContractsListPage() {
         try { await api.patch('/rental-contracts/' + id + '/lastro', { ressalva: t }); setRessOk(p => ({ ...p, [id]: t })); setRessEdit(null); toast.success('Ressalva registrada.'); }
         catch (e: any) { toast.error(e?.response?.data?.message ?? 'Falha ao registrar a ressalva.'); }
     };
+    // LASTRO-03 (17/11/2026): documento ja ligado no Arquivo Digital vira lastro com confirmacao do usuario
+    const [assinOk, setAssinOk] = useState<Record<string, boolean>>({});
+    const usarDocArquivo = async (id: string, docId: string) => {
+        try { await api.patch('/rental-contracts/' + id + '/lastro', { signedDocumentId: docId }); setAssinOk(p => ({ ...p, [id]: true })); toast.success('Documento do Arquivo registrado como contrato assinado.'); }
+        catch (e: any) { toast.error(e?.response?.data?.message ?? 'Falha ao registrar o documento.'); }
+    };
     const { token } = useAuth();
     const { activeCompany } = useCompany();
 
@@ -170,7 +176,8 @@ export default function RentalContractsListPage() {
                                         );
                                         const ress: string | null = ressOk[x.id] ?? x.lastroRessalva ?? null;
                                         if (x.lastroConferidoEm || lastroOk[x.id]) return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700" title={x.lastroRessalva ?? 'Dados conferidos com o contrato assinado'}>Conferido</span>;
-                                        if (x.signedDocumentId) return <button type="button" onClick={() => conferir(x.id)} className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700 hover:bg-blue-200" title="Clique para registrar que os dados conferem com o PDF assinado">Com documento - conferir</button>;
+                                        if (x.signedDocumentId || assinOk[x.id]) return <button type="button" onClick={() => conferir(x.id)} className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700 hover:bg-blue-200" title="Clique para registrar que os dados conferem com o PDF assinado">Com documento - conferir</button>;
+                                        if (x.documentId && !ress) return <button type="button" onClick={() => usarDocArquivo(x.id, x.documentId)} className="px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700 hover:bg-indigo-200" title="Há documento ligado no Arquivo Digital. Clique para confirmar que é o contrato assinado (se for minuta não assinada, use a ressalva)">No Arquivo - confirmar assinado</button>;
                                         if (ress) return <button type="button" onClick={() => { setRessEdit(x.id); setRessTxt(ress); }} className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 hover:bg-amber-200" title={ress + ' (clique para editar)'}>Ressalva</button>;
                                         return <button type="button" onClick={() => { setRessEdit(x.id); setRessTxt(''); }} className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500 hover:bg-amber-100 hover:text-amber-800" title="Sem PDF assinado. Clique para registrar a ressalva (contrato cumprido sem assinatura)">Sem documento - ressalvar</button>;
                                     })()}
