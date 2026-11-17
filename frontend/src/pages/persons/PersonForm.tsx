@@ -765,6 +765,21 @@ export const PersonForm: React.FC = () => {
             </div>
 
 
+            {/* eSocial - opcionais (17/11/2026) */}
+            <Grid cols={2}>
+              <Field label="Raça/cor (autodeclaração)">
+                <select value={form.racaCor} onChange={e => set('racaCor', e.target.value)} className={inputCls}>
+                  <option value="">(em branco)</option>
+                  {RACA_COR_OPTIONS.map(o => <option key={o.v} value={o.v}>{o.t}</option>)}
+                </select>
+              </Field>
+              <Field label="Grau de instrução">
+                <select value={form.grauInstrucao} onChange={e => set('grauInstrucao', e.target.value)} className={inputCls}>
+                  <option value="">(em branco)</option>
+                  {GRAU_INSTRUCAO_OPTIONS.map(o => <option key={o.v} value={o.v}>{o.t}</option>)}
+                </select>
+              </Field>
+            </Grid>
             <Grid cols={2}>
               <Field label="Estado Civil">
                 <select value={form.maritalStatus}
@@ -808,21 +823,6 @@ export const PersonForm: React.FC = () => {
                 </Field>
               </Grid>
             )}
-            {/* eSocial - opcionais (17/11/2026) */}
-            <Grid cols={2}>
-              <Field label="Raça/cor (autodeclaração)">
-                <select value={form.racaCor} onChange={e => set('racaCor', e.target.value)} className={inputCls}>
-                  <option value="">(em branco)</option>
-                  {RACA_COR_OPTIONS.map(o => <option key={o.v} value={o.v}>{o.t}</option>)}
-                </select>
-              </Field>
-              <Field label="Grau de instrução">
-                <select value={form.grauInstrucao} onChange={e => set('grauInstrucao', e.target.value)} className={inputCls}>
-                  <option value="">(em branco)</option>
-                  {GRAU_INSTRUCAO_OPTIONS.map(o => <option key={o.v} value={o.v}>{o.t}</option>)}
-                </select>
-              </Field>
-            </Grid>
           </Section>
 
           {/* 2.5 Dependentes */}
