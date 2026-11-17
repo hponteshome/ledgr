@@ -30,6 +30,17 @@ export class ProLaboreController {
     return this.svc.updateConfig(id, req.companyId, dto);
   }
 
+  // Diretoria a partir do QSA (17/11/2026)
+  @Get('diretoria')
+  diretoria(@Request() req: any) {
+    return this.svc.diretoria(req.companyId);
+  }
+
+  @Put('diretoria/:shareholderId')
+  salvarDiretoria(@Param('shareholderId') shareholderId: string, @Body() dto: any, @Request() req: any) {
+    return this.svc.salvarDiretoria(req.companyId, shareholderId, dto);
+  }
+
   @Get('previa')
   calcularPrevia(@Query('valorBruto') valorBruto: string) {
     return this.svc.calcularPrevia(parseFloat(valorBruto));

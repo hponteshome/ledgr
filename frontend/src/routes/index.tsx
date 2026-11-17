@@ -87,7 +87,7 @@ import BalancoConsolidadoPage from '../pages/accounting/BalancoConsolidadoPage';
 import LivroLalurPage from '../pages/accounting/LivroLalurPage';
 import RazaoAnaliticoPage from '../pages/accounting/RazaoAnaliticoPage';
 import CdbProjecaoPage from '../pages/accounting/investments/CdbProjecaoPage';
-import ProLaborePage from '../pages/hr/ProLabore';
+import ProLaborePage from '../pages/hr/ProLaboreDiretoria';
 import InformeRendimentosPage from '../pages/hr/InformeRendimentosPage';
 import { EmployeesPage } from '../pages/hr/EmployeesPage';
 import EsocialPage from '../pages/hr/EsocialPage';

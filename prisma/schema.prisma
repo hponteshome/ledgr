@@ -538,6 +538,7 @@ model CompanyShareholder {
   company            Company  @relation("CompanyShareholders", fields: [companyId], references: [id], onDelete: Cascade)
   person             Person?  @relation(fields: [personId], references: [id], onDelete: SetNull)
   shareholderCompany Company? @relation("ShareholderCompany", fields: [shareholderCompanyId], references: [id], onDelete: SetNull)
+  proLaboreConfigs   ProLaboreConfig[]
 
   @@index([companyId])
   @@index([personId])
@@ -3319,6 +3320,10 @@ model ProLaboreConfig {
   companyId String @map("company_id") @db.Uuid
   personId  String @map("person_id") @db.Uuid
   cargo     String @map("cargo") @db.VarChar
+  shareholderId    String? @map("shareholder_id") @db.Uuid // QSA - company_shareholders (17/11/2026)
+  categoriaEsocial String  @default("723") @map("categoria_esocial") @db.VarChar(3)
+  cbo              String? @map("cbo") @db.VarChar(6)
+  diaPagamento     Int?    @map("dia_pagamento") @db.SmallInt
 
   valorBruto     Decimal @map("valor_bruto") @db.Decimal(15, 2)
   competenciaIni String  @map("competencia_ini") @db.VarChar(7) // AAAA-MM
@@ -3342,10 +3347,12 @@ model ProLaboreConfig {
 
   company  Company            @relation(fields: [companyId], references: [id])
   person   Person             @relation(fields: [personId], references: [id])
+  shareholder CompanyShareholder? @relation(fields: [shareholderId], references: [id], onDelete: Restrict)
   calculos ProLaboreCalculo[]
 
   @@index([companyId, personId])
   @@index([companyId, competenciaIni])
+  @@index([shareholderId])
   @@map("pro_labore_configs")
 }
 
