@@ -89,6 +89,7 @@ export function RentalContractFormModal({ asset, contractId, documentStatus, onC
     const [readjustmentPeriodMonths, setReadjustmentPeriodMonths] = useState('12');
     const [contractNumber, setContractNumber] = useState('');
     const [notes, setNotes] = useState('');
+    const [arquivo, setArquivo] = useState<File | null>(null);
 
     const [loadingInitial, setLoadingInitial] = useState(!!contractId);
 
@@ -183,6 +184,29 @@ export function RentalContractFormModal({ asset, contractId, documentStatus, onC
             if (!res.ok) {
                 const err = await res.json().catch(() => ({}));
                 throw new Error(err.message ?? `Erro ${res.status}`);
+            }
+            // 17/11/2026: contrato assinado (PDF) vai para o Arquivo Digital e fica como lastro do cadastro
+            if (arquivo) {
+                const salvo = await res.json().catch(() => null);
+                const idContrato = contractId ?? salvo?.id;
+                try {
+                    if (!idContrato) throw new Error('id do contrato não retornado');
+                    const fd = new FormData();
+                    fd.append('file', arquivo);
+                    fd.append('companyId', activeCompany?.id ?? '');
+                    fd.append('type', 'CONTRATO_LOCACAO');
+                    fd.append('title', `Contrato de Locação - ${asset.internalCode} - ${tenantName.trim()}`);
+                    fd.append('date', startDate);
+                    const up = await fetch(`${API}/documents/import-signed`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'x-company-id': activeCompany?.id ?? '' }, body: fd });
+                    const doc: any = await up.json().catch(() => ({}));
+                    const docId = doc?.id ?? doc?.document?.id ?? doc?.data?.id;
+                    if (!up.ok || !docId) throw new Error(doc?.message ?? ('Erro ' + up.status));
+                    const lk = await fetch(`${API}/rental-contracts/${idContrato}/lastro`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`, 'x-company-id': activeCompany?.id ?? '' }, body: JSON.stringify({ signedDocumentId: docId }) });
+                    if (!lk.ok) throw new Error('PDF arquivado, mas não vinculado ao contrato');
+                    toast.success('Contrato assinado arquivado e vinculado ao cadastro.');
+                } catch (e: any) {
+                    toast.error('Contrato salvo, mas o PDF não foi arquivado: ' + (e?.message ?? ''), { duration: 8000 });
+                }
             }
             if (contractId && documentStatus === 'RASCUNHO') {
                 // Nova geracao exige a data do instrumento: o Quadro Resumo abre a confirmacao ao salvar.
@@ -310,6 +334,10 @@ export function RentalContractFormModal({ asset, contractId, documentStatus, onC
                         placeholder="Opcional" />
                 </Field>
 
+                <Field label="Contrato assinado (PDF)">
+                    <input type="file" accept="application/pdf" className={inputSt} onChange={e => setArquivo(e.target.files?.[0] ?? null)} />
+                </Field>
+                
                 <Field label="Observações">
                     <textarea className={inputSt} rows={2} value={notes} onChange={e => setNotes(e.target.value)} />
                 </Field>

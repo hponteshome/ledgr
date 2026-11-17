@@ -95,6 +95,25 @@ export class AssetsService {
       }
     }
 
+    // 17/11/2026: contrato ATIVO que ainda nao comecou (ex.: temporada reservada) -> selo Reservado na lista
+    const livres = data.filter((a: any) => !a.rentalContracts || a.rentalContracts.length === 0);
+    if (livres.length > 0) {
+      const hoje0 = new Date(new Date().toISOString().slice(0, 10));
+      const props = livres.map((a: any) => a.propertyId).filter(Boolean) as string[];
+      const futuros = await this.prisma.rentalContract.findMany({
+        where: {
+          companyId, status: 'ATIVO', deletedAt: null, startDate: { gt: hoje0 },
+          OR: [{ fixedAssetId: { in: livres.map((a: any) => a.id) } }, ...(props.length ? [{ fixedAsset: { propertyId: { in: props }, deletedAt: null } }] : [])],
+        },
+        select: { startDate: true, endDate: true, tenantName: true, fixedAssetId: true, fixedAsset: { select: { propertyId: true } } },
+        orderBy: { startDate: 'asc' },
+      });
+      for (const a of livres as any[]) {
+        const f: any = futuros.find((c: any) => c.fixedAssetId === a.id || (a.propertyId && c.fixedAsset?.propertyId === a.propertyId));
+        if (f) a.proximoContrato = { startDate: f.startDate, endDate: f.endDate, tenantName: f.tenantName };
+      }
+    }
+
     const kpis = await this.prisma.fixedAsset.aggregate({
       where: { companyId, deletedAt: null, status: { not: 'WRITTEN_OFF' } },
       _sum:   { acquisitionCost: true, bookValue: true, accumulatedDeprec: true },

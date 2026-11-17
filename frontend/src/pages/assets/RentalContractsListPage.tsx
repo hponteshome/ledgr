@@ -6,6 +6,8 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCompany } from '../../contexts/CompanyContext';
+import api from '../../services/api';
+import { toast } from 'react-hot-toast';
 import { RentalContractDetailModal } from './modals/RentalContractDetailModal';
 
 const API = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3000';
@@ -39,6 +41,11 @@ function fmtDate(v: string | undefined): string {
 
 export default function RentalContractsListPage() {
     const navigate = useNavigate();
+    const [lastroOk, setLastroOk] = useState<Record<string, boolean>>({});
+    const conferir = async (id: string) => {
+        try { await api.patch('/rental-contracts/' + id + '/lastro', { conferido: true }); setLastroOk(p => ({ ...p, [id]: true })); toast.success('Lastro conferido.'); }
+        catch (e: any) { toast.error(e?.response?.data?.message ?? 'Falha ao registrar a conferência.'); }
+    };
     const { token } = useAuth();
     const { activeCompany } = useCompany();
 
@@ -111,15 +118,16 @@ export default function RentalContractsListPage() {
                             <th className="px-3 py-3 text-center font-medium">Vencimento</th>
                             <th className="px-3 py-3 text-center font-medium">Início</th>
                             <th className="px-3 py-3 text-center font-medium">Término / Vigência</th>
+                            <th className="px-3 py-3 text-center font-medium">Lastro</th>
                             <th className="px-3 py-3 text-center font-medium">Status</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                         {loading && (
-                            <tr><td colSpan={7} className="text-center py-8 text-gray-400">Carregando...</td></tr>
+                            <tr><td colSpan={8} className="text-center py-8 text-gray-400">Carregando...</td></tr>
                         )}
                         {!loading && contracts.length === 0 && (
-                            <tr><td colSpan={7} className="text-center py-8 text-gray-400">Nenhum contrato encontrado.</td></tr>
+                            <tr><td colSpan={8} className="text-center py-8 text-gray-400">Nenhum contrato encontrado.</td></tr>
                         )}
                         {!loading && contracts.map(c => (
                             <tr
@@ -139,6 +147,15 @@ export default function RentalContractsListPage() {
                                 <td className="px-3 py-2.5 text-center">Dia {c.dueDay}</td>
                                 <td className="px-3 py-2.5 text-center">{fmtDate(c.startDate)}</td>
                                 <td className="px-3 py-2.5 text-center">{c.endDate ? fmtDate(c.endDate) : 'Indeterminado'}</td>
+                                <td className="px-3 py-2.5 text-center" onClick={e => e.stopPropagation()}>
+                                    {(() => {
+                                        const x: any = c;
+                                        if (x.lastroConferidoEm || lastroOk[x.id]) return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700" title={x.lastroRessalva ?? 'Dados conferidos com o contrato assinado'}>Conferido</span>;
+                                        if (x.signedDocumentId) return <button type="button" onClick={() => conferir(x.id)} className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700 hover:bg-blue-200" title="Clique para registrar que os dados conferem com o PDF assinado">Com documento - conferir</button>;
+                                        if (x.lastroRessalva) return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800" title={x.lastroRessalva}>Ressalva</span>;
+                                        return <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">Sem documento</span>;
+                                    })()}
+                                </td>
                                 <td className="px-3 py-2.5 text-center">
                                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[c.status] ?? 'bg-gray-100 text-gray-600'}`}>
                                         {STATUS_LABELS[c.status] ?? c.status}

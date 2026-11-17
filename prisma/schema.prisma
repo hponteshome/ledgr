@@ -2712,6 +2712,10 @@ model RentalContract {
   // -- Status e documento --------------------------------------------------
   status     RentalContractStatus @default(ATIVO) @map("status")
   documentId String?              @map("document_id") @db.Uuid /// Vinculo futuro (validacao automatica) - PENDENTE
+  signedDocumentId   String?   @map("signed_document_id") @db.Uuid /// 17/11/2026: contrato assinado (PDF no Arquivo Digital)
+  lastroConferidoEm  DateTime? @map("lastro_conferido_em") @db.Timestamp(6)
+  lastroConferidoPor String?   @map("lastro_conferido_por") @db.Uuid
+  lastroRessalva     String?   @map("lastro_ressalva") @db.Text
   renewedByContractId String? @map("renewed_by_contract_id") @db.Uuid /// 04/11/2026: contrato que renovou este (status RENOVADO)
 
   notes String? @map("notes") @db.Text

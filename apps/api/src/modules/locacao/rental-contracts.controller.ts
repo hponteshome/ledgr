@@ -42,6 +42,13 @@ export class RentalContractsController {
     return this.svc.alertas(companyId);
   }
 
+  // 17/11/2026: lastro documental (PDF assinado, conferencia, ressalva)
+  @Patch(':id/lastro')
+  @RequireResourceAccess('rental-contracts', 'EDIT')
+  lastro(@Req() req: any, @Param('id') id: string, @Body() body: any) {
+    return this.svc.lastro(req.companyId ?? req.headers['x-company-id'], req.user?.id ?? req.user?.sub, id, body ?? {});
+  }
+
   // 04/11/2026: encerramento por fim de prazo ou rescisao
   @Post(':id/encerrar')
   @RequireResourceAccess('rental-contracts', 'EDIT')

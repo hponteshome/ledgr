@@ -431,6 +431,11 @@ export default function AssetsList() {
                                                 </button>
                                             ) : (
                                                 <div className="flex items-center justify-center gap-1.5">
+                                                    {(ativo as any).proximoContrato && (
+                                                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800" title={'Reservado para ' + ((ativo as any).proximoContrato.tenantName ?? '')}>
+                                                            Reservado {String((ativo as any).proximoContrato.startDate).slice(8, 10)}/{String((ativo as any).proximoContrato.startDate).slice(5, 7)}{(ativo as any).proximoContrato.endDate ? ' a ' + String((ativo as any).proximoContrato.endDate).slice(8, 10) + '/' + String((ativo as any).proximoContrato.endDate).slice(5, 7) : ''}
+                                                        </span>
+                                                    )}
                                                     {ativo.occupancyStatus ? (
                                                         <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${ASSET_OCCUPANCY_COLORS[ativo.occupancyStatus]}`}>
                                                             {ASSET_OCCUPANCY_LABELS[ativo.occupancyStatus]}

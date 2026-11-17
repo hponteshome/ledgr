@@ -54,7 +54,7 @@ export const CATALOGO: Regra[] = [
     prazo: (y, m, u) => { const [ny, nm] = mais(y, m, 1); return u.dia(ny, nm, 20, 'ANTECIPA'); } },
   { code: 'DCTFWEB', label: 'DCTFWeb/MIT', tipo: 'ACESSORIA', periodicidade: 'MENSAL', vigencia: { de: '2021-10' },
     aplica: (c, y, m) => folha(c) || (comp(y, m) >= '2025-01' && em(c, LUCRO)),
-    prazo: (y, m, u) => { const [ny, nm] = mais(y, m, 1); return u.dia(ny, nm, comp(y, m) >= '2025-01' ? 25 : 15, 'ANTECIPA'); } },
+    prazo: (y, m, u) => { const [ny, nm] = mais(y, m, 1); return comp(y, m) >= '2025-01' ? u.ultimoUtil(ny, nm) : u.dia(ny, nm, 15, 'ANTECIPA'); } },
   { code: 'DCTF', label: 'DCTF (PGD)', tipo: 'ACESSORIA', periodicidade: 'MENSAL', vigencia: { ate: '2024-12' }, aplica: (c) => em(c, LUCRO),
     prazo: (y, m, u) => { const [ny, nm] = mais(y, m, 2); return u.nUtil(ny, nm, 15); } },
   { code: 'PIS_COFINS', label: 'PIS/Cofins (DARF)', tipo: 'TRIBUTO', periodicidade: 'MENSAL', aplica: (c) => em(c, REAL_PRES),

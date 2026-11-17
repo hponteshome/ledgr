@@ -444,6 +444,29 @@ export class RentalContractsService {
     });
   }
 
+  // 17/11/2026: lastro documental do contrato - PDF assinado (Arquivo Digital), conferencia (quem/quando) e ressalva
+  async lastro(companyId: string, userId: string, id: string, body: any) {
+    const c: any = await this.findOne(companyId, id);
+    const data: any = {};
+    if (body?.signedDocumentId !== undefined) {
+      const sid = body.signedDocumentId ? String(body.signedDocumentId) : null;
+      if (sid) {
+        const d = await this.prisma.document.findFirst({ where: { id: sid, companyId, deletedAt: null }, select: { id: true } });
+        if (!d) throw new BadRequestException('Documento nao encontrado nesta empresa.');
+      }
+      data.signedDocumentId = sid; data.lastroConferidoEm = null; data.lastroConferidoPor = null;
+    }
+    if (body?.ressalva !== undefined) data.lastroRessalva = body.ressalva ? String(body.ressalva).trim() : null;
+    if (body?.conferido === true) {
+      const temDoc = data.signedDocumentId !== undefined ? data.signedDocumentId : c.signedDocumentId;
+      const temRessalva = data.lastroRessalva !== undefined ? data.lastroRessalva : c.lastroRessalva;
+      if (!temDoc && !temRessalva) throw new BadRequestException('Anexe o contrato assinado ou registre a ressalva antes de conferir.');
+      data.lastroConferidoEm = new Date(); data.lastroConferidoPor = userId || null;
+    }
+    if (body?.conferido === false) { data.lastroConferidoEm = null; data.lastroConferidoPor = null; }
+    return this.prisma.rentalContract.update({ where: { id }, data, select: { id: true, signedDocumentId: true, lastroConferidoEm: true, lastroRessalva: true } });
+  }
+
   async update(companyId: string, userId: string, id: string, dto: UpdateRentalContractDto) {
     await this.findOne(companyId, id);
     return this.prisma.rentalContract.update({
