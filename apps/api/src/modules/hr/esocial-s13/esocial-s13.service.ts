@@ -428,6 +428,8 @@ export class EsocialS13Service {
   async enviar(companyId: string, dto: any) {
     const tpAmb = Number(dto?.tpAmb);
     if (![1, 2].includes(tpAmb)) throw new BadRequestException('Ambiente invalido.');
+    // 18/11/2026: envio so por competencia aprovada (Processamento Mensal) - nenhum caminho contorna a aprovacao
+    if (!dto?.perApur) throw new BadRequestException('Envio somente pelo Processamento Mensal, com a competencia aprovada.');
     if (tpAmb === 1 && String(dto?.confirmacao || '').trim() !== 'ENVIAR PRODUCAO')
       throw new BadRequestException('Envio a PRODUCAO exige digitar a confirmacao "ENVIAR PRODUCAO".');
     if (await this.prisma.esocialS13Lote.count({ where: { companyId, tpAmb, status: 'ENVIADO' } }))

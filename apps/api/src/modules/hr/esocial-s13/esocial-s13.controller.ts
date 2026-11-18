@@ -14,11 +14,6 @@ import { EsocialS13Service } from './esocial-s13.service';
 export class EsocialS13Controller {
   constructor(private readonly svc: EsocialS13Service) {}
 
-  @Post('gerar')
-  gerar(@Body() dto: any, @Request() req: any) {
-    return this.svc.gerarPacote(req.companyId, dto);
-  }
-
   @Get('eventos')
   listar(@Query('tpAmb') tpAmb: string, @Request() req: any) {
     return this.svc.listar(req.companyId, Number(tpAmb) || 2);
