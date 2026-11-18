@@ -34,6 +34,8 @@ const RE_COMP = /^\d{4}-(0[1-9]|1[0-2])$/;
 const esc = (s: any) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const dec = (n: number) => (Math.round(n * 100) / 100).toFixed(2);
 const ymd = (d: Date) => new Date(d).toISOString().slice(0, 10);
+// matricula do TSVE no eSocial: obrigatoria no S-2300 e repetida no S-1200 (regra 312)
+const matriculaTsve = (cpf: string) => 'PL' + String(cpf).replace(/\D/g, '');
 
 interface EvtDef { tipo: string; chave: string; perApur: string | null; corpo: string }
 
@@ -203,8 +205,9 @@ export class EsocialS13Service {
         `<endereco><brasil><dscLograd>${esc(p.street)}</dscLograd><nrLograd>${esc(p.number || 'S/N')}</nrLograd>` +
         (p.complement ? `<complemento>${esc(p.complement)}</complemento>` : '') + (p.neighborhood ? `<bairro>${esc(p.neighborhood)}</bairro>` : '') +
         `<cep>${cep}</cep><codMunic>${codMun}</codMunic><uf>${esc(p.state)}</uf></brasil></endereco></trabalhador>` +
-        `<infoTSVInicio><cadIni>N</cadIni><codCateg>${ult.categoriaEsocial}</codCateg><dtInicio>${cfgsP[0].competenciaIni}-01</dtInicio>` +
-        `<infoComplementares><cargoFuncao><nmCargo>${esc(ult.cargo)}</nmCargo><CBOCargo>${ult.cbo}</CBOCargo></cargoFuncao></infoComplementares>` +
+        `<infoTSVInicio><cadIni>N</cadIni><matricula>${matriculaTsve(p.cpf)}</matricula><codCateg>${ult.categoriaEsocial}</codCateg><dtInicio>${cfgsP[0].competenciaIni}-01</dtInicio>` +
+        `<infoComplementares><cargoFuncao><nmCargo>${esc(ult.cargo)}</nmCargo><CBOCargo>${ult.cbo}</CBOCargo></cargoFuncao>` +
+        `<localTrabGeral><tpInsc>1</tpInsc><nrInsc>${cnpj}</nrInsc></localTrabGeral></infoComplementares>` +
         `</infoTSVInicio>` });
     }
 
@@ -231,7 +234,7 @@ export class EsocialS13Service {
         `<ideTrabalhador><cpfTrab>${pes.cpf}</cpfTrab></ideTrabalhador>` +
         `<dmDev><ideDmDev>PL${comp.replace('-', '')}</ideDmDev><codCateg>${cfg.categoriaEsocial}</codCateg>` +
         `<infoPerApur><ideEstabLot><tpInsc>1</tpInsc><nrInsc>${cnpj}</nrInsc><codLotacao>${esc(par.codLotacao)}</codLotacao>` +
-        `<remunPerApur>${item('PL001', bruto)}${item('PL002', inss)}</remunPerApur></ideEstabLot></infoPerApur>` +
+        `<remunPerApur><matricula>${matriculaTsve(pes.cpf)}</matricula>${item('PL001', bruto)}${item('PL002', inss)}</remunPerApur></ideEstabLot></infoPerApur>` +
         // com S-2300 do socio, o S-1200 nao repete dados cadastrais/contratuais (infoComplem/infoComplCont)
         `</dmDev>` });
     }
