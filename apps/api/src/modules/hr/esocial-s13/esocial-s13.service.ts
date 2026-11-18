@@ -30,6 +30,7 @@ const DEF: Record<string, { evt: string; grupo: number; etapa: number }> = {
   'S-1200': { evt: 'evtRemun', grupo: 3, etapa: 4 },
   'S-1210': { evt: 'evtPgtos', grupo: 3, etapa: 5 }, // depois do S-1200 processado (ideDmDev)
   'S-1299': { evt: 'evtFechaEvPer', grupo: 3, etapa: 6 },
+  'S-1298': { evt: 'evtReabreEvPer', grupo: 3, etapa: 1 }, // reabertura: acao avulsa (18/11/2026)
 };
 const RE_COMP = /^\d{4}-(0[1-9]|1[0-2])$/;
 const esc = (s: any) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -37,6 +38,10 @@ const dec = (n: number) => (Math.round(n * 100) / 100).toFixed(2);
 const ymd = (d: Date) => new Date(d).toISOString().slice(0, 10);
 // matricula do TSVE no eSocial: obrigatoria no S-2300 e repetida no S-1200 (regra 312)
 const matriculaTsve = (cpf: string) => 'PL' + String(cpf).replace(/\D/g, '');
+// retificacao (18/11/2026): compara o conteudo ignorando Id, assinatura, indRetif e nrRecibo
+const normEvt = (xml: string) => String(xml || '').replace(/<Signature[\s\S]*<\/Signature>/, '').replace(/ Id="[^"]*"/, '')
+  .replace(/<indRetif>\d<\/indRetif>/, '').replace(/<nrRecibo>[^<]*<\/nrRecibo>/, '');
+const RETIFICAVEIS = ['S-1200', 'S-1210'];
 
 interface EvtDef { tipo: string; chave: string; perApur: string | null; corpo: string }
 
@@ -270,9 +275,17 @@ export class EsocialS13Service {
     // conferencia (processamento mensal): devolve o que sera gerado, sem gravar nem assinar
     if (simular) {
       const ex = await this.prisma.esocialS13Evento.findMany({ where: { companyId, tpAmb, chave: { in: evts.map(e => e.chave) } },
-        select: { id: true, chave: true, status: true, nrRecibo: true, descResposta: true, validacao: true, updatedAt: true } });
+        select: { id: true, chave: true, status: true, nrRecibo: true, descResposta: true, validacao: true, updatedAt: true, xml: true } });
       return { tpAmb, perApur,
-        eventos: evts.map(e => ({ tipo: e.tipo, chave: e.chave, perApur: e.perApur, etapa: DEF[e.tipo].etapa, ...(ex.find(x => x.chave === e.chave) || {}) })),
+        eventos: await Promise.all(evts.map(async e => {
+          const x: any = ex.find(y => y.chave === e.chave);
+          const b: any = { tipo: e.tipo, chave: e.chave, perApur: e.perApur, etapa: DEF[e.tipo].etapa, ...(x || {}) };
+          delete b.xml;
+          if (x && x.status === 'PROCESSADO' && RETIFICAVEIS.includes(e.tipo) && normEvt(this.envelope(e.tipo, 'X', e.corpo)) !== normEvt(x.xml)) {
+            if (await this.periodoAberto(companyId, tpAmb, e.perApur)) b.retificar = true; else b.divergente = true;
+          }
+          return b;
+        })),
         remuneracoes: resumoRemun,
         pagamentos: pgs.map(p => ({ dtPagamento: p.dtPagamento, competencia: p.competencia, valorLiquido: Number(p.valorLiquido) })) };
     }
@@ -281,9 +294,19 @@ export class EsocialS13Service {
     const out: any[] = [];
     for (const e of evts) {
       const ex = await this.prisma.esocialS13Evento.findUnique({ where: { companyId_tpAmb_chave: { companyId, tpAmb, chave: e.chave } } });
-      if (ex && ['ENVIADO', 'PROCESSADO'].includes(ex.status)) { out.push({ chave: e.chave, status: ex.status, mantido: true }); continue; }
+      let corpo = e.corpo; let anterior: any = null;
+      if (ex && ex.status === 'PROCESSADO' && RETIFICAVEIS.includes(e.tipo) && ex.nrRecibo
+          && normEvt(this.envelope(e.tipo, 'X', e.corpo)) !== normEvt(ex.xml)) {
+        if (await this.periodoAberto(companyId, tpAmb, e.perApur)) {
+          corpo = e.corpo.replace('<ideEvento><indRetif>1</indRetif>', `<ideEvento><indRetif>2</indRetif><nrRecibo>${ex.nrRecibo}</nrRecibo>`);
+          anterior = ex;
+        } else { out.push({ chave: e.chave, status: ex.status, mantido: true, divergente: true }); continue; }
+      } else if (ex && !['ENVIADO', 'PROCESSADO'].includes(ex.status) && /<indRetif>2<\/indRetif>/.test(ex.xml)) {
+        const nr = (ex.xml.match(/<nrRecibo>([^<]+)<\/nrRecibo>/) || [])[1];
+        if (nr) corpo = e.corpo.replace('<ideEvento><indRetif>1</indRetif>', `<ideEvento><indRetif>2</indRetif><nrRecibo>${nr}</nrRecibo>`);
+      } else if (ex && ['ENVIADO', 'PROCESSADO'].includes(ex.status)) { out.push({ chave: e.chave, status: ex.status, mantido: true }); continue; }
       const id = this.novoId(raiz);
-      let xml = this.envelope(e.tipo, id, e.corpo);
+      let xml = this.envelope(e.tipo, id, corpo);
       let status = 'VALIDADO'; let validacao: string | null = null;
       try {
         xml = await this.assinar(xml, certId);
@@ -292,7 +315,11 @@ export class EsocialS13Service {
       } catch (err: any) { status = 'INVALIDO'; validacao = 'Falha: ' + (err?.message || String(err)); }
       const data = { tipo: e.tipo, perApur: e.perApur, eventoId: id, grupo: DEF[e.tipo].grupo, etapa: DEF[e.tipo].etapa, xml, status, validacao,
         loteId: null, nrRecibo: null, cdResposta: null, descResposta: null };
-      if (ex) await this.prisma.esocialS13Evento.update({ where: { id: ex.id }, data });
+      if (anterior) {
+        // retificacao: preserva o original (com recibo) e cria o retificador com a mesma chave
+        await this.prisma.esocialS13Evento.update({ where: { id: anterior.id }, data: { chave: `${anterior.chave}#${anterior.nrRecibo}`, status: 'SUBSTITUIDO' } });
+        await this.prisma.esocialS13Evento.create({ data: { ...data, companyId, tpAmb, chave: e.chave } });
+      } else if (ex) await this.prisma.esocialS13Evento.update({ where: { id: ex.id }, data });
       else await this.prisma.esocialS13Evento.create({ data: { ...data, companyId, tpAmb, chave: e.chave } });
       out.push({ chave: e.chave, status, validacao });
     }
@@ -405,7 +432,7 @@ export class EsocialS13Service {
       throw new BadRequestException('Envio a PRODUCAO exige digitar a confirmacao "ENVIAR PRODUCAO".');
     if (await this.prisma.esocialS13Lote.count({ where: { companyId, tpAmb, status: 'ENVIADO' } }))
       throw new BadRequestException('Ha lote aguardando processamento. Consulte o retorno antes de enviar a proxima etapa.');
-    const evs = await this.prisma.esocialS13Evento.findMany({ where: { companyId, tpAmb }, orderBy: [{ etapa: 'asc' }, { chave: 'asc' }] });
+    const evs = await this.prisma.esocialS13Evento.findMany({ where: { companyId, tpAmb, status: { not: 'SUBSTITUIDO' } }, orderBy: [{ etapa: 'asc' }, { chave: 'asc' }] });
     let base = evs;
     if (dto?.perApur) {
       // processamento mensal: so os eventos do pacote da competencia aprovada
@@ -492,6 +519,14 @@ export class EsocialS13Service {
           status: okE ? 'PROCESSADO' : 'REJEITADO', cdResposta: cdE || null,
           descResposta: String(proc?.descResposta ?? '') + (oc.length ? ' | ' + this.txtOcorr(oc) : ''),
           nrRecibo: inner?.recibo?.nrRecibo ? String(inner.recibo.nrRecibo) : null, ocorrencias: oc as any } });
+        if (okE) {
+          const row = await this.prisma.esocialS13Evento.findFirst({ where: { companyId, tpAmb, eventoId: id }, select: { tipo: true, perApur: true } });
+          if (row?.tipo === 'S-1298' && row.perApur) {
+            const f = await this.prisma.esocialS13Evento.findUnique({ where: { companyId_tpAmb_chave: { companyId, tpAmb, chave: `S-1299:${row.perApur}` } } });
+            if (f && f.status === 'PROCESSADO')
+              await this.prisma.esocialS13Evento.update({ where: { id: f.id }, data: { chave: `${f.chave}#${f.nrRecibo || f.id}`, status: 'SUBSTITUIDO' } });
+          }
+        }
         if (okE) okN++; else errN++;
       }
       if (!evRet.length) {
@@ -525,11 +560,14 @@ export class EsocialS13Service {
       if (c > fim) break;
       lista.push(c); m++; if (m > 12) { m = 1; a++; }
     }
-    const fechs = await this.prisma.esocialS13Evento.findMany({ where: { companyId, tpAmb, tipo: 'S-1299' }, select: { perApur: true, status: true, nrRecibo: true, descResposta: true } });
+    const fechs = await this.prisma.esocialS13Evento.findMany({ where: { companyId, tpAmb, tipo: 'S-1299', status: { not: 'SUBSTITUIDO' } }, select: { perApur: true, status: true, nrRecibo: true, descResposta: true } });
+    const reabs = await this.prisma.esocialS13Evento.findMany({ where: { companyId, tpAmb, tipo: 'S-1298', status: 'PROCESSADO' }, select: { perApur: true, updatedAt: true }, orderBy: { updatedAt: 'desc' } });
     const aps = await this.prisma.esocialS13Aprovacao.findMany({ where: { companyId, tpAmb } });
     return lista.reverse().map(c => {
       const f = fechs.find(x => x.perApur === c); const ap = aps.find(x => x.perApur === c);
-      return { perApur: c, fechamento: f?.status || null, recibo: f?.nrRecibo || null, descResposta: f?.descResposta || null, aprovadoEm: ap?.aprovadoEm || null };
+      const rb = reabs.find(x => x.perApur === c);
+      return { perApur: c, fechamento: f?.status || null, recibo: f?.nrRecibo || null, descResposta: f?.descResposta || null, aprovadoEm: ap?.aprovadoEm || null,
+        reabertaEm: rb && f?.status !== 'PROCESSADO' ? rb.updatedAt : null };
     });
   }
 
@@ -640,6 +678,55 @@ export class EsocialS13Service {
       if (saldo > 0.005) out.push({ id: a.id, dtPagamento: a.dtPagamento, valorLiquido: Number(a.valorLiquido), saldo, observacao: a.observacao });
     }
     return out;
+  }
+
+  // ── reabertura (S-1298) e periodo aberto - 18/11/2026 ─────────────────────
+  private async periodoAberto(companyId: string, tpAmb: number, per: string | null): Promise<boolean> {
+    if (!per) return false;
+    const f = await this.prisma.esocialS13Evento.findUnique({ where: { companyId_tpAmb_chave: { companyId, tpAmb, chave: `S-1299:${per}` } }, select: { status: true } });
+    return !f || f.status !== 'PROCESSADO';
+  }
+
+  async reabrir(companyId: string, dto: any) {
+    const tpAmb = Number(dto?.tpAmb); const perApur = String(dto?.perApur || '');
+    if (![1, 2].includes(tpAmb) || !RE_COMP.test(perApur)) throw new BadRequestException('Ambiente ou competencia invalidos.');
+    if (tpAmb === 1 && String(dto?.confirmacao || '').trim() !== 'REABRIR PRODUCAO')
+      throw new BadRequestException('Reabertura em PRODUCAO exige digitar a confirmacao "REABRIR PRODUCAO".');
+    if (await this.prisma.esocialS13Lote.count({ where: { companyId, tpAmb, status: 'ENVIADO' } }))
+      throw new BadRequestException('Ha lote aguardando processamento. Consulte o retorno antes.');
+    const f = await this.prisma.esocialS13Evento.findUnique({ where: { companyId_tpAmb_chave: { companyId, tpAmb, chave: `S-1299:${perApur}` } } });
+    if (!f || f.status !== 'PROCESSADO') throw new BadRequestException('A competencia nao esta fechada: nao ha o que reabrir.');
+    const emp: any = await this.prisma.company.findUnique({ where: { id: companyId } });
+    const cnpj = String(emp?.taxId || '').replace(/\D/g, ''); const raiz = cnpj.slice(0, 8);
+    if (cnpj.length !== 14) throw new BadRequestException('CNPJ da empresa invalido no cadastro.');
+    const certId = await this.certId(companyId);
+    const id = this.novoId(raiz);
+    let xml = this.envelope('S-1298', id,
+      `<ideEvento><indApuracao>1</indApuracao><perApur>${perApur}</perApur><tpAmb>${tpAmb}</tpAmb><procEmi>1</procEmi><verProc>${VER_PROC}</verProc></ideEvento>` +
+      `<ideEmpregador><tpInsc>1</tpInsc><nrInsc>${raiz}</nrInsc></ideEmpregador>`);
+    xml = await this.assinar(xml, certId);
+    const inval = await this.validar(xml, 'evtReabreEvPer.xsd');
+    if (inval) throw new BadRequestException('S-1298 invalido no XSD oficial (nada foi enviado): ' + inval);
+    const { certPem } = await this.signing.getKeyMaterial(certId);
+    await this.autoteste([xml], certPem);
+    const ev = await this.prisma.esocialS13Evento.create({ data: { companyId, tpAmb, tipo: 'S-1298', perApur, chave: `S-1298:${perApur}:${id}`,
+      eventoId: id, grupo: 3, etapa: 1, xml, status: 'VALIDADO' } });
+    const lote = `<eSocial xmlns="http://www.esocial.gov.br/schema/lote/eventos/envio/v1_1_1"><envioLoteEventos grupo="3">` +
+      `<ideEmpregador><tpInsc>1</tpInsc><nrInsc>${raiz}</nrInsc></ideEmpregador><ideTransmissor><tpInsc>1</tpInsc><nrInsc>${cnpj}</nrInsc></ideTransmissor>` +
+      `<eventos><evento Id="${id}">${xml}</evento></eventos></envioLoteEventos></eSocial>`;
+    const errLote = await this.validarLote(lote);
+    if (errLote) throw new BadRequestException('Lote invalido no XSD oficial (nada foi enviado): ' + errLote);
+    const agent = await this.agente(certId);
+    const r = await this.soap(this.URLS[tpAmb].envio, '', this.NS_WS_ENVIO, 'EnviarLoteEventos', 'loteEventos', lote, agent);
+    const ret = this.achar(this.parse(r.body), 'retornoEnvioLoteEventos');
+    const cd = Number(ret?.status?.cdResposta ?? 0); const oc = this.ocorr(ret?.status);
+    const desc = (ret?.status?.descResposta ? String(ret.status.descResposta) : `HTTP ${r.http} - resposta sem retorno do eSocial`) + (oc.length ? ' | ' + this.txtOcorr(oc) : '');
+    const prot = ret?.dadosRecepcaoLote?.protocoloEnvio ? String(ret.dadosRecepcaoLote.protocoloEnvio) : null;
+    const ok = cd === 201 && !!prot;
+    const l = await this.prisma.esocialS13Lote.create({ data: { companyId, tpAmb, grupo: 3, etapa: 1, protocolo: prot, status: ok ? 'ENVIADO' : 'REJEITADO',
+      cdResposta: cd || null, descResposta: desc, xmlEnvio: lote, xmlRetornoEnvio: r.body, enviadoEm: new Date() } });
+    await this.prisma.esocialS13Evento.update({ where: { id: ev.id }, data: ok ? { status: 'ENVIADO', loteId: l.id } : { status: 'REJEITADO', descResposta: 'Lote: ' + desc } });
+    return { ok, protocolo: prot, descResposta: desc };
   }
 
   // ── consultas ──────────────────────────────────────────────────────────────

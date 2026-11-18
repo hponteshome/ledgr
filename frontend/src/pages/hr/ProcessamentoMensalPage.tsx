@@ -22,18 +22,20 @@ const ETAPAS: Record<number, string> = { 1: 'S-1000', 2: 'Tabelas', 3: 'S-2300',
 const INFORMATIVO = /446 - Transmiss[aã]o da DCTFWeb realizada com sucesso/i;
 const SIT: Record<string, [string, string, string]> = {
   FECHADA: ['Fechada', FIN_LIGHT, FIN], REJEITADA: ['Rejeitada', '#FCEBEB', '#A32D2D'], TRANSMISSAO: ['Em transmissão', '#EFF6FF', '#1D4ED8'],
-  APROVADA: ['Aprovada', '#FEF3C7', '#92400E'], PENDENTE: ['Pendente', '#F3F4F6', '#374151'],
+  APROVADA: ['Aprovada', '#FEF3C7', '#92400E'], PENDENTE: ['Pendente', '#F3F4F6', '#374151'], REABERTA: ['Reaberta', '#FFF7ED', '#9A3412'],
 };
 const COR_EV: Record<string, [string, string]> = {
   VALIDADO: ['#ECFDF5', '#047857'], INVALIDO: ['#FCEBEB', '#A32D2D'], ENVIADO: ['#EFF6FF', '#1D4ED8'],
   PROCESSADO: [FIN_LIGHT, FIN], REJEITADO: ['#FCEBEB', '#A32D2D'], 'A GERAR': ['#F3F4F6', '#374151'],
+  'A RETIFICAR': ['#FEF3C7', '#92400E'], DIVERGENTE: ['#FCEBEB', '#A32D2D'], SUBSTITUIDO: ['#F3F4F6', '#6B7280'],
 };
 
-interface Comp { perApur: string; fechamento: string | null; recibo: string | null; descResposta: string | null; aprovadoEm: string | null; }
+interface Comp { perApur: string; fechamento: string | null; recibo: string | null; descResposta: string | null; aprovadoEm: string | null; reabertaEm?: string | null; }
 interface Previa { eventos: any[]; remuneracoes: any[]; pagamentos: any[]; }
 interface Pg { id: string; tipo: string; competencia: string | null; dtPagamento: string; valorLiquido: number; observacao: string | null; nome: string; compensado?: number; emDinheiro?: number; saldo?: number | null; }
 const situacao = (c?: Comp) => !c ? 'PENDENTE' : c.fechamento === 'PROCESSADO' ? 'FECHADA' : c.fechamento === 'REJEITADO' ? 'REJEITADA'
-  : c.fechamento === 'ENVIADO' ? 'TRANSMISSAO' : c.aprovadoEm ? 'APROVADA' : 'PENDENTE';
+  : c.fechamento === 'ENVIADO' ? 'TRANSMISSAO'
+  : (c.aprovadoEm && (!c.reabertaEm || c.aprovadoEm > c.reabertaEm)) ? 'APROVADA' : c.reabertaEm ? 'REABERTA' : 'PENDENTE';
 
 const card: React.CSSProperties = { background: '#fff', border: '1px solid #E5E7EB', borderRadius: 10, padding: 18, marginBottom: 16 };
 const titulo: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: '#374151', textTransform: 'uppercase', marginBottom: 10 };
@@ -81,6 +83,7 @@ export default function ProcessamentoMensalPage() {
   const [novoPg, setNovoPg] = useState(false);
   const [delId, setDelId] = useState('');
   const [transEv, setTransEv] = useState<any[] | null>(null);
+  const [reabrir, setReabrir] = useState(false);
   const prod = tpAmb === '1';
 
   const loadComps = async () => {
@@ -159,6 +162,7 @@ export default function ProcessamentoMensalPage() {
             <div style={{ ...titulo, marginBottom: 0 }}>Conferência - {fmtComp(sel)}</div>
             <span style={{ marginLeft: 10 }}><Chip txt={SIT[sit][0]} bg={SIT[sit][1]} fg={SIT[sit][2]} /></span>
             <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+              {sit === 'FECHADA' && <button style={{ ...btnSec, color: '#A32D2D', borderColor: '#F5C2C2' }} disabled={ocupado} onClick={() => setReabrir(true)}>Reabrir competência</button>}
               <button style={{ ...btnSec, opacity: ocupado || sit === 'FECHADA' ? 0.5 : 1 }} disabled={ocupado || sit === 'FECHADA' || !!prevErro} onClick={aprovar}>{ocupado ? 'Processando...' : sit === 'APROVADA' ? 'Aprovar novamente' : 'Aprovar conferência'}</button>
               <button style={{ ...btnPri, background: sit !== 'APROVADA' && sit !== 'REJEITADA' && sit !== 'TRANSMISSAO' || ocupado ? '#aaa' : prod ? '#B45309' : FIN_ACCENT }}
                 disabled={(sit !== 'APROVADA' && sit !== 'REJEITADA' && sit !== 'TRANSMISSAO') || ocupado || !pendentesEnvio} onClick={() => setTransEv(prev?.eventos || [])}>Transmitir</button>
@@ -208,9 +212,10 @@ export default function ProcessamentoMensalPage() {
                   <thead><tr><th style={th}>Etapa</th><th style={th}>Evento</th><th style={th}>Chave</th><th style={th}>Situação</th><th style={th}>Retorno</th></tr></thead>
                   <tbody>
                     {prev.eventos.map((e: any) => {
-                      const st = e.status || 'A GERAR';
+                      const st = e.retificar ? 'A RETIFICAR' : e.divergente ? 'DIVERGENTE' : (e.status || 'A GERAR');
                       const [bg, fg] = COR_EV[st] || COR_EV['A GERAR'];
-                      const txt = e.validacao || e.descResposta || '';
+                      const txt = e.divergente ? 'Alterado depois do fechamento: reabra a competência para retificar.'
+                        : e.retificar ? `Será retificado (recibo original ${e.nrRecibo || ''}).` : (e.validacao || e.descResposta || '');
                       const info = INFORMATIVO.test(txt);
                       return (
                         <tr key={e.chave}>
@@ -262,6 +267,10 @@ export default function ProcessamentoMensalPage() {
         )}
       </div>
 
+      {reabrir && <ReabrirModal tpAmb={tpAmb} perApur={sel} onClose={() => setReabrir(false)} onFim={(ok: boolean) => {
+        loadComps(); loadPrevia(sel);
+        if (ok) { setReabrir(false); setMsg({ tipo: 'ok', txt: `${fmtComp(sel)} reaberta. Ajuste os dados, aprove a conferência e transmita: o que mudou sai como retificação e o novo fechamento gera a DCTFWeb retificadora.` }); }
+      }} />}
       {novoPg && <PagamentoModal onClose={() => setNovoPg(false)} onSaved={() => { setNovoPg(false); loadPgs(); if (sel) loadPrevia(sel); setMsg({ tipo: 'ok', txt: 'Pagamento registrado.' }); }} />}
       {transEv && <TransmitirModal tpAmb={tpAmb} perApur={sel} eventos={transEv} onClose={() => setTransEv(null)} onFim={(ok: boolean) => {
         loadComps(); loadPrevia(sel);
@@ -446,6 +455,70 @@ function PagamentoModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
           )}
         </div>
       </div>
+    </Modal>
+  );
+}
+
+function ReabrirModal({ tpAmb, perApur, onClose, onFim }: { tpAmb: string; perApur: string; onClose: () => void; onFim: (ok: boolean) => void }) {
+  const prod = tpAmb === '1';
+  const [confirma, setConfirma] = useState('');
+  const [rodando, setRodando] = useState(false);
+  const [acabou, setAcabou] = useState(false);
+  const [log, setLog] = useState<{ tipo: 'ok' | 'erro' | 'info'; txt: string }[]>([]);
+  const add = (tipo: 'ok' | 'erro' | 'info', txt: string) => setLog(l => [...l, { tipo, txt }]);
+
+  const iniciar = async () => {
+    setRodando(true); setLog([]);
+    let sucesso = false;
+    try {
+      const r = await api.post('/hr/esocial-s13/reabrir', { tpAmb: Number(tpAmb), perApur, confirmacao: confirma });
+      if (!r.data?.ok) add('erro', 'Lote recusado - ' + (r.data?.descResposta || ''));
+      else {
+        add('info', `S-1298 enviado - protocolo ${r.data.protocolo}. Aguardando processamento...`);
+        let terminou = false;
+        for (let t = 0; t < 36 && !terminou; t++) {
+          await sleep(5000);
+          const c = await api.post('/hr/esocial-s13/consultar', { tpAmb: Number(tpAmb) });
+          const l = (c.data?.lotes || [])[0];
+          if (!l) { terminou = true; add('info', 'Nenhum lote pendente: confira a situação em Eventos eSocial.'); break; }
+          if (l.situacao === 'EM PROCESSAMENTO') continue;
+          terminou = true;
+          if (l.situacao === 'REJEITADO' || Number(l.rejeitados) > 0) add('erro', 'Reabertura rejeitada pelo eSocial - veja o retorno em Eventos eSocial.');
+          else { add('ok', 'Competência reaberta no eSocial.'); sucesso = true; }
+        }
+        if (!terminou) add('erro', 'O eSocial não concluiu em 3 minutos. Consulte mais tarde em Eventos eSocial.');
+      }
+    } catch (e: any) { add('erro', erroTxt(e, 'Erro na reabertura.')); }
+    setRodando(false); setAcabou(true);
+    if (sucesso) await sleep(1500);
+    onFim(sucesso);
+  };
+
+  const pode = !rodando && !acabou && (!prod || confirma.trim() === 'REABRIR PRODUCAO');
+  return (
+    <Modal titulo={`Reabrir ${fmtComp(perApur)}`} sub={prod ? 'Produção - envia o S-1298 ao eSocial' : 'Produção restrita (teste)'} onClose={onClose} travado={rodando}
+      rodape={<>
+        <button style={btnSec} disabled={rodando} onClick={onClose}>{acabou ? 'Fechar' : 'Cancelar'}</button>
+        <button style={{ ...btnPri, background: pode ? '#A32D2D' : '#aaa' }} disabled={!pode} onClick={iniciar}>{rodando ? 'Reabrindo...' : 'Reabrir competência'}</button>
+      </>}>
+      <div style={{ ...secSt, fontSize: 12, color: FIN, lineHeight: 1.5 }}>
+        O S-1298 reabre a competência no eSocial. Depois: ajuste os dados (pagamentos, vigências), aprove a conferência e transmita.
+        Os eventos alterados saem como <b>retificação</b> (com o recibo original) e o novo fechamento gera a <b>DCTFWeb retificadora</b>.
+        Diferença a pagar exige DARF complementar.
+      </div>
+      <div style={{ background: '#FFF7ED', color: '#9A3412', borderRadius: 7, padding: '8px 12px', fontSize: 12 }}>
+        Não deixe a competência reaberta sem novo fechamento: ela aparecerá como Reaberta até ser transmitida de novo.
+      </div>
+      {prod && !rodando && !acabou && (
+        <div><Label>Confirmação (digite REABRIR PRODUCAO)</Label>
+          <input style={inputSt} value={confirma} onChange={e => setConfirma(e.target.value.toUpperCase())} placeholder="REABRIR PRODUCAO" />
+        </div>
+      )}
+      {log.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {log.map((l, i) => <div key={i} style={{ fontSize: 12, color: l.tipo === 'ok' ? '#047857' : l.tipo === 'erro' ? '#A32D2D' : '#374151' }}>{l.txt}</div>)}
+        </div>
+      )}
     </Modal>
   );
 }

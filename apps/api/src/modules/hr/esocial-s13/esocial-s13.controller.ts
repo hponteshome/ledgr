@@ -45,6 +45,11 @@ export class EsocialS13Controller {
   }
 
   // processamento mensal (18/11/2026)
+  @Post('reabrir')
+  reabrir(@Body() dto: any, @Request() req: any) {
+    return this.svc.reabrir(req.companyId, dto);
+  }
+
   @Get('competencias')
   competencias(@Query('tpAmb') tpAmb: string, @Request() req: any) {
     return this.svc.competencias(req.companyId, Number(tpAmb) || 1);
