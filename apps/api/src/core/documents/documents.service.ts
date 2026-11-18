@@ -1265,7 +1265,7 @@ async handleGovBrCallback(
   // Areas com abas; subtipo (coluna documents.subtipo) separa Balancete/ECD/ECF/Obrigacao etc.
   private readonly SUBTIPOS_DOC: Record<string, string[]> = {
     CONTABIL: ['BALANCETE', 'DEMONSTRACAO', 'ECD', 'LIVRO_CAIXA', 'EXTRATO_BANCARIO'],
-    FISCAL: ['ECF', 'OBRIGACAO', 'DARF', 'NOTIFICACAO'],
+    FISCAL: ['ECF', 'OBRIGACAO', 'DIMOB', 'DARF', 'NOTIFICACAO'],
     TRABALHISTA: ['CONTRATO_TRABALHO', 'ACORDO_COLETIVO'],
   };
 
