@@ -80,7 +80,7 @@ export default function ProcessamentoMensalPage() {
   const [pgs, setPgs] = useState<Pg[]>([]);
   const [novoPg, setNovoPg] = useState(false);
   const [delId, setDelId] = useState('');
-  const [trans, setTrans] = useState(false);
+  const [transEv, setTransEv] = useState<any[] | null>(null);
   const prod = tpAmb === '1';
 
   const loadComps = async () => {
@@ -160,7 +160,7 @@ export default function ProcessamentoMensalPage() {
             <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
               <button style={{ ...btnSec, opacity: ocupado || sit === 'FECHADA' ? 0.5 : 1 }} disabled={ocupado || sit === 'FECHADA' || !!prevErro} onClick={aprovar}>{ocupado ? 'Processando...' : sit === 'APROVADA' ? 'Aprovar novamente' : 'Aprovar conferência'}</button>
               <button style={{ ...btnPri, background: sit !== 'APROVADA' && sit !== 'REJEITADA' && sit !== 'TRANSMISSAO' || ocupado ? '#aaa' : prod ? '#B45309' : FIN_ACCENT }}
-                disabled={(sit !== 'APROVADA' && sit !== 'REJEITADA' && sit !== 'TRANSMISSAO') || ocupado || !pendentesEnvio} onClick={() => setTrans(true)}>Transmitir</button>
+                disabled={(sit !== 'APROVADA' && sit !== 'REJEITADA' && sit !== 'TRANSMISSAO') || ocupado || !pendentesEnvio} onClick={() => setTransEv(prev?.eventos || [])}>Transmitir</button>
             </div>
           </div>
           {compSel?.aprovadoEm && <div style={{ fontSize: 11, color: '#6B7280', marginBottom: 8 }}>Aprovada em {fmtDh(compSel.aprovadoEm)}{compSel.recibo ? ` · Fechamento recibo ${compSel.recibo}` : ''}</div>}
@@ -259,12 +259,15 @@ export default function ProcessamentoMensalPage() {
       </div>
 
       {novoPg && <PagamentoModal onClose={() => setNovoPg(false)} onSaved={() => { setNovoPg(false); loadPgs(); if (sel) loadPrevia(sel); setMsg({ tipo: 'ok', txt: 'Pagamento registrado.' }); }} />}
-      {trans && prev && <TransmitirModal tpAmb={tpAmb} perApur={sel} eventos={prev.eventos} onClose={() => setTrans(false)} onFim={() => { loadComps(); loadPrevia(sel); }} />}
+      {transEv && <TransmitirModal tpAmb={tpAmb} perApur={sel} eventos={transEv} onClose={() => setTransEv(null)} onFim={(ok: boolean) => {
+        loadComps(); loadPrevia(sel);
+        if (ok) { setTransEv(null); setMsg({ tipo: 'ok', txt: `${fmtComp(sel)} transmitida e fechada. A DCTFWeb foi transmitida pelo eSocial: emita o DARF no e-CAC.` }); }
+      }} />}
     </div>
   );
 }
 
-function TransmitirModal({ tpAmb, perApur, eventos, onClose, onFim }: { tpAmb: string; perApur: string; eventos: any[]; onClose: () => void; onFim: () => void }) {
+function TransmitirModal({ tpAmb, perApur, eventos, onClose, onFim }: { tpAmb: string; perApur: string; eventos: any[]; onClose: () => void; onFim: (ok: boolean) => void }) {
   const prod = tpAmb === '1';
   const pend = Array.from(new Set(eventos.filter(e => e.status !== 'PROCESSADO').map(e => Number(e.etapa)))).sort((a, b) => a - b);
   const [confirma, setConfirma] = useState('');
@@ -279,12 +282,12 @@ function TransmitirModal({ tpAmb, perApur, eventos, onClose, onFim }: { tpAmb: s
   const iniciar = async () => {
     setRodando(true); setLog([]); setFeitas([]);
     try { await api.post('/hr/esocial-s13/consultar', { tpAmb: Number(tpAmb) }); } catch { /* sem lote pendente */ }
-    let parar = false;
+    let parar = false; let sucesso = false;
     for (let volta = 0; volta < 12 && !parar; volta++) {
       let r: any;
       try { r = await api.post('/hr/esocial-s13/enviar', { tpAmb: Number(tpAmb), perApur, confirmacao: confirma }); }
       catch (e: any) { add('erro', erroTxt(e, 'Erro ao enviar.')); break; }
-      if (r.data?.mensagem) { add('ok', 'Todas as etapas da competência estão processadas.'); break; }
+      if (r.data?.mensagem) { add('ok', 'Todas as etapas da competência estão processadas.'); sucesso = true; break; }
       const etapa = Number(r.data?.etapa); const lote = (r.data?.lotes || [])[0];
       setAtual(etapa);
       if (!lote?.ok) { add('erro', `Etapa ${etapa} (${ETAPAS[etapa] || ''}): lote recusado - ${lote?.descResposta || ''}`); break; }
@@ -304,7 +307,9 @@ function TransmitirModal({ tpAmb, perApur, eventos, onClose, onFim }: { tpAmb: s
       }
       if (!concluiu && !parar) { add('erro', 'O eSocial não concluiu em 3 minutos. Feche e clique em Transmitir mais tarde: a consulta continua de onde parou.'); parar = true; }
     }
-    setAtual(null); setRodando(false); setAcabou(true); onFim();
+    setAtual(null); setRodando(false); setAcabou(true);
+    if (sucesso) { setFeitas(pend); await sleep(2000); }
+    onFim(sucesso);
   };
 
   const pode = !rodando && !acabou && pend.length > 0 && (!prod || confirma.trim() === 'ENVIAR PRODUCAO');

@@ -125,6 +125,11 @@ export class EsocialS13Service {
     const raiz = cnpj.slice(0, 8);
     const cnae = String(emp.mainActivity || '').replace(/\D/g, '').slice(0, 7);
     if (cnae.length !== 7) throw new BadRequestException('CNAE principal ausente no cadastro da empresa (cartao CNPJ).');
+    // por enquanto so pro-labore: com folha na competencia, o fechamento (S-1299 unico) exige a rotina da folha
+    const folhaDesdeRaw = emp.folhaDesde ?? emp.folha_desde;
+    const folhaDesde = folhaDesdeRaw ? new Date(folhaDesdeRaw).toISOString().slice(0, 7) : null;
+    if (folhaDesde ? folhaDesde <= perApur : !!(emp.temFolha ?? emp.tem_folha))
+      throw new BadRequestException(`Empresa com folha de pagamento em ${perApur}: o fechamento (S-1299 unico) exige a rotina da folha, ainda nao disponivel no LEDGR.`);
     const par = await this.prisma.esocialS13Config.findUnique({ where: { companyId } });
     if (!par) throw new BadRequestException('Parametros eSocial da empresa nao cadastrados (FPAS, terceiros, lotacao).');
 
