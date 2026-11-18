@@ -31,7 +31,7 @@ const COR_EV: Record<string, [string, string]> = {
 
 interface Comp { perApur: string; fechamento: string | null; recibo: string | null; descResposta: string | null; aprovadoEm: string | null; }
 interface Previa { eventos: any[]; remuneracoes: any[]; pagamentos: any[]; }
-interface Pg { id: string; tipo: string; competencia: string | null; dtPagamento: string; valorLiquido: number; observacao: string | null; nome: string; }
+interface Pg { id: string; tipo: string; competencia: string | null; dtPagamento: string; valorLiquido: number; observacao: string | null; nome: string; compensado?: number; emDinheiro?: number; saldo?: number | null; }
 const situacao = (c?: Comp) => !c ? 'PENDENTE' : c.fechamento === 'PROCESSADO' ? 'FECHADA' : c.fechamento === 'REJEITADO' ? 'REJEITADA'
   : c.fechamento === 'ENVIADO' ? 'TRANSMISSAO' : c.aprovadoEm ? 'APROVADA' : 'PENDENTE';
 
@@ -238,13 +238,16 @@ export default function ProcessamentoMensalPage() {
         </div>
         {pgs.length === 0 ? <p style={{ fontSize: 12, color: '#9CA3AF', fontStyle: 'italic' }}>Nenhum pagamento registrado.</p> : (
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead><tr><th style={th}>Data</th><th style={th}>Sócio</th><th style={th}>Tipo</th><th style={th}>Competência</th><th style={thR}>Líquido</th><th style={th}>Observação</th><th style={th}></th></tr></thead>
+            <thead><tr><th style={th}>Data</th><th style={th}>Sócio</th><th style={th}>Tipo</th><th style={th}>Competência</th><th style={thR}>Líquido</th><th style={th}>Composição / saldo</th><th style={th}>Observação</th><th style={th}></th></tr></thead>
             <tbody>
               {pgs.map(p => (
                 <tr key={p.id}>
                   <td style={td}>{fmtData(p.dtPagamento)}</td><td style={td}>{p.nome}</td>
                   <td style={td}>{p.tipo === 'ADIANTAMENTO' ? <Chip txt="Adiantamento" bg="#FEF3C7" fg="#92400E" /> : 'Pró-labore'}</td>
                   <td style={td}>{fmtComp(p.competencia)}</td><td style={tdR}>R$ {fmtBRL(p.valorLiquido)}</td>
+                  <td style={{ ...td, fontSize: 11 }}>{p.tipo === 'ADIANTAMENTO'
+                    ? (Number(p.saldo) > 0.005 ? <span style={{ color: '#92400E' }}>Saldo R$ {fmtBRL(p.saldo)}</span> : <span style={{ color: '#047857' }}>Liquidado</span>)
+                    : (Number(p.compensado) > 0 ? <span>Compensado R$ {fmtBRL(p.compensado)}{Number(p.emDinheiro) > 0.005 ? ` · dinheiro R$ ${fmtBRL(p.emDinheiro)}` : ''}</span> : <span style={{ color: '#6B7280' }}>Em dinheiro</span>)}</td>
                   <td style={{ ...td, fontSize: 11, color: '#6B7280' }}>{p.observacao || ''}</td>
                   <td style={{ ...td, whiteSpace: 'nowrap' }}>
                     {delId === p.id
@@ -356,6 +359,15 @@ function PagamentoModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
   const [sug, setSug] = useState('');
   const [erro, setErro] = useState('');
   const [salvando, setSalvando] = useState(false);
+  const [adis, setAdis] = useState<any[]>([]);
+  const [compens, setCompens] = useState<Record<string, string>>({});
+  useEffect(() => {
+    setAdis([]); setCompens({});
+    if (tipo !== 'PRO_LABORE' || !personId) return;
+    api.get('/hr/esocial-s13/pagamentos/adiantamentos', { params: { personId } }).then(r => setAdis(Array.isArray(r.data) ? r.data : [])).catch(() => setAdis([]));
+  }, [personId, tipo]);
+  const totalComp = Object.values(compens).reduce((a, v) => a + (parseValor(v) > 0 ? parseValor(v) : 0), 0);
+  const emDinheiro = (parseValor(valor) || 0) - totalComp;
 
   useEffect(() => {
     api.get('/hr/pro-labore/diretoria').then(r => {
@@ -379,7 +391,8 @@ function PagamentoModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
     if (!(parseValor(valor) > 0)) { setErro('Informe o valor líquido pago.'); return; }
     setSalvando(true);
     try {
-      await api.post('/hr/esocial-s13/pagamentos', { personId, tipo, competencia: tipo === 'PRO_LABORE' ? comp : null, dtPagamento: dt, valorLiquido: parseValor(valor), observacao: obs });
+      await api.post('/hr/esocial-s13/pagamentos', { personId, tipo, competencia: tipo === 'PRO_LABORE' ? comp : null, dtPagamento: dt, valorLiquido: parseValor(valor), observacao: obs,
+        compensacoes: tipo === 'PRO_LABORE' ? Object.entries(compens).map(([id, v]) => ({ adiantamentoId: id, valor: parseValor(v) })).filter(x => x.valor > 0) : [] });
       onSaved();
     } catch (e: any) { setErro(erroTxt(e, 'Erro ao registrar.')); }
     setSalvando(false);
@@ -413,6 +426,23 @@ function PagamentoModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
           <div><Label>Valor líquido pago (R$)</Label><input style={{ ...inputSt, textAlign: 'right' }} value={valor} placeholder="0,00" onChange={e => setValor(e.target.value)} /></div>
           {sug && <div style={{ gridColumn: '1 / 3', fontSize: 11, color: FIN }}>{sug}</div>}
           <div style={{ gridColumn: '1 / 3' }}><Label>Observação</Label><input style={inputSt} value={obs} maxLength={300} onChange={e => setObs(e.target.value)} placeholder="ex.: PIX conforme extrato" /></div>
+          {tipo === 'PRO_LABORE' && adis.length > 0 && (
+            <div style={{ gridColumn: '1 / 3', background: '#fff', borderRadius: 8, padding: '10px 12px', border: '1px solid #D1E7DD' }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: FIN, marginBottom: 6 }}>Compensar adiantamentos do sócio</div>
+              {adis.map(a => (
+                <div key={a.id} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 130px 90px', gap: 8, alignItems: 'center', marginBottom: 6, fontSize: 12 }}>
+                  <span>{fmtData(a.dtPagamento)} · R$ {fmtBRL(a.valorLiquido)}</span>
+                  <span style={{ color: '#92400E' }}>Saldo R$ {fmtBRL(a.saldo)}</span>
+                  <input style={{ ...inputSt, height: 28, textAlign: 'right' }} placeholder="0,00" value={compens[a.id] || ''}
+                    onChange={e => setCompens(c => ({ ...c, [a.id]: e.target.value }))} />
+                  <button style={{ ...btnSec, height: 28, fontSize: 11 }} onClick={() => setCompens(c => ({ ...c, [a.id]: fmtBRL(a.saldo) }))}>Usar saldo</button>
+                </div>
+              ))}
+              <div style={{ fontSize: 11, color: emDinheiro < -0.005 ? '#A32D2D' : FIN, marginTop: 4 }}>
+                Compensado R$ {fmtBRL(totalComp)} · em dinheiro R$ {fmtBRL(emDinheiro)}{emDinheiro < -0.005 ? ' - compensação maior que o líquido' : ''}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </Modal>

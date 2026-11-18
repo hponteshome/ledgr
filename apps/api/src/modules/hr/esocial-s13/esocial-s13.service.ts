@@ -587,8 +587,26 @@ export class EsocialS13Service {
     }
     if (await this.mesFechadoProducao(companyId, dt.slice(0, 7)))
       throw new BadRequestException('O mes do pagamento ja foi fechado no eSocial (producao): a inclusao exige retificacao.');
-    return this.prisma.proLaborePagamento.create({ data: { companyId, personId, configId, tipo, competencia,
-      dtPagamento: new Date(dt + 'T00:00:00Z'), valorLiquido: valor, observacao: dto?.observacao ? String(dto.observacao).slice(0, 300) : null } });
+    // compensacao de adiantamentos (so em pagamento de pro-labore)
+    const comps: { adiantamentoId: string; valor: number }[] = tipo === 'PRO_LABORE' && Array.isArray(dto?.compensacoes)
+      ? dto.compensacoes.map((c: any) => ({ adiantamentoId: String(c?.adiantamentoId || ''), valor: Math.round(Number(c?.valor) * 100) / 100 }))
+          .filter((c: { valor: number }) => c.valor > 0)
+      : [];
+    if (new Set(comps.map(c => c.adiantamentoId)).size !== comps.length) throw new BadRequestException('Adiantamento repetido na compensacao.');
+    if (comps.length) {
+      const soma = comps.reduce((a, c) => a + c.valor, 0);
+      if (soma - valor > 0.005) throw new BadRequestException('A compensacao de adiantamentos excede o valor liquido do pagamento.');
+      for (const c of comps) {
+        const sd = await this.saldoAdiantamento(companyId, c.adiantamentoId, personId);
+        if (c.valor - sd > 0.005) throw new BadRequestException(`Compensacao de R$ ${c.valor.toFixed(2)} maior que o saldo do adiantamento (R$ ${sd.toFixed(2)}).`);
+      }
+    }
+    return this.prisma.$transaction(async tx => {
+      const pg = await tx.proLaborePagamento.create({ data: { companyId, personId, configId, tipo, competencia,
+        dtPagamento: new Date(dt + 'T00:00:00Z'), valorLiquido: valor, observacao: dto?.observacao ? String(dto.observacao).slice(0, 300) : null } });
+      for (const c of comps) await tx.proLaboreCompensacao.create({ data: { companyId, pagamentoId: pg.id, adiantamentoId: c.adiantamentoId, valor: c.valor } });
+      return pg;
+    });
   }
 
   async excluirPagamento(companyId: string, id: string) {
@@ -596,8 +614,32 @@ export class EsocialS13Service {
     if (!p) throw new NotFoundException('Pagamento nao encontrado.');
     if (await this.mesFechadoProducao(companyId, ymd(p.dtPagamento).slice(0, 7)))
       throw new BadRequestException('Pagamento ja declarado em mes fechado no eSocial (producao): a exclusao exige retificacao.');
-    await this.prisma.proLaborePagamento.update({ where: { id }, data: { deletedAt: new Date() } });
+    if (p.tipo === 'ADIANTAMENTO' && await this.prisma.proLaboreCompensacao.count({ where: { adiantamentoId: id, deletedAt: null } }))
+      throw new BadRequestException('Adiantamento ja compensado em pagamento de pro-labore: exclua primeiro esse pagamento.');
+    const agora = new Date();
+    await this.prisma.$transaction([
+      this.prisma.proLaboreCompensacao.updateMany({ where: { pagamentoId: id, deletedAt: null }, data: { deletedAt: agora } }),
+      this.prisma.proLaborePagamento.update({ where: { id }, data: { deletedAt: agora } }),
+    ]);
     return { ok: true };
+  }
+
+  // ── adiantamentos: saldo e compensacao (18/11/2026) ─────────────────────
+  private async saldoAdiantamento(companyId: string, adiantamentoId: string, personId?: string): Promise<number> {
+    const a = await this.prisma.proLaborePagamento.findFirst({ where: { id: adiantamentoId, companyId, tipo: 'ADIANTAMENTO', deletedAt: null, ...(personId ? { personId } : {}) } });
+    if (!a) throw new BadRequestException('Adiantamento nao encontrado para este socio.');
+    const agg = await this.prisma.proLaboreCompensacao.aggregate({ where: { adiantamentoId, deletedAt: null }, _sum: { valor: true } });
+    return Math.round((Number(a.valorLiquido) - Number(agg._sum.valor || 0)) * 100) / 100;
+  }
+
+  async adiantamentosDisponiveis(companyId: string, personId: string) {
+    const ads = await this.prisma.proLaborePagamento.findMany({ where: { companyId, personId, tipo: 'ADIANTAMENTO', deletedAt: null }, orderBy: { dtPagamento: 'asc' } });
+    const out: any[] = [];
+    for (const a of ads) {
+      const saldo = await this.saldoAdiantamento(companyId, a.id);
+      if (saldo > 0.005) out.push({ id: a.id, dtPagamento: a.dtPagamento, valorLiquido: Number(a.valorLiquido), saldo, observacao: a.observacao });
+    }
+    return out;
   }
 
   // ── consultas ──────────────────────────────────────────────────────────────
@@ -619,6 +661,14 @@ export class EsocialS13Service {
   async pagamentos(companyId: string) {
     const ps = await this.prisma.proLaborePagamento.findMany({ where: { companyId, deletedAt: null }, orderBy: { dtPagamento: 'desc' } });
     const pes = await this.prisma.person.findMany({ where: { id: { in: Array.from(new Set(ps.map(p => p.personId))) } }, select: { id: true, fullName: true } });
-    return ps.map(p => ({ ...p, valorLiquido: Number(p.valorLiquido), nome: pes.find(x => x.id === p.personId)?.fullName || '' }));
+    const cps = await this.prisma.proLaboreCompensacao.findMany({ where: { companyId, deletedAt: null } });
+    const r2 = (n: number) => Math.round(n * 100) / 100;
+    return ps.map(p => {
+      const v = Number(p.valorLiquido);
+      const usado = cps.filter(c => c.adiantamentoId === p.id).reduce((a, c) => a + Number(c.valor), 0);
+      const comp = cps.filter(c => c.pagamentoId === p.id).reduce((a, c) => a + Number(c.valor), 0);
+      return { ...p, valorLiquido: v, nome: pes.find(x => x.id === p.personId)?.fullName || '',
+        compensado: r2(comp), emDinheiro: r2(v - comp), saldo: p.tipo === 'ADIANTAMENTO' ? r2(v - usado) : null };
+    });
   }
 }

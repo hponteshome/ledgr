@@ -6241,3 +6241,18 @@ model EsocialS13Aprovacao {
   @@unique([companyId, tpAmb, perApur])
   @@map("esocial_s13_aprovacoes")
 }
+
+// compensacao de adiantamentos de pro-labore (18/11/2026)
+model ProLaboreCompensacao {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId      String    @map("company_id") @db.Uuid
+  pagamentoId    String    @map("pagamento_id") @db.Uuid
+  adiantamentoId String    @map("adiantamento_id") @db.Uuid
+  valor          Decimal   @db.Decimal(15, 2)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamp(6)
+
+  @@index([adiantamentoId])
+  @@index([pagamentoId])
+  @@map("pro_labore_compensacoes")
+}

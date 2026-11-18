@@ -60,6 +60,11 @@ export class EsocialS13Controller {
     return this.svc.aprovar(req.companyId, req.user?.id || null, dto);
   }
 
+  @Get('pagamentos/adiantamentos')
+  adiantamentos(@Query('personId') personId: string, @Request() req: any) {
+    return this.svc.adiantamentosDisponiveis(req.companyId, personId);
+  }
+
   @Get('pagamentos/sugestao')
   sugestao(@Query('personId') personId: string, @Query('competencia') competencia: string, @Request() req: any) {
     return this.svc.sugestaoLiquido(req.companyId, personId, competencia);
