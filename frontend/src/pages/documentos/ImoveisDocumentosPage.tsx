@@ -18,6 +18,19 @@ const FIN = '#1A3A5C';
 const FIN_ACCENT = '#2E6DA4';
 const FIN_LIGHT = '#EEF4FA';
 
+// ARQ-IMOV-01 (18/11/2026): abas em destaque com cor propria; Contratos de locacao e a aba principal;
+// abas Todos (documentos unicos) e A classificar (locacao sem vinculo); filtro por imovel em todas as abas
+type CorAba = { forte: string; claro: string; borda: string };
+const CORES_ABA: CorAba[] = [
+  { forte: '#0369A1', claro: '#E0F2FE', borda: '#7DD3FC' }, // azul
+  { forte: '#047857', claro: '#D1FAE5', borda: '#6EE7B7' }, // verde
+  { forte: '#6D28D9', claro: '#EDE9FE', borda: '#C4B5FD' }, // violeta
+  { forte: '#B45309', claro: '#FEF3C7', borda: '#FCD34D' }, // ambar
+  { forte: '#BE185D', claro: '#FCE7F3', borda: '#F9A8D4' }, // rosa
+];
+const COR_TODOS: CorAba = { forte: '#334155', claro: '#F1F5F9', borda: '#CBD5E1' };
+const COR_CLASSIFICAR: CorAba = { forte: '#C2410C', claro: '#FFEDD5', borda: '#FDBA74' };
+
 const SITUACOES: Record<string, { label: string; alerta: boolean; cor: string }> = {
   EMPRESA:                 { label: 'Em nome da empresa', alerta: false, cor: 'bg-green-50 text-green-700' },
   SOCIO_PENDENTE_REGISTRO: { label: 'Em nome do sócio/cedente - registro pendente', alerta: true, cor: 'bg-orange-50 text-orange-700' },
@@ -269,7 +282,7 @@ export const ImoveisDocumentosPage: React.FC = () => {
   const location = useLocation();
   const abaDaRota = () => {
     const sub = location.pathname.replace(/\/+$/, '').split('/').pop();
-    return sub === 'matriculas' || sub === 'escrituras' || sub === 'cessoes' ? sub : sub === 'locacao' ? 'locacao' : 'todos';
+    return ['locacao', 'matesc', 'matriculas', 'escrituras', 'cessoes', 'todos', 'classificar'].includes(sub ?? '') ? (sub as string) : 'locacao';
   };
   const [aba, setAba] = useState(abaDaRota());
   useEffect(() => { setAba(abaDaRota()); }, [location.pathname]);
@@ -302,6 +315,7 @@ export const ImoveisDocumentosPage: React.FC = () => {
   const [showImport, setShowImport] = useState(false);
   const [viewDoc, setViewDoc] = useState<{ id: string; title: string } | null>(null);
   const [filtroSit, setFiltroSit] = useState('');
+  const [filtroImovel, setFiltroImovel] = useState('');
   const [ordem, setOrdem] = useState<{ key: string; dir: 1 | -1 }>({ key: 'imovel', dir: 1 });
   const [assetImport, setAssetImport] = useState<string | undefined>(undefined);
   const [tipoImport, setTipoImport] = useState('MATRICULA');
@@ -327,7 +341,9 @@ export const ImoveisDocumentosPage: React.FC = () => {
     setLoading(false);
   };
   useEffect(() => { carregar(); }, []);
-  const linhas = tipoFiltro ? todas.filter(l => l.tipo === tipoFiltro) : todas.filter(l => l.tipo !== 'CESSAO');
+  const imovelSel = imoveis.find(i => i.id === filtroImovel);
+  const todasF = filtroImovel ? todas.filter(l => l.fixedAssetId === filtroImovel) : todas;
+  const linhas = tipoFiltro ? todasF.filter(l => l.tipo === tipoFiltro) : todasF.filter(l => l.tipo !== 'CESSAO');
   const cessoes = todas.filter(l => l.tipo === 'CESSAO');
   const cessoesPorImovel = useMemo(() => {
     const m: Record<string, any[]> = {};
@@ -345,6 +361,36 @@ export const ImoveisDocumentosPage: React.FC = () => {
   }, [todas]);
   const precisaCessao = (l: any) => l.tipo === 'MATRICULA' && CEDE[l.situacao] && !(cessoesPorImovel[l.fixedAssetId]?.length);
   const semCessao = todas.filter(precisaCessao).length;
+  const codigosLoc = (l: any) => String(l.internalCode ?? '').split(/\s*[,;]\s*/).filter(Boolean);
+  const locacoesF = filtroImovel
+    ? locacoes.filter(l => l.fixedAssetId === filtroImovel || (!!imovelSel && codigosLoc(l).includes(imovelSel.internalCode)))
+    : locacoes;
+  const aClassificar = locacoes.filter(l => !l.internalCode);
+  const contratosCessaoF = filtroImovel ? contratosCessao.filter((c: any) => !!imovelSel && c.imoveis.includes(imovelSel.internalCode)) : contratosCessao;
+  const locLike = aba === 'locacao' || aba === 'classificar' || aba === 'todos';
+  // Todos: um registro por documento (um documento pode estar ligado a varios imoveis)
+  const todosDocs = useMemo(() => {
+    const regs: any[] = locacoesF.map(l => ({
+      key: 'L' + (l.documentId ?? l.id), documentId: l.documentId ?? l.id, title: l.title, tipo: 'Contrato de locação',
+      imoveis: l.internalCode || '', data: l.startDate, info: [l.tenantName, l.contractNumber ? 'nº ' + l.contractNumber : ''].filter(Boolean).join(' · '),
+    }));
+    const porDoc: Record<string, any> = {};
+    todasF.filter(l => l.tipo !== 'CESSAO').forEach(l => {
+      const g = porDoc[l.documentId] ?? (porDoc[l.documentId] = {
+        key: 'D' + l.documentId, documentId: l.documentId, title: l.title, tipo: TIPO_LABEL[l.tipo] ?? l.tipo, cod: [] as string[], data: l.dataCertidao,
+        info: [l.proprietarioRegistral, SITUACOES[l.situacao]?.alerta ? SITUACOES[l.situacao].label : ''].filter(Boolean).join(' · '),
+      });
+      if (!g.cod.includes(l.internalCode)) g.cod.push(l.internalCode);
+    });
+    Object.values(porDoc).forEach((g: any) => regs.push({ ...g, imoveis: g.cod.join(', ') }));
+    contratosCessaoF.forEach((c: any) => regs.push({
+      key: 'C' + c.documentId, documentId: c.documentId, title: c.title, tipo: 'Contrato de cessão',
+      imoveis: c.imoveis.join(', '), data: c.dataCertidao, info: c.proprietarioRegistral || '',
+    }));
+    return regs.sort((a, b) => (a.imoveis ? 0 : -1) - (b.imoveis ? 0 : -1)
+      || String(a.imoveis).localeCompare(String(b.imoveis), 'pt-BR', { numeric: true })
+      || String(a.tipo).localeCompare(String(b.tipo), 'pt-BR'));
+  }, [locacoesF, todasF, contratosCessaoF]);
   const abrirImport = (tipo: string, asset?: string) => { setTipoImport(tipo); setAssetImport(asset); setShowImport(true); };
 
   const mudarSituacao = async (l: any, situacao: string) => {
@@ -358,18 +404,24 @@ export const ImoveisDocumentosPage: React.FC = () => {
   const semMatricula = useMemo(
     () => imoveis.filter(i => !todas.some(l => l.fixedAssetId === i.id && l.tipo === 'MATRICULA')),
     [imoveis, todas]);
-  const abaBtn = (key: string, label: string, n: number) => (
-    <button key={key} onClick={() => setAba(key)}
-      className={`px-3 py-1.5 rounded-full text-[12px] border transition-colors ${aba === key ? 'text-white border-transparent' : 'text-gray-600 border-gray-200 bg-white hover:bg-gray-50'}`}
-      style={aba === key ? { background: FIN } : undefined}>
-      {label} <span className={aba === key ? 'text-white/70' : 'text-gray-400'}>{n}</span>
-    </button>
-  );
+  const abaBtn = (key: string, label: string, n: number, cor: CorAba) => {
+    const ativa = aba === key;
+    return (
+      <button key={key} onClick={() => setAba(key)}
+        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[13px] font-medium border transition-shadow hover:shadow-sm"
+        style={ativa ? { background: cor.forte, borderColor: cor.forte, color: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,.18)' }
+                     : { background: cor.claro, borderColor: cor.borda, color: cor.forte }}>
+        {label}
+        <span className="min-w-[20px] px-1.5 rounded-full text-[11px] font-semibold text-center"
+          style={ativa ? { background: 'rgba(255,255,255,.25)', color: '#fff' } : { background: '#fff', color: cor.forte }}>{n}</span>
+      </button>
+    );
+  };
 
   const th = 'px-3 py-2.5 text-left text-[11px] font-medium uppercase tracking-wide text-gray-500 bg-gray-50 border-b border-gray-200';
 
   // Filtro de situacao. "Sem matricula" junta os documentos marcados assim e os imoveis sem matricula arquivada.
-  const semMatriculaLinhas = semMatricula.map(i => ({
+  const semMatriculaLinhas = semMatricula.filter(i => !filtroImovel || i.id === filtroImovel).map(i => ({
     id: 'asset-' + i.id, semDoc: true, fixedAssetId: i.id, internalCode: i.internalCode, assetDescription: i.description,
     tipo: '', numeroMatricula: i.registryNumber ?? '', cartorio: i.registryOffice ?? '', dataCertidao: null,
     proprietarioRegistral: '', ultimoAto: '', observacao: '', situacao: 'SEM_MATRICULA',
@@ -410,12 +462,21 @@ export const ImoveisDocumentosPage: React.FC = () => {
         <div>
           <h1 className="text-[22px] font-medium text-gray-900 flex items-center gap-2"><FiHome size={20} /> {tituloPagina}</h1>
           <p className="text-[13px] text-gray-500 mt-0.5">
-            {todas.length + locacoes.length} documento{todas.length + locacoes.length !== 1 ? 's' : ''}
+            {todosDocs.length} documento{todosDocs.length !== 1 ? 's' : ''}{imovelSel ? ' do imóvel ' + imovelSel.internalCode : ''}
             {alertas > 0 && <span className="text-orange-700"> · {alertas} com alerta de situação registral</span>}
             {semCessao > 0 && <span className="text-red-700"> · {semCessao} sem contrato de cessão</span>}
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <label className="text-[12px] text-gray-600 flex items-center gap-1.5 cursor-pointer">
+            Imóvel
+            <select value={filtroImovel} onChange={e => setFiltroImovel(e.target.value)}
+              className="text-[12px] border rounded-lg px-2 py-1 bg-white" style={filtroImovel ? { borderColor: FIN_ACCENT, color: FIN } : { borderColor: '#E5E7EB' }}>
+              <option value="">Todos</option>
+              {imoveis.map(i => <option key={i.id} value={i.id}>{i.internalCode}</option>)}
+            </select>
+          </label>
+          {(aba === 'matesc' || aba === 'matriculas' || aba === 'escrituras') && (
           <label className="text-[12px] text-gray-600 flex items-center gap-1.5 cursor-pointer">
             Situação
             <select value={filtroSit} onChange={e => setFiltroSit(e.target.value)}
@@ -425,19 +486,28 @@ export const ImoveisDocumentosPage: React.FC = () => {
               <option value="SEM_CESSAO">Sem contrato de cessão (sócio/Grupo/terceiro)</option>
               {Object.entries(SITUACOES).map(([k, v]) => <option key={k} value={k}>{k === 'SEM_MATRICULA' ? 'Sem matrícula (inclui imóveis sem matrícula arquivada)' : v.label}</option>)}
             </select>
-          </label>
-          <button onClick={() => aba === 'locacao' ? setShowImportLoc(true) : abrirImport(aba === 'cessoes' ? 'CESSAO' : aba === 'escrituras' ? 'ESCRITURA' : 'MATRICULA')} className="flex items-center gap-1.5 px-4 py-2 text-white rounded-lg text-[13px]" style={{ background: FIN }}>
-            <FiUpload size={13} /> Arquivar {aba === 'locacao' ? 'contrato de locação' : aba === 'cessoes' ? 'contrato de cessão' : aba === 'escrituras' ? 'escritura' : 'matrícula'}
+          </label>)}
+          <button onClick={() => locLike ? setShowImportLoc(true) : abrirImport(aba === 'cessoes' ? 'CESSAO' : aba === 'escrituras' ? 'ESCRITURA' : 'MATRICULA')} className="flex items-center gap-1.5 px-4 py-2 text-white rounded-lg text-[13px]" style={{ background: FIN }}>
+            <FiUpload size={13} /> Arquivar {locLike ? 'contrato de locação' : aba === 'cessoes' ? 'contrato de cessão' : aba === 'escrituras' ? 'escritura' : 'matrícula'}
           </button>
         </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        {abaBtn('todos', 'Matrículas e escrituras', todas.filter(l => l.tipo !== 'CESSAO').length)}
-        {abaBtn('matriculas', 'Matrículas', todas.filter(l => l.tipo === 'MATRICULA').length)}
-        {abaBtn('escrituras', 'Escrituras', todas.filter(l => l.tipo === 'ESCRITURA').length)}
-        {abaBtn('cessoes', 'Contratos de cessão', contratosCessao.length)}
-        {abaBtn('locacao', 'Contratos de locação', locacoes.length)}
+        {abaBtn('locacao', 'Contratos de locação', locacoesF.length, CORES_ABA[0])}
+        {abaBtn('matesc', 'Matrículas e escrituras', todasF.filter(l => l.tipo !== 'CESSAO').length, CORES_ABA[1])}
+        {abaBtn('matriculas', 'Matrículas', todasF.filter(l => l.tipo === 'MATRICULA').length, CORES_ABA[2])}
+        {abaBtn('escrituras', 'Escrituras', todasF.filter(l => l.tipo === 'ESCRITURA').length, CORES_ABA[3])}
+        {abaBtn('cessoes', 'Contratos de cessão', contratosCessaoF.length, CORES_ABA[4])}
+        <span className="mx-1 h-5 border-l border-gray-300" />
+        {abaBtn('todos', 'Todos', todosDocs.length, COR_TODOS)}
+        {abaBtn('classificar', 'A classificar', aClassificar.length, COR_CLASSIFICAR)}
+        {imovelSel && (
+          <span className="ml-2 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[12px]" style={{ background: FIN_LIGHT, color: FIN }}>
+            Imóvel {imovelSel.internalCode}
+            <button title="Limpar filtro" onClick={() => setFiltroImovel('')} className="hover:opacity-70"><FiX size={12} /></button>
+          </span>
+        )}
       </div>
 
       {aba === 'cessoes' ? (
@@ -479,7 +549,45 @@ export const ImoveisDocumentosPage: React.FC = () => {
           </tbody>
         </table>
       </div>
-      ) : aba === 'locacao' ? (
+      ) : aba === 'todos' ? (
+      <div className="border border-gray-200 rounded-[10px] overflow-hidden">
+        <table className="w-full">
+          <thead>
+            <tr>
+              <th className={th}>Imóvel</th>
+              <th className={th}>Tipo</th>
+              <th className={th}>Documento</th>
+              <th className={th}>Data</th>
+              <th className={th}>Detalhe</th>
+              <th className={th}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan={6} className="px-4 py-10 text-center text-gray-400 text-[14px]">Carregando...</td></tr>
+            ) : todosDocs.length === 0 ? (
+              <tr><td colSpan={6} className="px-4 py-10 text-center text-gray-400 text-[14px]">Nenhum documento arquivado</td></tr>
+            ) : todosDocs.map((d: any) => (
+              <tr key={d.key} className="border-b border-gray-100 last:border-0 hover:bg-gray-50 align-top">
+                <td className="px-3 py-2.5 text-[13px] font-medium text-gray-900">{d.imoveis || (
+                  <button onClick={() => setAba('classificar')} className="text-[12px] font-normal text-orange-700 hover:underline">a classificar</button>
+                )}</td>
+                <td className="px-3 py-2.5 text-[12px] text-gray-600">{d.tipo}</td>
+                <td className="px-3 py-2.5">
+                  <button onClick={() => setViewDoc({ id: d.documentId, title: d.title })} className="text-[13px] text-gray-900 hover:text-blue-600 hover:underline text-left">{d.title}</button>
+                </td>
+                <td className="px-3 py-2.5 text-[12px] text-gray-700">{fmtData(d.data)}</td>
+                <td className="px-3 py-2.5 text-[12px] text-gray-500 max-w-[280px]">{d.info || '-'}</td>
+                <td className="px-3 py-2.5">
+                  <button title="Visualizar" onClick={() => setViewDoc({ id: d.documentId, title: d.title })}
+                    className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded"><FiEye size={14} /></button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      ) : (aba === 'locacao' || aba === 'classificar') ? (
       <div className="border border-gray-200 rounded-[10px] overflow-hidden">
         <table className="w-full">
           <thead>
@@ -495,9 +603,9 @@ export const ImoveisDocumentosPage: React.FC = () => {
           <tbody>
             {loading ? (
               <tr><td colSpan={6} className="px-4 py-10 text-center text-gray-400 text-[14px]">Carregando...</td></tr>
-            ) : locacoes.length === 0 ? (
-              <tr><td colSpan={6} className="px-4 py-10 text-center text-gray-400 text-[14px]">Nenhum contrato de locação arquivado</td></tr>
-            ) : locacoes.map(l => (
+            ) : (aba === 'classificar' ? aClassificar : locacoesF).length === 0 ? (
+              <tr><td colSpan={6} className="px-4 py-10 text-center text-gray-400 text-[14px]">{aba === 'classificar' ? 'Nenhum documento a classificar' : 'Nenhum contrato de locação arquivado'}</td></tr>
+            ) : (aba === 'classificar' ? aClassificar : locacoesF).map(l => (
               <tr key={l.documentId} className="border-b border-gray-100 last:border-0 hover:bg-gray-50 align-top">
                 <td className="px-3 py-2.5 text-[13px] font-medium text-gray-900">{l.internalCode || (vincDoc === (l.documentId ?? l.id) ? (
   <select autoFocus defaultValue="" onChange={e => vincular(e.target.value)} onBlur={() => setVincDoc(null)} className="border border-gray-300 rounded px-1 py-0.5 text-[12px] font-normal max-w-[240px]">
