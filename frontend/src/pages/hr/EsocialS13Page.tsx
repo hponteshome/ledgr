@@ -2,6 +2,7 @@
 // LEDGR - eSocial S-1.3 (17/11/2026): gera/valida o pacote da competencia e transmite por etapas
 // (S-1000 > tabelas > S-1200 > S-1210 > S-1299). Producao exige confirmacao digitada.
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import { SmartMonthInput } from '../../components/SmartMonthInput';
 
@@ -33,6 +34,7 @@ function Selo({ s }: { s: string }) {
 }
 
 export default function EsocialS13Page() {
+  const navigate = useNavigate();
   const [tpAmb, setTpAmb] = useState('2');
   const [comp, setComp] = useState('');
   const [evs, setEvs] = useState<Ev[]>([]);
@@ -107,6 +109,7 @@ export default function EsocialS13Page() {
   return (
     <div style={{ padding: 24 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+        <button onClick={() => navigate('/app/hr/pro-labore')} title="Voltar para o Pró-labore" style={{ height: 30, width: 30, border: '1px solid #D1D5DB', borderRadius: 6, background: '#fff', cursor: 'pointer', fontSize: 16, lineHeight: 1, color: '#374151' }}>←</button>
         <span style={{ fontSize: 11, fontWeight: 600, color: '#0E7490', background: '#ECFEFF', padding: '3px 8px', borderRadius: 6 }}>◆ RH</span>
         <span style={{ fontSize: 18, fontWeight: 600, color: '#111827' }}>eSocial S-1.3</span>
       </div>

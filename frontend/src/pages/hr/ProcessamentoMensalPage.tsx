@@ -121,6 +121,7 @@ export default function ProcessamentoMensalPage() {
   return (
     <div style={{ padding: 24 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+        <button onClick={() => navigate('/app/hr/pro-labore')} title="Voltar para o Pró-labore" style={{ height: 30, width: 30, border: '1px solid #D1D5DB', borderRadius: 6, background: '#fff', cursor: 'pointer', fontSize: 16, lineHeight: 1, color: '#374151' }}>←</button>
         <span style={{ fontSize: 11, fontWeight: 600, color: '#0E7490', background: '#ECFEFF', padding: '3px 8px', borderRadius: 6 }}>◆ RH</span>
         <span style={{ fontSize: 18, fontWeight: 600, color: '#111827' }}>Processamento Mensal</span>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
