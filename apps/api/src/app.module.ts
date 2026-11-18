@@ -31,6 +31,7 @@ import { CalendarModule } from './modules/calendar/calendar.module';
 import { SpedModule } from './modules/sped/sped.module';
 import { AssetsModule } from './modules/assets/assets.module';
 import { RentalContractsModule } from './modules/locacao/rental-contracts.module';
+import { DimobModule } from './modules/dimob/dimob.module';
 
 import { IntegridadeModule } from './modules/integridade/integridade.module';
 import { Reflector } from '@nestjs/core';
@@ -75,6 +76,7 @@ import { ChatModule } from './chat/chat.module';
     SpedModule,
     AssetsModule,
     RentalContractsModule,
+    DimobModule,
     IntegridadeModule,
     FinanceModule,
     BankImportModule,

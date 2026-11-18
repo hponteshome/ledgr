@@ -68,6 +68,7 @@ import EcfPage from '../pages/sped/EcfPage';
 import EcfPreValidatePage from '../pages/sped/EcfPreValidatePage';
 import LalurViewPage from '../pages/sped/LalurViewPage';
 import EfdPage from '../pages/sped/EfdPage';
+import DimobPage from '../pages/sped/DimobPage';
 import { EcdViewerPage } from '../pages/sped/EcdViewerPage';
 //import { EcdHistoryPage } from '../pages/sped/EcdHistoryPage';
 import JournalPage from '../pages/accounting/JournalPage';
@@ -263,6 +264,7 @@ export const AppRoutes = () => {
                 <Route path="app/sped/ecf/lalur" element={<ProtectedRoute><LalurViewPage /></ProtectedRoute>} />
                 <Route path="app/sped/ecf" element={<ProtectedRoute><EcfPage /></ProtectedRoute>} />
                 <Route path="app/sped/efd" element={<ProtectedRoute><EfdPage /></ProtectedRoute>} />
+                <Route path="app/sped/dimob" element={<ProtectedRoute><DimobPage /></ProtectedRoute>} />
                 <Route path="app/sped/ecd/viewer/:id" element={<ProtectedRoute> <EcdViewerPage /></ProtectedRoute>} />
 
                 {/* Empresas */}
