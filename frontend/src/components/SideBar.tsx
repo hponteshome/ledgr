@@ -15,6 +15,10 @@ import { useFavorites } from '../hooks/useFavorites';
 import { HelpCenter } from './help/HelpCenter';
 import { contextualHelp } from '../help/helpContent';
 
+
+// 18/11/2026: o item so fica ativo para o mesmo caminho ou subcaminho ('/app/hr/esocial' nao casa com '/app/hr/esocial-s13')
+const pathMatch = (atual: string, p: string) => !!p && (atual === p || atual.startsWith(p.endsWith('/') ? p : p + '/'));
+
 const MySwal = withReactContent(Swal);
 
 // Estagio 1 do roadmap de navegacao (docs/LEDGR-benchmark-ux-navegacao.md):
@@ -42,7 +46,7 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
   const [expanded, setExpanded] = useState<string[]>([]); // sub-accordion de 3o nivel (dentro do painel)
   const [helpOpen, setHelpOpen] = useState(false);
   const helpSlug = Object.entries(contextualHelp).find(([path]) =>
-    location.pathname.startsWith(path)
+    pathMatch(location.pathname, path)
   )?.[1];
 
   // Sincroniza o modulo ativo (Nivel 1) e o sub-accordion (3o nivel) com a rota atual -
@@ -55,9 +59,9 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
     filteredMenu.forEach(item => {
       if (!item.children) return;
       const childMatch = item.children.some(child => {
-        if (currentPath.startsWith(child.path.split('?')[0])) return true;
+        if (pathMatch(currentPath, child.path.split('?')[0])) return true;
         if (child.children) {
-          return child.children.some(gc => currentPath.startsWith(gc.path.split('?')[0]));
+          return child.children.some(gc => pathMatch(currentPath, gc.path.split('?')[0]));
         }
         return false;
       });
@@ -65,7 +69,7 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
 
       item.children.forEach(child => {
         if (child.children) {
-          const gcMatch = child.children.some(gc => currentPath.startsWith(gc.path.split('?')[0]));
+          const gcMatch = child.children.some(gc => pathMatch(currentPath, gc.path.split('?')[0]));
           if (gcMatch) toExpand.push(child.path);
         }
       });
@@ -135,7 +139,7 @@ export const Sidebar: React.FC<{ open: boolean; onToggle: () => void }> = ({ ope
           <div className="w-8 h-px bg-gray-100 my-1" />
 
           {filteredMenu.map((item, idx) => {
-            const active = location.pathname.startsWith(item.path);
+            const active = pathMatch(location.pathname, item.path);
             const isModuleOpen = open && activeModulePath === item.path;
             const showDivider = item.dividerBefore && idx > 0;
             return (
