@@ -14,6 +14,21 @@ import api from '../../services/api';
 const FIN = '#1A3A5C';
 const FIN_LIGHT = '#EEF4FA';
 
+// ARQ-ABAS-01 (18/11/2026): abas em destaque - cada aba com cor propria (fundo claro, borda e texto na cor; ativa preenchida)
+type CorAba = { forte: string; claro: string; borda: string };
+const CORES_ABA: CorAba[] = [
+  { forte: '#0369A1', claro: '#E0F2FE', borda: '#7DD3FC' }, // azul
+  { forte: '#047857', claro: '#D1FAE5', borda: '#6EE7B7' }, // verde
+  { forte: '#6D28D9', claro: '#EDE9FE', borda: '#C4B5FD' }, // violeta
+  { forte: '#B45309', claro: '#FEF3C7', borda: '#FCD34D' }, // ambar
+  { forte: '#BE185D', claro: '#FCE7F3', borda: '#F9A8D4' }, // rosa
+  { forte: '#0F766E', claro: '#CCFBF1', borda: '#5EEAD4' }, // verde-agua
+  { forte: '#4338CA', claro: '#E0E7FF', borda: '#A5B4FC' }, // indigo
+  { forte: '#A16207', claro: '#FEF9C3', borda: '#FDE047' }, // mostarda
+];
+const COR_TODOS: CorAba = { forte: '#334155', claro: '#F1F5F9', borda: '#CBD5E1' };
+const COR_CLASSIFICAR: CorAba = { forte: '#C2410C', claro: '#FFEDD5', borda: '#FDBA74' };
+
 type Aba = { key: string; label: string; types: string[]; subtipos?: string[]; semSubtipo?: boolean };
 type Area = { label: string; abas: Aba[] };
 
@@ -169,13 +184,19 @@ export const ArquivoAreaPage: React.FC = () => {
   const aClassificar = area.abas.find(a => a.semSubtipo);
   const pendentes = aClassificar ? contagem(aClassificar) : 0;
 
-  const abaBtn = (key: string, label: string, n: number) => (
-    <button key={key} onClick={() => setAba(key)}
-      className={`px-3 py-1.5 rounded-full text-[12px] border transition-colors ${aba === key ? 'text-white border-transparent' : 'text-gray-600 border-gray-200 bg-white hover:bg-gray-50'}`}
-      style={aba === key ? { background: FIN } : undefined}>
-      {label} <span className={aba === key ? 'text-white/70' : 'text-gray-400'}>{n}</span>
-    </button>
-  );
+  const abaBtn = (key: string, label: string, n: number, cor: CorAba) => {
+    const ativa = aba === key;
+    return (
+      <button key={key} onClick={() => setAba(key)}
+        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[13px] font-medium border transition-shadow hover:shadow-sm"
+        style={ativa ? { background: cor.forte, borderColor: cor.forte, color: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,.18)' }
+                     : { background: cor.claro, borderColor: cor.borda, color: cor.forte }}>
+        {label}
+        <span className="min-w-[20px] px-1.5 rounded-full text-[11px] font-semibold text-center"
+          style={ativa ? { background: 'rgba(255,255,255,.25)', color: '#fff' } : { background: '#fff', color: cor.forte }}>{n}</span>
+      </button>
+    );
+  };
   const th = 'px-4 py-2.5 text-left text-[11px] font-medium uppercase tracking-wide text-gray-500 bg-gray-50 border-b border-gray-200';
 
   return (
@@ -201,8 +222,8 @@ export const ArquivoAreaPage: React.FC = () => {
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        {abaBtn('todos', 'Todos', docs.length)}
-        {area.abas.map(a => abaBtn(a.key, a.label, contagem(a)))}
+        {abaBtn('todos', 'Todos', docs.length, COR_TODOS)}
+        {area.abas.map((a, i) => abaBtn(a.key, a.label, contagem(a), a.key === 'classificar' ? COR_CLASSIFICAR : CORES_ABA[i % CORES_ABA.length]))}
         <div className="flex-1" />
         <div className="flex items-center gap-2 border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white">
           <FiSearch size={13} className="text-gray-400" />
