@@ -39,8 +39,8 @@ export class ProLaboreService {
     const personId = sh.personId;
     const ym = (d: Date | null) => (d ? d.toISOString().slice(0, 7) : null);
     const recebe = !!dto?.recebe;
-    const vigs: { competenciaIni: string; competenciaFim: string | null; valorBruto: number }[] = recebe && Array.isArray(dto?.vigencias)
-      ? dto.vigencias.map((v: any) => ({ competenciaIni: String(v.competenciaIni || ''), competenciaFim: v.competenciaFim ? String(v.competenciaFim) : null, valorBruto: Number(v.valorBruto) }))
+    const vigs: { competenciaIni: string; competenciaFim: string | null; valorBruto: number; documentoId: string | null }[] = recebe && Array.isArray(dto?.vigencias)
+      ? dto.vigencias.map((v: any) => ({ competenciaIni: String(v.competenciaIni || ''), competenciaFim: v.competenciaFim ? String(v.competenciaFim) : null, valorBruto: Number(v.valorBruto), documentoId: v.documentoId ? String(v.documentoId) : null }))
       : [];
     let cargo = '', cbo: string | null = null, categoriaEsocial = '723', diaPagamento: number | null = null;
     if (recebe) {
@@ -72,6 +72,11 @@ export class ProLaboreService {
         }
       });
     }
+    // ata de deliberacao (18/11/2026): o documento precisa ser da propria empresa
+    for (const docId of Array.from(new Set(vigs.map(v => v.documentoId).filter(Boolean))) as string[]) {
+      const doc = await (this.prisma as any).document.findFirst({ where: { id: docId, companyId }, select: { id: true } });
+      if (!doc) throw new BadRequestException('Ata vinculada nao encontrada no Arquivo Digital desta empresa.');
+    }
     const atuais = await this.prisma.proLaboreConfig.findMany({
       where: { companyId, shareholderId, deletedAt: null },
       include: { _count: { select: { calculos: true } } },
@@ -85,7 +90,7 @@ export class ProLaboreService {
       for (const a of remover) await tx.proLaboreConfig.update({ where: { id: a.id }, data: { deletedAt: new Date(), ativo: false } });
       for (const v of vigs) {
         const ex = atuais.find(a => a.competenciaIni === v.competenciaIni);
-        const data = { cargo, cbo, categoriaEsocial, diaPagamento, valorBruto: v.valorBruto, competenciaFim: v.competenciaFim, ativo: true };
+        const data = { cargo, cbo, categoriaEsocial, diaPagamento, valorBruto: v.valorBruto, competenciaFim: v.competenciaFim, documentoId: v.documentoId, ativo: true };
         if (ex) await tx.proLaboreConfig.update({ where: { id: ex.id }, data });
         else await tx.proLaboreConfig.create({ data: { ...data, companyId, personId, shareholderId, competenciaIni: v.competenciaIni } });
       }

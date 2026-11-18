@@ -18,13 +18,13 @@ const fmtData = (d?: string | null) => (d ? d.slice(8, 10) + '/' + d.slice(5, 7)
 const parseValor = (s: string) => { const t = (s || '').trim(); if (!t) return NaN; return Number(t.includes(',') ? t.replace(/\./g, '').replace(',', '.') : t); };
 const mesValor = (x: any) => (typeof x === 'string' ? x : x?.target?.value ?? '');
 
-interface Vig { id?: string; competenciaIni: string; competenciaFim: string | null; valorBruto: any; cargo?: string; cbo?: string | null; categoriaEsocial?: string; diaPagamento?: number | null; }
+interface Vig { id?: string; competenciaIni: string; competenciaFim: string | null; valorBruto: any; cargo?: string; cbo?: string | null; categoriaEsocial?: string; diaPagamento?: number | null; documentoId?: string | null; }
 interface Socio {
   shareholderId: string; qualificacao: string | null; dataEntrada: string | null; dataRetirada: string | null;
   participacao: any; administra: boolean; recebeProLabore: boolean; vigencias: Vig[];
   person: { id: string; cpf: string; fullName: string; birthDate: string | null };
 }
-interface VigForm { competenciaIni: string; competenciaFim: string; valor: string; }
+interface VigForm { competenciaIni: string; competenciaFim: string; valor: string; documentoId: string; }
 
 const CATEGORIAS = [
   { v: '723', t: '723 - Sócio / empresário' },
@@ -130,13 +130,20 @@ function ConfigModal({ socio, onClose, onSaved }: { socio: Socio; onClose: () =>
   const [categoria, setCategoria] = useState(ult?.categoriaEsocial || '723');
   const [dia, setDia] = useState(ult?.diaPagamento ? String(ult.diaPagamento) : '');
   const [vigs, setVigs] = useState<VigForm[]>(socio.vigencias.length
-    ? socio.vigencias.map(v => ({ competenciaIni: v.competenciaIni, competenciaFim: v.competenciaFim || '', valor: fmtBRL(v.valorBruto) }))
-    : [{ competenciaIni: '', competenciaFim: '', valor: '' }]);
+    ? socio.vigencias.map(v => ({ competenciaIni: v.competenciaIni, competenciaFim: v.competenciaFim || '', valor: fmtBRL(v.valorBruto), documentoId: v.documentoId || '' }))
+    : [{ competenciaIni: '', competenciaFim: '', valor: '', documentoId: '' }]);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState('');
 
   const setVig = (i: number, campo: keyof VigForm, valor: string) => setVigs(p => p.map((v, j) => (j === i ? { ...v, [campo]: valor } : v)));
-  const addVig = () => setVigs(p => [...p, { competenciaIni: '', competenciaFim: '', valor: '' }]);
+  const addVig = () => setVigs(p => [...p, { competenciaIni: '', competenciaFim: '', valor: '', documentoId: '' }]);
+  const [docs, setDocs] = useState<{ id: string; rotulo: string }[]>([]);
+  useEffect(() => {
+    api.get('/documents', { params: { limit: 200, status: 'ASSINADO,REGISTRADO' } }).then(r => {
+      const raw: any = r.data; const arr: any[] = Array.isArray(raw) ? raw : raw?.items ?? raw?.data ?? raw?.documents ?? [];
+      setDocs(arr.map((x: any) => ({ id: x.id, rotulo: [x.title || x.name || x.originalName || x.fileName || x.documentNumber || x.id, x.createdAt ? String(x.createdAt).slice(0, 10).split('-').reverse().join('/') : ''].filter(Boolean).join(' - ') })));
+    }).catch(() => setDocs([]));
+  }, []);
   const delVig = (i: number) => setVigs(p => p.filter((_, j) => j !== i));
 
   const salvar = async () => {
@@ -152,7 +159,7 @@ function ConfigModal({ socio, onClose, onSaved }: { socio: Socio; onClose: () =>
     try {
       await api.put('/hr/pro-labore/diretoria/' + socio.shareholderId, {
         recebe, cargo: cargo.trim(), cbo: cbo.replace(/\D/g, ''), categoriaEsocial: categoria, diaPagamento: dia ? Number(dia) : null,
-        vigencias: recebe ? vigs.map(v => ({ competenciaIni: v.competenciaIni, competenciaFim: v.competenciaFim || null, valorBruto: parseValor(v.valor) })) : [],
+        vigencias: recebe ? vigs.map(v => ({ competenciaIni: v.competenciaIni, competenciaFim: v.competenciaFim || null, valorBruto: parseValor(v.valor), documentoId: v.documentoId || null })) : [],
       });
       onSaved();
     } catch (e: any) {
@@ -203,13 +210,19 @@ function ConfigModal({ socio, onClose, onSaved }: { socio: Socio; onClose: () =>
                 </div>
                 <div style={{ fontSize: 11, color: '#6B7280', margin: '4px 0 8px' }}>Uma linha por valor. Deixe o fim em branco na vigência atual.</div>
                 {vigs.map((v, i) => (
-                  <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 28px', gap: 8, alignItems: 'end', marginBottom: 8 }}>
+                  <React.Fragment key={i}><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 28px', gap: 8, alignItems: 'end', marginBottom: 4 }}>
                     <div><Label>De</Label><SmartMonthInput value={v.competenciaIni} onChange={(x: any) => setVig(i, 'competenciaIni', mesValor(x))} /></div>
                     <div><Label>Até</Label><SmartMonthInput value={v.competenciaFim} onChange={(x: any) => setVig(i, 'competenciaFim', mesValor(x))} /></div>
                     <div><Label>Valor bruto (R$)</Label><input style={{ ...inputSt, textAlign: 'right' }} value={v.valor} placeholder="0,00" onChange={e => setVig(i, 'valor', e.target.value)} /></div>
                     <button title="Remover" onClick={() => delVig(i)} disabled={vigs.length === 1}
                       style={{ height: 32, border: 'none', background: 'transparent', color: vigs.length === 1 ? '#D1D5DB' : '#DC2626', cursor: vigs.length === 1 ? 'default' : 'pointer', fontSize: 16 }}>×</button>
                   </div>
+                  <div style={{ marginBottom: 10 }}>
+                    <select style={{ ...inputSt, height: 28, fontSize: 12, color: v.documentoId ? '#111827' : '#B45309' }} value={v.documentoId} onChange={e => setVig(i, 'documentoId', e.target.value)}>
+                      <option value="">⚠ Ata de deliberação: não vinculada</option>
+                      {docs.map(x => <option key={x.id} value={x.id}>Ata: {x.rotulo}</option>)}
+                    </select>
+                  </div></React.Fragment>
                 ))}
               </div>
             </>

@@ -111,12 +111,36 @@ export class SituacaoFiscalService {
       blocksAction: null, createdByName: null, createdAt: new Date().toISOString(), auto: true,
     }];
 
+    // ATA-PL (18/11/2026): alerta calculado - vigencia de pro-labore sem ata de deliberacao vinculada,
+    // ou empresa marcada com pro-labore sem nenhuma vigencia. Some sozinho quando resolvido. So alerta, nao bloqueia.
+    const [plSemAta, plVig, empPl] = await Promise.all([
+      this.prisma.proLaboreConfig.count({ where: { companyId, deletedAt: null, documentoId: null } }),
+      this.prisma.proLaboreConfig.count({ where: { companyId, deletedAt: null } }),
+      (this.prisma as any).company.findUnique({ where: { id: companyId } }),
+    ]);
+    const temPl = !!((empPl as any)?.temProLabore ?? (empPl as any)?.tem_pro_labore);
+    const autoProLabore: any[] = [];
+    if (plSemAta > 0) autoProLabore.push({
+      id: 'auto-prolabore-sem-ata', severity: 'WARNING',
+      title: plSemAta === 1 ? '1 vigência de pró-labore sem ata' : plSemAta + ' vigências de pró-labore sem ata',
+      message: 'O valor do pró-labore deve estar deliberado pelos sócios. Prepare a ata, guarde no Arquivo Digital e vincule em Pró-labore > Configurar.',
+      locked: false, actionUrl: '/app/hr/pro-labore', actionLabel: 'Ver pró-labore',
+      blocksAction: null, createdByName: null, createdAt: new Date().toISOString(), auto: true,
+    });
+    if (temPl && plVig === 0) autoProLabore.push({
+      id: 'auto-prolabore-sem-vigencia', severity: 'WARNING',
+      title: 'Pró-labore sem vigência cadastrada',
+      message: 'A empresa está marcada com pró-labore, mas não há vigência (valor, cargo, CBO) nem ata. Cadastre em Pró-labore > Configurar.',
+      locked: false, actionUrl: '/app/hr/pro-labore', actionLabel: 'Ver pró-labore',
+      blocksAction: null, createdByName: null, createdAt: new Date().toISOString(), auto: true,
+    });
+
     return {
       hoje,
       alertas: [...alertas.map(a => ({
         id: a.id, severity: a.severity, title: a.title, message: a.message ?? null, locked: a.locked, actionUrl: (a as any).actionUrl ?? null, actionLabel: (a as any).actionLabel ?? null,
         blocksAction: a.blocksAction ?? null, createdByName: a.createdByName ?? null, createdAt: a.createdAt.toISOString(),
-      })), ...autoLastro],
+      })), ...autoLastro, ...autoProLabore],
       kpis: {
         atrasadas: itens.filter(i => i.sit === 'ATRASADA').length,
         retificar: itens.filter(i => i.sit === 'RETIFICAR').length,
