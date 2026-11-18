@@ -3,7 +3,7 @@
 // Quadro Resumo de Locação — lista de todos os contratos de locação
 // ============================================================
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCompany } from '../../contexts/CompanyContext';
 import api from '../../services/api';
@@ -68,13 +68,18 @@ export default function RentalContractsListPage() {
     const [contracts, setContracts] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [statusFilter, setStatusFilter] = useState('ATIVO');
+    // LASTRO-04 (18/11/2026): ?lastro=pendente (link do alerta da Situacao Fiscal) mostra so os contratos ativos sem PDF assinado e sem ressalva
+    const [searchParams, setSearchParams] = useSearchParams();
+    const soPendentes = searchParams.get('lastro') === 'pendente';
+    const semLastro = (c: any) => c.status === 'ATIVO' && !c.signedDocumentId && !assinOk[c.id] && !c.lastroRessalva && !ressOk[c.id];
     const [detailId, setDetailId] = useState<string | null>(null);
     const [detailTitle, setDetailTitle] = useState('');
 
     useEffect(() => {
         if (!activeCompany?.id) return;
         setLoading(true);
-        const qs = statusFilter ? `?status=${statusFilter}` : '';
+        const st = soPendentes ? 'ATIVO' : statusFilter;
+        const qs = st ? `?status=${st}` : '';
         fetch(`${API}/rental-contracts${qs}`, {
             headers: {
                 'Authorization': `Bearer ${token}`,
@@ -84,7 +89,7 @@ export default function RentalContractsListPage() {
             .then(res => res.json())
             .then(data => setContracts(Array.isArray(data) ? data : []))
             .finally(() => setLoading(false));
-    }, [token, activeCompany?.id, statusFilter]);
+    }, [token, activeCompany?.id, statusFilter, soPendentes]);
 
     const totalMensal = contracts
         .filter(c => c.status === 'ATIVO')
@@ -96,6 +101,12 @@ export default function RentalContractsListPage() {
                 <h1 className="text-xl font-bold text-gray-900">Quadro Resumo de Locação</h1>
             </div>
             <p className="text-sm text-gray-500 mb-4">Todos os contratos de locação vinculados aos imóveis da empresa.</p>
+            {soPendentes && (
+                <div className="mb-4 flex items-center justify-between rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm text-amber-900">
+                    <span>Mostrando {contracts.filter(semLastro).length} contrato(s) ativo(s) sem lastro: sem PDF assinado e sem ressalva. Anexe o contrato assinado ou registre a ressalva na coluna Lastro.</span>
+                    <button type="button" onClick={() => setSearchParams({})} className="ml-4 rounded border border-amber-400 px-2 py-1 text-xs hover:bg-amber-100">Ver todos</button>
+                </div>
+            )}
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
                 <div className="bg-white rounded-xl border border-gray-200 p-4">
@@ -112,7 +123,7 @@ export default function RentalContractsListPage() {
                         <select
                             className="text-sm border border-gray-300 rounded-lg py-1.5 px-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                             value={statusFilter}
-                            onChange={e => setStatusFilter(e.target.value)}
+                            onChange={e => { setStatusFilter(e.target.value); if (soPendentes) setSearchParams({}); }}
                         >
                             <option value="">Todos</option>
                             <option value="ATIVO">Ativo</option>
@@ -142,13 +153,13 @@ export default function RentalContractsListPage() {
                         {loading && (
                             <tr><td colSpan={8} className="text-center py-8 text-gray-400">Carregando...</td></tr>
                         )}
-                        {!loading && contracts.length === 0 && (
+                        {!loading && (soPendentes ? contracts.filter(semLastro) : contracts).length === 0 && (
                             <tr><td colSpan={8} className="text-center py-8 text-gray-400">Nenhum contrato encontrado.</td></tr>
                         )}
-                        {!loading && contracts.map(c => (
+                        {!loading && (soPendentes ? contracts.filter(semLastro) : contracts).map(c => (
                             <tr
                                 key={c.id}
-                                className="hover:bg-gray-50 cursor-pointer"
+                                className={`${semLastro(c) ? 'bg-amber-50 ' : ''}hover:bg-gray-50 cursor-pointer`}
                                 onClick={() => {
                                     setDetailId(c.id);
                                     setDetailTitle(`Quadro Resumo - ${c.fixedAsset?.internalCode ?? ''}`);

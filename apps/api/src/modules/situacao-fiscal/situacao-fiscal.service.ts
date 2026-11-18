@@ -107,7 +107,7 @@ export class SituacaoFiscalService {
       id: 'auto-lastro-contratos', severity: 'WARNING',
       title: semLastro.length === 1 ? '1 contrato de locação sem assinatura' : semLastro.length + ' contratos de locação sem assinatura',
       message: 'Sem PDF assinado e sem ressalva: ' + semLastro.map(c => (c.contractNumber ?? 's/n') + ' (' + (c.fixedAsset?.internalCode ?? '?') + ')').join(', ') + '. Anexe o contrato assinado ou registre a ressalva na coluna Lastro.',
-      locked: false, actionUrl: '/app/assets/rental-contracts', actionLabel: 'Ver contratos sem lastro',
+      locked: false, actionUrl: '/app/assets/rental-contracts?lastro=pendente', actionLabel: 'Ver contratos sem lastro',
       blocksAction: null, createdByName: null, createdAt: new Date().toISOString(), auto: true,
     }];
 
