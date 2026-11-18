@@ -2526,6 +2526,16 @@ model ArEntry {
   receivableAccountId String? @map("receivable_account_id") @db.Uuid
   rentalContractId    String? @map("rental_contract_id") @db.Uuid // NOVO 25/09/2026: recorrencia de aluguel
 
+  // 18/11/2026 - DIMOB: comissao do intermediario (imobiliaria PJ ou pessoa fisica) e IR retido sobre o aluguel
+  commissionAmount     Decimal   @default(0) @map("commission_amount") @db.Decimal(15, 2)
+  commissionPayeeType  String?   @map("commission_payee_type") @db.VarChar(2) /// PJ ou PF
+  commissionPayeeId    String?   @map("commission_payee_id") @db.Uuid /// Person do beneficiario PF, quando cadastrada
+  commissionPayeeName  String?   @map("commission_payee_name") @db.VarChar(200)
+  commissionPayeeTaxId String?   @map("commission_payee_tax_id") @db.VarChar(18)
+  commissionPaidBy     String?   @map("commission_paid_by") @db.VarChar(10) /// LOCADORA ou LOCATARIO
+  commissionPaidAt     DateTime? @map("commission_paid_at") @db.Date
+  withheldTaxAmount    Decimal   @default(0) @map("withheld_tax_amount") @db.Decimal(15, 2) /// IR retido pelo locatario (DIMOB)
+
   notes         String? @map("notes") @db.Text
   attachmentUrl String? @map("attachment_url") @db.VarChar(500)
 
