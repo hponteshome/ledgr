@@ -1294,7 +1294,7 @@ async handleGovBrCallback(
               to_char(rc.start_date, 'YYYY-MM-DD') AS "startDate", to_char(rc.end_date, 'YYYY-MM-DD') AS "endDate",
               rc.tenant_name AS "tenantName", a.internal_code AS "internalCode"
          FROM documents d
-         LEFT JOIN rental_contracts rc ON rc.document_id = d.id AND rc.deleted_at IS NULL
+         LEFT JOIN rental_contracts rc ON (rc.document_id = d.id OR rc.signed_document_id = d.id) AND rc.deleted_at IS NULL /* LOFT-ADITIVO-01: tambem pelo PDF assinado */
          LEFT JOIN fixed_assets a ON a.id = rc.fixed_asset_id
         WHERE d.company_id = $1::uuid AND d.deleted_at IS NULL AND d.is_template = false AND d.type::text = 'CONTRATO_LOCACAO'
         ORDER BY a.internal_code NULLS LAST, d.date DESC NULLS LAST`,

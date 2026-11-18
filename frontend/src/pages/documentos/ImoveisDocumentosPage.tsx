@@ -618,8 +618,8 @@ export const ImoveisDocumentosPage: React.FC = () => {
                   {l.contractNumber && <p className="text-[11px] text-gray-400">nº {l.contractNumber}</p>}
                 </td>
                 <td className="px-3 py-2.5 text-[12px] text-gray-700">{l.tenantName || '-'}</td>
-                <td className="px-3 py-2.5 text-[12px] text-gray-700">{l.startDate ? fmtData(l.startDate) + ' a ' + (l.endDate ? fmtData(l.endDate) : 'indeterminado') : '-'}</td>
-                <td className="px-3 py-2.5 text-[12px] text-gray-600">{l.contractStatus ? l.contractStatus.charAt(0) + l.contractStatus.slice(1).toLowerCase() : '-'}</td>
+                <td className="px-3 py-2.5 text-[12px] text-gray-700" style={{ whiteSpace: 'nowrap', paddingRight: 16 }}>{l.startDate ? fmtData(l.startDate) + ' a ' + (l.endDate ? fmtData(l.endDate) : 'indeterminado') : '-'}</td>
+                <td className="px-3 py-2.5 text-[12px] text-gray-600" style={{ whiteSpace: 'nowrap', paddingLeft: 12, paddingRight: 12 }}>{l.contractStatus ? l.contractStatus.charAt(0) + l.contractStatus.slice(1).toLowerCase() : '-'}</td>
                 <td className="px-3 py-2.5">
                   <button title="Visualizar" onClick={() => setViewDoc({ id: l.documentId, title: l.title })}
                     className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded"><FiEye size={14} /></button>
