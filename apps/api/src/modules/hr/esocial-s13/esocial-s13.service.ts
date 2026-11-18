@@ -164,9 +164,10 @@ export class EsocialS13Service {
 
     // tabelas
     if (tpAmb === 2) {
-      evts.push({ tipo: 'S-1000', chave: 'S-1000:' + raiz, perApur: null, corpo: ideEvtTab + ideEmp +
+      // ESOC-S1000-01 (18/11/2026): indOptRegEletron removido - descontinuado pela NT S-1.3 07/2026 (rejeicao 'O campo nao pode ser preenchido')
+    evts.push({ tipo: 'S-1000', chave: 'S-1000:' + raiz, perApur: null, corpo: ideEvtTab + ideEmp +
         `<infoEmpregador><inclusao><idePeriodo><iniValid>${par.iniValidS1000}</iniValid></idePeriodo>` +
-        `<infoCadastro><classTrib>${par.classTrib}</classTrib><indCoop>0</indCoop><indConstr>0</indConstr><indDesFolha>0</indDesFolha><indOptRegEletron>0</indOptRegEletron></infoCadastro>` +
+        `<infoCadastro><classTrib>${par.classTrib}</classTrib><indCoop>0</indCoop><indConstr>0</indConstr><indDesFolha>0</indDesFolha></infoCadastro>` +
         `</inclusao></infoEmpregador>` });
     }
     evts.push({ tipo: 'S-1005', chave: 'S-1005:' + cnpj, perApur: null, corpo: ideEvtTab + ideEmp +
