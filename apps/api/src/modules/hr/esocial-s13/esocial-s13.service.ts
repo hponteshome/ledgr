@@ -14,7 +14,8 @@ import { SigningService } from '../../../core/certificates/signing.service';
 
 const VERSAO = 'v_S_01_03_00';
 const VER_PROC = 'LEDGR-1.0';
-const ALIQ_CI = 0.11; // contribuinte individual - desconto do segurado (Lei 8.212/91, art. 21 e 30)
+const ALIQ_CI = 0.11;
+const ALIQ_PATRONAL_CI = 0.20; // previsao exibida na conferencia (Lei 8.212/91, art. 22, III); a DCTFWeb e a fonte oficial // contribuinte individual - desconto do segurado (Lei 8.212/91, art. 21 e 30)
 const TETO_INSS: Record<string, number> = { '2026': 8475.55 }; // teto do salario de contribuicao por ano
 const RUBRICAS = [
   { cod: 'PL001', dsc: 'Pró-labore', nat: '3508', tp: '1', cp: '11', ir: '11', fgts: '00' },
@@ -111,7 +112,7 @@ export class EsocialS13Service {
   }
 
   // ── geracao do pacote de uma competencia ───────────────────────────────────
-  async gerarPacote(companyId: string, dto: any) {
+  async gerarPacote(companyId: string, dto: any, simular = false) {
     const tpAmb = Number(dto?.tpAmb);
     if (![1, 2].includes(tpAmb)) throw new BadRequestException('Ambiente invalido (1 = producao, 2 = producao restrita).');
     const perApur = String(dto?.perApur || '');
@@ -149,6 +150,7 @@ export class EsocialS13Service {
     const ideEmp = `<ideEmpregador><tpInsc>1</tpInsc><nrInsc>${raiz}</nrInsc></ideEmpregador>`;
     const tab = esc(par.ideTabRubr);
     const evts: EvtDef[] = [];
+    const resumoRemun: any[] = [];
 
     // tabelas
     if (tpAmb === 2) {
@@ -229,6 +231,8 @@ export class EsocialS13Service {
       if (!pes.birthDate) throw new BadRequestException(`Data de nascimento ausente na ficha da Pessoa (${pes.fullName}).`);
       const bruto = Number(cfg.valorBruto);
       const inss = Math.round(Math.min(bruto, teto) * ALIQ_CI * 100) / 100;
+      resumoRemun.push({ comp, cpf: pes.cpf, nome: pes.fullName, categoria: cfg.categoriaEsocial, bruto, inssSegurado: inss,
+        inssPatronal: ['01', '02', '03', '04'].includes(par.classTrib) ? null : Math.round(bruto * ALIQ_PATRONAL_CI * 100) / 100 });
       evts.push({ tipo: 'S-1200', chave: `S-1200:${comp}:${pes.cpf}`, perApur: comp, corpo:
         `<ideEvento><indRetif>1</indRetif><indApuracao>1</indApuracao><perApur>${comp}</perApur><tpAmb>${tpAmb}</tpAmb>${ideTab}</ideEvento>` + ideEmp +
         `<ideTrabalhador><cpfTrab>${pes.cpf}</cpfTrab></ideTrabalhador>` +
@@ -257,6 +261,16 @@ export class EsocialS13Service {
       `<ideEvento><indApuracao>1</indApuracao><perApur>${perApur}</perApur><tpAmb>${tpAmb}</tpAmb>${ideTab}</ideEvento>` + ideEmp +
       `<infoFech><evtRemun>${temRemun ? 'S' : 'N'}</evtRemun><evtPgtos>${pgs.length ? 'S' : 'N'}</evtPgtos><evtComProd>N</evtComProd>` +
       `<evtContratAvNP>N</evtContratAvNP><evtInfoComplPer>N</evtInfoComplPer><transDCTFWeb>S</transDCTFWeb></infoFech>` });
+
+    // conferencia (processamento mensal): devolve o que sera gerado, sem gravar nem assinar
+    if (simular) {
+      const ex = await this.prisma.esocialS13Evento.findMany({ where: { companyId, tpAmb, chave: { in: evts.map(e => e.chave) } },
+        select: { id: true, chave: true, status: true, nrRecibo: true, descResposta: true, validacao: true, updatedAt: true } });
+      return { tpAmb, perApur,
+        eventos: evts.map(e => ({ tipo: e.tipo, chave: e.chave, perApur: e.perApur, etapa: DEF[e.tipo].etapa, ...(ex.find(x => x.chave === e.chave) || {}) })),
+        remuneracoes: resumoRemun,
+        pagamentos: pgs.map(p => ({ dtPagamento: p.dtPagamento, competencia: p.competencia, valorLiquido: Number(p.valorLiquido) })) };
+    }
 
     // grava: assina e valida; eventos ja enviados/processados nao sao regerados
     const out: any[] = [];
@@ -387,7 +401,18 @@ export class EsocialS13Service {
     if (await this.prisma.esocialS13Lote.count({ where: { companyId, tpAmb, status: 'ENVIADO' } }))
       throw new BadRequestException('Ha lote aguardando processamento. Consulte o retorno antes de enviar a proxima etapa.');
     const evs = await this.prisma.esocialS13Evento.findMany({ where: { companyId, tpAmb }, orderBy: [{ etapa: 'asc' }, { chave: 'asc' }] });
-    const abertos = evs.filter(e => e.status !== 'PROCESSADO');
+    let base = evs;
+    if (dto?.perApur) {
+      // processamento mensal: so os eventos do pacote da competencia aprovada
+      const prev: any = await this.gerarPacote(companyId, { tpAmb, perApur: dto.perApur }, true);
+      const chaves = new Set<string>(prev.eventos.map((e: any) => e.chave));
+      const ap = await this.prisma.esocialS13Aprovacao.findUnique({ where: { companyId_tpAmb_perApur: { companyId, tpAmb, perApur: String(dto.perApur) } } });
+      if (!ap) throw new BadRequestException('Competencia nao aprovada: faca a conferencia e aprove antes de transmitir.');
+      base = evs.filter(e => chaves.has(e.chave));
+      const alterado = base.find(e => e.status !== 'PROCESSADO' && e.status !== 'ENVIADO' && e.updatedAt > ap.aprovadoEm);
+      if (alterado) throw new BadRequestException(`O evento ${alterado.chave} foi alterado depois da aprovacao. Aprove a conferencia novamente.`);
+    }
+    const abertos = base.filter(e => e.status !== 'PROCESSADO');
     if (!abertos.length) return { mensagem: 'Nada a enviar: todos os eventos ja foram processados.', lotes: [] };
     const etapa = Math.min(...abertos.map(e => e.etapa));
     const daEtapa = abertos.filter(e => e.etapa === etapa);
@@ -482,6 +507,94 @@ export class EsocialS13Service {
     });
   }
 
+  // ── processamento mensal (18/11/2026) ────────────────────────────────────
+  async competencias(companyId: string, tpAmb: number) {
+    const cfgs = await this.prisma.proLaboreConfig.findMany({ where: { companyId, deletedAt: null, shareholderId: { not: null } },
+      orderBy: { competenciaIni: 'asc' }, select: { competenciaIni: true } });
+    if (!cfgs.length) return [];
+    const fim = new Date().toISOString().slice(0, 7);
+    const lista: string[] = [];
+    let [a, m] = cfgs[0].competenciaIni.split('-').map(Number);
+    for (let i = 0; i < 240; i++) {
+      const c = `${a}-${String(m).padStart(2, '0')}`;
+      if (c > fim) break;
+      lista.push(c); m++; if (m > 12) { m = 1; a++; }
+    }
+    const fechs = await this.prisma.esocialS13Evento.findMany({ where: { companyId, tpAmb, tipo: 'S-1299' }, select: { perApur: true, status: true, nrRecibo: true, descResposta: true } });
+    const aps = await this.prisma.esocialS13Aprovacao.findMany({ where: { companyId, tpAmb } });
+    return lista.reverse().map(c => {
+      const f = fechs.find(x => x.perApur === c); const ap = aps.find(x => x.perApur === c);
+      return { perApur: c, fechamento: f?.status || null, recibo: f?.nrRecibo || null, descResposta: f?.descResposta || null, aprovadoEm: ap?.aprovadoEm || null };
+    });
+  }
+
+  async aprovar(companyId: string, userId: string | null, dto: any) {
+    const tpAmb = Number(dto?.tpAmb); const perApur = String(dto?.perApur || '');
+    const g: any = await this.gerarPacote(companyId, dto);
+    const inv = (g.eventos || []).filter((e: any) => e.status === 'INVALIDO');
+    if (inv.length) throw new BadRequestException('Eventos invalidos no XSD oficial: ' + inv.map((e: any) => `${e.chave} - ${e.validacao}`).join(' | '));
+    const p: any = await this.gerarPacote(companyId, dto, true);
+    const resumo: any = { remuneracoes: p.remuneracoes, pagamentos: p.pagamentos, eventos: p.eventos.map((e: any) => ({ chave: e.chave, status: e.status })) };
+    const agora = new Date();
+    await this.prisma.esocialS13Aprovacao.upsert({
+      where: { companyId_tpAmb_perApur: { companyId, tpAmb, perApur } },
+      create: { companyId, tpAmb, perApur, aprovadoPor: userId || null, aprovadoEm: agora, resumo },
+      update: { aprovadoPor: userId || null, aprovadoEm: agora, resumo },
+    });
+    return { ok: true, aprovadoEm: agora };
+  }
+
+  async sugestaoLiquido(companyId: string, personId: string, comp: string) {
+    if (!RE_COMP.test(String(comp || ''))) throw new BadRequestException('Competencia invalida.');
+    const cfg = await this.prisma.proLaboreConfig.findFirst({ where: { companyId, personId, deletedAt: null, shareholderId: { not: null },
+      competenciaIni: { lte: comp }, OR: [{ competenciaFim: null }, { competenciaFim: { gte: comp } }] } });
+    if (!cfg) throw new BadRequestException('Sem vigencia de pro-labore para a competencia.');
+    const teto = TETO_INSS[comp.slice(0, 4)];
+    if (!teto) throw new BadRequestException(`Teto do INSS de ${comp.slice(0, 4)} nao cadastrado.`);
+    const bruto = Number(cfg.valorBruto);
+    const inss = Math.round(Math.min(bruto, teto) * ALIQ_CI * 100) / 100;
+    return { bruto, inss, liquido: Math.round((bruto - inss) * 100) / 100 };
+  }
+
+  private async mesFechadoProducao(companyId: string, ym: string): Promise<boolean> {
+    return !!(await this.prisma.esocialS13Evento.findFirst({ where: { companyId, tpAmb: 1, chave: `S-1299:${ym}`, status: 'PROCESSADO' }, select: { id: true } }));
+  }
+
+  async registrarPagamento(companyId: string, dto: any) {
+    const tipo = dto?.tipo === 'ADIANTAMENTO' ? 'ADIANTAMENTO' : 'PRO_LABORE';
+    const personId = String(dto?.personId || '');
+    const dt = String(dto?.dtPagamento || '').slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dt)) throw new BadRequestException('Data de pagamento invalida.');
+    const valor = Number(dto?.valorLiquido);
+    if (!(valor > 0)) throw new BadRequestException('Informe o valor liquido pago.');
+    const cfgs = await this.prisma.proLaboreConfig.findMany({ where: { companyId, personId, deletedAt: null, shareholderId: { not: null } } });
+    if (!cfgs.length) throw new BadRequestException('Pessoa sem pro-labore configurado nesta empresa (QSA).');
+    let competencia: string | null = null; let configId: string | null = null;
+    if (tipo === 'PRO_LABORE') {
+      const c = String(dto?.competencia || '');
+      if (!RE_COMP.test(c)) throw new BadRequestException('Informe a competencia paga (AAAA-MM).');
+      const cfg = cfgs.find(x => x.competenciaIni <= c && (!x.competenciaFim || x.competenciaFim >= c));
+      if (!cfg) throw new BadRequestException(`Sem vigencia de pro-labore para ${c}.`);
+      if (dt.slice(0, 7) < c) throw new BadRequestException('Pagamento anterior a competencia paga: registre como Adiantamento.');
+      const dup = await this.prisma.proLaborePagamento.findFirst({ where: { companyId, personId, tipo: 'PRO_LABORE', competencia: c, deletedAt: null } });
+      if (dup) throw new BadRequestException(`Ja existe pagamento de pro-labore da competencia ${c}.`);
+      competencia = c; configId = cfg.id;
+    }
+    if (await this.mesFechadoProducao(companyId, dt.slice(0, 7)))
+      throw new BadRequestException('O mes do pagamento ja foi fechado no eSocial (producao): a inclusao exige retificacao.');
+    return this.prisma.proLaborePagamento.create({ data: { companyId, personId, configId, tipo, competencia,
+      dtPagamento: new Date(dt + 'T00:00:00Z'), valorLiquido: valor, observacao: dto?.observacao ? String(dto.observacao).slice(0, 300) : null } });
+  }
+
+  async excluirPagamento(companyId: string, id: string) {
+    const p = await this.prisma.proLaborePagamento.findFirst({ where: { id, companyId, deletedAt: null } });
+    if (!p) throw new NotFoundException('Pagamento nao encontrado.');
+    if (await this.mesFechadoProducao(companyId, ymd(p.dtPagamento).slice(0, 7)))
+      throw new BadRequestException('Pagamento ja declarado em mes fechado no eSocial (producao): a exclusao exige retificacao.');
+    await this.prisma.proLaborePagamento.update({ where: { id }, data: { deletedAt: new Date() } });
+    return { ok: true };
+  }
+
   // ── consultas ──────────────────────────────────────────────────────────────
   listar(companyId: string, tpAmb: number) {
     return this.prisma.esocialS13Evento.findMany({
@@ -498,7 +611,9 @@ export class EsocialS13Service {
     return e;
   }
 
-  pagamentos(companyId: string) {
-    return this.prisma.proLaborePagamento.findMany({ where: { companyId, deletedAt: null }, orderBy: { dtPagamento: 'asc' } });
+  async pagamentos(companyId: string) {
+    const ps = await this.prisma.proLaborePagamento.findMany({ where: { companyId, deletedAt: null }, orderBy: { dtPagamento: 'desc' } });
+    const pes = await this.prisma.person.findMany({ where: { id: { in: Array.from(new Set(ps.map(p => p.personId))) } }, select: { id: true, fullName: true } });
+    return ps.map(p => ({ ...p, valorLiquido: Number(p.valorLiquido), nome: pes.find(x => x.id === p.personId)?.fullName || '' }));
   }
 }

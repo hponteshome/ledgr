@@ -1,6 +1,6 @@
 // apps/api/src/modules/hr/esocial-s13/esocial-s13.controller.ts
 // LEDGR - eSocial S-1.3 (17/11/2026)
-import { Controller, Get, Post, Body, Param, Query, Request, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Body, Param, Query, Request, UseGuards } from '@nestjs/common';
 import { SidebarResourceGuard } from '../../../auth/guards/sidebar-resource.guard';
 import { RecursoMenu } from '../../../auth/decorators/recurso-menu.decorator';
 import { JwtAuthGuard } from '@/auth/guards/jwt.guard';
@@ -42,6 +42,37 @@ export class EsocialS13Controller {
   @Get('lotes')
   lotes(@Query('tpAmb') tpAmb: string, @Request() req: any) {
     return this.svc.listarLotes(req.companyId, Number(tpAmb) || 2);
+  }
+
+  // processamento mensal (18/11/2026)
+  @Get('competencias')
+  competencias(@Query('tpAmb') tpAmb: string, @Request() req: any) {
+    return this.svc.competencias(req.companyId, Number(tpAmb) || 1);
+  }
+
+  @Post('previa')
+  previa(@Body() dto: any, @Request() req: any) {
+    return this.svc.gerarPacote(req.companyId, dto, true);
+  }
+
+  @Post('aprovar')
+  aprovar(@Body() dto: any, @Request() req: any) {
+    return this.svc.aprovar(req.companyId, req.user?.id || null, dto);
+  }
+
+  @Get('pagamentos/sugestao')
+  sugestao(@Query('personId') personId: string, @Query('competencia') competencia: string, @Request() req: any) {
+    return this.svc.sugestaoLiquido(req.companyId, personId, competencia);
+  }
+
+  @Post('pagamentos')
+  registrarPagamento(@Body() dto: any, @Request() req: any) {
+    return this.svc.registrarPagamento(req.companyId, dto);
+  }
+
+  @Delete('pagamentos/:id')
+  excluirPagamento(@Param('id') id: string, @Request() req: any) {
+    return this.svc.excluirPagamento(req.companyId, id);
   }
 
   @Get('pagamentos')

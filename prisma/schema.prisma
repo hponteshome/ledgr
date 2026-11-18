@@ -6227,3 +6227,17 @@ model ProLaborePagamento {
   @@index([companyId, dtPagamento])
   @@map("pro_labore_pagamentos")
 }
+
+model EsocialS13Aprovacao {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId   String   @map("company_id") @db.Uuid
+  tpAmb       Int      @map("tp_amb") @db.SmallInt
+  perApur     String   @map("per_apur") @db.VarChar(7)
+  aprovadoPor String?  @map("aprovado_por") @db.Uuid
+  aprovadoEm  DateTime @map("aprovado_em") @db.Timestamp(6)
+  resumo      Json?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+
+  @@unique([companyId, tpAmb, perApur])
+  @@map("esocial_s13_aprovacoes")
+}
