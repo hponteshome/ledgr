@@ -51,8 +51,12 @@ const AREAS: Record<string, Area> = {
       { key: 'livrocaixa', label: 'Livro Caixa', types: ['CONTABIL'], subtipos: ['LIVRO_CAIXA'] },
       { key: 'extratos', label: 'Extratos bancários', types: ['CONTABIL'], subtipos: ['EXTRATO_BANCARIO'] },
       { key: 'ecf', label: 'ECF', types: ['FISCAL'], subtipos: ['ECF'], obrig: ['ECF'] },
-      { key: 'obrigacoes', label: 'Obrigações', types: ['FISCAL'], subtipos: ['OBRIGACAO', 'DIMOB', 'EFD_CONTRIBUICOES', 'EFD_REINF', 'DCTF', 'DCTFWEB', 'SPED_OUTROS'], obrig: ['EFD_CONTRIB', 'DCTF', 'DCTFWEB', 'DIRF'] },
+      // ARQ-DECL-02 (19/11/2026): uma aba por declaracao; "Outras" (chave obrigacoes, mantida pelas rotas) fica com o restante
       { key: 'dimob', label: 'DIMOB', types: ['FISCAL'], subtipos: ['DIMOB'], obrig: ['DIMOB'] },
+      { key: 'efd', label: 'EFD-Contribuições', types: ['FISCAL'], subtipos: ['EFD_CONTRIBUICOES'], obrig: ['EFD_CONTRIB'] },
+      { key: 'dctf', label: 'DCTF', types: ['FISCAL'], subtipos: ['DCTF'], obrig: ['DCTF'] },
+      { key: 'dctfweb', label: 'DCTFWeb / MIT', types: ['FISCAL'], subtipos: ['DCTFWEB'], obrig: ['DCTFWEB'] },
+      { key: 'obrigacoes', label: 'Outras', types: ['FISCAL'], subtipos: ['OBRIGACAO', 'EFD_REINF', 'SPED_OUTROS'], obrig: ['DIRF'] },
       { key: 'darfs', label: 'DARFs e comprovantes', types: ['FISCAL'], subtipos: ['DARF'] },
       { key: 'notificacoes', label: 'Notificações e intimações', types: ['FISCAL'], subtipos: ['NOTIFICACAO'] },
       { key: 'classificar', label: 'A classificar', types: ['CONTABIL', 'FISCAL'], semSubtipo: true },
@@ -109,7 +113,7 @@ const resolverRota = (pathname: string): { area: string; aba: string } => {
   if (a === 'societario') return { area: 'societario', aba: b ?? 'todos' };
   if (a === 'livros') return { area: 'societario', aba: 'livros' };
   if (a === 'contabil') return { area: 'contabil', aba: b === 'demonstracoes' ? 'balancetes' : (b ?? 'todos') };
-  if (a === 'fiscal') return { area: 'contabil', aba: ['ecf', 'obrigacoes', 'dimob', 'ecd'].includes(b) ? b : 'todos' };
+  if (a === 'fiscal') return { area: 'contabil', aba: ['ecf', 'obrigacoes', 'dimob', 'ecd', 'efd', 'dctf', 'dctfweb'].includes(b) ? b : 'todos' };
   if (a === 'rh') return { area: 'pessoal', aba: ['contratos', 'acordos', 'esocial', 'folha'].includes(b) ? b : 'todos' };
   return { area: 'societario', aba: 'todos' };
 };
@@ -277,7 +281,7 @@ export const ArquivoAreaPage: React.FC = () => {
                 <td className="px-4 py-3 whitespace-nowrap">
                   {o.sit === 'DISPENSADA' && !o.arquivos.pdf.length && !o.arquivos.rec.length ? <span className="text-[11px] text-gray-400">-</span> : <>
                     {selo('PDF', o.arquivos.pdf, entregue)}
-                    {selo('.REC', o.arquivos.rec, entregue)}
+                    {selo('.REC', o.arquivos.rec, entregue && o.temRec)}
                     {selo('.DEC', o.arquivos.dec, entregue && !o.temCopiaReceita)}
                   </>}
                 </td>

@@ -188,12 +188,14 @@ export class RecibosService {
       if (d && !x.pdf.some(a => a.id === d.id)) x.pdf.push({ id: d.id, title: d.title, tipo: null });
     }
     const copia = new Map<string, boolean>(padroes.map(p => [p.code, !!p.tem_copia_receita] as [string, boolean]));
+    // ARQ-DECL-02: .REC so e cobrado nas declaracoes transmitidas pelo Receitanet (padrao de nome cadastrado)
+    const comRec = new Set<string>(padroes.filter(p => p.re_arquivo).map(p => p.code));
     return obrig.map(o => {
       const arquivos = mapa.get(o.code + '|' + o.competence) ?? { pdf: [], rec: [], dec: [] };
       const sit = o.status === 'DONE' ? 'ENTREGUE' : o.status === 'DISPENSED' ? 'DISPENSADA' : o.status === 'RECTIFY' ? 'RETIFICAR'
         : (String(o.dueDate) < hoje ? 'ATRASADA' : 'PENDENTE');
       const tipo = [...arquivos.pdf, ...arquivos.rec].map(a => a.tipo).find(Boolean) ?? null;
-      return { ...o, sit, tipo, temCopiaReceita: copia.get(o.code) ?? true, arquivos };
+      return { ...o, sit, tipo, temCopiaReceita: copia.get(o.code) ?? true, temRec: comRec.has(o.code), arquivos };
     });
   }
 

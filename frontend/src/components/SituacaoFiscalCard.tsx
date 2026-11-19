@@ -48,7 +48,7 @@ const OBRIG: Record<string, { rota: string; dica: string }> = {
   ECD: { rota: '/app/sped/ecd', dica: 'Último dia útil de junho. Obrigatória no Lucro Real; no Presumido, facultativa e sem multa.' },
   DIMOB: { rota: '/app/sped/dimob', dica: 'Último dia útil de fevereiro. Multa por mês de atraso (MP 2.158-35, art. 57); base: contratos e recebimentos.' },
   EFD_CONTRIB: { rota: '/app/sped/efd', dica: '10º dia útil do 2º mês seguinte. Multa 0,02%/dia sobre a receita do mês, limite 1%.' },
-  DCTF: { rota: '/app/arquivo/fiscal/obrigacoes', dica: 'DCTF mensal (PGD) até dez/2024: 15º dia útil do 2º mês. Multa 2%/mês sobre os tributos, mínimo R$ 500.' },
+  DCTF: { rota: '/app/arquivo/fiscal/dctf', dica: 'DCTF mensal (PGD) até dez/2024: 15º dia útil do 2º mês. Multa 2%/mês sobre os tributos, mínimo R$ 500.' },
   DCTFWEB: { rota: '/app/hr/processamento-mensal', dica: 'DCTFWeb/MIT: último dia útil do mês seguinte (desde 2025). Confissão dos tributos do mês.' },
   PIS_COFINS: { rota: '/app/fiscal/apuracao', dica: 'DARF de PIS/Cofins até o dia 25 do mês seguinte.' },
   IRPJ_CSLL_TRI: { rota: '/app/fiscal/apuracao', dica: 'DARF de IRPJ/CSLL: último dia útil do mês seguinte ao trimestre.' },
