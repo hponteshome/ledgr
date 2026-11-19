@@ -1263,10 +1263,10 @@ async handleGovBrCallback(
 
   // ── Arquivo Digital reorganizado (04/11/2026) ─────────────────
   // Areas com abas; subtipo (coluna documents.subtipo) separa Balancete/ECD/ECF/Obrigacao etc.
-  private readonly SUBTIPOS_DOC: Record<string, string[]> = {
+  private readonly SUBTIPOS_DOC: Record<string, string[]> = { // ARQ-IMP-01 (19/11/2026): SPED, declaracoes e eSocial
     CONTABIL: ['BALANCETE', 'DEMONSTRACAO', 'ECD', 'LIVRO_CAIXA', 'EXTRATO_BANCARIO'],
-    FISCAL: ['ECF', 'OBRIGACAO', 'DIMOB', 'DARF', 'NOTIFICACAO'],
-    TRABALHISTA: ['CONTRATO_TRABALHO', 'ACORDO_COLETIVO'],
+    FISCAL: ['ECF', 'OBRIGACAO', 'DIMOB', 'DARF', 'NOTIFICACAO', 'ECD', 'EFD_CONTRIBUICOES', 'EFD_REINF', 'SPED_OUTROS', 'DCTF', 'DCTFWEB'],
+    TRABALHISTA: ['CONTRATO_TRABALHO', 'ACORDO_COLETIVO', 'ESOCIAL', 'FOLHA', 'RECIBO_PROLABORE'],
   };
 
   async listarArquivo(companyId: string, types?: string, q?: string) {

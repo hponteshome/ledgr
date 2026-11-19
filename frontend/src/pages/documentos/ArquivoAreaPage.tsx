@@ -47,11 +47,11 @@ const AREAS: Record<string, Area> = {
     label: 'Contábil e Fiscal',
     abas: [
       { key: 'balancetes', label: 'Balancetes e demonstrações', types: ['CONTABIL'], subtipos: ['BALANCETE', 'DEMONSTRACAO'] },
-      { key: 'ecd', label: 'ECD', types: ['CONTABIL'], subtipos: ['ECD'] },
+      { key: 'ecd', label: 'ECD', types: ['CONTABIL', 'FISCAL'], subtipos: ['ECD'] },
       { key: 'livrocaixa', label: 'Livro Caixa', types: ['CONTABIL'], subtipos: ['LIVRO_CAIXA'] },
       { key: 'extratos', label: 'Extratos bancários', types: ['CONTABIL'], subtipos: ['EXTRATO_BANCARIO'] },
       { key: 'ecf', label: 'ECF', types: ['FISCAL'], subtipos: ['ECF'] },
-      { key: 'obrigacoes', label: 'Obrigações', types: ['FISCAL'], subtipos: ['OBRIGACAO', 'DIMOB'] },
+      { key: 'obrigacoes', label: 'Obrigações', types: ['FISCAL'], subtipos: ['OBRIGACAO', 'DIMOB', 'EFD_CONTRIBUICOES', 'EFD_REINF', 'DCTF', 'DCTFWEB', 'SPED_OUTROS'] },
       { key: 'dimob', label: 'DIMOB', types: ['FISCAL'], subtipos: ['DIMOB'] },
       { key: 'darfs', label: 'DARFs e comprovantes', types: ['FISCAL'], subtipos: ['DARF'] },
       { key: 'notificacoes', label: 'Notificações e intimações', types: ['FISCAL'], subtipos: ['NOTIFICACAO'] },
@@ -63,6 +63,8 @@ const AREAS: Record<string, Area> = {
     abas: [
       { key: 'contratos', label: 'Contratos de trabalho', types: ['TRABALHISTA'], subtipos: ['CONTRATO_TRABALHO'] },
       { key: 'acordos', label: 'Acordos coletivos', types: ['TRABALHISTA'], subtipos: ['ACORDO_COLETIVO'] },
+      { key: 'esocial', label: 'eSocial', types: ['TRABALHISTA'], subtipos: ['ESOCIAL'] },
+      { key: 'folha', label: 'Folha e pró-labore', types: ['TRABALHISTA'], subtipos: ['FOLHA', 'RECIBO_PROLABORE'] },
       { key: 'classificar', label: 'A classificar', types: ['TRABALHISTA'], semSubtipo: true },
     ],
   },
@@ -73,11 +75,14 @@ const SUBTIPO_LABEL: Record<string, string> = {
   ECF: 'ECF', OBRIGACAO: 'Obrigação acessória', DIMOB: 'DIMOB',
   LIVRO_CAIXA: 'Livro Caixa', EXTRATO_BANCARIO: 'Extrato bancário', DARF: 'DARF / comprovante', NOTIFICACAO: 'Notificação / intimação',
   CONTRATO_TRABALHO: 'Contrato de trabalho', ACORDO_COLETIVO: 'Acordo coletivo',
+  // ARQ-IMP-01 (19/11/2026)
+  EFD_CONTRIBUICOES: 'EFD-Contribuições', EFD_REINF: 'EFD-Reinf', DCTF: 'DCTF Mensal', DCTFWEB: 'DCTFWeb / MIT', SPED_OUTROS: 'Arquivo SPED (outros)',
+  ESOCIAL: 'eSocial', FOLHA: 'Folha / holerite', RECIBO_PROLABORE: 'Recibo de pró-labore',
 };
 const SUBTIPOS_POR_TIPO: Record<string, string[]> = {
   CONTABIL: ['BALANCETE', 'DEMONSTRACAO', 'ECD', 'LIVRO_CAIXA', 'EXTRATO_BANCARIO'],
-  FISCAL: ['ECF', 'OBRIGACAO', 'DIMOB', 'DARF', 'NOTIFICACAO'],
-  TRABALHISTA: ['CONTRATO_TRABALHO', 'ACORDO_COLETIVO'],
+  FISCAL: ['ECF', 'ECD', 'EFD_CONTRIBUICOES', 'EFD_REINF', 'SPED_OUTROS', 'DCTF', 'DCTFWEB', 'DIMOB', 'OBRIGACAO', 'DARF', 'NOTIFICACAO'],
+  TRABALHISTA: ['ESOCIAL', 'FOLHA', 'RECIBO_PROLABORE', 'CONTRATO_TRABALHO', 'ACORDO_COLETIVO'],
 };
 const TIPO_LABEL: Record<string, string> = {
   CONTRATO_SOCIAL: 'Contrato social', ESTATUTO_SOCIAL: 'Estatuto social', ADITIVO_CONTRATUAL: 'Alteração / aditivo',
@@ -105,7 +110,7 @@ const resolverRota = (pathname: string): { area: string; aba: string } => {
   if (a === 'livros') return { area: 'societario', aba: 'livros' };
   if (a === 'contabil') return { area: 'contabil', aba: b === 'demonstracoes' ? 'balancetes' : (b ?? 'todos') };
   if (a === 'fiscal') return { area: 'contabil', aba: b === 'ecf' || b === 'obrigacoes' ? b : 'todos' };
-  if (a === 'rh') return { area: 'pessoal', aba: b === 'contratos' || b === 'acordos' ? b : 'todos' };
+  if (a === 'rh') return { area: 'pessoal', aba: ['contratos', 'acordos', 'esocial', 'folha'].includes(b) ? b : 'todos' };
   return { area: 'societario', aba: 'todos' };
 };
 
@@ -180,7 +185,10 @@ export const ArquivoAreaPage: React.FC = () => {
     } catch (e: any) { alert(e?.response?.data?.message ?? 'Erro ao classificar'); }
   };
 
-  const tipoImport = abaAtual && abaAtual.types.length === 1 ? abaAtual.types[0] : undefined;
+  // ARQ-IMP-01: aba com uma classificacao abre o modal ja no tipo|subtipo da aba
+  const tipoImport = !abaAtual ? undefined
+    : abaAtual.subtipos?.length === 1 ? `${abaAtual.types[0]}|${abaAtual.subtipos[0]}`
+    : abaAtual.types.length === 1 && !abaAtual.subtipos && !abaAtual.semSubtipo ? abaAtual.types[0] : undefined;
   const aClassificar = area.abas.find(a => a.semSubtipo);
   const pendentes = aClassificar ? contagem(aClassificar) : 0;
 
