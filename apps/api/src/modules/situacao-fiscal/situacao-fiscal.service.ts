@@ -4,6 +4,7 @@
 // e tax_darfs (DARFs em aberto). Generico: so le o que estiver cadastrado para a empresa.
 import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { RecibosService } from './recibos.service';
 
 export type SituacaoObrigacao = 'ATRASADA' | 'RETIFICAR' | 'PENDENTE' | 'ENTREGUE' | 'DISPENSADA';
 
@@ -24,7 +25,7 @@ const local = (d: Date) => d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + 
 
 @Injectable()
 export class SituacaoFiscalService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private recibos: RecibosService) {}
 
   private situacao(status: string, dueDate: Date, hoje: string): SituacaoObrigacao {
     if (status === 'DONE') return 'ENTREGUE';
@@ -38,6 +39,12 @@ export class SituacaoFiscalService {
     const n = new Date();
     const hoje = local(n);
     const limite30 = local(new Date(n.getFullYear(), n.getMonth(), n.getDate() + 30));
+
+    // ALERTA-AUTO-01 (19/11/2026): antes de montar o painel, le os recibos em PDF ainda nao lidos (baixa as obrigacoes)
+    // e resolve os alertas cuja regra de baixa foi atendida. Falha aqui nunca derruba o painel.
+    const autoRecibos = await this.recibos.processar(companyId)
+      .catch((e: any) => ({ lidos: 0, baixas: [] as any[], avisos: ['Leitura de recibos: ' + (e?.message ?? e)] }));
+    const autoResolvidos = await this.recibos.avaliarAlertas(companyId).catch(() => [] as any[]);
 
     const [alertas, obrig, darfs] = await Promise.all([
       this.prisma.companyAlert.findMany({ where: { companyId, resolvedAt: null }, orderBy: [{ locked: 'desc' }, { createdAt: 'asc' }] }),
@@ -141,6 +148,7 @@ export class SituacaoFiscalService {
         id: a.id, severity: a.severity, title: a.title, message: a.message ?? null, locked: a.locked, actionUrl: (a as any).actionUrl ?? null, actionLabel: (a as any).actionLabel ?? null,
         blocksAction: a.blocksAction ?? null, createdByName: a.createdByName ?? null, createdAt: a.createdAt.toISOString(),
       })), ...autoLastro, ...autoProLabore],
+      automatico: { recibos: autoRecibos, alertasResolvidos: autoResolvidos },
       kpis: {
         atrasadas: itens.filter(i => i.sit === 'ATRASADA').length,
         retificar: itens.filter(i => i.sit === 'RETIFICAR').length,

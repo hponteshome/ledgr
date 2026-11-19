@@ -2,6 +2,7 @@
 // ARQ-IMP-01 (19/11/2026): tipo + classificacao (subtipo) escolhidos juntos no envio; Contabil, Fiscal e RH no topo;
 // SPED/declaracoes (ECD, ECF, EFD-Contribuicoes, EFD-Reinf, DCTF, DCTFWeb/MIT, DIMOB) e eSocial; botao "Importar outro documento".
 // ARQ-IMP-02 (19/11/2026): varios arquivos de uma vez (ex.: declaracao .DEC + recibo .REC + recibo PDF) - um documento por arquivo.
+// ALERTA-AUTO-01 (19/11/2026): titulo com a extensao quando sao varios; recibo em PDF lido na hora (baixa da obrigacao).
 import React, { useState, useRef } from 'react';
 import { FiUpload, FiX, FiCheckCircle, FiShield, FiAlertTriangle } from 'react-icons/fi';
 import { SmartDateInput } from '../../components/SmartDateInput';
@@ -123,6 +124,7 @@ export const ImportarDocumentoModal: React.FC<Props> = ({ onClose, onSuccess, de
   const [enviadosLote, setEnviadosLote] = useState<{ nome: string; ok: boolean; erro?: string }[]>([]);
   const [avisoClassif, setAvisoClassif] = useState('');
   const [enviados, setEnviados] = useState(0);
+  const [recibosLidos, setRecibosLidos] = useState<any>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const token = localStorage.getItem('@ledgr:token');
@@ -172,12 +174,24 @@ export const ImportarDocumentoModal: React.FC<Props> = ({ onClose, onSuccess, de
     let ultimo: any = null; const avisos: string[] = [];
     for (const f of files) {
       // varios arquivos: titulo = prefixo informado (se houver) + nome do arquivo
-      const titulo = varios ? (title.trim() ? `${title.trim()} - ${semExt(f.name)}` : semExt(f.name)) : title;
+      const titulo = varios ? (title.trim() ? `${title.trim()} - ${f.name}` : f.name) : title;
       try {
         const { data, aviso } = await enviarUm(f, titulo);
         ultimo = data; lote.push({ nome: f.name, ok: true });
         if (aviso) avisos.push(`${f.name}: ${aviso}`);
       } catch (e: any) { lote.push({ nome: f.name, ok: false, erro: e.message }); }
+    }
+    // Recibo em PDF: o LEDGR le o numero e da baixa na obrigacao (e nos alertas ligados a ela)
+    setRecibosLidos(null);
+    if (lote.some(x => x.ok && /\.pdf$/i.test(x.nome))) {
+      try {
+        const rr = await fetch(`${API}/situacao-fiscal/recibos/processar`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}`, 'x-company-id': company.id ?? '', 'Content-Type': 'application/json' },
+          body: '{}',
+        });
+        if (rr.ok) { const j = await rr.json(); setRecibosLidos(j?.data ?? j); }
+      } catch { /* leitura do recibo e complementar: o arquivo ja foi salvo */ }
     }
     setLoading(false);
     const ok = lote.filter(x => x.ok).length;
@@ -191,7 +205,7 @@ export const ImportarDocumentoModal: React.FC<Props> = ({ onClose, onSuccess, de
   // Volta ao passo 1 mantendo o tipo e a data (envio em sequencia de documentos parecidos)
   const importarOutro = () => {
     onSuccess();
-    setFiles([]); setTitle(''); setDescription(''); setResult(null); setAvisoClassif(''); setValidate(true); setEnviadosLote([]);
+    setFiles([]); setTitle(''); setDescription(''); setResult(null); setAvisoClassif(''); setValidate(true); setEnviadosLote([]); setRecibosLidos(null);
     if (fileRef.current) fileRef.current.value = '';
   };
 
@@ -322,6 +336,20 @@ export const ImportarDocumentoModal: React.FC<Props> = ({ onClose, onSuccess, de
             </div>
             {avisoClassif && (
               <p className="text-[12px] text-orange-700 flex items-center gap-1.5"><FiAlertTriangle size={12} /> {avisoClassif}</p>
+            )}
+            {recibosLidos && ((recibosLidos.baixas?.length ?? 0) + (recibosLidos.alertasResolvidos?.length ?? 0) + (recibosLidos.avisos?.length ?? 0)) > 0 && (
+              <div className="border border-green-200 bg-green-50 rounded-[10px] p-3 space-y-1">
+                <p className="text-[12px] font-medium text-green-800">Recibos lidos pelo LEDGR</p>
+                {(recibosLidos.baixas ?? []).map((b: any, i: number) => (
+                  <p key={'b' + i} className="text-[12px] text-green-800">✓ {b.code} {b.competence}: recibo {b.recibo}{b.tipo ? ' (' + String(b.tipo).toLowerCase() + ')' : ''} - obrigação baixada</p>
+                ))}
+                {(recibosLidos.alertasResolvidos ?? []).map((a: any) => (
+                  <p key={a.id} className="text-[12px] text-green-800">✓ Alerta resolvido: {a.title}</p>
+                ))}
+                {(recibosLidos.avisos ?? []).map((t: string, i: number) => (
+                  <p key={'a' + i} className="text-[12px] text-orange-700">{t}</p>
+                ))}
+              </div>
             )}
             <div className="flex justify-end gap-2">
               <button onClick={importarOutro} className="flex items-center gap-1.5 px-4 py-2 text-[14px] border border-gray-300 rounded-lg hover:bg-gray-50">

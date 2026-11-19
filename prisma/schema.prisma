@@ -1002,6 +1002,8 @@ model Document {
   @@index([companyId, type, deletedAt])
   @@index([companyId, visibility, deletedAt])
   @@index([isTemplate, type])
+  reciboLidoEm  DateTime? @map("recibo_lido_em") @db.Timestamp(6) /// ALERTA-AUTO-01: PDF ja lido como recibo
+  reciboDados   Json?     @map("recibo_dados")
   @@map("documents")
 }
 
@@ -3986,6 +3988,7 @@ model FiscalObligation {
   @@unique([companyId, code, competence])
   @@index([companyId, dueDate])
   @@index([companyId, status])
+  documentId    String?  @map("document_id") @db.Uuid /// ALERTA-AUTO-01: recibo arquivado que deu a baixa
   @@map("fiscal_obligations")
 }
 
@@ -4008,6 +4011,7 @@ model CompanyAlert {
   @@index([companyId, resolvedAt])
   actionUrl       String?   @map("action_url") @db.VarChar(200)
   actionLabel     String?   @map("action_label") @db.VarChar(60)
+  regraBaixa      Json?     @map("regra_baixa") /// ALERTA-AUTO-01: condicao que resolve o alerta sozinho
   @@map("company_alerts")
 }
 
@@ -6266,4 +6270,23 @@ model ProLaboreCompensacao {
   @@index([adiantamentoId])
   @@index([pagamentoId])
   @@map("pro_labore_compensacoes")
+}
+
+/// ALERTA-AUTO-01 (19/11/2026): padroes de leitura de recibos em PDF, um por declaracao (regex sobre o texto da pagina)
+model ReciboPadrao {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code          String   @db.VarChar(30)
+  nome          String   @db.VarChar(120)
+  detecta       String   @db.Text
+  reRecibo      String   @map("re_recibo") @db.Text
+  reCnpj        String   @map("re_cnpj") @db.Text
+  reCompetencia String   @map("re_competencia") @db.Text
+  formatoComp   String   @default("ANO") @map("formato_comp") @db.VarChar(10)
+  reTipo        String?  @map("re_tipo") @db.Text
+  reRecebidoEm  String?  @map("re_recebido_em") @db.Text
+  ativo         Boolean  @default(true)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+
+  @@unique([code, nome])
+  @@map("recibo_padroes")
 }
