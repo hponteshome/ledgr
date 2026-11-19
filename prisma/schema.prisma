@@ -2730,6 +2730,7 @@ model RentalContract {
   lastroConferidoPor String?   @map("lastro_conferido_por") @db.Uuid
   lastroRessalva     String?   @map("lastro_ressalva") @db.Text
   renewedByContractId String? @map("renewed_by_contract_id") @db.Uuid /// 04/11/2026: contrato que renovou este (status RENOVADO)
+  dimobNumero         String?   @map("dimob_numero") @db.VarChar(6) /// 19/11/2026: numero interno fixo na DIMOB (contrato com mais de 6 posicoes)
 
   notes String? @map("notes") @db.Text
 

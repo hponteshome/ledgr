@@ -30,6 +30,13 @@ export class DimobService {
     return porNome.length === 1 ? porNome[0].codigo : null;
   }
 
+  // Maior numero interno ja atribuido na empresa (900001, 900002...); o proximo contrato recebe o seguinte
+  private async maxNumeroInterno(companyId: string): Promise<number> {
+    const [r]: any[] = await this.prisma.$queryRawUnsafe(
+      `SELECT coalesce(max(dimob_numero::int), 900000)::int AS m FROM rental_contracts WHERE company_id = $1::uuid AND dimob_numero ~ '^[0-9]{6}$'`, companyId);
+    return Number(r?.m ?? 900000);
+  }
+
   async montar(companyId: string, ano: number, cpfResponsavel: string) {
     if (!companyId) throw new BadRequestException('Empresa nao informada.');
     if (!Number.isInteger(ano) || ano < 2000 || ano > 2100) throw new BadRequestException('Ano-calendario invalido.');
@@ -51,7 +58,7 @@ export class DimobService {
     };
 
     const linhas: any[] = await this.prisma.$queryRawUnsafe(`
-      SELECT rc.id AS contrato_id, rc.contract_number, rc.tenant_name, rc.tenant_tax_id, rc.start_date, rc.instrument_date,
+      SELECT rc.id AS contrato_id, rc.contract_number, rc.dimob_numero, rc.tenant_name, rc.tenant_tax_id, rc.start_date, rc.instrument_date,
              fa.internal_code, fa.street, fa.number, fa.complement, fa.neighborhood, fa.zip_code, fa.state, fa.city, fa.country,
              a.competence_month, sum(a.amount)::float8 AS aluguel, sum(a.commission_amount)::float8 AS comissao,
              sum(a.withheld_tax_amount)::float8 AS imposto, count(*)::int AS titulos
@@ -60,7 +67,7 @@ export class DimobService {
       JOIN fixed_assets fa ON fa.id = rc.fixed_asset_id
       WHERE a.company_id = $1::uuid AND a.deleted_at IS NULL AND a.status::text = 'RECEIVED' AND a.origin::text = 'ALUGUEL'
         AND left(a.competence_month, 4) = $2
-      GROUP BY rc.id, rc.contract_number, rc.tenant_name, rc.tenant_tax_id, rc.start_date, rc.instrument_date,
+      GROUP BY rc.id, rc.contract_number, rc.dimob_numero, rc.tenant_name, rc.tenant_tax_id, rc.start_date, rc.instrument_date,
                fa.internal_code, fa.street, fa.number, fa.complement, fa.neighborhood, fa.zip_code, fa.state, fa.city, fa.country, a.competence_month
       ORDER BY coalesce(rc.instrument_date, rc.start_date), rc.contract_number, a.competence_month`, companyId, String(ano));
 
@@ -74,15 +81,23 @@ export class DimobService {
 
     const locacoes: (DimobLocacao & { imovel: string; contratoLedgr: string; total: { aluguel: number; comissao: number; imposto: number } })[] = [];
     const exterior: { contrato: string; imovel: string; aluguel: number }[] = [];
-    let seqInterno = 0;
+    // DIMOB-NUM-01 (19/11/2026): numero interno (contrato com mais de 6 posicoes) fixo por contrato, igual em todos os anos
+    let maxInterno = await this.maxNumeroInterno(companyId);
     for (const c of porContrato.values()) {
       const contratoLedgr = c.contract_number ?? 's/n';
       const total = c.meses.reduce((s: any, m: any) => ({ aluguel: s.aluguel + m.aluguel, comissao: s.comissao + m.comissao, imposto: s.imposto + m.imposto }), { aluguel: 0, comissao: 0, imposto: 0 });
       const pais = ascii(c.country ?? '');
       const noBrasil = (!pais || pais.startsWith('BRASIL') || pais === 'BR') && digits(c.zip_code).length === 8 && /^[A-Z]{2}$/.test(String(c.state ?? ''));
       if (!noBrasil) { exterior.push({ contrato: contratoLedgr, imovel: c.internal_code, aluguel: total.aluguel }); continue; }
-      const numero = /^\d{1,6}$/.test(String(c.contract_number ?? '')) ? String(c.contract_number) : String(900000 + ++seqInterno);
-      if (numero !== c.contract_number) avisos.push({ nivel: 'ALERTA', contrato: contratoLedgr, texto: `Numero do contrato com mais de 6 posicoes: informado como ${numero} na DIMOB.` });
+      let numero: string;
+      let novo = false;
+      if (/^\d{1,6}$/.test(String(c.contract_number ?? ''))) numero = String(c.contract_number);
+      else if (c.dimob_numero) numero = String(c.dimob_numero);
+      else {
+        numero = String(++maxInterno); novo = true;
+        await this.prisma.$executeRawUnsafe(`UPDATE rental_contracts SET dimob_numero = $2 WHERE id = $1::uuid AND dimob_numero IS NULL`, c.contrato_id, numero);
+      }
+      if (numero !== c.contract_number) avisos.push({ nivel: 'ALERTA', contrato: contratoLedgr, texto: `Numero do contrato com mais de 6 posicoes: informado como ${numero} na DIMOB (numero fixo do contrato${novo ? ', atribuido agora' : ''}).` });
       const dataIso = c.instrument_date ?? c.start_date;
       const data = dataIso ? new Date(dataIso).toISOString().slice(0, 10) : null;
       if (!data) avisos.push({ nivel: 'ERRO', contrato: contratoLedgr, texto: 'Contrato sem data.' });
