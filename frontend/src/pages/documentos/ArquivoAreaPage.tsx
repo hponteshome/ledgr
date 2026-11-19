@@ -29,7 +29,7 @@ const CORES_ABA: CorAba[] = [
 const COR_TODOS: CorAba = { forte: '#334155', claro: '#F1F5F9', borda: '#CBD5E1' };
 const COR_CLASSIFICAR: CorAba = { forte: '#C2410C', claro: '#FFEDD5', borda: '#FDBA74' };
 
-type Aba = { key: string; label: string; types: string[]; subtipos?: string[]; semSubtipo?: boolean };
+type Aba = { key: string; label: string; types: string[]; subtipos?: string[]; semSubtipo?: boolean; obrig?: string[] };
 type Area = { label: string; abas: Aba[] };
 
 const AREAS: Record<string, Area> = {
@@ -47,12 +47,12 @@ const AREAS: Record<string, Area> = {
     label: 'Contábil e Fiscal',
     abas: [
       { key: 'balancetes', label: 'Balancetes e demonstrações', types: ['CONTABIL'], subtipos: ['BALANCETE', 'DEMONSTRACAO'] },
-      { key: 'ecd', label: 'ECD', types: ['CONTABIL', 'FISCAL'], subtipos: ['ECD'] },
+      { key: 'ecd', label: 'ECD', types: ['CONTABIL', 'FISCAL'], subtipos: ['ECD'], obrig: ['ECD'] },
       { key: 'livrocaixa', label: 'Livro Caixa', types: ['CONTABIL'], subtipos: ['LIVRO_CAIXA'] },
       { key: 'extratos', label: 'Extratos bancários', types: ['CONTABIL'], subtipos: ['EXTRATO_BANCARIO'] },
-      { key: 'ecf', label: 'ECF', types: ['FISCAL'], subtipos: ['ECF'] },
-      { key: 'obrigacoes', label: 'Obrigações', types: ['FISCAL'], subtipos: ['OBRIGACAO', 'DIMOB', 'EFD_CONTRIBUICOES', 'EFD_REINF', 'DCTF', 'DCTFWEB', 'SPED_OUTROS'] },
-      { key: 'dimob', label: 'DIMOB', types: ['FISCAL'], subtipos: ['DIMOB'] },
+      { key: 'ecf', label: 'ECF', types: ['FISCAL'], subtipos: ['ECF'], obrig: ['ECF'] },
+      { key: 'obrigacoes', label: 'Obrigações', types: ['FISCAL'], subtipos: ['OBRIGACAO', 'DIMOB', 'EFD_CONTRIBUICOES', 'EFD_REINF', 'DCTF', 'DCTFWEB', 'SPED_OUTROS'], obrig: ['EFD_CONTRIB', 'DCTF', 'DCTFWEB', 'DIRF'] },
+      { key: 'dimob', label: 'DIMOB', types: ['FISCAL'], subtipos: ['DIMOB'], obrig: ['DIMOB'] },
       { key: 'darfs', label: 'DARFs e comprovantes', types: ['FISCAL'], subtipos: ['DARF'] },
       { key: 'notificacoes', label: 'Notificações e intimações', types: ['FISCAL'], subtipos: ['NOTIFICACAO'] },
       { key: 'classificar', label: 'A classificar', types: ['CONTABIL', 'FISCAL'], semSubtipo: true },
@@ -109,7 +109,7 @@ const resolverRota = (pathname: string): { area: string; aba: string } => {
   if (a === 'societario') return { area: 'societario', aba: b ?? 'todos' };
   if (a === 'livros') return { area: 'societario', aba: 'livros' };
   if (a === 'contabil') return { area: 'contabil', aba: b === 'demonstracoes' ? 'balancetes' : (b ?? 'todos') };
-  if (a === 'fiscal') return { area: 'contabil', aba: b === 'ecf' || b === 'obrigacoes' ? b : 'todos' };
+  if (a === 'fiscal') return { area: 'contabil', aba: ['ecf', 'obrigacoes', 'dimob', 'ecd'].includes(b) ? b : 'todos' };
   if (a === 'rh') return { area: 'pessoal', aba: ['contratos', 'acordos', 'esocial', 'folha'].includes(b) ? b : 'todos' };
   return { area: 'societario', aba: 'todos' };
 };
@@ -140,6 +140,11 @@ export const ArquivoAreaPage: React.FC = () => {
   const [validateDocId, setValidateDocId] = useState<string | null>(null);
   const [showImport, setShowImport] = useState(false);
   const [showRedigir, setShowRedigir] = useState(false);
+  // ARQ-DECL-01: abas de declaracao - uma linha por competencia (agenda de obrigacoes) com recibo e arquivos
+  const [modo, setModo] = useState<'comp' | 'docs'>('comp');
+  const [decl, setDecl] = useState<any[]>([]);
+  const [loadingDecl, setLoadingDecl] = useState(false);
+  const [ocultarDisp, setOcultarDisp] = useState(true);
 
   useEffect(() => { setAba(rota.aba); }, [location.pathname]);
 
@@ -168,6 +173,16 @@ export const ArquivoAreaPage: React.FC = () => {
   const pertence = (d: any, a: Aba) =>
     a.types.includes(d.type) && (a.semSubtipo ? !d.subtipo : a.subtipos ? a.subtipos.includes(d.subtipo) : true);
   const abaAtual = area.abas.find(a => a.key === aba);
+  const obrigAba = abaAtual?.obrig ?? [];
+  const emComp = obrigAba.length > 0 && modo === 'comp' && !buscaGlobal;
+  const carregarDecl = async () => {
+    if (!obrigAba.length) { setDecl([]); return; }
+    setLoadingDecl(true);
+    try { const r = await api.get('/situacao-fiscal/declaracoes', { params: { codes: obrigAba.join(',') } }); const v = r.data?.data ?? r.data; setDecl(Array.isArray(v) ? v : []); }
+    catch { setDecl([]); }
+    setLoadingDecl(false);
+  };
+  useEffect(() => { carregarDecl(); }, [aba, rota.area]);
   const contagem = (a: Aba) => docs.filter(d => pertence(d, a)).length;
 
   const filtrados = useMemo(() => {
@@ -206,6 +221,73 @@ export const ArquivoAreaPage: React.FC = () => {
     );
   };
   const th = 'px-4 py-2.5 text-left text-[11px] font-medium uppercase tracking-wide text-gray-500 bg-gray-50 border-b border-gray-200';
+
+  // ARQ-DECL-01: visao por competencia
+  const SIT_DECL: Record<string, { rot: string; bg: string; fg: string }> = {
+    ATRASADA: { rot: 'Em atraso', bg: '#FEE2E2', fg: '#991B1B' }, RETIFICAR: { rot: 'Retificar', bg: '#FFEDD5', fg: '#9A3412' },
+    PENDENTE: { rot: 'A entregar', bg: '#EFF6FF', fg: '#1D4ED8' }, ENTREGUE: { rot: 'Entregue', bg: '#D1FAE5', fg: '#065F46' },
+    DISPENSADA: { rot: 'Dispensada', bg: '#F3F4F6', fg: '#6B7280' },
+  };
+  const ROT_OBRIG: Record<string, string> = { DIMOB: 'DIMOB', ECF: 'ECF', ECD: 'ECD', EFD_CONTRIB: 'EFD-Contribuições', DCTF: 'DCTF (PGD)', DCTFWEB: 'DCTFWeb/MIT', DIRF: 'DIRF' };
+  const fmtComp = (c: string) => (c && c.length === 7 ? c.slice(5, 7) + '/' + c.slice(0, 4) : c);
+  const fmtDH = (iso?: string | null) => iso ? new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-';
+  const selo = (rot: string, lista: any[], mostrarFalta = true) => lista.length
+    ? lista.map((f: any) => (
+        <button key={f.id} type="button" onClick={() => setViewDoc({ id: f.id, title: f.title })}
+          title={f.title + (f.confere === false ? ' - o recibo gravado no arquivo não confere com o da obrigação' : '')}
+          className="px-2 py-0.5 rounded-full text-[11px] font-medium border mr-1"
+          style={f.confere === false ? { background: '#FEF3C7', borderColor: '#FCD34D', color: '#92400E' } : { background: '#D1FAE5', borderColor: '#6EE7B7', color: '#065F46' }}>
+          {rot} {f.confere === false ? '⚠' : '✓'}{f.tipo === 'Retificadora' ? ' retif.' : ''}
+        </button>))
+    : mostrarFalta ? <span className="px-2 py-0.5 rounded-full text-[11px] border border-dashed border-gray-300 text-gray-400 mr-1">{rot} falta</span> : null;
+  const linhasDecl = decl.filter(o => !(ocultarDisp && o.sit === 'DISPENSADA'));
+  const renderDecl = () => (
+    <div className="border border-gray-200 rounded-[10px] overflow-hidden">
+      <table className="w-full">
+        <thead>
+          <tr>
+            {obrigAba.length > 1 && <th className={th}>Obrigação</th>}
+            <th className={th}>Competência</th>
+            <th className={th}>Situação</th>
+            <th className={th}>Recibo</th>
+            <th className={th}>Entrega</th>
+            <th className={th}>Arquivos</th>
+          </tr>
+        </thead>
+        <tbody>
+          {loadingDecl ? (
+            <tr><td colSpan={6} className="px-4 py-12 text-center text-gray-400 text-[14px]">Carregando...</td></tr>
+          ) : linhasDecl.length === 0 ? (
+            <tr><td colSpan={6} className="px-4 py-12 text-center text-[14px] text-gray-400">Nenhuma competência na agenda de obrigações para esta aba</td></tr>
+          ) : linhasDecl.map(o => {
+            const st = SIT_DECL[o.sit] ?? SIT_DECL.PENDENTE;
+            const entregue = o.sit === 'ENTREGUE' || o.sit === 'RETIFICAR';
+            return (
+              <tr key={o.id} className="hover:bg-gray-50 border-b border-gray-100 last:border-0 align-top">
+                {obrigAba.length > 1 && <td className="px-4 py-3 text-[13px] text-gray-700 whitespace-nowrap">{ROT_OBRIG[o.code] ?? o.code}</td>}
+                <td className="px-4 py-3 text-[14px] font-medium text-gray-900 whitespace-nowrap">{fmtComp(o.competence)}</td>
+                <td className="px-4 py-3">
+                  <span className="px-2 py-0.5 rounded-full text-[11px] font-medium whitespace-nowrap" style={{ background: st.bg, color: st.fg }}>{st.rot}</span>
+                  {o.tipo && entregue && <span className="ml-1.5 text-[11px] text-gray-500">{o.tipo}</span>}
+                  {!entregue && o.sit !== 'DISPENSADA' && <div className="text-[11px] text-gray-400 mt-0.5">prazo {fmtData(o.dueDate)}</div>}
+                  {o.notes && <div className="text-[11px] text-gray-500 mt-0.5 max-w-[340px]">{o.notes}</div>}
+                </td>
+                <td className="px-4 py-3 text-[13px] font-mono text-gray-800 whitespace-nowrap">{o.recibo ?? '-'}</td>
+                <td className="px-4 py-3 text-[13px] text-gray-600 whitespace-nowrap">{fmtDH(o.entregaEm)}</td>
+                <td className="px-4 py-3 whitespace-nowrap">
+                  {o.sit === 'DISPENSADA' && !o.arquivos.pdf.length && !o.arquivos.rec.length ? <span className="text-[11px] text-gray-400">-</span> : <>
+                    {selo('PDF', o.arquivos.pdf, entregue)}
+                    {selo('.REC', o.arquivos.rec, entregue)}
+                    {selo('.DEC', o.arquivos.dec, entregue && !o.temCopiaReceita)}
+                  </>}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
 
   return (
     <div className="space-y-4">
@@ -249,6 +331,24 @@ export const ArquivoAreaPage: React.FC = () => {
         </div>
       )}
 
+      {obrigAba.length > 0 && !buscaGlobal && (
+        <div className="flex items-center gap-2 text-[12px]">
+          <span className="text-gray-500">Ver:</span>
+          {(['comp', 'docs'] as const).map(m => (
+            <button key={m} type="button" onClick={() => setModo(m)}
+              className={`px-3 py-1 rounded-full border ${modo === m ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-600 border-gray-300'}`}>
+              {m === 'comp' ? 'Por competência' : 'Documentos'}
+            </button>
+          ))}
+          {modo === 'comp' && (
+            <label className="ml-3 flex items-center gap-1.5 text-gray-600 cursor-pointer">
+              <input type="checkbox" checked={ocultarDisp} onChange={e => setOcultarDisp(e.target.checked)} /> ocultar dispensadas
+            </label>
+          )}
+        </div>
+      )}
+
+      {emComp ? renderDecl() : (
       <div className="border border-gray-200 rounded-[10px] overflow-hidden">
         <table className="w-full">
           <thead>
@@ -311,6 +411,7 @@ export const ArquivoAreaPage: React.FC = () => {
           </tbody>
         </table>
       </div>
+      )}
 
       {pendentes > 0 && aba !== 'classificar' && (
         <p className="text-[12px] text-orange-700 flex items-center gap-1.5">
@@ -319,7 +420,7 @@ export const ArquivoAreaPage: React.FC = () => {
       )}
 
       {showRedigir && <RedigirProcuracaoModal onClose={() => setShowRedigir(false)} onSuccess={() => { setShowRedigir(false); carregar(); }} />}
-      {showImport && <ImportarDocumentoModal onClose={() => setShowImport(false)} onSuccess={() => carregar()} defaultType={tipoImport} />}
+      {showImport && <ImportarDocumentoModal onClose={() => setShowImport(false)} onSuccess={() => { carregar(); carregarDecl(); }} defaultType={tipoImport} />}
       {viewDoc !== null && (
         <DocumentViewModal documentId={viewDoc.id} documentTitle={viewDoc.title}
           onClose={() => { setViewDoc(null); carregar(); }} onValidate={(id: string) => { setValidateDocId(id); setViewDoc(null); }} />

@@ -1,6 +1,6 @@
 // apps/api/src/modules/situacao-fiscal/situacao-fiscal.controller.ts
 // DASH-03 (13/11/2026): painel de situacao fiscal (Dashboard), resolucao de alertas e atualizacao de obrigacoes.
-import { Controller, Get, Post, Patch, Body, Param, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Param, Query, Req, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/guards/jwt.guard';
 import { isMasterAdmin } from '../../multi-company/company.interceptor';
 import { SituacaoFiscalService } from './situacao-fiscal.service';
@@ -22,6 +22,12 @@ export class SituacaoFiscalController {
   }
 
   // ALERTA-AUTO-01: le os recibos arquivados (todos=true rele inclusive os ja lidos) e avalia as regras de baixa dos alertas
+  // ARQ-DECL-01: declaracoes por competencia, com recibo e arquivos (abas do Arquivo Digital)
+  @Get('declaracoes')
+  declaracoes(@Req() req: any, @Query('codes') codes?: string) {
+    return this.recibos.declaracoes(req.headers['x-company-id'] ?? '', String(codes ?? '').split(','));
+  }
+
   @Post('recibos/processar')
   async processarRecibos(@Req() req: any, @Body('todos') todos?: boolean) {
     const cid = req.headers['x-company-id'] ?? '';

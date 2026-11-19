@@ -48,13 +48,13 @@ const OBRIG: Record<string, { rota: string; dica: string }> = {
   ECD: { rota: '/app/sped/ecd', dica: 'Último dia útil de junho. Obrigatória no Lucro Real; no Presumido, facultativa e sem multa.' },
   DIMOB: { rota: '/app/sped/dimob', dica: 'Último dia útil de fevereiro. Multa por mês de atraso (MP 2.158-35, art. 57); base: contratos e recebimentos.' },
   EFD_CONTRIB: { rota: '/app/sped/efd', dica: '10º dia útil do 2º mês seguinte. Multa 0,02%/dia sobre a receita do mês, limite 1%.' },
-  DCTF: { rota: '/app/sistema/obrigacoes', dica: 'DCTF mensal (PGD) até dez/2024: 15º dia útil do 2º mês. Multa 2%/mês sobre os tributos, mínimo R$ 500.' },
+  DCTF: { rota: '/app/arquivo/fiscal/obrigacoes', dica: 'DCTF mensal (PGD) até dez/2024: 15º dia útil do 2º mês. Multa 2%/mês sobre os tributos, mínimo R$ 500.' },
   DCTFWEB: { rota: '/app/hr/processamento-mensal', dica: 'DCTFWeb/MIT: último dia útil do mês seguinte (desde 2025). Confissão dos tributos do mês.' },
   PIS_COFINS: { rota: '/app/fiscal/apuracao', dica: 'DARF de PIS/Cofins até o dia 25 do mês seguinte.' },
   IRPJ_CSLL_TRI: { rota: '/app/fiscal/apuracao', dica: 'DARF de IRPJ/CSLL: último dia útil do mês seguinte ao trimestre.' },
   IRPJ_CSLL_AJUSTE: { rota: '/app/fiscal/apuracao', dica: 'Ajuste anual do Lucro Real: último dia útil de março do ano seguinte.' },
   DAS: { rota: '/app/fiscal/apuracao', dica: 'DAS do Simples: dia 20 do mês seguinte.' },
-  DEFIS: { rota: '/app/sistema/obrigacoes', dica: 'DEFIS: 31 de março do ano seguinte.' },
+  DEFIS: { rota: '/app/arquivo/fiscal/obrigacoes', dica: 'DEFIS: 31 de março do ano seguinte.' },
   ESOCIAL: { rota: '/app/hr/processamento-mensal', dica: 'eSocial: eventos periódicos até o dia 15 do mês seguinte.' },
   FGTS: { rota: '/app/hr/folha', dica: 'FGTS Digital: dia 20 do mês seguinte.' },
   INSS_DARF: { rota: '/app/hr/processamento-mensal', dica: 'INSS pelo DARF da DCTFWeb: dia 20 do mês seguinte.' },
@@ -101,8 +101,8 @@ export const SituacaoFiscalCard: React.FC<{ refreshKey?: number }> = ({ refreshK
   if (!d) return null;
   if (d.alertas.length === 0 && d.matriz.linhas.length === 0 && d.darfs.length === 0) return null;
   const k = d.kpis;
-  const irObrigacoes = () => navigate('/app/sistema/obrigacoes');
-  const irCod = (code: string) => navigate(OBRIG[code]?.rota ?? '/app/sistema/obrigacoes');
+  const irObrigacoes = () => navigate('/app/arquivo/fiscal/obrigacoes');
+  const irCod = (code: string) => navigate(OBRIG[code]?.rota ?? '/app/arquivo/fiscal/obrigacoes');
   const resolver = async (id: string) => {
     if (!nota.trim()) { toast.error('Informe o motivo da resolução.'); return; }
     try { await api.post('/situacao-fiscal/alertas/' + id + '/resolver', { nota }); toast.success('Resolução registrada.'); setResolv(null); setRk(k => k + 1); }

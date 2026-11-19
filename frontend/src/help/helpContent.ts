@@ -1261,25 +1261,20 @@ export const helpContent: Record<string, HelpArticle> = {
   },
 
   'sped/obrigacoes': {
-    title: 'Calendário de Obrigações Fiscais',
+    title: 'Declarações e obrigações - situação por competência',
     section: 'SPED / Obrigações',
-    intro: 'O LEDGR mantém um calendário automático com todas as obrigações fiscais e trabalhistas da empresa, com alertas de vencimento.',
+    intro: 'As abas de declaração do Arquivo Digital (ECD, ECF, DIMOB e Obrigações) mostram uma linha por competência, com a situação, o recibo, a data de entrega e os arquivos guardados.',
     content: [
+      { type: 'text', text: 'A lista vem da agenda de obrigações da empresa (gerada pelo regime tributário, pelo perfil e pelos contratos de locação). Competências sem nenhum arquivo também aparecem - é assim que se vê o que está em atraso.' },
       { type: 'list', items: [
-        'FGTS Mensal — até dia 7 do mês seguinte',
-        'GPS INSS (pró-labore) — até dia 20 do mês seguinte',
-        'DARF PIS/COFINS — até dia 25 do mês seguinte',
-        'DAS Simples Nacional — até dia 20 do mês seguinte',
-        'DCTFWeb — mensal, após fechamento da folha',
-        'ECD — anual, até 31 de maio',
-        'ECF — anual, até 31 de julho',
-        'DIRF — anual, até último dia útil de fevereiro',
-        'RAIS — anual, prazo variável (janeiro-março)',
+        'PDF do recibo - ao arquivar o recibo em PDF, o LEDGR lê o número, confere o CNPJ e dá baixa na obrigação sozinho.',
+        '.REC - recibo eletrônico; permite reimprimir o recibo no programa da declaração. Guarde sempre.',
+        '.DEC - arquivo da declaração; guardado só nas declarações sem cópia direta na Receita (ex.: DIMOB). O selo fica amarelo se o recibo gravado no arquivo não conferir com o da obrigação.',
       ]},
-      { type: 'tip', text: 'O Dashboard mostra as obrigações dos próximos 60 dias com indicador de dias restantes. Obrigações vencidas aparecem em vermelho.' },
-      { type: 'warning', text: 'Os prazos podem ser alterados pela Receita Federal. Sempre confirme as datas no site oficial da RFB antes do pagamento.' },
+      { type: 'tip', text: 'Use "Documentos" no seletor "Ver" para voltar à lista arquivo por arquivo.' },
+      { type: 'warning', text: 'O Arquivo recusa um arquivo idêntico a outro já arquivado na empresa e mostra onde está o original.' },
     ],
-    related: ['sped/ecd', 'sped/efd', 'dp/esocial'],
+    related: ['sped/ecd', 'sped/efd', 'acervo/introducao'],
   },
 
   'cadastros/empresas': {

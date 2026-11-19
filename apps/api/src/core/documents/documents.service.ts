@@ -1097,6 +1097,12 @@ async handleGovBrCallback(
     const path = require('path');
     const pdfBuffer = file.buffer;
     const contentHash = crypto.createHash('sha256').update(pdfBuffer).digest('hex');
+    // ARQ-DECL-01 (19/11/2026): arquivo identico (mesmo SHA-256) ja arquivado na empresa -> recusa, para nao duplicar
+    const dup: any[] = await this.prisma.$queryRawUnsafe(
+      `SELECT title, to_char(created_at, 'DD/MM/YYYY') AS em FROM documents
+        WHERE company_id = $1::uuid AND content_hash = $2 AND deleted_at IS NULL AND file_url IS NOT NULL LIMIT 1`,
+      dto.companyId, contentHash);
+    if (dup.length) throw new BadRequestException(`Arquivo idêntico já arquivado: "${dup[0].title}" (enviado em ${dup[0].em}).`);
     const uploadsDir = path.join(process.cwd(), 'uploads');
     if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
     const fileName = contentHash.slice(0,16) + '_' + file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');

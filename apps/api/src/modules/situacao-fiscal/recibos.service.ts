@@ -135,6 +135,79 @@ export class RecibosService {
     return resolvidos;
   }
 
+  // ARQ-DECL-01 (19/11/2026): declaracoes por competencia (agenda de obrigacoes) com recibo, entrega e arquivos vinculados.
+  // PDF do recibo: pelo que a leitura encontrou nele (recibo_dados). .REC/.DEC: pelo padrao de nome da Receita
+  // (recibo_padroes.re_arquivo: grupos CNPJ, competencia, ORIGI/RETIF, extensao). .DEC: confere a base do recibo gravada no cabecalho.
+  async declaracoes(companyId: string, codes: string[]) {
+    const cods = codes.map(c => String(c).trim().toUpperCase()).filter(c => /^[A-Z_]{2,30}$/.test(c));
+    if (!cods.length) return [];
+    const obrig: any[] = await this.prisma.$queryRawUnsafe(
+      `SELECT id::text AS id, code, competence, status::text AS status, to_char(due_date, 'YYYY-MM-DD') AS "dueDate",
+              receipt_number AS recibo, delivered_at AS "entregaEm", notes, depends_on AS "dependsOn", document_id::text AS "documentId"
+         FROM fiscal_obligations WHERE company_id = $1::uuid AND code = ANY ($2::text[])
+        ORDER BY competence DESC, code`, companyId, cods);
+    const docs: any[] = await this.prisma.$queryRawUnsafe(
+      `SELECT id::text AS id, title, original_file_name AS nome, file_url AS "fileUrl", recibo_dados AS dados
+         FROM documents
+        WHERE company_id = $1::uuid AND deleted_at IS NULL AND is_template = false AND type::text IN ('FISCAL', 'CONTABIL')
+          AND lower(coalesce(original_file_name, '')) ~ '\\.(pdf|rec|dec)$'`, companyId);
+    const padroes: any[] = await this.prisma.$queryRawUnsafe(`SELECT code, re_arquivo, tem_copia_receita FROM recibo_padroes WHERE ativo`);
+    const emp = await (this.prisma as any).company.findUnique({ where: { id: companyId }, select: { taxId: true } });
+    const cnpj = dig(emp?.taxId);
+    const hoje = new Date().toISOString().slice(0, 10);
+    type Arq = { id: string; title: string; tipo: string | null; confere?: boolean | null };
+    const mapa = new Map<string, { pdf: Arq[]; rec: Arq[]; dec: Arq[] }>();
+    const slot = (k: string) => { let x = mapa.get(k); if (!x) { x = { pdf: [], rec: [], dec: [] }; mapa.set(k, x); } return x; };
+    const recibos = new Map<string, string | null>(obrig.map(o => [o.code + '|' + o.competence, o.recibo] as [string, string | null]));
+    for (const d of docs) {
+      const nome = String(d.nome ?? '');
+      if (/\.pdf$/i.test(nome)) {
+        for (const r of (d.dados?.recibos ?? [])) {
+          if (!r?.code || !r?.competence || !cods.includes(r.code) || (r.cnpj && r.cnpj !== cnpj)) continue;
+          const x = slot(r.code + '|' + r.competence);
+          if (!x.pdf.some(a => a.id === d.id)) x.pdf.push({ id: d.id, title: d.title, tipo: r.tipo ?? null });
+        }
+        continue;
+      }
+      for (const p of padroes) {
+        if (!p.re_arquivo || !cods.includes(p.code)) continue;
+        const m = nome.match(new RegExp(p.re_arquivo, 'i'));
+        if (!m || dig(m[1]) !== cnpj) continue;
+        const k = p.code + '|' + m[2];
+        const tipo = /^RETIF/i.test(m[3] ?? '') ? 'Retificadora' : 'Original';
+        const ext = String(m[4] ?? '').toUpperCase();
+        if (ext === 'REC') slot(k).rec.push({ id: d.id, title: d.title, tipo });
+        if (ext === 'DEC') slot(k).dec.push({ id: d.id, title: d.title, tipo, confere: this.decConfere(d.fileUrl, recibos.get(k) ?? null) });
+      }
+    }
+    // Recibo que deu a baixa (fiscal_obligations.document_id), mesmo sem leitura registrada no documento
+    for (const o of obrig) {
+      if (!o.documentId) continue;
+      const x = slot(o.code + '|' + o.competence);
+      const d = docs.find(y => y.id === o.documentId);
+      if (d && !x.pdf.some(a => a.id === d.id)) x.pdf.push({ id: d.id, title: d.title, tipo: null });
+    }
+    const copia = new Map<string, boolean>(padroes.map(p => [p.code, !!p.tem_copia_receita] as [string, boolean]));
+    return obrig.map(o => {
+      const arquivos = mapa.get(o.code + '|' + o.competence) ?? { pdf: [], rec: [], dec: [] };
+      const sit = o.status === 'DONE' ? 'ENTREGUE' : o.status === 'DISPENSED' ? 'DISPENSADA' : o.status === 'RECTIFY' ? 'RETIFICAR'
+        : (String(o.dueDate) < hoje ? 'ATRASADA' : 'PENDENTE');
+      const tipo = [...arquivos.pdf, ...arquivos.rec].map(a => a.tipo).find(Boolean) ?? null;
+      return { ...o, sit, tipo, temCopiaReceita: copia.get(o.code) ?? true, arquivos };
+    });
+  }
+
+  /** .DEC: a base do recibo (10 primeiros digitos) fica gravada no cabecalho depois da transmissao. */
+  private decConfere(fileUrl: string | null, recibo: string | null): boolean | null {
+    const base = dig(recibo).slice(0, 10);
+    if (base.length < 10 || !fileUrl) return null;
+    try {
+      const arq = path.join(process.cwd(), String(fileUrl).replace(/^\/+/, ''));
+      const fd = fs.openSync(arq, 'r'); const b = Buffer.alloc(400); const n = fs.readSync(fd, b, 0, 400, 0); fs.closeSync(fd);
+      return b.subarray(0, n).toString('latin1').split(/\r?\n/)[0].includes(base);
+    } catch { return null; }
+  }
+
   private async condicao(companyId: string, r: any): Promise<{ ok: boolean; motivo: string }> {
     const desc = r.descricao ? String(r.descricao) : '';
     switch (r.tipo) {

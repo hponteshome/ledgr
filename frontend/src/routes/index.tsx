@@ -121,7 +121,6 @@ import EquityMethodPage from '../pages/accounting/investments/EquityMethodPage';
 import EncerramentoExerciciosPage from '../pages/accounting/EncerramentoExerciciosPage';
 import { IndicadoresPage } from '../pages/sistema/IndicadoresPage';
 import { CalendarioPage } from '../pages/sistema/CalendarioPage';
-import { ObrigacoesPage } from '../pages/sistema/ObrigacoesPage';
 import { TabelasLegaisPage } from '../pages/sistema/TabelasLegaisPage';
 import SidebarPermissionsPage from '../pages/sistema/SidebarPermissionsPage';
 import MenuUsageAuditPage from '../pages/sistema/MenuUsageAuditPage';
@@ -222,7 +221,7 @@ export const AppRoutes = () => {
                 <Route path="app/sistema/indicadores" element={<ProtectedRoute><IndicadoresPage /></ProtectedRoute>} />
                 <Route path="app/sistema/indicadores/calculadora" element={<ProtectedRoute><CalculadoraCorrecaoPage /></ProtectedRoute>} />
                 <Route path="app/sistema/calendario" element={<ProtectedRoute><CalendarioPage /></ProtectedRoute>} />
-                <Route path="app/sistema/obrigacoes" element={<ProtectedRoute><ObrigacoesPage /></ProtectedRoute>} />
+                <Route path="app/sistema/obrigacoes" element={<Navigate to="/app/arquivo/fiscal/obrigacoes" replace />} /> {/* ARQ-DECL-01: declaracoes no Arquivo Digital */}
                 <Route path="app/sistema/tabelas" element={<ProtectedRoute><TabelasLegaisPage /></ProtectedRoute>} />
                     <Route path="app/sistema/sidebar-permissions" element={<ProtectedRoute><SidebarPermissionsPage /></ProtectedRoute>} />
                     <Route path="app/sistema/menu-usage" element={<ProtectedRoute><MenuUsageAuditPage /></ProtectedRoute>} />
