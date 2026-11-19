@@ -1,6 +1,7 @@
 // frontend/src/pages/documentos/ImportarDocumentoModal.tsx
 // ARQ-IMP-01 (19/11/2026): tipo + classificacao (subtipo) escolhidos juntos no envio; Contabil, Fiscal e RH no topo;
 // SPED/declaracoes (ECD, ECF, EFD-Contribuicoes, EFD-Reinf, DCTF, DCTFWeb/MIT, DIMOB) e eSocial; botao "Importar outro documento".
+// ARQ-IMP-02 (19/11/2026): varios arquivos de uma vez (ex.: declaracao .DEC + recibo .REC + recibo PDF) - um documento por arquivo.
 import React, { useState, useRef } from 'react';
 import { FiUpload, FiX, FiCheckCircle, FiShield, FiAlertTriangle } from 'react-icons/fi';
 import { SmartDateInput } from '../../components/SmartDateInput';
@@ -112,13 +113,14 @@ interface Props {
 export const ImportarDocumentoModal: React.FC<Props> = ({ onClose, onSuccess, defaultType }) => {
   const inicial = defaultType && OPCOES.some(o => o.value === defaultType) ? defaultType : '';
   const [opcao, setOpcao] = useState(inicial);
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [title, setTitle] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [description, setDescription] = useState('');
   const [validate, setValidate] = useState(true);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
+  const [enviadosLote, setEnviadosLote] = useState<{ nome: string; ok: boolean; erro?: string }[]>([]);
   const [avisoClassif, setAvisoClassif] = useState('');
   const [enviados, setEnviados] = useState(0);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -126,53 +128,70 @@ export const ImportarDocumentoModal: React.FC<Props> = ({ onClose, onSuccess, de
   const token = localStorage.getItem('@ledgr:token');
   const company = JSON.parse(localStorage.getItem('@ledgr:activeCompany') ?? '{}');
   const [type, subtipo] = opcao.split('|');
-  const ehPdf = !file || /\.pdf$/i.test(file.name);
+  const ehPdf = files.length === 0 || files.every(f => /\.pdf$/i.test(f.name));
+  const varios = files.length > 1;
+  const semExt = (n: string) => n.replace(/\.[^.]+$/, '');
+
+  // Envia um arquivo; devolve o retorno do import ou lanca erro. Classifica (subtipo) logo depois.
+  const enviarUm = async (f: File, titulo: string) => {
+    const fd = new FormData();
+    fd.append('file', f);
+    fd.append('companyId', company.id ?? '');
+    fd.append('type', type);
+    fd.append('title', titulo);
+    fd.append('date', date);
+    fd.append('description', description);
+    fd.append('validate', validate && /\.pdf$/i.test(f.name) ? 'true' : 'false');
+    const res = await fetch(`${API}/documents/import-signed`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}`, 'x-company-id': company.id ?? '' },
+      body: fd,
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message ?? 'Erro ao importar');
+    let aviso = '';
+    if (subtipo) {
+      const docId = data?.id ?? data?.documentId ?? data?.document?.id;
+      if (!docId) aviso = 'sem classificação (classifique na lista)';
+      else {
+        const r2 = await fetch(`${API}/documents/${docId}/subtipo`, {
+          method: 'PATCH',
+          headers: { 'Authorization': `Bearer ${token}`, 'x-company-id': company.id ?? '', 'Content-Type': 'application/json' },
+          body: JSON.stringify({ companyId: company.id ?? '', subtipo }),
+        });
+        if (!r2.ok) { const e2 = await r2.json().catch(() => ({})); aviso = 'classificação falhou' + (e2?.message ? ': ' + e2.message : ''); }
+      }
+    }
+    return { data, aviso };
+  };
 
   const handleSubmit = async () => {
-    if (!file || !title || !type || !date) { alert('Preencha todos os campos obrigatórios'); return; }
+    if (!files.length || !type || !date || (!varios && !title)) { alert('Preencha todos os campos obrigatórios'); return; }
     setLoading(true); setAvisoClassif('');
-    try {
-      const fd = new FormData();
-      fd.append('file', file);
-      fd.append('companyId', company.id ?? '');
-      fd.append('type', type);
-      fd.append('title', title);
-      fd.append('date', date);
-      fd.append('description', description);
-      fd.append('validate', validate && ehPdf ? 'true' : 'false');
-      const res = await fetch(`${API}/documents/import-signed`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}`, 'x-company-id': company.id ?? '' },
-        body: fd,
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message ?? 'Erro ao importar');
-      // Classificacao (subtipo) gravada logo apos o envio - o documento ja cai na aba certa
-      if (subtipo) {
-        const docId = data?.id ?? data?.documentId ?? data?.document?.id;
-        if (!docId) setAvisoClassif('Documento arquivado, mas sem classificação: classifique-o na lista (aba "A classificar").');
-        else {
-          const r2 = await fetch(`${API}/documents/${docId}/subtipo`, {
-            method: 'PATCH',
-            headers: { 'Authorization': `Bearer ${token}`, 'x-company-id': company.id ?? '', 'Content-Type': 'application/json' },
-            body: JSON.stringify({ companyId: company.id ?? '', subtipo }),
-          });
-          if (!r2.ok) {
-            const e2 = await r2.json().catch(() => ({}));
-            setAvisoClassif('Documento arquivado, mas a classificação falhou' + (e2?.message ? ': ' + e2.message : '') + '. Classifique-o na lista.');
-          }
-        }
-      }
-      setResult(data);
-      setEnviados(n => n + 1);
-    } catch (e: any) { alert(e.message); }
+    const lote: { nome: string; ok: boolean; erro?: string }[] = [];
+    let ultimo: any = null; const avisos: string[] = [];
+    for (const f of files) {
+      // varios arquivos: titulo = prefixo informado (se houver) + nome do arquivo
+      const titulo = varios ? (title.trim() ? `${title.trim()} - ${semExt(f.name)}` : semExt(f.name)) : title;
+      try {
+        const { data, aviso } = await enviarUm(f, titulo);
+        ultimo = data; lote.push({ nome: f.name, ok: true });
+        if (aviso) avisos.push(`${f.name}: ${aviso}`);
+      } catch (e: any) { lote.push({ nome: f.name, ok: false, erro: e.message }); }
+    }
     setLoading(false);
+    const ok = lote.filter(x => x.ok).length;
+    if (!ok) { alert('Nenhum arquivo foi enviado: ' + lote.map(x => `${x.nome}: ${x.erro}`).join(' | ')); return; }
+    if (avisos.length) setAvisoClassif('Arquivado, mas: ' + avisos.join(' | '));
+    setEnviadosLote(lote);
+    setResult(ultimo);
+    setEnviados(n => n + ok);
   };
 
   // Volta ao passo 1 mantendo o tipo e a data (envio em sequencia de documentos parecidos)
   const importarOutro = () => {
     onSuccess();
-    setFile(null); setTitle(''); setDescription(''); setResult(null); setAvisoClassif(''); setValidate(true);
+    setFiles([]); setTitle(''); setDescription(''); setResult(null); setAvisoClassif(''); setValidate(true); setEnviadosLote([]);
     if (fileRef.current) fileRef.current.value = '';
   };
 
@@ -219,22 +238,24 @@ export const ImportarDocumentoModal: React.FC<Props> = ({ onClose, onSuccess, de
             <div className="border border-gray-200 rounded-[10px] p-4">
               <label className="block text-[13px] font-medium text-gray-700 mb-2">
                 <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[#111] text-white text-[11px] mr-2">2</span>
-                {aceitaArquivo(opcao) ? 'Selecione o arquivo (PDF, TXT, REC, DEC, XML ou ZIP)' : 'Selecione o arquivo PDF'}
+                {aceitaArquivo(opcao) ? 'Selecione o(s) arquivo(s) (PDF, TXT, REC, DEC, XML ou ZIP)' : 'Selecione o(s) arquivo(s) PDF'}
               </label>
               <div onClick={() => fileRef.current?.click()}
                 className="border-2 border-dashed border-gray-200 rounded-lg p-4 text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors">
                 <FiUpload size={20} className="mx-auto mb-1.5 text-gray-400" />
-                {file ? (
-                  <div>
-                    <p className="text-[14px] font-medium text-gray-800">{file.name}</p>
-                    <p className="text-[12px] text-gray-500">{(file.size / 1024).toFixed(1)} KB</p>
+                {files.length ? (
+                  <div className="space-y-0.5">
+                    {files.map(f => (
+                      <p key={f.name} className="text-[13px] text-gray-800"><span className="font-medium">{f.name}</span> <span className="text-gray-500">({(f.size / 1024).toFixed(1)} KB)</span></p>
+                    ))}
+                    {varios && <p className="text-[11px] text-blue-600 pt-1">{files.length} arquivos - um documento para cada, com o mesmo tipo e data</p>}
                   </div>
                 ) : (
-                  <p className="text-[13px] text-gray-500">Clique para selecionar o arquivo</p>
+                  <p className="text-[13px] text-gray-500">Clique para selecionar - pode marcar vários (ex.: declaração .DEC + recibo .REC + recibo PDF)</p>
                 )}
               </div>
-              <input ref={fileRef} type="file" accept={aceitaArquivo(opcao) ? '.pdf,.txt,.rec,.dec,.xml,.zip' : '.pdf'} className="hidden"
-                onChange={e => { const f = e.target.files?.[0]; if (f) { setFile(f); if (!title) setTitle(f.name.replace(/\.[^.]+$/, '')); } }} />
+              <input ref={fileRef} type="file" multiple accept={aceitaArquivo(opcao) ? '.pdf,.txt,.rec,.dec,.xml,.zip' : '.pdf'} className="hidden"
+                onChange={e => { const l = Array.from(e.target.files ?? []); if (l.length) { setFiles(l); if (l.length === 1 && !title) setTitle(semExt(l[0].name)); } }} />
             </div>
 
             {/* PASSO 3 - Detalhes */}
@@ -244,7 +265,7 @@ export const ImportarDocumentoModal: React.FC<Props> = ({ onClose, onSuccess, de
                 Detalhes do documento
               </label>
               <div>
-                <label className="block text-[11px] text-gray-500 mb-1">Título *</label>
+                <label className="block text-[11px] text-gray-500 mb-1">{varios ? 'Prefixo do título (opcional - cada documento leva o nome do arquivo)' : 'Título *'}</label>
                 <input value={title} onChange={e => setTitle(e.target.value)}
                   className="w-full text-[14px] border border-gray-200 rounded-lg px-3 py-2" placeholder="Ex: Recibo ECF 2025 - entrega original" />
               </div>
@@ -274,9 +295,9 @@ export const ImportarDocumentoModal: React.FC<Props> = ({ onClose, onSuccess, de
 
             <div className="flex justify-end gap-2">
               <button onClick={() => { if (enviados) onSuccess(); onClose(); }} className="px-4 py-2 text-[14px] border border-gray-200 rounded-lg">Cancelar</button>
-              <button onClick={handleSubmit} disabled={loading || !file || !title || !type}
+              <button onClick={handleSubmit} disabled={loading || !files.length || (!varios && !title) || !type}
                 className="px-5 py-2 text-[14px] bg-[#111] text-white rounded-lg disabled:opacity-50">
-                {loading ? 'Enviando...' : 'Enviar para o Arquivo'}
+                {loading ? 'Enviando...' : varios ? `Enviar ${files.length} arquivos` : 'Enviar para o Arquivo'}
               </button>
             </div>
           </div>
@@ -285,7 +306,10 @@ export const ImportarDocumentoModal: React.FC<Props> = ({ onClose, onSuccess, de
             <div className={`flex items-center gap-3 p-4 rounded-[10px] ${result.hasSignature ? 'bg-green-50 border border-green-200' : 'bg-blue-50 border border-blue-200'}`}>
               <FiCheckCircle size={24} className={result.hasSignature ? 'text-green-600' : 'text-blue-600'} />
               <div>
-                <p className="text-[15px] font-medium text-gray-900">Documento enviado com sucesso</p>
+                <p className="text-[15px] font-medium text-gray-900">{enviadosLote.length > 1 ? `${enviadosLote.filter(x => x.ok).length} de ${enviadosLote.length} documentos enviados` : 'Documento enviado com sucesso'}</p>
+                {enviadosLote.length > 1 && enviadosLote.map(x => (
+                  <p key={x.nome} className={`text-[12px] ${x.ok ? 'text-gray-600' : 'text-red-700'}`}>{x.ok ? '✓' : '✗'} {x.nome}{x.erro ? ' - ' + x.erro : ''}</p>
+                ))}
                 <p className="text-[13px] text-gray-500 mt-0.5">
                   Arquivado em: <strong>{destino(opcao)}</strong>
                 </p>
