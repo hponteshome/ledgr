@@ -36,10 +36,15 @@ export class RecibosService {
     let competence: string | null = null;
     if (mc) {
       if (p.formato_comp === 'MES_ANO') competence = (mc[2] ?? '') + '-' + String(mc[1] ?? '').padStart(2, '0');
+      // ARQ-DECL-03: mes por extenso (JAN, FEV...) - notificacoes da DCTF
+      else if (p.formato_comp === 'MESNOME') {
+        const i = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'].indexOf(String(mc[1] ?? '').slice(0, 3).toUpperCase());
+        competence = i < 0 ? null : (mc[2] ?? '') + '-' + String(i + 1).padStart(2, '0');
+      }
       else competence = mc[1] ?? null;
     }
     const mr = g(p.re_recebido_em);
-    const recebidoEm = mr ? `${mr[3]}-${mr[2]}-${mr[1]}T${mr[4]}:${mr[5]}:${mr[6] ?? '00'}-03:00` : null;
+    const recebidoEm = mr ? `${mr[3]}-${mr[2]}-${mr[1]}T${mr[4] ?? '12'}:${mr[5] ?? '00'}:${mr[6] ?? '00'}-03:00` : null; // ARQ-DECL-03: so a data -> 12:00
     const tipo = g(p.re_tipo)?.[1] ?? null;
     return {
       code: p.code, nome: p.nome, cnpj: dig(g(p.re_cnpj)?.[1]) || null, competence,
