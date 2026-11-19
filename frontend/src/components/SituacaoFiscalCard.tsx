@@ -17,6 +17,7 @@ interface Darf { id: string; codigo: string; descricao: string | null; periodoAp
 interface Celula { sit: Sit; total: number; entregues: number; }
 interface Painel {
   alertas: Alerta[];
+  automatico?: { recibos?: { lidos?: number; baixas?: any[]; avisos?: string[] }; alertasResolvidos?: { id: string; title: string; motivo: string }[] };
   kpis: { atrasadas: number; retificar: number; vencendo30: number; darfsAbertos: number; darfsTotal: number; darfProxVenc: string | null };
   grupos: Grupo[]; proximas: Prox[]; darfs: Darf[];
   matriz: { anos: string[]; linhas: { code: string; label: string; celulas: Record<string, Celula> }[] };
@@ -110,6 +111,15 @@ export const SituacaoFiscalCard: React.FC<{ refreshKey?: number }> = ({ refreshK
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+
+      {/* ALERTA-AUTO-02: o que a leitura automatica fez (ou nao conseguiu fazer) nesta abertura */}
+      {((d.automatico?.recibos?.baixas?.length ?? 0) + (d.automatico?.alertasResolvidos?.length ?? 0) + (d.automatico?.recibos?.avisos?.length ?? 0)) > 0 && (
+        <div style={{ ...caixa, padding: '0.6rem 1rem', fontSize: 12, background: '#F0FDF4', border: '0.5px solid #BBF7D0' }}>
+          {(d.automatico?.recibos?.baixas ?? []).map((b: any, i: number) => <div key={'b' + i} style={{ color: '#065F46' }}>✓ Recibo lido: {b.code} {b.competence} - recibo {b.recibo} - obrigação baixada</div>)}
+          {(d.automatico?.alertasResolvidos ?? []).map(a => <div key={a.id} style={{ color: '#065F46' }}>✓ Alerta resolvido: {a.title} ({a.motivo})</div>)}
+          {(d.automatico?.recibos?.avisos ?? []).map((t, i) => <div key={'a' + i} style={{ color: '#92400E' }}>Leitura de recibos: {t}</div>)}
+        </div>
+      )}
 
       {/* ALERTAS - travados primeiro */}
       {d.alertas.map(a => {

@@ -64,8 +64,9 @@ export class RecibosService {
     const padroes: any[] = await this.prisma.$queryRawUnsafe(
       `SELECT code, nome, detecta, re_recibo, re_cnpj, re_competencia, formato_comp, re_tipo, re_recebido_em
          FROM recibo_padroes WHERE ativo ORDER BY code`);
-    const emp: any[] = await this.prisma.$queryRawUnsafe(`SELECT tax_id AS "taxId" FROM companies WHERE id = $1::uuid`, companyId);
-    const cnpjEmpresa = dig(emp[0]?.taxId);
+    // ALERTA-AUTO-02: CNPJ pelo modelo Prisma (nao depende do nome da coluna)
+    const emp = await (this.prisma as any).company.findUnique({ where: { id: companyId }, select: { taxId: true } });
+    const cnpjEmpresa = dig(emp?.taxId);
 
     for (const doc of docs) {
       const dados: any = { recibos: [] as any[] };
