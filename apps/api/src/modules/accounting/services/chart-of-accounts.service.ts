@@ -176,7 +176,7 @@ export class ChartOfAccountsService {
     // ainda usam normalizeAccountCode() e podem ter o mesmo problema, mas
     // ficam fora desta correcao (fluxos diferentes, nao e o que esta
     // quebrado agora).
-    const normalizedCode = dto.code.trim();
+    const normalizedCode = normalizeAccountCode(dto.code.trim()); // CODPURO-02B: digitacao pode vir com mascara; grava sempre o codigo bruto
 
     const getLevelFromRawCode = (code: string): number => {
       const len = code.length;
