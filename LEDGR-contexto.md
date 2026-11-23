@@ -10997,3 +10997,9 @@ No INSP-EXTBB-02 a funcao auxiliar R colidiu com o alias nativo r = Invoke-Histo
 - Backup antes: D:\Temp\backups\ledgr_app-antes-codpuro01-20261123-121603.dump.
 - Causa: normalizeAccountCode() converte codigo puro em pontuado (usado na criacao em lote do plano e na importacao de saldos da ECD); servico de mascara assume pontos.
 - Pendente Fase B: normalizeAccountCode -> so digitos, mascara so na exibicao, CHECK no banco impedindo ponto em chart_of_accounts.code.
+
+## 2026-11-23 - CODPURO Fase B: codigo puro garantido no codigo e no banco
+- normalizeAccountCode() agora REMOVE mascara (antes inseria pontos).
+- accounting-mask.service: parseMask aceita 0.0.0.00.00.0000 e 1.1.1.2.2.4 (antes quebrava com as mascaras cadastradas); validacao, nivel e sugestao de filho por comprimento do codigo puro; formatCodeWithMask para exibicao; padrao 0.0.0.00.00.0000.
+- chartMapper: pai = maior codigo existente que e prefixo.
+- Banco: CHECK chart_of_accounts_code_puro_chk (sem ponto, hifen, barra ou espaco) - migracao manual 2026-11-23-codpuro-02.

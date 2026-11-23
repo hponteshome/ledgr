@@ -21,91 +21,85 @@ export interface CreateMaskDto {
 }
 
 // ─── Helpers de máscara ───────────────────────────────────────────────────────
+// CODPURO-02 (23/11/2026): codigo de conta e SEMPRE puro (so digitos). A mascara define
+// apenas o tamanho de cada nivel e e aplicada so na exibicao/digitacao.
+// Mascara aceita nos dois formatos: "0.0.0.00.00.0000" (tamanho = quantidade de zeros)
+// ou "1.1.1.2.2.4" (tamanho = numero). Padrao LEDGR: 1-1-1-2-2-4 (codigos de 1, 2, 3, 5, 7 e 11 digitos).
 
-/**
- * Parseia "1.1.1.2.3" → [1, 1, 1, 2, 3]
- */
+export const DEFAULT_MASK = '0.0.0.00.00.0000';
+
+/** "0.0.0.00.00.0000" ou "1.1.1.2.2.4" -> [1, 1, 1, 2, 2, 4] */
 export function parseMask(mask: string): number[] {
   const parts = mask.split('.');
   const levels = parts.map(p => {
-    const n = parseInt(p, 10);
+    const n = /^0+$/.test(p) ? p.length : parseInt(p, 10);
     if (isNaN(n) || n < 1 || n > 9) {
       throw new BadRequestException(
-        `Máscara inválida: "${mask}". Cada nível deve ser um número entre 1 e 9.`
+        `Máscara inválida: "${mask}". Cada nível deve ter de 1 a 9 dígitos (ex.: 0.0.0.00.00.0000).`
       );
     }
     return n;
   });
   if (levels.length < 1 || levels.length > 8) {
-    throw new BadRequestException(
-      `Máscara inválida: deve ter entre 1 e 8 níveis.`
-    );
+    throw new BadRequestException(`Máscara inválida: deve ter entre 1 e 8 níveis.`);
   }
   return levels;
 }
 
-/**
- * Valida se um código segue a máscara.
- * Ex: código "1.1.02.001", máscara [1,1,2,3] → válido
- *     código "1.1.2.001",  máscara [1,1,2,3] → inválido (nível 3 deve ter 2 dígitos)
- */
-export function validateCodeAgainstMask(code: string, levels: number[]): void {
-  const parts = code.split('.');
+/** Tamanhos acumulados: [1,1,1,2,2,4] -> [1,2,3,5,7,11] */
+export function cumulativeLengths(levels: number[]): number[] {
+  const out: number[] = [];
+  let acc = 0;
+  for (const l of levels) { acc += l; out.push(acc); }
+  return out;
+}
 
-  if (parts.length > levels.length) {
+/** Valida codigo PURO contra a mascara: so digitos e comprimento de algum nivel. */
+export function validateCodeAgainstMask(code: string, levels: number[]): void {
+  if (!/^\d+$/.test(code)) {
     throw new BadRequestException(
-      `Código "${code}" excede o número máximo de níveis (${levels.length}) definido na máscara.`
+      `Código "${code}" inválido: use só dígitos, sem máscara (a máscara é aplicada na exibição).`
     );
   }
-
-  for (let i = 0; i < parts.length; i++) {
-    const expectedDigits = levels[i];
-    const part = parts[i];
-
-    if (part.length !== expectedDigits) {
-      throw new BadRequestException(
-        `Código "${code}" inválido: nível ${i + 1} deve ter ${expectedDigits} dígito(s), ` +
-        `mas "${part}" tem ${part.length}.`
-      );
-    }
-
-    if (!/^\d+$/.test(part)) {
-      throw new BadRequestException(
-        `Código "${code}" inválido: nível ${i + 1} deve conter apenas dígitos.`
-      );
-    }
+  const lens = cumulativeLengths(levels);
+  if (!lens.includes(code.length)) {
+    throw new BadRequestException(
+      `Código "${code}" inválido: ${code.length} dígito(s) não corresponde a nenhum nível da máscara (válidos: ${lens.join(', ')}).`
+    );
   }
 }
 
-/**
- * Calcula o nível de um código baseado na máscara.
- * Ex: "1.1.02" com máscara [1,1,2,3] → nível 3
- */
-export function getLevelFromCode(code: string): number {
-  return code.split('.').length;
+/** Nivel pelo comprimento do codigo puro (0 = comprimento fora da mascara). */
+export function getLevelFromCode(code: string, levels: number[] = parseMask(DEFAULT_MASK)): number {
+  return cumulativeLengths(levels).indexOf(code.length) + 1;
 }
 
-/**
- * Sugere o próximo código disponível para um filho do pai dado.
- * Ex: pai "1.1", filhos existentes ["1.1.01","1.1.02"], máscara nível 3 = 2 dígitos
- *     → sugere "1.1.03"
- */
+/** Exibicao: "11104040001" com [1,1,1,2,2,4] -> "1.1.1.04.04.0001" */
+export function formatCodeWithMask(code: string, levels: number[] = parseMask(DEFAULT_MASK)): string {
+  const parts: string[] = [];
+  let cur = 0;
+  for (const l of levels) {
+    const chunk = code.slice(cur, cur + l);
+    if (!chunk) break;
+    parts.push(chunk);
+    cur += l;
+  }
+  if (cur < code.length) parts.push(code.slice(cur));
+  return parts.join('.');
+}
+
+/** Proximo codigo filho: pai "11104" + filhos ["1110401","1110402"], 2 digitos -> "1110403" */
 export function suggestNextCode(
   parentCode: string,
   existingChildren: string[],
   childDigits: number,
 ): string {
-  const childCodes = existingChildren
-    .map(c => {
-      const parts = c.split('.');
-      return parseInt(parts[parts.length - 1], 10);
-    })
+  const nums = existingChildren
+    .filter(c => c.startsWith(parentCode) && c.length === parentCode.length + childDigits)
+    .map(c => parseInt(c.slice(parentCode.length), 10))
     .filter(n => !isNaN(n));
-
-  const maxExisting = childCodes.length > 0 ? Math.max(...childCodes) : 0;
-  const next = maxExisting + 1;
-  const padded = String(next).padStart(childDigits, '0');
-  return `${parentCode}.${padded}`;
+  const next = (nums.length ? Math.max(...nums) : 0) + 1;
+  return `${parentCode}${String(next).padStart(childDigits, '0')}`;
 }
 
 // ─── Service ──────────────────────────────────────────────────────────────────
@@ -133,7 +127,7 @@ export class AccountingMaskService {
 
     if (!config) {
       // Retorna padrão SPED se não houver config cadastrada
-      const defaultMask = '1.1.1.2.3';
+      const defaultMask = DEFAULT_MASK; // CODPURO-02: padrao LEDGR (1-2-3-5-7-11 digitos)
       const levels = parseMask(defaultMask);
       return {
         id: 'default',
@@ -283,7 +277,7 @@ export class AccountingMaskService {
         validateCodeAgainstMask(account.code, maskConfig.levels);
 
         // Verificar se o nível calculado bate com o campo level
-        const calculatedLevel = getLevelFromCode(account.code);
+        const calculatedLevel = getLevelFromCode(account.code, maskConfig.levels); // CODPURO-02
         if (calculatedLevel !== account.level) {
           invalid.push({
             code: account.code,

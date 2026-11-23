@@ -1,4 +1,6 @@
 // apps/frontend/src/utils/chartMapper.ts
+// CODPURO-02 (23/11/2026): codigo de conta e puro (sem pontos) - o pai de cada conta e o
+// maior codigo existente que e prefixo do seu codigo (antes dependia dos pontos).
 
 export interface AccountNode {
   id: string;
@@ -16,6 +18,7 @@ export function buildAccountTree(accounts: any[]): AccountNode[] {
   const mappedArr: { [code: string]: AccountNode } = {};
 
   const sortedAccounts = [...accounts].sort((a, b) => a.code.localeCompare(b.code));
+  const codes = sortedAccounts.map(a => String(a.code));
 
   sortedAccounts.forEach(acc => {
     mappedArr[acc.code] = {
@@ -31,19 +34,12 @@ export function buildAccountTree(accounts: any[]): AccountNode[] {
   });
 
   sortedAccounts.forEach(acc => {
-    const codeParts = acc.code.split('.');
-
-    if (codeParts.length > 1) {
-      const parentCode = codeParts.slice(0, -1).join('.');
-
-      if (mappedArr[parentCode]) {
-        mappedArr[parentCode].children.push(mappedArr[acc.code]);
-      } else {
-        tree.push(mappedArr[acc.code]);
-      }
-    } else {
-      tree.push(mappedArr[acc.code]);
+    let parent: string | undefined;
+    for (const c of codes) {
+      if (c !== acc.code && acc.code.startsWith(c) && (!parent || c.length > parent.length)) parent = c;
     }
+    if (parent) mappedArr[parent].children.push(mappedArr[acc.code]);
+    else tree.push(mappedArr[acc.code]);
   });
 
   return tree;
