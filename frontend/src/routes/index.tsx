@@ -8,6 +8,7 @@ import AuditPage from '../pages/admin/AuditPage';
 import ChatPage from '../pages/chat/ChatPage';
 import FinancePage from '../pages/finance/FinancePage';
 import BankImport from '../pages/finance/BankImportPage';
+import BankStatementsPage from '../pages/finance/BankStatementsPage'; // EXTBB-10B
 import BankAccountsPage from '../pages/finance/BankAccountsPage';
 import ProvisoesPage from '../pages/finance/ProvisoesPage';
 import { CompanyList } from '../pages/companies/CompanyList';
@@ -188,7 +189,8 @@ export const AppRoutes = () => {
                 <Route path="app/fiscal/nfse-sp-csv" element={<ProtectedRoute><NfseSpCsvPage /></ProtectedRoute>} />
                 <Route path="app/fiscal/nfse-sp" element={<ProtectedRoute><NfseImportPage /></ProtectedRoute>} />
                 <Route path="app/finance/" element={<ProtectedRoute><FinancePage /></ProtectedRoute>} />
-                <Route path="app/finance/bank-import" element={<ProtectedRoute><BankImport /></ProtectedRoute>} />
+                <Route path="app/finance/bank-import" element={<ProtectedRoute><BankStatementsPage /></ProtectedRoute>} />
+                <Route path="app/finance/bank-import-legado" element={<ProtectedRoute><BankImport /></ProtectedRoute>} />
                 <Route path="app/finance/contas-bancarias" element={<ProtectedRoute><BankAccountsPage /></ProtectedRoute>} />
 
                 {/* Contabilidade */}
