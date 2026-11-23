@@ -301,11 +301,11 @@ export class JournalManualImportService {
 
     const found = mode === 'full'
       ? await this.prisma.chartOfAccounts.findMany({
-          where: { companyId, code: { in: allCodes } },
+          where: { companyId, code: { in: allCodes }, deletedAt: null }, // JOURNAL-IMP-02 (23/11/2026): ignora contas excluidas
           select: { id: true, code: true, reducedCode: true, isAnalytic: true },
         })
       : await this.prisma.chartOfAccounts.findMany({
-          where: { companyId, origin: 'MATRIZ' as any, reducedCode: { in: allCodes } },
+          where: { companyId, origin: 'MATRIZ' as any, reducedCode: { in: allCodes }, deletedAt: null }, // JOURNAL-IMP-02
           select: { id: true, code: true, reducedCode: true, isAnalytic: true },
         });
 

@@ -25,7 +25,8 @@ interface ProjectionLine {
 }
 
 const fmtBRL  = (v: any) => (Number(v) || 0).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
-const fmtDate = (s: string) => { if (!s) return '--'; const d = s.length===10 ? s+'T12:00:00Z' : s; return new Date(d).toLocaleDateString('pt-BR'); };
+// FICHA-CDB-02 (23/11/2026): data pura (YYYY-MM-DD) ao meio-dia - a API devolve T00:00Z e o fuso -03 mostrava o dia anterior
+const fmtDate = (s: string) => { if (!s) return '--'; const d = s.slice(0,10)+'T12:00:00Z'; return new Date(d).toLocaleDateString('pt-BR'); };
 const fmtComp = (s: string) => s.split('-').reverse().join('/');
 
 function irrfAliq(days: number): number {
@@ -39,7 +40,7 @@ function daysBetween(a: Date, b: Date): number {
 }
 function lastDayOfMonth(y: number, m: number): Date { return new Date(y, m, 0); }
 function parseD(s: string): Date {
-  const d = new Date(s.length===10 ? s+'T12:00:00' : s);
+  const d = new Date(s.slice(0,10)+'T12:00:00'); // FICHA-CDB-02: sempre data pura
   return isNaN(d.getTime()) ? new Date() : d;
 }
 
@@ -615,7 +616,7 @@ export default function RendaFixaPage() {
     const totalIrrf = ativos.reduce((s, i) => {
       const cb = Number(i.capitalBalance ?? i.capitalInitial);
       const rend = Math.max(0, Number(i.capitalCurrent) - cb);
-      const appD = new Date(i.applicationDate);
+      const appD = new Date(i.applicationDate.slice(0,10)+'T12:00:00'); // FICHA-CDB-02
       const dias = Math.round(Math.abs(new Date().getTime()-appD.getTime())/86400000);
       const aliq = i.irrfExempt ? 0 : dias<=180?0.225:dias<=360?0.200:dias<=720?0.175:0.150;
       return s + rend * aliq;

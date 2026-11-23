@@ -536,13 +536,14 @@ export class FixedIncomeService {
   }
 
   async updateInvestment(id: string, companyId: string, dto: any) {
-    await this.findOne(id, companyId);
+    const atual = await this.findOne(id, companyId);
     return this.prisma.fixedIncomeInvestment.update({
       where: { id },
       data: {
         description: dto.description,
         capitalInitial: dto.capitalInitial ? Number(dto.capitalInitial) : undefined,
-        capitalBalance: dto.capitalInitial ? Number(dto.capitalInitial) : undefined,
+        // FICHA-CDB-02 (23/11/2026): editar nao apaga os resgates - saldo = capital inicial - principal ja resgatado
+        capitalBalance: dto.capitalInitial ? Math.max(0, Number(dto.capitalInitial) - Number(atual.totalRedeemedPrincipal ?? 0)) : undefined,
         issuerName: dto.issuerName,
         issuerCnpj: dto.issuerCnpj || null,
         indexer: dto.indexer,
