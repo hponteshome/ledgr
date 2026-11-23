@@ -525,7 +525,7 @@ export class BankImportService {
     if (!stmt) throw new BadRequestException('Extrato nao encontrado.');
 
     const contabilizadas = await this.prisma.bankTransaction.count({
-      where: { statementId, deletedAt: null, journalEntryId: { not: null } },
+      where: { statementId, deletedAt: null, status: 'POSTED' as any }, // EXTBB-10A: so bloqueia linha LANCADA pelo extrato (conciliada com lancamento existente nao bloqueia)
     });
     if (contabilizadas > 0) {
       throw new BadRequestException(`Extrato com ${contabilizadas} linha(s) já contabilizada(s): estorne os lançamentos antes de excluir.`);
