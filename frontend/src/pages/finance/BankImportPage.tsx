@@ -268,7 +268,7 @@ export default function BankImportPage() {
       {/* UPLOAD */}
       {step === 'upload' && (
         <div>
-          <input ref={fileRef} type="file" accept=".xls,.xlsx,.ofx,.ofc,.csv" style={{ display: 'none' }} onChange={handleFileChange} />
+          <input ref={fileRef} type="file" accept=".xls,.xlsx,.ofx,.ofc,.csv,.pdf" style={{ display: 'none' }} onChange={handleFileChange} />
           <div style={{ background: T.accentSurf, border: `0.5px solid #BAE6FD`, borderRadius: 10, padding: '10px 16px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
             <span style={{ fontSize: 15 }}>🏢</span>
             <span style={{ color: T.accentText }}>Importando para: <strong>{activeCompany?.name ?? '—'}</strong>{activeCompany?.taxId && <span style={{ color: T.textHint, fontSize: 12, marginLeft: 6 }}>{activeCompany.taxId}</span>}</span>
@@ -414,7 +414,7 @@ export default function BankImportPage() {
 
       {/* Input oculto extrato */}
       {/* Input oculto extrato */}
-      <input ref={fileRef} type='file' accept='.xls,.xlsx,.ofx,.ofc,.csv' style={{ display: 'none' }} onChange={handleFileChange} />
+      <input ref={fileRef} type='file' accept='.xls,.xlsx,.ofx,.ofc,.csv,.pdf' style={{ display: 'none' }} onChange={handleFileChange} />
 
       {/* Modal planilha mapeada */}
       {showExcelModal && (

@@ -2,6 +2,8 @@
 // LEDGR — apps/api/src/modules/bank-import/bank-import.service.ts
 // ============================================================
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { createHash } from 'crypto'; // EXTBB-08
+import { BankAccountsService } from './bank-accounts.service'; // EXTBB-08
 import { PrismaService } from '@/prisma/prisma.service';
 import { BankParserService, buildGroupKey } from './parsers/bank-parser.service';
 import { SuggestionService } from './suggestion.service';
@@ -93,35 +95,97 @@ export class BankImportService {
     private readonly prisma:      PrismaService,
     private readonly parser:      BankParserService,
     private readonly suggestion:  SuggestionService,
+    private readonly bankAccounts: BankAccountsService, // EXTBB-08
   ) {}
 
   // ── 1. Upload e parse ────────────────────────────────────────
+  // EXTBB-08 (23/11/2026): hash do arquivo, conta do cadastro de Contas Bancarias, CNPJ do titular,
+  // trava de saldo, impressao digital por linha e texto extraido (o arquivo em si nao e guardado).
   async uploadStatement(
     companyId: string,
     buffer:    Buffer,
     fileName:  string,
     userId:    string,
   ) {
+    // Duplicidade de arquivo: mesmo conteudo (SHA-256) ja importado nesta empresa
+    const fileHash = createHash('sha256').update(buffer).digest('hex');
+    const mesmoArquivo = await this.prisma.bankStatement.findFirst({
+      where: { companyId, fileHash, deletedAt: null },
+      select: { createdAt: true, fileName: true },
+    });
+    if (mesmoArquivo) {
+      throw new BadRequestException(`Este arquivo já foi importado em ${mesmoArquivo.createdAt.toLocaleDateString('pt-BR')} (${mesmoArquivo.fileName}).`);
+    }
+
     const parsed = await this.parser.parse(buffer, fileName);
 
     if (parsed.transactions.length === 0) {
       throw new BadRequestException('Nenhuma transação encontrada no arquivo.');
     }
 
-    // Fase 1.7 (03/10/2026): evita duplicidade ao reimportar o mesmo periodo - transacoes ja existentes na empresa
-    // (mesma data, tipo, valor, descricao e saldo) sao descartadas; arquivo inteiramente repetido e recusado.
-    const datas = parsed.transactions.map(t => t.transactionDate.getTime());
-    const existentes = await this.prisma.bankTransaction.findMany({
-      where: { companyId, transactionDate: { gte: new Date(Math.min(...datas) - 86400000), lte: new Date(Math.max(...datas) + 86400000) } },
-      select: { transactionDate: true, type: true, amount: true, descriptionNorm: true, balance: true },
-    });
-    const chaveTx = (d: Date, tipo: string, valor: string, desc: string, saldo: string) => [d.toISOString().slice(0, 10), tipo, valor, desc, saldo].join('|');
-    const jaExiste = new Set(existentes.map(e => chaveTx(e.transactionDate, String(e.type), e.amount.toFixed(2), e.descriptionNorm ?? '', e.balance != null ? e.balance.toFixed(2) : '')));
+    // Conta bancaria: obrigatoria no cadastro quando o extrato identifica banco/agencia/conta
+    let bankAccount: Awaited<ReturnType<BankAccountsService['findByAgencyAccount']>> = null;
+    if (parsed.bankNumber && parsed.agencyNoDv && parsed.accountNoDv) {
+      bankAccount = await this.bankAccounts.findByAgencyAccount(companyId, parsed.bankNumber, parsed.agencyNoDv, parsed.accountNoDv);
+      if (!bankAccount) {
+        throw new BadRequestException(`A conta ${parsed.bankName} ag. ${parsed.agency} c/c ${parsed.account} não está cadastrada (ou está inativa) em Contas Bancárias desta empresa. Cadastre em Financeiro > Contas Bancárias.`);
+      }
+    }
+
+    // CNPJ do titular (quando o extrato traz) x empresa ativa
+    if (parsed.taxId) {
+      const company = await this.prisma.company.findUnique({ where: { id: companyId }, select: { taxId: true } });
+      const cnpjEmpresa = (company?.taxId ?? '').replace(/\D/g, '');
+      if (cnpjEmpresa && cnpjEmpresa !== parsed.taxId) {
+        throw new BadRequestException(`O extrato é do CNPJ ${parsed.taxId}, diferente da empresa ativa (${cnpjEmpresa}). Nada foi importado.`);
+      }
+    }
+
+    // Trava de saldo: saldo inicial + movimentos = saldo final
+    if (parsed.balanceCheck && !parsed.balanceCheck.ok) {
+      const f = (n: number) => n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      throw new BadRequestException(`O extrato não fecha: saldo inicial + movimentos = ${f(parsed.balanceCheck.expected)}, mas o saldo final lido é ${f(parsed.balanceCheck.found)}. Nada foi importado.`);
+    }
+
     const totalLido = parsed.transactions.length;
-    parsed.transactions = parsed.transactions.filter(t => !jaExiste.has(chaveTx(t.transactionDate, t.type, t.amount.toFixed(2), t.descriptionNorm, t.balance != null ? t.balance.toFixed(2) : '')));
+    let fingerprints: (string | null)[] = parsed.transactions.map(() => null);
+    if (bankAccount) {
+      // Duplicidade por linha: conta | data | documento | valor | D/C | ordem entre linhas identicas
+      // (estavel entre leiautes e reemissoes do mesmo extrato; vale para qualquer banco/formato)
+      const ocorrencias = new Map<string, number>();
+      const contaId = bankAccount.id;
+      fingerprints = parsed.transactions.map(t => {
+        const d = t.transactionDate;
+        const dia = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        const base = [contaId, dia, t.docKey ?? '', t.amount.toFixed(2), t.type].join('|');
+        const n = (ocorrencias.get(base) ?? 0) + 1;
+        ocorrencias.set(base, n);
+        return createHash('sha256').update(`${base}|${n}`).digest('hex');
+      });
+      const existentes = await this.prisma.bankTransaction.findMany({
+        where: { companyId, deletedAt: null, fingerprint: { in: fingerprints as string[] } },
+        select: { fingerprint: true },
+      });
+      const jaExiste = new Set(existentes.map(e => e.fingerprint));
+      const manter = fingerprints.map(fp => !jaExiste.has(fp));
+      parsed.transactions = parsed.transactions.filter((_, i) => manter[i]);
+      fingerprints = fingerprints.filter((_, i) => manter[i]);
+    } else {
+      // Legado (Fase 1.7): sem conta identificada, compara data, tipo, valor, descricao e saldo
+      const datas = parsed.transactions.map(t => t.transactionDate.getTime());
+      const existentes = await this.prisma.bankTransaction.findMany({
+        where: { companyId, deletedAt: null, transactionDate: { gte: new Date(Math.min(...datas) - 86400000), lte: new Date(Math.max(...datas) + 86400000) } },
+        select: { transactionDate: true, type: true, amount: true, descriptionNorm: true, balance: true },
+      });
+      const chaveTx = (d: Date, tipo: string, valor: string, desc: string, saldo: string) => [d.toISOString().slice(0, 10), tipo, valor, desc, saldo].join('|');
+      const jaExiste = new Set(existentes.map(e => chaveTx(e.transactionDate, String(e.type), e.amount.toFixed(2), e.descriptionNorm ?? '', e.balance != null ? e.balance.toFixed(2) : '')));
+      parsed.transactions = parsed.transactions.filter(t => !jaExiste.has(chaveTx(t.transactionDate, t.type, t.amount.toFixed(2), t.descriptionNorm, t.balance != null ? t.balance.toFixed(2) : '')));
+      fingerprints = parsed.transactions.map(() => null);
+    }
     if (parsed.transactions.length === 0) {
       throw new BadRequestException(`Nenhuma transação nova: as ${totalLido} transações do arquivo já foram importadas.`);
     }
+    const duplicadas = totalLido - parsed.transactions.length;
 
     // Calcula totais
     const totalDebits  = parsed.transactions.filter(t => t.type === 'DEBIT')
@@ -147,6 +211,12 @@ export class BankImportService {
         openingBalance: parsed.openingBalance != null ? new Prisma.Decimal(parsed.openingBalance.toFixed(2)) : null,
         closingBalance: parsed.closingBalance != null ? new Prisma.Decimal(parsed.closingBalance.toFixed(2)) : null,
         createdById:    userId,
+        // EXTBB-08
+        bankAccountId:  bankAccount?.id ?? null,
+        fileHash,
+        rawText:        parsed.rawText ?? null,
+        layout:         parsed.layout ?? null,
+        issuedAt:       parsed.issuedAt ?? null,
       },
     });
 
@@ -176,6 +246,11 @@ export class BankImportService {
       suggestionConfidence: suggestions[i].confidence,
       // Memo template como sugestão de histórico
       memo:                suggestions[i].memoTemplate ?? tx.description,
+      // EXTBB-08: ordem, impressao digital, codigo do historico e conta do banco (do cadastro)
+      lineNo:              tx.lineNo ?? i + 1,
+      fingerprint:         fingerprints[i],
+      bankHistCode:        tx.bankHistCode ?? null,
+      counterAccountId:    bankAccount?.ledgerAccountId ?? null,
     }));
 
     await this.prisma.bankTransaction.createMany({ data: txData });
@@ -230,6 +305,13 @@ export class BankImportService {
       totalCredits,
       periodFrom:   parsed.periodFrom,
       periodTo:     parsed.periodTo,
+      // EXTBB-08
+      bankAccountId:   bankAccount?.id ?? null,
+      bankAccountName: bankAccount?.nickname ?? null,
+      layout:          parsed.layout ?? null,
+      duplicates:      duplicadas,
+      openingBalance:  parsed.openingBalance ?? null,
+      closingBalance:  parsed.closingBalance ?? null,
     };
   }
 
@@ -434,29 +516,26 @@ export class BankImportService {
   }
 
 
+  // EXTBB-08: soft-delete; extrato com linha ja contabilizada nao e excluido (estornar antes)
   async deleteStatement(companyId: string, statementId: string) {
     const stmt = await this.prisma.bankStatement.findFirst({
-      where: { id: statementId, companyId },
+      where: { id: statementId, companyId, deletedAt: null },
     });
     if (!stmt) throw new BadRequestException('Extrato nao encontrado.');
 
-    // Buscar journal entries gerados pelas transacoes deste statement
-    const txs = await this.prisma.bankTransaction.findMany({
-      where: { statementId },
-      select: { journalEntryId: true },
+    const contabilizadas = await this.prisma.bankTransaction.count({
+      where: { statementId, deletedAt: null, journalEntryId: { not: null } },
     });
-    const journalIds = txs.map(t => t.journalEntryId).filter(Boolean) as string[];
-
-    // Excluir em cascata
-    await this.prisma.bankTransaction.deleteMany({ where: { statementId } });
-
-    if (journalIds.length > 0) {
-      await this.prisma.journalEntryItem.deleteMany({ where: { journalEntryId: { in: journalIds } } });
-      await this.prisma.journalEntry.deleteMany({ where: { id: { in: journalIds } } });
+    if (contabilizadas > 0) {
+      throw new BadRequestException(`Extrato com ${contabilizadas} linha(s) já contabilizada(s): estorne os lançamentos antes de excluir.`);
     }
 
-    await this.prisma.bankStatement.delete({ where: { id: statementId } });
-    return { deleted: true, statementId, journalsDeleted: journalIds.length };
+    const agora = new Date();
+    await this.prisma.$transaction([
+      this.prisma.bankTransaction.updateMany({ where: { statementId, deletedAt: null }, data: { deletedAt: agora } }),
+      this.prisma.bankStatement.update({ where: { id: statementId }, data: { deletedAt: agora, status: 'CANCELED' as any } }),
+    ]);
+    return { deleted: true, statementId, journalsDeleted: 0 };
   }
 
   async previewExcelMapped(companyId: string, buffer: Buffer) {
