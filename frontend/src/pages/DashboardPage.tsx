@@ -9,6 +9,7 @@ import {
 } from 'react-icons/fi';
 import api from '../services/api';
 import { RentalAlertsCard } from '../components/RentalAlertsCard';
+import { IndicadoresAlertCard } from '../components/IndicadoresAlertCard';
 import { SituacaoFiscalCard } from '../components/SituacaoFiscalCard';
 import { ListaRecolhida } from '../components/ListaRecolhida';
 import { useCompany } from '../contexts/CompanyContext';
@@ -277,6 +278,9 @@ export const DashboardPage: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* NOVO 23/11/2026 (IND-AUTO-02): indicadores economicos com falha ou atrasados (some quando em dia) */}
+      <IndicadoresAlertCard refreshKey={lastUpdate.getTime()} />
 
       {/* NOVO 13/11/2026 (DASH-03): situacao fiscal - alertas travados, obrigacoes em atraso/a retificar, DARFs em aberto */}
       {show('/app/sistema/obrigacoes') && (

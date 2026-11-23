@@ -6,13 +6,14 @@ import api from '../../services/api';
 import { SmartMonthInput } from '../../components/SmartMonthInput';
 
 const INDICADORES = [
-  { key: 'SELIC', label: 'Selic',  cor: '#0369A1', fonte: 'BCB Serie 11', desc: 'Taxa Selic acumulada no mes (% a.m.)' },
-  { key: 'IPCA',  label: 'IPCA',   cor: '#7C3AED', fonte: 'IBGE',         desc: 'Indice Nacional de Precos ao Consumidor Amplo (% a.m.)' },
-  { key: 'IGPM',  label: 'IGP-M',  cor: '#EA580C', fonte: 'FGV/IBRE',     desc: 'Indice Geral de Precos - Mercado (% a.m.)' },
-  { key: 'IGPDI', label: 'IGP-DI', cor: '#B45309', fonte: 'FGV/IBRE',     desc: 'Indice Geral de Precos - Disponibilidade Interna (% a.m.)' },
-  { key: 'INPC',  label: 'INPC',   cor: '#0891B2', fonte: 'IBGE',         desc: 'Indice Nacional de Precos ao Consumidor (% a.m.)' },
-  { key: 'TR',    label: 'TR',     cor: '#6B7280', fonte: 'BCB',           desc: 'Taxa Referencial (% a.m.)' },
-  { key: 'CDI',   label: 'CDI',    cor: '#15803D', fonte: 'BCB Serie 12',  desc: 'Certificado de Deposito Interbancario — ver tabela dedicada' },
+  // IND-AUTO-03 (23/11/2026): fonte = codigo da serie mensal no SGS (a serie 11 e a Selic diaria; a 12 e o CDI diario)
+  { key: 'SELIC', label: 'Selic',  cor: '#0369A1', fonte: 'BCB-SGS 4390', desc: 'Taxa Selic acumulada no mes (% a.m.)' },
+  { key: 'IPCA',  label: 'IPCA',   cor: '#7C3AED', fonte: 'BCB-SGS 433',         desc: 'Indice Nacional de Precos ao Consumidor Amplo (% a.m.)' },
+  { key: 'IGPM',  label: 'IGP-M',  cor: '#EA580C', fonte: 'BCB-SGS 189',     desc: 'Indice Geral de Precos - Mercado (% a.m.)' },
+  { key: 'IGPDI', label: 'IGP-DI', cor: '#B45309', fonte: 'BCB-SGS 190',     desc: 'Indice Geral de Precos - Disponibilidade Interna (% a.m.)' },
+  { key: 'INPC',  label: 'INPC',   cor: '#0891B2', fonte: 'BCB-SGS 188',         desc: 'Indice Nacional de Precos ao Consumidor (% a.m.)' },
+  { key: 'TR',    label: 'TR',     cor: '#6B7280', fonte: 'BCB-SGS 7811',           desc: 'Taxa Referencial (% a.m.)' },
+  { key: 'CDI',   label: 'CDI',    cor: '#15803D', fonte: 'BCB-SGS 4391',  desc: 'Certificado de Deposito Interbancario — ver tabela dedicada' },
 ];
 
 const S = {

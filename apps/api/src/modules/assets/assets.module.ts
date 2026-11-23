@@ -1,6 +1,5 @@
 // D:\Projetos\Ledgr\apps\api\src\modules\assets\assets.module.ts
 import { Module }         from '@nestjs/common';
-import { ScheduleModule } from '@nestjs/schedule';
 import { PrismaModule }   from '../../prisma/prisma.module';
 import { AssetsController }    from './controllers/assets.controller';
 import { AssetsService }       from './services/assets.service';
@@ -17,7 +16,6 @@ import { SidebarResourceGuard } from '../../auth/guards/sidebar-resource.guard';
 @Module({
   imports: [
     PrismaModule,
-    ScheduleModule.forRoot(),
     SidebarPermissionsModule,
   ],
   controllers: [AssetsController],

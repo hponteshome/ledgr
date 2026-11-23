@@ -42,6 +42,8 @@ import { SignaturesModule } from './modules/signatures/signatures.module';
 import { SidebarPermissionsModule } from './modules/sidebar-permissions/sidebar-permissions.module';
 import { MenuUsageModule } from './modules/menu-usage/menu-usage.module';
 import { ChatModule } from './chat/chat.module';
+import { ScheduleModule } from '@nestjs/schedule';
+import { IndicadoresSyncModule } from './modules/indicadores-sync/indicadores-sync.module';
 
 
 @Module({
@@ -85,6 +87,8 @@ import { ChatModule } from './chat/chat.module';
         SidebarPermissionsModule,
         MenuUsageModule,
         ChatModule,
+        ScheduleModule.forRoot(), // IND-AUTO-01 (23/11/2026): agendamento ligado uma vez so (saiu de certificates/assets)
+        IndicadoresSyncModule,
     
   ],
   providers: [

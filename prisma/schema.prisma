@@ -6359,3 +6359,20 @@ model ReciboPadrao {
   @@unique([code, nome])
   @@map("recibo_padroes")
 }
+
+// CRIADO 23/11/2026 (IND-AUTO-01): status da atualizacao automatica dos indicadores (SGS/BCB)
+model IndicadorSyncStatus {
+  serie           String    @id @db.VarChar(20)
+  codigoSgs       Int       @map("codigo_sgs")
+  destino         String    @db.VarChar(12) // CDI_DIARIO | MENSAL
+  ultimoDado      String?   @map("ultimo_dado") @db.VarChar(10) // AAAA-MM-DD ou AAAA-MM
+  ultimaExecucao  DateTime? @map("ultima_execucao") @db.Timestamp(6)
+  ultimoSucesso   DateTime? @map("ultimo_sucesso") @db.Timestamp(6)
+  falhasSeguidas  Int       @default(0) @map("falhas_seguidas")
+  ultimoErro      String?   @map("ultimo_erro") @db.Text
+  registrosUltima Int       @default(0) @map("registros_ultima")
+  origemUltima    String?   @map("origem_ultima") @db.VarChar(20) // AGENDADA | MANUAL | INICIO
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  @@map("indicador_sync_status")
+}

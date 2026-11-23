@@ -2,7 +2,6 @@ import { SidebarPermissionsModule } from '../../modules/sidebar-permissions/side
 // src/core/certificates/certificates.module.ts
 
 import { Module } from '@nestjs/common';
-import { ScheduleModule } from '@nestjs/schedule';
 import { MulterModule }   from '@nestjs/platform-express';
 import { memoryStorage }  from 'multer';
 
@@ -15,7 +14,6 @@ import { CertificatesController } from './certificates.controller';
 @Module({
   imports: [SidebarPermissionsModule, 
     PrismaModule,
-    ScheduleModule.forRoot(),           // necessário para o @Cron do checkExpirations
     MulterModule.register({
       storage: memoryStorage(),         // arquivo em buffer, nunca em disco
       limits:  { fileSize: 2 * 1024 * 1024 },
