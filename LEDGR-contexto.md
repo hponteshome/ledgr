@@ -10989,3 +10989,11 @@ No INSP-EXTBB-02 a funcao auxiliar R colidiu com o alias nativo r = Invoke-Histo
 - Feito: SCHEMA-EXTBB-01 (BankAccount + campos de extrato/linha), EXTBB-05/05B (cadastro Contas Bancarias), EXTBB-07 (parser BB PDF; 12/12 extratos da Jose Silva fecham o saldo).
 - Jose Silva: BB 1192-4 / 38340-6 cadastrada (banco 001012, aplicacao automatica 001006).
 - Proximo: EXTBB-08 (upload: hash, impressao digital, conta, trava de saldo), EXTBB-09 (camada documento no nome da conta), EXTBB-10 (tela 3 etapas).
+
+## 2026-11-23 - CODPURO Fase A: codigo de conta contabil sempre puro
+- Regra reafirmada pelo Hpontes: numeros sempre na forma pura, inclusive codigo de conta contabil; mascara so na exibicao.
+- Jose Silva: 123 pares nativa (ECD) x Matriz unificados na Matriz (Regra 13); 978 referencias repontadas (257 lancamentos, 374 saldos, 234 vinculos ECD, 113 parent_id); nativas soft-delete.
+- Jose Silva e Kipstone: codigos da Matriz sem ponto. Hoje: 0 codigos com ponto em todas as empresas.
+- Backup antes: D:\Temp\backups\ledgr_app-antes-codpuro01-20261123-121603.dump.
+- Causa: normalizeAccountCode() converte codigo puro em pontuado (usado na criacao em lote do plano e na importacao de saldos da ECD); servico de mascara assume pontos.
+- Pendente Fase B: normalizeAccountCode -> so digitos, mascara so na exibicao, CHECK no banco impedindo ponto em chart_of_accounts.code.
