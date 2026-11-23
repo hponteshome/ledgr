@@ -80,9 +80,12 @@ export class BankAccountsService {
   }
 
   // EXTBB-05B: contas analiticas ativas do plano da empresa, para os seletores da tela (sem paginacao)
+  // EXTBB-09B: Regra 13 - havendo Plano Matriz na empresa, so as contas da Matriz (base dos lancamentos);
+  // evita escolher a conta nativa da ECD de mesmo nome
   async ledgerOptions(companyId: string) {
+    const temMatriz = await this.prisma.chartOfAccounts.count({ where: { companyId, deletedAt: null, origin: 'MATRIZ' } });
     return this.prisma.chartOfAccounts.findMany({
-      where: { companyId, deletedAt: null, isAnalytic: true, isActive: true },
+      where: { companyId, deletedAt: null, isAnalytic: true, isActive: true, ...(temMatriz ? { origin: 'MATRIZ' as const } : {}) },
       select: { id: true, code: true, reducedCode: true, name: true },
       orderBy: { code: 'asc' },
     });

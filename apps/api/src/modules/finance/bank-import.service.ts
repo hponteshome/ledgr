@@ -223,7 +223,8 @@ export class BankImportService {
     // Busca sugestões para todas as transações de uma vez
     const suggestions = await this.suggestion.suggestBatch(
       companyId,
-      parsed.transactions.map(t => ({ descriptionNorm: t.descriptionNorm, type: t.type })),
+      parsed.transactions.map(t => ({ descriptionNorm: t.descriptionNorm, type: t.type, docKey: t.docKey })), // EXTBB-09
+      { bankCode: parsed.bankCode, investmentAccountId: bankAccount?.investmentAccountId ?? null }, // EXTBB-09
     );
 
     // Salva as transações com sugestões

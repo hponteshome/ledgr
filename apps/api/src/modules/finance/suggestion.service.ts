@@ -9,7 +9,7 @@ import { normalizeText } from './parsers/bank-parser.service';
 export interface SuggestionResult {
   accountId:   string | null;
   memoTemplate: string | null;
-  source:      'FIXED' | 'LEARNED' | 'FUZZY' | null;
+  source:      'FIXED' | 'LEARNED' | 'FUZZY' | 'DOCUMENT' | 'AUTO_INVEST' | null; // EXTBB-09
   confidence:  number;  // 0–100
 }
 
@@ -49,14 +49,24 @@ const FIXED_RULES: {
   { patterns: ['PIX TRANSF', 'TED ', 'DOC '],                  memo: 'Transferência bancária',                     category: 'TRANSFERENCIA' },
 ];
 
+// EXTBB-09: texto (normalizado) das linhas de aplicacao/resgate automatico, por banco.
+// Cada banco entra quando houver extrato real para conferir (nao adivinhar).
+const AUTO_INVEST_PATTERNS: Record<string, string[]> = {
+  BB: ['RENDE FACIL', 'REND.FACIL'], // BB Rende Facil - leiautes A e B
+};
+
 @Injectable()
 export class SuggestionService {
   constructor(private readonly prisma: PrismaService) {}
 
   // ── Sugere conta para uma lista de transações ───────────────
+  // EXTBB-09 (23/11/2026): camadas novas antes das regras aprendidas (vem de dados, nao de palpite):
+  //   DOCUMENT    - documento da linha (10+ digitos) no nome de uma unica conta analitica (ex.: CDB pelo numero)
+  //   AUTO_INVEST - aplicacao/resgate automatico do banco -> conta de aplicacao do cadastro de Contas Bancarias
   async suggestBatch(
     companyId: string,
-    transactions: { descriptionNorm: string; type: 'DEBIT' | 'CREDIT' }[],
+    transactions: { descriptionNorm: string; type: 'DEBIT' | 'CREDIT'; docKey?: string }[],
+    ctx?: { bankCode?: string; investmentAccountId?: string | null },
   ): Promise<SuggestionResult[]> {
     // Carrega todas as regras aprendidas da empresa de uma vez
     const learnedRules = await this.prisma.bankImportRule.findMany({
@@ -64,9 +74,19 @@ export class SuggestionService {
       orderBy: { usageCount: 'desc' },
     });
 
+    const docKeys = [...new Set(transactions.map(t => t.docKey).filter((d): d is string => !!d && d.length >= 10))];
+    const docAccounts = docKeys.length
+      ? await this.prisma.chartOfAccounts.findMany({
+          where: { companyId, deletedAt: null, isAnalytic: true, isActive: true, OR: docKeys.map(d => ({ name: { contains: d } })) },
+          select: { id: true, name: true, origin: true },
+        })
+      : [];
+
     return Promise.all(
       transactions.map(tx =>
-        this.suggest(tx.descriptionNorm, tx.type, learnedRules),
+        this.matchDocument(tx.docKey, docAccounts)
+        ?? this.matchAutoInvest(tx.descriptionNorm, ctx)
+        ?? this.suggest(tx.descriptionNorm, tx.type, learnedRules),
       ),
     );
   }
@@ -134,6 +154,25 @@ export class SuggestionService {
     });
   }
 
+  // ── EXTBB-09: documento da linha no nome de uma conta analitica (ex.: CDB pelo numero) ──
+  private matchDocument(docKey: string | undefined, accounts: { id: string; name: string; origin?: string | null }[]): SuggestionResult | null {
+    if (!docKey || docKey.length < 10) return null;
+    const re = new RegExp(`(^|\\D)0*${docKey}(\\D|$)`);
+    const hits = accounts.filter(a => re.test(a.name));
+    const matriz = hits.filter(a => a.origin === 'MATRIZ'); // EXTBB-09B: Regra 13 - Matriz prevalece sobre a conta nativa da ECD
+    const pool = matriz.length ? matriz : hits;
+    if (pool.length !== 1) return null; // nenhuma ou ambigua: nao sugere
+    return { accountId: pool[0].id, memoTemplate: null, source: 'DOCUMENT', confidence: 95 };
+  }
+
+  // ── EXTBB-09: aplicacao/resgate automatico do banco -> conta de aplicacao do cadastro de Contas Bancarias ──
+  private matchAutoInvest(descNorm: string, ctx?: { bankCode?: string; investmentAccountId?: string | null }): SuggestionResult | null {
+    if (!ctx?.investmentAccountId || !ctx.bankCode) return null;
+    const pats = AUTO_INVEST_PATTERNS[ctx.bankCode] ?? [];
+    if (!pats.some(p => descNorm.includes(p))) return null;
+    return { accountId: ctx.investmentAccountId, memoTemplate: null, source: 'AUTO_INVEST', confidence: 95 };
+  }
+
   // ── CAMADA 1: Regras aprendidas ──────────────────────────────
   private matchLearned(
     descNorm:  string,
@@ -163,6 +202,7 @@ export class SuggestionService {
   ): SuggestionResult | null {
     for (const rule of FIXED_RULES) {
       if (rule.type && rule.type !== type) continue;
+      if (rule.category === 'RENDIMENTO' && /RESGATE|RENDE FACIL|REND\.FACIL/.test(descNorm)) continue; // EXTBB-09: resgate nao e receita
       const hit = rule.patterns.some(p => descNorm.includes(normalizeText(p)));
       if (hit) {
         return {
