@@ -21,3 +21,5 @@ backups/
 
 # Seguranca 0A.6: arquivos de codigos de recuperacao do 2FA nunca entram no repositorio
 ledgr-codigos-recuperacao*.txt
+# Material de trabalho local da Pontes Contabilidade (fora do repositorio)
+Pontes/
