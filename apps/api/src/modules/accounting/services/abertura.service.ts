@@ -18,6 +18,16 @@
 // REAL (bug de importacao) continua existindo via o check de 'diferenca'
 // em registrarAbertura() - se algo de fato duplicar incorretamente, o
 // lancamento nao fecha e fica bloqueado, como deve ser.
+//
+// ALTERADO 23/11/2026 (ABERTURA-01, achado na Jose Silva):
+// 1. Lote de origem: sem lote ECD terminando na data de fechamento, usa o
+//    lote que COMECA no dia seguinte (o saldo inicial declarado nele). A Jose
+//    Silva nao tem ECD 2023; os saldos de 31/12/2023 vieram da ECD 2024.
+// 2. Modo DIRETO: empresa sem nenhuma linha de de/para usa a propria conta
+//    como destino (ECD importada direto no plano, sem arvore paralela).
+// 3. Registrar de novo exclui o lancamento anterior de forma LOGICA
+//    (deletedAt), nunca fisica.
+// 4. Recusa registrar em competencia fechada (FECHADO / FECHADO_PREVIO).
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 
@@ -39,7 +49,17 @@ export interface AberturaCalculo {
   totalCredito: number;
   diferenca: number;
   contasNaoAnaliticas: { code: string; name: string }[];
+  modo: 'DE_PARA' | 'DIRETO';
+  loteOrigem: 'FIM_DO_PERIODO' | 'SALDO_INICIAL';
 }
+
+type ContaDestino = { id: string; code: string; name: string; type: any; isAnalytic: boolean };
+type ParOrigemDestino = {
+  sourceAccountId: string;
+  source: { code: string; name: string };
+  targetAccountId: string;
+  target: ContaDestino;
+};
 
 @Injectable()
 export class AberturaService {
@@ -50,55 +70,74 @@ export class AberturaService {
     const fim = new Date(dataFechamentoISO + 'T23:59:59Z');
 
     // CORRIGIDO 15/09/2026: restringe as origens ao LOTE de importacao ECD
-    // cujo period_end bate com a data de fechamento escolhida. Achado real
-    // na Hotelsys: cada ano de ECD cria contas NOVAS em chart_of_accounts
-    // (arvores ECD paralelas, nunca reaproveita a conta do ano anterior) e
-    // cada uma delas declara seu proprio account_balance na MESMA data de
-    // referencia (o ECD de um ano sempre redeclara o comparativo do ano
-    // anterior sob suas proprias contas - pratica normal do SPED). Sem esse
-    // filtro, uma conta como "Edificios e Benfeitorias" era somada uma vez
-    // POR ANO de ECD que redeclarava o mesmo saldo (9x na Hotelsys, 2017 a
-    // 2025), multiplicando o valor real do imobilizado. A tentativa anterior
-    // (dedupe por valor identico) foi removida por ser uma premissa falsa
-    // em outro sentido: contas REALMENTE diferentes, consolidadas de
-    // origens distintas no mesmo destino, podem legitimamente ter o mesmo
-    // valor - a duplicacao real esta em QUAL LOTE a origem pertence, nao no
-    // valor do saldo.
-    const lotes = await this.prisma.ecdImport.findMany({
+    // da data escolhida (arvores ECD paralelas redeclaram o mesmo saldo a
+    // cada ano - sem o filtro, o imobilizado da Hotelsys era somado 9x).
+    // ALTERADO 23/11/2026: sem lote terminando na data, usa o lote que
+    // comeca no dia seguinte (saldo inicial).
+    let loteOrigem: AberturaCalculo['loteOrigem'] = 'FIM_DO_PERIODO';
+    let lotes = await this.prisma.ecdImport.findMany({
       where: { companyId, periodEnd: new Date(dataFechamentoISO + 'T00:00:00Z'), deletedAt: null },
       select: { id: true },
     });
     if (lotes.length === 0) {
+      const diaSeguinte = new Date(dataFechamentoISO + 'T00:00:00Z');
+      diaSeguinte.setUTCDate(diaSeguinte.getUTCDate() + 1);
+      lotes = await this.prisma.ecdImport.findMany({
+        where: { companyId, periodStart: diaSeguinte, deletedAt: null },
+        select: { id: true },
+      });
+      loteOrigem = 'SALDO_INICIAL';
+    }
+    if (lotes.length === 0) {
       throw new BadRequestException(
-        `Nenhum lote de importação ECD encontrado com data de fechamento ${dataFechamentoISO}. Confira a data ou importe o ECD correspondente antes de calcular a abertura.`,
+        `Nenhum lote de importa\u00e7\u00e3o ECD terminando em ${dataFechamentoISO} nem come\u00e7ando no dia seguinte. Confira a data ou importe o ECD correspondente antes de calcular a abertura.`,
       );
     }
     const loteIds = lotes.map(l => l.id);
 
-    const mappings = await this.prisma.ecdAccountMapping.findMany({
-      where: {
-        companyId,
-        sourceAccount: { ecdImportLinks: { some: { ecdImportId: { in: loteIds } } } },
-      },
-      include: {
-        sourceAccount: { select: { id: true, code: true, name: true } },
-        targetAccount: { select: { id: true, code: true, name: true, type: true, isAnalytic: true } },
-      },
-    });
+    // ALTERADO 23/11/2026: empresa sem de/para -> modo DIRETO (a propria conta).
+    const totalDePara = await this.prisma.ecdAccountMapping.count({ where: { companyId } });
+    const modo: AberturaCalculo['modo'] = totalDePara > 0 ? 'DE_PARA' : 'DIRETO';
 
-    const sourceIds = mappings.map(m => m.sourceAccountId);
+    let pares: ParOrigemDestino[];
+    if (modo === 'DE_PARA') {
+      const mappings = await this.prisma.ecdAccountMapping.findMany({
+        where: {
+          companyId,
+          sourceAccount: { ecdImportLinks: { some: { ecdImportId: { in: loteIds } } } },
+        },
+        include: {
+          sourceAccount: { select: { id: true, code: true, name: true } },
+          targetAccount: { select: { id: true, code: true, name: true, type: true, isAnalytic: true } },
+        },
+      });
+      pares = mappings.map(m => ({
+        sourceAccountId: m.sourceAccountId,
+        source: m.sourceAccount,
+        targetAccountId: m.targetAccountId,
+        target: m.targetAccount,
+      }));
+    } else {
+      const contas = await this.prisma.chartOfAccounts.findMany({
+        where: { companyId, deletedAt: null, ecdImportLinks: { some: { ecdImportId: { in: loteIds } } } },
+        select: { id: true, code: true, name: true, type: true, isAnalytic: true },
+      });
+      pares = contas.map(c => ({ sourceAccountId: c.id, source: c, targetAccountId: c.id, target: c }));
+    }
+
+    const sourceIds = pares.map(p => p.sourceAccountId);
     const balances = await this.prisma.accountBalance.findMany({
       where: { accountId: { in: sourceIds }, referenceDate: { gte: inicio, lte: fim } },
     });
     const balMap = new Map<string, number>(balances.map(b => [b.accountId, Number(b.balance)]));
 
-    const porTarget = new Map<string, { target: any; origens: { code: string; name: string; balance: number }[] }>();
-    for (const m of mappings) {
-      const bal = balMap.get(m.sourceAccountId);
+    const porTarget = new Map<string, { target: ContaDestino; origens: { code: string; name: string; balance: number }[] }>();
+    for (const p of pares) {
+      const bal = balMap.get(p.sourceAccountId);
       if (bal === undefined || bal === 0) continue;
-      const key = m.targetAccountId;
-      if (!porTarget.has(key)) porTarget.set(key, { target: m.targetAccount, origens: [] });
-      porTarget.get(key)!.origens.push({ code: m.sourceAccount.code, name: m.sourceAccount.name, balance: bal });
+      const key = p.targetAccountId;
+      if (!porTarget.has(key)) porTarget.set(key, { target: p.target, origens: [] });
+      porTarget.get(key)!.origens.push({ code: p.source.code, name: p.source.name, balance: bal });
     }
 
     const resultado: AberturaLinha[] = [];
@@ -112,9 +151,7 @@ export class AberturaService {
       if (soma === 0) continue;
 
       // Sinaliza (sem excluir) origens com valor identico no mesmo destino -
-      // pura visibilidade para revisao humana antes de registrar. Coincidencia
-      // de valor entre contas de consolidacoes diferentes e normal (ver nota
-      // acima) - isto NUNCA remove nada da soma, so avisa na tela.
+      // pura visibilidade para revisao humana antes de registrar.
       const contagemPorValor = new Map<number, number>();
       for (const o of origens) {
         const chave = Math.round(o.balance * 100) / 100;
@@ -149,6 +186,8 @@ export class AberturaService {
       totalCredito,
       diferenca: Math.round((totalDebito - totalCredito) * 100) / 100,
       contasNaoAnaliticas: resultado.filter(r => !r.isAnalytic).map(r => ({ code: r.targetCode, name: r.targetName })),
+      modo,
+      loteOrigem,
     };
   }
 
@@ -160,53 +199,64 @@ export class AberturaService {
 
     if (calculo.contasNaoAnaliticas.length > 0) {
       throw new BadRequestException(
-        `Existem ${calculo.contasNaoAnaliticas.length} conta(s) sintética(s) com saldo - crie contas analíticas antes de registrar: ${calculo.contasNaoAnaliticas.map(c => c.code).join(', ')}`,
+        `Existem ${calculo.contasNaoAnaliticas.length} conta(s) sint\u00e9tica(s) com saldo - crie contas anal\u00edticas antes de registrar: ${calculo.contasNaoAnaliticas.map(c => c.code).join(', ')}`,
       );
     }
     if (Math.abs(calculo.diferenca) > 0.01) {
-      throw new BadRequestException(`Lançamento não fecha - diferença de ${calculo.diferenca.toFixed(2)}.`);
+      throw new BadRequestException(`Lan\u00e7amento n\u00e3o fecha - diferen\u00e7a de ${calculo.diferenca.toFixed(2)}.`);
     }
     if (calculo.linhas.length === 0) {
       throw new BadRequestException('Nenhuma linha calculada - verifique o de/para (ecd_account_mappings) e os saldos na data de fechamento.');
     }
 
-    const dataAbertura = new Date(dataAberturaISO + 'T12:00:00Z');
-
-    // CORRIGIDO 31/08/2026: registrarAbertura() nao verificava se ja existia
-    // uma abertura com a MESMA referencia antes de criar outra - cada clique
-    // em "Registrar" so somava mais uma entrada, causando dupla (ou tripla)
-    // contagem. Achado real na Sunrise: apos remapear o de/para e re-registrar,
-    // 2 lancamentos "ABERTURA-2018" coexistiram, dobrando varias contas no
-    // Balancete. Corrigido: apaga qualquer lancamento com a MESMA referencia
-    // para esta empresa antes de criar o novo - re-registrar sempre SUBSTITUI,
-    // nunca soma.
-    const entriesAntigas = await this.prisma.journalEntry.findMany({
-      where: { companyId, reference: referencia },
-      select: { id: true },
+    // ALTERADO 23/11/2026: mesma regra do JournalEntryService - competencia fechada recusa.
+    const competencia = dataAberturaISO.slice(0, 7);
+    const fech = await this.prisma.fechamentoMensal.findUnique({
+      where: { companyId_competencia: { companyId, competencia } },
+      select: { status: true },
     });
-    if (entriesAntigas.length > 0) {
-      const idsAntigos = entriesAntigas.map(e => e.id);
-      await this.prisma.journalEntryItem.deleteMany({ where: { journalEntryId: { in: idsAntigos } } });
-      await this.prisma.journalEntry.deleteMany({ where: { id: { in: idsAntigos } } });
+    if (fech && (fech.status === 'FECHADO' || fech.status === 'FECHADO_PREVIO')) {
+      throw new BadRequestException(`Compet\u00eancia ${competencia} est\u00e1 fechada - reabra no Fechamento Mensal antes de registrar a abertura.`);
     }
 
-    const entry = await this.prisma.journalEntry.create({
-      data: {
-        companyId,
-        date: dataAbertura,
-        description: `Lançamento de Abertura ${referencia}`,
-        reference: referencia,
-        createdById: userId,
-        items: {
-          create: calculo.linhas.map(l => ({
-            accountId: l.targetAccountId,
-            value: l.saldo > 0 ? l.saldo : -l.saldo,
-            type: l.saldo > 0 ? 'DEBIT' : 'CREDIT',
-          })),
-        },
-      },
-    });
+    const dataAbertura = new Date(dataAberturaISO + 'T12:00:00Z');
 
-    return { journalEntryId: entry.id, totalItens: calculo.linhas.length, totalDebito: calculo.totalDebito, totalCredito: calculo.totalCredito };
+    return this.prisma.$transaction(async tx => {
+      // CORRIGIDO 31/08/2026: re-registrar sempre SUBSTITUI, nunca soma
+      // (achado real na Sunrise: 2 "ABERTURA-2018" coexistindo).
+      // ALTERADO 23/11/2026: a substituicao e por exclusao LOGICA.
+      const substituidos = await tx.journalEntry.updateMany({
+        where: { companyId, reference: referencia, deletedAt: null },
+        data: { deletedAt: new Date() },
+      });
+
+      const entry = await tx.journalEntry.create({
+        data: {
+          companyId,
+          date: dataAbertura,
+          description: `Lan\u00e7amento de Abertura ${referencia}`,
+          reference: referencia,
+          sourceModule: 'ACCOUNTING',
+          createdById: userId,
+          items: {
+            create: calculo.linhas.map(l => ({
+              accountId: l.targetAccountId,
+              value: l.saldo > 0 ? l.saldo : -l.saldo,
+              type: l.saldo > 0 ? 'DEBIT' : 'CREDIT',
+            })),
+          },
+        },
+      });
+
+      return {
+        journalEntryId: entry.id,
+        totalItens: calculo.linhas.length,
+        totalDebito: calculo.totalDebito,
+        totalCredito: calculo.totalCredito,
+        modo: calculo.modo,
+        loteOrigem: calculo.loteOrigem,
+        substituidos: substituidos.count,
+      };
+    });
   }
 }

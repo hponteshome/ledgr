@@ -205,7 +205,7 @@ export class JournalImporterService {
     // Validar contas
     const allCodes = [...new Set(entries.flatMap(e => e.lines.map(l => l.code)))];
     const found = await this.prisma.chartOfAccounts.findMany({
-      where: { companyId, code: { in: allCodes } },
+      where: { companyId, code: { in: allCodes }, deletedAt: null }, // JOURNAL-IMP-01 (23/11/2026): ignora contas excluidas
       select: { code: true, isAnalytic: true },
     });
     const foundMap = new Map(found.map(a => [a.code, a]));
@@ -258,7 +258,7 @@ export class JournalImporterService {
 
     const allCodes = [...new Set(entries.flatMap(e => e.lines.map(l => l.code)))];
     const found = await this.prisma.chartOfAccounts.findMany({
-      where: { companyId, code: { in: allCodes } },
+      where: { companyId, code: { in: allCodes }, deletedAt: null }, // JOURNAL-IMP-01 (23/11/2026): ignora contas excluidas
       select: { id: true, code: true },
     });
     const codeToId = new Map(found.map(a => [a.code, a.id]));
