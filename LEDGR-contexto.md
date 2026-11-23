@@ -10980,3 +10980,12 @@ independente da profundidade). Contraste ajustado a pedido do usuario
 - Achado: ECF 2023 da LM declarou saldo inicial de prejuizo fiscal 1.414.992,41 na Parte B sem origem (2022 e anteriores no Presumido). Saldos corretos: 2023 939.296,11; 2024 2.605.672,76; 2025 4.437.588,90. Corrigir nas retificadoras (R2), travadas ate as DIMOBs 2023-2025.
 - Pendente: obrigacoes.service.ts (getRegime com dtFin gte nunca acha regime vigente; codigos antigos de forma) - DASH-02; segunda retificadora no arquivo fiel cai em "conflito"; alerta automatico na Situacao Fiscal quando a conferencia divergir; arquivo fiel da EFD-Contribuicoes (0110); Hotelsys 2018-2019 sem ECF.
 - Area de conhecimento do projeto no claude.ai: removidas as copias antigas de codigo; ficam so os claude/*.md (ver claude/regimes-declaracoes-conferencia.md).
+
+## 2026-11-23 - Licao (blocos PS): nunca nomear funcao auxiliar com 1-2 letras
+No INSP-EXTBB-02 a funcao auxiliar R colidiu com o alias nativo r = Invoke-History (alias tem precedencia sobre function); os caminhos sairam vazios e o erro so apareceu no console. Regra: funcoes auxiliares de bloco sempre em Verbo-Substantivo (ex.: Out-Line, Get-RelPath). Aliases nativos a evitar: r, h, gc, gi, gm, gp, si, sv, cd, ls, cp, mv, rm, md, iex.
+
+## 2026-11-23 - EXTBB parte 1 (Extratos e Conciliacao Bancaria)
+- Desenho aprovado no projeto: claude/extrato-bancario-conciliacao.md. Importacao no Financeiro, evoluindo o bank-import.
+- Feito: SCHEMA-EXTBB-01 (BankAccount + campos de extrato/linha), EXTBB-05/05B (cadastro Contas Bancarias), EXTBB-07 (parser BB PDF; 12/12 extratos da Jose Silva fecham o saldo).
+- Jose Silva: BB 1192-4 / 38340-6 cadastrada (banco 001012, aplicacao automatica 001006).
+- Proximo: EXTBB-08 (upload: hash, impressao digital, conta, trava de saldo), EXTBB-09 (camada documento no nome da conta), EXTBB-10 (tela 3 etapas).

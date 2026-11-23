@@ -6,6 +6,7 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import * as ExcelJS from 'exceljs';
 import { Readable } from 'stream';
+import { parseBbPdfText } from './bb-pdf.parser'; // EXTBB-07
 
 export interface ParsedTransaction {
   transactionDate: Date;
@@ -22,6 +23,9 @@ export interface ParsedTransaction {
   referencia?:     string;  // referencia original do extrato LM
   counterpartyName?: string;  // Fase 1.7: nome de quem pagou/recebeu (quando o extrato traz)
   counterpartyDoc?:  string;  // Fase 1.7: CPF/CNPJ so com digitos
+  bankHistCode?:     string;  // EXTBB-07: codigo do historico do banco (ex.: BB 393 = TED)
+  lineNo?:           number;  // EXTBB-07: ordem da linha no extrato
+  docKey?:           string;  // EXTBB-07: documento so com digitos, sem zeros a esquerda (impressao digital)
 }
 
 export interface ParsedStatement {
@@ -33,6 +37,14 @@ export interface ParsedStatement {
   periodTo:       Date;
   openingBalance?: number;
   closingBalance?: number;
+  layout?:         string;  // EXTBB-07: ex.: BB_PDF_A / BB_PDF_B
+  taxId?:          string;  // EXTBB-07: CNPJ do titular (so digitos), quando o extrato traz
+  issuedAt?:       Date;    // EXTBB-07: data de emissao do extrato
+  rawText?:        string;  // EXTBB-07: texto extraido (o PDF nao e guardado)
+  bankNumber?:     string;  // EXTBB-07: codigo FEBRABAN
+  agencyNoDv?:     string;  // EXTBB-07: agencia sem digito
+  accountNoDv?:    string;  // EXTBB-07: conta sem digito
+  balanceCheck?:   { ok: boolean; expected: number; found: number }; // EXTBB-07: saldo inicial + movimentos = saldo final
   transactions:   ParsedTransaction[];
 }
 
@@ -158,7 +170,26 @@ export class BankParserService {
     if (ext === 'xls' || ext === 'xlsx') {
       return this.parseXLS(buffer);
     }
-    throw new BadRequestException(`Formato não suportado: .${ext}. Use XLS, XLSX, OFX ou CSV.`);
+    if (ext === 'pdf') {
+      return this.parsePDF(buffer);
+    }
+    throw new BadRequestException(`Formato não suportado: .${ext}. Use XLS, XLSX, OFX, CSV ou PDF (Banco do Brasil).`);
+  }
+
+  // ── EXTBB-07: PDF com texto (sem OCR) - por enquanto Banco do Brasil ──
+  private async parsePDF(buffer: Buffer): Promise<ParsedStatement> {
+    // caminho interno do pdf-parse: o index do pacote roda um teste de depuracao quando carregado sem module.parent
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const pdfParse = require('pdf-parse/lib/pdf-parse.js');
+    const { text } = await pdfParse(buffer);
+    if (!/SISBB|bb\.com\.br/i.test(text ?? '')) {
+      throw new BadRequestException('PDF não reconhecido: por enquanto o LEDGR lê extratos do Banco do Brasil em PDF. Para outros bancos, use XLS, OFX ou CSV.');
+    }
+    try {
+      return parseBbPdfText(text, normalizeText);
+    } catch (e: any) {
+      throw new BadRequestException(e?.message ?? 'Falha ao ler o extrato em PDF.');
+    }
   }
 
   // ── Parser XLS/XLSX — detecta banco pelo conteúdo ─────────

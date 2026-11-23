@@ -1259,6 +1259,9 @@ model ChartOfAccounts {
   equityInvestmentAccounts  EquityMethodInvestment[]   @relation("EquityInvestmentAccount")
   equityGainAccounts        EquityMethodInvestment[]   @relation("EquityGainAccount")
   equityLossAccounts        EquityMethodInvestment[]   @relation("EquityLossAccount")
+  // NOVO 23/11/2026 (SCHEMA-EXTBB-01): Contas Bancarias
+  bankAccountsLedger        BankAccount[]              @relation("BankAccountLedger")
+  bankAccountsInvestment    BankAccount[]              @relation("BankAccountInvestment")
 
   // ── Deducibilidade Fiscal (LALUR/LACS) ──────────────────────────────────
   /// Indica se despesas desta conta sao total ou parcialmente nao-dedutiveis
@@ -2869,6 +2872,54 @@ enum TransactionType {
 }
 
 /// Extratos bancários importados. Agrupa transações de um período.
+// NOVO 23/11/2026 (SCHEMA-EXTBB-01) - Cadastro centralizado de Contas Bancarias por empresa.
+// Liga o extrato a contabilidade: ledgerAccount = conta contabil do banco; investmentAccount =
+// conta da aplicacao automatica (ex.: BB Rende Facil), opcional. Agencia/conta so digitos.
+// Unicidade via INDICES UNICOS PARCIAIS (WHERE deleted_at IS NULL) em
+// prisma/migrations-manuais/2026-11-23-extbb-01-bank-accounts.sql (Prisma nao suporta na DSL):
+// bank_accounts(empresa+banco+agencia+conta), bank_statements(empresa+file_hash), bank_transactions(empresa+fingerprint).
+enum BankStatementStatus {
+  IMPORTED
+  IN_PROGRESS
+  COMPLETED
+  CANCELED
+}
+
+enum BankTxDestination {
+  RECONCILE_EXISTING
+  SETTLE_TITLE
+  DIRECT_ENTRY
+  ALREADY_POSTED
+  IGNORE
+}
+
+model BankAccount {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId           String    @map("company_id") @db.Uuid
+  bankCode            BankCode  @map("bank_code")
+  bankNumber          String    @map("bank_number") @db.VarChar(3)
+  agency              String    @map("agency") @db.VarChar(10)
+  agencyDigit         String?   @map("agency_digit") @db.VarChar(2)
+  account             String    @map("account") @db.VarChar(20)
+  accountDigit        String?   @map("account_digit") @db.VarChar(2)
+  nickname            String?   @map("nickname") @db.VarChar(80)
+  ledgerAccountId     String?   @map("ledger_account_id") @db.Uuid
+  investmentAccountId String?   @map("investment_account_id") @db.Uuid
+  openedAt            DateTime? @map("opened_at") @db.Date
+  isActive            Boolean   @default(true) @map("is_active")
+  createdById         String?   @map("created_by_id") @db.Uuid
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
+  deletedAt           DateTime? @map("deleted_at") @db.Timestamp(6)
+
+  ledgerAccount     ChartOfAccounts? @relation("BankAccountLedger", fields: [ledgerAccountId], references: [id])
+  investmentAccount ChartOfAccounts? @relation("BankAccountInvestment", fields: [investmentAccountId], references: [id])
+  statements        BankStatement[]
+
+  @@index([companyId])
+  @@map("bank_accounts")
+}
+
 model BankStatement {
   id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   companyId      String    @map("company_id") @db.Uuid
@@ -2888,11 +2939,21 @@ model BankStatement {
   createdById    String    @map("created_by_id") @db.Uuid
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
   deletedAt      DateTime? @map("deleted_at") @db.Timestamp(6)
+  // NOVO 23/11/2026 (SCHEMA-EXTBB-01): conta bancaria, hash do arquivo (o PDF nao e guardado), texto extraido, leiaute, emissao e status
+  bankAccountId  String?             @map("bank_account_id") @db.Uuid
+  fileHash       String?             @map("file_hash") @db.VarChar(64)
+  rawText        String?             @map("raw_text") @db.Text
+  layout         String?             @map("layout") @db.VarChar(40)
+  issuedAt       DateTime?           @map("issued_at") @db.Date
+  status         BankStatementStatus @default(IMPORTED) @map("status")
 
   transactions BankTransaction[]
+  bankAccount  BankAccount?      @relation(fields: [bankAccountId], references: [id])
 
   @@index([companyId, periodFrom])
   @@index([companyId, bankCode])
+  @@index([bankAccountId])
+  @@index([companyId, fileHash])
   @@map("bank_statements")
 }
 
@@ -2927,6 +2988,13 @@ model BankTransaction {
   propertyTag          String?          @map("property_tag") @db.VarChar(50)
   payrollId            String?          @map("payroll_id") @db.Uuid
   journalEntryId       String?          @map("journal_entry_id") @db.Uuid
+  // NOVO 23/11/2026 (SCHEMA-EXTBB-01): duplicidade por linha (fingerprint) e destino unico por linha
+  lineNo               Int?               @map("line_no")
+  fingerprint          String?            @map("fingerprint") @db.VarChar(64)
+  bankHistCode         String?            @map("bank_hist_code") @db.VarChar(10)
+  destination          BankTxDestination? @map("destination")
+  ignoreReason         String?            @map("ignore_reason") @db.VarChar(255)
+  deletedAt            DateTime?          @map("deleted_at") @db.Timestamp(6)
   createdAt            DateTime         @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt            DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)
 
@@ -2938,6 +3006,7 @@ model BankTransaction {
   @@index([status])
   @@index([descriptionNorm])
   @@index([groupKey])
+  @@index([companyId, fingerprint])
   @@map("bank_transactions")
 }
 
