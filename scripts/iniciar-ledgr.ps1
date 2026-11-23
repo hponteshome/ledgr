@@ -1,4 +1,6 @@
-﻿# iniciar-ledgr.ps1 - sobe o que estiver fora do ar: Postgres (Docker), API (3000), Frontend (5173), Agent (7778)
+﻿# iniciar-ledgr.ps1 - sobe o que estiver fora do ar: Postgres (Docker), API (3000), Frontend (5173)
+# e abre uma janela PowerShell na raiz do projeto, para executar os blocos.
+# O Agent A3 (7778) nao e iniciado aqui; quando precisar do token A3: cd apps\agent; npx tsx src\main.ts
 # Uso (na pasta do projeto): .\scripts\iniciar-ledgr.ps1
 $raiz = Split-Path -Parent $PSScriptRoot
 Set-Location $raiz
@@ -32,11 +34,6 @@ else { $c = ScriptDev "$raiz\apps\api"; Janela 'LEDGR API' "$raiz\apps\api" $c; 
 if (NoAr 5173) { Write-Host "Front 5173: ja no ar" -ForegroundColor DarkGray }
 else { $c = ScriptDev "$raiz\frontend"; Janela 'LEDGR Frontend' "$raiz\frontend" $c; Write-Host "Front 5173: iniciando ($c) - janela LEDGR Frontend" -ForegroundColor Green }
 
-# Agent (A3) - minimizado
-if (NoAr 7778) { Write-Host "Agent 7778: ja no ar" -ForegroundColor DarkGray }
-elseif (Test-Path "$raiz\scripts\iniciar-agent.ps1") { & "$raiz\scripts\iniciar-agent.ps1"; Write-Host "Agent 7778: iniciando - janela LEDGR Agent (minimizada)" -ForegroundColor Green }
-else { Janela 'LEDGR Agent' "$raiz\apps\agent" 'npx tsx src\main.ts' 'Minimized'; Write-Host "Agent 7778: iniciando - janela LEDGR Agent (minimizada)" -ForegroundColor Green }
-
 # Espera API e Frontend (ate 2 min) e abre o navegador
 Write-Host "`nAguardando API e Frontend..." -ForegroundColor Cyan
 for ($i = 0; $i -lt 60 -and -not ((NoAr 3000) -and (NoAr 5173)); $i++) { Start-Sleep 2 }
@@ -47,3 +44,7 @@ if ((NoAr 3000) -and (NoAr 5173)) {
   if (-not (NoAr 3000)) { Write-Host "Atencao - API ainda fora do ar: veja a janela LEDGR API" -ForegroundColor Yellow }
   if (-not (NoAr 5173)) { Write-Host "Atencao - Frontend ainda fora do ar: veja a janela LEDGR Frontend" -ForegroundColor Yellow }
 }
+
+# Janela PowerShell na raiz do projeto, para executar os blocos
+Janela 'LEDGR Blocos' $raiz 'cls'
+Write-Host "Blocos    : janela LEDGR Blocos aberta em $raiz" -ForegroundColor Green
