@@ -10,6 +10,7 @@ import { FiUpload, FiEye, FiAlertTriangle, FiCheckCircle, FiX, FiHome, FiChevron
 import { SmartDateInput } from '../../components/SmartDateInput';
 import { DocumentViewModal } from './DocumentViewModal';
 import { ImportarDocumentoModal } from './ImportarDocumentoModal';
+import { ContratosLocacaoAgrupados } from './ContratosLocacaoAgrupados'; // ARQ-LOC-01
 import api from '../../services/api';
 import toast from 'react-hot-toast';
 
@@ -292,6 +293,7 @@ export const ImoveisDocumentosPage: React.FC = () => {
   const [todas, setTodas] = useState<any[]>([]);
   const [locacoes, setLocacoes] = useState<any[]>([]);
   const [showImportLoc, setShowImportLoc] = useState(false);
+  const [locKey, setLocKey] = useState(0); // ARQ-LOC-01: recarrega a lista agrupada depois de arquivar
   // LASTRO-04 (17/11/2026): vincular documento de locacao "sem vinculo" a um contrato (vira o PDF assinado do contrato)
   const [vincDoc, setVincDoc] = useState<string | null>(null);
   const [contratosVinc, setContratosVinc] = useState<any[]>([]);
@@ -494,7 +496,7 @@ export const ImoveisDocumentosPage: React.FC = () => {
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        {abaBtn('locacao', 'Contratos de locação', locacoesF.length, CORES_ABA[0])}
+        {abaBtn('locacao', 'Contratos de locação', locacoesF.filter(l => l.contractStatus === 'ATIVO').length, CORES_ABA[0])}
         {abaBtn('matesc', 'Matrículas e escrituras', todasF.filter(l => l.tipo !== 'CESSAO').length, CORES_ABA[1])}
         {abaBtn('matriculas', 'Matrículas', todasF.filter(l => l.tipo === 'MATRICULA').length, CORES_ABA[2])}
         {abaBtn('escrituras', 'Escrituras', todasF.filter(l => l.tipo === 'ESCRITURA').length, CORES_ABA[3])}
@@ -587,7 +589,10 @@ export const ImoveisDocumentosPage: React.FC = () => {
           </tbody>
         </table>
       </div>
-      ) : (aba === 'locacao' || aba === 'classificar') ? (
+      ) : aba === 'locacao' ? (
+        <ContratosLocacaoAgrupados companyId={empresaAtiva().id} filtroImovel={imovelSel?.internalCode ?? ''} reloadKey={locKey}
+          onView={(id: string, title: string) => setViewDoc({ id, title })} />
+      ) : aba === 'classificar' ? (
       <div className="border border-gray-200 rounded-[10px] overflow-hidden">
         <table className="w-full">
           <thead>
@@ -730,7 +735,7 @@ export const ImoveisDocumentosPage: React.FC = () => {
       )}
 
       {showImportLoc && (
-        <ImportarDocumentoModal defaultType="CONTRATO_LOCACAO" onClose={() => setShowImportLoc(false)} onSuccess={() => carregar()} />
+        <ImportarDocumentoModal defaultType="CONTRATO_LOCACAO" onClose={() => setShowImportLoc(false)} onSuccess={() => { carregar(); setLocKey(k => k + 1); }} />
       )}
 
       {showImport && (

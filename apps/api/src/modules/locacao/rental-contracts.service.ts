@@ -7,6 +7,7 @@ import * as crypto from 'crypto';
 import * as Handlebars from 'handlebars';
 import { DocumentsService } from '../../core/documents/documents.service';
 import { valorPorExtenso } from './utils/extenso.util';
+import { situacaoReajuste, addMesesIso } from './utils/reajuste.util'; // REAJ-01
 import {
   formatDateBR,
   formatDateExtenso,
@@ -83,14 +84,17 @@ export class RentalContractsService {
     const renova = await this.prisma.rentalContract.findFirst({
       where: { renewedByContractId: id, deletedAt: null }, select: { id: true, contractNumber: true, startDate: true, endDate: true },
     });
+    // REAJ-01: situacao do reajuste (regra unica) e historico de reajustes
+    const reajuste = situacaoReajuste(found as any);
+    const reajustes = await this.prisma.rentalContractReadjustment.findMany({ where: { rentalContractId: id, deletedAt: null }, orderBy: [{ dataBase: 'desc' }, { createdAt: 'desc' }] });
     if (found.documentId) {
       const doc = await this.prisma.document.findUnique({
         where: { id: found.documentId },
         select: { id: true, status: true, currentVersion: true },
       });
-      return { ...found, document: doc, renovadoPor, renova };
+      return { ...found, document: doc, renovadoPor, renova, reajuste, reajustes };
     }
-    return { ...found, renovadoPor, renova };
+    return { ...found, renovadoPor, renova, reajuste, reajustes };
   }
 
   // Recorrencia mensal de aluguel: gera o ArEntry (origin ALUGUEL) + JournalEntry
@@ -309,30 +313,21 @@ export class RentalContractsService {
         });
       }
       if (c.duePeriodicity !== 'MENSAL') continue;
-      const per = c.readjustmentPeriodMonths || 12;
-      const aplicado = c.lastReadjustmentDate ? utc(c.lastReadjustmentDate) : null;
-      let ultimoAniv: Date | null = null;
-      let proximo: Date | null = null;
-      for (let k = 1; k < 200; k++) {
-        const a = addMeses(ini, per * k);
-        if (a <= hoje) ultimoAniv = a; else { proximo = a; break; }
-      }
-      if (c.nextReadjustmentDate) {
-        const nx = utc(c.nextReadjustmentDate);
-        if (nx <= hoje) { ultimoAniv = nx; proximo = addMeses(nx, per); } else { ultimoAniv = null; proximo = nx; }
-      }
-      const indice = c.readjustmentIndex ?? 'sem índice cadastrado';
-      if (ultimoAniv && hoje.getTime() - ultimoAniv.getTime() <= 365 * DIA && (!aplicado || aplicado < ultimoAniv)) {
+      // REAJ-01: regra unica (utils/reajuste.util) - o pendente fica ativo ate o reajuste ser registrado (aplicado ou dispensado)
+      const rj = situacaoReajuste(c, hoje);
+      if (!rj.aplica) continue;
+      const br = (s: string) => s.split('-').reverse().join('/');
+      if (rj.dataBasePendente) {
+        const db = utc(rj.dataBasePendente);
         alertas.push({
-          tipo: 'REAJUSTE_PENDENTE', severidade: 'media', contratoId: c.id, imovel, data: iso(ultimoAniv), dias: dias(ultimoAniv),
-          mensagem: `Reajuste (${indice}) a aplicar - data-base ${iso(ultimoAniv).split('-').reverse().join('/')}`,
+          tipo: 'REAJUSTE_PENDENTE', severidade: dias(db) < -60 ? 'alta' : 'media', contratoId: c.id, imovel, data: rj.dataBasePendente, dias: dias(db),
+          mensagem: `Reajuste (${rj.indiceLabel}) pendente desde ${br(rj.dataBasePendente)}${rj.pendentes > 1 ? ` (${rj.pendentes} datas-base)` : ''} - registrar ou dispensar`,
         });
-      }
-      if (proximo && fim && proximo > fim) proximo = null;
-      if (proximo && dias(proximo) <= 60) {
-        alertas.push({
-          tipo: 'REAJUSTE_PROXIMO', severidade: 'baixa', contratoId: c.id, imovel, data: iso(proximo), dias: dias(proximo),
-          mensagem: `Reajuste (${indice}) em ${dias(proximo)} dias`,
+      } else if (rj.proximaDataBase) {
+        const px = utc(rj.proximaDataBase);
+        if (dias(px) <= 60) alertas.push({
+          tipo: 'REAJUSTE_PROXIMO', severidade: 'baixa', contratoId: c.id, imovel, data: rj.proximaDataBase, dias: dias(px),
+          mensagem: `Reajuste (${rj.indiceLabel}) em ${dias(px)} dias`,
         });
       }
     }
@@ -361,6 +356,89 @@ export class RentalContractsService {
     const ordem: Record<string, number> = { alta: 0, media: 1, baixa: 2 };
     alertas.sort((a, b) => ordem[a.severidade] - ordem[b.severidade] || String(a.data).localeCompare(String(b.data)));
     return { geradoEm: new Date().toISOString(), total: alertas.length, alertas };
+  }
+
+  // REAJ-01 (24/11/2026): reajuste do aluguel - APLICADO (novo valor a partir de uma competencia) ou DISPENSADO (com motivo).
+  // Atualiza o valor e as datas de reajuste do contrato e guarda o historico; e assim que o aviso de pendente sai.
+  async registrarReajuste(companyId: string, userId: string, id: string, body: any) {
+    const c = await this.prisma.rentalContract.findFirst({ where: { id, companyId, deletedAt: null }, include: { fixedAsset: { select: { internalCode: true } } } });
+    if (!c) throw new NotFoundException('Contrato de locacao nao encontrado.');
+    if (c.status !== 'ATIVO') throw new BadRequestException('Reajuste so para contrato ativo.');
+    const tipo = String(body?.tipo ?? '').toUpperCase();
+    if (!['APLICADO', 'DISPENSADO'].includes(tipo)) throw new BadRequestException('Tipo de reajuste invalido (APLICADO ou DISPENSADO).');
+    const dataBase = String(body?.dataBase ?? '').slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dataBase)) throw new BadRequestException('Informe a data-base (AAAA-MM-DD).');
+    const ini = new Date(c.startDate).toISOString().slice(0, 10);
+    if (dataBase <= ini) throw new BadRequestException('A data-base deve ser posterior ao inicio do contrato.');
+    const motivo = String(body?.motivo ?? '').trim();
+    const valorAnterior = Number(c.rentAmount);
+    let valorNovo = valorAnterior;
+    let percentual: number | null = body?.percentual !== undefined && body?.percentual !== null && body?.percentual !== '' ? Number(body.percentual) : null;
+    if (tipo === 'APLICADO') {
+      valorNovo = Number(body?.valorNovo);
+      if (!(valorNovo > 0)) throw new BadRequestException('Informe o novo valor do aluguel.');
+      if (percentual === null || !Number.isFinite(percentual)) percentual = Math.round(((valorNovo / valorAnterior) - 1) * 100 * 1e6) / 1e6;
+    } else {
+      if (motivo.length < 10) throw new BadRequestException('Informe o motivo da dispensa (minimo 10 caracteres).');
+      percentual = null;
+    }
+    const compIni = /^\d{4}-\d{2}$/.test(String(body?.competenciaInicio ?? '')) ? String(body.competenciaInicio) : dataBase.slice(0, 7);
+    const per = c.readjustmentPeriodMonths || 12;
+    const proxima = addMesesIso(dataBase, per);
+    const titulos = tipo === 'APLICADO'
+      ? await this.prisma.arEntry.findMany({ where: { rentalContractId: id, deletedAt: null, competenceMonth: { gte: compIni } }, select: { competenceMonth: true, amount: true }, orderBy: { competenceMonth: 'asc' } })
+      : [];
+    const titulosValorAntigo = titulos.filter(t => Math.abs(Number(t.amount) - valorNovo) > 0.005).map(t => String(t.competenceMonth));
+    const reg = await this.prisma.$transaction(async (tx) => {
+      const r = await tx.rentalContractReadjustment.create({
+        data: {
+          companyId, rentalContractId: id, dataBase: toDate(dataBase)!, tipo, indice: c.readjustmentIndex ?? null,
+          percentual: percentual === null ? null : new Prisma.Decimal(percentual.toFixed(6)),
+          valorAnterior: new Prisma.Decimal(valorAnterior.toFixed(2)), valorNovo: new Prisma.Decimal(valorNovo.toFixed(2)),
+          competenciaInicio: compIni, motivo: motivo || null,
+          ultimoAnterior: c.lastReadjustmentDate, proximoAnterior: c.nextReadjustmentDate, createdById: userId,
+        },
+      });
+      await tx.rentalContract.update({
+        where: { id },
+        data: {
+          ...(tipo === 'APLICADO' ? { rentAmount: new Prisma.Decimal(valorNovo.toFixed(2)) } : {}),
+          lastReadjustmentDate: toDate(dataBase), nextReadjustmentDate: toDate(proxima), updatedById: userId,
+        },
+      });
+      await (tx as any).auditLog.create({
+        data: {
+          actorId: userId, action: tipo === 'APLICADO' ? 'LOCACAO_REAJUSTE_APLICADO' : 'LOCACAO_REAJUSTE_DISPENSADO', targetId: id,
+          after: { contrato: c.contractNumber, imovel: c.fixedAsset?.internalCode, dataBase, percentual, valorAnterior, valorNovo, competenciaInicio: compIni, motivo: motivo || null },
+        },
+      });
+      return r;
+    });
+    return { ok: true, reajusteId: reg.id, titulosValorAntigo };
+  }
+
+  // REAJ-01: exclui (soft-delete) o reajuste mais recente e devolve ao contrato o valor e as datas anteriores a ele
+  async excluirReajuste(companyId: string, userId: string, id: string, reajusteId: string) {
+    const c = await this.prisma.rentalContract.findFirst({ where: { id, companyId, deletedAt: null }, select: { id: true } });
+    if (!c) throw new NotFoundException('Contrato de locacao nao encontrado.');
+    const ult = await this.prisma.rentalContractReadjustment.findFirst({
+      where: { rentalContractId: id, companyId, deletedAt: null }, orderBy: [{ dataBase: 'desc' }, { createdAt: 'desc' }],
+    });
+    if (!ult || ult.id !== reajusteId) throw new BadRequestException('So o reajuste mais recente pode ser excluido.');
+    await this.prisma.$transaction(async (tx) => {
+      await tx.rentalContractReadjustment.update({ where: { id: ult.id }, data: { deletedAt: new Date() } });
+      await tx.rentalContract.update({
+        where: { id },
+        data: {
+          ...(ult.tipo === 'APLICADO' ? { rentAmount: ult.valorAnterior } : {}),
+          lastReadjustmentDate: ult.ultimoAnterior, nextReadjustmentDate: ult.proximoAnterior, updatedById: userId,
+        },
+      });
+      await (tx as any).auditLog.create({
+        data: { actorId: userId, action: 'LOCACAO_REAJUSTE_EXCLUIDO', targetId: id, after: { reajusteId, dataBase: ult.dataBase, tipo: ult.tipo } },
+      });
+    });
+    return { ok: true };
   }
 
   // IMPL-LOC-02 (13/11/2026): numero do contrato = AA (ano do contrato: data do instrumento ou inicio) + sequencial

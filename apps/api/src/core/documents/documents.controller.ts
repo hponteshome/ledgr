@@ -353,6 +353,25 @@ export class DocumentsController {
     return this.documentsService.listarLocacoesImoveis(this.empresaEfetiva(req, companyId) as string);
   }
 
+  // ARQ-LOC-01 (24/11/2026): contratos de locacao vigentes/futuros com os documentos ligados
+  // GET /documents/imoveis/contratos-locacao?companyId=
+  @Get('imoveis/contratos-locacao')
+  listarContratosLocacao(@Req() req: any, @Query('companyId') companyId: string) {
+    return this.documentsService.listarContratosLocacao(this.empresaEfetiva(req, companyId) as string);
+  }
+
+  // POST /documents/imoveis/contratos-locacao/:contratoId/documentos - { documentId, papel, data?, observacao? }
+  @Post('imoveis/contratos-locacao/:contratoId/documentos')
+  vincularDocumentoContrato(@Req() req: any, @Param('contratoId') contratoId: string, @Body() body: any) {
+    return this.documentsService.vincularDocumentoContrato(this.empresaEfetiva(req, body?.companyId) as string, req.user.id, contratoId, body ?? {});
+  }
+
+  // PATCH /documents/imoveis/contratos-locacao/documentos/:vinculoId/desvincular
+  @Patch('imoveis/contratos-locacao/documentos/:vinculoId/desvincular')
+  desvincularDocumentoContrato(@Req() req: any, @Param('vinculoId') vinculoId: string, @Body() body: any) {
+    return this.documentsService.desvincularDocumentoContrato(this.empresaEfetiva(req, body?.companyId) as string, vinculoId);
+  }
+
   // PATCH /documents/:id/subtipo - classifica Balancete/ECD/ECF/Obrigacao etc.
   @Patch(':id/subtipo')
   definirSubtipo(@Req() req: any, @Param('id') id: string, @Body() body: any) {

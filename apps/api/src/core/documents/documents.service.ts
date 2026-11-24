@@ -12,6 +12,7 @@ import {
   AddSignerDto, SignDocumentDto,
 } from './create-documents.dto';
 import { DocumentType, DocumentStatus, DocumentVisibility } from '@prisma/client';
+import { situacaoReajuste } from '../../modules/locacao/utils/reajuste.util'; // REAJ-01
 
 // ── Filtros aceitos pelo findAll ───────────────────────────────
 export interface DocumentFilters {
@@ -1306,6 +1307,105 @@ async handleGovBrCallback(
         ORDER BY a.internal_code NULLS LAST, d.date DESC NULLS LAST`,
       companyId,
     );
+  }
+
+  // ── ARQ-LOC-01 (24/11/2026): contratos de locacao com os documentos ligados ──────────
+  private readonly PAPEIS_LOCACAO = ['LASTRO', 'ADITIVO', 'TERMO', 'VISTORIA', 'NOTIFICACAO', 'GARANTIA', 'DOC_LOCATARIO', 'RECIBO', 'OUTRO'];
+
+  // Contratos vigentes e futuros (status ATIVO), um por linha, com o lastro e os documentos ligados; e os
+  // documentos de locacao sem vinculo (nao sao lastro, minuta nem documento ligado de nenhum contrato).
+  async listarContratosLocacao(companyId: string) {
+    if (!companyId) throw new BadRequestException('Empresa nao informada.');
+    const iso = (d: any) => (d ? new Date(d).toISOString().slice(0, 10) : null);
+    const hoje = new Date().toISOString().slice(0, 10);
+    const contratos = await this.prisma.rentalContract.findMany({
+      where: { companyId, deletedAt: null, status: 'ATIVO' as any },
+      include: { fixedAsset: { select: { internalCode: true } } },
+      orderBy: { startDate: 'asc' },
+    });
+    const todosContratos = await this.prisma.rentalContract.findMany({
+      where: { companyId, deletedAt: null },
+      select: { signedDocumentId: true, documentId: true },
+    });
+    const vinculos = await this.prisma.rentalContractDocument.findMany({ where: { companyId, deletedAt: null } });
+    const ocupados = new Set<string>();
+    for (const c of todosContratos) { if (c.signedDocumentId) ocupados.add(c.signedDocumentId); if (c.documentId) ocupados.add(c.documentId); }
+    for (const v of vinculos) ocupados.add(v.documentId);
+    const ids = new Set<string>();
+    contratos.forEach(c => { if (c.signedDocumentId) ids.add(c.signedDocumentId); });
+    vinculos.forEach(v => ids.add(v.documentId));
+    const docs = ids.size ? await this.prisma.document.findMany({
+      where: { id: { in: [...ids] } },
+      select: { id: true, title: true, date: true, status: true, fileUrl: true, deletedAt: true },
+    }) : [];
+    const dMap = new Map(docs.map(d => [d.id, d]));
+    const info = (id: string | null) => {
+      const d = id ? dMap.get(id) : undefined;
+      return d && !d.deletedAt ? { documentId: d.id, title: d.title, data: iso(d.date), status: String(d.status), temArquivo: !!d.fileUrl } : null;
+    };
+    const lista = contratos.map(c => {
+      const inicio = iso(c.startDate) as string;
+      const fim = iso(c.endDate);
+      const situacao = inicio > hoje ? 'RESERVADO' : (fim && fim < hoje ? 'VENCIDO' : 'VIGENTE');
+      const documentos = vinculos
+        .filter(v => v.rentalContractId === c.id)
+        .map(v => { const d = info(v.documentId); return d ? { vinculoId: v.id, papel: v.papel, ...d, data: iso(v.dataDocumento) ?? d.data, observacao: v.observacao ?? null } : null; })
+        .filter((x): x is NonNullable<typeof x> => !!x)
+        .sort((a, b) => String(a.data ?? '').localeCompare(String(b.data ?? '')));
+      return {
+        id: c.id, numero: c.contractNumber, imovelId: c.fixedAssetId, imovel: (c as any).fixedAsset?.internalCode ?? null,
+        locatario: c.tenantName, inicio, fim, situacao,
+        lastro: info(c.signedDocumentId), lastroRessalva: c.lastroRessalva ?? null,
+        reajuste: situacaoReajuste(c as any), // REAJ-01
+        documentos,
+      };
+    }).sort((a, b) => String(a.imovel ?? '').localeCompare(String(b.imovel ?? ''), 'pt-BR', { numeric: true }) || a.inicio.localeCompare(b.inicio));
+    const soltos = await this.prisma.document.findMany({
+      where: { companyId, deletedAt: null, type: 'CONTRATO_LOCACAO' as any, id: { notIn: [...ocupados] } },
+      select: { id: true, title: true, date: true, status: true, fileUrl: true },
+      orderBy: { date: 'desc' },
+    });
+    return {
+      contratos: lista,
+      semVinculo: soltos.map(d => ({ documentId: d.id, title: d.title, data: iso(d.date), status: String(d.status), temArquivo: !!d.fileUrl })),
+    };
+  }
+
+  // Liga um documento ao contrato com um papel. LASTRO grava o PDF assinado do contrato (so se ainda nao tiver).
+  async vincularDocumentoContrato(companyId: string, userId: string, contratoId: string, body: any) {
+    const papel = String(body?.papel ?? '').toUpperCase();
+    if (!this.PAPEIS_LOCACAO.includes(papel)) throw new BadRequestException('Papel do documento invalido.');
+    const documentId = String(body?.documentId ?? '');
+    const contrato = await this.prisma.rentalContract.findFirst({ where: { id: contratoId, companyId, deletedAt: null } });
+    if (!contrato) throw new NotFoundException('Contrato de locacao nao encontrado.');
+    const doc = await this.prisma.document.findFirst({ where: { id: documentId, companyId, deletedAt: null } });
+    if (!doc) throw new NotFoundException('Documento nao encontrado.');
+    if (papel === 'LASTRO') {
+      if (contrato.signedDocumentId && contrato.signedDocumentId !== documentId) {
+        throw new BadRequestException('O contrato ja tem o PDF assinado (lastro). Vincule este documento com outro papel.');
+      }
+      await this.prisma.rentalContract.update({ where: { id: contrato.id }, data: { signedDocumentId: documentId, updatedById: userId } });
+      return { ok: true, papel };
+    }
+    if (contrato.signedDocumentId === documentId) throw new BadRequestException('Este documento ja e o lastro do contrato.');
+    const existe = await this.prisma.rentalContractDocument.findFirst({ where: { rentalContractId: contrato.id, documentId, deletedAt: null } });
+    if (existe) throw new BadRequestException('Documento ja vinculado a este contrato.');
+    const data = body?.data ? new Date(String(body.data).slice(0, 10) + 'T00:00:00Z') : null;
+    const v = await this.prisma.rentalContractDocument.create({
+      data: {
+        companyId, rentalContractId: contrato.id, documentId, papel, dataDocumento: data,
+        observacao: body?.observacao ? String(body.observacao).slice(0, 1000) : null, createdById: userId,
+      },
+    });
+    return { ok: true, papel, vinculoId: v.id };
+  }
+
+  // Desfaz o vinculo (soft-delete); o documento continua no Arquivo Digital e volta para "sem vinculo".
+  async desvincularDocumentoContrato(companyId: string, vinculoId: string) {
+    const v = await this.prisma.rentalContractDocument.findFirst({ where: { id: vinculoId, companyId, deletedAt: null } });
+    if (!v) throw new NotFoundException('Vinculo nao encontrado.');
+    await this.prisma.rentalContractDocument.update({ where: { id: v.id }, data: { deletedAt: new Date() } });
+    return { ok: true };
   }
 
   async definirSubtipo(companyId: string, id: string, subtipo: string | null, userId: string) {

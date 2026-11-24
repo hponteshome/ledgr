@@ -49,6 +49,23 @@ export class RentalContractsController {
     return this.svc.lastro(req.companyId ?? req.headers['x-company-id'], req.user?.id ?? req.user?.sub, id, body ?? {});
   }
 
+  // REAJ-01 (24/11/2026): reajuste do aluguel - registrar (APLICADO ou DISPENSADO) e excluir o mais recente
+  @Post(':id/reajustes')
+  @RequireResourceAccess('rental-contracts', 'EDIT')
+  registrarReajuste(@Req() req: any, @Param('id') id: string, @Body() body: any) {
+    const companyId = req.headers['x-company-id'] ?? '';
+    const userId = req.user?.id ?? req.user?.sub ?? '';
+    return this.svc.registrarReajuste(companyId, userId, id, body ?? {});
+  }
+
+  @Patch(':id/reajustes/:reajusteId/excluir')
+  @RequireResourceAccess('rental-contracts', 'EDIT')
+  excluirReajuste(@Req() req: any, @Param('id') id: string, @Param('reajusteId') reajusteId: string) {
+    const companyId = req.headers['x-company-id'] ?? '';
+    const userId = req.user?.id ?? req.user?.sub ?? '';
+    return this.svc.excluirReajuste(companyId, userId, id, reajusteId);
+  }
+
   // 04/11/2026: encerramento por fim de prazo ou rescisao
   @Post(':id/encerrar')
   @RequireResourceAccess('rental-contracts', 'EDIT')

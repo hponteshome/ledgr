@@ -11,6 +11,7 @@ import { DocumentViewModal } from '../../documentos/DocumentViewModal';
 import { RentalContractFormModal } from './RentalContractFormModal';
 import { SmartDateInput } from '../../../components/SmartDateInput';
 import { EmitirNfseLocacaoModal } from './EmitirNfseLocacaoModal';
+import { ReajusteContratoSection } from './ReajusteContratoSection'; // REAJ-01
 
 const API = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3000';
 
@@ -516,21 +517,8 @@ export function RentalContractDetailModal({ contractId, title, onClose }: { cont
                             </div>
                         )}
 
-                        {contract.readjustmentIndex && (
-                            <div className="grid grid-cols-2 gap-4">
-                                <Field label="Índice de Reajuste">
-                                    <div className="text-sm text-gray-900">
-                                        {READJUSTMENT_LABELS[contract.readjustmentIndex] ?? contract.readjustmentIndex}
-                                        {contract.readjustmentIndex === 'OUTRO' && contract.readjustmentIndexOther ? ` (${contract.readjustmentIndexOther})` : ''}
-                                    </div>
-                                </Field>
-                                {contract.readjustmentPeriodMonths && (
-                                    <Field label="Periodicidade">
-                                        <div className="text-sm text-gray-900">A cada {contract.readjustmentPeriodMonths} meses</div>
-                                    </Field>
-                                )}
-                            </div>
-                        )}
+                        {/* REAJ-01: secao Reajuste sempre visivel (indice, periodicidade, data-base, pendente, historico) */}
+                        <ReajusteContratoSection contract={contract} token={token} companyId={activeCompany?.id ?? ''} onChanged={loadContract} />
 
                         {contract.contractNumber && (
                             <Field label="Nº do Contrato">

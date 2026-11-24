@@ -2757,6 +2757,49 @@ model RentalContract {
   @@map("rental_contracts")
 }
 
+/// ARQ-LOC-01 (24/11/2026): documentos ligados ao contrato de locacao (aditivo, termo, vistoria, notificacao...).
+/// O contrato assinado continua em RentalContract.signedDocumentId (lastro). Soft-delete por deletedAt.
+model RentalContractDocument {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId        String    @map("company_id") @db.Uuid
+  rentalContractId String    @map("rental_contract_id") @db.Uuid
+  documentId       String    @map("document_id") @db.Uuid
+  papel            String    @map("papel") @db.VarChar(30)
+  dataDocumento    DateTime? @map("data_documento") @db.Date
+  observacao       String?   @map("observacao") @db.Text
+  createdById      String    @map("created_by_id") @db.Uuid
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  deletedAt        DateTime? @map("deleted_at") @db.Timestamp(6)
+
+  @@index([rentalContractId])
+  @@index([documentId])
+  @@map("rental_contract_documents")
+}
+
+/// REAJ-01 (24/11/2026): historico de reajustes do aluguel (APLICADO ou DISPENSADO); soft-delete por deletedAt.
+model RentalContractReadjustment {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId         String    @map("company_id") @db.Uuid
+  rentalContractId  String    @map("rental_contract_id") @db.Uuid
+  dataBase          DateTime  @map("data_base") @db.Date
+  tipo              String    @map("tipo") @db.VarChar(12)
+  indice            String?   @map("indice") @db.VarChar(20)
+  percentual        Decimal?  @map("percentual") @db.Decimal(9, 6)
+  valorAnterior     Decimal   @map("valor_anterior") @db.Decimal(15, 2)
+  valorNovo         Decimal   @map("valor_novo") @db.Decimal(15, 2)
+  competenciaInicio String?   @map("competencia_inicio") @db.VarChar(7)
+  motivo            String?   @map("motivo") @db.Text
+  documentId        String?   @map("document_id") @db.Uuid
+  ultimoAnterior    DateTime? @map("ultimo_anterior") @db.Date
+  proximoAnterior   DateTime? @map("proximo_anterior") @db.Date
+  createdById       String    @map("created_by_id") @db.Uuid
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  deletedAt         DateTime? @map("deleted_at") @db.Timestamp(6)
+
+  @@index([rentalContractId])
+  @@map("rental_contract_readjustments")
+}
+
 // =============================================================================
 // 10 · ECF (ESCRITURAÇÃO CONTÁBIL FISCAL)
 // =============================================================================
