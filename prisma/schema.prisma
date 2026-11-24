@@ -2891,6 +2891,7 @@ enum BankTxDestination {
   DIRECT_ENTRY
   ALREADY_POSTED
   IGNORE
+  INVEST_REDEMPTION // EXTINV-01: resgate de aplicacao de renda fixa (ficha da carteira)
 }
 
 model BankAccount {
@@ -2994,6 +2995,10 @@ model BankTransaction {
   bankHistCode         String?            @map("bank_hist_code") @db.VarChar(10)
   destination          BankTxDestination? @map("destination")
   ignoreReason         String?            @map("ignore_reason") @db.VarChar(255)
+  // NOVO 23/11/2026 (EXTINV-01): resgate de investimento (ficha da Renda Fixa)
+  investmentId         String?            @map("investment_id") @db.Uuid
+  investSplit          Json?              @map("invest_split")
+  fixedIncomeEventId   String?            @map("fixed_income_event_id") @db.Uuid
   deletedAt            DateTime?          @map("deleted_at") @db.Timestamp(6)
   createdAt            DateTime         @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt            DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamp(6)

@@ -1,4 +1,5 @@
 import { SidebarPermissionsModule } from '../sidebar-permissions/sidebar-permissions.module';
+import { FixedIncomeModule } from '../accounting/fixed-income/fixed-income.module'; // EXTINV-01
 // ============================================================
 // LEDGR — apps/api/src/modules/finance/bank-import.module.ts
 // FIX: Remove MulterModule — storage definido direto no interceptor
@@ -16,7 +17,7 @@ import { BankReconciliationController } from './bank-reconciliation.controller';
 import { BankReconciliationService } from './bank-reconciliation.service'; // EXTBB-10A
 
 @Module({
-  imports: [SidebarPermissionsModule, PrismaModule, AccountingModule], // EXTBB-10A: a Contabil nao importa o Financeiro (sem ciclo)
+  imports: [FixedIncomeModule, SidebarPermissionsModule, PrismaModule, AccountingModule], // EXTBB-10A: a Contabil nao importa o Financeiro (sem ciclo)
   controllers: [BankImportController, BankAccountsController, BankReconciliationController],
   providers: [BankImportService, BankParserService, SuggestionService, BankAccountsService, BankReconciliationService],
   exports: [BankImportService, SuggestionService, BankAccountsService],

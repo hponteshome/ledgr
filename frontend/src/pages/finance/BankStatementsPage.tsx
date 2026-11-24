@@ -8,6 +8,7 @@ import Swal from 'sweetalert2';
 import toast from 'react-hot-toast';
 import api from '../../services/api';
 import { AccountPicker, PickerAccount } from '../../components/finance/AccountPicker';
+import { InvestRedemptionModal } from '../../components/finance/InvestRedemptionModal'; // EXTINV-02
 import { useSidebarPermissions } from '../../contexts/SidebarPermissionsContext';
 import { DEFAULT_LEVELS, formatAccountCode, parseMaskLevels } from '../../utils/accountMask';
 
@@ -25,6 +26,9 @@ interface Line {
   account: Acc | null;
   suggestion: { account: Acc | null; source: string | null; confidence: number | null; memo: string | null } | null;
   journalEntry: Entry | null; possibleMatch: Entry | null;
+  // EXTINV-02: resgate de investimento
+  invest?: { investmentId: string; cdb: string | null; tipo: string | null; split: any; eventId: string | null } | null;
+  investHint?: { investmentId: string | null; cdb: string | null; porDocumento: boolean } | null;
 }
 interface StatementInfo {
   id: string; fileName: string; layout: string | null; status: string; bankName: string; agency: string | null; account: string | null;
@@ -32,8 +36,9 @@ interface StatementInfo {
   bankAccount: { id: string; nickname: string | null; ledgerAccount: Acc | null; investmentAccount: Acc | null } | null;
 }
 interface Preview {
-  counts: { gerar: number; conciliar: number; ignorar: number; pendentes: number; total: number };
-  entries: { lineId: string; lineNo: number | null; date: string; description: string; value: number; debit: Acc | null; credit: Acc | null }[];
+  counts: { gerar: number; investir?: number; conciliar: number; ignorar: number; pendentes: number; total: number };
+  entries: { lineId: string; lineNo: number | null; date: string; description: string; value: number; debit: Acc | null; credit: Acc | null;
+    partidas?: { tipo: 'D' | 'C'; conta: Acc | null; valor: number }[]; resgate?: any }[]; // EXTINV-02
   saldo: { ate: string; contabilAntes: number | null; efeito: number; contabilDepois: number | null; extratoFinal: number | null; diferenca: number | null };
   avisos: string[];
 }
@@ -99,6 +104,7 @@ export default function BankStatementsPage() {
   const [busy, setBusy] = useState(false);
   // etapa 3
   const [preview, setPreview] = useState<Preview | null>(null);
+  const [resgateLinha, setResgateLinha] = useState<string | null>(null); // EXTINV-02
 
   const fmtAcc = (a?: Acc | null) => (a ? `${formatAccountCode(a.code, levels)}${a.reducedCode ? ` (${a.reducedCode})` : ''} - ${a.name}` : '-');
 
@@ -252,6 +258,14 @@ export default function BankStatementsPage() {
     if (await patch(selIds(), { destination: null }, 'Linha(s) de volta a pendente.')) await depois();
   };
 
+  // EXTINV-02: resgate de investimento (uma linha de entrada por vez)
+  const resgateInvestimento = () => {
+    const sel = lines.filter(l => selected.has(l.id) && !TRAVADAS.includes(l.status));
+    if (sel.length !== 1) { toast.error('Selecione uma linha de resgate por vez.'); return; }
+    if (sel[0].type !== 'CREDIT') { toast.error('Resgate de investimento só para entradas no extrato.'); return; }
+    setResgateLinha(sel[0].id);
+  };
+
   // ── Etapa 3: contabilizar ──────────────────────────────────────────────────
   const irEtapa3 = async () => { if (!current) return; await loadPreview(current); setStep(3); };
   const gerar = async () => {
@@ -286,12 +300,14 @@ export default function BankStatementsPage() {
     if (l.status === 'CLASSIFIED') {
       if (l.destination === 'DIRECT_ENTRY') return <span><span style={chip(FIN_LIGHT, FIN)}>Lançar</span> <span style={{ fontSize: 11 }}>{fmtAcc(l.account)}</span></span>;
       if (l.destination === 'ALREADY_POSTED') return <span style={chip('#EFF6FF', '#1D4ED8')}>Já contabilizado</span>;
+      if (l.destination === 'INVEST_REDEMPTION') return <span><span style={chip('#F5F3FF', '#6D28D9')}>Resgate</span> <span style={{ fontSize: 11 }}>{l.invest?.tipo ?? ''} {l.invest?.cdb ?? ''} · principal {brl(l.invest?.split?.principal)} · rend. {brl(l.invest?.split?.rendimentoBruto)} · IR {brl(l.invest?.split?.ir)}</span></span>;
       if (l.destination === 'IGNORE') return <span style={chip('#F3F4F6', '#6B7280')} title={l.ignoreReason ?? ''}>Ignorar</span>;
     }
     return (
       <span>
         <span style={chip('#FEFCE8', '#854D0E')}>Pendente</span>
         {l.possibleMatch && <span style={{ ...chip('#EFF6FF', '#1D4ED8'), marginLeft: 4 }} title={`${dmy(l.possibleMatch.date)} - ${l.possibleMatch.description}`}>lançamento existente encontrado</span>}
+        {l.investHint && <span style={{ ...chip('#F5F3FF', '#6D28D9'), marginLeft: 4 }}>{l.investHint.porDocumento ? `resgate de ${l.investHint.cdb}` : 'resgate de aplicação'}</span>}
       </span>
     );
   };
@@ -440,6 +456,7 @@ export default function BankStatementsPage() {
               <button disabled={!podeEditar || busy} onClick={lancarEm} style={btn(true, !podeEditar || busy)}>Lançar na conta escolhida</button>
               <button disabled={!podeEditar || busy} onClick={jaContabilizado} style={btn(false, !podeEditar || busy)}>Já contabilizado</button>
               <button disabled={!podeEditar || busy} onClick={ignorar} style={btn(false, !podeEditar || busy)}>Ignorar...</button>
+              <button disabled={!podeEditar || busy} onClick={resgateInvestimento} style={btn(false, !podeEditar || busy)}>Resgate de investimento...</button>
               <button disabled={!podeEditar || busy} onClick={voltarPendente} style={btn(false, !podeEditar || busy)}>Voltar a pendente</button>
               <button onClick={irEtapa3} style={{ ...btn(true), marginLeft: 'auto' }}>Ir para Contabilizar</button>
             </div>
@@ -497,8 +514,8 @@ export default function BankStatementsPage() {
                   <tr key={e.lineId} style={{ borderTop: '0.5px solid #F0F0F0' }}>
                     <td style={{ ...td, color: '#9CA3AF' }}>{e.lineNo ?? '-'}</td>
                     <td style={{ ...td, whiteSpace: 'nowrap' }}>{dmy(e.date)}</td>
-                    <td style={td}>{fmtAcc(e.debit)}</td>
-                    <td style={td}>{fmtAcc(e.credit)}</td>
+                    <td style={td}>{e.partidas ? e.partidas.filter(p => p.tipo === 'D').map((p, i) => <div key={i}>{fmtAcc(p.conta)} <span style={{ color: '#6B7280' }}>{brl(p.valor)}</span></div>) : fmtAcc(e.debit)}</td>
+                    <td style={td}>{e.partidas ? e.partidas.filter(p => p.tipo === 'C').map((p, i) => <div key={i}>{fmtAcc(p.conta)} <span style={{ color: '#6B7280' }}>{brl(p.valor)}</span></div>) : fmtAcc(e.credit)}</td>
                     <td style={{ ...td, textAlign: 'right' }}>{brl(e.value)}</td>
                     <td style={td}>{e.description}</td>
                   </tr>
@@ -514,6 +531,13 @@ export default function BankStatementsPage() {
             </button>
           </div>
         </>
+      )}
+
+      {/* EXTINV-02: resgate de investimento */}
+      {resgateLinha && current && (
+        <InvestRedemptionModal statementId={current} lineId={resgateLinha}
+          onClose={() => setResgateLinha(null)}
+          onSaved={async () => { setResgateLinha(null); toast.success('Resgate definido para a linha.'); await depois(); }} />
       )}
     </div>
   );

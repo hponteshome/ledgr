@@ -26,6 +26,12 @@ export class BankReconciliationController {
     return this.service.setLines(req.companyId, id, dto, req.user.id);
   }
 
+  // EXTINV-01: aplicacoes candidatas (com a divisao calculada) para um resgate do extrato
+  @Get(':id/lines/:lineId/invest-options')
+  investOptions(@Param('id') id: string, @Param('lineId') lineId: string, @Req() req: any) {
+    return this.service.investOptions(req.companyId, id, lineId);
+  }
+
   @Get(':id/preview')
   preview(@Param('id') id: string, @Req() req: any) {
     return this.service.preview(req.companyId, id);
