@@ -484,6 +484,7 @@ export default function RendaFixaPage() {
   const [historicalRates, setHistoricalRates] = useState<HistoricalRate[]>([]);
   const [redemptions,     setRedemptions]     = useState<Redemption[]>([]);
   const [projRate,        setProjRate]        = useState(0.95);
+  const projEditado = React.useRef(false); // RF-PROJ-03: CDI projetado editado pelo usuario
   const [loading,         setLoading]         = useState(false);
   const [summary,         setSummary]         = useState<any>(null);
   const [holidays,        setHolidays]        = useState<Set<string>>(new Set());
@@ -522,6 +523,10 @@ export default function RendaFixaPage() {
       }));
       setInvestments(invs);
       setHistoricalRates(rates);
+      // RF-PROJ-03: CDI projetado = media dos ultimos 12 meses fechados (o mes corrente e parcial)
+      const compAtual = new Date().toISOString().slice(0, 7);
+      const ult = rates.filter((r: any) => r.competence < compAtual).sort((a: any, b: any) => b.competence.localeCompare(a.competence)).slice(0, 12);
+      if (ult.length && !projEditado.current) setProjRate(Math.round(ult.reduce((s: number, r: any) => s + Number(r.rate), 0) / ult.length * 10000) / 100);
       if (invs.length && !selected) setSelected(invs[0]);
       const sumR = await api.get('/accounting/fixed-income/summary');
       setSummary(sumR.data);
@@ -589,6 +594,7 @@ export default function RendaFixaPage() {
     const totPrinc = redemptions.reduce((s, r) => s + Number(r.redemptionPrincipal ?? 0), 0);
     return {
       capitalInicial: Number(selected.capitalInitial),
+      capitalRestante: last.capitalBalance, // RF-PROJ-03
       rendBruto: last.accumulatedYield,
       irrfTotal: last.irrfOnRedemption,
       saldoLiq: last.netBalance,
@@ -768,9 +774,9 @@ export default function RendaFixaPage() {
                 <span style={S.pill(selected.status)}>{selected.status}</span>
                 <span style={{fontSize:11, color:'var(--color-text-secondary)'}}>{selected.indexerRate}% CDI{selected.irrfExempt?' · Isento IRRF':' · IRRF aplicavel'}</span>
                 <div style={{marginLeft:'auto', display:'flex', gap:6, alignItems:'center'}}>
-                  <span style={{fontSize:11, color:'var(--color-text-secondary)'}}>CDI proj.(%/mes)</span>
+                  <span style={{fontSize:11, color:'var(--color-text-secondary)'}}>CDI proj. (% a.m., média 12 meses)</span>
                   <input style={{...S.input, width:64, textAlign:'right' as const}} type='number' min={0} max={5} step={0.01}
-                    value={projRate} onChange={e=>setProjRate(parseFloat(e.target.value)||0.95)}/>
+                    value={projRate} onChange={e=>{ projEditado.current = true; setProjRate(parseFloat(e.target.value)||0.95); }}/>
                   <button style={S.btnP} onClick={()=>setShowResgate(true)}>+ Novo Resgate</button>
                 </div>
               </div>
@@ -778,7 +784,7 @@ export default function RendaFixaPage() {
               {kpis && (
                 <div style={S.kpiGrid}>
                   <div style={S.kpi}><div style={S.kpiLbl}>Capital inicial</div><div style={S.kpiVal}>R$ {fmtBRL(kpis.capitalInicial)}</div><div style={S.kpiSub}>Aplicado em {fmtDate(selected.applicationDate)}</div></div>
-                  <div style={S.kpi}><div style={S.kpiLbl}>Rendimento bruto proj.</div><div style={S.kpiVal}>R$ {fmtBRL(kpis.rendBruto)}</div><div style={S.kpiSub}>{((kpis.rendBruto/kpis.capitalInicial)*100).toFixed(2)}% sobre capital</div></div>
+                  <div style={S.kpi}><div style={S.kpiLbl}>Rendimento bruto proj.</div><div style={S.kpiVal}>R$ {fmtBRL(kpis.rendBruto)}</div><div style={S.kpiSub}>{(kpis.capitalRestante > 0 ? (kpis.rendBruto/kpis.capitalRestante)*100 : 0).toFixed(2)}% sobre capital restante</div></div>
                   <div style={S.kpi}><div style={S.kpiLbl}>IRRF estimado</div><div style={{...S.kpiVal,...S.neg}}>{selected.irrfExempt?'--':'R$ '+fmtBRL(kpis.irrfTotal)}</div><div style={S.kpiSub}>{selected.irrfExempt?'Isento':(kpis.aliqFinal*100).toFixed(1)+'% ('+kpis.diasFinal+'d)'}</div></div>
                   <div style={S.kpi}><div style={S.kpiLbl}>Saldo liquido final</div><div style={S.kpiVal}>R$ {fmtBRL(kpis.saldoLiq)}</div><div style={S.kpiSub}>Vencto {fmtDate(selected.maturityDate)}</div></div>
                   <div style={S.kpi}><div style={S.kpiLbl}>Saldo de capital</div><div style={{...S.kpiVal,color:'#0369A1'}}>R$ {fmtBRL(projection.length ? projection[projection.length-1].capitalBalance : Number(selected.capitalBalance ?? selected.capitalInitial))}</div><div style={S.kpiSub}>Principal restante</div></div>
