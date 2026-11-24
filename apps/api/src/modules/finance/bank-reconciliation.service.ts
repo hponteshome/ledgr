@@ -138,8 +138,35 @@ export class BankReconciliationService {
   }
 
   // ── Linhas do extrato ──────────────────────────────────────────────────────
+  // REGRA-01: recalcula a sugestao (regra aprendida/fixa/similar) das linhas pendentes e sem destino.
+  // Nao mexe em sugestao por documento ou aplicacao automatica, nem em linha de resgate; so grava quando ha conta.
+  private async refreshSuggestions(companyId: string, statementId?: string) {
+    const abertas = await this.prisma.bankTransaction.findMany({
+      where: {
+        companyId, deletedAt: null, destination: null, status: 'PENDING' as any,
+        ...(statementId ? { statementId } : {}),
+        OR: [{ suggestionSource: null }, { suggestionSource: { in: ['FIXED', 'LEARNED', 'FUZZY'] } }],
+      },
+      select: { id: true, type: true, description: true, descriptionNorm: true, suggestedAccountId: true, suggestionSource: true, suggestionConfidence: true },
+    });
+    const alvo = abertas.filter(l => !ehResgateAplicacao(l));
+    if (!alvo.length) return 0;
+    const res = await this.suggestion.suggestBatch(companyId, alvo.map(l => ({ descriptionNorm: l.descriptionNorm, type: l.type as any })));
+    let n = 0;
+    for (let i = 0; i < alvo.length; i++) {
+      const r = res[i];
+      const l = alvo[i];
+      if (!r?.accountId) continue;
+      if (r.accountId === l.suggestedAccountId && r.source === l.suggestionSource && r.confidence === l.suggestionConfidence) continue;
+      await this.prisma.bankTransaction.update({ where: { id: l.id }, data: { suggestedAccountId: r.accountId, suggestionSource: r.source, suggestionConfidence: r.confidence } });
+      n++;
+    }
+    return n;
+  }
+
   async getLines(companyId: string, statementId: string) {
     const stmt = await this.loadStatement(companyId, statementId);
+    await this.refreshSuggestions(companyId, statementId); // REGRA-01
     const lines = await this.loadLines(statementId);
     const accIds = [...new Set(lines.flatMap(l => [l.accountId, l.suggestedAccountId]).filter(Boolean))] as string[];
     const accs = accIds.length ? await this.prisma.chartOfAccounts.findMany({ where: { id: { in: accIds } }, select: ACC }) : [];
@@ -266,6 +293,7 @@ export class BankReconciliationService {
           vistos.add(k);
           await this.suggestion.learn(companyId, l.descriptionNorm, l.type as any, dto.accountId, memo || l.memo || l.description, userId, stmt.bankCode as any);
         }
+        await this.refreshSuggestions(companyId); // REGRA-01: regra nova vale para os extratos abertos
       }
     } else if (d === 'ALREADY_POSTED') {
       const ledgerId = stmt.bankAccount?.ledgerAccountId ?? null;

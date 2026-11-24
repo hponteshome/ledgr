@@ -50,6 +50,7 @@ function buildProjection(inv: Investment, rates: HistoricalRate[], projRate: num
   const pct = inv.indexerRate / 100, proj = projRate / 100;
   const lines: ProjectionLine[] = [];
   let saldoBruto = Number(inv.capitalInitial), rendAcum = 0, capitalBalance = Number(inv.capitalInitial);
+  let fatorAcum = 1; // RF-PROJ-02: fator acumulado do indexador desde a aplicacao
   let cursor = new Date(appDate.getFullYear(), appDate.getMonth(), 1);
   // Calcular fator de proporcao do primeiro mes (dias uteis da aplicacao ate fim do mes)
   const firstMonthFactor = (() => {
@@ -78,8 +79,10 @@ function buildProjection(inv: Investment, rates: HistoricalRate[], projRate: num
     const isProjected = !hist, rawRate = hist ? hist.rate : proj;
     const fator = isFirstMonth ? firstMonthFactor : 1;
     isFirstMonth = false;
-    const indice = rawRate * pct * fator, rendMes = saldoBruto * indice;
-    saldoBruto += rendMes; rendAcum += rendMes;
+    // RF-PROJ-02: pos-fixado = capital restante x fator acumulado (independe do historico de resgates)
+    const indice = rawRate * pct * fator, rendMes = capitalBalance * fatorAcum * indice;
+    fatorAcum *= (1 + indice);
+    saldoBruto = capitalBalance * fatorAcum; rendAcum = saldoBruto - capitalBalance;
     const dias = daysBetween(appDate, fimMes);
     const aliq = inv.irrfExempt ? 0 : irrfAliq(dias);
     lines.push({competence:comp, calendarDays:dias, indexerRate:indice,
@@ -92,18 +95,9 @@ function buildProjection(inv: Investment, rates: HistoricalRate[], projRate: num
       return d.getFullYear()===yyyy && d.getMonth()+1===mm;
     });
     for (const resg of resgMes) {
-      const brutoResg = Number(resg.redemptionPrincipal ?? 0) + Number(resg.redemptionYield ?? 0);
-      const rendResg = Number(resg.redemptionYield ?? 0);
-      const princResg = Number(resg.redemptionPrincipal ?? 0);
-      saldoBruto = Math.max(0, saldoBruto - brutoResg);
-      rendAcum = Math.max(0, rendAcum - rendResg);
-      capitalBalance = Math.max(0, capitalBalance - princResg);
+      capitalBalance = Math.max(0, capitalBalance - Number(resg.redemptionPrincipal ?? 0));
     }
-    // Se saldoBruto zerou mas ainda ha capital, reinicar com capitalBalance
-    if (saldoBruto < 0.01 && capitalBalance > 0.01) {
-      saldoBruto = capitalBalance;
-      rendAcum = 0;
-    }
+    saldoBruto = capitalBalance * fatorAcum; rendAcum = saldoBruto - capitalBalance; // RF-PROJ-02: resgate so reduz o capital
     cursor.setMonth(cursor.getMonth() + 1);
     if (lines.length > 400) break;
   }
@@ -570,9 +564,9 @@ export default function RendaFixaPage() {
 
   // Projecao de todos os investimentos para totalizacao na lista
   const allProjections = useMemo(() => {
-    const map: Record<string, {rendBruto:number; irrf:number; saldoLiq:number; capitalBalance:number}> = {};
+    const map: Record<string, {rendBruto:number; irrf:number; saldoLiq:number; capitalBalance:number; saldoBruto:number}> = {};
     for (const inv of investments) {
-      const proj = buildProjection(inv, historicalRates, projRate, [], holidays);
+      const proj = buildProjection(inv, historicalRates, projRate, (inv as any).redemptions ?? [], holidays); // RF-PROJ-01: com os resgates da ficha
       const filtered = filterDate ? proj.filter(l => l.competence <= filterDate) : proj;
       if (filtered.length) {
         const last = filtered[filtered.length - 1];
@@ -581,6 +575,7 @@ export default function RendaFixaPage() {
           irrf: last.irrfOnRedemption,
           saldoLiq: last.netBalance,
           capitalBalance: last.capitalBalance,
+          saldoBruto: last.grossBalance,
         };
       }
     }
@@ -709,13 +704,13 @@ export default function RendaFixaPage() {
             <table style={{width:'100%', borderCollapse:'collapse', minWidth:860}}>
               <thead><tr>
                 <th style={S.thL}>Descricao</th><th style={S.thL}>Tipo</th><th style={S.thL}>Emissor</th><th style={S.thL}>Indexador</th>
-                <th style={S.th}>Capital inicial</th><th style={S.th}>Saldo capital</th><th style={S.th}>Rend. bruto</th><th style={S.th}>IRRF est.</th><th style={S.th}>Saldo liquido</th>
+                <th style={S.th}>Capital inicial</th><th style={S.th}>Saldo capital</th><th style={S.th}>Rend. bruto</th><th style={S.th}>Saldo bruto</th><th style={S.th}>IRRF est.</th><th style={S.th}>Saldo liquido</th>
                 <th style={S.th}>Aplicacao</th><th style={S.th}>Vencimento</th>
                 <th style={S.thL}>Status</th><th style={S.th}>Acoes</th>
               </tr></thead>
               <tbody>
                 {investments.length === 0
-                  ? <tr><td colSpan={13} style={{...S.tdL, textAlign:'center' as const, color:'var(--color-text-secondary)', fontStyle:'italic', padding:'32px'}}>Nenhum investimento cadastrado.</td></tr>
+                  ? <tr><td colSpan={14} style={{...S.tdL, textAlign:'center' as const, color:'var(--color-text-secondary)', fontStyle:'italic', padding:'32px'}}>Nenhum investimento cadastrado.</td></tr>
                   : investments.map(inv => (
                     <tr key={inv.id}
                       style={{background: selected?.id===inv.id ? '#EFF6FF' : 'transparent', cursor:'pointer'}}
@@ -730,6 +725,7 @@ export default function RendaFixaPage() {
                         const p = allProjections[inv.id];
                         return (<>
                           <td style={S.td}>{p ? 'R$ '+fmtBRL(p.rendBruto) : '--'}</td>
+                          <td style={S.td}>{p ? 'R$ '+fmtBRL(p.saldoBruto) : '--'}</td>
                           <td style={{...S.td,...S.neg}}>{p ? (inv.irrfExempt?'Isento':'R$ '+fmtBRL(p.irrf)) : '--'}</td>
                           <td style={S.td}>{p ? 'R$ '+fmtBRL(p.saldoLiq) : '--'}</td>
                         </>);
@@ -755,6 +751,7 @@ export default function RendaFixaPage() {
                     <td style={{...S.td,fontWeight:700}}>R$ {fmtBRL(listKpis.capitalTotal)}</td>
                     <td style={{...S.td,fontWeight:700,color:'#0369A1'}}>R$ {fmtBRL(investments.filter(i=>i.status==='ATIVO').reduce((s,i)=>s+Number(i.capitalBalance??i.capitalInitial),0))}</td>
                     <td style={{...S.td,fontWeight:700}}>R$ {fmtBRL(Object.values(allProjections).reduce((s,p)=>s+p.rendBruto,0))}</td>
+                    <td style={{...S.td,fontWeight:700}}>R$ {fmtBRL(Object.values(allProjections).reduce((s,p)=>s+p.saldoBruto,0))}</td>
                     <td style={{...S.td,fontWeight:700,color:'#DC2626'}}>R$ {fmtBRL(Object.values(allProjections).reduce((s,p)=>s+p.irrf,0))}</td>
                     <td style={{...S.td,fontWeight:700}}>R$ {fmtBRL(Object.values(allProjections).reduce((s,p)=>s+p.saldoLiq,0))}</td>
                     <td colSpan={4}></td>

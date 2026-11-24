@@ -60,11 +60,19 @@ export class FixedIncomeService {
   // ═══════════════════════════════════════════════════════════════════════════
 
   async findAll(companyId: string) {
-    return this.prisma.fixedIncomeInvestment.findMany({
+    const invs = await this.prisma.fixedIncomeInvestment.findMany({
       where: { companyId, deletedAt: null },
       include: { events: { orderBy: { eventDate: 'desc' }, take: 1 } },
       orderBy: { applicationDate: 'desc' },
     });
+    // RF-PROJ-01: resgates de cada ficha, para a projecao da carteira partir do saldo real
+    const ids = invs.map(i => i.id);
+    const resg = ids.length ? await this.prisma.fixedIncomeEvent.findMany({
+      where: { investmentId: { in: ids }, eventType: { in: ['RESGATE_ANTECIPADO', 'RESGATE_VENCIMENTO'] as any } },
+      select: { id: true, investmentId: true, eventDate: true, eventType: true, redemptionPrincipal: true, redemptionYield: true, grossAmount: true, irrfAmount: true, netAmount: true, balanceAfter: true },
+      orderBy: { eventDate: 'asc' },
+    }) : [];
+    return invs.map(i => ({ ...i, redemptions: resg.filter(r => r.investmentId === i.id) }));
   }
 
   async findOne(id: string, companyId: string) {

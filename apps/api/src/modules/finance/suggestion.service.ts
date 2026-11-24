@@ -179,11 +179,15 @@ export class SuggestionService {
     type:      'DEBIT' | 'CREDIT',
     rules:     any[],
   ): SuggestionResult | null {
-    // Filtra por tipo e ordena por usageCount
-    const candidates = rules.filter(r =>
-      (!r.type || r.type === type) &&
-      descNorm.includes(r.textPattern),
-    );
+    // REGRA-01: compara o texto limpo dos dois lados (sem CPF/CNPJ, documento, data, hora, banco/agencia);
+    // a regra mais especifica (padrao mais longo) vence, depois a mais usada
+    const alvo = this.limpar(descNorm);
+    const candidates = rules
+      .filter(r => (!r.type || r.type === type) && r.accountId)
+      .map(r => ({ r, p: this.limpar(r.textPattern) }))
+      .filter(x => x.p.length >= 6 && alvo.includes(x.p))
+      .sort((a, b) => b.p.length - a.p.length || (b.r.usageCount ?? 0) - (a.r.usageCount ?? 0))
+      .map(x => x.r);
     if (candidates.length === 0) return null;
 
     const best = candidates[0]; // já ordenado por usageCount desc
@@ -247,14 +251,18 @@ export class SuggestionService {
   }
 
   // ── Extrai padrão representativo do texto normalizado ────────
+  // REGRA-01: texto limpo - tira numeros longos (CPF/CNPJ/documento) e tokens so numericos (data, hora, banco, agencia, valor)
+  private limpar(descNorm: string): string {
+    return String(descNorm ?? '')
+      .replace(/\d{5,}/g, ' ')
+      .split(/\s+/)
+      .filter(t => t && !/^[\d\/\.:,\-]+$/.test(t))
+      .join(' ')
+      .trim();
+  }
+
   private extractPattern(descNorm: string): string {
-    // Remove datas, valores, números de documentos longos
-    return descNorm
-      .replace(/\d{5,}/g, '')   // remove números longos (doc, CPF, etc.)
-      .replace(/\d{2}\/\d{2}/, '') // remove datas
-      .replace(/\s+/g, ' ')
-      .trim()
-      .slice(0, 60);             // limita o padrão a 60 chars
+    return this.limpar(descNorm).slice(0, 60);
   }
 
   // ── Retorna categoria/memo da regra fixa para log ────────────
